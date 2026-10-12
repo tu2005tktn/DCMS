@@ -4,7 +4,9 @@ public sealed class AuthSession
 {
     public Guid Id { get; set; }
     public int AccountId { get; set; }
+    public string DeviceLabel { get; set; } = "";
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset ExpiresAt { get; set; }
+    public DateTimeOffset LastSeenAt { get; set; }
     public DateTimeOffset? RevokedAt { get; set; }
 }

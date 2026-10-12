@@ -98,6 +98,54 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.ToTable("EMPLOYEE_PROFILE", (string)null);
                 });
 
+            modelBuilder.Entity("DCMS.Domain.Features.Authentication.AuthRefreshToken", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("AccountId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("IssuedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("ReplacedById")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("SessionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AccountId");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.HasIndex("SessionId", "Status");
+
+                    b.ToTable("AUTH_REFRESH_TOKEN", (string)null);
+                });
+
             modelBuilder.Entity("DCMS.Domain.Features.Authentication.AuthSession", b =>
                 {
                     b.Property<Guid>("Id")
@@ -110,7 +158,15 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("DeviceLabel")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
                     b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("LastSeenAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTimeOffset?>("RevokedAt")
@@ -365,6 +421,21 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasOne("DCMS.Infrastructure.Features.Accounts.ApplicationUser", null)
                         .WithOne()
                         .HasForeignKey("DCMS.Domain.Features.Accounts.EmployeeProfile", "AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Authentication.AuthRefreshToken", b =>
+                {
+                    b.HasOne("DCMS.Infrastructure.Features.Accounts.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DCMS.Domain.Features.Authentication.AuthSession", null)
+                        .WithMany()
+                        .HasForeignKey("SessionId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

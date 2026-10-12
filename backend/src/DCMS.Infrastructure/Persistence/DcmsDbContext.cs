@@ -8,10 +8,11 @@ using DCMS.Domain.Features.Authentication;
 namespace DCMS.Infrastructure.Persistence;
 
 public sealed class DcmsDbContext(DbContextOptions<DcmsDbContext> options)
-    : IdentityDbContext<ApplicationUser, IdentityRole<int>, int>(options)
+: IdentityDbContext<ApplicationUser, IdentityRole<int>, int>(options)
 {
     public DbSet<EmployeeProfile> Employees => Set<EmployeeProfile>();
     public DbSet<AuthSession> AuthSessions => Set<AuthSession>();
+    public DbSet<AuthRefreshToken> AuthRefreshTokens => Set<AuthRefreshToken>();
     public DbSet<AccountAudit> AccountAudits => Set<AccountAudit>();
 
     protected override void OnModelCreating(ModelBuilder model)
@@ -39,8 +40,20 @@ public sealed class DcmsDbContext(DbContextOptions<DcmsDbContext> options)
         model.Entity<AuthSession>(b =>
         {
             b.ToTable("AUTH_SESSION");
+            b.Property(x => x.DeviceLabel).HasMaxLength(120);
             b.HasIndex(x => new { x.AccountId, x.RevokedAt });
             b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.AccountId).OnDelete(DeleteBehavior.Restrict);
+        });
+        model.Entity<AuthRefreshToken>(b =>
+        {
+            b.ToTable("AUTH_REFRESH_TOKEN");
+            b.Property(x => x.TokenHash).HasMaxLength(64);
+            b.Property(x => x.Status).HasMaxLength(16);
+            // Chỉ có một ACTIVE refresh per session; lookup nhanh theo hash để xác thực rotation.
+            b.HasIndex(x => x.TokenHash).IsUnique();
+            b.HasIndex(x => new { x.SessionId, x.Status });
+            b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.AccountId).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<AuthSession>().WithMany().HasForeignKey(x => x.SessionId).OnDelete(DeleteBehavior.Restrict);
         });
         model.Entity<AccountAudit>(b =>
         {
