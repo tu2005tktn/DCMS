@@ -143,6 +143,26 @@ public sealed class FakeContactDeliveryAdapter : IContactDeliveryAdapter
     public void Reset() { lock (gate) { lastProof.Clear(); SendCount = 0; } }
 }
 
+public sealed record DevelopmentProofResponse(int AccountId, string Proof);
+
+/// <summary>
+/// Adapter that records every attempt, used to show the development adapter is not reachable
+/// outside Development.
+/// </summary>
+public sealed class RefusedAdapter : IContactDeliveryAdapter
+{
+    public static List<string> Attempts { get; } = [];
+    public RecoveryChannel DetectChannel(string? contact) => RecoveryChannel.Unknown;
+    public bool IsValid(string? contact) => false;
+    public string Normalize(string? contact) => "";
+    public Task<bool> SendRecoveryAsync(int accountId, RecoveryChannel channel, string destination,
+        string proof, string resetLink, CancellationToken ct)
+    {
+        lock (Attempts) { Attempts.Add($"{accountId}:{destination}"); }
+        return Task.FromResult(true);
+    }
+}
+
 public sealed class AccountApiTests(ApiFixture fixture) : IClassFixture<ApiFixture>
 {
     private async Task<(HttpClient Client, SignInResponse Session)> Login(string name = "admin.demo")

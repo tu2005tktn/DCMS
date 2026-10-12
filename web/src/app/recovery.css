@@ -1,0 +1,98 @@
+:root {
+  --recovery-motion: cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+/* Recovery flow (S03): card transitions between the four steps. */
+.recovery-shell {
+  width: min(100%, 460px);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.recovery-card {
+  border-radius: 14px;
+  box-shadow: 0 18px 48px rgba(23, 43, 77, 0.1);
+  border: 1px solid rgba(23, 43, 77, 0.08);
+}
+
+.recovery-card .ant-card-body {
+  padding: 26px 26px 22px;
+}
+
+.recovery-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 4px;
+  list-style: none;
+  padding: 0;
+}
+
+.recovery-step-item {
+  flex: 1;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(23, 43, 77, 0.12);
+}
+
+.recovery-step-item[data-state='done'] {
+  background: #175cd3;
+}
+
+.recovery-step-item[data-state='current'] {
+  background: linear-gradient(90deg, #175cd3, rgba(23, 92, 211, 0.35));
+}
+
+.recovery-neutral {
+  background: #f0f6ff;
+  border: 1px solid #b6d4fe;
+  color: #0b3a86;
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.recovery-hint {
+  color: #475467;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.recovery-policy {
+  margin: 0 0 14px;
+  padding-left: 18px;
+  color: #475467;
+  font-size: 13px;
+}
+
+.recovery-resend {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.recovery-fade-in {
+  animation: recovery-fade-in 280ms var(--recovery-motion);
+}
+
+@keyframes recovery-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .recovery-fade-in {
+    animation: none;
+  }
+}

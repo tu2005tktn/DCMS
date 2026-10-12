@@ -18,6 +18,9 @@ public sealed partial class DevelopmentContactDeliveryAdapter(
     IHostEnvironment environment,
     ILogger<DevelopmentContactDeliveryAdapter> logger) : IContactDeliveryAdapter
 {
+    private readonly Lock gate = new();
+    private readonly Dictionary<int, string> delivered = [];
+
     public RecoveryChannel DetectChannel(string? contact)
     {
         if (string.IsNullOrWhiteSpace(contact)) return RecoveryChannel.Unknown;
@@ -36,12 +39,32 @@ public sealed partial class DevelopmentContactDeliveryAdapter(
         return DetectChannel(value) == RecoveryChannel.Email ? value.ToLowerInvariant() : value;
     }
 
+    /// <summary>
+    /// Last proof handed to this account, kept in process memory for Development only.
+    ///
+    /// This is a local developer aid so the recovery flow can actually be completed without a real
+    /// mail provider: the proof is never written to the database, the outbox, the logs or any audit
+    /// entry. It is reachable only through the Development-only endpoint that is registered next to
+    /// this adapter, and the adapter itself is not registered outside Development.
+    /// </summary>
+    public string? TryGetProof(int accountId)
+    {
+        lock (gate) { return delivered.TryGetValue(accountId, out var proof) ? proof : null; }
+    }
+
+    public void Forget(int accountId)
+    {
+        lock (gate) { delivered.Remove(accountId); }
+    }
+
     public async Task<bool> SendRecoveryAsync(int accountId, RecoveryChannel channel, string destination,
         string proof, string resetLink, CancellationToken ct)
     {
         if (!environment.IsDevelopment())
             throw new InvalidOperationException(
                 "The development contact adapter must not run outside Development; configure a real recovery channel.");
+
+        lock (gate) { delivered[accountId] = proof; }
 
         // Proof and link stay out of the log: only their length is recorded as a sanity check.
         logger.LogInformation(

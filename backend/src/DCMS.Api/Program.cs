@@ -99,6 +99,7 @@ app.MapHealthEndpoints();
 app.MapAuthenticationEndpoints();
 app.MapRecoveryEndpoints();
 app.MapAccountEndpoints();
+app.MapDevelopmentRecoveryEndpoints();
 
 app.Run();
 

@@ -4,12 +4,14 @@ import { Link, Navigate, Outlet, Route, Routes, useLocation } from 'react-router
 import { useAuth } from '../features/authentication/AuthContext';
 import SignInPage from '../features/authentication/SignInPage';
 import AccountsPage from '../features/accounts/AccountsPage';
+import RecoverAccountPage from '../features/recovery/RecoverAccountPage';
 import { roleLabels } from '../features/accounts/types';
 import HealthStatus from '../features/HealthStatus';
 
 export default function App() {
   return <Routes>
     <Route path="/sign-in" element={<SignInPage />} />
+    <Route path="/recover" element={<RecoverAccountPage />} />
     <Route path="/health" element={<HealthStatus />} />
     <Route element={<Protected><Workspace /></Protected>}>
       <Route index element={<Home />} />

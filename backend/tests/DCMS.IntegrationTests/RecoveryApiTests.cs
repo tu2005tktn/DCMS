@@ -6,7 +6,11 @@ using DCMS.Application.Common;
 using DCMS.Application.Features.Authentication;
 using DCMS.Infrastructure.Features.Authentication;
 using DCMS.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Xunit;
 
 namespace DCMS.IntegrationTests;
@@ -308,6 +312,43 @@ public sealed class RecoveryApiTests(ApiFixture fixture) : IClassFixture<ApiFixt
         hashCommand.Parameters.AddWithValue("proof", proof);
         hashCommand.Parameters.AddWithValue("grant", grant);
         Assert.Equal(1L, (long)(await hashCommand.ExecuteScalarAsync())!);
+    }
+
+    [Fact]
+    public async Task TheDevelopmentProofAidIsAbsentOutsideDevelopment()
+    {
+        // The Development contact adapter is registered only in Development, and so is the aid that
+        // hands its delivered proof back. Production must not expose either.
+        var production = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Production");
+            builder.ConfigureServices(services => services.AddSingleton<IContactDeliveryAdapter>(new RefusedAdapter()));
+        });
+        var accountId = await AccountIdAsync("dentist.demo");
+        var anonymous = production.CreateClient();
+        var response = await anonymous.GetAsync($"/api/dev/recovery/proof/{accountId}");
+        Assert.True(response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.Unauthorized,
+            $"The development aid is reachable outside Development with status {response.StatusCode}.");
+        Assert.Empty(RefusedAdapter.Attempts);
+        production.Dispose();
+    }
+
+    [Fact]
+    public async Task TheDevelopmentProofAidRequiresASignedInSession()
+    {
+        var accountId = await AccountIdAsync("dentist.demo");
+        await fixture.CreateClient().PostAsJsonAsync("/api/auth/recovery/request", new RecoveryRequest("dentist.demo"));
+
+        // Anonymous access is refused even in Development.
+        await AssertMessageAsync(await fixture.CreateClient().GetAsync($"/api/dev/recovery/proof/{accountId}"),
+            HttpStatusCode.Unauthorized, "MSG07");
+
+        var (admin, _) = await Login("admin.demo");
+        var granted = await admin.GetAsync($"/api/dev/recovery/proof/{accountId}");
+        Assert.Equal(HttpStatusCode.OK, granted.StatusCode);
+        var body = (await granted.Content.ReadFromJsonAsync<DevelopmentProofResponse>())!;
+        Assert.Equal(accountId, body.AccountId);
+        Assert.True(body.Proof.Length >= 4, "The development adapter must hand back the delivered proof.");
     }
 
     [Fact]

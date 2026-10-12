@@ -1,6 +1,6 @@
 import { Alert, Button, Card, Form, Input, Typography } from 'antd';
 import { useState } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Navigate, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 
 export default function SignInPage() {
@@ -31,6 +31,8 @@ export default function SignInPage() {
         <Button type="primary" htmlType="submit" block loading={busy}>Đăng nhập</Button>
       </Form>
     </Card>
-    <Typography.Paragraph className="login-help">Khôi phục mật khẩu chưa khả dụng vì phòng khám chưa cấu hình kênh xác minh. Liên hệ người quản trị để được hướng dẫn.</Typography.Paragraph>
+    <Typography.Paragraph className="login-help">
+      Quên mật khẩu? <Link to="/recover">Khôi phục tài khoản</Link>
+    </Typography.Paragraph>
   </div></main>;
 }
