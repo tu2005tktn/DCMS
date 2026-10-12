@@ -2,7 +2,7 @@
 
 Hướng dẫn này dành cho môi trường phát triển trên **Windows, dùng PowerShell**. Chạy các lệnh tại thư mục gốc của repository, trừ khi bước đó yêu cầu vào `web` hoặc `backend`. Mỗi thành viên dùng database và mật khẩu riêng trên máy mình.
 
-Hiện repository có ASP.NET Core Web API (.NET 10), PostgreSQL 17 qua Docker và web React/TypeScript/Vite/Ant Design. Đã có đăng nhập/đăng xuất Identity + JWT và quản lý tài khoản nhân viên với phân quyền, khóa/mở khóa và audit. ERD 37 bảng là tài liệu thiết kế; mới áp dụng phần tài khoản/nhân viên/phiên, chưa có Patient hoặc bệnh án. `mobile` và `ai-service` là phần dự kiến, chưa cần cài Expo, Python, YOLO hay tải model. Xem thêm [hướng dẫn chạy thử UC-01/UC-31](implementation/RUN-ACCOUNTS.vi.md).
+Hiện repository có ASP.NET Core Web API (.NET 10), PostgreSQL 17 qua Docker và web React/TypeScript/Vite/Ant Design. Đã có đăng nhập/đăng xuất Identity + JWT và quản lý tài khoản nhân viên với phân quyền, khóa/mở khóa và audit. ERD 37 bảng là tài liệu thiết kế; mới áp dụng phần tài khoản/nhân viên/phiên, chưa có Patient hoặc bệnh án. `mobile` có bộ khung Expo và màn hình placeholder; team mobile xem [hướng dẫn riêng](../mobile/README.md). `ai-service` vẫn là phần dự kiến, chưa cần cài Python, YOLO hay tải model. Xem thêm [hướng dẫn chạy thử UC-01/UC-31](implementation/RUN-ACCOUNTS.vi.md).
 
 ## 1. Cài các công cụ cần thiết
 
