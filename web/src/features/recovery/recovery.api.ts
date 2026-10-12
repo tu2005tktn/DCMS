@@ -19,11 +19,6 @@ export type RecoveryPolicy = {
 /** Marks a step of the recovery flow. */
 export type RecoveryStepId = 'request' | 'verify' | 'reset' | 'done';
 
-export type RecoveryOutcome = {
-  /** HTTP status as reported by the API (always 200 for the neutral steps). */
-  status: number;
-};
-
 export async function requestRecovery(identifier: string): Promise<SystemMessage> {
   return api<SystemMessage>(
     '/api/auth/recovery/request',

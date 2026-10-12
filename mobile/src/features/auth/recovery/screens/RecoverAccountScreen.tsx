@@ -59,6 +59,7 @@ export default function RecoverAccountScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [policy, setPolicy] = useState<RecoveryPolicy | null>(null);
   const [cooldown, setCooldown] = useState(0);
@@ -162,8 +163,9 @@ export default function RecoverAccountScreen() {
         // Drop the grant as soon as it is consumed; it is single-use on the server too.
         setResetGrant('');
         setNotice(null);
+        setError(null);
         setStep('done');
-        setError(result.message);
+        setSuccess(result.message);
       } catch (failure) {
         setError(messageOf(failure));
       }
@@ -190,6 +192,7 @@ export default function RecoverAccountScreen() {
     setStep('request');
     setError(null);
     setNotice(null);
+    setSuccess(null);
     setFieldErrors({});
     setResetGrant('');
     setCooldown(0);
@@ -354,7 +357,9 @@ export default function RecoverAccountScreen() {
 
         {step === 'done' ? (
           <View style={styles.form}>
-            <Text style={styles.doneTitle}>{recoveryMessages.MSG13}</Text>
+            <View style={[styles.callout, styles.neutral]} accessibilityLiveRegion="polite">
+              <Text style={styles.neutralText}>{success ?? recoveryMessages.MSG13}</Text>
+            </View>
             <Text style={styles.hint}>
               Các phiên đăng nhập trước đã bị thu hồi. Hãy đăng nhập lại bằng mật khẩu mới.
             </Text>

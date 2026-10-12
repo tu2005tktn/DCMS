@@ -1,4 +1,4 @@
-import { Alert, Button, Card, Form, Input, Space, Spin, Typography, message } from 'antd';
+import { Alert, Button, Card, Form, Input, Space, Typography, message } from 'antd';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ApiError } from '../../services/api';
@@ -322,12 +322,6 @@ export default function RecoverAccountPage() {
                   </Button>
                   <Button onClick={startOver}>Khôi phục tài khoản khác</Button>
                 </Space>
-              </div>
-            )}
-
-            {step === 'reset' && busy && (
-              <div style={{ marginTop: 12, textAlign: 'center' }}>
-                <Spin size="small" />
               </div>
             )}
           </Card>
