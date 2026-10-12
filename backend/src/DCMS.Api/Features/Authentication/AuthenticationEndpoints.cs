@@ -13,6 +13,11 @@ public static class AuthenticationEndpoints
         var group = endpoints.MapGroup("/api/auth").WithTags("UC-01 Authentication");
         group.MapPost("/sign-in", async (SignInRequest request, IAuthenticationService service, CancellationToken ct) =>
             Results.Ok(await service.SignInAsync(request, ct))).AllowAnonymous();
+        group.MapPost("/register", async (RegisterRequest request, IRegistrationService service, CancellationToken ct) =>
+        {
+            var result = await service.RegisterAsync(request, ct);
+            return Results.Json(result, statusCode: StatusCodes.Status201Created);
+        }).AllowAnonymous().WithTags("UC-33 Registration");
         group.MapGet("/me", (HttpContext context) => Results.Ok((CurrentUser)context.Items["CurrentUser"]!)).RequireAuthorization();
         group.MapPost("/sign-out", async (HttpContext context, IAuthenticationService service, CancellationToken ct) =>
         {
