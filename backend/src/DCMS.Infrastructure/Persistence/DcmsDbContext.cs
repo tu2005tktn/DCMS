@@ -13,6 +13,9 @@ public sealed class DcmsDbContext(DbContextOptions<DcmsDbContext> options)
     public DbSet<EmployeeProfile> Employees => Set<EmployeeProfile>();
     public DbSet<AuthSession> AuthSessions => Set<AuthSession>();
     public DbSet<AccountAudit> AccountAudits => Set<AccountAudit>();
+    public DbSet<RecoveryToken> RecoveryTokens => Set<RecoveryToken>();
+    public DbSet<RecoveryAudit> RecoveryAudits => Set<RecoveryAudit>();
+    public DbSet<RecoveryOutbox> RecoveryOutbox => Set<RecoveryOutbox>();
 
     protected override void OnModelCreating(ModelBuilder model)
     {
@@ -52,6 +55,43 @@ public sealed class DcmsDbContext(DbContextOptions<DcmsDbContext> options)
             b.HasIndex(x => new { x.TargetId, x.OccurredAt });
             b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.ActorId).OnDelete(DeleteBehavior.Restrict);
             b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.TargetId).OnDelete(DeleteBehavior.Restrict);
+        });
+        model.Entity<RecoveryToken>(b =>
+        {
+            b.ToTable("RECOVERY_TOKEN");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.TokenHash).HasMaxLength(256).IsRequired();
+            b.Property(x => x.ResetGrantHash).HasMaxLength(256).IsRequired();
+            b.Property(x => x.ChannelType).HasMaxLength(16).IsRequired();
+            b.Property(x => x.NormalizedDestination).HasMaxLength(256).IsRequired();
+            b.HasIndex(x => new { x.AccountId, x.UsedAt });
+            b.HasIndex(x => x.ExpiresAt);
+            b.HasIndex(x => new { x.AccountId, x.CreatedAt });
+            b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.AccountId).OnDelete(DeleteBehavior.Cascade);
+        });
+        model.Entity<RecoveryAudit>(b =>
+        {
+            b.ToTable("RECOVERY_AUDIT");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.Action).HasMaxLength(40).IsRequired();
+            b.Property(x => x.Reason).HasMaxLength(500);
+            b.Property(x => x.ChannelType).HasMaxLength(16);
+            b.Property(x => x.Result).HasMaxLength(20);
+            b.HasIndex(x => new { x.TargetId, x.OccurredAt });
+            b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.ActorId).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.TargetId).OnDelete(DeleteBehavior.Restrict);
+        });
+        model.Entity<RecoveryOutbox>(b =>
+        {
+            b.ToTable("RECOVERY_OUTBOX");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.ChannelType).HasMaxLength(16).IsRequired();
+            b.Property(x => x.Destination).HasMaxLength(256).IsRequired();
+            b.Property(x => x.Provider).HasMaxLength(32).IsRequired();
+            b.Property(x => x.Status).HasMaxLength(16).IsRequired();
+            b.Property(x => x.ProviderMessageId).HasMaxLength(64);
+            b.HasIndex(x => new { x.AccountId, x.OccurredAt });
+            b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.AccountId).OnDelete(DeleteBehavior.Restrict);
         });
     }
 }

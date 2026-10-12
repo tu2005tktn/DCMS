@@ -9,9 +9,10 @@ using DCMS.Application.Common;
 using DCMS.Application.Features.Accounts;
 using DCMS.Application.Features.Authentication;
 using DCMS.Domain.Features.Accounts;
+using DCMS.Domain.Features.Authentication;
 using DCMS.Infrastructure.Features.Accounts;
-using DCMS.Infrastructure.Persistence;
 using DCMS.Infrastructure.Features.Authentication;
+using DCMS.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -42,6 +43,9 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
         {
             ["Jwt:SigningKey"] = Convert.ToBase64String(RandomNumberGenerator.GetBytes(48)),
             ["DevSeed:Password"] = Password,
+            // Generous request limits so feature tests are not throttled by the shared counters.
+            ["Recovery:RateLimitPerAccountPerHour"] = "200",
+            ["Recovery:RateLimitPerIpPerHour"] = "2000",
             ["Logging:LogLevel:Default"] = "Warning"
         }));
         builder.ConfigureServices(services =>
@@ -50,8 +54,21 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
             services.RemoveAll<DbContextOptions<DcmsDbContext>>();
             services.RemoveAll<IDbContextOptionsConfiguration<DcmsDbContext>>();
             services.AddDbContext<DcmsDbContext>(options => options.UseNpgsql(Connection));
+            // Tests use an in-memory stand-in for the S02 contact adapter so the delivered proof can
+            // be read back. It never writes a proof, link or password anywhere.
+            services.RemoveAll<IContactDeliveryAdapter>();
+            services.AddSingleton<FakeContactDeliveryAdapter>();
+            services.AddSingleton<IContactDeliveryAdapter>(provider => provider.GetRequiredService<FakeContactDeliveryAdapter>());
         });
     }
+
+    public FakeContactDeliveryAdapter Delivery => Services.GetRequiredService<FakeContactDeliveryAdapter>();
+
+    // Test-only connection string for the isolated schema this fixture created.
+    public string ConnectionString => new NpgsqlConnectionStringBuilder(
+        Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
+        ?? throw new InvalidOperationException("Import development env before running integration tests."))
+        { SearchPath = schema }.ConnectionString;
 
     public async Task InitializeAsync()
     {
@@ -87,6 +104,43 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
 
     async Task IAsyncLifetime.DisposeAsync() { await DisposeAsync(); }
     // Test schemas are deliberately retained for inspection; no development data is deleted.
+}
+
+/// <summary>
+/// In-memory stand-in for the shared S02 contact adapter used only by tests. It keeps the last
+/// delivered proof in process memory so a test can complete verification; it never persists a
+/// proof, a reset link or a password.
+/// </summary>
+public sealed class FakeContactDeliveryAdapter : IContactDeliveryAdapter
+{
+    private readonly Lock gate = new();
+    private readonly Dictionary<int, string> lastProof = [];
+    public int SendCount { get; private set; }
+
+    public RecoveryChannel DetectChannel(string? contact) =>
+        !string.IsNullOrWhiteSpace(contact) && contact.Contains('@') ? RecoveryChannel.Email : RecoveryChannel.Unknown;
+
+    public bool IsValid(string? contact) => DetectChannel(contact) != RecoveryChannel.Unknown;
+
+    public string Normalize(string? contact) => contact?.Trim().ToLowerInvariant() ?? "";
+
+    public Task<bool> SendRecoveryAsync(int accountId, RecoveryChannel channel, string destination,
+        string proof, string resetLink, CancellationToken ct)
+    {
+        lock (gate)
+        {
+            lastProof[accountId] = proof;
+            SendCount++;
+        }
+        return Task.FromResult(true);
+    }
+
+    public string? ProofFor(int accountId)
+    {
+        lock (gate) { return lastProof.TryGetValue(accountId, out var proof) ? proof : null; }
+    }
+
+    public void Reset() { lock (gate) { lastProof.Clear(); SendCount = 0; } }
 }
 
 public sealed class AccountApiTests(ApiFixture fixture) : IClassFixture<ApiFixture>
