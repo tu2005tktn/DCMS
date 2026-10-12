@@ -22,7 +22,8 @@ public sealed class BusinessErrorMiddleware(RequestDelegate next, ILogger<Busine
                 BusinessException business => (business.Status, business.Response),
                 BadHttpRequestException => (400, SystemMessages.Get("MSG04", "Yêu cầu")),
                 DbUpdateConcurrencyException => (409, SystemMessages.Get("MSG111")),
-                _ when context.Request.Path.StartsWithSegments("/api/accounts")
+                _ when (context.Request.Path.StartsWithSegments("/api/accounts")
+                        || context.Request.Path.StartsWithSegments("/api/auth/register"))
                     && postgres?.SqlState == PostgresErrorCodes.UniqueViolation => (409, SystemMessages.Get("MSG139")),
                 _ when context.Request.Path.StartsWithSegments("/api/accounts")
                     && postgres?.SqlState is PostgresErrorCodes.SerializationFailure or PostgresErrorCodes.DeadlockDetected => (409, SystemMessages.Get("MSG111")),
