@@ -435,7 +435,10 @@ public sealed class AccountRecoveryService(
             entry.AbsoluteExpiration = now.Add(window);
             entry.Size = 1;
             return new List<DateTimeOffset>();
-        })!;
+        });
+        // If the cache is at capacity the entry is not stored. Fail open instead of locking out a
+        // legitimate user: the proof itself is still single-use, time-limited and hashed.
+        if (hits == null) return true;
         lock (hits)
         {
             hits.RemoveAll(x => now - x >= window);
