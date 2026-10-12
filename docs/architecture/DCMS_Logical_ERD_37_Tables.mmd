@@ -1,0 +1,1071 @@
+erDiagram
+    direction TB
+
+    %% DCMS property-first logical ERD: 37 tables, 2026-10-06.
+    %% 26 retained original tables + BILL_LINE replacing two original details + 10 additions.
+    %% Read the implementation contract at the end; comments are not SQL enforcement.
+
+    USER_ACCOUNT {
+        Integer account_id PK
+        String username UK
+        String password_hash
+        String email "Optional"
+        String phone "Optional"
+        String status
+        DateTime contact_verified_at "Optional; account contact only"
+        Boolean appointment_reminders_enabled
+        Boolean follow_up_reminders_enabled
+        Boolean medication_reminders_enabled
+        Boolean push_enabled
+        DateTime created_at
+        DateTime updated_at
+        Integer concurrency_version
+    }
+
+    ROLE {
+        Integer role_id PK
+        String role_code UK
+        String role_name
+        String description "Optional"
+    }
+
+    USER_ACCOUNT_ROLE {
+        Integer account_id PK, FK
+        Integer role_id PK, FK
+    }
+
+    EMPLOYEE_PROFILE {
+        Integer employee_id PK
+        Integer account_id FK, UK
+        String employee_code UK
+        String full_name
+        Date birth_date "Optional"
+        String phone "Optional"
+        String professional_title "Optional"
+        String license_number "Optional"
+        String status
+    }
+
+    PATIENT_PROFILE {
+        Integer patient_id PK
+        String patient_code UK
+        String full_name
+        Date birth_date "Optional"
+        String gender "Optional"
+        String phone "Optional; shared phones allowed"
+        String address "Optional"
+        String guardian_name "Optional"
+        String guardian_relationship "Optional"
+        String guardian_phone "Optional"
+        DateTime created_at
+        DateTime updated_at
+        Integer concurrency_version
+    }
+
+    PATIENT_ACCOUNT_LINK {
+        Integer link_id PK
+        Integer account_id FK
+        Integer patient_id FK
+        String status "PENDING VERIFIED REJECTED REVOKED WITHDRAWN"
+        DateTime requested_at
+        String request_note "Optional"
+        Integer reviewing_employee_id FK "Optional until reviewed"
+        String verification_note "Optional"
+        String decision_reason "Optional; required for rejection or revocation"
+        DateTime reviewed_at "Optional"
+        Integer revoking_employee_id FK "Optional"
+        DateTime revoked_at "Optional"
+        DateTime withdrawn_at "Optional"
+        Integer concurrency_version
+    }
+
+    WORKING_SCHEDULE {
+        Integer schedule_id PK
+        Integer employee_id FK
+        Date working_date
+        Time start_time
+        Time end_time
+        String interval_type "WORK or BLOCKED"
+        String status "DRAFT PUBLISHED CANCELLED"
+        DateTime published_at "Optional"
+        Integer concurrency_version
+    }
+
+    APPOINTMENT {
+        Integer appointment_id PK
+        String booking_code UK
+        String request_key UK
+        Integer booker_account_id FK "Optional for public booking"
+        Integer recording_employee_id FK "Optional for self-service"
+        String booker_name
+        String booker_phone
+        String attendee_relationship "SELF or RELATIVE; booking only"
+        String booking_channel "PUBLIC_WEB PATIENT_APP PHONE SOCIAL WALK_IN STAFF"
+        String attendee_name
+        Date attendee_birth_date "Optional"
+        String attendee_gender "Optional"
+        String attendee_phone "Optional"
+        Integer patient_id FK "Optional until identity is checked at reception"
+        Integer employee_id FK
+        Integer schedule_id FK
+        Integer follow_up_instruction_id FK "Optional"
+        Integer rebooked_from_appointment_id FK "Optional; preserve original No-show"
+        Date appointment_date
+        Time start_time
+        Time end_time
+        String reason
+        String near_start_exception_reason "Optional; required for staff exception"
+        String status "CONFIRMED CHECKED_IN COMPLETED CANCELLED NO_SHOW"
+        Integer cancelling_account_id FK "Optional"
+        DateTime cancelled_at "Optional"
+        String cancellation_reason "Optional"
+        String no_show_reason "Optional"
+        DateTime created_at
+        DateTime updated_at
+        Integer concurrency_version
+    }
+
+    MEDICAL_RECORD {
+        Integer medical_record_id PK
+        Integer patient_id FK, UK
+        String record_code UK
+        String medical_history_state "UNKNOWN NONE PRESENT"
+        String medical_history "Optional"
+        String allergy_state "UNKNOWN NONE PRESENT"
+        String allergy_information "Optional"
+        String current_medication_state "UNKNOWN NONE PRESENT"
+        String current_medication_information "Optional"
+        Integer reviewing_employee_id FK "Optional before clinical review"
+        DateTime reviewed_at "Optional"
+        DateTime opened_at
+        Integer concurrency_version
+    }
+
+    MEDICAL_VISIT {
+        Integer visit_id PK
+        String visit_code UK
+        Integer appointment_id FK, UK
+        Integer medical_record_id FK
+        Integer receiving_employee_id FK
+        Integer examining_employee_id FK "Optional while waiting"
+        DateTime arrived_at
+        DateTime checked_in_at
+        Integer queue_number
+        Integer queue_priority
+        DateTime started_at "Optional"
+        DateTime completed_at "Optional"
+        String chief_complaint "Optional while waiting"
+        String clinical_findings "Optional before finalization"
+        String diagnosis "Optional before finalization"
+        String advice "Optional"
+        String disposition "Optional; consultation treatment refusal deferral referral"
+        String internal_notes "Optional; never patient-visible"
+        String care_instructions "Optional"
+        Json reviewed_health_snapshot "Optional before review; fixed document schema"
+        Json draft_clinical_payload "Optional amendment draft; not patient-visible"
+        Integer clinical_version
+        String amendment_reason "Optional; required for finalized amendments"
+        String status "WAITING IN_PROGRESS COMPLETED CANCELLED"
+        DateTime updated_at
+        Integer concurrency_version
+    }
+
+    CLINICAL_ORDER {
+        Integer clinical_order_id PK
+        Integer visit_id FK
+        Integer ordering_employee_id FK
+        String order_type
+        String instructions "Optional"
+        String result_summary "Optional"
+        String external_reference "Optional when PACS is enabled"
+        DateTime ordered_at
+        String status
+    }
+
+    CLINICAL_DOCUMENT {
+        Integer document_id PK
+        Integer medical_record_id FK
+        Integer visit_id FK "Optional for general documents"
+        Integer treatment_plan_id FK "Optional; exact stored plan version"
+        Integer clinical_order_id FK "Optional"
+        Integer uploader_employee_id FK
+        String document_name
+        String document_type
+        String storage_path
+        String content_type
+        String content_hash
+        String description "Optional"
+        String publication_status "PRIVATE RELEASED WITHDRAWN"
+        Integer publishing_employee_id FK "Optional"
+        DateTime published_at "Optional"
+        DateTime uploaded_at
+        Integer concurrency_version
+    }
+
+    AI_ANALYSIS {
+        Integer analysis_id PK
+        String correlation_id UK
+        Integer source_document_id FK
+        Integer requesting_employee_id FK
+        Integer retry_of_analysis_id FK "Optional; a retry is a new row"
+        String input_content_hash
+        String model_name
+        String model_version
+        String payload_schema_version
+        String status "QUEUED PROCESSING SUCCEEDED FAILED TIMED_OUT"
+        Json result_payload "Optional; immutable original findings with stable finding_id"
+        String applicability_notes "Optional"
+        String error_message "Optional"
+        DateTime requested_at
+        DateTime started_at "Optional"
+        DateTime completed_at "Optional"
+        Integer reviewing_employee_id FK "Optional until assessed"
+        Json review_payload "Optional; decision and correction per finding_id"
+        String review_notes "Optional"
+        Integer review_version
+        DateTime reviewed_at "Optional"
+        Integer concurrency_version
+    }
+
+    SERVICE {
+        Integer service_id PK
+        String service_code UK
+        String service_name
+        String description "Optional"
+        String billing_unit "VISIT TOOTH JAW or configured unit"
+        Decimal standard_price
+        Integer duration_minutes "Configured 30 or 60"
+        Boolean is_active
+    }
+
+    TREATMENT_PLAN {
+        Integer treatment_plan_id PK
+        String plan_code "Family code; composite unique with revision_number"
+        Integer revision_number
+        Integer root_plan_id FK "Optional on first version; otherwise first version"
+        Integer supersedes_plan_id FK "Optional on first version"
+        Integer patient_id FK
+        Integer creating_employee_id FK
+        String plan_name
+        String diagnosis_summary "Optional"
+        String objectives "Optional"
+        String notes "Optional"
+        String document_status "DRAFT FINALIZED"
+        Boolean is_current_final
+        String treatment_status "PROPOSED IN_PROGRESS COMPLETED STOPPED CANCELLED"
+        DateTime created_at
+        DateTime finalized_at "Optional"
+        String amendment_reason "Optional; required for revision"
+        DateTime stopped_at "Optional"
+        String stop_reason "Optional"
+        Integer concurrency_version
+    }
+
+    TREATMENT_PLAN_SERVICE {
+        Integer treatment_plan_id PK, FK
+        Integer line_number PK
+        String logical_line_id "Stable across versions of the plan family"
+        Integer service_id FK
+        String tooth_reference "Optional"
+        Integer quantity
+        Decimal proposed_unit_price
+        Decimal agreed_unit_price "Optional until accepted"
+        Integer treatment_sequence
+        Date planned_start_date "Optional"
+        Date planned_end_date "Optional"
+        String instructions "Optional"
+        String patient_decision "UNDECIDED ACCEPTED REJECTED"
+        Integer decision_recording_employee_id FK "Optional until recorded"
+        DateTime decided_at "Optional"
+        Integer consent_document_id FK "Optional"
+        String decision_note "Optional"
+        String status "PROPOSED AGREED IN_PROGRESS COMPLETED CANCELLED"
+    }
+
+    SERVICE_PACKAGE {
+        Integer package_id PK
+        String package_code "Composite unique with version_number"
+        Integer version_number
+        Integer supersedes_package_id FK "Optional"
+        String package_name
+        String description "Optional"
+        Decimal package_price
+        String publication_status "DRAFT PUBLISHED RETIRED"
+        Boolean is_active
+        DateTime created_at
+        DateTime published_at "Optional"
+    }
+
+    SERVICE_PACKAGE_SERVICE {
+        Integer package_id PK, FK
+        Integer service_id PK, FK
+        Integer quantity
+    }
+
+    APPLIED_SERVICE_PACKAGE {
+        Integer applied_package_id PK
+        String applied_package_code UK
+        Integer package_id FK "Immutable package definition version"
+        Integer patient_id FK
+        Integer treatment_plan_id FK "Optional; exact stored plan version"
+        Integer recording_employee_id FK
+        String package_name_snapshot
+        Decimal agreed_package_price
+        String patient_decision "UNDECIDED ACCEPTED REJECTED"
+        DateTime decided_at "Optional"
+        DateTime applied_at
+        String status "PROPOSED ACTIVE COMPLETED STOPPED CANCELLED"
+        String stop_reason "Optional"
+        Integer concurrency_version
+    }
+
+    MEDICAL_VISIT_SERVICE {
+        Integer visit_id PK, FK
+        Integer line_number PK
+        Integer service_id FK
+        Integer treatment_plan_id FK "Optional; paired with treatment_plan_line_number"
+        Integer treatment_plan_line_number FK "Optional; source version is immutable"
+        Integer applied_package_id FK "Optional"
+        Integer package_definition_id FK "Optional; same definition as applied package"
+        String tooth_reference "Optional"
+        String service_name_snapshot
+        String billing_unit_snapshot
+        Integer quantity
+        Decimal unit_price
+        String billing_mode "INCLUDED SEPARATE FREE"
+        String direct_patient_decision "Optional; required if no plan decision is used"
+        DateTime agreed_at "Optional"
+        Integer consent_document_id FK "Optional"
+        String clinical_notes "Optional"
+        Integer performing_employee_id FK
+        DateTime performed_at "Optional before completion"
+        String status "PLANNED PERFORMED CANCELLED"
+        String request_key UK
+    }
+
+    MEDICINE {
+        Integer medicine_id PK
+        String medicine_code UK
+        String medicine_name
+        String active_ingredient "Optional"
+        String strength "Optional"
+        String dosage_form "Optional"
+        String manufacturer "Optional"
+        String stock_unit
+        String packaging_description "Optional"
+        String storage_instructions "Optional"
+        Integer stock_quantity "Cached total physical stock"
+        Integer eligible_stock_quantity "Cached stock permitted for issue"
+        Integer low_stock_threshold "Optional"
+        Decimal unit_price
+        Boolean is_active
+        Integer concurrency_version
+    }
+
+    PRESCRIPTION {
+        Integer prescription_id PK
+        String prescription_code "Family code; composite unique with revision_number"
+        Integer revision_number
+        Integer root_prescription_id FK "Optional on first version"
+        Integer supersedes_prescription_id FK "Optional on first version"
+        Integer source_template_id FK "Optional; TEMPLATE source copied into PATIENT document"
+        String document_kind "PATIENT or TEMPLATE"
+        Integer visit_id FK "Required for PATIENT; null for TEMPLATE"
+        Integer prescribing_employee_id FK
+        String template_name "Optional; required for TEMPLATE"
+        String general_instructions "Optional"
+        String status "DRAFT FINALIZED SUPERSEDED CANCELLED"
+        Boolean is_current_final
+        DateTime created_at
+        DateTime finalized_at "Optional"
+        String amendment_reason "Optional; required for revision"
+        Integer concurrency_version
+    }
+
+    PRESCRIPTION_MEDICINE {
+        Integer prescription_id PK, FK
+        Integer line_number PK
+        String logical_line_id "Stable within prescription family; new medicine needs new identity"
+        Integer medicine_id FK
+        String medicine_name_snapshot
+        String strength_snapshot "Optional"
+        String dosage_form_snapshot "Optional"
+        String stock_unit_snapshot
+        Integer prescribed_quantity "Total target for this logical line; not additional quantity per revision"
+        String fulfillment_choice "CLINIC or EXTERNAL"
+        String dose
+        String route "Optional"
+        String frequency
+        Date start_date
+        Integer duration_days
+        String usage_instructions "Optional"
+        String line_status "ACTIVE STOPPED"
+    }
+
+    PRESCRIPTION_MEDICINE_REMINDER {
+        Integer prescription_id PK, FK
+        Integer prescription_line_number PK, FK
+        Integer reminder_number PK
+        Time reminder_time
+        Boolean is_enabled
+    }
+
+    MEDICAL_VISIT_MEDICINE {
+        Integer visit_id PK, FK
+        Integer line_number PK
+        Integer medicine_id FK
+        Integer visit_service_line_number FK "Optional; same visit"
+        Integer applied_package_id FK "Optional"
+        Integer used_quantity "Confirmed actual total; consistent with USE events"
+        String billing_mode "INCLUDED SEPARATE FREE"
+        String usage_notes "Optional"
+        Integer recording_employee_id FK
+        DateTime recorded_at
+        String request_key UK
+    }
+
+    MEDICINE_STOCK_EVENT {
+        Integer stock_event_id PK
+        String operation_id "Composite unique with operation_line_number"
+        Integer operation_line_number
+        Integer medicine_id FK
+        String event_type "RECEIPT DISPENSE USE COUNT ADJUSTMENT RETURN DISPOSAL QUALITY_TRANSFER"
+        String stock_bucket "ELIGIBLE or QUARANTINED; aggregate quantities without batches"
+        Integer quantity_delta "COUNT is zero; signed physical movement within bucket otherwise"
+        Integer system_quantity_snapshot "Optional; required for COUNT"
+        Integer counted_quantity "Optional; required for COUNT"
+        Integer basis_count_event_id FK "Optional; COUNT of same medicine and bucket"
+        Integer original_issue_event_id FK "Optional; DISPENSE source for RETURN"
+        Integer source_prescription_id FK "Optional; paired with source_prescription_line_number"
+        Integer source_prescription_line_number FK "Optional; exact original prescribed row"
+        Integer source_visit_id FK "Optional; paired with source_visit_medicine_line_number"
+        Integer source_visit_medicine_line_number FK "Optional"
+        Integer included_package_id FK "Optional"
+        String billing_mode "NONE INCLUDED SEPARATE FREE"
+        String stock_unit_snapshot
+        String input_unit "Optional"
+        Decimal input_quantity "Optional"
+        Decimal conversion_factor_snapshot "Optional"
+        Decimal unit_cost "Optional for receipts"
+        Decimal sale_unit_price "Optional; required for separately chargeable issue or use"
+        String supplier_name "Optional for receipts"
+        String source_document_reference "Optional"
+        String reason "Optional; required for adjustment return disposal"
+        Integer recording_employee_id FK
+        Integer approving_employee_id FK "Optional; required where policy requires approval"
+        DateTime approved_at "Optional"
+        String status "DRAFT PENDING_APPROVAL CONFIRMED REJECTED CANCELLED"
+        DateTime occurred_at
+        DateTime entered_at
+        Integer concurrency_version
+    }
+
+    FOLLOW_UP_INSTRUCTION {
+        Integer follow_up_instruction_id PK
+        Integer visit_id FK
+        Integer patient_id FK
+        Integer issuing_employee_id FK
+        String doctor_requirement "ANY SAME_AS_VISIT SPECIFIC"
+        Integer required_employee_id FK "Optional; required for SPECIFIC"
+        Date earliest_date "Optional"
+        Date recommended_date
+        Date latest_date "Optional"
+        Integer required_duration_minutes "30 or 60"
+        String reason
+        String instructions "Optional"
+        String status "NEEDS_BOOKING BOOKED COMPLETED CANCELLED SUPERSEDED"
+        Integer completing_visit_id FK "Optional; required for COMPLETED"
+        DateTime issued_at
+        DateTime completed_at "Optional"
+        String closure_reason "Optional"
+        Integer concurrency_version
+    }
+
+    BILL {
+        Integer bill_id PK
+        Integer patient_id FK
+        Integer visit_id FK
+        Integer preparing_employee_id FK
+        String bill_number UK
+        Decimal discount_amount
+        String discount_reason "Optional; required for reduction"
+        Integer discount_approving_employee_id FK "Optional per policy"
+        DateTime created_at
+        DateTime issued_at "Optional before issue"
+        String notes "Optional"
+        String status "DRAFT ISSUED CANCELLED"
+        Integer concurrency_version
+    }
+
+    BILL_LINE {
+        Integer bill_id PK, FK
+        Integer line_number PK
+        String line_type "SERVICE MEDICINE PACKAGE"
+        Integer source_visit_id FK "Optional; SERVICE only"
+        Integer source_visit_line_number FK "Optional; SERVICE only"
+        Integer source_stock_event_id FK "Optional; MEDICINE only"
+        Integer applied_package_id FK "Optional; PACKAGE only"
+        String item_name_snapshot
+        String billing_unit_snapshot
+        Integer quantity
+        Decimal unit_price
+        Decimal discount_amount
+        String discount_reason "Optional"
+    }
+
+    PAYMENT_DUE {
+        Integer due_id PK
+        Integer patient_id FK
+        Integer bill_id FK "Optional before the bill exists"
+        Integer treatment_plan_id FK "Optional; at least bill or plan is required"
+        Integer period_number
+        Decimal amount_due
+        Date due_date
+        String status "ACTIVE CANCELLED"
+        Integer recording_employee_id FK
+        DateTime created_at
+        String change_reason "Optional"
+        Integer concurrency_version
+    }
+
+    PAYMENT {
+        Integer payment_id PK
+        Integer patient_id FK
+        String record_type "RECEIPT or CORRECTION"
+        String payment_reference UK
+        String request_key UK
+        Integer recording_employee_id FK "Optional for authenticated electronic receipt"
+        Decimal amount "Required positive on RECEIPT; null on CORRECTION"
+        String payment_method "Required on RECEIPT; null on CORRECTION"
+        String payment_purpose "Optional; DEPOSIT or SETTLEMENT on RECEIPT"
+        String currency
+        String transaction_reference "Optional; unique per provider for receipts"
+        String payment_provider "Optional"
+        String verification_reference "Optional; authenticated evidence"
+        DateTime received_at "Required on RECEIPT; optional on CORRECTION"
+        Integer original_payment_id FK "Required on CORRECTION; null on RECEIPT"
+        String original_record_type FK "RECEIPT constant when original_payment_id is set"
+        Integer correction_number "Optional; unique per original receipt"
+        Integer base_effective_version "Optional; required on CORRECTION"
+        Decimal corrected_amount "Optional; required nonnegative on CORRECTION"
+        String corrected_payment_method "Optional; required on CORRECTION"
+        DateTime corrected_received_at "Optional"
+        String correction_reason "Optional; required on CORRECTION"
+        Integer requesting_employee_id FK "Optional; required on CORRECTION"
+        Integer approving_employee_id FK "Optional until decision"
+        DateTime requested_at "Optional; required on CORRECTION"
+        DateTime decided_at "Optional"
+        String decision_reason "Optional"
+        Integer active_correction_id FK "Optional on RECEIPT; null on CORRECTION"
+        Integer effective_version "RECEIPT concurrency sequence; not a new receipt amount"
+        String status "RECEIPT states or CORRECTION approval states as constrained"
+        String notes "Optional"
+        DateTime created_at
+        Integer concurrency_version
+    }
+
+    PAYMENT_ALLOCATION {
+        Integer allocation_id PK
+        Integer patient_id FK
+        Integer payment_id FK "RECEIPT only"
+        String receipt_record_type FK "RECEIPT constant"
+        Integer bill_id FK
+        Integer due_id FK "Optional; same bill and patient"
+        Decimal allocated_amount
+        Integer allocating_employee_id FK "Optional for authenticated electronic processing"
+        String request_key UK
+        DateTime allocated_at
+        String status "ACTIVE VOIDED"
+        Integer voiding_employee_id FK "Optional"
+        DateTime voided_at "Optional"
+        String void_reason "Optional"
+    }
+
+    NOTIFICATION {
+        Integer notification_id PK
+        String deduplication_key UK
+        Integer recipient_account_id FK "Optional for contact-only public booking"
+        Integer patient_id FK "Optional before check-in"
+        Integer recipient_link_id FK "Optional; private own-record notifications require verified SELF"
+        Integer appointment_id FK "Optional; appointment sources"
+        Integer follow_up_instruction_id FK "Optional; unbooked follow-up source"
+        Integer prescription_id FK "Optional; medication source"
+        Integer prescription_line_number FK "Optional; medication source"
+        Integer reminder_number FK "Optional; medication source"
+        String source_version "Snapshot for stale-source detection"
+        String notification_type "BOOKED CHANGED CANCELLED APPOINTMENT_REMINDER FOLLOW_UP_DUE MEDICATION_REMINDER"
+        String title
+        String content
+        DateTime created_at
+        DateTime scheduled_at
+        DateTime read_at "Optional; app acknowledgement only"
+        String status "PENDING AVAILABLE CANCELLED"
+    }
+
+    NOTIFICATION_DELIVERY {
+        Integer notification_id PK, FK
+        Integer attempt_number PK
+        String delivery_channel "Configured IN_APP PUSH SMS EMAIL"
+        String recipient_address_snapshot
+        String provider_reference "Optional"
+        String status "PENDING ACCEPTED DELIVERED FAILED CANCELLED"
+        DateTime attempted_at
+        DateTime accepted_at "Optional"
+        DateTime delivered_at "Optional"
+        String error_code "Optional"
+        String error_message "Optional"
+    }
+
+    SUPPORT_CASE {
+        Integer case_id PK
+        String case_code UK
+        String request_key UK
+        String case_type "NO_SHOW FOLLOW_UP DELIVERY_FAILURE CHAT LATE_APPOINTMENT_CHANGE"
+        Integer patient_id FK "Optional for guest cases"
+        Integer requester_account_id FK "Optional for unauthenticated guest"
+        String guest_access_token_hash "Optional; controlled guest conversation access"
+        String contact_name "Optional"
+        String contact_phone "Optional"
+        String contact_email "Optional"
+        Integer appointment_id FK "Optional; required for NO_SHOW or late appointment change"
+        Integer follow_up_instruction_id FK "Optional; required for FOLLOW_UP"
+        Integer notification_id FK "Optional; required for DELIVERY_FAILURE"
+        Integer assigned_employee_id FK "Optional until assigned"
+        String requested_action "Optional; CHANGE or CANCEL for late request"
+        Json request_payload "Optional; bounded requested parameters, not authority to execute"
+        Integer priority
+        String status "OPEN AWAITING_STAFF STAFF_ACTIVE RESOLVED REJECTED WITHDRAWN"
+        DateTime scheduled_at "Optional for scheduled contact"
+        DateTime opened_at
+        DateTime handoff_requested_at "Optional"
+        DateTime accepted_at "Optional"
+        DateTime closed_at "Optional"
+        String resolution_reason "Optional"
+        Integer concurrency_version
+    }
+
+    SUPPORT_INTERACTION {
+        Integer interaction_id PK
+        Integer case_id FK
+        String request_key UK
+        String interaction_type "MESSAGE CALL ACTION"
+        String sender_type "CUSTOMER EMPLOYEE BOT SYSTEM"
+        Integer author_account_id FK "Optional for bot or unauthenticated guest"
+        String channel
+        String content "Optional for unanswered call"
+        String contact_outcome "Optional; NOT_CONTACTED NO_ANSWER CONTACTED REBOOKED NO_INTEREST"
+        String action_type "Optional"
+        String action_status "Optional; REQUESTED COMMITTED FAILED"
+        Integer resulting_appointment_id FK "Optional; committed appointment only"
+        Json action_summary "Optional; confirmed parameters and result references"
+        DateTime occurred_at
+        DateTime recorded_at
+        DateTime next_contact_at "Optional"
+    }
+
+    AUDIT_LOG {
+        Integer audit_id PK
+        String operation_id
+        Integer actor_account_id FK "Optional for system events"
+        String actor_type "ACCOUNT or SYSTEM"
+        Integer patient_id FK "Optional for patient-scoped event"
+        String event_type
+        String entity_type
+        String entity_key "Stable serialized key; includes composite keys where needed"
+        Integer entity_version "Optional"
+        String snapshot_schema_version
+        Json before_snapshot "Optional"
+        Json after_snapshot "Optional"
+        String reason "Optional; required for important amendments"
+        DateTime occurred_at
+        DateTime recorded_at
+    }
+
+    USER_ACCOUNT ||--|{ USER_ACCOUNT_ROLE : "account_id"
+    ROLE ||--o{ USER_ACCOUNT_ROLE : "role_id"
+    USER_ACCOUNT ||..o| EMPLOYEE_PROFILE : "account_id"
+    USER_ACCOUNT ||..o{ PATIENT_ACCOUNT_LINK : "account_id"
+    PATIENT_PROFILE ||..o{ PATIENT_ACCOUNT_LINK : "patient_id"
+    EMPLOYEE_PROFILE |o..o{ PATIENT_ACCOUNT_LINK : "reviewing_employee_id"
+    EMPLOYEE_PROFILE |o..o{ PATIENT_ACCOUNT_LINK : "revoking_employee_id"
+    EMPLOYEE_PROFILE ||..o{ WORKING_SCHEDULE : "employee_id"
+    USER_ACCOUNT |o..o{ APPOINTMENT : "booker_account_id"
+    EMPLOYEE_PROFILE |o..o{ APPOINTMENT : "recording_employee_id"
+    PATIENT_PROFILE |o..o{ APPOINTMENT : "patient_id"
+    FOLLOW_UP_INSTRUCTION |o..o{ APPOINTMENT : "follow_up_instruction_id"
+    APPOINTMENT |o..o{ APPOINTMENT : "rebooked_from_appointment_id"
+    USER_ACCOUNT |o..o{ APPOINTMENT : "cancelling_account_id"
+    EMPLOYEE_PROFILE ||..o{ APPOINTMENT : "employee_id"
+    WORKING_SCHEDULE ||..o{ APPOINTMENT : "schedule_id"
+    PATIENT_PROFILE ||..o| MEDICAL_RECORD : "patient_id"
+    EMPLOYEE_PROFILE |o..o{ MEDICAL_RECORD : "reviewing_employee_id"
+    APPOINTMENT ||..o| MEDICAL_VISIT : "appointment_id"
+    MEDICAL_RECORD ||..o{ MEDICAL_VISIT : "medical_record_id"
+    EMPLOYEE_PROFILE ||..o{ MEDICAL_VISIT : "receiving_employee_id"
+    EMPLOYEE_PROFILE |o..o{ MEDICAL_VISIT : "examining_employee_id"
+    MEDICAL_VISIT ||..o{ CLINICAL_ORDER : "visit_id"
+    EMPLOYEE_PROFILE ||..o{ CLINICAL_ORDER : "ordering_employee_id"
+    MEDICAL_RECORD ||..o{ CLINICAL_DOCUMENT : "medical_record_id"
+    MEDICAL_VISIT |o..o{ CLINICAL_DOCUMENT : "visit_id"
+    TREATMENT_PLAN |o..o{ CLINICAL_DOCUMENT : "treatment_plan_id"
+    CLINICAL_ORDER |o..o{ CLINICAL_DOCUMENT : "clinical_order_id"
+    EMPLOYEE_PROFILE ||..o{ CLINICAL_DOCUMENT : "uploader_employee_id"
+    EMPLOYEE_PROFILE |o..o{ CLINICAL_DOCUMENT : "publishing_employee_id"
+    CLINICAL_DOCUMENT ||..o{ AI_ANALYSIS : "source_document_id"
+    EMPLOYEE_PROFILE ||..o{ AI_ANALYSIS : "requesting_employee_id"
+    AI_ANALYSIS |o..o{ AI_ANALYSIS : "retry_of_analysis_id"
+    EMPLOYEE_PROFILE |o..o{ AI_ANALYSIS : "reviewing_employee_id"
+    TREATMENT_PLAN |o..o{ TREATMENT_PLAN : "root_plan_id"
+    TREATMENT_PLAN |o..o{ TREATMENT_PLAN : "supersedes_plan_id"
+    PATIENT_PROFILE ||..o{ TREATMENT_PLAN : "patient_id"
+    EMPLOYEE_PROFILE ||..o{ TREATMENT_PLAN : "creating_employee_id"
+    TREATMENT_PLAN ||--o{ TREATMENT_PLAN_SERVICE : "treatment_plan_id"
+    SERVICE ||..o{ TREATMENT_PLAN_SERVICE : "service_id"
+    EMPLOYEE_PROFILE |o..o{ TREATMENT_PLAN_SERVICE : "decision_recording_employee_id"
+    CLINICAL_DOCUMENT |o..o{ TREATMENT_PLAN_SERVICE : "consent_document_id"
+    SERVICE_PACKAGE |o..o{ SERVICE_PACKAGE : "supersedes_package_id"
+    SERVICE_PACKAGE ||--o{ SERVICE_PACKAGE_SERVICE : "package_id"
+    SERVICE ||--o{ SERVICE_PACKAGE_SERVICE : "service_id"
+    SERVICE_PACKAGE ||..o{ APPLIED_SERVICE_PACKAGE : "package_id"
+    PATIENT_PROFILE ||..o{ APPLIED_SERVICE_PACKAGE : "patient_id"
+    TREATMENT_PLAN |o..o{ APPLIED_SERVICE_PACKAGE : "treatment_plan_id"
+    EMPLOYEE_PROFILE ||..o{ APPLIED_SERVICE_PACKAGE : "recording_employee_id"
+    MEDICAL_VISIT ||--o{ MEDICAL_VISIT_SERVICE : "visit_id"
+    SERVICE ||..o{ MEDICAL_VISIT_SERVICE : "service_id"
+    TREATMENT_PLAN_SERVICE |o..o{ MEDICAL_VISIT_SERVICE : "source_plan_line"
+    APPLIED_SERVICE_PACKAGE |o..o{ MEDICAL_VISIT_SERVICE : "applied_package_definition"
+    SERVICE_PACKAGE_SERVICE |o..o{ MEDICAL_VISIT_SERVICE : "included_service_definition"
+    CLINICAL_DOCUMENT |o..o{ MEDICAL_VISIT_SERVICE : "consent_document_id"
+    EMPLOYEE_PROFILE ||..o{ MEDICAL_VISIT_SERVICE : "performing_employee_id"
+    PRESCRIPTION |o..o{ PRESCRIPTION : "root_prescription_id"
+    PRESCRIPTION |o..o{ PRESCRIPTION : "supersedes_prescription_id"
+    PRESCRIPTION |o..o{ PRESCRIPTION : "source_template_id"
+    MEDICAL_VISIT |o..o{ PRESCRIPTION : "visit_id"
+    EMPLOYEE_PROFILE ||..o{ PRESCRIPTION : "prescribing_employee_id"
+    PRESCRIPTION ||--o{ PRESCRIPTION_MEDICINE : "prescription_id"
+    MEDICINE ||..o{ PRESCRIPTION_MEDICINE : "medicine_id"
+    PRESCRIPTION_MEDICINE ||--o{ PRESCRIPTION_MEDICINE_REMINDER : "prescription_line"
+    MEDICAL_VISIT ||--o{ MEDICAL_VISIT_MEDICINE : "visit_id"
+    MEDICINE ||..o{ MEDICAL_VISIT_MEDICINE : "medicine_id"
+    MEDICAL_VISIT_SERVICE |o..o{ MEDICAL_VISIT_MEDICINE : "related_visit_service"
+    APPLIED_SERVICE_PACKAGE |o..o{ MEDICAL_VISIT_MEDICINE : "applied_package_id"
+    EMPLOYEE_PROFILE ||..o{ MEDICAL_VISIT_MEDICINE : "recording_employee_id"
+    MEDICINE ||..o{ MEDICINE_STOCK_EVENT : "medicine_id"
+    MEDICINE_STOCK_EVENT |o..o{ MEDICINE_STOCK_EVENT : "count_basis_same_medicine"
+    MEDICINE_STOCK_EVENT |o..o{ MEDICINE_STOCK_EVENT : "returned_issue_same_medicine"
+    PRESCRIPTION_MEDICINE |o..o{ MEDICINE_STOCK_EVENT : "issued_prescription_line"
+    MEDICAL_VISIT_MEDICINE |o..o{ MEDICINE_STOCK_EVENT : "used_visit_medicine"
+    APPLIED_SERVICE_PACKAGE |o..o{ MEDICINE_STOCK_EVENT : "included_package_id"
+    EMPLOYEE_PROFILE ||..o{ MEDICINE_STOCK_EVENT : "recording_employee_id"
+    EMPLOYEE_PROFILE |o..o{ MEDICINE_STOCK_EVENT : "approving_employee_id"
+    MEDICAL_VISIT ||..o{ FOLLOW_UP_INSTRUCTION : "visit_id"
+    PATIENT_PROFILE ||..o{ FOLLOW_UP_INSTRUCTION : "patient_id"
+    EMPLOYEE_PROFILE ||..o{ FOLLOW_UP_INSTRUCTION : "issuing_employee_id"
+    EMPLOYEE_PROFILE |o..o{ FOLLOW_UP_INSTRUCTION : "required_employee_id"
+    MEDICAL_VISIT |o..o{ FOLLOW_UP_INSTRUCTION : "completing_visit_id"
+    PATIENT_PROFILE ||..o{ BILL : "patient_id"
+    MEDICAL_VISIT ||..o{ BILL : "visit_id"
+    EMPLOYEE_PROFILE ||..o{ BILL : "preparing_employee_id"
+    EMPLOYEE_PROFILE |o..o{ BILL : "discount_approving_employee_id"
+    BILL ||--o{ BILL_LINE : "bill_id"
+    MEDICAL_VISIT_SERVICE |o..o{ BILL_LINE : "performed_service_source"
+    MEDICINE_STOCK_EVENT |o..o{ BILL_LINE : "source_stock_event_id"
+    APPLIED_SERVICE_PACKAGE |o..o{ BILL_LINE : "applied_package_id"
+    PATIENT_PROFILE ||..o{ PAYMENT_DUE : "patient_id"
+    BILL |o..o{ PAYMENT_DUE : "billed_obligation_same_patient"
+    TREATMENT_PLAN |o..o{ PAYMENT_DUE : "planned_obligation_same_patient"
+    EMPLOYEE_PROFILE ||..o{ PAYMENT_DUE : "recording_employee_id"
+    PATIENT_PROFILE ||..o{ PAYMENT : "patient_id"
+    EMPLOYEE_PROFILE |o..o{ PAYMENT : "recording_employee_id"
+    EMPLOYEE_PROFILE |o..o{ PAYMENT : "requesting_employee_id"
+    EMPLOYEE_PROFILE |o..o{ PAYMENT : "approving_employee_id"
+    PAYMENT |o..o{ PAYMENT : "correction_of_receipt"
+    PAYMENT |o..o{ PAYMENT : "active_approved_correction"
+    PAYMENT ||..o{ PAYMENT_ALLOCATION : "original_receipt_same_patient"
+    BILL ||..o{ PAYMENT_ALLOCATION : "bill_same_patient"
+    PAYMENT_DUE |o..o{ PAYMENT_ALLOCATION : "payment_period_same_bill"
+    EMPLOYEE_PROFILE |o..o{ PAYMENT_ALLOCATION : "allocating_employee_id"
+    EMPLOYEE_PROFILE |o..o{ PAYMENT_ALLOCATION : "voiding_employee_id"
+    USER_ACCOUNT |o..o{ NOTIFICATION : "recipient_account_id"
+    PATIENT_PROFILE |o..o{ NOTIFICATION : "patient_id"
+    PATIENT_ACCOUNT_LINK |o..o{ NOTIFICATION : "recipient_link_id"
+    APPOINTMENT |o..o{ NOTIFICATION : "appointment_id"
+    FOLLOW_UP_INSTRUCTION |o..o{ NOTIFICATION : "follow_up_instruction_id"
+    PRESCRIPTION_MEDICINE_REMINDER |o..o{ NOTIFICATION : "medication_reminder_source"
+    NOTIFICATION ||--o{ NOTIFICATION_DELIVERY : "notification_id"
+    PATIENT_PROFILE |o..o{ SUPPORT_CASE : "patient_id"
+    USER_ACCOUNT |o..o{ SUPPORT_CASE : "requester_account_id"
+    APPOINTMENT |o..o{ SUPPORT_CASE : "appointment_id"
+    FOLLOW_UP_INSTRUCTION |o..o{ SUPPORT_CASE : "follow_up_instruction_id"
+    NOTIFICATION |o..o{ SUPPORT_CASE : "notification_id"
+    EMPLOYEE_PROFILE |o..o{ SUPPORT_CASE : "assigned_employee_id"
+    SUPPORT_CASE ||..o{ SUPPORT_INTERACTION : "case_id"
+    USER_ACCOUNT |o..o{ SUPPORT_INTERACTION : "author_account_id"
+    APPOINTMENT |o..o{ SUPPORT_INTERACTION : "resulting_appointment_id"
+    USER_ACCOUNT |o..o{ AUDIT_LOG : "actor_account_id"
+    PATIENT_PROFILE |o..o{ AUDIT_LOG : "patient_id"
+
+    %% COMPOSITE AND CONDITIONAL UNIQUE KEYS
+    %% UK TREATMENT_PLAN(plan_code, revision_number)
+    %% UK TREATMENT_PLAN(treatment_plan_id, patient_id)
+    %% UK TREATMENT_PLAN_SERVICE(treatment_plan_id, logical_line_id)
+    %% UK SERVICE_PACKAGE(package_code, version_number)
+    %% UK APPLIED_SERVICE_PACKAGE(applied_package_id, package_id)
+    %% UK PRESCRIPTION(prescription_code, revision_number)
+    %% UK PRESCRIPTION_MEDICINE(prescription_id, logical_line_id)
+    %% UK PRESCRIPTION_MEDICINE(prescription_id, line_number, medicine_id)
+    %% UK MEDICAL_VISIT_MEDICINE(visit_id, line_number, medicine_id)
+    %% UK MEDICINE_STOCK_EVENT(operation_id, operation_line_number)
+    %% UK MEDICINE_STOCK_EVENT(stock_event_id, medicine_id)
+    %% UK BILL(bill_id, patient_id)
+    %% UK PAYMENT(payment_id, patient_id, record_type)
+    %% UK PAYMENT(payment_id, original_payment_id, patient_id)
+    %% UK PAYMENT_DUE(due_id, bill_id, patient_id)
+    %% UK PATIENT_ACCOUNT_LINK(account_id) WHERE status = VERIFIED
+    %% UK PATIENT_ACCOUNT_LINK(patient_id) WHERE status = VERIFIED
+    %% UK TREATMENT_PLAN(plan_code) WHERE is_current_final = true
+    %% UK PRESCRIPTION(prescription_code) WHERE is_current_final = true
+    %% UK SERVICE_PACKAGE(package_code) WHERE is_active = true
+    %% UK PAYMENT(original_payment_id, correction_number) WHERE record_type = CORRECTION
+    %% UK PAYMENT(payment_provider, transaction_reference) WHERE record_type = RECEIPT and transaction_reference is present
+    %% UK SUPPORT_CASE(appointment_id) WHERE case_type = NO_SHOW
+    %% UK SUPPORT_CASE(follow_up_instruction_id) WHERE case_type = FOLLOW_UP
+    %% UK SUPPORT_CASE(notification_id) WHERE case_type = DELIVERY_FAILURE
+
+    %% COMPOSITE FK TARGETS
+    %% FK MEDICAL_VISIT_SERVICE(treatment_plan_id, treatment_plan_line_number) -> TREATMENT_PLAN_SERVICE(treatment_plan_id, line_number)
+    %% FK MEDICAL_VISIT_SERVICE(applied_package_id, package_definition_id) -> APPLIED_SERVICE_PACKAGE(applied_package_id, package_id)
+    %% FK MEDICAL_VISIT_SERVICE(package_definition_id, service_id) -> SERVICE_PACKAGE_SERVICE(package_id, service_id)
+    %% FK PRESCRIPTION_MEDICINE_REMINDER(prescription_id, prescription_line_number) -> PRESCRIPTION_MEDICINE(prescription_id, line_number)
+    %% FK MEDICAL_VISIT_MEDICINE(visit_id, visit_service_line_number) -> MEDICAL_VISIT_SERVICE(visit_id, line_number)
+    %% FK MEDICINE_STOCK_EVENT(basis_count_event_id, medicine_id) -> MEDICINE_STOCK_EVENT(stock_event_id, medicine_id)
+    %% FK MEDICINE_STOCK_EVENT(original_issue_event_id, medicine_id) -> MEDICINE_STOCK_EVENT(stock_event_id, medicine_id)
+    %% FK MEDICINE_STOCK_EVENT(source_prescription_id, source_prescription_line_number, medicine_id) -> PRESCRIPTION_MEDICINE(prescription_id, line_number, medicine_id)
+    %% FK MEDICINE_STOCK_EVENT(source_visit_id, source_visit_medicine_line_number, medicine_id) -> MEDICAL_VISIT_MEDICINE(visit_id, line_number, medicine_id)
+    %% FK BILL_LINE(source_visit_id, source_visit_line_number) -> MEDICAL_VISIT_SERVICE(visit_id, line_number)
+    %% FK PAYMENT_DUE(bill_id, patient_id) -> BILL(bill_id, patient_id)
+    %% FK PAYMENT_DUE(treatment_plan_id, patient_id) -> TREATMENT_PLAN(treatment_plan_id, patient_id)
+    %% FK PAYMENT(original_payment_id, patient_id, original_record_type) -> PAYMENT(payment_id, patient_id, record_type)
+    %% FK PAYMENT(active_correction_id, payment_id, patient_id) -> PAYMENT(payment_id, original_payment_id, patient_id)
+    %% FK PAYMENT_ALLOCATION(payment_id, patient_id, receipt_record_type) -> PAYMENT(payment_id, patient_id, record_type)
+    %% FK PAYMENT_ALLOCATION(bill_id, patient_id) -> BILL(bill_id, patient_id)
+    %% FK PAYMENT_ALLOCATION(due_id, bill_id, patient_id) -> PAYMENT_DUE(due_id, bill_id, patient_id)
+    %% FK NOTIFICATION(prescription_id, prescription_line_number, reminder_number) -> PRESCRIPTION_MEDICINE_REMINDER(prescription_id, prescription_line_number, reminder_number)
+
+    %% LOGICAL IMPLEMENTATION CONTRACT
+    %% This file is the 37-table property-first proposal. Mermaid does not enforce these rules.
+    %% PK, FK and scalar UK marks are logical. Composite and conditional UKs are listed below.
+    %% Attributes marked Optional are nullable or conditionally required; remaining attributes
+    %% are required unless the type-specific rules explicitly make them conditional.
+    %% Physical lengths, decimal precision, indexes and DB-specific syntax are implementation choices.
+    %% No medicine batches, expiry by batch, FEFO, refund workflow or multi-clinic entities.
+    %% One stable base stock unit per medicine. Cache updates and confirmed events share a transaction.
+    %%
+    %% FK RULES
+    %% Every composite reference targets the complete parent key or listed candidate key.
+    %% Nullable source ID pairs/triples must be present together when their source is selected.
+    %% Shared mandatory context columns (patient_id, medicine_id, service_id, bill_id, payment_id)
+    %% remain populated when a nullable reference is absent. CHECK guards prevent partial sources;
+    %% a nullable composite FK alone must never be treated as an all-or-none CHECK.
+    %% Preserve referenced clinical, financial and stock history; do not cascade-delete it.
+    %% Guard polymorphic source kind/status and same-family membership in database transactions
+    %% or appropriate DB-side constraints/triggers; ordinary FK alone does not prove these states.
+    %%
+    %% IDENTITY AND ACCESS
+    %% Each account has at least one role; staff roles require the employee profile.
+    %% PATIENT_ACCOUNT_LINK stores SELF requests only. Relative booking is not a clinical link.
+    %% A request grants no access until VERIFIED. Store decisions and revocation audit history.
+    %% Account lock or link revocation blocks new private reads/file access and pending private delivery.
+    %% Private content requires active account, current VERIFIED SELF link and eligible released content.
+    %% Phones are not unique patient identifiers. Guardian fields describe one primary representative.
+    %% Contact verification/recovery sessions and device push tokens belong to the selected auth/delivery
+    %% implementation; this logical domain diagram does not claim those protocols are complete.
+    %%
+    %% BOOKING AND RECEPTION
+    %% Booking code is unique; request_key makes booking retries return the same result.
+    %% Keep booker identity and attendee identity separate. Booking does not create Patient.
+    %% All visits, including walk-ins, require a valid confirmed appointment before reception.
+    %% Check-in sets the correct patient on the appointment and creates exactly one visit atomically.
+    %% appointment.employee_id and date must match its published WORK schedule.
+    %% Intervals have start < end; 30/60-minute appointments fit work intervals excluding blocked time.
+    %% No overlap for the dentist or an identified attendee; configured chair capacity covers the interval.
+    %% Self booking needs configured lead time (baseline 60 minutes); staff exception keeps a reason.
+    %% Self change/cancel requires ownership, CONFIRMED not started and baseline at least 12 hours.
+    %% Changing schedule must not invalidate unresolved confirmed appointments.
+    %% No-show baseline: start + 15 minutes, still CONFIRMED and not checked-in; recheck state at commit.
+    %% Rebooking a No-show creates a NEW appointment with rebooked_from_appointment_id.
+    %% Rescheduling retains the same appointment and follow-up link; failure retains the old interval.
+    %% Only one competing conflicting booking can commit. Exist-then-insert is not sufficient.
+    %% Appointment completion follows clinical completion, independent of payment.
+    %%
+    %% CLINICAL DOCUMENT AND TEXT HISTORY
+    %% Medical record, visit, order, plan and attachment patient identities must match.
+    %% Completed visit requires examining dentist and required findings, conclusion, advice/disposition.
+    %% Snapshot health reviewed at the visit; distinguish UNKNOWN from NONE.
+    %% Internal notes, amendment draft payloads and raw AI/reviews are never patient-visible.
+    %% On finalized amendment, append full before/after clinical snapshot, author, time, version and reason
+    %% to AUDIT_LOG in the same transaction; then atomically replace current finalized text and version.
+    %% A pending amendment draft never replaces the currently released finalized text on the app.
+    %% Audit is append-only under application permissions, versioned, backed up and retained.
+    %% This text-history approach does not support FK to each text revision. If such a requirement or an
+    %% independent per-version approval lifecycle is introduced, a typed revision table is required.
+    %% RELEASED files require correct completed visit scope; general files need an eligible visit before
+    %% patient publication. Uploaded storage references are served only after server authorization.
+    %%
+    %% PLAN AND PRESCRIPTION VERSIONS WITHOUT EXTRA TABLES
+    %% plan_code/prescription_code identify a family. Version 1 has null root/supersedes references;
+    %% later versions reference that family's first and immediately preceding versions.
+    %% Same family keeps the same patient/visit and kind; revision increases; no cycles or branching finals.
+    %% is_current_final is true only for a finalized effective version; at most one per family.
+    %% Copy a draft amendment into a NEW header and NEW existing child rows. Keep the old header/rows.
+    %% The old final remains effective until the new final is committed. Switch final flags atomically.
+    %% Scope, service/medicine identity, quantities, snapshots and prices of finalized source rows
+    %% are immutable. Subsequent stop/fulfillment state changes retain audit history.
+    %% plan services are performed only after acceptance; direct treatment records its own agreement.
+    %% Plan lines keep agreed prices regardless of later catalog prices; changes require a new decision.
+    %% PRESCRIPTION.document_kind PATIENT requires visit_id and null template_name; TEMPLATE requires
+    %% template_name and null visit_id. A source_template_id must point to a finalized TEMPLATE.
+    %% Templates are copied into independent PATIENT prescriptions and cannot cause issue, bill or reminder.
+    %% logical_line_id survives copied versions of the same service/medicine within its document family.
+    %% Changing medicine or adding an independent course uses a new logical line; never relabel prior issues.
+    %% Remaining clinic issue = current finalized target quantity minus confirmed DISPENSE quantity over
+    %% all historical source rows of that SAME prescription family and logical line. Returns do not
+    %% automatically authorize re-issue. Old superseded rows remain physical issue/billing evidence.
+    %% 20 target, 8 issued, amended target 20 means 12 remaining; amended target 30 means 22 remaining.
+    %% Lowering target below prior factual issue retains prior facts and blocks further issue;
+    %% it does not erase stock events or imply a refund. Stop affected lines and record the explanation.
+    %% Final prescription has at least one item; dose/route/frequency/duration and stock quantity differ.
+    %% Medicine identity and stock unit are immutable once referenced; catalog edits do not alter snapshots.
+    %% Completed consultation is valid without treatment services, prescription or payment.
+    %%
+    %% PACKAGE DEFINITIONS AND INSTANCES
+    %% A published package definition used by an applied package has immutable components and quantities.
+    %% A catalog change creates a NEW SERVICE_PACKAGE row and component rows with a new version.
+    %% The previous definition remains referenced; only the current version is active for new selection.
+    %% Retiring a version affects new selection, not patients' previously applied entitlements.
+    %% APPLIED_SERVICE_PACKAGE points to the exact definition version and keeps agreed price/name.
+    %% Each separate purchase/application has a distinct applied_package_id, even for the same package.
+    %% MEDICAL_VISIT_SERVICE.applied_package_id and package_definition_id are paired; the selected
+    %% service must exist in that exact definition. Patient identities match the visit and plan.
+    %% Included quantities are checked across all performed services of the same applied instance.
+    %% Accepted applied packages are billed according to the agreed package charging basis;
+    %% package components and included/free medicines never create an additional charge.
+    %% Package charge timing is a clinic business policy, not implied merely by a catalog row.
+    %% Personalized component changes require a new immutable definition and renewed agreement;
+    %% this model does not allow silently modifying a purchased package's live components.
+    %%
+    %% STOCK EVENT DISCRIMINATORS
+    %% All quantities are whole base units. Each event has actor, actual time, entry time and request identity.
+    %% One operation may have multiple lines; all its lines are committed atomically.
+    %% COUNT: quantity_delta = 0, nonnegative system/count snapshots, no prescription/use/return sources;
+    %% confirmed COUNT records evidence, including zero discrepancy, without changing physical stock.
+    %% RECEIPT: delta > 0, receipt source and conversion snapshot where applicable, no clinical source.
+    %% DISPENSE: delta < 0, ELIGIBLE bucket, complete source prescription line, no visit-use source;
+    %% source is current finalized PATIENT CLINIC line of the SAME medicine at time of issue.
+    %% USE: delta < 0, ELIGIBLE bucket, complete source visit-medicine line, no prescription source.
+    %% A confirmed actual use is recorded once; used_quantity matches the confirmed USE totals of its line.
+    %% ADJUSTMENT: signed nonzero delta, reason and configured approval; COUNT basis if from a count.
+    %% Confirmed adjustment is a new event, not an overwrite of prior count or stock movement.
+    %% RETURN: delta > 0 into QUARANTINED, original_issue_event_id references confirmed DISPENSE of
+    %% SAME medicine; cumulative return quantity cannot exceed the remaining returnable original issue.
+    %% DISPOSAL: delta < 0, reason and approval; never exceeds the physical quantity in its bucket.
+    %% QUALITY_TRANSFER: a paired same-medicine operation with equal opposite bucket deltas;
+    %% total physical change is zero. It is aggregate quality tracking, not batch tracking.
+    %% PENDING_APPROVAL/REJECTED/CANCELLED events do not affect stock. CONFIRMED events are immutable.
+    %% Store total physical cache = sum confirmed deltas over buckets; eligible cache = ELIGIBLE sum.
+    %% Bucket balances and total physical stock never go negative; 0 <= eligible <= total physical.
+    %% Recheck stock, source quantity remainder and operation id at commit under suitable locking.
+    %% None of prescription finalization, bill issue or payment deducts stock.
+    %% Billing mode NONE on non-clinical stock events; INCLUDED/SEPARATE/FREE on DISPENSE/USE.
+    %% SEPARATE requires nonnegative sale_unit_price snapshot; included package/source agrees with patient.
+    %% Return is not payment correction/refund and does not automatically increase eligible stock.
+    %%
+    %% BILL SOURCE DISCRIMINATORS
+    %% SERVICE requires both source_visit columns and null stock/package sources.
+    %% MEDICINE requires source_stock_event_id and null visit-service/package sources.
+    %% PACKAGE requires applied_package_id and null visit-service/stock sources.
+    %% SERVICE source is PERFORMED and SEPARATE; source_visit_id equals BILL.visit_id.
+    %% MEDICINE source is confirmed DISPENSE or USE, SEPARATE, and belongs to the same patient.
+    %% Medicine from external purchase or merely prescribed is not a charge source.
+    %% PACKAGE source is accepted, same patient, and allowed by the agreed charging policy.
+    %% Quantity > 0, unit_price >= 0, 0 <= line discount <= quantity * unit_price.
+    %% PACKAGE quantity = 1 and agreed price is preserved; active bills cannot charge it twice.
+    %% Active billed quantity per service/stock source cannot exceed actual performed/issued quantity.
+    %% Canceled bills are excluded from source consumption; draft reservations need a consistent locking policy.
+    %% Issued bills contain at least one line. Line totals and bill total are derived, not stored again.
+    %% Whole-bill discount cannot exceed summed line net values; authorized discounts retain reasons/approval.
+    %% Issued names, units, quantities, prices and discounts are immutable; subsequent corrections need
+    %% an authorized traceable procedure and cannot silently rewrite previously confirmed obligations.
+    %%
+    %% PAYMENT RECEIPT AND CORRECTION DISCRIMINATORS
+    %% RECEIPT has positive amount, method, received_at; null original/corrected/requested correction fields.
+    %% RECEIPT status is PENDING/SUCCESS/FAILED/CANCELLED, as constrained by actual verification.
+    %% CORRECTION has null receipt amount/method, original receipt identity, original_record_type=RECEIPT,
+    %% correction_number, base_effective_version, corrected_amount >= 0, corrected method, reason,
+    %% requester and requested_at. CORRECTION active_correction_id is null.
+    %% CORRECTION status is PENDING_APPROVAL/APPROVED/REJECTED/WITHDRAWN.
+    %% A correction references a SUCCESS RECEIPT of the same patient, never another correction.
+    %% Successful original receipt fields remain immutable. Receipt metadata effective_version and its
+    %% active_correction_id change only through the atomic approved-correction transaction.
+    %% active_correction_id references APPROVED CORRECTION of that exact original receipt and patient.
+    %% Effective receipt amount/method/time comes from active approved correction, otherwise original.
+    %% Corrected amount is an ABSOLUTE corrected value, not an additional collection or an amount to sum.
+    %% Never SUM all PAYMENT rows as cash revenue. Count SUCCESS RECEIPT rows using effective values.
+    %% Pending/rejected correction does not affect funds. Correction is accounting-record repair, not refund.
+    %% Approval locks original receipt, matches base_effective_version, increments it and revisits allocations.
+    %% Approved corrections are immutable. Multiple pending requests require stale-version rejection.
+    %% Payment gateway result must be authenticated and match currency, reference, amount and purpose.
+    %% An unmatched result remains pending reconciliation; screenshots alone are not confirmation.
+    %% Exactly one receipt per provider transaction; request identity protects cash/manual retries too.
+    %%
+    %% ALLOCATIONS AND DUE PERIODS
+    %% Allocation receipt_record_type=RECEIPT; source is SUCCESS original receipt of same patient as bill.
+    %% active allocation amount > 0; total active per receipt <= effective received amount.
+    %% Total active per bill <= derived bill net amount. Unallocated credit remains on the patient receipt.
+    %% Due period has positive amount_due, patient, and at least bill or finalized plan source.
+    %% bill and plan, when both present, belong to that patient and compatible agreed scope.
+    %% An allocation with due_id uses that due's exact bill/patient; bind planned due to bill before allocation.
+    %% Total active allocations per due do not exceed amount_due; scheduled totals do not exceed the
+    %% agreed obligation they partition. Installments/deadlines are distinct from funds actually received.
+    %% Pending receipts and corrections are not available funds. Allocation retries return existing result.
+    %% A correction that reduces effective receipt below allocations must atomically void/reallocate excess.
+    %% Confirmed receipt/allocation history is retained. No delete or cascade removes confirmed money history.
+    %% Bill payment status PAID/PARTIAL/UNPAID and overdue/remaining due are computed from effective funds,
+    %% active allocations and active due periods; they are independent of visit/stock states.
+    %% An issued bill with active allocations cannot be canceled without an authorized allocation resolution;
+    %% cancellation alone does not erase receipt or create a refund.
+    %%
+    %% NOTIFICATIONS
+    %% Appointment types require only appointment source; FOLLOW_UP_DUE only instruction source;
+    %% MEDICATION_REMINDER requires the full reminder composite source and no appointment/instruction source.
+    %% Private medication/follow-up messages need current verified SELF recipient link; account/patient match.
+    %% Public booking events may target booker account/contact without patient or clinical link.
+    %% Medication dates/times lie within source course and enabled reminder; obsolete versions are canceled.
+    %% Asia/Ho_Chi_Minh schedule and configured retries; recheck source version, current state and preferences.
+    %% Disabling push does not remove in-app notification. Provider ACCEPTED/DELIVERED never sets read_at.
+    %% Push contains generic text and authorized deep link, not diagnosis, medicine content or raw AI.
+    %% A final delivery failure/no-channel creates one corresponding support case without canceling booking.
+    %%
+    %% SUPPORT CASE AND INTERACTION DISCRIMINATORS
+    %% NO_SHOW requires appointment source; FOLLOW_UP requires instruction; DELIVERY_FAILURE requires
+    %% notification; LATE_APPOINTMENT_CHANGE requires appointment plus confirmed requested_action/payload.
+    %% CHAT may have no clinical source. Guest patient_id remains nullable before check-in.
+    %% Source-linked patient identity and minimal authorized contact context must agree.
+    %% One case per No-show/instruction/final-notification-failure source; reopen and append interactions
+    %% when more follow-up is needed, rather than producing duplicate cases on each job retry.
+    %% Late change requests may recur; at most one currently active equivalent request, not one lifetime case.
+    %% MESSAGE stores one message; CALL stores one contact attempt and contact outcome;
+    %% ACTION stores authorized request/result. Actor/channel/type must agree; BOT has no staff account.
+    %% Only successful committed booking/change action may set resulting_appointment_id or COMMITTED.
+    %% Three calls are three interactions. Assignment/handoff/current state live on case and audit history.
+    %% Case type and ownership control visibility; sharing a table does not expose internal staff tasks.
+    %% Chatbot never diagnoses/prescribes or releases raw imaging; actions use the ordinary server rules.
+    %%
+    %% AUDIT AND CONCURRENCY
+    %% Every important change keeps actor, original reference, reason, actual event time and entry time.
+    %% Log own-record/file reads; target entity_key may be composite and is not a business FK source.
+    %% Audit must not become the primary stock, funds, allocation or support-interaction ledger.
+    %% concurrency_version supports stale-change detection; aggregate checks require actual transactional
+    %% locking/isolation/idempotency. A version column alone does not enforce cross-row invariants.
+    %% Offline re-entry reconciles request/source identity and real time before applying changes.
+    %% Required indexes are chosen from actual queries; table count does not prove query performance.

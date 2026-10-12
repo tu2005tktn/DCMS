@@ -1,0 +1,18 @@
+:root { font-family: Inter, system-ui, sans-serif; color: #17233d; background: #f4f7fb; }
+body { margin: 0; }
+.page { min-height: 100vh; display: grid; place-items: center; padding: 24px; box-sizing: border-box; }
+.content { width: min(100%, 680px); }
+.eyebrow { color: #175cd3; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.intro { font-size: 17px; color: #475467; margin-bottom: 28px; }
+.login-content { max-width: 440px; }
+.login-help { margin-top: 24px; color: #667085; }
+.form-alert { margin-bottom: 18px; }
+.workspace { min-height: 100vh; }
+.workspace-header { background: white; display: flex; align-items: center; justify-content: space-between; padding: 0 32px; border-bottom: 1px solid #edf0f5; }
+.brand { font-size: 24px; font-weight: 800; color: #175cd3; }
+.workspace-content { width: min(100%, 1440px); margin: 0 auto; padding: 32px; box-sizing: border-box; }
+.page-heading, .table-tools { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 24px; }
+.page-heading h2 { margin-top: 0; }
+.audit-entry { margin-bottom: 16px; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }
+@media (max-width: 680px) { .workspace-header { padding: 0 16px; } .workspace-content { padding: 16px; } .page-heading, .table-tools { align-items: stretch; flex-direction: column; } }
