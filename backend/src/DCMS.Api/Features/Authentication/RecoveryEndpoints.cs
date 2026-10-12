@@ -31,13 +31,15 @@ public static class RecoveryEndpoints
                 : Results.BadRequest(SystemMessages.Get("MSG108"));
         }).AllowAnonymous();
 
-        // Resend inside the cooldown / resend cap; still a neutral response.
+        // Resend. Always the same neutral answer: cooldown, cap and rate limits are enforced
+        // server-side, but the response carries no field that would reveal whether an account
+        // exists, whether a proof is still valid, or whether a message was actually sent.
         group.MapPost("/resend", async (RecoveryRequest request, IAccountRecoveryService service,
             HttpContext context, CancellationToken ct) =>
         {
             var ip = context.Connection.RemoteIpAddress?.ToString();
-            var result = await service.ResendAsync(request.Identifier, ip, ct);
-            return Results.Ok(new RecoveryResendResponse(result.RetryAfterSeconds));
+            await service.ResendAsync(request.Identifier, ip, ct);
+            return Results.Ok(SystemMessages.Get("MSG12"));
         }).AllowAnonymous();
 
         // Step 3: apply the new password with the grant from the verify step.
@@ -50,10 +52,6 @@ public static class RecoveryEndpoints
                 ? Results.Ok(SystemMessages.Get("MSG13"))
                 : Results.BadRequest(SystemMessages.Get("MSG108"));
         }).AllowAnonymous();
-
-        // Current request state so the UI can drive the resend countdown.
-        group.MapGet("/status", async (string identifier, IAccountRecoveryService service, CancellationToken ct) =>
-            Results.Ok(await service.GetStatusAsync(identifier, ct))).AllowAnonymous();
 
         // S04 integration point: an authorized Admin may start the same recovery process for an
         // account. The service re-checks the Admin permission server-side on every call.
@@ -83,6 +81,10 @@ public static class RecoveryEndpoints
                 ? Results.Ok(SystemMessages.Get("MSG13"))
                 : Results.BadRequest(SystemMessages.Get("MSG108"));
         });
+        // Admin-only because for an anonymous caller it would confirm that an account exists.
+        admin.MapGet("/status/{accountId:int}", async (HttpContext context, int accountId,
+            IAccountRecoveryService service, CancellationToken ct) =>
+            Results.Ok(await service.GetStatusAsync(AccountId(context.User), accountId, ct)));
     }
 
     public static int AccountId(ClaimsPrincipal user) => AuthenticationEndpoints.AccountId(user);
@@ -93,5 +95,4 @@ public sealed record RecoveryVerifyRequest(string Identifier, string Proof);
 public sealed record RecoveryResetRequest(string Identifier, string ResetGrant, string NewPassword, string ConfirmPassword);
 public sealed record RecoveryAdminResetRequest(string NewPassword, string ConfirmPassword);
 public sealed record RecoveryGrantResponse(string ResetGrant);
-public sealed record RecoveryResendResponse(int? RetryAfterSeconds);
 public sealed record AdminRecoveryResponse(int AccountId, string ChannelType, string Destination, int? RetryAfterSeconds);

@@ -311,6 +311,73 @@ public sealed class RecoveryApiTests(ApiFixture fixture) : IClassFixture<ApiFixt
     }
 
     [Fact]
+    public async Task AdminAssistedVerificationRecordsTheAdminAsActor()
+    {
+        const string userName = "guest.demo";
+        var accountId = await AccountIdAsync(userName);
+        var (admin, _) = await Login("admin.demo");
+        var adminId = await AccountIdAsync("admin.demo");
+
+        var started = await admin.PostAsJsonAsync($"/api/admin/recovery/request/{accountId}", new { });
+        Assert.Equal(HttpStatusCode.OK, started.StatusCode);
+        var proof = fixture.Delivery.ProofFor(accountId)!;
+
+        // A verifier given to the owner: the Admin path only starts the process, it cannot skip it.
+        var verified = await admin.PostAsJsonAsync($"/api/admin/recovery/verify/{accountId}",
+            new RecoveryVerifyRequest(userName, proof));
+        Assert.Equal(HttpStatusCode.OK, verified.StatusCode);
+        var grant = (await verified.Content.ReadFromJsonAsync<RecoveryGrantResponse>())!.ResetGrant;
+
+        await using var connection = new Npgsql.NpgsqlConnection(fixture.ConnectionString);
+        await connection.OpenAsync();
+        await using var command = new Npgsql.NpgsqlCommand("""
+            SELECT "ActorId", "TargetId", "Action" FROM "RECOVERY_AUDIT"
+            WHERE "TargetId" = @id AND "Action" IN ('RecoveryRequested', 'RecoveryVerified')
+            """, connection);
+        command.Parameters.AddWithValue("id", accountId);
+        await using var reader = await command.ExecuteReaderAsync();
+        var requested = new List<(int? Actor, string Action)>();
+        while (await reader.ReadAsync())
+            requested.Add((reader.IsDBNull(0) ? null : reader.GetInt32(0), reader.GetString(2)));
+
+        // GBR-028/GBR-081: the Admin who drove the action is recorded as the actor, not null.
+        Assert.Contains(requested, entry => entry.Action == "RecoveryRequested" && entry.Actor == adminId);
+        Assert.Contains(requested, entry => entry.Action == "RecoveryVerified" && entry.Actor == adminId);
+
+        var reset = await admin.PostAsJsonAsync($"/api/admin/recovery/reset/{accountId}",
+            new { NewPassword, ConfirmPassword = NewPassword });
+        await AssertMessageAsync(reset, HttpStatusCode.OK, "MSG13");
+        await AssertMessageAsync(await fixture.CreateClient().PostAsJsonAsync("/api/auth/sign-in",
+            new SignInRequest(userName, fixture.Password)), HttpStatusCode.Unauthorized, "MSG09");
+        Assert.Equal(HttpStatusCode.OK, (await fixture.CreateClient().PostAsJsonAsync("/api/auth/sign-in",
+            new SignInRequest(userName, NewPassword))).StatusCode);
+
+        // The grant the Admin received is single-use: replaying it fails.
+        await AssertMessageAsync(await fixture.CreateClient().PostAsJsonAsync("/api/auth/recovery/reset",
+            new RecoveryResetRequest(userName, grant, NewPassword + "x", NewPassword + "x")),
+            HttpStatusCode.BadRequest, "MSG108");
+    }
+
+    [Fact]
+    public async Task AdminRecoveryKeepsTheSharedCooldown()
+    {
+        const string userName = "assistant.demo";
+        var accountId = await AccountIdAsync(userName);
+        var (admin, _) = await Login("admin.demo");
+        await admin.PostAsJsonAsync($"/api/admin/recovery/request/{accountId}", new { });
+        var first = fixture.Delivery.ProofFor(accountId)!;
+
+        // A second Admin request inside the cooldown must not issue a new proof or invalidate the
+        // first one: the Admin path reuses the same process instead of bypassing it.
+        var second = await admin.PostAsJsonAsync($"/api/admin/recovery/request/{accountId}", new { });
+        Assert.Equal(HttpStatusCode.OK, second.StatusCode);
+        Assert.Equal(first, fixture.Delivery.ProofFor(accountId));
+        var verify = await admin.PostAsJsonAsync($"/api/admin/recovery/verify/{accountId}",
+            new RecoveryVerifyRequest(userName, first));
+        Assert.Equal(HttpStatusCode.OK, verify.StatusCode);
+    }
+
+    [Fact]
     public async Task AuditRecordsTheRecoveryEventsWithoutStoringSecrets()
     {
         const string userName = "dentist.demo";
@@ -358,30 +425,42 @@ public sealed class RecoveryApiTests(ApiFixture fixture) : IClassFixture<ApiFixt
     }
 
     [Fact]
-    public async Task ResendRespectsTheCooldownAndTheResendCap()
+    public async Task ResendStaysNeutralWhileCooldownAndCapAreStillEnforced()
     {
         const string userName = "guest.demo";
         var client = fixture.CreateClient();
         await client.PostAsJsonAsync("/api/auth/recovery/request", new RecoveryRequest(userName));
-
-        // Immediately resending is refused and reports the remaining wait.
-        var immediate = await client.PostAsJsonAsync("/api/auth/recovery/resend", new RecoveryRequest(userName));
-        Assert.Equal(HttpStatusCode.OK, immediate.StatusCode);
-        var body = (await immediate.Content.ReadFromJsonAsync<RecoveryResendResponse>())!;
-        Assert.True(body.RetryAfterSeconds is > 0, "A resend inside the cooldown must be refused.");
-
-        // Rewinding the timestamp makes the wait elapse; only the cap can then refuse it.
         var accountId = await AccountIdAsync(userName);
-        await ForceLastResendAsync(accountId, DateTimeOffset.UtcNow.AddHours(-1));
-        var afterCooldown = await client.PostAsJsonAsync("/api/auth/recovery/resend", new RecoveryRequest(userName));
-        Assert.Equal(HttpStatusCode.OK, afterCooldown.StatusCode);
+        var proof = fixture.Delivery.ProofFor(accountId)!;
 
-        // Drive the counter past the configured cap.
+        // Immediate resend is refused on the server but the answer is byte-for-byte the same as a
+        // successful one, and the already delivered proof is still the only live one.
+        var immediate = await client.PostAsJsonAsync("/api/auth/recovery/resend", new RecoveryRequest(userName));
+        var neutral = SystemMessages.Get("MSG12");
+        Assert.Equal(HttpStatusCode.OK, immediate.StatusCode);
+        Assert.Equal(neutral, (await immediate.Content.ReadFromJsonAsync<SystemMessage>())!);
+        Assert.Equal(neutral, (await (await client.PostAsJsonAsync("/api/auth/recovery/resend",
+            new RecoveryRequest("no.such.account." + Guid.NewGuid().ToString("N")[..8])))
+            .Content.ReadFromJsonAsync<SystemMessage>())!);
+        var verify = await client.PostAsJsonAsync("/api/auth/recovery/verify", new RecoveryVerifyRequest(userName, proof));
+        Assert.Equal(HttpStatusCode.OK, verify.StatusCode);
+
+        // Past the cooldown the resend goes through, invalidating the earlier proof.
+        await ForceLastResendAsync(accountId, DateTimeOffset.UtcNow.AddHours(-1));
+        await client.PostAsJsonAsync("/api/auth/recovery/resend", new RecoveryRequest(userName));
+        var replaced = fixture.Delivery.ProofFor(accountId)!;
+        Assert.NotEqual(proof, replaced);
+        await AssertMessageAsync(await client.PostAsJsonAsync("/api/auth/recovery/verify",
+            new RecoveryVerifyRequest(userName, proof)), HttpStatusCode.BadRequest, "MSG108");
+        var verifyReplaced = await client.PostAsJsonAsync("/api/auth/recovery/verify",
+            new RecoveryVerifyRequest(userName, replaced));
+        Assert.Equal(HttpStatusCode.OK, verifyReplaced.StatusCode);
+        Assert.NotNull((await verifyReplaced.Content.ReadFromJsonAsync<RecoveryGrantResponse>())!.ResetGrant);
+
+        // Past the cap no new proof is issued, so the last one stays live.
         await ForceResendCountAsync(accountId, 99);
-        var capped = await client.PostAsJsonAsync("/api/auth/recovery/resend", new RecoveryRequest(userName));
-        Assert.Equal(HttpStatusCode.OK, capped.StatusCode);
-        var cappedBody = (await capped.Content.ReadFromJsonAsync<RecoveryResendResponse>())!;
-        Assert.Null(cappedBody.RetryAfterSeconds);
+        await client.PostAsJsonAsync("/api/auth/recovery/resend", new RecoveryRequest(userName));
+        Assert.Equal(replaced, fixture.Delivery.ProofFor(accountId));
     }
 
     [Fact]
@@ -441,18 +520,28 @@ public sealed class RecoveryApiTests(ApiFixture fixture) : IClassFixture<ApiFixt
     }
 
     [Fact]
-    public async Task StatusReportsTheActiveRequestWithoutLeakingExistence()
+    public async Task RecoveryStatusIsAdminOnlySoItCannotBeUsedToEnumerateAccounts()
     {
-        var unknown = fixture.CreateClient();
-        var unknownStatus = (await unknown.GetFromJsonAsync<RecoveryStatusSnapshot>("/api/auth/recovery/status?identifier=missing." + Guid.NewGuid().ToString("N")[..8]))!;
-        Assert.False(unknownStatus.HasActiveRequest);
-        Assert.Empty(unknownStatus.ChannelType);
+        const string userName = "guest.demo";
+        var accountId = await AccountIdAsync(userName);
 
-        await fixture.CreateClient().PostAsJsonAsync("/api/auth/recovery/request", new RecoveryRequest("guest.demo"));
-        var known = (await fixture.CreateClient().GetFromJsonAsync<RecoveryStatusSnapshot>("/api/auth/recovery/status?identifier=guest.demo"))!;
-        Assert.True(known.HasActiveRequest);
-        Assert.Equal("Email", known.ChannelType);
-        Assert.True(known.SecondsUntilExpiry > 0);
+        // There is deliberately no anonymous status endpoint: once a request had been made for an
+        // account it would confirm that the account exists.
+        var anonymous = fixture.CreateClient();
+        var missingEndpoint = await anonymous.GetAsync("/api/auth/recovery/status?identifier=" + userName);
+        Assert.True(missingEndpoint.StatusCode is HttpStatusCode.MethodNotAllowed or HttpStatusCode.NotFound,
+            $"Anonymous status unexpectedly returned {missingEndpoint.StatusCode}.");
+
+        await fixture.CreateClient().PostAsJsonAsync("/api/auth/recovery/request", new RecoveryRequest(userName));
+        var (dentist, _) = await Login("dentist.demo");
+        await AssertMessageAsync(await dentist.GetAsync($"/api/admin/recovery/status/{accountId}"),
+            HttpStatusCode.Forbidden, "MSG06");
+
+        var (admin, _) = await Login("admin.demo");
+        var status = await admin.GetFromJsonAsync<RecoveryStatusSnapshot>($"/api/admin/recovery/status/{accountId}");
+        Assert.True(status!.HasActiveRequest);
+        Assert.Equal("Email", status.ChannelType);
+        Assert.True(status.SecondsUntilExpiry > 0);
     }
 
     private async Task LockAccountAsync(HttpClient admin, int accountId)

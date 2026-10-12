@@ -1,6 +1,5 @@
-using System.Data;
+﻿using System.Data;
 using System.Security.Cryptography;
-using System.Text;
 using DCMS.Application.Common;
 using DCMS.Application.Features.Authentication;
 using DCMS.Domain.Features.Accounts;
@@ -18,8 +17,8 @@ namespace DCMS.Infrastructure.Features.Authentication;
 
 /// <summary>
 /// Shared UC-02 account recovery process used by S03 (self-service) and S04 (Admin-assisted).
-/// Self-service responses are always neutral so account existence is never leaked.
-/// Passwords, verification codes, reset grants and reset links are never logged or stored.
+/// Self-service responses are always neutral, in text, status and shape, so account existence is
+/// never leaked. Passwords, verification codes, reset grants and reset links are never logged.
 /// </summary>
 public sealed class AccountRecoveryService(
     DcmsDbContext db,
@@ -33,12 +32,12 @@ public sealed class AccountRecoveryService(
 
     public async Task<RecoveryRequestOutcome> RequestAsync(string identifier, string? ipAddress, CancellationToken ct)
     {
-        // Neutral answer used for every valid-format request, matching or not an account (GBR/UC-02 step 3).
+        // One neutral answer for every valid-format request, matching an account or not (UC-02 step 3).
         var neutral = new RecoveryRequestOutcome(true, "MSG12");
         var invalid = ValidateIdentifier(identifier);
         if (invalid != null) throw invalid;
 
-        // Limits are checked before the lookup so "throttled" cannot be told apart from "unknown account".
+        // Limits are checked before the lookup so "throttled" cannot be told apart from "unknown".
         if (!AllowRequest(identifier, ipAddress)) return neutral;
 
         var user = await FindAsync(identifier, ct);
@@ -51,8 +50,8 @@ public sealed class AccountRecoveryService(
         try
         {
             var current = await LatestTokenAsync(user.Id, ct);
-            var token = await IssueAsync(user, current, null, ct);
-            await AuditAsync(null, user.Id, "RecoveryRequested", "Yêu cầu đặt lại mật khẩu",
+            var token = await IssueAsync(user, current, ct);
+            await AuditAsync(null, user.Id, "RecoveryRequested", "YÃªu cáº§u Ä‘áº·t láº¡i máº­t kháº©u",
                 ChannelName(token), "Succeeded", ct);
         }
         catch (RecoveryBlockedException blocked)
@@ -64,22 +63,80 @@ public sealed class AccountRecoveryService(
         return neutral;
     }
 
-    public async Task<RecoveryVerifyOutcome> VerifyAsync(string identifier, string proof, string? ipAddress, CancellationToken ct)
+    public async Task<RecoveryResendOutcome> ResendAsync(string identifier, string? ipAddress, CancellationToken ct)
     {
-        var invalid = new RecoveryVerifyOutcome(false, null);
-        var validation = ValidateIdentifier(identifier) ?? ValidateProof(proof);
-        if (validation != null) throw validation;
+        // The resend answer is the same for every valid-format request: the neutral text with no
+        // field that would reveal whether an account exists or whether a send actually happened.
+        // Cooldown, cap and rate limits are still enforced before any send.
+        var invalid = ValidateIdentifier(identifier);
+        if (invalid != null) throw invalid;
+        if (!AllowRequest(identifier, ipAddress)) return new RecoveryResendOutcome(false, "MSG12", null);
 
         var user = await FindAsync(identifier, ct);
-        if (user == null) return invalid;
+        if (user == null)
+        {
+            await EqualizeTimingAsync(ct);
+            return new RecoveryResendOutcome(false, "MSG12", null);
+        }
 
+        // Unknown account and throttled account get the same answer below, so neither can be told
+        // apart without knowing an identifier that actually exists.
+        var current = await LatestTokenAsync(user.Id, ct);
+        if (current != null && ThrottleFor(current) != null) return new RecoveryResendOutcome(false, "MSG12", null);
+
+        try
+        {
+            var token = await IssueAsync(user, current, ct);
+            await AuditAsync(null, user.Id, "RecoveryRequested", "Gá»­i láº¡i hÆ°á»›ng dáº«n Ä‘áº·t láº¡i máº­t kháº©u",
+                ChannelName(token), "Succeeded", ct);
+        }
+        catch (RecoveryBlockedException blocked)
+        {
+            await AuditAsync(null, user.Id, "RecoveryBlocked", blocked.Reason,
+                settings.Channel.ToString(), blocked.Result, ct);
+        }
+
+        return new RecoveryResendOutcome(true, "MSG12", null);
+    }
+
+    public async Task<RecoveryVerifyOutcome> VerifyAsync(string identifier, string proof, string? ipAddress,
+        CancellationToken ct)
+    {
+        var invalid = ValidateIdentifier(identifier) ?? ValidateProof(proof);
+        if (invalid != null) throw invalid;
+
+        var user = await FindAsync(identifier, ct);
+        if (user == null)
+        {
+            await EqualizeTimingAsync(ct);
+            return new RecoveryVerifyOutcome(false, null);
+        }
+
+        return await VerifyCoreAsync(user, proof, actorId: null, ct);
+    }
+
+    public async Task<RecoveryResetOutcome> ResetAsync(string identifier, string resetGrant, string newPassword,
+        string confirmPassword, CancellationToken ct)
+    {
+        var invalid = ValidateIdentifier(identifier) ?? ValidateProof(resetGrant)
+            ?? ValidatePassword(newPassword, confirmPassword);
+        if (invalid != null) throw invalid;
+
+        var user = await FindAsync(identifier, ct);
+        return await ApplyResetAsync(user, resetGrant, newPassword, adminActor: null, ct);
+    }
+
+    private async Task<RecoveryVerifyOutcome> VerifyCoreAsync(ApplicationUser user, string proof, int? actorId,
+        CancellationToken ct)
+    {
+        var invalid = new RecoveryVerifyOutcome(false, null);
         var current = await LatestTokenAsync(user.Id, ct);
         if (current == null) return invalid;
 
         // Over the attempt limit the proof is refused outright, exactly like an invalid proof.
         if (current.VerifyAttempts >= settings.MaxVerifyAttempts)
         {
-            await AuditAsync(null, user.Id, "RecoveryBlocked", "Vượt quá số lần xác minh cho phép",
+            await AuditAsync(actorId, user.Id, "RecoveryBlocked", "VÆ°á»£t quÃ¡ sá»‘ láº§n xÃ¡c minh cho phÃ©p",
                 ChannelName(current), "OverAttemptLimit", ct);
             return invalid;
         }
@@ -94,7 +151,7 @@ public sealed class AccountRecoveryService(
             await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
             var result = row.UsedAt != null ? "UsedProof" : row.ExpiresAt <= DateTimeOffset.UtcNow ? "ExpiredProof" : "InvalidProof";
-            await AuditAsync(null, user.Id, "RecoveryFailed", ReasonFor(result), ChannelName(row), result, ct);
+            await AuditAsync(actorId, user.Id, "RecoveryFailed", ReasonFor(result), ChannelName(row), result, ct);
             return invalid;
         }
 
@@ -102,66 +159,86 @@ public sealed class AccountRecoveryService(
         row.ResetGrantHash = Hash(grant);
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
-        await AuditAsync(null, user.Id, "RecoveryVerified", "Xác minh thành công", ChannelName(row), "Succeeded", ct);
-        logger.LogInformation("Recovery verified for account {AccountId}; grant issued (grant not logged).", user.Id);
+        await AuditAsync(actorId, user.Id, "RecoveryVerified", "XÃ¡c minh thÃ nh cÃ´ng", ChannelName(row), "Succeeded", ct);
+        logger.LogInformation("Recovery verified for account {AccountId} by actor {ActorId}; grant issued (grant not logged).",
+            user.Id, actorId?.ToString() ?? "self");
         return new RecoveryVerifyOutcome(true, grant);
     }
 
-    public async Task<RecoveryResendOutcome> ResendAsync(string identifier, string? ipAddress, CancellationToken ct)
+    public async Task<AdminRecoveryRequestOutcome> RequestForAccountAsync(int actorId, int targetAccountId,
+        CancellationToken ct)
     {
-        var validation = ValidateIdentifier(identifier);
-        if (validation != null) throw validation;
-        if (!AllowRequest(identifier, ipAddress)) return new RecoveryResendOutcome(false, "MSG12", null);
+        await RequireAdminAsync(actorId, ct);
+        var user = await db.Users.SingleOrDefaultAsync(x => x.Id == targetAccountId, ct)
+            ?? throw new BusinessException(404, SystemMessages.Get("MSG01"));
 
-        var user = await FindAsync(identifier, ct);
-        if (user == null)
+        var current = await LatestTokenAsync(targetAccountId, ct);
+        var throttle = current == null ? null : ThrottleFor(current);
+        if (throttle != null)
         {
-            await EqualizeTimingAsync(ct);
-            return new RecoveryResendOutcome(false, "MSG12", null);
+            // Admin-assisted recovery keeps the shared cooldown: it is not a way around the cap.
+            await AuditAsync(actorId, targetAccountId, "RecoveryBlocked", "Gá»­i láº¡i quÃ¡ sá»›m",
+                ChannelName(current), "OverResendLimit", ct);
+            return new AdminRecoveryRequestOutcome(false, "MSG12", targetAccountId, ChannelName(current),
+                current!.NormalizedDestination, throttle.RetryAfterSeconds);
         }
-
-        var current = await LatestTokenAsync(user.Id, ct);
-        if (current == null) return new RecoveryResendOutcome(false, "MSG12", null);
-
-        var throttle = ThrottleFor(current);
-        if (throttle != null) return throttle;
 
         try
         {
-            var token = await IssueAsync(user, current, null, ct);
-            await AuditAsync(null, user.Id, "RecoveryRequested", "Gửi lại hướng dẫn đặt lại mật khẩu",
+            var token = await IssueAsync(user, current, ct);
+            await AuditAsync(actorId, targetAccountId, "RecoveryRequested", "Há»— trá»£ khÃ´i phá»¥c bá»Ÿi quáº£n trá»‹ viÃªn",
                 ChannelName(token), "Succeeded", ct);
-            return new RecoveryResendOutcome(true, "MSG12", null);
+            return new AdminRecoveryRequestOutcome(true, "MSG12", targetAccountId, ChannelName(token),
+                token.NormalizedDestination, null);
         }
         catch (RecoveryBlockedException blocked)
         {
-            await AuditAsync(null, user.Id, "RecoveryBlocked", blocked.Reason, ChannelName(current), blocked.Result, ct);
-            return new RecoveryResendOutcome(false, "MSG12", null);
+            await AuditAsync(actorId, targetAccountId, "RecoveryBlocked", blocked.Reason,
+                ChannelName(current), blocked.Result, ct);
+            return new AdminRecoveryRequestOutcome(false, "MSG12", targetAccountId, ChannelName(current), "", null);
         }
     }
 
-    public async Task<RecoveryResetOutcome> ResetAsync(string identifier, string resetGrant, string newPassword,
-        string confirmPassword, CancellationToken ct)
+    public async Task<RecoveryVerifyOutcome> VerifyForAccountAsync(int actorId, int targetAccountId, string proof,
+        CancellationToken ct)
     {
-        var validation = ValidateIdentifier(identifier) ?? ValidateProof(resetGrant)
-            ?? ValidatePassword(newPassword, confirmPassword);
-        if (validation != null) throw validation;
-
-        var user = await FindAsync(identifier, ct);
-        return await ApplyResetAsync(user, resetGrant, newPassword, null, ct);
+        await RequireAdminAsync(actorId, ct);
+        var user = await db.Users.SingleOrDefaultAsync(x => x.Id == targetAccountId, ct)
+            ?? throw new BusinessException(404, SystemMessages.Get("MSG01"));
+        // The Admin actor is carried into the audit trail so GBR-028 stays satisfied.
+        return await VerifyCoreAsync(user, proof, actorId, ct);
     }
 
-    public async Task<RecoveryStatusSnapshot> GetStatusAsync(string identifier, CancellationToken ct)
+    public async Task<RecoveryResetOutcome> ResetForAccountAsync(int actorId, int targetAccountId, string newPassword,
+        string confirmPassword, CancellationToken ct)
     {
-        var validation = ValidateIdentifier(identifier);
-        if (validation != null) throw validation;
+        await RequireAdminAsync(actorId, ct);
+        var invalid = ValidatePassword(newPassword, confirmPassword);
+        if (invalid != null) throw invalid;
 
-        var user = await FindAsync(identifier, ct);
-        if (user == null) return NeutralStatus();
+        var user = await db.Users.SingleOrDefaultAsync(x => x.Id == targetAccountId, ct)
+            ?? throw new BusinessException(404, SystemMessages.Get("MSG01"));
 
-        var current = await LatestTokenAsync(user.Id, ct);
-        if (current == null) return NeutralStatus();
-        return NeutralStatus() with
+        // The Admin path reuses the same process: the account owner must already have completed
+        // verification. An Admin may then set the new credential, and the action is audited.
+        var current = await LatestTokenAsync(targetAccountId, ct);
+        if (current == null || string.IsNullOrEmpty(current.ResetGrantHash) || current.UsedAt != null)
+            throw new BusinessException(400, SystemMessages.Get("MSG108"));
+
+        return await ApplyResetAsync(user, grant: null, newPassword, actorId, ct);
+    }
+
+    public async Task<RecoveryStatusSnapshot> GetStatusAsync(int actorId, int targetAccountId, CancellationToken ct)
+    {
+        // Status is deliberately admin-only: for an anonymous caller it would confirm that an
+        // account exists as soon as one recovery request had been made for it.
+        await RequireAdminAsync(actorId, ct);
+        var user = await db.Users.AsNoTracking().SingleOrDefaultAsync(x => x.Id == targetAccountId, ct)
+            ?? throw new BusinessException(404, SystemMessages.Get("MSG01"));
+
+        var current = await LatestTokenAsync(targetAccountId, ct);
+        if (current == null) return EmptyStatus();
+        return EmptyStatus() with
         {
             HasActiveRequest = true,
             ChannelType = ChannelName(current),
@@ -172,69 +249,15 @@ public sealed class AccountRecoveryService(
         };
     }
 
-    public async Task<AdminRecoveryRequestOutcome> RequestForAccountAsync(int actorId, int targetAccountId, CancellationToken ct)
-    {
-        await RequireAdminAsync(actorId, ct);
-        var user = await db.Users.AsNoTracking().SingleOrDefaultAsync(x => x.Id == targetAccountId, ct)
-            ?? throw new BusinessException(404, SystemMessages.Get("MSG01"));
-
-        var current = await LatestTokenAsync(user.Id, ct);
-        var throttle = current == null ? null : ThrottleFor(current);
-        if (throttle != null && !throttle.Accepted)
-        {
-            await AuditAsync(actorId, user.Id, "RecoveryBlocked", "Gửi lại quá sớm", ChannelName(current), "OverResendLimit", ct);
-            return new AdminRecoveryRequestOutcome(false, "MSG12", user.Id, ChannelName(current),
-                current!.NormalizedDestination, throttle.RetryAfterSeconds);
-        }
-
-        try
-        {
-            var token = await IssueAsync(user, current, actorId, ct);
-            await AuditAsync(actorId, user.Id, "RecoveryRequested", "Hỗ trợ khôi phục bởi quản trị viên",
-                ChannelName(token), "Succeeded", ct);
-            return new AdminRecoveryRequestOutcome(true, "MSG12", user.Id, ChannelName(token),
-                token.NormalizedDestination, null);
-        }
-        catch (RecoveryBlockedException blocked)
-        {
-            await AuditAsync(actorId, user.Id, "RecoveryBlocked", blocked.Reason,
-                ChannelName(current), blocked.Result, ct);
-            return new AdminRecoveryRequestOutcome(false, "MSG12", user.Id, ChannelName(current), "", null);
-        }
-    }
-
-    public async Task<RecoveryVerifyOutcome> VerifyForAccountAsync(int actorId, int targetAccountId, string proof, CancellationToken ct)
-    {
-        await RequireAdminAsync(actorId, ct);
-        var user = await db.Users.AsNoTracking().SingleOrDefaultAsync(x => x.Id == targetAccountId, ct)
-            ?? throw new BusinessException(404, SystemMessages.Get("MSG01"));
-        return await VerifyAsync(user.UserName!, proof, null, ct);
-    }
-
-    public async Task<RecoveryResetOutcome> ResetForAccountAsync(int actorId, int targetAccountId, string newPassword,
-        string confirmPassword, CancellationToken ct)
-    {
-        await RequireAdminAsync(actorId, ct);
-        var validation = ValidatePassword(newPassword, confirmPassword);
-        if (validation != null) throw validation;
-
-        var user = await db.Users.SingleOrDefaultAsync(x => x.Id == targetAccountId, ct)
-            ?? throw new BusinessException(404, SystemMessages.Get("MSG01"));
-
-        // The Admin path reuses the same process: the account owner must already have completed
-        // verification. An Admin may then set the new credential, and the action is audited.
-        var current = await LatestTokenAsync(user.Id, ct);
-        if (current == null || string.IsNullOrEmpty(current.ResetGrantHash) || current.UsedAt != null)
-            throw new BusinessException(400, SystemMessages.Get("MSG108"));
-
-        return await ApplyResetAsync(user, grant: null, newPassword, actorId, ct);
-    }
-
     private async Task<RecoveryResetOutcome> ApplyResetAsync(ApplicationUser? user, string? grant, string newPassword,
         int? adminActor, CancellationToken ct)
     {
         var invalid = new RecoveryResetOutcome(false, "MSG108");
-        if (user == null) return invalid;
+        if (user == null)
+        {
+            await EqualizeTimingAsync(ct);
+            return invalid;
+        }
 
         var current = await LatestTokenAsync(user.Id, ct);
         if (current == null) return invalid;
@@ -245,7 +268,7 @@ public sealed class AccountRecoveryService(
 
         if (current.ExpiresAt <= DateTimeOffset.UtcNow)
         {
-            await AuditAsync(adminActor, user.Id, "RecoveryFailed", "Phiên đặt lại đã hết hạn",
+            await AuditAsync(adminActor, user.Id, "RecoveryFailed", "PhiÃªn Ä‘áº·t láº¡i Ä‘Ã£ háº¿t háº¡n",
                 ChannelName(current), "ExpiredProof", ct);
             return invalid;
         }
@@ -257,7 +280,7 @@ public sealed class AccountRecoveryService(
             if (row.UsedAt != null)
             {
                 await transaction.RollbackAsync(ct);
-                await AuditAsync(adminActor, user.Id, "RecoveryFailed", "Mã đặt lại đã được sử dụng",
+                await AuditAsync(adminActor, user.Id, "RecoveryFailed", "MÃ£ Ä‘áº·t láº¡i Ä‘Ã£ Ä‘Æ°á»£c sá»­ dá»¥ng",
                     ChannelName(row), "UsedProof", ct);
                 return invalid;
             }
@@ -286,42 +309,44 @@ public sealed class AccountRecoveryService(
             await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
 
-            await AuditAsync(adminActor, user.Id, "PasswordReset", "Đặt lại mật khẩu thành công",
+            await AuditAsync(adminActor, user.Id, "PasswordReset", "Äáº·t láº¡i máº­t kháº©u thÃ nh cÃ´ng",
                 ChannelName(row), "Succeeded", ct, before);
-            logger.LogInformation("Password reset completed for account {AccountId}; previous sessions revoked (no secrets logged).", user.Id);
+            logger.LogInformation("Password reset completed for account {AccountId} by actor {ActorId}; " +
+                "previous sessions revoked (no secrets logged).",
+                user.Id, adminActor?.ToString() ?? "self");
             return new RecoveryResetOutcome(true, "MSG13");
         }
         catch (DbUpdateException exception) when (IsConcurrencyConflict(exception))
         {
             await SafeRollbackAsync(transaction, ct);
-            await AuditAsync(adminActor, user.Id, "RecoveryFailed", "Xung đột thao tác đồng thời",
+            await AuditAsync(adminActor, user.Id, "RecoveryFailed", "Xung Ä‘á»™t thao tÃ¡c Ä‘á»“ng thá»i",
                 ChannelName(current), "UsedProof", ct);
             return invalid;
         }
         catch (DbUpdateConcurrencyException)
         {
             await SafeRollbackAsync(transaction, ct);
-            await AuditAsync(adminActor, user.Id, "RecoveryFailed", "Xung đột thao tác đồng thời",
+            await AuditAsync(adminActor, user.Id, "RecoveryFailed", "Xung Ä‘á»™t thao tÃ¡c Ä‘á»“ng thá»i",
                 ChannelName(current), "UsedProof", ct);
             return invalid;
         }
     }
 
-    private async Task<RecoveryToken> IssueAsync(ApplicationUser user, RecoveryToken? previous, int? adminActor, CancellationToken ct)
+    private async Task<RecoveryToken> IssueAsync(ApplicationUser user, RecoveryToken? previous, CancellationToken ct)
     {
         var now = DateTimeOffset.UtcNow;
 
         if (previous != null)
         {
             if (previous.ResendCount >= settings.MaxResends)
-                throw new RecoveryBlockedException("Hết số lần gửi lại cho phép", "OverResendLimit");
+                throw new RecoveryBlockedException("Háº¿t sá»‘ láº§n gá»­i láº¡i cho phÃ©p", "OverResendLimit");
             if (previous.LastResentAt.HasValue
                 && now - previous.LastResentAt.Value < TimeSpan.FromMinutes(settings.ResendCooldownMinutes))
-                throw new RecoveryBlockedException("Gửi lại quá sớm", "OverResendLimit");
+                throw new RecoveryBlockedException("Gá»­i láº¡i quÃ¡ sá»›m", "OverResendLimit");
         }
 
         if (!await HasVerifiedChannelAsync(user, ct))
-            throw new RecoveryBlockedException("Không có kênh liên hệ đã xác minh", "DeliveryFailure");
+            throw new RecoveryBlockedException("KhÃ´ng cÃ³ kÃªnh liÃªn há»‡ Ä‘Ã£ xÃ¡c minh", "DeliveryFailure");
 
         var proof = GenerateCode();
         var token = new RecoveryToken
@@ -340,7 +365,8 @@ public sealed class AccountRecoveryService(
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
 
         // Issuing a new proof invalidates every older unused proof for this account, so two live
-        // codes can never be valid at the same time (GBR-081: stale/concurrent change detection).
+        // codes can never be valid at the same time (GBR-081: stale change detection). This runs
+        // before the send and is only committed with it, so a failed send cannot leave a half state.
         var stale = await db.RecoveryTokens.Where(x => x.AccountId == user.Id && x.UsedAt == null).ToListAsync(ct);
         foreach (var old in stale) old.UsedAt = now;
 
@@ -354,7 +380,7 @@ public sealed class AccountRecoveryService(
         {
             logger.LogWarning("Recovery delivery failed for account {AccountId} on channel {Channel}.",
                 user.Id, token.ChannelType);
-            throw new RecoveryBlockedException("Gửi mã xác minh thất bại", "DeliveryFailure");
+            throw new RecoveryBlockedException("Gá»­i mÃ£ xÃ¡c minh tháº¥t báº¡i", "DeliveryFailure");
         }
 
         return token;
@@ -402,7 +428,7 @@ public sealed class AccountRecoveryService(
         return remaining > TimeSpan.Zero ? (int)Math.Ceiling(remaining.TotalSeconds) : 0;
     }
 
-    private RecoveryStatusSnapshot NeutralStatus() => new(false, "", 0, 0, null,
+    private RecoveryStatusSnapshot EmptyStatus() => new(false, "", 0, 0, null,
         settings.MaxVerifyAttempts, settings.MaxResends, null);
 
     private async Task<RecoveryToken?> LatestTokenAsync(int accountId, CancellationToken ct)
@@ -412,8 +438,8 @@ public sealed class AccountRecoveryService(
             .Where(x => x.AccountId == accountId)
             .OrderByDescending(x => x.Id)
             .ToListAsync(ct);
-        // An unexpired unused proof wins; an expired one is still returned so the UI can show the
-        // "request again" state instead of pretending nothing was requested.
+        // An unexpired unused proof wins; an expired one is still returned so the caller can report
+        // "expired" instead of "never requested".
         return tokens.FirstOrDefault(x => x.UsedAt == null && x.ExpiresAt > now)
             ?? tokens.FirstOrDefault(x => x.UsedAt == null);
     }
@@ -448,28 +474,33 @@ public sealed class AccountRecoveryService(
         }
     }
 
-    private async Task EqualizeTimingAsync(CancellationToken ct)
+    private static async Task EqualizeTimingAsync(CancellationToken ct)
     {
-        // Do comparable hashing work so "known account" and "unknown account" answers take a
-        // similar amount of time. Nothing is written to the database.
+        // Comparable hashing work so an unknown account is not answered noticeably faster than a
+        // known one. Nothing is written to the database.
         await Task.CompletedTask;
         var salt = RandomNumberGenerator.GetBytes(16);
+        var buffer = new byte[20];
         for (var i = 0; i < 3000; i++)
-            SHA256.HashData([.. salt, .. BitConverter.GetBytes(i)]);
+        {
+            salt.CopyTo(buffer, 0);
+            BitConverter.GetBytes(i).CopyTo(buffer, 16);
+            SHA256.HashData(buffer);
+        }
     }
 
     private async Task<ApplicationUser?> FindAsync(string identifier, CancellationToken ct)
     {
         var value = identifier.Trim();
-        var user = await db.Users.AsNoTracking()
-            .FirstOrDefaultAsync(x => x.NormalizedUserName == value.ToUpperInvariant(), ct);
-        if (user != null) return await db.Users.FirstOrDefaultAsync(x => x.Id == user.Id, ct);
+        var normalizedUserName = value.ToUpperInvariant();
+        // One tracked query: the entity is reused by both the read-only paths and the reset path.
+        var user = await db.Users.FirstOrDefaultAsync(x => x.NormalizedUserName == normalizedUserName, ct);
+        if (user != null) return user;
 
         if (!delivery.IsValid(value)) return null;
         var contact = delivery.Normalize(value).ToUpperInvariant();
-        var byContact = await db.Users.AsNoTracking().FirstOrDefaultAsync(x =>
-            x.NormalizedEmail == contact || (x.PhoneNumber != null && x.PhoneNumber.ToUpper() == contact), ct);
-        return byContact == null ? null : await db.Users.FirstOrDefaultAsync(x => x.Id == byContact.Id, ct);
+        return await db.Users.FirstOrDefaultAsync(x => x.NormalizedEmail == contact
+            || (x.PhoneNumber != null && x.PhoneNumber.ToUpper() == contact), ct);
     }
 
     private static string Snapshot(ApplicationUser user) => System.Text.Json.JsonSerializer.Serialize(new
@@ -483,14 +514,14 @@ public sealed class AccountRecoveryService(
 
     private static string ReasonFor(string result) => result switch
     {
-        "UsedProof" => "Mã xác minh đã được sử dụng",
-        "ExpiredProof" => "Mã xác minh đã hết hạn",
-        "InvalidProof" => "Mã xác minh không đúng",
-        "OverAttemptLimit" => "Vượt quá số lần xác minh cho phép",
-        "OverResendLimit" => "Vượt quá số lần gửi lại cho phép",
-        "DeliveryFailure" => "Gửi mã xác minh thất bại",
-        "Blocked" => "Yêu cầu bị chặn",
-        _ => "Không rõ"
+        "UsedProof" => "MÃ£ xÃ¡c minh Ä‘Ã£ Ä‘Æ°á»£c sá»­ dá»¥ng",
+        "ExpiredProof" => "MÃ£ xÃ¡c minh Ä‘Ã£ háº¿t háº¡n",
+        "InvalidProof" => "MÃ£ xÃ¡c minh khÃ´ng Ä‘Ãºng",
+        "OverAttemptLimit" => "VÆ°á»£t quÃ¡ sá»‘ láº§n xÃ¡c minh cho phÃ©p",
+        "OverResendLimit" => "VÆ°á»£t quÃ¡ sá»‘ láº§n gá»­i láº¡i cho phÃ©p",
+        "DeliveryFailure" => "Gá»­i mÃ£ xÃ¡c minh tháº¥t báº¡i",
+        "Blocked" => "YÃªu cáº§u bá»‹ cháº·n",
+        _ => "KhÃ´ng rÃµ"
     };
 
     private async Task AuditAsync(int? actorId, int targetId, string action, string reason, string channelType,
@@ -562,32 +593,34 @@ public sealed class AccountRecoveryService(
     private static BusinessException? ValidateIdentifier(string? identifier)
     {
         if (string.IsNullOrWhiteSpace(identifier))
-            return new BusinessException(400, SystemMessages.Get("MSG02", "Tài khoản"));
+            return new BusinessException(400, SystemMessages.Get("MSG02", "TÃ i khoáº£n"));
         var value = identifier.Trim();
-        if (value.Length > 64) return new BusinessException(400, SystemMessages.Get("MSG03", "Tài khoản", 64));
+        // Any non-empty identifier is accepted: an unknown or malformed one simply gets the same
+        // neutral answer, so the format itself is never used to test whether an account exists.
+        if (value.Length > 64) return new BusinessException(400, SystemMessages.Get("MSG03", "TÃ i khoáº£n", 64));
         return null;
     }
 
     private static BusinessException? ValidateProof(string? proof)
     {
         if (string.IsNullOrWhiteSpace(proof))
-            return new BusinessException(400, SystemMessages.Get("MSG02", "Mã xác minh"));
+            return new BusinessException(400, SystemMessages.Get("MSG02", "MÃ£ xÃ¡c minh"));
         if (proof.Trim().Length is < 4 or > 64)
-            return new BusinessException(400, SystemMessages.Get("MSG04", "Mã xác minh"));
+            return new BusinessException(400, SystemMessages.Get("MSG04", "MÃ£ xÃ¡c minh"));
         return null;
     }
 
     private static BusinessException? ValidatePassword(string? password, string? confirm)
     {
         if (string.IsNullOrWhiteSpace(password))
-            return new BusinessException(400, SystemMessages.Get("MSG02", "Mật khẩu mới"));
+            return new BusinessException(400, SystemMessages.Get("MSG02", "Máº­t kháº©u má»›i"));
         if (string.IsNullOrWhiteSpace(confirm))
-            return new BusinessException(400, SystemMessages.Get("MSG02", "Xác nhận mật khẩu"));
+            return new BusinessException(400, SystemMessages.Get("MSG02", "XÃ¡c nháº­n máº­t kháº©u"));
         if (password.Length > 256)
-            return new BusinessException(400, SystemMessages.Get("MSG03", "Mật khẩu mới", 256));
+            return new BusinessException(400, SystemMessages.Get("MSG03", "Máº­t kháº©u má»›i", 256));
         if (!string.Equals(password, confirm, StringComparison.Ordinal))
             // No exact MSG exists for a mismatch in v1.2; MSG04 is the closest match [PROPOSED].
-            return new BusinessException(400, SystemMessages.Get("MSG04", "Xác nhận mật khẩu"));
+            return new BusinessException(400, SystemMessages.Get("MSG04", "XÃ¡c nháº­n máº­t kháº©u"));
         return null;
     }
 
