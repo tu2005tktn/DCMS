@@ -60,6 +60,8 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
         await using (var create = new NpgsqlCommand($"CREATE SCHEMA \"{schema}\"", connection)) await create.ExecuteNonQueryAsync();
         using var scope = Services.CreateScope();
         await scope.ServiceProvider.GetRequiredService<DcmsDbContext>().Database.MigrateAsync();
+        Assert.True(await scope.ServiceProvider.GetRequiredService<DcmsDbContext>().Roles
+            .AnyAsync(x => x.NormalizedName == "GUEST"));
         await scope.ServiceProvider.GetRequiredService<DevelopmentAccountSeeder>().SeedAsync();
         // Test-only sentinel tables protect the boundary without implementing UC-07/36.
         await using var sentinel = new NpgsqlCommand("""
