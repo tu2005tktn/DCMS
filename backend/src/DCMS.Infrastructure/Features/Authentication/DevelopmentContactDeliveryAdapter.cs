@@ -18,8 +18,11 @@ public sealed partial class DevelopmentContactDeliveryAdapter(
     IHostEnvironment environment,
     ILogger<DevelopmentContactDeliveryAdapter> logger) : IContactDeliveryAdapter
 {
-    private readonly Lock gate = new();
-    private readonly Dictionary<int, string> delivered = [];
+    // The adapter is registered per request scope, so an instance-scoped dictionary would lose the
+    // delivered proof before the Development-only aid endpoint can hand it back in a later request.
+    // Process memory is shared between scopes for this Development-only aid; nothing is persisted.
+    private static readonly Lock Gate = new();
+    private static readonly Dictionary<int, string> Delivered = [];
 
     public RecoveryChannel DetectChannel(string? contact)
     {
@@ -49,12 +52,12 @@ public sealed partial class DevelopmentContactDeliveryAdapter(
     /// </summary>
     public string? TryGetProof(int accountId)
     {
-        lock (gate) { return delivered.TryGetValue(accountId, out var proof) ? proof : null; }
+        lock (Gate) { return Delivered.TryGetValue(accountId, out var proof) ? proof : null; }
     }
 
     public void Forget(int accountId)
     {
-        lock (gate) { delivered.Remove(accountId); }
+        lock (Gate) { Delivered.Remove(accountId); }
     }
 
     public async Task<bool> SendRecoveryAsync(int accountId, RecoveryChannel channel, string destination,
@@ -64,7 +67,7 @@ public sealed partial class DevelopmentContactDeliveryAdapter(
             throw new InvalidOperationException(
                 "The development contact adapter must not run outside Development; configure a real recovery channel.");
 
-        lock (gate) { delivered[accountId] = proof; }
+        lock (Gate) { Delivered[accountId] = proof; }
 
         // Proof and link stay out of the log: only their length is recorded as a sanity check.
         logger.LogInformation(

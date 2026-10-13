@@ -19,6 +19,27 @@ const MSG144 = 'Không thể hoàn tất thao tác. Vui lòng kiểm tra kết n
 
 const newPassword = () => 'Zx9!q' + Math.random().toString(36).slice(2, 20);
 
+// The page is served from the Vite origin and calls the API cross-origin, so a fulfilled response
+// without CORS headers would fail in the browser as a network error instead of carrying its
+// status. Every mocked recovery response repeats the development CORS grant and answers the
+// preflight; otherwise the client cannot tell a real 503/400 from a transport failure.
+const corsHeaders = {
+  'Access-Control-Allow-Origin': 'http://localhost:5173',
+  'Access-Control-Allow-Headers': 'content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
+async function fulfillWithCors(
+  route: import('@playwright/test').Route,
+  status: number,
+  body: unknown,
+): Promise<void> {
+  if (route.request().method() === 'OPTIONS') {
+    await route.fulfill({ status: 204, headers: corsHeaders });
+    return;
+  }
+  await route.fulfill({ status, contentType: 'application/json', headers: corsHeaders, body: JSON.stringify(body) });
+}
+
 test('sign-in page links to recovery instead of claiming it is unavailable', async ({ page }) => {
   await page.goto('/sign-in');
   await expect(page.getByRole('link', { name: 'Khôi phục tài khoản' })).toBeVisible();
@@ -106,14 +127,27 @@ test('wrong proof, weak password and mismatch show inline errors', async ({ page
   await page.getByRole('button', { name: 'Đặt lại mật khẩu', exact: true }).click();
   expect((await rejected).status()).toBe(400);
   await expect(page.getByText('Mật khẩu chưa đáp ứng yêu cầu được hiển thị. Vui lòng kiểm tra và nhập lại.')).toBeVisible();
+  // The error can render one tick before the in-flight guard clears; wait for the button to settle.
+  await expect(page.locator('button:has-text("Đặt lại mật khẩu")')).toBeEnabled();
 
   // Mismatched confirmation is refused before the request is sent.
   const updated = newPassword();
   await page.getByLabel('Mật khẩu mới', { exact: true }).fill(updated);
   await page.getByLabel('Xác nhận mật khẩu', { exact: true }).fill(updated + 'typo');
-  await page.getByRole('button', { name: 'Đặt lại mật khẩu', exact: true }).click();
+  // The text locator also matches the in-flight (loading) button, so the click auto-waits for the
+  // double-submit guard to clear instead of timing out on a renamed accessible name.
+  await page.locator('button:has-text("Đặt lại mật khẩu")').click();
   await expect(page.getByText('Xác nhận mật khẩu không đúng định dạng.')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Đặt lại mật khẩu', exact: true })).toBeEnabled();
+
+  // The grant survived the refused attempts, so the flow is completed with the real API. This also
+  // consumes the token: the demo account is shared between runs, and an unused token would keep
+  // accumulating verification attempts until the limit refuses even the correct proof.
+  await page.getByLabel('Xác nhận mật khẩu', { exact: true }).fill(updated);
+  const completed = page.waitForResponse(r => r.url().endsWith('/api/auth/recovery/reset') && r.request().method() === 'POST');
+  await page.getByRole('button', { name: 'Đặt lại mật khẩu', exact: true }).click();
+  expect((await completed).status()).toBe(200);
+  await expect(page.getByText(MSG13).first()).toBeVisible();
 });
 
 test('validation, resend cooldown and service failure are handled', async ({ page }) => {
@@ -134,39 +168,40 @@ test('validation, resend cooldown and service failure are handled', async ({ pag
 
   // A service failure on the verify step surfaces MSG144.
   await page.route('**/api/auth/recovery/verify', async route => {
-    await route.fulfill({
-      status: 503,
-      contentType: 'application/json',
-      body: JSON.stringify({ code: 'MSG144', message: MSG144 }),
-    });
+    await fulfillWithCors(route, 503, { code: 'MSG144', message: MSG144 });
   });
   await page.getByLabel('Mã xác minh', { exact: true }).fill('123456');
   const failed = page.waitForResponse(r => r.url().endsWith('/api/auth/recovery/verify') && r.request().method() === 'POST');
   await page.getByRole('button', { name: 'Xác minh', exact: true }).click();
   expect((await failed).status()).toBe(503);
   await expect(page.getByText(MSG144, { exact: true })).toBeVisible();
+  // The error can render one tick before the in-flight guard clears; wait for the button to settle.
+  await expect(page.locator('button:has-text("Xác minh")')).toBeEnabled();
 
-  // The request is in flight while the button stays disabled (double-submit guard).
+  // The request is in flight while the button stays disabled (double-submit guard). The loading
+  // spinner renames the button, so the disabled state is checked through its text instead.
   let release!: () => void;
   const pending = new Promise<void>(resolve => { release = resolve; });
   await page.unroute('**/api/auth/recovery/verify');
   await page.route('**/api/auth/recovery/verify', async route => {
     await pending;
-    await route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ code: 'MSG108', message: MSG108 }) });
+    await fulfillWithCors(route, 400, { code: 'MSG108', message: MSG108 });
   });
   await page.getByLabel('Mã xác minh', { exact: true }).fill('123456');
   await page.getByRole('button', { name: 'Xác minh', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Xác minh', exact: true })).toBeDisabled();
+  await expect(page.locator('button:has-text("Xác minh")')).toBeDisabled();
   release();
   await expect(page.getByText(MSG108, { exact: true })).toBeVisible();
 });
 
 test('no proof, grant or password is written into the URL', async ({ page }) => {
   await page.goto('/recover');
-  await page.getByLabel('Tài khoản', { exact: true }).fill('owner.demo');
+  // dual.demo is deliberately chosen: the accounts spec signs in as admin.demo and owner.demo, so
+  // the recovery spec must not leave either of them with a changed credential between runs.
+  await page.getByLabel('Tài khoản', { exact: true }).fill('dual.demo');
   await page.getByRole('button', { name: 'Gửi yêu cầu', exact: true }).click();
   await page.waitForResponse(r => r.url().endsWith('/api/auth/recovery/request') && r.request().method() === 'POST');
-  const proof = await readOutboxProof(page.request, 'owner.demo');
+  const proof = await readOutboxProof(page.request, 'dual.demo');
   await page.getByLabel('Mã xác minh', { exact: true }).fill(proof);
   await page.getByRole('button', { name: 'Xác minh', exact: true }).click();
   await page.waitForResponse(r => r.url().endsWith('/api/auth/recovery/verify') && r.request().method() === 'POST');
@@ -174,7 +209,7 @@ test('no proof, grant or password is written into the URL', async ({ page }) => 
   await page.getByLabel('Mật khẩu mới', { exact: true }).fill(updated);
   await page.getByLabel('Xác nhận mật khẩu', { exact: true }).fill(updated);
   await page.getByRole('button', { name: 'Đặt lại mật khẩu', exact: true }).click();
-  await page.waitForResponse(r => r.url().endsWith('/api/auth/recovery/reset') && r.request().method() => 'POST');
+  await page.waitForResponse(r => r.url().endsWith('/api/auth/recovery/reset') && r.request().method() === 'POST');
 
   const url = page.url();
   expect(url).not.toContain(proof);

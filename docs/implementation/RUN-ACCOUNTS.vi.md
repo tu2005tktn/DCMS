@@ -88,8 +88,8 @@ Khóa nằm trong `backend/src/DCMS.Api/appsettings.Development.json`, mặc đ�
 | `ResendCooldownMinutes` | 2 | Khoảng cách tối thiểu giữa hai lần gửi |
 | `MaxResends` | 3 | Số lần gửi lại tối đa trong một phiên |
 | `MaxVerifyAttempts` | 5 | Số lần nhập sai trước khi chặn |
-| `RateLimitPerAccountPerHour` | 5 | Số request tối đa mỗi account mỗi giờ |
-| `RateLimitPerIpPerHour` | 20 | Số request tối đa mỗi IP mỗi giờ |
+| `RateLimitPerAccountPerHour` | 50 (dev) | Số request tối đa mỗi account mỗi giờ; [PROPOSED] cho production |
+| `RateLimitPerIpPerHour` | 500 (dev) | Số request tối đa mỗi IP mỗi giờ; dev nới rộng để chạy test/thử nghiệm, production tự đặt lại |
 | `Channel` | `Email` | Kênh gửi: `Email`, `Phone` hoặc `Link` |
 | `CodeLength` | 6 | Độ dài mã số |
 | `VerificationBaseUrl` | rỗng | Base URL cho kênh `Link`; link chỉ mang id mờ, không mang mã |
@@ -186,3 +186,19 @@ Tiêu chí nghiệm thu 1–7 hiện được **chứng minh bằng test đã vi
 Đã rà soát bảo mật và vá: `/recovery/status` và `/recovery/resend` ban đầu để lộ tài khoản có tồn tại; audit của luồng Admin ban đầu ghi thiếu actor. Chi tiết trong commit history nhánh `tuan`.
 
 Browser test loading/error chủ động trì hoãn và giả lập một response 503 rồi bỏ giả lập để retry API thật; các luồng chức năng dùng API/database thật. Backend tests có Patient/link sentinel để kiểm chứng bảo toàn dữ liệu ở boundary, không kiểm thử UC Patient chưa triển khai. Chưa kiểm thử production deployment hoặc kênh khôi phục chưa có.
+
+### Đợt 13/10/2026 (máy local: Docker Desktop, PostgreSQL, .NET 10 SDK local)
+
+| Kiểm tra đã chạy | Kết quả |
+| --- | --- |
+| API khởi động (`start-api.ps1`) | **Thất bại trước khi sửa**: `Body was inferred but the method does not allow inferred body parameters` do inject concrete adapter không có `[FromServices]` trên endpoint `/api/dev/recovery/proof/{accountId}`; đã sửa (khớp docs s03 §7) |
+| Đăng nhập `admin.demo`, `/health` | Thành công; HTTP 200, API/database healthy |
+| Luồng khôi phục thật qua API | **Thất bại trước khi sửa**: reset trả 503 do thiếu `.AddDefaultTokenProviders()`; sau khi sửa request→verify→reset→đăng nhập lại chạy đúng, mật khẩu cũ bị từ chối |
+| Chuỗi tiếng Việt UC-02 | Phát hiện mojibake trong `AccountRecoveryService.cs`; đã viết lại đúng UTF-8, audit đọc lại tiếng Việt chính xác |
+| Backend unit tests | **30/30 passed** |
+| Backend integration tests | Trước sửa: **21/33 passed (12 fail)**; sau khi vá sản phẩm và tăng cường cách ly test: **33/33 passed** (hai lần chạy liên tiếp) |
+| Web `npm run build` | Thành công; chỉ còn cảnh báo bundle > 500 kB (khoảng 1.14 MB trước gzip) như đợt trước |
+| Browser tests (Chromium) | `accounts.spec.ts` **4/4 passed**. `recovery.spec.ts` sửa lỗi cú pháp `=> 'POST'` từng chặn toàn bộ file; các test chức năng xanh, test injected-fault (mock 503/400) còn flaky do tên accessible của nút đổi khi in-flight — ghi nhận làm follow-up cho team web |
+| Trạng thái thay đổi | Các bản sửa đang ở working tree, **chưa commit**; mô tả trong [RUN-DEMO.vi.md](RUN-DEMO.vi.md) |
+
+Các sửa đổi sản phẩm chính: đăng ký concrete `DevelopmentContactDeliveryAdapter` + `[FromServices]`; `.AddDefaultTokenProviders()`; proof aid lưu ở store tĩnh (adapter scoped không giữ được proof giữa các request); viết lại mojibake; bắt mọi chuỗi lỗi concurrency 40001 (bao gồm wrapper `InvalidOperationException` của Npgsql execution strategy) và `ChangeTracker.Clear()` trước khi ghi audit. Test: mỗi test khôi phục tự tạo account riêng có email đã xác minh, kỳ vọng message theo field, ép kiểu cột JSON sang text, chấp nhận 401 cho endpoint status ẩn.

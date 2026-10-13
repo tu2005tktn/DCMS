@@ -3,7 +3,10 @@ using System.Net;
 using System.Net.Http.Json;
 using DCMS.Api.Features.Authentication;
 using DCMS.Application.Common;
+using DCMS.Application.Features.Accounts;
 using DCMS.Application.Features.Authentication;
+using DCMS.Domain.Features.Accounts;
+using DCMS.Domain.Features.Authentication;
 using DCMS.Infrastructure.Features.Authentication;
 using DCMS.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Hosting;
@@ -61,18 +64,19 @@ public sealed class RecoveryApiTests(ApiFixture fixture) : IClassFixture<ApiFixt
         return (reset, grant.ResetGrant);
     }
 
-    private static async Task AssertMessageAsync(HttpResponseMessage response, HttpStatusCode status, string code)
+    private static async Task AssertMessageAsync(HttpResponseMessage response, HttpStatusCode status, string code,
+        SystemMessage? expected = null)
     {
         Assert.Equal(status, response.StatusCode);
         var message = (await response.Content.ReadFromJsonAsync<SystemMessage>())!;
-        Assert.Equal(SystemMessages.Get(code).Message, message.Message);
+        Assert.Equal((expected ?? SystemMessages.Get(code)).Message, message.Message);
         Assert.Equal(code, message.Code);
     }
 
     [Fact]
     public async Task C1_ValidRecoveryChangesPasswordAndOldPasswordNoLongerSignsIn()
     {
-        const string userName = "dentist.demo";
+        var userName = await CreateRecoveryAccountAsync();
         var (reset, _) = await CompleteRecoveryAsync(userName);
         await AssertMessageAsync(reset, HttpStatusCode.OK, "MSG13");
 
@@ -85,7 +89,8 @@ public sealed class RecoveryApiTests(ApiFixture fixture) : IClassFixture<ApiFixt
     [Fact]
     public async Task C3_ExistingAndMissingAccountsReturnTheSameNeutralResponse()
     {
-        var existing = await fixture.CreateClient().PostAsJsonAsync("/api/auth/recovery/request", new RecoveryRequest("dentist.demo"));
+        var existingUserName = await CreateRecoveryAccountAsync();
+        var existing = await fixture.CreateClient().PostAsJsonAsync("/api/auth/recovery/request", new RecoveryRequest(existingUserName));
         var missing = await fixture.CreateClient().PostAsJsonAsync("/api/auth/recovery/request",
             new RecoveryRequest("no.such.account." + Guid.NewGuid().ToString("N")[..8]));
 
@@ -97,14 +102,14 @@ public sealed class RecoveryApiTests(ApiFixture fixture) : IClassFixture<ApiFixt
         Assert.Equal("MSG12", existingBody.Code);
         // The body must not carry any account-identifying field.
         var raw = await existing.Content.ReadAsStringAsync();
-        Assert.DoesNotContain("dentist.demo", raw, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(existingUserName, raw, StringComparison.OrdinalIgnoreCase);
 
         // Similar timing: neither answer may be dramatically faster than the other.
         var existingTimes = new List<double>();
         var missingTimes = new List<double>();
         for (var i = 0; i < 15; i++)
         {
-            existingTimes.Add(await TimeRequestAsync("dentist.demo"));
+            existingTimes.Add(await TimeRequestAsync(existingUserName));
             missingTimes.Add(await TimeRequestAsync("another.missing." + Guid.NewGuid().ToString("N")[..8]));
         }
         existingTimes.Sort(); missingTimes.Sort();
@@ -124,7 +129,7 @@ public sealed class RecoveryApiTests(ApiFixture fixture) : IClassFixture<ApiFixt
     [Fact]
     public async Task C2_WrongExpiredUsedAndOverLimitProofsAreRejected()
     {
-        const string userName = "dentist.demo";
+        var userName = await CreateRecoveryAccountAsync();
         var client = fixture.CreateClient();
         var request = await client.PostAsJsonAsync("/api/auth/recovery/request", new RecoveryRequest(userName));
         Assert.Equal(HttpStatusCode.OK, request.StatusCode);
@@ -140,7 +145,9 @@ public sealed class RecoveryApiTests(ApiFixture fixture) : IClassFixture<ApiFixt
         await AssertMessageAsync(await client.PostAsJsonAsync("/api/auth/recovery/verify",
             new RecoveryVerifyRequest(userName, proof)), HttpStatusCode.BadRequest, "MSG108");
 
-        // A fresh request so the used-proof case can be checked.
+        // A fresh request so the used-proof case can be checked. The cooldown clock is moved into
+        // the past because the first request of this test happened seconds ago.
+        await ForceLastResendAsync(accountId, DateTimeOffset.UtcNow.AddHours(-1));
         await client.PostAsJsonAsync("/api/auth/recovery/request", new RecoveryRequest(userName));
         var freshProof = fixture.Delivery.ProofFor(accountId)!;
         var verify = await client.PostAsJsonAsync("/api/auth/recovery/verify",
@@ -165,7 +172,7 @@ public sealed class RecoveryApiTests(ApiFixture fixture) : IClassFixture<ApiFixt
     [Fact]
     public async Task C2_OverTheAttemptLimitRefusesEvenTheCorrectProof()
     {
-        const string userName = "assistant.demo";
+        var userName = await CreateRecoveryAccountAsync();
         var client = fixture.CreateClient();
         await client.PostAsJsonAsync("/api/auth/recovery/request", new RecoveryRequest(userName));
         var accountId = await AccountIdAsync(userName);
@@ -188,7 +195,7 @@ public sealed class RecoveryApiTests(ApiFixture fixture) : IClassFixture<ApiFixt
     [Fact]
     public async Task C2_ConcurrentDoubleResetProducesExactlyOneSuccess()
     {
-        const string userName = "owner.demo";
+        var userName = await CreateRecoveryAccountAsync();
         var client = fixture.CreateClient();
         await client.PostAsJsonAsync("/api/auth/recovery/request", new RecoveryRequest(userName));
         var accountId = await AccountIdAsync(userName);
@@ -213,7 +220,7 @@ public sealed class RecoveryApiTests(ApiFixture fixture) : IClassFixture<ApiFixt
     [Fact]
     public async Task C4_ResetDoesNotUnlockALockedAccount()
     {
-        const string userName = "dual.demo";
+        var userName = await CreateRecoveryAccountAsync();
         var (admin, _) = await Login("admin.demo");
         var accountId = await AccountIdAsync(userName);
         await LockAccountAsync(admin, accountId);
@@ -233,7 +240,7 @@ public sealed class RecoveryApiTests(ApiFixture fixture) : IClassFixture<ApiFixt
     [Fact]
     public async Task C5_OldSessionsAreRevokedAfterReset()
     {
-        const string userName = "dentist.demo";
+        var userName = await CreateRecoveryAccountAsync();
         var (first, _) = await Login(userName);
         var (second, _) = await Login(userName);
         Assert.Equal(HttpStatusCode.OK, (await first.GetAsync("/api/auth/me")).StatusCode);
@@ -248,7 +255,7 @@ public sealed class RecoveryApiTests(ApiFixture fixture) : IClassFixture<ApiFixt
     [Fact]
     public async Task C6_RecoveryDoesNotVerifyAPatientLinkOrRaisePermissions()
     {
-        const string userName = "dentist.demo";
+        var userName = await CreateRecoveryAccountAsync();
         await using var connection = new Npgsql.NpgsqlConnection(fixture.ConnectionString);
         await connection.OpenAsync();
         var rolesBefore = await RolesAsync(connection, await AccountIdAsync(userName));
@@ -272,7 +279,7 @@ public sealed class RecoveryApiTests(ApiFixture fixture) : IClassFixture<ApiFixt
     [Fact]
     public async Task C7_NoSecretIsStoredAnywhereByTheRecoveryProcess()
     {
-        const string userName = "guest.demo";
+        var userName = await CreateRecoveryAccountAsync();
         var (reset, grant) = await CompleteRecoveryAsync(userName);
         await AssertMessageAsync(reset, HttpStatusCode.OK, "MSG13");
         var accountId = await AccountIdAsync(userName);
@@ -291,7 +298,12 @@ public sealed class RecoveryApiTests(ApiFixture fixture) : IClassFixture<ApiFixt
         };
         foreach (var (table, columns) in tables)
         {
-            var projection = string.Join(" || '|' || ", columns.Select(c => $"COALESCE(\"{c}\", '')"));
+            // The audit JSON columns are cast to text so the neutral concatenation stays a plain
+            // text projection; without the cast PostgreSQL resolves COALESCE to the json type.
+            var projection = string.Join(" || '|' || ", columns.Select(c =>
+                table == "ACCOUNT_AUDIT" && c.EndsWith("Json", StringComparison.Ordinal)
+                    ? $"COALESCE(\"{c}\"::text, '')"
+                    : $"COALESCE(\"{c}\", '')"));
             await using var command = new Npgsql.NpgsqlCommand($"""SELECT {projection} FROM "{table}" """, connection);
             await using var reader = await command.ExecuteReaderAsync();
             while (await reader.ReadAsync())
@@ -324,7 +336,8 @@ public sealed class RecoveryApiTests(ApiFixture fixture) : IClassFixture<ApiFixt
             builder.UseEnvironment("Production");
             builder.ConfigureServices(services => services.AddSingleton<IContactDeliveryAdapter>(new RefusedAdapter()));
         });
-        var accountId = await AccountIdAsync("dentist.demo");
+        var targetUserName = await CreateRecoveryAccountAsync();
+        var accountId = await AccountIdAsync(targetUserName);
         var anonymous = production.CreateClient();
         var response = await anonymous.GetAsync($"/api/dev/recovery/proof/{accountId}");
         Assert.True(response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.Unauthorized,
@@ -336,25 +349,37 @@ public sealed class RecoveryApiTests(ApiFixture fixture) : IClassFixture<ApiFixt
     [Fact]
     public async Task TheDevelopmentProofAidRequiresASignedInSession()
     {
-        var accountId = await AccountIdAsync("dentist.demo");
-        await fixture.CreateClient().PostAsJsonAsync("/api/auth/recovery/request", new RecoveryRequest("dentist.demo"));
+        var userName = await CreateRecoveryAccountAsync();
+        var accountId = await AccountIdAsync(userName);
+        await fixture.CreateClient().PostAsJsonAsync("/api/auth/recovery/request", new RecoveryRequest(userName));
 
         // Anonymous access is refused even in Development.
         await AssertMessageAsync(await fixture.CreateClient().GetAsync($"/api/dev/recovery/proof/{accountId}"),
             HttpStatusCode.Unauthorized, "MSG07");
+
+        // The aid reads the Development delivery adapter's in-process memory, so the proof the
+        // fixture delivery captured is pushed through the same store before the aid is called.
+        var proof = fixture.Delivery.ProofFor(accountId)
+            ?? throw new InvalidOperationException("No proof was delivered.");
+        using (var scope = fixture.Services.CreateScope())
+        {
+            var developmentAdapter = scope.ServiceProvider.GetRequiredService<DevelopmentContactDeliveryAdapter>();
+            await developmentAdapter.SendRecoveryAsync(accountId, RecoveryChannel.Email,
+                userName + "@example.invalid", proof, resetLink: "", CancellationToken.None);
+        }
 
         var (admin, _) = await Login("admin.demo");
         var granted = await admin.GetAsync($"/api/dev/recovery/proof/{accountId}");
         Assert.Equal(HttpStatusCode.OK, granted.StatusCode);
         var body = (await granted.Content.ReadFromJsonAsync<DevelopmentProofResponse>())!;
         Assert.Equal(accountId, body.AccountId);
-        Assert.True(body.Proof.Length >= 4, "The development adapter must hand back the delivered proof.");
+        Assert.Equal(proof, body.Proof);
     }
 
     [Fact]
     public async Task AdminAssistedVerificationRecordsTheAdminAsActor()
     {
-        const string userName = "guest.demo";
+        var userName = await CreateRecoveryAccountAsync();
         var accountId = await AccountIdAsync(userName);
         var (admin, _) = await Login("admin.demo");
         var adminId = await AccountIdAsync("admin.demo");
@@ -402,7 +427,7 @@ public sealed class RecoveryApiTests(ApiFixture fixture) : IClassFixture<ApiFixt
     [Fact]
     public async Task AdminRecoveryKeepsTheSharedCooldown()
     {
-        const string userName = "assistant.demo";
+        var userName = await CreateRecoveryAccountAsync();
         var accountId = await AccountIdAsync(userName);
         var (admin, _) = await Login("admin.demo");
         await admin.PostAsJsonAsync($"/api/admin/recovery/request/{accountId}", new { });
@@ -421,7 +446,7 @@ public sealed class RecoveryApiTests(ApiFixture fixture) : IClassFixture<ApiFixt
     [Fact]
     public async Task AuditRecordsTheRecoveryEventsWithoutStoringSecrets()
     {
-        const string userName = "dentist.demo";
+        var userName = await CreateRecoveryAccountAsync();
         await CompleteRecoveryAsync(userName);
         var accountId = await AccountIdAsync(userName);
 
@@ -468,7 +493,7 @@ public sealed class RecoveryApiTests(ApiFixture fixture) : IClassFixture<ApiFixt
     [Fact]
     public async Task ResendStaysNeutralWhileCooldownAndCapAreStillEnforced()
     {
-        const string userName = "guest.demo";
+        var userName = await CreateRecoveryAccountAsync();
         var client = fixture.CreateClient();
         await client.PostAsJsonAsync("/api/auth/recovery/request", new RecoveryRequest(userName));
         var accountId = await AccountIdAsync(userName);
@@ -509,33 +534,39 @@ public sealed class RecoveryApiTests(ApiFixture fixture) : IClassFixture<ApiFixt
     {
         var client = fixture.CreateClient();
         await AssertMessageAsync(await client.PostAsJsonAsync("/api/auth/recovery/request",
-            new RecoveryRequest("")), HttpStatusCode.BadRequest, "MSG02");
+            new RecoveryRequest("")), HttpStatusCode.BadRequest, "MSG02",
+            SystemMessages.Get("MSG02", "Tài khoản"));
         await AssertMessageAsync(await client.PostAsJsonAsync("/api/auth/recovery/request",
-            new RecoveryRequest(new string('x', 100))), HttpStatusCode.BadRequest, "MSG03");
+            new RecoveryRequest(new string('x', 100))), HttpStatusCode.BadRequest, "MSG03",
+            SystemMessages.Get("MSG03", "Tài khoản", 64));
         await AssertMessageAsync(await client.PostAsJsonAsync("/api/auth/recovery/verify",
-            new RecoveryVerifyRequest("dentist.demo", "")), HttpStatusCode.BadRequest, "MSG02");
+            new RecoveryVerifyRequest("dentist.demo", "")), HttpStatusCode.BadRequest, "MSG02",
+            SystemMessages.Get("MSG02", "Mã xác minh"));
 
-        var (reset, grant) = await CompleteRecoveryAsync("dentist.demo");
+        var userName = await CreateRecoveryAccountAsync();
+        var (reset, grant) = await CompleteRecoveryAsync(userName);
         await AssertMessageAsync(reset, HttpStatusCode.OK, "MSG13");
 
         // A weak new password is refused by the shared password policy.
-        await fixture.CreateClient().PostAsJsonAsync("/api/auth/recovery/request", new RecoveryRequest("dentist.demo"));
-        var accountId = await AccountIdAsync("dentist.demo");
+        await fixture.CreateClient().PostAsJsonAsync("/api/auth/recovery/request", new RecoveryRequest(userName));
+        var accountId = await AccountIdAsync(userName);
         var proof = fixture.Delivery.ProofFor(accountId)!;
         var verify = await fixture.CreateClient().PostAsJsonAsync("/api/auth/recovery/verify",
-            new RecoveryVerifyRequest("dentist.demo", proof));
+            new RecoveryVerifyRequest(userName, proof));
         var newGrant = (await verify.Content.ReadFromJsonAsync<RecoveryGrantResponse>())!.ResetGrant;
         await AssertMessageAsync(await fixture.CreateClient().PostAsJsonAsync("/api/auth/recovery/reset",
-            new RecoveryResetRequest("dentist.demo", newGrant, "short", "short")), HttpStatusCode.BadRequest, "MSG109");
+            new RecoveryResetRequest(userName, newGrant, "short", "short")), HttpStatusCode.BadRequest, "MSG109");
         // A mismatched confirmation is refused before any change.
         await AssertMessageAsync(await fixture.CreateClient().PostAsJsonAsync("/api/auth/recovery/reset",
-            new RecoveryResetRequest("dentist.demo", newGrant, NewPassword, "different")), HttpStatusCode.BadRequest, "MSG04");
+            new RecoveryResetRequest(userName, newGrant, NewPassword, "different")), HttpStatusCode.BadRequest, "MSG04",
+            SystemMessages.Get("MSG04", "Xác nhận mật khẩu"));
     }
 
     [Fact]
     public async Task AdminAssistedRecoveryRequiresAdminPermission()
     {
-        var accountId = await AccountIdAsync("dentist.demo");
+        var userName = await CreateRecoveryAccountAsync();
+        var accountId = await AccountIdAsync(userName);
 
         var anonymous = fixture.CreateClient();
         await AssertMessageAsync(await anonymous.PostAsJsonAsync($"/api/admin/recovery/request/{accountId}",
@@ -547,7 +578,7 @@ public sealed class RecoveryApiTests(ApiFixture fixture) : IClassFixture<ApiFixt
         await AssertMessageAsync(await dentist.PostAsJsonAsync($"/api/admin/recovery/reset/{accountId}",
             new { NewPassword, ConfirmPassword = NewPassword }), HttpStatusCode.Forbidden, "MSG06");
         await AssertMessageAsync(await dentist.PostAsJsonAsync($"/api/admin/recovery/verify/{accountId}",
-            new RecoveryVerifyRequest("dentist.demo", "123456")), HttpStatusCode.Forbidden, "MSG06");
+            new RecoveryVerifyRequest(userName, "123456")), HttpStatusCode.Forbidden, "MSG06");
 
         var (admin, _) = await Login("admin.demo");
         var started = await admin.PostAsJsonAsync($"/api/admin/recovery/request/{accountId}", new { });
@@ -563,14 +594,16 @@ public sealed class RecoveryApiTests(ApiFixture fixture) : IClassFixture<ApiFixt
     [Fact]
     public async Task RecoveryStatusIsAdminOnlySoItCannotBeUsedToEnumerateAccounts()
     {
-        const string userName = "guest.demo";
+        var userName = await CreateRecoveryAccountAsync();
         var accountId = await AccountIdAsync(userName);
 
         // There is deliberately no anonymous status endpoint: once a request had been made for an
-        // account it would confirm that the account exists.
+        // account it would confirm that the account exists. The fallback authorization policy
+        // refuses every anonymous call, so the shape of the answer cannot leak an account either.
         var anonymous = fixture.CreateClient();
         var missingEndpoint = await anonymous.GetAsync("/api/auth/recovery/status?identifier=" + userName);
-        Assert.True(missingEndpoint.StatusCode is HttpStatusCode.MethodNotAllowed or HttpStatusCode.NotFound,
+        Assert.True(missingEndpoint.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.MethodNotAllowed
+            or HttpStatusCode.NotFound,
             $"Anonymous status unexpectedly returned {missingEndpoint.StatusCode}.");
 
         await fixture.CreateClient().PostAsJsonAsync("/api/auth/recovery/request", new RecoveryRequest(userName));
@@ -659,6 +692,37 @@ public sealed class RecoveryApiTests(ApiFixture fixture) : IClassFixture<ApiFixt
             WHERE "AccountId" = @id AND "UsedAt" IS NULL
             """, connection);
         command.Parameters.AddWithValue("count", count);
+        command.Parameters.AddWithValue("id", accountId);
+        await command.ExecuteNonQueryAsync();
+    }
+
+    /// <summary>
+    /// Creates a fresh staff account with a confirmed e-mail for one recovery test. The demo
+    /// accounts are shared between tests, so a recovery that completes in one test would leave the
+    /// next one without a working credential; every test owns its own account instead. The initial
+    /// password is the fixture password, so a later sign-in with it proves the old credential died.
+    /// </summary>
+    private async Task<string> CreateRecoveryAccountAsync()
+    {
+        var (admin, _) = await Login("admin.demo");
+        var suffix = Guid.NewGuid().ToString("N")[..12];
+        var userName = "recovery." + suffix;
+        var response = await admin.PostAsJsonAsync("/api/accounts", new CreateStaffRequest(userName,
+            fixture.Password, "Nhân viên khôi phục thử nghiệm", "RCV-" + suffix,
+            userName + "@example.invalid", null, [AccountRoles.Dentist]));
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var account = (await response.Content.ReadFromJsonAsync<AccountChange>())!.Account;
+        await ConfirmContactAsync(account.Id);
+        return userName;
+    }
+
+    private async Task ConfirmContactAsync(int accountId)
+    {
+        await using var connection = new Npgsql.NpgsqlConnection(fixture.ConnectionString);
+        await connection.OpenAsync();
+        await using var command = new Npgsql.NpgsqlCommand("""
+            UPDATE "USER_ACCOUNT" SET "EmailConfirmed" = true WHERE "Id" = @id
+            """, connection);
         command.Parameters.AddWithValue("id", accountId);
         await command.ExecuteNonQueryAsync();
     }

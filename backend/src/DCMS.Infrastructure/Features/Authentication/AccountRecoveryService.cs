@@ -51,7 +51,7 @@ public sealed class AccountRecoveryService(
         {
             var current = await LatestTokenAsync(user.Id, ct);
             var token = await IssueAsync(user, current, ct);
-            await AuditAsync(null, user.Id, "RecoveryRequested", "YÃªu cáº§u Ä‘áº·t láº¡i máº­t kháº©u",
+            await AuditAsync(null, user.Id, "RecoveryRequested", "Yêu cầu đặt lại mật khẩu",
                 ChannelName(token), "Succeeded", ct);
         }
         catch (RecoveryBlockedException blocked)
@@ -87,7 +87,7 @@ public sealed class AccountRecoveryService(
         try
         {
             var token = await IssueAsync(user, current, ct);
-            await AuditAsync(null, user.Id, "RecoveryRequested", "Gá»­i láº¡i hÆ°á»›ng dáº«n Ä‘áº·t láº¡i máº­t kháº©u",
+            await AuditAsync(null, user.Id, "RecoveryRequested", "Gửi lại hướng dẫn đặt lại mật khẩu",
                 ChannelName(token), "Succeeded", ct);
         }
         catch (RecoveryBlockedException blocked)
@@ -136,7 +136,7 @@ public sealed class AccountRecoveryService(
         // Over the attempt limit the proof is refused outright, exactly like an invalid proof.
         if (current.VerifyAttempts >= settings.MaxVerifyAttempts)
         {
-            await AuditAsync(actorId, user.Id, "RecoveryBlocked", "VÆ°á»£t quÃ¡ sá»‘ láº§n xÃ¡c minh cho phÃ©p",
+            await AuditAsync(actorId, user.Id, "RecoveryBlocked", "Vượt quá số lần xác minh cho phép",
                 ChannelName(current), "OverAttemptLimit", ct);
             return invalid;
         }
@@ -159,7 +159,7 @@ public sealed class AccountRecoveryService(
         row.ResetGrantHash = Hash(grant);
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
-        await AuditAsync(actorId, user.Id, "RecoveryVerified", "XÃ¡c minh thÃ nh cÃ´ng", ChannelName(row), "Succeeded", ct);
+        await AuditAsync(actorId, user.Id, "RecoveryVerified", "Xác minh thành công", ChannelName(row), "Succeeded", ct);
         logger.LogInformation("Recovery verified for account {AccountId} by actor {ActorId}; grant issued (grant not logged).",
             user.Id, actorId?.ToString() ?? "self");
         return new RecoveryVerifyOutcome(true, grant);
@@ -177,7 +177,7 @@ public sealed class AccountRecoveryService(
         if (throttle != null)
         {
             // Admin-assisted recovery keeps the shared cooldown: it is not a way around the cap.
-            await AuditAsync(actorId, targetAccountId, "RecoveryBlocked", "Gá»­i láº¡i quÃ¡ sá»›m",
+            await AuditAsync(actorId, targetAccountId, "RecoveryBlocked", "Gửi lại quá sớm",
                 ChannelName(current), "OverResendLimit", ct);
             return new AdminRecoveryRequestOutcome(false, "MSG12", targetAccountId, ChannelName(current),
                 current!.NormalizedDestination, throttle.RetryAfterSeconds);
@@ -186,7 +186,7 @@ public sealed class AccountRecoveryService(
         try
         {
             var token = await IssueAsync(user, current, ct);
-            await AuditAsync(actorId, targetAccountId, "RecoveryRequested", "Há»— trá»£ khÃ´i phá»¥c bá»Ÿi quáº£n trá»‹ viÃªn",
+            await AuditAsync(actorId, targetAccountId, "RecoveryRequested", "Hỗ trợ khôi phục bởi quản trị viên",
                 ChannelName(token), "Succeeded", ct);
             return new AdminRecoveryRequestOutcome(true, "MSG12", targetAccountId, ChannelName(token),
                 token.NormalizedDestination, null);
@@ -268,7 +268,7 @@ public sealed class AccountRecoveryService(
 
         if (current.ExpiresAt <= DateTimeOffset.UtcNow)
         {
-            await AuditAsync(adminActor, user.Id, "RecoveryFailed", "PhiÃªn Ä‘áº·t láº¡i Ä‘Ã£ háº¿t háº¡n",
+            await AuditAsync(adminActor, user.Id, "RecoveryFailed", "Phiên đặt lại đã hết hạn",
                 ChannelName(current), "ExpiredProof", ct);
             return invalid;
         }
@@ -280,7 +280,7 @@ public sealed class AccountRecoveryService(
             if (row.UsedAt != null)
             {
                 await transaction.RollbackAsync(ct);
-                await AuditAsync(adminActor, user.Id, "RecoveryFailed", "MÃ£ Ä‘áº·t láº¡i Ä‘Ã£ Ä‘Æ°á»£c sá»­ dá»¥ng",
+                await AuditAsync(adminActor, user.Id, "RecoveryFailed", "Mã đặt lại đã được sử dụng",
                     ChannelName(row), "UsedProof", ct);
                 return invalid;
             }
@@ -309,24 +309,24 @@ public sealed class AccountRecoveryService(
             await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
 
-            await AuditAsync(adminActor, user.Id, "PasswordReset", "Äáº·t láº¡i máº­t kháº©u thÃ nh cÃ´ng",
+            await AuditAsync(adminActor, user.Id, "PasswordReset", "Đặt lại mật khẩu thành công",
                 ChannelName(row), "Succeeded", ct, before);
             logger.LogInformation("Password reset completed for account {AccountId} by actor {ActorId}; " +
                 "previous sessions revoked (no secrets logged).",
                 user.Id, adminActor?.ToString() ?? "self");
             return new RecoveryResetOutcome(true, "MSG13");
         }
-        catch (DbUpdateException exception) when (IsConcurrencyConflict(exception))
+        // The loser of a concurrent reset never reaches the password change. The conflict can
+        // surface as a DbUpdateException, a DbUpdateConcurrencyException, directly from the driver,
+        // or wrapped by the Npgsql execution strategy as a transient-failure InvalidOperationException;
+        // every chain is recognised so the loser answers like a used-proof replay, not an outage.
+        catch (Exception exception) when (IsConcurrencyConflict(exception) || exception is DbUpdateConcurrencyException)
         {
             await SafeRollbackAsync(transaction, ct);
-            await AuditAsync(adminActor, user.Id, "RecoveryFailed", "Xung Ä‘á»™t thao tÃ¡c Ä‘á»“ng thá»i",
-                ChannelName(current), "UsedProof", ct);
-            return invalid;
-        }
-        catch (DbUpdateConcurrencyException)
-        {
-            await SafeRollbackAsync(transaction, ct);
-            await AuditAsync(adminActor, user.Id, "RecoveryFailed", "Xung Ä‘á»™t thao tÃ¡c Ä‘á»“ng thá»i",
+            // The failed save left the losing edits tracked; drop them so the audit is written with
+            // a clean change tracker instead of retrying the stale version.
+            db.ChangeTracker.Clear();
+            await AuditAsync(adminActor, user.Id, "RecoveryFailed", "Xung đột thao tác đồng thời",
                 ChannelName(current), "UsedProof", ct);
             return invalid;
         }
@@ -339,14 +339,14 @@ public sealed class AccountRecoveryService(
         if (previous != null)
         {
             if (previous.ResendCount >= settings.MaxResends)
-                throw new RecoveryBlockedException("Háº¿t sá»‘ láº§n gá»­i láº¡i cho phÃ©p", "OverResendLimit");
+                throw new RecoveryBlockedException("Hết số lần gửi lại cho phép", "OverResendLimit");
             if (previous.LastResentAt.HasValue
                 && now - previous.LastResentAt.Value < TimeSpan.FromMinutes(settings.ResendCooldownMinutes))
-                throw new RecoveryBlockedException("Gá»­i láº¡i quÃ¡ sá»›m", "OverResendLimit");
+                throw new RecoveryBlockedException("Gửi lại quá sớm", "OverResendLimit");
         }
 
         if (!await HasVerifiedChannelAsync(user, ct))
-            throw new RecoveryBlockedException("KhÃ´ng cÃ³ kÃªnh liÃªn há»‡ Ä‘Ã£ xÃ¡c minh", "DeliveryFailure");
+            throw new RecoveryBlockedException("Không có kênh liên hệ đã xác minh", "DeliveryFailure");
 
         var proof = GenerateCode();
         var token = new RecoveryToken
@@ -380,7 +380,7 @@ public sealed class AccountRecoveryService(
         {
             logger.LogWarning("Recovery delivery failed for account {AccountId} on channel {Channel}.",
                 user.Id, token.ChannelType);
-            throw new RecoveryBlockedException("Gá»­i mÃ£ xÃ¡c minh tháº¥t báº¡i", "DeliveryFailure");
+            throw new RecoveryBlockedException("Gửi mã xác minh thất bại", "DeliveryFailure");
         }
 
         return token;
@@ -514,14 +514,14 @@ public sealed class AccountRecoveryService(
 
     private static string ReasonFor(string result) => result switch
     {
-        "UsedProof" => "MÃ£ xÃ¡c minh Ä‘Ã£ Ä‘Æ°á»£c sá»­ dá»¥ng",
-        "ExpiredProof" => "MÃ£ xÃ¡c minh Ä‘Ã£ háº¿t háº¡n",
-        "InvalidProof" => "MÃ£ xÃ¡c minh khÃ´ng Ä‘Ãºng",
-        "OverAttemptLimit" => "VÆ°á»£t quÃ¡ sá»‘ láº§n xÃ¡c minh cho phÃ©p",
-        "OverResendLimit" => "VÆ°á»£t quÃ¡ sá»‘ láº§n gá»­i láº¡i cho phÃ©p",
-        "DeliveryFailure" => "Gá»­i mÃ£ xÃ¡c minh tháº¥t báº¡i",
-        "Blocked" => "YÃªu cáº§u bá»‹ cháº·n",
-        _ => "KhÃ´ng rÃµ"
+        "UsedProof" => "Mã xác minh đã được sử dụng",
+        "ExpiredProof" => "Mã xác minh đã hết hạn",
+        "InvalidProof" => "Mã xác minh không đúng",
+        "OverAttemptLimit" => "Vượt quá số lần xác minh cho phép",
+        "OverResendLimit" => "Vượt quá số lần gửi lại cho phép",
+        "DeliveryFailure" => "Gửi mã xác minh thất bại",
+        "Blocked" => "Yêu cầu bị chặn",
+        _ => "Không rõ"
     };
 
     private async Task AuditAsync(int? actorId, int targetId, string action, string reason, string channelType,
@@ -575,7 +575,7 @@ public sealed class AccountRecoveryService(
 
     private static string GenerateSecret() => RecoveryProof.GenerateGrant();
 
-    private static bool IsConcurrencyConflict(DbUpdateException exception)
+    private static bool IsConcurrencyConflict(Exception exception)
     {
         for (Exception? cause = exception; cause != null; cause = cause.InnerException)
             if (cause is PostgresException postgres && postgres.SqlState is PostgresErrorCodes.SerializationFailure
@@ -593,34 +593,34 @@ public sealed class AccountRecoveryService(
     private static BusinessException? ValidateIdentifier(string? identifier)
     {
         if (string.IsNullOrWhiteSpace(identifier))
-            return new BusinessException(400, SystemMessages.Get("MSG02", "TÃ i khoáº£n"));
+            return new BusinessException(400, SystemMessages.Get("MSG02", "Tài khoản"));
         var value = identifier.Trim();
         // Any non-empty identifier is accepted: an unknown or malformed one simply gets the same
         // neutral answer, so the format itself is never used to test whether an account exists.
-        if (value.Length > 64) return new BusinessException(400, SystemMessages.Get("MSG03", "TÃ i khoáº£n", 64));
+        if (value.Length > 64) return new BusinessException(400, SystemMessages.Get("MSG03", "Tài khoản", 64));
         return null;
     }
 
     private static BusinessException? ValidateProof(string? proof)
     {
         if (string.IsNullOrWhiteSpace(proof))
-            return new BusinessException(400, SystemMessages.Get("MSG02", "MÃ£ xÃ¡c minh"));
+            return new BusinessException(400, SystemMessages.Get("MSG02", "Mã xác minh"));
         if (proof.Trim().Length is < 4 or > 64)
-            return new BusinessException(400, SystemMessages.Get("MSG04", "MÃ£ xÃ¡c minh"));
+            return new BusinessException(400, SystemMessages.Get("MSG04", "Mã xác minh"));
         return null;
     }
 
     private static BusinessException? ValidatePassword(string? password, string? confirm)
     {
         if (string.IsNullOrWhiteSpace(password))
-            return new BusinessException(400, SystemMessages.Get("MSG02", "Máº­t kháº©u má»›i"));
+            return new BusinessException(400, SystemMessages.Get("MSG02", "mật khẩu mới"));
         if (string.IsNullOrWhiteSpace(confirm))
-            return new BusinessException(400, SystemMessages.Get("MSG02", "XÃ¡c nháº­n máº­t kháº©u"));
+            return new BusinessException(400, SystemMessages.Get("MSG02", "Xác nhận mật khẩu"));
         if (password.Length > 256)
-            return new BusinessException(400, SystemMessages.Get("MSG03", "Máº­t kháº©u má»›i", 256));
+            return new BusinessException(400, SystemMessages.Get("MSG03", "mật khẩu mới", 256));
         if (!string.Equals(password, confirm, StringComparison.Ordinal))
             // No exact MSG exists for a mismatch in v1.2; MSG04 is the closest match [PROPOSED].
-            return new BusinessException(400, SystemMessages.Get("MSG04", "XÃ¡c nháº­n máº­t kháº©u"));
+            return new BusinessException(400, SystemMessages.Get("MSG04", "Xác nhận mật khẩu"));
         return null;
     }
 

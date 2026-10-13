@@ -1,4 +1,5 @@
 using DCMS.Infrastructure.Features.Authentication;
+using Microsoft.AspNetCore.Mvc;
 
 namespace DCMS.Api.Features.Authentication;
 
@@ -16,9 +17,9 @@ public static class DevelopmentRecoveryEndpoints
     public static void MapDevelopmentRecoveryEndpoints(this WebApplication app)
     {
         if (!app.Environment.IsDevelopment()) return;
-
         app.MapGet("/api/dev/recovery/proof/{accountId:int}", (int accountId,
-            DevelopmentContactDeliveryAdapter adapter) =>
+
+            [FromServices] DevelopmentContactDeliveryAdapter adapter) =>
         {
             // Guard: a signed-in session is required so this aid cannot be used anonymously, even in
             // Development.
