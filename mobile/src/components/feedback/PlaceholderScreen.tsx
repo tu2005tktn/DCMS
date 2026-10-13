@@ -9,6 +9,7 @@ const routes: { label: string; href: Href }[] = [
   { label: 'S03 · Khôi phục tài khoản', href: '/(auth)/recover-account' },
   { label: 'S03 · Đặt lại mật khẩu', href: '/(auth)/reset-password' },
   { label: 'S07 · Liên kết tài khoản', href: '/(account)/account-link' },
+  { label: 'Trang chủ tài khoản', href: '/(account)/home' },
 ];
 export function PlaceholderScreen({ title, description }: { title: string; description: string }) {
   return <ScrollView contentContainerStyle={styles.container}>
