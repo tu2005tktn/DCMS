@@ -18,7 +18,7 @@ export default function AuthLayout() {
     );
   }
   if (state.status === 'authenticated') {
-    return <Redirect href="/(account)/account-link" />;
+    return <Redirect href="/(account)/home" />;
   }
   return <Stack screenOptions={{ headerTitle: 'Tài khoản' }} />;
 }
