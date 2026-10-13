@@ -2,6 +2,8 @@
 
 **Team setup (Tiếng Việt): [Hướng dẫn cài đặt và chạy dự án](docs/SETUP.vi.md).** Includes required tools, first-run commands, daily startup, verification, and troubleshooting for Windows/PowerShell.
 
+**Hướng dẫn chạy & demo nhanh (tiếng Việt, file text): [HUONG-DAN-SU-DUNG.txt](HUONG-DAN-SU-DUNG.txt).**
+
 This repository contains the .NET 10 API, PostgreSQL development container and React web app. UC-01 (Identity/JWT sign in/out) and core UC-31 (staff account management, current roles, lock/unlock, concurrency and audit) are implemented. The [mobile team scaffold](mobile/README.md) provides Expo routes and placeholder screens; mobile business workflows, AI, patient workflows and verified credential recovery remain future work.
 
 The [37-table logical ERD](docs/architecture/DCMS_Logical_ERD_37_Tables.mmd) is a design reference; only account/employee/authentication tables have been migrated. Read the [UC/GBR/MSG implementation matrix](docs/implementation/UC01-UC31.md) and [Vietnamese account demo/test guide](docs/implementation/RUN-ACCOUNTS.vi.md).
