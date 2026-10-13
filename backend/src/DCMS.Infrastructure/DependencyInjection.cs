@@ -30,7 +30,9 @@ public static class DependencyInjection
         services.AddOptions<JwtSettings>().Bind(configuration.GetSection("Jwt"))
             .Validate(x => System.Text.Encoding.UTF8.GetByteCount(x.SigningKey) >= 32, "Jwt:SigningKey must contain at least 32 bytes.")
             .Validate(x => !string.IsNullOrWhiteSpace(x.Issuer) && !string.IsNullOrWhiteSpace(x.Audience)
-                && x.SessionMinutes is >= 1 and <= 1440, "Invalid JWT configuration.").ValidateOnStart();
+                && x.SessionMinutes is >= 1 and <= 1440
+                && x.AccessTokenMinutes is >= 1 and <= 60
+                && x.RefreshTokenDays is >= 1 and <= 365, "Invalid JWT configuration.").ValidateOnStart();
         services.AddScoped<IAccountService, AccountService>();
         services.AddScoped<IAuthenticationService, AuthenticationService>();
         services.AddScoped<IRegistrationService, RegistrationService>();
