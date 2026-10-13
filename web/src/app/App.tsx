@@ -4,6 +4,7 @@ import { Link, Navigate, Outlet, Route, Routes, useLocation } from 'react-router
 import { useAuth } from '../features/authentication/AuthContext';
 import SignInPage from '../features/authentication/SignInPage';
 import AccountsPage from '../features/accounts/AccountsPage';
+import LinkVerificationPage from '../features/patient-links/LinkVerificationPage';
 import { roleLabels } from '../features/accounts/types';
 import HealthStatus from '../features/HealthStatus';
 
@@ -14,6 +15,7 @@ export default function App() {
     <Route element={<Protected><Workspace /></Protected>}>
       <Route index element={<Home />} />
       <Route path="accounts" element={<Protected permission="accounts.manage"><AccountsPage /></Protected>} />
+      <Route path="link-verification" element={<Protected permission="patient-links.verify"><LinkVerificationPage /></Protected>} />
       <Route path="*" element={<Result status="404" title="Không tìm thấy trang" extra={<Link to="/">Về trang chủ</Link>} />} />
     </Route>
   </Routes>;
@@ -42,6 +44,7 @@ function Workspace() {
     <Menu mode="horizontal" selectedKeys={[location.pathname]} items={[
       { key: '/', label: <Link to="/">Tài khoản của tôi</Link> },
       ...(auth.user?.permissions.includes('accounts.manage') ? [{ key: '/accounts', label: <Link to="/accounts">Quản lý tài khoản</Link> }] : []),
+      ...(auth.user?.permissions.includes('patient-links.verify') ? [{ key: '/link-verification', label: <Link to="/link-verification">Xác minh liên kết hồ sơ</Link> }] : []),
     ]} />
     <Layout.Content className="workspace-content">{error && <Alert className="form-alert" type="error" message={error} showIcon />}<Outlet /></Layout.Content>
   </Layout>;
@@ -60,7 +63,9 @@ function Home() {
       <Typography.Paragraph>Loại tài khoản: {user?.accountType === 'Staff' ? 'Nhân viên' : 'Công khai'}</Typography.Paragraph>
       <Typography.Paragraph>Vai trò được cấp: <Space wrap>{user?.roles.map(role => <Tag key={role}>{roleLabels[role] ?? role}</Tag>)}</Space></Typography.Paragraph>
       <Typography.Paragraph>Vai trò hiệu lực: <Space wrap>{user?.effectiveRoles.map(role => <Tag key={role}>{roleLabels[role] ?? role}</Tag>)}</Space></Typography.Paragraph>
-      {user?.accountType === 'Public' && <Typography.Paragraph>Chưa có liên kết hồ sơ bệnh án được xác minh. Tài khoản công khai không tự có quyền đọc hồ sơ lâm sàng.</Typography.Paragraph>}
+      {user?.accountType === 'Public' && <Typography.Paragraph>{user.hasVerifiedPatientLink
+        ? 'Tài khoản đã được liên kết với hồ sơ của chính bạn.'
+        : 'Chưa có liên kết hồ sơ bệnh án được xác minh. Tài khoản công khai không tự có quyền đọc hồ sơ lâm sàng.'}</Typography.Paragraph>}
     </Card>
     <Typography.Paragraph className="login-help"><Link to="/health">Xem trạng thái hệ thống</Link></Typography.Paragraph>
   </>;

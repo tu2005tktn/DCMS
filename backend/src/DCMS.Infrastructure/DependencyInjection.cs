@@ -8,6 +8,8 @@ using DCMS.Application.Features.Accounts;
 using DCMS.Application.Features.Authentication;
 using DCMS.Infrastructure.Features.Accounts;
 using DCMS.Infrastructure.Features.Authentication;
+using DCMS.Application.Features.PatientLinks;
+using DCMS.Infrastructure.Features.PatientLinks;
 
 namespace DCMS.Infrastructure;
 
@@ -33,7 +35,11 @@ public static class DependencyInjection
                 && x.RefreshTokenDays is >= 1 and <= 365, "Invalid JWT configuration.").ValidateOnStart();
         services.AddScoped<IAccountService, AccountService>();
         services.AddScoped<IAuthenticationService, AuthenticationService>();
+        services.AddScoped<IRegistrationService, RegistrationService>();
         services.AddScoped<DevelopmentAccountSeeder>();
+        services.AddScoped<IPatientLinkService, PatientLinkService>();
+        services.AddScoped<IPatientLinkReviewService, PatientLinkReviewService>();
+        services.AddScoped<DevelopmentPatientLinkSeeder>();
         return services;
     }
 }

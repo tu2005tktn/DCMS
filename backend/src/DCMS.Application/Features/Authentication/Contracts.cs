@@ -1,3 +1,5 @@
+using DCMS.Application.Common;
+
 namespace DCMS.Application.Features.Authentication;
 
 public sealed record SignInRequest(string UserName, string Password, string? DeviceLabel = null);
@@ -10,7 +12,14 @@ public sealed record RefreshResponse(string AccessToken, DateTimeOffset ExpiresA
 public sealed record SessionInfo(Guid SessionId, string DeviceLabel, DateTimeOffset CreatedAt,
     DateTimeOffset LastSeenAt, DateTimeOffset ExpiresAt, bool CurrentSession);
 public sealed record CredentialPolicy(int RequiredLength, bool RequireDigit, bool RequireLowercase,
-    bool RequireUppercase, bool RequireNonAlphanumeric, int SessionMinutes);
+    bool RequireUppercase, bool RequireNonAlphanumeric, int SessionMinutes, int MaximumLength = 256);
+public sealed record RegisterRequest(string? FullName, string? PhoneNumber, string? Email, string? Password, string? ConfirmPassword);
+public sealed record RegisterResponse(int AccountId, string PhoneNumber, SystemMessage Notification);
+
+public interface IRegistrationService
+{
+    Task<RegisterResponse> RegisterAsync(RegisterRequest request, CancellationToken ct);
+}
 
 public interface IAuthenticationService
 {
