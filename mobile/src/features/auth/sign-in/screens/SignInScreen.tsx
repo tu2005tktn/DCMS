@@ -52,7 +52,9 @@ export default function SignInScreen() {
   const handleSignIn = useCallback(
     async (snapshot: SessionSnapshot) => {
       await signIn(snapshot);
-      router.replace('/(account)/account-link' as never);
+      // Sau khi đăng nhập, về menu trung tâm — "Trang chủ tài khoản" sẽ tự xuất hiện
+      // trong menu vì lúc này session đã authenticated.
+      router.replace('/(home)/' as never);
     },
     [signIn, router],
   );

@@ -15,7 +15,8 @@ export default function AccountLinkScreen() {
 
   const { signingOut, signOut: doSignOut } = useSignOut({
     onCleared: () => {
-      router.replace('/(auth)/sign-in');
+      // Về menu trung tâm — "Trang chủ tài khoản" sẽ tự biến mất vì session trở về anonymous.
+      router.replace('/(home)/' as never);
     },
   });
 
