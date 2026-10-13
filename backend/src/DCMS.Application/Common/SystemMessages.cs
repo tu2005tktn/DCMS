@@ -14,6 +14,7 @@ public static class SystemMessages
         "MSG06" => "Bạn không có quyền thực hiện thao tác này.",
         "MSG07" => "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
         "MSG09" => "Thông tin đăng nhập không đúng hoặc tài khoản không thể sử dụng. Vui lòng kiểm tra và thử lại.",
+        "MSG11" => "Tạo tài khoản thành công. Bạn có thể đặt lịch cho mình hoặc người thân.",
         "MSG14" => "Đã cập nhật tài khoản thành công.",
         "MSG15" => "Đã khóa tài khoản. Quyền truy cập từ các phiên hiện tại đã bị vô hiệu hóa.",
         "MSG16" => "Đã mở khóa tài khoản thành công.",

@@ -63,6 +63,8 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
         await using (var create = new NpgsqlCommand($"CREATE SCHEMA \"{schema}\"", connection)) await create.ExecuteNonQueryAsync();
         using var scope = Services.CreateScope();
         await scope.ServiceProvider.GetRequiredService<DcmsDbContext>().Database.MigrateAsync();
+        Assert.True(await scope.ServiceProvider.GetRequiredService<DcmsDbContext>().Roles
+            .AnyAsync(x => x.NormalizedName == "GUEST"));
         await scope.ServiceProvider.GetRequiredService<DevelopmentAccountSeeder>().SeedAsync();
         await scope.ServiceProvider.GetRequiredService<DevelopmentPatientLinkSeeder>().SeedAsync();
         // Sentinel Patient and REVOKED link: account administration must never change them.

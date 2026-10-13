@@ -33,6 +33,7 @@ public static class DependencyInjection
                 && x.SessionMinutes is >= 1 and <= 1440, "Invalid JWT configuration.").ValidateOnStart();
         services.AddScoped<IAccountService, AccountService>();
         services.AddScoped<IAuthenticationService, AuthenticationService>();
+        services.AddScoped<IRegistrationService, RegistrationService>();
         services.AddScoped<DevelopmentAccountSeeder>();
         services.AddScoped<IPatientLinkService, PatientLinkService>();
         services.AddScoped<IPatientLinkReviewService, PatientLinkReviewService>();
