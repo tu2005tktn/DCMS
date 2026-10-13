@@ -67,7 +67,11 @@ khau vao chat cong khai, anh chup man hinh hoac file commit len Git.
 
 
 V. DEMO NHANH (10 PHUT)
-------------------------------------------------------------------------
+----------------------------------------------------------------------
+Giao diện web (bản mới): sidebar điều hướng bên trái, header có đồng hồ
+và menu người dùng, trang đăng nhập/khôi phục có panel thương hiệu.
+Chi tiết thiết kế: docs/specs/UI-DESIGN.vi.md
+
 1. Dang nhap admin.demo -> xem trang "Tai khoan cua toi" (vai tro duoc
    cap / vai tro hieu luc).
 2. Vao "Quan ly tai khoan": tim kiem, tao nhan vien, sua vai tro,

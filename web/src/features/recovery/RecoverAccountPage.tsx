@@ -1,7 +1,9 @@
 import { Alert, Button, Card, Form, Input, Space, Typography, message } from 'antd';
+import { KeyOutlined, LockOutlined, SafetyCertificateOutlined } from '@ant-design/icons';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ApiError } from '../../services/api';
+import BrandLogo from '../../components/BrandLogo';
 import { channelHelpText, recoveryFields, recoveryMessages, requiredMessage } from './recovery.messages';
 import {
   fetchRecoveryPolicy,
@@ -179,12 +181,31 @@ export default function RecoverAccountPage() {
   const disableForm = busy;
 
   return (
-    <main className="page">
-      <div className="content">
-        <div className="recovery-shell">
+    <main className="auth-page">
+      <div className="auth-shell">
+        <aside className="auth-brand">
+          <span className="auth-brand-logo"><BrandLogo size={26} /></span>
           <div>
-            <Typography.Text className="eyebrow">DCMS · Phòng khám nha khoa</Typography.Text>
-            <Typography.Title level={1} style={{ marginBottom: 10 }}>Khôi phục tài khoản</Typography.Title>
+            <h1>Khôi phục tài khoản</h1>
+            <p className="auth-brand-sub">Quy trình 4 bước giúp bạn lấy lại quyền truy cập một cách an toàn.</p>
+          </div>
+          <ul className="auth-brand-features">
+            <li><span className="feature-icon"><SafetyCertificateOutlined /></span>
+              <span><strong>Không tiết lộ tài khoản</strong><br />Thông báo luôn giống nhau dù tài khoản có tồn tại hay không.</span></li>
+            <li><span className="feature-icon"><KeyOutlined /></span>
+              <span><strong>Mã xác minh một lần</strong><br />Mã có thời hạn và bị vô hiệu sau khi dùng.</span></li>
+            <li><span className="feature-icon"><LockOutlined /></span>
+              <span><strong>Thu hồi phiên cũ</strong><br />Các phiên đăng nhập trước đó bị thu hồi sau khi đặt lại mật khẩu.</span></li>
+          </ul>
+          <div className="auth-brand-foot">Cần hỗ trợ? Liên hệ quản trị viên phòng khám.</div>
+        </aside>
+        <section className="auth-panel">
+          <div className="auth-head">
+            <span className="auth-eyebrow"><KeyOutlined />UC-02 · Khôi phục tài khoản</span>
+            <h1>Đặt lại mật khẩu</h1>
+            <p>Nhập tài khoản, xác minh mã được gửi qua kênh liên hệ đã đăng ký, rồi đặt mật khẩu mới.</p>
+          </div>
+          <div className="recovery-shell">
             <ol className="recovery-step" aria-label="Tiến trình khôi phục">
               {stepOrder.map((item, index) => (
                 <li
@@ -196,9 +217,15 @@ export default function RecoverAccountPage() {
                 />
               ))}
             </ol>
-          </div>
+            <div className="recovery-step-labels" aria-hidden>
+              {stepOrder.map((item, index) => (
+                <span key={item} data-active={index === currentIndex}>
+                  {index + 1}. {stepNames[item]}
+                </span>
+              ))}
+            </div>
 
-          <Card className="recovery-card" bordered>
+            <Card className="recovery-card" bordered>
             {error && <Alert className="form-alert" type="error" showIcon message={error} />}
             {notice && step !== 'request' && (
               <div className="recovery-neutral recovery-fade-in" role="status">
@@ -325,11 +352,11 @@ export default function RecoverAccountPage() {
               </div>
             )}
           </Card>
-
-          <Typography.Paragraph className="login-help">
-            <Link to="/sign-in">Quay lại đăng nhập</Link>
-          </Typography.Paragraph>
-        </div>
+          </div>
+          <p className="auth-foot">
+            <Link to="/sign-in" className="dcms-link">Quay lại đăng nhập</Link>
+          </p>
+        </section>
       </div>
       {toastContext}
     </main>
