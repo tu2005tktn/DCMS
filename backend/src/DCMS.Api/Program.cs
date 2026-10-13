@@ -5,6 +5,8 @@ using System.Text;
 using DCMS.Api.Common;
 using DCMS.Api.Features.Accounts;
 using DCMS.Api.Features.Authentication;
+using DCMS.Api.Features.PatientLinks;
+using DCMS.Infrastructure.Features.PatientLinks;
 using DCMS.Application.Common;
 using DCMS.Application.Features.Authentication;
 using DCMS.Domain.Features.Accounts;
@@ -64,7 +66,11 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
 });
 builder.Services.AddAuthorizationBuilder()
     .SetFallbackPolicy(new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build())
-    .AddPolicy("ManageAccounts", policy => policy.RequireRole(AccountRoles.Admin));
+    .AddPolicy("ManageAccounts", policy => policy.RequireRole(AccountRoles.Admin))
+    // Guest is effective for every public account (Patient inherits it) and never for staff.
+    .AddPolicy(PatientLinkEndpoints.PublicAccountPolicy, policy => policy.RequireRole(AccountRoles.Guest))
+    // Admin, Dentist and Clinic Owner do not inherit link verification.
+    .AddPolicy(PatientLinkEndpoints.VerifyPolicy, policy => policy.RequireRole(AccountRoles.ClinicAssistant));
 
 var webOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 builder.Services.AddCors(options => options.AddPolicy("WebDevelopment", policy =>
@@ -77,7 +83,11 @@ if (args.Contains("--migrate") || args.Contains("--seed-demo"))
     if (!app.Environment.IsDevelopment()) throw new InvalidOperationException("Development database commands require Development environment.");
     using var scope = app.Services.CreateScope();
     if (args.Contains("--migrate")) await scope.ServiceProvider.GetRequiredService<DcmsDbContext>().Database.MigrateAsync();
-    if (args.Contains("--seed-demo")) await scope.ServiceProvider.GetRequiredService<DevelopmentAccountSeeder>().SeedAsync();
+    if (args.Contains("--seed-demo"))
+    {
+        await scope.ServiceProvider.GetRequiredService<DevelopmentAccountSeeder>().SeedAsync();
+        await scope.ServiceProvider.GetRequiredService<DevelopmentPatientLinkSeeder>().SeedAsync();
+    }
     return;
 }
 
@@ -98,6 +108,7 @@ app.UseAuthorization();
 app.MapHealthEndpoints();
 app.MapAuthenticationEndpoints();
 app.MapAccountEndpoints();
+app.MapPatientLinkEndpoints();
 
 app.Run();
 

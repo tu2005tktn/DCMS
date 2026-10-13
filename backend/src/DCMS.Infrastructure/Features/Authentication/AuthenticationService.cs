@@ -6,6 +6,7 @@ using DCMS.Application.Common;
 using DCMS.Application.Features.Authentication;
 using DCMS.Domain.Features.Accounts;
 using DCMS.Domain.Features.Authentication;
+using DCMS.Domain.Features.PatientLinks;
 using DCMS.Infrastructure.Features.Accounts;
 using DCMS.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
@@ -91,9 +92,14 @@ public sealed class AuthenticationService(DcmsDbContext db, UserManager<Applicat
         }
         else if (user.AccountType != "Public" || roles.Any(x => x != AccountRoles.Guest && x != AccountRoles.Patient)) return null;
         var effective = AccountRoles.Effective(roles);
-        return new(user.Id, user.UserName!, user.FullName, user.AccountType, roles, effective,
-            effective.Contains(AccountRoles.Admin) ? ["accounts.manage"] : []);
-        // No UC-36 link verification is implemented: never infer a self link from a role/contact.
+        string[] permissions = [
+            .. effective.Contains(AccountRoles.Admin) ? ["accounts.manage"] : Array.Empty<string>(),
+            .. effective.Contains(AccountRoles.ClinicAssistant) ? ["patient-links.verify"] : Array.Empty<string>()
+        ];
+        // UC-36: only a current VERIFIED self link counts; never inferred from a role or contact. Re-read on every request.
+        var verifiedLink = user.AccountType == "Public" && await db.PatientAccountLinks.AsNoTracking()
+            .AnyAsync(x => x.AccountId == user.Id && x.Status == PatientLinkStatus.Verified, ct);
+        return new(user.Id, user.UserName!, user.FullName, user.AccountType, roles, effective, permissions, verifiedLink);
     }
 
     private static void DenySignIn() => throw new BusinessException(401, SystemMessages.Get("MSG09"));

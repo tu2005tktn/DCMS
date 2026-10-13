@@ -1,0 +1,283 @@
+<!doctype html>
+<!-- TEMPORARY UC-36 API test page. Delete before committing. Served by Vite at http://localhost:5173/uc36-test.html -->
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UC-36 API test</title>
+<style>
+  body { font: 14px/1.4 system-ui, sans-serif; margin: 0; padding: 12px; background: #f5f6f8; color: #1f2329; }
+  h1 { font-size: 18px; margin: 0 0 8px; }
+  h2 { font-size: 16px; margin: 0 0 8px; }
+  h3 { font-size: 14px; margin: 12px 0 6px; }
+  .cols { display: grid; grid-template-columns: 1fr 1.4fr; gap: 12px; }
+  @media (max-width: 900px) { .cols { grid-template-columns: 1fr; } }
+  .card { background: #fff; border: 1px solid #dde1e6; border-radius: 8px; padding: 12px; }
+  label { display: block; margin: 6px 0 2px; font-weight: 600; font-size: 12px; }
+  input, select, textarea { width: 100%; box-sizing: border-box; padding: 6px; border: 1px solid #c4c9d0; border-radius: 4px; font: inherit; }
+  textarea { min-height: 54px; }
+  .row { display: flex; gap: 6px; align-items: end; flex-wrap: wrap; }
+  .row > * { flex: 1; min-width: 110px; }
+  button { padding: 6px 10px; border: 1px solid #1d4ed8; background: #2563eb; color: #fff; border-radius: 4px; cursor: pointer; font: inherit; }
+  button.secondary { background: #fff; color: #1d4ed8; }
+  button.danger { background: #dc2626; border-color: #b91c1c; }
+  button:disabled { opacity: .5; cursor: wait; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { border-bottom: 1px solid #e5e7eb; padding: 4px; text-align: left; }
+  tr.click { cursor: pointer; } tr.click:hover { background: #eef2ff; } tr.sel { background: #dbeafe; }
+  .badge { display: inline-block; padding: 1px 6px; border-radius: 10px; font-size: 12px; font-weight: 600; background: #e5e7eb; }
+  .PENDING { background: #fef3c7; } .VERIFIED { background: #d1fae5; } .REJECTED, .REVOKED { background: #fee2e2; }
+  .msg { padding: 6px 8px; border-radius: 4px; margin: 6px 0; display: none; }
+  .msg.ok { display: block; background: #dcfce7; } .msg.err { display: block; background: #fee2e2; }
+  pre { background: #111827; color: #e5e7eb; padding: 8px; border-radius: 4px; overflow: auto; max-height: 220px; font-size: 12px; white-space: pre-wrap; }
+  .muted { color: #6b7280; font-size: 12px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+</style>
+</head>
+<body>
+<h1>UC-36 — trang test API tạm thời (S07 + S08)</h1>
+<div class="row" style="max-width:520px">
+  <div><label>API base URL</label><input id="base" value="http://localhost:5080"></div>
+</div>
+<p class="muted">Trang này chỉ để thử API. Xóa <code>web/public/uc36-test.html</code> trước khi commit.</p>
+
+<div class="cols">
+  <!-- ================= S07 ================= -->
+  <section class="card">
+    <h2>S07 — Tài khoản công khai</h2>
+    <div class="row">
+      <div><label>Username</label><input id="pUser" value="patient.demo"></div>
+      <div><label>Mật khẩu</label><input id="pPass" type="password" placeholder="DEV_SEED_PASSWORD"></div>
+      <div style="flex:0"><button id="pLogin">Đăng nhập</button></div>
+    </div>
+    <div id="pMsg" class="msg"></div>
+
+    <h3>Trạng thái liên kết <button class="secondary" id="pRefresh" style="float:right">Tải lại</button></h3>
+    <div id="pOverview" class="muted">Chưa đăng nhập.</div>
+
+    <h3>Gửi yêu cầu liên kết</h3>
+    <label>Họ tên *</label><input id="fName" value="Nguyễn Văn An" maxlength="160">
+    <div class="grid2">
+      <div><label>Ngày sinh</label><input id="fBirth" type="date" value="1990-05-12"></div>
+      <div><label>Mã hồ sơ (nếu biết)</label><input id="fCode" maxlength="40"></div>
+    </div>
+    <label>Thông tin đối chiếu (0–1000)</label><textarea id="fMatch" maxlength="1000">Khám lần đầu ngày 01/10/2026</textarea>
+    <label style="font-weight:400"><input id="fConfirm" type="checkbox" style="width:auto"> Tôi xác nhận đây là hồ sơ của chính tôi</label>
+    <div class="row" style="margin-top:6px">
+      <button id="pSubmit">Gửi yêu cầu</button>
+      <button class="secondary" id="pWithdraw">Rút yêu cầu đang chờ</button>
+      <button class="secondary" id="pRecord">Đọc hồ sơ tự thân</button>
+    </div>
+  </section>
+
+  <!-- ================= S08 ================= -->
+  <section class="card">
+    <h2>S08 — Hàng đợi xác minh (Clinic Assistant)</h2>
+    <div class="row">
+      <div><label>Username</label><input id="aUser" value="assistant.demo"></div>
+      <div><label>Mật khẩu</label><input id="aPass" type="password" placeholder="DEV_SEED_PASSWORD"></div>
+      <div style="flex:0"><button id="aLogin">Đăng nhập</button></div>
+    </div>
+    <div id="aMsg" class="msg"></div>
+
+    <div class="row">
+      <div><label>Trạng thái</label><select id="qStatus">
+        <option>PENDING</option><option>VERIFIED</option><option>REJECTED</option><option>REVOKED</option><option>WITHDRAWN</option><option>ALL</option>
+      </select></div>
+      <div><label>Từ ngày</label><input id="qFrom" type="date"></div>
+      <div><label>Đến ngày</label><input id="qTo" type="date"></div>
+      <div><label>Từ khóa</label><input id="qKey" maxlength="100"></div>
+      <div style="flex:0"><button id="qLoad">Tìm</button></div>
+    </div>
+    <table><thead><tr><th>Mã</th><th>Tài khoản</th><th>Họ tên khai</th><th>Gửi lúc</th><th>Trạng thái</th><th>Người xử lý</th></tr></thead>
+      <tbody id="qBody"><tr><td colspan="6" class="muted">Chưa tải.</td></tr></tbody></table>
+    <div class="row muted" style="margin-top:4px">
+      <span id="qInfo"></span>
+      <button class="secondary" id="qPrev" style="flex:0">‹</button><button class="secondary" id="qNext" style="flex:0">›</button>
+    </div>
+
+    <div id="detail" style="display:none">
+      <h3>Đối chiếu — <span id="dCode"></span> <span id="dStatus" class="badge"></span></h3>
+      <div class="grid2">
+        <div><b>Tài khoản</b><div id="dAccount" class="muted"></div></div>
+        <div><b>Thông tin tự khai</b><div id="dDeclared" class="muted"></div></div>
+      </div>
+      <div id="dConflict" class="msg"></div>
+      <div><b>Hồ sơ Patient đã gắn</b> <span id="dPatient" class="muted"></span></div>
+      <div class="muted" id="dHandled"></div>
+
+      <div id="verifyBox">
+        <h3>Tra cứu Patient</h3>
+        <div class="row"><div><input id="pkKey" placeholder="Mã / họ tên / SĐT"></div><div style="flex:0"><button class="secondary" id="pkSearch">Tìm</button></div></div>
+        <table><tbody id="pkBody"></tbody></table>
+        <label>Kết quả đối chiếu (phương pháp/bằng chứng, 1–1000) *</label><textarea id="vNote" maxlength="1000">Đối chiếu CCCD tại quầy lễ tân</textarea>
+        <div class="row" style="margin-top:6px"><button id="vVerify">Xác minh (Verify)</button></div>
+      </div>
+      <div id="decideBox">
+        <label>Lý do quyết định (nội bộ, 1–500) * — bắt buộc khi Reject/Revoke</label><textarea id="rReason" maxlength="500"></textarea>
+        <label>Nội dung gửi người dùng (0–500)</label><input id="rPublic" maxlength="500">
+        <div class="row" style="margin-top:6px">
+          <button class="danger" id="rReject">Từ chối (Reject)</button>
+          <button class="danger" id="rRevoke">Thu hồi (Revoke)</button>
+          <button class="secondary" id="dAudit">Xem audit</button>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<h3>Response gần nhất</h3>
+<pre id="log">—</pre>
+
+<script>
+const $ = id => document.getElementById(id);
+const tokens = { p: null, a: null };
+let overview = null, detail = null, selectedPatient = null, page = 1, total = 0;
+const pageSize = 10;
+const fmt = v => v ? new Date(v).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : '—';
+const esc = v => String(v ?? '—').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const badge = s => `<span class="badge ${s}">${s}</span>`;
+
+function show(box, ok, text) { const el = $(box); el.className = 'msg ' + (ok ? 'ok' : 'err'); el.textContent = text; }
+
+async function call(who, path, method = 'GET', body) {
+  const headers = {};
+  if (body) headers['Content-Type'] = 'application/json';
+  if (tokens[who]) headers.Authorization = 'Bearer ' + tokens[who];
+  let res;
+  try { res = await fetch($('base').value.replace(/\/$/, '') + path, { method, headers, body: body ? JSON.stringify(body) : undefined }); }
+  catch { throw { code: 'MSG144', message: 'Không thể hoàn tất thao tác. Vui lòng kiểm tra kết nối và thử lại.' }; }
+  const data = res.status === 204 ? null : await res.json().catch(() => null);
+  $('log').textContent = `${method} ${path} → ${res.status}\n` + JSON.stringify(data, null, 2);
+  if (!res.ok) throw data ?? { code: 'MSG144', message: 'HTTP ' + res.status };
+  return data;
+}
+
+// Disable the button while the request runs to block duplicate submission.
+function action(buttonId, box, fn) {
+  $(buttonId).addEventListener('click', async () => {
+    const btn = $(buttonId);
+    if (btn.disabled) return;
+    btn.disabled = true;
+    try { await fn(); } catch (e) { show(box, false, `${e.code ?? ''} ${e.message ?? e}`); }
+    finally { btn.disabled = false; }
+  });
+}
+
+async function login(who, user, pass, box) {
+  const r = await call(who, '/api/auth/sign-in', 'POST', { userName: $(user).value, password: $(pass).value });
+  tokens[who] = r.accessToken;
+  show(box, true, `Đã đăng nhập ${r.user.userName} (${r.user.effectiveRoles.join(', ')}) — hasVerifiedPatientLink=${r.user.hasVerifiedPatientLink}`);
+}
+
+/* ---------- S07 ---------- */
+async function loadOverview() {
+  overview = await call('p', '/api/patient-links/me');
+  const a = overview.account, c = overview.current;
+  $('pOverview').innerHTML = `
+    <div>Tài khoản: <b>${esc(a.userName)}</b> (#${a.id}) — ${esc(a.fullName)} — contact đã xác minh: ${esc(a.verifiedEmail ?? a.verifiedPhone)}</div>
+    <div style="margin:6px 0">Trạng thái: ${badge(overview.linkStatus)} ${overview.canSubmit ? '' : '<span class="muted">(không thể gửi yêu cầu mới)</span>'}</div>
+    ${c ? `<div>Yêu cầu hiện tại: <b>${esc(c.requestCode)}</b> gửi ${fmt(c.requestedAt)}, quyết định ${fmt(c.decidedAt)}</div>
+      ${c.result ? `<div>Kết quả: ${esc(c.result.message)}</div>` : ''}
+      ${c.publicNote ? `<div>Ghi chú từ phòng khám: ${esc(c.publicNote)}</div>` : ''}` : ''}
+    <div class="muted">Lịch sử: ${overview.history.map(h => `${h.requestCode} ${h.status}`).join(' · ') || 'trống'}</div>`;
+  $('pSubmit').disabled = !overview.canSubmit;
+}
+action('pLogin', 'pMsg', async () => { await login('p', 'pUser', 'pPass', 'pMsg'); await loadOverview(); });
+action('pRefresh', 'pMsg', loadOverview);
+action('pSubmit', 'pMsg', async () => {
+  const r = await call('p', '/api/patient-links/me/requests', 'POST', {
+    fullName: $('fName').value, birthDate: $('fBirth').value || null, patientCode: $('fCode').value || null,
+    matchingInformation: $('fMatch').value || null, confirmSelf: $('fConfirm').checked
+  });
+  show('pMsg', true, `${r.notification.code}: ${r.notification.message}${r.created ? '' : ' (đã có yêu cầu đang chờ — không tạo mới)'}`);
+  await loadOverview();
+});
+action('pWithdraw', 'pMsg', async () => {
+  const c = overview?.current;
+  if (!c || c.status !== 'PENDING') throw { message: 'Không có yêu cầu đang chờ.' };
+  if (!confirm('Rút yêu cầu ' + c.requestCode + '?')) return;
+  await call('p', `/api/patient-links/me/requests/${c.id}/withdraw`, 'POST', { version: c.version });
+  show('pMsg', true, 'Đã rút yêu cầu.');
+  await loadOverview();
+});
+action('pRecord', 'pMsg', async () => {
+  const r = await call('p', '/api/patient-links/me/record');
+  show('pMsg', true, `Hồ sơ tự thân: ${r.patientCode} — ${r.fullName} — ${r.birthDate ?? 'không có ngày sinh'}`);
+});
+
+/* ---------- S08 ---------- */
+async function loadQueue() {
+  const q = new URLSearchParams({ status: $('qStatus').value, page, pageSize });
+  if ($('qFrom').value) q.set('from', $('qFrom').value);
+  if ($('qTo').value) q.set('to', $('qTo').value);
+  if ($('qKey').value.trim()) q.set('keyword', $('qKey').value.trim());
+  const r = await call('a', '/api/patient-link-reviews?' + q);
+  total = r.total;
+  $('qBody').innerHTML = r.items.length ? r.items.map(i => `<tr class="click ${detail?.id === i.id ? 'sel' : ''}" data-id="${i.id}">
+      <td>${esc(i.requestCode)}</td><td>${esc(i.accountUserName)}</td><td>${esc(i.declaredFullName)}</td>
+      <td>${fmt(i.requestedAt)}</td><td>${badge(i.status)}</td><td>${esc(i.handlerName)}</td></tr>`).join('')
+    : '<tr><td colspan="6" class="muted">Không có yêu cầu phù hợp.</td></tr>';
+  $('qInfo').textContent = `Trang ${page}/${Math.max(1, Math.ceil(total / pageSize))} — ${total} yêu cầu`;
+  document.querySelectorAll('#qBody tr.click').forEach(tr => tr.onclick = () => openDetail(+tr.dataset.id).catch(e => show('aMsg', false, `${e.code ?? ''} ${e.message}`)));
+}
+async function openDetail(id) {
+  detail = await call('a', `/api/patient-link-reviews/${id}`);
+  selectedPatient = null;
+  const d = detail, a = d.account;
+  $('detail').style.display = '';
+  $('dCode').textContent = d.requestCode;
+  $('dStatus').textContent = d.status; $('dStatus').className = 'badge ' + d.status;
+  $('dAccount').innerHTML = `${esc(a.userName)} — ${esc(a.fullName)}<br>Email: ${esc(a.email)} ${a.emailConfirmed ? '✔' : '(chưa xác minh)'}<br>
+    SĐT: ${esc(a.phone)} ${a.phoneConfirmed ? '✔' : '(chưa xác minh)'}<br>${a.isActive ? 'Đang hoạt động' : 'ĐÃ KHÓA'}`;
+  $('dDeclared').innerHTML = `${esc(d.declaredFullName)}<br>Ngày sinh: ${esc(d.declaredBirthDate)}<br>Mã khai: ${esc(d.declaredPatientCode)}<br>${esc(d.matchingInformation)}`;
+  $('dPatient').textContent = d.patient ? `${d.patient.patientCode} — ${d.patient.fullName} — ${d.patient.birthDate ?? ''}` : '—';
+  $('dHandled').innerHTML = `Kết quả đối chiếu: ${esc(d.verificationNote)} · Lý do: ${esc(d.decisionReason)} · Gửi người dùng: ${esc(d.publicNote)}<br>
+    Xử lý: ${esc(d.reviewerName)} ${fmt(d.reviewedAt)} · Thu hồi: ${esc(d.revokerName)} ${fmt(d.revokedAt)}`;
+  if (d.conflict.accountHasActiveLink) show('dConflict', false, 'Tài khoản đã có liên kết đang hiệu lực: ' + d.conflict.activeRequestCode);
+  else $('dConflict').className = 'msg';
+  $('verifyBox').style.display = d.status === 'PENDING' ? '' : 'none';
+  $('rReject').style.display = d.status === 'PENDING' ? '' : 'none';
+  $('rRevoke').style.display = d.status === 'VERIFIED' ? '' : 'none';
+  $('pkBody').innerHTML = '';
+  $('pkKey').value = d.declaredPatientCode ?? d.declaredFullName;
+  document.querySelectorAll('#qBody tr').forEach(tr => tr.classList.toggle('sel', +tr.dataset.id === id));
+}
+async function decided(r) {
+  show('aMsg', true, `Đã lưu. Nội dung gửi người dùng: ${r.notification.code} — ${r.notification.message}`);
+  await openDetail(r.request.id); await loadQueue();
+}
+action('aLogin', 'aMsg', async () => { await login('a', 'aUser', 'aPass', 'aMsg'); await loadQueue(); });
+action('qLoad', 'aMsg', async () => { page = 1; await loadQueue(); });
+action('qPrev', 'aMsg', async () => { if (page > 1) { page--; await loadQueue(); } });
+action('qNext', 'aMsg', async () => { if (page * pageSize < total) { page++; await loadQueue(); } });
+action('pkSearch', 'aMsg', async () => {
+  const r = await call('a', `/api/patient-link-reviews/${detail.id}/patients?keyword=${encodeURIComponent($('pkKey').value)}`);
+  $('pkBody').innerHTML = r.length ? r.map(c => `<tr class="click" data-id="${c.patient.id}"><td>${esc(c.patient.patientCode)}</td><td>${esc(c.patient.fullName)}</td>
+      <td>${esc(c.patient.birthDate)}</td><td>${esc(c.patient.phone)}</td><td>${c.hasActiveLink ? '<span class="badge REVOKED">đã có liên kết</span>' : ''}</td></tr>`).join('')
+    : '<tr><td class="muted">Không tìm thấy Patient.</td></tr>';
+  document.querySelectorAll('#pkBody tr.click').forEach(tr => tr.onclick = () => {
+    selectedPatient = +tr.dataset.id;
+    document.querySelectorAll('#pkBody tr').forEach(x => x.classList.toggle('sel', x === tr));
+  });
+});
+action('vVerify', 'aMsg', async () => {
+  if (!selectedPatient) throw { message: 'Chọn một Patient trong kết quả tra cứu.' };
+  if (!confirm('Xác nhận đúng hồ sơ tự thân và cấp quyền xem hồ sơ?')) return;
+  await decided(await call('a', `/api/patient-link-reviews/${detail.id}/verify`, 'POST',
+    { version: detail.version, patientId: selectedPatient, verificationNote: $('vNote').value }));
+});
+action('rReject', 'aMsg', async () => {
+  if (!confirm('Từ chối yêu cầu này?')) return;
+  await decided(await call('a', `/api/patient-link-reviews/${detail.id}/reject`, 'POST',
+    { version: detail.version, decisionReason: $('rReason').value, verificationNote: $('vNote').value || null, publicNote: $('rPublic').value || null }));
+});
+action('rRevoke', 'aMsg', async () => {
+  if (!confirm('Thu hồi liên kết? Người dùng sẽ mất quyền xem hồ sơ ngay ở request tiếp theo.')) return;
+  await decided(await call('a', `/api/patient-link-reviews/${detail.id}/revoke`, 'POST',
+    { version: detail.version, decisionReason: $('rReason').value, publicNote: $('rPublic').value || null }));
+});
+action('dAudit', 'aMsg', async () => { await call('a', `/api/patient-link-reviews/${detail.id}/audit`); });
+</script>
+</body>
+</html>

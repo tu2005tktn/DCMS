@@ -16,3 +16,14 @@ body { margin: 0; }
 .audit-entry { margin-bottom: 16px; }
 pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }
 @media (max-width: 680px) { .workspace-header { padding: 0 16px; } .workspace-content { padding: 16px; } .page-heading, .table-tools { align-items: stretch; flex-direction: column; } }
+.link-filters { display: grid; grid-template-columns: 180px 160px 160px minmax(200px, 1fr) auto; gap: 12px; align-items: end; margin-bottom: 16px; }
+.link-filters label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: #475467; }
+.link-row, .link-row-selected { cursor: pointer; }
+.link-row-selected > td { background: #e6f0ff !important; }
+.link-section { margin-top: 20px; }
+.link-hint { margin-top: 12px; }
+.link-inline-alert { margin-top: 8px; }
+.link-candidates { margin-top: 12px; }
+.multiline { white-space: pre-wrap; }
+@media (max-width: 1100px) { .link-filters { grid-template-columns: 1fr 1fr; } .link-filter-actions { grid-column: 1 / -1; } }
+@media (max-width: 680px) { .link-filters { grid-template-columns: 1fr; } }

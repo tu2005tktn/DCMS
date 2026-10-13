@@ -80,3 +80,7 @@ Recovery support hoãn vì S03/UC-02 chưa có kênh xác minh và policy; Drawe
 **Jira DCMS-75 chưa được cập nhật trực tiếp:** Atlassian chưa kết nối trong phiên này. Nội dung task và bằng chứng ở đây sẵn sàng dùng để cập nhật task hiện có; không tạo task thay thế hoặc tự đổi trạng thái/assignee trên Jira.
 
 Tham khảo triển khai: [EF indexes](https://learn.microsoft.com/en-us/ef/core/modeling/indexes), [EF concurrency](https://learn.microsoft.com/en-us/ef/core/saving/concurrency), [Ant Design Table](https://ant.design/components/table/). Quy tắc nghiệp vụ/MSG lấy từ DOCX local, không lấy từ tài liệu kỹ thuật.
+
+## Đồng bộ main ngày 13/10/2026
+
+Khi tích hợp UC-36, test S04 dùng PatientProfile và PatientAccountLink từ migration thật thay cho hai bảng sentinel tự tạo. Giữ bảng MEDICAL_RECORD sentinel trong schema test để tiếp tục kiểm tra quản lý tài khoản không thay đổi bệnh án. Không thay đổi API hoặc nghiệp vụ S04.

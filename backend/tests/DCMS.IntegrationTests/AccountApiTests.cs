@@ -12,6 +12,9 @@ using DCMS.Domain.Features.Accounts;
 using DCMS.Infrastructure.Features.Accounts;
 using DCMS.Infrastructure.Persistence;
 using DCMS.Infrastructure.Features.Authentication;
+using DCMS.Infrastructure.Features.PatientLinks;
+using DCMS.Domain.Features.PatientLinks;
+using DCMS.Domain.Features.Patients;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -63,32 +66,49 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
         Assert.True(await scope.ServiceProvider.GetRequiredService<DcmsDbContext>().Roles
             .AnyAsync(x => x.NormalizedName == "GUEST"));
         await scope.ServiceProvider.GetRequiredService<DevelopmentAccountSeeder>().SeedAsync();
-        // Test-only sentinel tables protect the boundary without implementing UC-07/36.
-        await using var sentinel = new NpgsqlCommand("""
-            CREATE TABLE "PATIENT_PROFILE" ("Id" integer PRIMARY KEY, "FullName" text NOT NULL);
-            INSERT INTO "PATIENT_PROFILE" VALUES (1, 'SYNTHETIC patient sentinel');
-            CREATE TABLE "PATIENT_ACCOUNT_LINK" ("Id" integer PRIMARY KEY, "Status" text NOT NULL);
-            INSERT INTO "PATIENT_ACCOUNT_LINK" VALUES (1, 'REVOKED');
+        await scope.ServiceProvider.GetRequiredService<DevelopmentPatientLinkSeeder>().SeedAsync();
+        // Sentinel Patient and REVOKED link: account administration must never change them.
+        var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
+        var guestId = await db.Users.Where(x => x.UserName == "guest.demo").Select(x => x.Id).SingleAsync();
+        var now = DateTimeOffset.UtcNow;
+        var patient = new PatientProfile { PatientCode = "SENTINEL-1", FullName = "SYNTHETIC patient sentinel", CreatedAt = now, UpdatedAt = now };
+        db.Patients.Add(patient);
+        await db.SaveChangesAsync();
+        var link = new PatientAccountLink
+        {
+            RequestCode = "LK-SENTINEL", AccountId = guestId, PatientId = patient.Id, Status = PatientLinkStatus.Revoked,
+            RequestedAt = now, DeclaredFullName = patient.FullName, RevokedAt = now, DecisionReason = "Sentinel"
+        };
+        db.PatientAccountLinks.Add(link);
+        await db.SaveChangesAsync();
+        sentinel = (patient.Id, link.Id, await db.Patients.CountAsync(), await db.PatientAccountLinks.CountAsync());
+        // Clinical sentinel stays test-only until the medical record module is implemented.
+        await using var clinicalSentinel = new NpgsqlCommand("""
             CREATE TABLE "MEDICAL_RECORD" ("Id" integer PRIMARY KEY, "Content" text NOT NULL);
             INSERT INTO "MEDICAL_RECORD" VALUES (1, 'SYNTHETIC clinical sentinel');
             """, connection);
-        await sentinel.ExecuteNonQueryAsync();
+        await clinicalSentinel.ExecuteNonQueryAsync();
     }
+
+    private (int PatientId, int LinkId, int Patients, int Links) sentinel;
 
     public async Task AssertPatientUnchangedAsync()
     {
+        using var scope = Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
+        Assert.Equal(sentinel.Patients, await db.Patients.CountAsync());
+        Assert.Equal("SYNTHETIC patient sentinel", (await db.Patients.AsNoTracking().SingleAsync(x => x.Id == sentinel.PatientId)).FullName);
+        Assert.Equal(sentinel.Links, await db.PatientAccountLinks.CountAsync());
+        Assert.Equal(PatientLinkStatus.Revoked, (await db.PatientAccountLinks.AsNoTracking().SingleAsync(x => x.Id == sentinel.LinkId)).Status);
         await using var connection = new NpgsqlConnection(Connection);
         await connection.OpenAsync();
         await using var command = new NpgsqlCommand("""
-            SELECT (SELECT count(*) FROM "PATIENT_PROFILE"), (SELECT "FullName" FROM "PATIENT_PROFILE" WHERE "Id" = 1),
-                   (SELECT count(*) FROM "PATIENT_ACCOUNT_LINK"), (SELECT "Status" FROM "PATIENT_ACCOUNT_LINK" WHERE "Id" = 1),
-                   (SELECT count(*) FROM "MEDICAL_RECORD"), (SELECT "Content" FROM "MEDICAL_RECORD" WHERE "Id" = 1)
+            SELECT count(*), min("Content") FROM "MEDICAL_RECORD"
             """, connection);
         await using var result = await command.ExecuteReaderAsync();
         Assert.True(await result.ReadAsync());
-        Assert.Equal(1L, result.GetInt64(0)); Assert.Equal("SYNTHETIC patient sentinel", result.GetString(1));
-        Assert.Equal(1L, result.GetInt64(2)); Assert.Equal("REVOKED", result.GetString(3));
-        Assert.Equal(1L, result.GetInt64(4)); Assert.Equal("SYNTHETIC clinical sentinel", result.GetString(5));
+        Assert.Equal(1L, result.GetInt64(0));
+        Assert.Equal("SYNTHETIC clinical sentinel", result.GetString(1));
     }
 
     async Task IAsyncLifetime.DisposeAsync() { await DisposeAsync(); }
