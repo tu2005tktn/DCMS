@@ -1,2 +1,37 @@
-// TODO: implement after confirming the mobile API contract. No endpoint is assumed.
-export {};
+import { env } from '@/config/env';
+import { ApiError } from '@/services/api/api-error';
+import type { OwnRecordSummary, SelfLinkChange, SelfLinkOverview, SelfLinkRequest, SignInResult, SubmitLinkRequest, SystemMessage } from './patient-link.types';
+
+const connectionMessage = 'Không thể hoàn tất thao tác. Vui lòng kiểm tra kết nối và thử lại.';
+
+export class LinkApiError extends ApiError {
+  constructor(message: string, status: number, public readonly code: string) { super(message, status); }
+}
+
+// The token is passed explicitly so S07 works with the demo sign-in now and the S01 session later.
+async function call<T>(path: string, token: string | null, init: RequestInit = {}): Promise<T> {
+  const headers: Record<string, string> = { Accept: 'application/json' };
+  if (init.body) headers['Content-Type'] = 'application/json';
+  if (token) headers.Authorization = `Bearer ${token}`;
+  let response: Response;
+  try { response = await fetch(env.apiUrl + path, { ...init, headers }); }
+  catch { throw new LinkApiError(connectionMessage, 0, 'MSG144'); }
+  const body = await response.json().catch(() => null) as unknown;
+  if (!response.ok) {
+    const error = body as Partial<SystemMessage> | null;
+    throw new LinkApiError(error?.message ?? connectionMessage, response.status, error?.code ?? 'MSG144');
+  }
+  return body as T;
+}
+
+export const patientLinkApi = {
+  signIn: (userName: string, password: string) =>
+    call<SignInResult>('/api/auth/sign-in', null, { method: 'POST', body: JSON.stringify({ userName, password }) }),
+  signOut: (token: string) => call<null>('/api/auth/sign-out', token, { method: 'POST' }),
+  overview: (token: string) => call<SelfLinkOverview>('/api/patient-links/me', token),
+  submit: (token: string, request: SubmitLinkRequest) =>
+    call<SelfLinkChange>('/api/patient-links/me/requests', token, { method: 'POST', body: JSON.stringify(request) }),
+  withdraw: (token: string, id: number, version: number) =>
+    call<SelfLinkRequest>(`/api/patient-links/me/requests/${id}/withdraw`, token, { method: 'POST', body: JSON.stringify({ version }) }),
+  ownRecord: (token: string) => call<OwnRecordSummary>('/api/patient-links/me/record', token),
+};
