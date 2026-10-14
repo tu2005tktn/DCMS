@@ -29,7 +29,7 @@ using Xunit;
 
 namespace DCMS.IntegrationTests;
 
-public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
+public class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
 {
     public string Password { get; } = "Aa1!" + Convert.ToBase64String(RandomNumberGenerator.GetBytes(36));
     private readonly string schema = "dcms_test_" + Guid.NewGuid().ToString("N");
