@@ -36,6 +36,9 @@ public static class DependencyInjection
         services.AddScoped<IAccountService, AccountService>();
         services.AddScoped<IAuthenticationService, AuthenticationService>();
         services.AddScoped<IRegistrationService, RegistrationService>();
+        services.AddHttpClient();
+        services.AddSingleton<IGoogleTokenVerifier, GoogleTokenVerifier>();
+        services.AddScoped<IGoogleAuthenticationService, GoogleAuthenticationService>();
         services.AddScoped<DevelopmentAccountSeeder>();
         services.AddScoped<IPatientLinkService, PatientLinkService>();
         services.AddScoped<IPatientLinkReviewService, PatientLinkReviewService>();

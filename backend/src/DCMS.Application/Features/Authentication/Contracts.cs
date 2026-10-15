@@ -15,6 +15,19 @@ public sealed record CredentialPolicy(int RequiredLength, bool RequireDigit, boo
     bool RequireUppercase, bool RequireNonAlphanumeric, int SessionMinutes, int MaximumLength = 256);
 public sealed record RegisterRequest(string? FullName, string? PhoneNumber, string? Email, string? Password, string? ConfirmPassword);
 public sealed record RegisterResponse(int AccountId, string PhoneNumber, SystemMessage Notification);
+public sealed record GoogleSignInRequest(string IdToken, string? DeviceLabel = null);
+public sealed record GooglePublicConfig(bool Enabled, string? ClientId);
+public sealed record GoogleIdentity(string Subject, string Email, string FullName);
+
+public interface IGoogleTokenVerifier
+{
+    Task<GoogleIdentity> VerifyAsync(string idToken, CancellationToken ct);
+}
+
+public interface IGoogleAuthenticationService
+{
+    Task<SignInResponse> SignInAsync(GoogleSignInRequest request, CancellationToken ct);
+}
 
 public interface IRegistrationService
 {
@@ -24,6 +37,7 @@ public interface IRegistrationService
 public interface IAuthenticationService
 {
     Task<SignInResponse> SignInAsync(SignInRequest request, CancellationToken ct);
+    Task<SignInResponse> CreateSessionAsync(int accountId, string? deviceLabel, string auditAction, CancellationToken ct);
     Task<CurrentUser?> ValidateSessionAsync(int accountId, Guid sessionId, CancellationToken ct);
     Task SignOutAsync(int accountId, Guid sessionId, CancellationToken ct);
     /// <summary>

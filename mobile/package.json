@@ -13,7 +13,9 @@
   },
   "dependencies": {
     "@expo/metro-runtime": "~55.0.12",
+    "@react-native-google-signin/google-signin": "^16.1.5",
     "expo": "~55.0.31",
+    "expo-build-properties": "~55.0.18",
     "expo-constants": "~55.0.17",
     "expo-linking": "~55.0.17",
     "expo-router": "~55.0.18",
