@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, ApiError } from '../../services/api';
 import type { Affected, Availability, Options, Period, Schedule, ScheduleCommand } from './contracts';
+import { validateAvailabilityDuration, validateSchedulePeriods } from './validation';
 
 const iso = (date: Date) => date.toISOString().slice(0, 10);
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
@@ -26,9 +27,10 @@ export default function WorkingSchedulesPage() {
   const [slots, setSlots] = useState<Availability>();
   const [service, setService] = useState<number>();
   const [assistant, setAssistant] = useState<number>();
-  const [duration, setDuration] = useState(30);
+  const [duration, setDuration] = useState<number | null>(30);
   const [previewDay, setPreviewDay] = useState(0);
   const [mode, setMode] = useState<'Staff' | 'Public'>('Staff');
+  const durationError = validateAvailabilityDuration(duration, mode === 'Public', options?.services.find(s => s.id === service)?.publicDurationMinutes);
   const commandRef = useRef<{ serialized: string; command: ScheduleCommand } | null>(null);
   const dirty = !!saved && JSON.stringify(periods) !== JSON.stringify(saved.intervals);
   const editable = options?.employees.some(e => e.branchId === branch && e.id === employee && e.canEdit) ?? false;
@@ -66,6 +68,8 @@ export default function WorkingSchedulesPage() {
   const discardOkay = () => !dirty || window.confirm('Hủy các thay đổi chưa lưu?');
   const edit = (next: Period[]) => { setPeriods(next); setAffected(undefined); setSlots(undefined); setSuccess(''); };
   const command = (): ScheduleCommand => {
+    const issues = validateSchedulePeriods(periods);
+    if (issues.length) throw new ApiError(400, 'MSG110', issues.join('\n'));
     const body = { branchId: branch!, dentistId: employee!, weekStart: week, expectedVersion: saved!.version, intervals: periods };
     const serialized = JSON.stringify(body);
     if (commandRef.current?.serialized !== serialized) commandRef.current = { serialized, command: { ...body, requestKey: crypto.randomUUID() } };
@@ -93,7 +97,8 @@ export default function WorkingSchedulesPage() {
   async function previewSlots() {
     setBusy(true); setError(undefined); setSlots(undefined);
     try {
-      const query = { branchId: branch!, dentistId: employee!, serviceId: service!, date: dateAt(week, previewDay), durationMinutes: duration, assistantId: assistant };
+      if (durationError) throw new ApiError(400, 'MSG110', durationError);
+      const query = { branchId: branch!, dentistId: employee!, serviceId: service!, date: dateAt(week, previewDay), durationMinutes: duration!, assistantId: assistant };
       if (mode === 'Public') {
         const params = new URLSearchParams(Object.entries(query).filter(([,v]) => v !== undefined).map(([k,v]) => [k, String(v)]));
         // Public preview is always the published schedule and catalog 30/60-minute policy.
@@ -105,7 +110,7 @@ export default function WorkingSchedulesPage() {
   return <Space direction="vertical" size="middle" style={{ width: '100%' }}>
     <Typography.Title level={2}>S09 · Lịch làm việc tuần</Typography.Title>
     <Typography.Text>Múi giờ Asia/Ho_Chi_Minh · Đơn vị 15 phút · Giờ kết thúc không thuộc khoảng làm</Typography.Text>
-    {error && <Alert showIcon type="error" message={`${error.status === 403 ? 'Không có quyền truy cập' : error.status === 409 ? 'Xung đột · Cần kiểm tra lại' : error.status === 400 ? 'Dữ liệu chưa hợp lệ' : 'Lỗi kết nối hoặc dịch vụ'} · ${error.code}`} description={error.message} action={<Button disabled={busy} onClick={() => { if (discardOkay()) void (options ? load() : loadOptions()); }}>Tải lại</Button>} />}
+    {error && <Alert showIcon type="error" message={`${error.status === 403 ? 'Không có quyền truy cập' : error.status === 409 ? 'Xung đột · Cần kiểm tra lại' : error.status === 400 ? 'Dữ liệu chưa hợp lệ' : 'Lỗi kết nối hoặc dịch vụ'} · ${error.code}`} description={<div style={{ whiteSpace: 'pre-line' }}>{error.message}</div>} action={<Button disabled={busy} onClick={() => { if (discardOkay()) void (options ? load() : loadOptions()); }}>Tải lại</Button>} />}
     {success && <Alert type="success" showIcon message={success} />}
     <Space wrap>
       <label>Chi nhánh <Select aria-label="Chi nhánh" style={{ width: 230 }} value={branch} disabled={busy} options={options?.branches.map(b => ({ value: b.id, label: b.name }))} onChange={value => {
@@ -124,6 +129,7 @@ export default function WorkingSchedulesPage() {
           <Space direction="vertical" style={{ width: '100%' }}>
             {!periods.some(p => p.day === day) && <Typography.Text type="secondary">Không có giờ làm</Typography.Text>}
             {periods.map((p, index) => p.day === day && <div key={index} style={{ borderBottom: '1px solid #eee', paddingBottom: 8 }}>
+              <Typography.Text>Khoảng {index + 1} · {time(p.startMinute)} → {time(p.endMinute)} (24 giờ)</Typography.Text><br />
               <Space wrap>
                 <Select aria-label={`Loại khoảng ${index + 1}`} value={p.kind} disabled={busy || !editable} style={{ width: 115 }} options={[{ value: 'Work', label: 'Làm việc' }, { value: 'Break', label: 'Nghỉ' }, { value: 'Block', label: 'Block' }]} onChange={kind => changePeriod(index, { kind })} />
                 <Input aria-label={`Bắt đầu ${index + 1}`} type="time" step={900} value={time(p.startMinute)} style={{ width: 110 }} disabled={busy || !editable} onChange={e => { if (e.target.value) changePeriod(index, { startMinute: minute(e.target.value) }); }} />
@@ -152,10 +158,11 @@ export default function WorkingSchedulesPage() {
           <Select aria-label="Chế độ preview" value={mode} options={[{ value: 'Staff', label: 'Nhân viên · bản đang sửa' }, { value: 'Public', label: 'Công khai · bản đã công bố' }]} onChange={value => { setMode(value); setSlots(undefined); if (value === 'Public') setDuration(options?.services.find(s => s.id === service)?.publicDurationMinutes ?? 30); }} style={{ width: 240 }} />
           <Select aria-label="Ngày preview" value={previewDay} options={Array.from({ length: 7 }, (_, value) => ({ value, label: dateAt(week, value) }))} onChange={value => { setPreviewDay(value); setSlots(undefined); }} />
           <Select aria-label="Dịch vụ" value={service} placeholder="Dịch vụ" style={{ width: 200 }} options={options?.services.filter(s => s.branchId === branch).map(s => ({ value: s.id, label: s.name }))} onChange={value => { setService(value); setSlots(undefined); if (mode === 'Public') setDuration(options?.services.find(s => s.id === value)?.publicDurationMinutes ?? 30); }} />
-          <InputNumber aria-label="Thời lượng phút" min={15} max={480} step={15} value={duration} disabled={mode === 'Public'} onChange={value => { setDuration(value ?? 30); setSlots(undefined); }} />
+          <InputNumber aria-label="Thời lượng phút" aria-describedby="duration-help" aria-invalid={!!durationError} status={durationError ? 'error' : undefined} min={15} max={480} step={15} changeOnBlur={false} value={duration} disabled={busy || mode === 'Public'} onChange={value => { setDuration(value); setSlots(undefined); }} />
           <Select aria-label="Trợ lý" allowClear placeholder="Trợ lý (nếu có)" style={{ width: 200 }} value={assistant} options={options?.employees.filter(e => e.branchId === branch && e.id !== employee).map(e => ({ value: e.id, label: e.name }))} onChange={value => { setAssistant(value); setSlots(undefined); }} />
           <Button disabled={busy || !service || !options?.employees.find(e => e.id === employee && e.branchId === branch)?.canDentist} onClick={() => void previewSlots()}>Preview slot</Button>
         </Space>
+        <Typography.Paragraph id="duration-help" type={durationError ? 'danger' : 'secondary'} role={durationError ? 'alert' : undefined}>{durationError ?? (mode === 'Public' ? 'Thời lượng theo dịch vụ: 30 hoặc 60 phút.' : 'Thời lượng: 15–480 phút, bội số của 15 (ví dụ 60, 75, 90 phút).')}</Typography.Paragraph>
         <Typography.Paragraph>Preview không giữ chỗ. Mỗi slot dùng một ghế và cùng nhân sự trong toàn bộ khoảng.</Typography.Paragraph>
         {slots && (slots.slots.length === 0 ? <Empty description="Không có khung giờ đáp ứng tài nguyên" /> : <Table size="small" rowKey="start" dataSource={slots.slots} columns={[
           { title: 'Bắt đầu', dataIndex: 'start', render: clinicTime }, { title: 'Kết thúc', dataIndex: 'end', render: clinicTime }, { title: 'Ghế', dataIndex: 'chairId' }, { title: 'Version lịch', dataIndex: 'scheduleVersion' },

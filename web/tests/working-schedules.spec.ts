@@ -57,6 +57,34 @@ test('S09 distinguishes access denied from an empty week', async ({ page }) => {
   await expect(page.getByText('Không có quyền truy cập · MSG06')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Lưu và công bố' })).toHaveCount(0);
 });
+
+test('70 minutes explains the duration error and 75 immediately recovers without losing the week', async ({ page }) => {
+  await mockedWorkspace(page);
+  await page.getByRole('button', { name: 'Thêm khoảng', exact: true }).first().click();
+  await page.getByLabel('Kết thúc 1', { exact: true }).fill('17:00');
+  let previewRequests = 0;
+  await page.route('**/api/working-schedules/preview-availability', route => {
+    previewRequests++;
+    expect(route.request().postDataJSON().query.durationMinutes).toBe(75);
+    return route.fulfill({ json: { timeZone: 'Asia/Ho_Chi_Minh', date: '2030-01-07', slots: [{ start: '2030-01-07T08:00:00+07:00', end: '2030-01-07T09:15:00+07:00', chairId: 1, dentistId: 10, assistantId: null, scheduleVersion: 0, assistantScheduleVersion: null }] } });
+  });
+  const duration = page.getByRole('spinbutton', { name: 'Thời lượng phút', exact: true });
+  const preview = page.getByRole('button', { name: 'Preview slot', exact: true });
+  await duration.fill('70');
+  await preview.click();
+  await expect(page.getByText('Dữ liệu chưa hợp lệ · MSG110', { exact: true })).toBeVisible();
+  await expect(page.locator('#duration-help')).toContainText('60 hoặc 75');
+  await expect(duration).toHaveValue('70'); await expect(preview).toBeEnabled();
+  await expect(page.getByLabel('Kết thúc 1', { exact: true })).toHaveValue('17:00');
+  expect(previewRequests).toBe(0);
+  await duration.fill(''); await preview.click();
+  await expect(duration).toHaveValue(''); await expect(page.locator('#duration-help')).toContainText('Nhập thời lượng');
+  expect(previewRequests).toBe(0);
+  await duration.fill('75'); await preview.click();
+  await expect(page.getByRole('columnheader', { name: 'Bắt đầu', exact: true })).toBeVisible();
+  await expect(page.getByText('Dữ liệu chưa hợp lệ · MSG110', { exact: true })).toHaveCount(0);
+  await expect(preview).toBeEnabled(); expect(previewRequests).toBe(1);
+});
 test('S09 publishes and reads real availability through local API', async ({ page, request }) => {
   const password = process.env.E2E_DEMO_PASSWORD;
   test.skip(!password, 'Set E2E_DEMO_PASSWORD from the ignored .env for the real API smoke test.');
@@ -76,4 +104,62 @@ test('S09 publishes and reads real availability through local API', async ({ pag
   const available = await request.get(`http://localhost:5080/api/availability?branchId=${result.schedule.branchId}&dentistId=${result.schedule.dentistId}&serviceId=${service.id}&date=2031-01-06&durationMinutes=${service.publicDurationMinutes}`);
   expect(available.status()).toBe(200); expect((await available.json()).slots.length).toBeGreaterThan(0);
   await page.screenshot({ path: '../.tools/qa/s09-working-schedules.png', fullPage: true });
+});
+
+test('reported Work Break Block sample previews through the real editor and API', async ({ page }) => {
+  const password = process.env.E2E_DEMO_PASSWORD;
+  test.skip(!password, 'Set E2E_DEMO_PASSWORD from the ignored .env.');
+  await page.goto('/sign-in');
+  await page.getByLabel('Tên đăng nhập', { exact: true }).fill('dentist.demo');
+  await page.getByLabel('Mật khẩu', { exact: true }).fill(password!);
+  await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
+  await page.getByRole('link', { name: 'Lịch làm việc', exact: true }).click();
+  const loading = page.waitForResponse(r => r.url().includes('/api/working-schedules?') && r.url().includes('2026-10-19'));
+  await page.getByLabel('Tuần bắt đầu', { exact: true }).fill('2026-10-19');
+  expect((await loading).status()).toBe(200);
+  await expect(page.getByRole('button', { name: 'Lưu và công bố' })).toBeEnabled();
+  // Read-only preview: discard the loaded periods locally, never publish over the user's week.
+  while (await page.getByRole('button', { name: /^Xóa khoảng/ }).count()) await page.getByRole('button', { name: /^Xóa khoảng/ }).first().click();
+  for (let index = 1; index <= 3; index++) await page.getByRole('button', { name: 'Thêm khoảng', exact: true }).first().click();
+  await page.getByLabel('Bắt đầu 1', { exact: true }).fill('08:00');
+  await page.getByLabel('Kết thúc 1', { exact: true }).fill('17:00');
+  await page.locator('.ant-select[aria-label="Loại khoảng 2"] .ant-select-selection-item').click();
+  await page.getByTitle('Nghỉ', { exact: true }).filter({ visible: true }).click();
+  await page.getByLabel('Bắt đầu 2', { exact: true }).fill('12:00');
+  await page.getByLabel('Kết thúc 2', { exact: true }).fill('13:00');
+  await page.getByLabel('Lý do 2', { exact: true }).fill('Nghỉ trưa');
+  await page.locator('.ant-select[aria-label="Loại khoảng 3"] .ant-select-selection-item').click();
+  const blockList = await page.getByRole('combobox', { name: 'Loại khoảng 3', exact: true }).getAttribute('aria-controls');
+  await page.locator(`.ant-select-dropdown:has([id="${blockList}"])`).getByTitle('Block', { exact: true }).click();
+  await page.getByLabel('Bắt đầu 3', { exact: true }).fill('15:00');
+  await page.getByLabel('Kết thúc 3', { exact: true }).fill('15:30');
+  await page.getByLabel('Lý do 3', { exact: true }).fill('Họp nội bộ');
+  const response = page.waitForResponse(r => r.url().endsWith('/api/working-schedules/preview'));
+  await page.getByRole('button', { name: 'Kiểm tra ảnh hưởng', exact: true }).click();
+  expect((await response).status()).toBe(200);
+  await expect(page.getByText('Không có lịch Confirmed bị ảnh hưởng tại thời điểm kiểm tra.')).toBeVisible();
+  await page.getByRole('button', { name: 'Preview slot', exact: true }).click();
+  await expect(page.getByRole('columnheader', { name: 'Bắt đầu', exact: true })).toBeVisible();
+  await expect(page.getByText('Dữ liệu chưa hợp lệ · MSG110', { exact: true })).toHaveCount(0);
+});
+
+test('S09 identifies the actual overlapping rows without submitting or losing the draft', async ({ page }) => {
+  await mockedWorkspace(page);
+  await page.getByRole('button', { name: 'Thêm khoảng', exact: true }).first().click();
+  await page.getByRole('button', { name: 'Thêm khoảng', exact: true }).first().click();
+  let requests = 0;
+  await page.route('**/api/working-schedules/preview', route => { requests++; return route.fulfill({ json: { affectedAppointments: [] } }); });
+  await page.getByRole('button', { name: 'Kiểm tra ảnh hưởng', exact: true }).click();
+  await expect(page.getByText(/Khoảng 1 \(Thứ 2\) và Khoảng 2 \(Thứ 2\) trùng giờ Làm việc/)).toBeVisible();
+  expect(requests).toBe(0);
+  await expect(page.getByLabel('Bắt đầu 2', { exact: true })).toHaveValue('08:00');
+  await page.locator('.ant-select[aria-label="Loại khoảng 2"] .ant-select-selection-item').click();
+  await page.getByTitle('Nghỉ', { exact: true }).filter({ visible: true }).click();
+  await page.getByLabel('Bắt đầu 2', { exact: true }).fill('09:00');
+  await page.getByLabel('Kết thúc 2', { exact: true }).fill('09:30');
+  await page.getByLabel('Lý do 2', { exact: true }).fill('Nghỉ');
+  await page.getByRole('button', { name: 'Kiểm tra ảnh hưởng', exact: true }).click();
+  await expect(page.getByText('Không có lịch Confirmed bị ảnh hưởng tại thời điểm kiểm tra.')).toBeVisible();
+  expect(requests).toBe(1);
+  await expect(page.getByText('Dữ liệu chưa hợp lệ · MSG110', { exact: true })).toHaveCount(0);
 });

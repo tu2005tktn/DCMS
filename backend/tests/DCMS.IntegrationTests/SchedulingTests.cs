@@ -90,6 +90,25 @@ public sealed class SchedulingApiTests(ApiFixture fixture) : IClassFixture<ApiFi
     { Assert.Equal(status, response.StatusCode); Assert.Equal(code, (await response.Content.ReadFromJsonAsync<SystemMessage>())!.Code); }
 
     [Fact]
+    public async Task ReportedWorkBreakBlockSamplePublishesAndExcludesBothBreakAndBlock()
+    {
+        var s = await Create(); using var client = await Login();
+        var command = Command(s, periods: [new(0, 480, 1020, "Work"), new(0, 720, 780, "Break", "Nghỉ trưa"), new(0, 900, 930, "Block", "Họp nội bộ")]);
+        var preview = await client.PostAsJsonAsync("/api/working-schedules/preview", command);
+        Assert.Equal(HttpStatusCode.OK, preview.StatusCode);
+        var published = await Publish(client, command);
+        Assert.Equal("Published", published.Schedule.Status); Assert.Equal(3, published.Schedule.Intervals.Length);
+        using var scope = fixture.Services.CreateScope(); var service = scope.ServiceProvider.GetRequiredService<IAvailabilityService>();
+        var query = new AvailabilityQuery(s.Branch, s.Dentist, s.Service, s.Date, 30);
+        var slots = (await service.QueryAsync(query, s.Actor, default)).Slots;
+        Assert.Contains(slots, slot => slot.Start == Start(s, 480)); Assert.Contains(slots, slot => slot.Start == Start(s, 990));
+        Assert.DoesNotContain(slots, slot => slot.Start < Start(s, 780) && slot.End > Start(s, 720));
+        Assert.DoesNotContain(slots, slot => slot.Start < Start(s, 930) && slot.End > Start(s, 900));
+        var longer = (await service.QueryAsync(query with { DurationMinutes = 120 }, s.Actor, default)).Slots;
+        Assert.Contains(longer, slot => slot.Start == Start(s, 600));
+        Assert.DoesNotContain(longer, slot => slot.Start == Start(s, 660) || slot.Start == Start(s, 840));
+    }
+    [Fact]
     public async Task PublishedWeekReadbackPublicAndStaffDurationsAndBoundary()
     {
         var s = await Create(); using var client = await Login(); var published = await Publish(client, Command(s));
