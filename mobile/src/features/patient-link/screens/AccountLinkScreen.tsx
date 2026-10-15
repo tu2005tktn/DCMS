@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { spacing } from '@/theme/spacing';
-import { DemoSignIn } from '../components/DemoSignIn';
+import { useSession } from '@/features/auth/session/useSession';
 import { Banner, Button, Card, Field, StatusBadge, formatTime, palette } from '../components/LinkUi';
 import { LinkApiError, patientLinkApi } from '../patient-link.api';
 import { emptyLinkForm, formatBirthDateInput, limits, validateLinkForm, type LinkForm, type LinkFormErrors } from '../patient-link.schema';
@@ -9,8 +9,9 @@ import type { OwnRecordSummary, SelfLinkOverview } from '../patient-link.types';
 
 // S07 Account Link Request (UC-36). The account always comes from the session; no Patient search is exposed.
 export default function AccountLinkScreen() {
-  const [token, setToken] = useState<string | null>(null);
-  const [signInNotice, setSignInNotice] = useState<string | null>(null);
+  // The (account) layout only renders for an authenticated S01 session.
+  const session = useSession();
+  const token = session.state.status === 'authenticated' ? session.state.accessToken : null;
   const [overview, setOverview] = useState<SelfLinkOverview | null>(null);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -27,11 +28,12 @@ export default function AccountLinkScreen() {
 
   const handleAuthFailure = useCallback((failure: unknown) => {
     if (failure instanceof LinkApiError && failure.status === 401) {
-      setToken(null); setOverview(null); setSignInNotice(failure.message);
+      // Expired or revoked session: S01 clears it and the guard returns to sign-in.
+      setOverview(null); void session.signOut('expired');
       return true;
     }
     return false;
-  }, []);
+  }, [session.signOut]);
 
   const load = useCallback(async (current: string, mode: 'initial' | 'refresh' = 'initial') => {
     if (mode === 'refresh') setRefreshing(true); else setLoading(true);
@@ -85,14 +87,11 @@ export default function AccountLinkScreen() {
   }
 
   async function signOut() {
-    if (token) await patientLinkApi.signOut(token).catch(() => null);
-    setToken(null); setOverview(null); setRecord(null); setNotice(null); setActionError(null); setForm(emptyLinkForm); setErrors({});
+    setOverview(null); setRecord(null); setNotice(null); setActionError(null); setForm(emptyLinkForm); setErrors({});
+    await session.signOut('user');
   }
 
-  if (!token) return <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-    <Text style={styles.title}>Liên kết hồ sơ của tôi</Text>
-    <DemoSignIn notice={signInNotice} onSignedIn={value => { setSignInNotice(null); setToken(value); }} />
-  </ScrollView>;
+  if (!token) return null;
 
   if (loading && !overview) return <View style={styles.center}><ActivityIndicator size="large" color={palette.primary} /><Text style={styles.muted}>Đang tải…</Text></View>;
 

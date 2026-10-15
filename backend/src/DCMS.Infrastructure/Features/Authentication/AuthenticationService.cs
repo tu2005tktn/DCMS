@@ -178,8 +178,16 @@ public sealed class AuthenticationService(DcmsDbContext db, UserManager<Applicat
         }
         else if (user.AccountType != "Public" || roles.Any(x => x != AccountRoles.Guest && x != AccountRoles.Patient)) return null;
         var effective = AccountRoles.Effective(roles);
-        return new(user.Id, user.UserName!, user.FullName, user.AccountType, roles, effective,
-            effective.Contains(AccountRoles.Admin) ? ["accounts.manage"] : []);
+        string[] permissions = [
+            .. effective.Contains(AccountRoles.Admin) ? ["accounts.manage"] : Array.Empty<string>(),
+            .. effective.Contains(AccountRoles.ClinicAssistant) ? ["patient-links.verify"] : Array.Empty<string>(),
+            .. effective.Contains(AccountRoles.ClinicAssistant) || effective.Contains(AccountRoles.Dentist) ? ["patients.read"] : Array.Empty<string>(),
+            .. effective.Contains(AccountRoles.ClinicAssistant) ? ["patients.manage"] : Array.Empty<string>()
+        ];
+        // UC-36: only a current VERIFIED self link counts; never inferred from a role or contact. Re-read on every request.
+        var verifiedLink = user.AccountType == "Public" && await db.PatientAccountLinks.AsNoTracking()
+            .AnyAsync(x => x.AccountId == user.Id && x.Status == PatientLinkStatus.Verified, ct);
+        return new(user.Id, user.UserName!, user.FullName, user.AccountType, roles, effective, permissions, verifiedLink);
     }
 
     private string IssueAccessToken(int accountId, Guid sessionId, DateTimeOffset now, DateTimeOffset expires)
@@ -240,14 +248,6 @@ public sealed class AuthenticationService(DcmsDbContext db, UserManager<Applicat
         if (string.IsNullOrWhiteSpace(raw)) return "Unknown device";
         var trimmed = raw.Trim();
         return trimmed.Length <= 120 ? trimmed : trimmed[..120];
-        string[] permissions = [
-            .. effective.Contains(AccountRoles.Admin) ? ["accounts.manage"] : Array.Empty<string>(),
-            .. effective.Contains(AccountRoles.ClinicAssistant) ? ["patient-links.verify"] : Array.Empty<string>()
-        ];
-        // UC-36: only a current VERIFIED self link counts; never inferred from a role or contact. Re-read on every request.
-        var verifiedLink = user.AccountType == "Public" && await db.PatientAccountLinks.AsNoTracking()
-            .AnyAsync(x => x.AccountId == user.Id && x.Status == PatientLinkStatus.Verified, ct);
-        return new(user.Id, user.UserName!, user.FullName, user.AccountType, roles, effective, permissions, verifiedLink);
     }
 
     private static void DenySignIn() => throw new BusinessException(401, SystemMessages.Get("MSG09"));

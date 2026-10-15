@@ -5,6 +5,8 @@ import { useAuth } from '../features/authentication/AuthContext';
 import SignInPage from '../features/authentication/SignInPage';
 import AccountsPage from '../features/accounts/AccountsPage';
 import LinkVerificationPage from '../features/patient-links/LinkVerificationPage';
+import PatientSearchPage from '../features/patients/PatientSearchPage';
+import PatientProfilePage from '../features/patients/PatientProfilePage';
 import { roleLabels } from '../features/accounts/types';
 import HealthStatus from '../features/HealthStatus';
 
@@ -15,6 +17,8 @@ export default function App() {
     <Route element={<Protected><Workspace /></Protected>}>
       <Route index element={<Home />} />
       <Route path="accounts" element={<Protected permission="accounts.manage"><AccountsPage /></Protected>} />
+      <Route path="patients" element={<Protected permission="patients.read"><PatientSearchPage /></Protected>} />
+      <Route path="patients/:id" element={<Protected permission="patients.read"><PatientProfilePage /></Protected>} />
       <Route path="link-verification" element={<Protected permission="patient-links.verify"><LinkVerificationPage /></Protected>} />
       <Route path="*" element={<Result status="404" title="Không tìm thấy trang" extra={<Link to="/">Về trang chủ</Link>} />} />
     </Route>
@@ -41,9 +45,10 @@ function Workspace() {
   return <Layout className="workspace">
     <Layout.Header className="workspace-header"><Link to="/" className="brand">DCMS</Link>
       <Space><Typography.Text>{auth.user?.fullName}</Typography.Text><Button loading={busy} onClick={() => void signOut()}>Đăng xuất</Button></Space></Layout.Header>
-    <Menu mode="horizontal" selectedKeys={[location.pathname]} items={[
+    <Menu mode="horizontal" selectedKeys={[location.pathname.startsWith('/patients') ? '/patients' : location.pathname]} items={[
       { key: '/', label: <Link to="/">Tài khoản của tôi</Link> },
       ...(auth.user?.permissions.includes('accounts.manage') ? [{ key: '/accounts', label: <Link to="/accounts">Quản lý tài khoản</Link> }] : []),
+      ...(auth.user?.permissions.includes('patients.read') ? [{ key: '/patients', label: <Link to="/patients">Bệnh nhân</Link> }] : []),
       ...(auth.user?.permissions.includes('patient-links.verify') ? [{ key: '/link-verification', label: <Link to="/link-verification">Xác minh liên kết hồ sơ</Link> }] : []),
     ]} />
     <Layout.Content className="workspace-content">{error && <Alert className="form-alert" type="error" message={error} showIcon />}<Outlet /></Layout.Content>

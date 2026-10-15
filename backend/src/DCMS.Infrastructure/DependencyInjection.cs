@@ -10,6 +10,8 @@ using DCMS.Infrastructure.Features.Accounts;
 using DCMS.Infrastructure.Features.Authentication;
 using DCMS.Application.Features.PatientLinks;
 using DCMS.Infrastructure.Features.PatientLinks;
+using DCMS.Application.Features.Patients;
+using DCMS.Infrastructure.Features.Patients;
 
 namespace DCMS.Infrastructure;
 
@@ -40,6 +42,7 @@ public static class DependencyInjection
         services.AddScoped<IPatientLinkService, PatientLinkService>();
         services.AddScoped<IPatientLinkReviewService, PatientLinkReviewService>();
         services.AddScoped<DevelopmentPatientLinkSeeder>();
+        services.AddScoped<IPatientService, PatientService>();
         return services;
     }
 }
