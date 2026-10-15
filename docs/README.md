@@ -1,5 +1,7 @@
 # Documentation
 
+- [S04 / UC-31](specs/S04-UC31.md): đặc tả quản lý tài khoản Web; [DCMS-75](implementation/S04-DCMS-75.md): phối hợp và bằng chứng nghiệm thu.
+
 - [Mobile scaffold](specs/MOBILE-SCAFFOLD.md): route mapping, folder responsibilities, and implementation scope; [team guide](../mobile/README.md).
 - [UC-33 and S02 Mobile registration](specs/UC33-S02-MOBILE.md): 12 October 2026 decision, workflow, validation, API contract, and account boundary.
 

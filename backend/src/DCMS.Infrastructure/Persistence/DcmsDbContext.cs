@@ -23,12 +23,17 @@ public sealed class DcmsDbContext(DbContextOptions<DcmsDbContext> options)
     protected override void OnModelCreating(ModelBuilder model)
     {
         base.OnModelCreating(model);
+        SchedulingModel.Configure(model);
         model.Entity<ApplicationUser>(b =>
         {
             b.ToTable("USER_ACCOUNT");
             b.Property(x => x.FullName).HasMaxLength(160);
             b.Property(x => x.AccountType).HasMaxLength(16);
             b.Property(x => x.Version).IsConcurrencyToken();
+            b.HasIndex(x => x.NormalizedEmail).HasDatabaseName("EmailIndex").IsUnique();
+            b.Property(x => x.NormalizedPhone).HasComputedColumnSql(
+                "NULLIF(regexp_replace(btrim(\"PhoneNumber\"), '[ ()-]', '', 'g'), '')", stored: true);
+            b.HasIndex(x => x.NormalizedPhone).IsUnique();
         });
         model.Entity<IdentityRole<int>>().ToTable("ROLE");
         model.Entity<IdentityUserRole<int>>().ToTable("USER_ACCOUNT_ROLE");

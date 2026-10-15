@@ -4,6 +4,7 @@ import { Link, Navigate, Outlet, Route, Routes, useLocation } from 'react-router
 import { useAuth } from '../features/authentication/AuthContext';
 import SignInPage from '../features/authentication/SignInPage';
 import AccountsPage from '../features/accounts/AccountsPage';
+import WorkingSchedulesPage from '../features/working-schedules/WorkingSchedulesPage';
 import LinkVerificationPage from '../features/patient-links/LinkVerificationPage';
 import { roleLabels } from '../features/accounts/types';
 import HealthStatus from '../features/HealthStatus';
@@ -14,6 +15,7 @@ export default function App() {
     <Route path="/health" element={<HealthStatus />} />
     <Route element={<Protected><Workspace /></Protected>}>
       <Route index element={<Home />} />
+      <Route path="working-schedules" element={<WorkingSchedulesPage />} />
       <Route path="accounts" element={<Protected permission="accounts.manage"><AccountsPage /></Protected>} />
       <Route path="link-verification" element={<Protected permission="patient-links.verify"><LinkVerificationPage /></Protected>} />
       <Route path="*" element={<Result status="404" title="Không tìm thấy trang" extra={<Link to="/">Về trang chủ</Link>} />} />
@@ -42,6 +44,7 @@ function Workspace() {
     <Layout.Header className="workspace-header"><Link to="/" className="brand">DCMS</Link>
       <Space><Typography.Text>{auth.user?.fullName}</Typography.Text><Button loading={busy} onClick={() => void signOut()}>Đăng xuất</Button></Space></Layout.Header>
     <Menu mode="horizontal" selectedKeys={[location.pathname]} items={[
+      ...(auth.user?.accountType === 'Staff' ? [{ key: '/working-schedules', label: <Link to="/working-schedules">Lịch làm việc</Link> }] : []),
       { key: '/', label: <Link to="/">Tài khoản của tôi</Link> },
       ...(auth.user?.permissions.includes('accounts.manage') ? [{ key: '/accounts', label: <Link to="/accounts">Quản lý tài khoản</Link> }] : []),
       ...(auth.user?.permissions.includes('patient-links.verify') ? [{ key: '/link-verification', label: <Link to="/link-verification">Xác minh liên kết hồ sơ</Link> }] : []),
