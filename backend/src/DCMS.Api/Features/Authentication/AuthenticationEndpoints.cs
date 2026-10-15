@@ -14,6 +14,13 @@ public static class AuthenticationEndpoints
         var group = endpoints.MapGroup("/api/auth").WithTags("UC-01 Authentication");
         group.MapPost("/sign-in", async (SignInRequest request, IAuthenticationService service, CancellationToken ct) =>
             Results.Ok(await service.SignInAsync(request, ct))).AllowAnonymous();
+        group.MapGet("/google/config", (IConfiguration config) =>
+        {
+            var clientId = config["Google:WebClientId"]?.Trim();
+            return Results.Ok(new GooglePublicConfig(!string.IsNullOrWhiteSpace(clientId), clientId));
+        }).AllowAnonymous();
+        group.MapPost("/google/sign-in", async (GoogleSignInRequest request, IGoogleAuthenticationService service, CancellationToken ct) =>
+            Results.Ok(await service.SignInAsync(request, ct))).AllowAnonymous();
         group.MapPost("/register", async (RegisterRequest request, IRegistrationService service, CancellationToken ct) =>
         {
             var result = await service.RegisterAsync(request, ct);

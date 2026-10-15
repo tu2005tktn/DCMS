@@ -24,10 +24,17 @@ public sealed class AuthenticationService(DcmsDbContext db, UserManager<Applicat
     {
         if (string.IsNullOrWhiteSpace(request.UserName) || request.UserName.Length > 64
             || string.IsNullOrEmpty(request.Password) || request.Password.Length > 256) DenySignIn();
-        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
         var user = await users.FindByNameAsync(request.UserName.Trim());
         if (user == null || !user.IsActive || await users.IsLockedOutAsync(user)
             || !await users.CheckPasswordAsync(user, request.Password)) DenySignIn();
+        return await CreateSessionAsync(user!.Id, request.DeviceLabel, "SignIn", ct);
+    }
+
+    public async Task<SignInResponse> CreateSessionAsync(int accountId, string? deviceLabel, string auditAction, CancellationToken ct)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+        var user = await db.Users.SingleOrDefaultAsync(x => x.Id == accountId, ct);
+        if (user == null || !user.IsActive || await users.IsLockedOutAsync(user)) DenySignIn();
         var current = await CurrentAsync(user!, ct);
         if (current == null) DenySignIn();
         var now = DateTimeOffset.UtcNow;
@@ -36,7 +43,7 @@ public sealed class AuthenticationService(DcmsDbContext db, UserManager<Applicat
         var session = new AuthSession
         {
             Id = Guid.NewGuid(), AccountId = user!.Id,
-            DeviceLabel = NormalizeDeviceLabel(request.DeviceLabel),
+            DeviceLabel = NormalizeDeviceLabel(deviceLabel),
             CreatedAt = now, LastSeenAt = now, ExpiresAt = accessExpires
         };
         var (refresh, refreshPlaintext) = CreateRefreshToken(session.AccountId, session.Id, refreshExpires);
@@ -44,7 +51,7 @@ public sealed class AuthenticationService(DcmsDbContext db, UserManager<Applicat
         db.AuthRefreshTokens.Add(refresh);
         db.AccountAudits.Add(new AccountAudit
         {
-            ActorId = user.Id, TargetId = user.Id, Action = "SignIn", Reason = "Đăng nhập",
+            ActorId = user.Id, TargetId = user.Id, Action = auditAction, Reason = "Đăng nhập",
             OccurredAt = now, AfterJson = "{\"sessionEstablished\":true,\"sessionId\":\"" + session.Id + "\"}"
         });
         await db.SaveChangesAsync(ct);
@@ -178,8 +185,13 @@ public sealed class AuthenticationService(DcmsDbContext db, UserManager<Applicat
         }
         else if (user.AccountType != "Public" || roles.Any(x => x != AccountRoles.Guest && x != AccountRoles.Patient)) return null;
         var effective = AccountRoles.Effective(roles);
-        return new(user.Id, user.UserName!, user.FullName, user.AccountType, roles, effective,
-            effective.Contains(AccountRoles.Admin) ? ["accounts.manage"] : []);
+        string[] permissions = [
+            .. effective.Contains(AccountRoles.Admin) ? ["accounts.manage"] : Array.Empty<string>(),
+            .. effective.Contains(AccountRoles.ClinicAssistant) ? ["patient-links.verify"] : Array.Empty<string>()
+        ];
+        var verifiedLink = user.AccountType == "Public" && await db.PatientAccountLinks.AsNoTracking()
+            .AnyAsync(x => x.AccountId == user.Id && x.Status == PatientLinkStatus.Verified, ct);
+        return new(user.Id, user.UserName!, user.FullName, user.AccountType, roles, effective, permissions, verifiedLink);
     }
 
     private string IssueAccessToken(int accountId, Guid sessionId, DateTimeOffset now, DateTimeOffset expires)
@@ -240,14 +252,6 @@ public sealed class AuthenticationService(DcmsDbContext db, UserManager<Applicat
         if (string.IsNullOrWhiteSpace(raw)) return "Unknown device";
         var trimmed = raw.Trim();
         return trimmed.Length <= 120 ? trimmed : trimmed[..120];
-        string[] permissions = [
-            .. effective.Contains(AccountRoles.Admin) ? ["accounts.manage"] : Array.Empty<string>(),
-            .. effective.Contains(AccountRoles.ClinicAssistant) ? ["patient-links.verify"] : Array.Empty<string>()
-        ];
-        // UC-36: only a current VERIFIED self link counts; never inferred from a role or contact. Re-read on every request.
-        var verifiedLink = user.AccountType == "Public" && await db.PatientAccountLinks.AsNoTracking()
-            .AnyAsync(x => x.AccountId == user.Id && x.Status == PatientLinkStatus.Verified, ct);
-        return new(user.Id, user.UserName!, user.FullName, user.AccountType, roles, effective, permissions, verifiedLink);
     }
 
     private static void DenySignIn() => throw new BusinessException(401, SystemMessages.Get("MSG09"));
