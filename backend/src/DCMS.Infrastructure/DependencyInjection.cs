@@ -40,6 +40,11 @@ public static class DependencyInjection
         services.AddScoped<IPatientLinkService, PatientLinkService>();
         services.AddScoped<IPatientLinkReviewService, PatientLinkReviewService>();
         services.AddScoped<DevelopmentPatientLinkSeeder>();
+        services.AddSingleton(TimeProvider.System);
+        services.AddScoped<Features.Scheduling.WorkingScheduleService>();
+        services.AddScoped<DCMS.Application.Features.Scheduling.IWorkingScheduleService>(sp => sp.GetRequiredService<Features.Scheduling.WorkingScheduleService>());
+        services.AddScoped<DCMS.Application.Features.Scheduling.IAvailabilityService>(sp => sp.GetRequiredService<Features.Scheduling.WorkingScheduleService>());
+        services.AddScoped<Features.Scheduling.DevelopmentSchedulingSeeder>();
         return services;
     }
 }

@@ -23,6 +23,7 @@ public sealed class DcmsDbContext(DbContextOptions<DcmsDbContext> options)
     protected override void OnModelCreating(ModelBuilder model)
     {
         base.OnModelCreating(model);
+        SchedulingModel.Configure(model);
         model.Entity<ApplicationUser>(b =>
         {
             b.ToTable("USER_ACCOUNT");
