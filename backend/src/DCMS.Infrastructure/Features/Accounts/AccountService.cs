@@ -115,6 +115,9 @@ public sealed partial class AccountService(DcmsDbContext db, UserManager<Applica
             var now = DateTimeOffset.UtcNow;
             await db.AuthSessions.Where(x => x.AccountId == id && x.RevokedAt == null)
                 .ExecuteUpdateAsync(s => s.SetProperty(x => x.RevokedAt, now), ct);
+            // Thu hồi luôn refresh token đang ACTIVE của account này.
+            await db.AuthRefreshTokens.Where(x => x.AccountId == id && x.Status == "ACTIVE")
+                .ExecuteUpdateAsync(s => s.SetProperty(x => x.Status, "REVOKED").SetProperty(x => x.RevokedAt, now), ct);
         }
         var account = Map(user, roles, employeeCode);
         AddAudit(actorId, id, request.Locked ? "Lock" : "Unlock", request.Reason.Trim(), before, account);

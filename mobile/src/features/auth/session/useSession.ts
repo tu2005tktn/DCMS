@@ -1,7 +1,18 @@
+/**
+ * useSession — đọc state phiên hiện tại.
+ */
+
 import { useContext } from 'react';
 import { SessionContext } from './SessionProvider';
-export function useSession() {
-  const session = useContext(SessionContext);
-  if (!session) throw new Error('useSession must be used within SessionProvider.');
-  return session;
+import type { SessionContextValue, SessionState } from './session.types';
+
+export function useSession(): SessionContextValue {
+  const ctx = useContext(SessionContext);
+  if (!ctx) throw new Error('useSession phải được dùng trong SessionProvider.');
+  return ctx;
+}
+
+/** Trả về state gọn để UI điều kiện. */
+export function useSessionState(): SessionState {
+  return useSession().state;
 }
