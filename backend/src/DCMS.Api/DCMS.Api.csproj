@@ -7,9 +7,9 @@
   <ItemGroup>
     <ProjectReference Include="..\DCMS.Application\DCMS.Application.csproj" />
     <ProjectReference Include="..\DCMS.Infrastructure\DCMS.Infrastructure.csproj" />
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.0" />
+    
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.0" />
-    <PackageReference Include="Microsoft.OpenApi" Version="2.7.5" />
+    
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.0">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

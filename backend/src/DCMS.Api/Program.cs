@@ -20,7 +20,7 @@ using Microsoft.IdentityModel.Tokens;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddInfrastructure(builder.Configuration, builder.Environment);
-builder.Services.AddOpenApi();
+// builder.Services.AddOpenApi();
 builder.Services.Configure<RouteHandlerOptions>(options => options.ThrowOnBadRequest = true);
 builder.Services.AddScoped<IAppointmentService, AppointmentService>();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
@@ -87,7 +87,7 @@ if (args.Contains("--migrate") || args.Contains("--seed-demo"))
 
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi().AllowAnonymous();
+//     app.MapOpenApi().AllowAnonymous();
 }
 
 app.UseCors("WebDevelopment");
