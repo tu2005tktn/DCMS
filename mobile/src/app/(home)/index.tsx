@@ -50,6 +50,25 @@ const GROUPS: MenuGroup[] = [
         href: '/(account)/home',
         requireAuth: 'authenticated',
       },
+      {
+        label: 'Lịch hẹn của tôi (S12)',
+        description: 'Xem code, lifecycle, booker/attendee, lịch sử và trạng thái yêu cầu hỗ trợ.',
+        href: '/(home)/appointments',
+        requireAuth: 'authenticated',
+      },
+      {
+        label: 'Thông báo (S26)',
+        description: 'Thông báo lịch hẹn của tài khoản hiện tại. Mở deep link sẽ kiểm quyền lại.',
+        href: '/(home)/notifications',
+        requireAuth: 'authenticated',
+      },
+    ],
+  },
+  {
+    title: 'S12 · Staff (UC-05/06 + TV4)',
+    items: [
+      { label: 'Hộp thư hỗ trợ', description: 'Staff xem & xử lý yêu cầu đổi/huỷ/xác nhận từ booker & attendee.', href: '/(home)/staff/requests' },
+      { label: 'Lịch bị ảnh hưởng (giảm giờ)', description: 'UC-03 S09: lịch Confirmed/Rescheduled nằm trong khung giờ sẽ thu hẹp.', href: '/(home)/staff/schedule-impact' },
     ],
   },
   {

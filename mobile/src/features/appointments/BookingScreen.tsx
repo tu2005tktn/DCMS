@@ -7,6 +7,7 @@ import { useSession } from '@/features/auth/session/useSession';
 import { ApiError } from '@/services/api/api-error';
 import { colors } from '@/theme/colors';
 import { bookingApi } from './booking.api';
+import { notificationMockRepo } from './notification.mock';
 import type { AvailabilitySlot, BookingOptions, BookingResult } from './booking.types';
 
 type Relation = 'Self' | 'Relative';
@@ -98,6 +99,24 @@ export default function BookingScreen() {
         assistantScheduleVersion: null,
       }, token);
       setResult(value); setStep(3);
+      // Tạo notification sau khi booking commit thành công (theo spec TV5).
+      // Có booker account → tạo in-app notification; anonymous booking vẫn nhận mã lịch trên UI.
+      const accountId = state.status === 'authenticated' ? state.user.id : null;
+      void notificationMockRepo.create({
+        accountId,
+        kind: 'AppointmentBooked',
+        title: 'Đặt lịch thành công',
+        body: `Lịch khám ${value.code} đã được tạo. Trạng thái: ${value.status}.`,
+        appointmentId: value.appointmentId,
+        requestId: null,
+        deepLink: accountId !== null ? `/appointments/${value.appointmentId}` : null,
+        channels: accountId !== null ? ['InApp', 'Email'] : ['InApp'],
+        dedupeKey: `appt:${value.appointmentId}:booked`,
+      });
+      // Lập reminder 24h/2h cho account (recheck khi load lại trang này).
+      if (accountId !== null) {
+        void notificationMockRepo.rebuildRemindersForAppointment(value.appointmentId, value.version);
+      }
     } catch (e) {
       const code = e instanceof ApiError ? e.code : undefined;
       setError(e instanceof ApiError ? `${code ? `${code}: ` : ''}${e.message}` : 'Không thể kết nối máy chủ. Vui lòng thử lại.');
