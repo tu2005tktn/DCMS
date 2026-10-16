@@ -64,6 +64,11 @@ public sealed class AppointmentService(DcmsDbContext db, IAvailabilityService av
         if (request.Attendee?.BirthDate is { } birthDate
             && birthDate > DateOnly.FromDateTime(clock.GetUtcNow().ToOffset(TimeSpan.FromHours(7)).DateTime)) throw Error("MSG04");
         var patientId = request.Attendee?.PatientId;
+        // A verified self link is explicit evidence of identity; a phone number is never used for this.
+        if (!staff && relation == "Self" && accountId.HasValue && !patientId.HasValue)
+            patientId = await db.PatientAccountLinks.AsNoTracking()
+                .Where(x => x.AccountId == accountId && x.Status == PatientLinkStatus.Verified)
+                .Select(x => x.PatientId).SingleOrDefaultAsync(ct);
         if (patientId.HasValue)
         {
             if (!staff && (relation != "Self" || !accountId.HasValue || !await db.PatientAccountLinks.AsNoTracking().AnyAsync(x =>
@@ -87,7 +92,7 @@ public sealed class AppointmentService(DcmsDbContext db, IAvailabilityService av
         var canonical = new
         {
             request.BranchId, BookerName = Clean(request.Booker?.Name), Phone = Clean(request.Booker?.Phone),
-            Email = Clean(request.Booker?.Email)?.ToLowerInvariant(), PatientId = patientId,
+            Email = Clean(request.Booker?.Email)?.ToLowerInvariant(), PatientId = request.Attendee?.PatientId,
             AttendeeName = Clean(request.Attendee?.Name), BirthDate = request.Attendee?.BirthDate,
             Relation = relation, Kind = kind, Source = source,
             request.ServiceId, Reason = reason, request.DentistId, request.AssistantId,

@@ -146,7 +146,7 @@ public sealed class AppointmentApiTests(ApiFixture fixture) : IClassFixture<ApiF
         var denied = await client.PostAsJsonAsync("/api/appointments", other);
         Assert.Equal(HttpStatusCode.Forbidden, denied.StatusCode);
         var accepted = await client.PostAsJsonAsync("/api/appointments", other with
-        { AttendeeRelation = "Self", RequestKey = Guid.NewGuid() });
+        { AttendeeRelation = "Self", Attendee = new AppointmentAttendee(null, "Tên nhập từ client", null), RequestKey = Guid.NewGuid() });
         Assert.Equal(HttpStatusCode.Created, accepted.StatusCode);
         using var verify = fixture.Services.CreateScope();
         var appointment = await verify.ServiceProvider.GetRequiredService<DcmsDbContext>().Appointments
