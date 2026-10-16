@@ -4,6 +4,7 @@ import { Link, Navigate, Outlet, Route, Routes, useLocation } from 'react-router
 import { useAuth } from '../features/authentication/AuthContext';
 import SignInPage from '../features/authentication/SignInPage';
 import AccountsPage from '../features/accounts/AccountsPage';
+import WorkingSchedulesPage from '../features/working-schedules/WorkingSchedulesPage';
 import LinkVerificationPage from '../features/patient-links/LinkVerificationPage';
 import PatientSearchPage from '../features/patients/PatientSearchPage';
 import PatientProfilePage from '../features/patients/PatientProfilePage';
@@ -16,6 +17,7 @@ export default function App() {
     <Route path="/health" element={<HealthStatus />} />
     <Route element={<Protected><Workspace /></Protected>}>
       <Route index element={<Home />} />
+      <Route path="working-schedules" element={<WorkingSchedulesPage />} />
       <Route path="accounts" element={<Protected permission="accounts.manage"><AccountsPage /></Protected>} />
       <Route path="patients" element={<Protected permission="patients.read"><PatientSearchPage /></Protected>} />
       <Route path="patients/:id" element={<Protected permission="patients.read"><PatientProfilePage /></Protected>} />
@@ -46,6 +48,8 @@ function Workspace() {
     <Layout.Header className="workspace-header"><Link to="/" className="brand">DCMS</Link>
       <Space><Typography.Text>{auth.user?.fullName}</Typography.Text><Button loading={busy} onClick={() => void signOut()}>Đăng xuất</Button></Space></Layout.Header>
     <Menu mode="horizontal" selectedKeys={[location.pathname.startsWith('/patients') ? '/patients' : location.pathname]} items={[
+    <Menu mode="horizontal" selectedKeys={[location.pathname]} items={[
+      ...(auth.user?.accountType === 'Staff' ? [{ key: '/working-schedules', label: <Link to="/working-schedules">Lịch làm việc</Link> }] : []),
       { key: '/', label: <Link to="/">Tài khoản của tôi</Link> },
       ...(auth.user?.permissions.includes('accounts.manage') ? [{ key: '/accounts', label: <Link to="/accounts">Quản lý tài khoản</Link> }] : []),
       ...(auth.user?.permissions.includes('patients.read') ? [{ key: '/patients', label: <Link to="/patients">Bệnh nhân</Link> }] : []),

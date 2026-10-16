@@ -8,7 +8,7 @@
  *  - Liên kết S02 (đăng ký) + S03 (khôi phục) — chỉ là link navigation, S02/S03 ngoài scope.
  *  - Lỗi sai hiển thị thông báo chung (MSG09), không phân biệt username hay password.
  *  - Loading: chặn submit, hiển thị FormError khi lỗi mạng.
- *  - Thành công -> router.replace('/(account)/account-link') (hoặc '/(account)' tuỳ đặc tả).
+ *  - Thành công -> trang tài khoản; từ đó người dùng Public mở S07 khi cần.
  *
  * Lưu ý cảnh báo thay đổi chưa lưu: SignInScreen không có form dirty state nên không cần chặn
  * sign-out. PatientData, v.v. sẽ dùng useUnsavedChanges() riêng.
@@ -19,6 +19,10 @@ import { useCallback, useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FormError } from '@/components/feedback/FormError';
+import { ApiError } from '@/services/api/api-error';
+import { GoogleIdentityButton } from '@/features/auth/google/GoogleIdentityButton';
+import { googleAuthApi } from '@/features/auth/google/google-auth.api';
+import { signInApi } from '@/features/auth/sign-in/sign-in.api';
 import { PasswordField } from '@/components/forms/PasswordField';
 import { TextField } from '@/components/forms/TextField';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
@@ -43,6 +47,7 @@ export default function SignInScreen() {
   const [password, setPassword] = useState('');
   const [touched, setTouched] = useState<{ userName: boolean; password: boolean }>({ userName: false, password: false });
   const [fieldErrors, setFieldErrors] = useState<FieldError>({ userName: null, password: null });
+  const [googleError, setGoogleError] = useState<string | null>(null);
 
   const validateField = useCallback((field: 'userName' | 'password', value: string) => {
     const err = validateSignInField(field, value);
@@ -52,7 +57,7 @@ export default function SignInScreen() {
   const handleSignIn = useCallback(
     async (snapshot: SessionSnapshot) => {
       await signIn(snapshot);
-      router.replace('/(account)/account-link' as never);
+      router.replace('/(account)/home');
     },
     [signIn, router],
   );
@@ -69,6 +74,16 @@ export default function SignInScreen() {
     if (u || p) return;
     await submit({ userName, password });
   }, [userName, password, submit]);
+
+  const onGoogleCredential = useCallback(async (idToken: string) => {
+    setGoogleError(null);
+    try {
+      const response = await googleAuthApi.signIn(idToken);
+      await handleSignIn(signInApi.buildSnapshot(response));
+    } catch (error) {
+      setGoogleError(error instanceof ApiError ? error.message : 'Không thể kết nối máy chủ. Vui lòng thử lại.');
+    }
+  }, [handleSignIn]);
 
   const generalError = useMemo(() => {
     if (feedback.kind !== 'error') return null;
@@ -148,6 +163,15 @@ export default function SignInScreen() {
                 </Pressable>
               </Link>
             </View>
+
+            <View style={styles.googleSection}>
+              <Text style={styles.orText}>Hoặc</Text>
+              <GoogleIdentityButton onCredential={onGoogleCredential} onError={setGoogleError} />
+              <FormError message={googleError} />
+            </View>
+            <Link href="/book-appointment" asChild>
+              <Pressable accessibilityRole="button"><Text style={styles.linkText}>Đặt lịch không cần tài khoản</Text></Pressable>
+            </Link>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -166,4 +190,6 @@ const styles = StyleSheet.create({
   actions: { marginTop: spacing.sm },
   linksRow: { flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.sm },
   linkText: { color: colors.primary, fontWeight: '600' },
+  googleSection: { gap: spacing.sm, marginTop: spacing.md, alignItems: 'center' },
+  orText: { color: colors.muted, textAlign: 'center' },
 });

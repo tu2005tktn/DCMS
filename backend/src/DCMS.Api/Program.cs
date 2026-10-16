@@ -1,4 +1,6 @@
 using DCMS.Api.Features.Health;
+using DCMS.Api.Features.Scheduling;
+using DCMS.Api.Features.Appointments;
 using DCMS.Infrastructure;
 using System.Security.Claims;
 using System.Text;
@@ -91,6 +93,7 @@ if (args.Contains("--migrate") || args.Contains("--seed-demo"))
     {
         await scope.ServiceProvider.GetRequiredService<DevelopmentAccountSeeder>().SeedAsync();
         await scope.ServiceProvider.GetRequiredService<DevelopmentPatientLinkSeeder>().SeedAsync();
+        await scope.ServiceProvider.GetRequiredService<DCMS.Infrastructure.Features.Scheduling.DevelopmentSchedulingSeeder>().SeedAsync();
     }
     return;
 }
@@ -114,6 +117,8 @@ app.MapAuthenticationEndpoints();
 app.MapAccountEndpoints();
 app.MapPatientLinkEndpoints();
 app.MapPatientEndpoints();
+app.MapSchedulingEndpoints();
+app.MapAppointmentEndpoints();
 
 app.Run();
 

@@ -6,6 +6,7 @@ using DCMS.Domain.Features.Accounts;
 using DCMS.Domain.Features.Authentication;
 using DCMS.Domain.Features.PatientLinks;
 using DCMS.Domain.Features.Patients;
+using DCMS.Domain.Features.Appointments;
 
 namespace DCMS.Infrastructure.Persistence;
 
@@ -20,16 +21,25 @@ public sealed class DcmsDbContext(DbContextOptions<DcmsDbContext> options)
     public DbSet<PatientAudit> PatientAudits => Set<PatientAudit>();
     public DbSet<PatientAccountLink> PatientAccountLinks => Set<PatientAccountLink>();
     public DbSet<PatientLinkAudit> PatientLinkAudits => Set<PatientLinkAudit>();
+    public DbSet<Appointment> Appointments => Set<Appointment>();
+    public DbSet<AppointmentReceipt> AppointmentReceipts => Set<AppointmentReceipt>();
+    public DbSet<AppointmentOutboxEvent> AppointmentOutboxEvents => Set<AppointmentOutboxEvent>();
 
     protected override void OnModelCreating(ModelBuilder model)
     {
         base.OnModelCreating(model);
+        SchedulingModel.Configure(model);
+        AppointmentModel.Configure(model);
         model.Entity<ApplicationUser>(b =>
         {
             b.ToTable("USER_ACCOUNT");
             b.Property(x => x.FullName).HasMaxLength(160);
             b.Property(x => x.AccountType).HasMaxLength(16);
             b.Property(x => x.Version).IsConcurrencyToken();
+            b.HasIndex(x => x.NormalizedEmail).HasDatabaseName("EmailIndex").IsUnique();
+            b.Property(x => x.NormalizedPhone).HasComputedColumnSql(
+                "NULLIF(regexp_replace(btrim(\"PhoneNumber\"), '[ ()-]', '', 'g'), '')", stored: true);
+            b.HasIndex(x => x.NormalizedPhone).IsUnique();
         });
         model.Entity<IdentityRole<int>>().ToTable("ROLE");
         model.Entity<IdentityUserRole<int>>().ToTable("USER_ACCOUNT_ROLE");

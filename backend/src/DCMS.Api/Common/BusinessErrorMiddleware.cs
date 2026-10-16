@@ -23,9 +23,11 @@ public sealed class BusinessErrorMiddleware(RequestDelegate next, ILogger<Busine
                 BadHttpRequestException => (400, SystemMessages.Get("MSG04", "Yêu cầu")),
                 DbUpdateConcurrencyException => (409, SystemMessages.Get("MSG111")),
                 _ when (context.Request.Path.StartsWithSegments("/api/accounts")
-                        || context.Request.Path.StartsWithSegments("/api/auth/register"))
+                        || context.Request.Path.StartsWithSegments("/api/auth/register")
+                        || context.Request.Path.StartsWithSegments("/api/auth/google"))
                     && postgres?.SqlState == PostgresErrorCodes.UniqueViolation => (409, SystemMessages.Get("MSG139")),
-                _ when context.Request.Path.StartsWithSegments("/api/accounts")
+                _ when (context.Request.Path.StartsWithSegments("/api/accounts")
+                        || context.Request.Path.StartsWithSegments("/api/auth/google"))
                     && postgres?.SqlState is PostgresErrorCodes.SerializationFailure or PostgresErrorCodes.DeadlockDetected => (409, SystemMessages.Get("MSG111")),
                 _ => (503, SystemMessages.Get("MSG144"))
             };

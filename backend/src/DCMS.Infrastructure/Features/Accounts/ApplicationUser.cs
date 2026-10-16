@@ -10,4 +10,5 @@ public sealed class ApplicationUser : IdentityUser<int>
     public int Version { get; set; } = 1;
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
+    public string? NormalizedPhone { get; private set; }
 }

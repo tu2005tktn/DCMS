@@ -1,5 +1,7 @@
 # DCMS
 
+**S04 / DCMS-75:** [Đặc tả quản lý tài khoản Web](docs/specs/S04-UC31.md) và [hướng dẫn chạy, migration, bằng chứng nghiệm thu](docs/implementation/S04-DCMS-75.md). Đăng nhập Admin dùng API/phiên chung S01; recovery S03 vẫn hoãn.
+
 **Team setup (Tiếng Việt): [Hướng dẫn cài đặt và chạy dự án](docs/SETUP.vi.md).** Includes required tools, first-run commands, daily startup, verification, and troubleshooting for Windows/PowerShell.
 
 This repository contains the .NET 10 API, PostgreSQL development container and React web app. UC-01 (Identity/JWT sign in/out) and core UC-31 (staff account management, current roles, lock/unlock, concurrency and audit) are implemented. The [mobile team scaffold](mobile/README.md) provides Expo routes and placeholder screens; mobile business workflows, AI, patient workflows and verified credential recovery remain future work.
