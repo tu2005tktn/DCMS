@@ -9,6 +9,8 @@ using DCMS.Application.Features.Authentication;
 using DCMS.Infrastructure.Features.Accounts;
 using DCMS.Infrastructure.Features.Authentication;
 using Microsoft.Extensions.Hosting;
+using DCMS.Application.Features.Appointments;
+using DCMS.Infrastructure.Features.Appointments;
 
 namespace DCMS.Infrastructure;
 
@@ -21,6 +23,7 @@ public static class DependencyInjection
             ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection is required.");
 
         services.AddDbContext<DcmsDbContext>(options => options.UseNpgsql(connectionString));
+        services.AddScoped<IAppointmentRepository, AppointmentRepository>();
         services.AddScoped<IDatabaseConnectionCheck, DatabaseConnectionCheck>();
         services.AddIdentityCore<ApplicationUser>(options =>
         {
@@ -49,9 +52,6 @@ public static class DependencyInjection
             services.AddScoped<DevelopmentContactDeliveryAdapter>();
             services.AddScoped<IContactDeliveryAdapter>(sp => sp.GetRequiredService<DevelopmentContactDeliveryAdapter>());
         }
-        
-        services.AddScoped<DCMS.Application.Features.Appointments.Interfaces.IAppointmentService, DCMS.Application.Features.Appointments.AppointmentService>();
-        services.AddKeyedScoped<DCMS.Application.Features.Appointments.IAppointmentService, DCMS.Infrastructure.Features.Appointments.AppointmentService>("Infrastructure\AppointmentService");
         return services;
     }
 }

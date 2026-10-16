@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using DCMS.Application.Features.Appointments.Dtos;
+using DCMS.Application.Features.Appointments;
 using DCMS.Application.Features.Appointments.Interfaces;
 
 namespace DCMS.Application.Features.Appointments;
