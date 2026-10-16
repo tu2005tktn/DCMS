@@ -1,5 +1,5 @@
 import { lazy } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, Route } from 'react-router-dom';
 
 // Lazy load components to improve performance
 const S10AppointmentCalendar = lazy(() => import('../features/appointments/S10AppointmentCalendar'));

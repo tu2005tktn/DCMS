@@ -1,5 +1,6 @@
 using DCMS.Application.Features.Appointments.Dtos;
 using DCMS.Application.Features.Appointments.Interfaces;
+using Microsoft.AspNetCore.Mvc;
 
 namespace DCMS.Api.Features.Appointments;
 

@@ -1,13 +1,9 @@
-import React from 'react';
 import { useParams } from 'react-router-dom';
-import { Spin, message } from 'antd';
+import { Spin } from 'antd';
 
 const S12AppointmentDetail = () => {
   const { id } = useParams();
-  
-  // In a real implementation, this would fetch appointment details from the API
-  // and display them for viewing/editing (but only within scope - dentist can't modify outside scope)
-  
+
   return (
     <div className="appointment-detail">
       <Spin tip="Đang tải chi tiết lịch hẹn...">
@@ -15,7 +11,7 @@ const S12AppointmentDetail = () => {
           <h2>Chi tiết lịch hẹn</h2>
           <p>ID Lịch hẹn: {id}</p>
           <p>Đây là thành phần S12 thuộc TV5 - Chi tiết lịch hẹn</p>
-          <p>Trong thực tế, thành phần này sẽ hiển thị chi tiết lịch hẹn và cho phép sửa đổi trong范围内.</p>
+          <p>Trong thực tế, thành phần này sẽ hiển thị chi tiết lịch hẹn và cho phép sửa đổi trong phạm vi cho phép.</p>
         </div>
       </Spin>
     </div>

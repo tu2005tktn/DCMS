@@ -105,4 +105,10 @@ public class Appointment : BaseEntity<int>
         ExceptionReason = exceptionReason;
         Version++;
     }
+
+    public void UpdateRelativeId(int? relativeId)
+    {
+        RelativeId = relativeId;
+        Version++;
+    }
 }

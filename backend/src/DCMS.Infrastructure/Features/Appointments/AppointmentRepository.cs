@@ -182,5 +182,71 @@ namespace DCMS.Infrastructure.Features.Appointments
             
             return appointment.Id;
         }
+        
+        public async Task UpdateAppointmentAsync(
+            int appointmentId,
+            DateTime startTime,
+            int durationInMinutes,
+            string service,
+            string reason,
+            string source,
+            int? relativeId,
+            CancellationToken cancellationToken = default)
+        {
+            var appointment = await _dbContext.Appointments
+                .FirstOrDefaultAsync(a => a.Id == appointmentId, cancellationToken);
+            
+            if (appointment == null)
+                throw new InvalidOperationException("Appointment not found.");
+            
+            appointment.UpdateSchedule(startTime, durationInMinutes);
+            appointment.UpdateDetails(service, reason);
+            appointment.UpdateSource(source);
+            appointment.UpdateRelativeId(relativeId);
+            
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        
+        public async Task CancelAppointmentAsync(
+            int appointmentId,
+            string reason,
+            CancellationToken cancellationToken = default)
+        {
+            var appointment = await _dbContext.Appointments
+                .FirstOrDefaultAsync(a => a.Id == appointmentId, cancellationToken);
+            
+            if (appointment == null)
+                throw new InvalidOperationException("Appointment not found.");
+            
+            appointment.UpdateStatus("Cancelled");
+            appointment.SetExceptionReason(reason);
+            
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        
+        public async Task<bool> IsTimeSlotAvailableAsync(
+            DateTime startTime,
+            int durationInMinutes,
+            int branchId,
+            int dentistId,
+            int chairId,
+            int? excludeAppointmentId = null,
+            CancellationToken cancellationToken = default)
+        {
+            var endTime = startTime.AddMinutes(durationInMinutes);
+            
+            var query = _dbContext.Appointments.Where(a =>
+                a.BranchId == branchId &&
+                a.DentistId == dentistId &&
+                a.ChairId == chairId &&
+                a.Status != "Cancelled" &&
+                a.StartTime < endTime &&
+                a.EndTime > startTime);
+            
+            if (excludeAppointmentId.HasValue)
+                query = query.Where(a => a.Id != excludeAppointmentId.Value);
+            
+            return !await query.AnyAsync(cancellationToken);
+        }
     }
 }

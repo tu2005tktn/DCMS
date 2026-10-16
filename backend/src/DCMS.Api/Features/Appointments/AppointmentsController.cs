@@ -121,28 +121,3 @@ public class AppointmentsController : ControllerBase
         return NoContent();
     }
 }
-
-// Request DTOs
-public class CreateAppointmentRequest
-{
-    public DateTime StartTime { get; set; }
-    public int DurationInMinutes { get; set; }
-    public string Service { get; set; } = string.Empty;
-    public string Reason { get; set; } = string.Empty;
-    public string Source { get; set; } = string.Empty;
-    public int PatientId { get; set; }
-    public int? RelativeId { get; set; }
-    public int DentistId { get; set; }
-    public int BranchId { get; set; }
-    public int ChairId { get; set; }
-}
-
-public class UpdateAppointmentRequest
-{
-    public DateTime StartTime { get; set; }
-    public int DurationInMinutes { get; set; }
-    public string Service { get; set; } = string.Empty;
-    public string Reason { get; set; } = string.Empty;
-    public string Source { get; set; } = string.Empty;
-    public int? RelativeId { get; set; }
-}
