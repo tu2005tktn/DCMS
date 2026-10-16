@@ -9,8 +9,6 @@ using DCMS.Application.Features.Authentication;
 using DCMS.Infrastructure.Features.Accounts;
 using DCMS.Infrastructure.Features.Authentication;
 using Microsoft.Extensions.Hosting;
-using DCMS.Infrastructure.Features.Appointments;
-using DCMS.Application.Features.Appointments;
 
 namespace DCMS.Infrastructure;
 
@@ -44,7 +42,6 @@ public static class DependencyInjection
         services.AddScoped<IAccountService, AccountService>();
         services.AddScoped<IAuthenticationService, AuthenticationService>();
         services.AddScoped<DevelopmentAccountSeeder>();
-        services.AddScoped<IAppointmentRepository, AppointmentRepository>();
         if (environment.IsDevelopment())
         {
             // The development adapter is never registered outside Development. The concrete type is
@@ -52,8 +49,9 @@ public static class DependencyInjection
             services.AddScoped<DevelopmentContactDeliveryAdapter>();
             services.AddScoped<IContactDeliveryAdapter>(sp => sp.GetRequiredService<DevelopmentContactDeliveryAdapter>());
         }
-            services.AddScoped<DCMS.Application.Features.Appointments.Interfaces.IAppointmentService, DCMS.Application.Features.Appointments.AppointmentService>();`n    services.AddKeyedScoped<DCMS.Application.Features.Appointments.IAppointmentService, DCMS.Infrastructure.Features.Appointments.AppointmentService>(\"Infrastructure\AppointmentService\">);`n        services.AddScoped<DCMS.Application.Features.Appointments.Interfaces.IAppointmentService, DCMS.Application.Features.Appointments.AppointmentService>();`n    services.AddKeyedScoped<DCMS.Application.Features.Appointments.IAppointmentService, DCMS.Infrastructure.Features.Appointments.AppointmentService>(\"Infrastructure\AppointmentService\">);`n    return services;
+        
+        services.AddScoped<DCMS.Application.Features.Appointments.Interfaces.IAppointmentService, DCMS.Application.Features.Appointments.AppointmentService>();
+        services.AddKeyedScoped<DCMS.Application.Features.Appointments.IAppointmentService, DCMS.Infrastructure.Features.Appointments.AppointmentService>("Infrastructure\AppointmentService");
+        return services;
     }
 }
-
-
