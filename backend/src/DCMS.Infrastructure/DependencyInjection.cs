@@ -10,6 +10,8 @@ using DCMS.Infrastructure.Features.Accounts;
 using DCMS.Infrastructure.Features.Authentication;
 using DCMS.Application.Features.PatientLinks;
 using DCMS.Infrastructure.Features.PatientLinks;
+using DCMS.Application.Features.Appointments;
+using DCMS.Infrastructure.Features.Appointments;
 
 namespace DCMS.Infrastructure;
 
@@ -48,6 +50,8 @@ public static class DependencyInjection
         services.AddScoped<DCMS.Application.Features.Scheduling.IWorkingScheduleService>(sp => sp.GetRequiredService<Features.Scheduling.WorkingScheduleService>());
         services.AddScoped<DCMS.Application.Features.Scheduling.IAvailabilityService>(sp => sp.GetRequiredService<Features.Scheduling.WorkingScheduleService>());
         services.AddScoped<Features.Scheduling.DevelopmentSchedulingSeeder>();
+        services.AddScoped<IAppointmentService, AppointmentService>();
+        services.AddScoped<IFollowUpBookingPort, UnavailableFollowUpBookingPort>();
         return services;
     }
 }

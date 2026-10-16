@@ -407,7 +407,7 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("End")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<int>("ServiceId")
+                    b.Property<int?>("ServiceId")
                         .HasColumnType("integer");
 
                     b.Property<DateTimeOffset>("Start")
@@ -990,8 +990,7 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("ServiceId", "BranchId")
                         .HasPrincipalKey("Id", "BranchId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("DCMS.Domain.Features.Scheduling.ScheduleReceipt", b =>
@@ -1115,6 +1114,7 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                 {
                     b.Navigation("Periods");
                 });
+            AppointmentSnapshot.Configure(modelBuilder);
 #pragma warning restore 612, 618
         }
     }

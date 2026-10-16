@@ -169,6 +169,9 @@ export default function SignInScreen() {
               <GoogleIdentityButton onCredential={onGoogleCredential} onError={setGoogleError} />
               <FormError message={googleError} />
             </View>
+            <Link href="/book-appointment" asChild>
+              <Pressable accessibilityRole="button"><Text style={styles.linkText}>Đặt lịch không cần tài khoản</Text></Pressable>
+            </Link>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

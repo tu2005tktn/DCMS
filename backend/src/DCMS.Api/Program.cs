@@ -1,5 +1,6 @@
 using DCMS.Api.Features.Health;
 using DCMS.Api.Features.Scheduling;
+using DCMS.Api.Features.Appointments;
 using DCMS.Infrastructure;
 using System.Security.Claims;
 using System.Text;
@@ -112,6 +113,7 @@ app.MapAuthenticationEndpoints();
 app.MapAccountEndpoints();
 app.MapPatientLinkEndpoints();
 app.MapSchedulingEndpoints();
+app.MapAppointmentEndpoints();
 
 app.Run();
 

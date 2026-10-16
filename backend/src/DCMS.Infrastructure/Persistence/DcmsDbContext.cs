@@ -6,6 +6,7 @@ using DCMS.Domain.Features.Accounts;
 using DCMS.Domain.Features.Authentication;
 using DCMS.Domain.Features.PatientLinks;
 using DCMS.Domain.Features.Patients;
+using DCMS.Domain.Features.Appointments;
 
 namespace DCMS.Infrastructure.Persistence;
 
@@ -19,11 +20,15 @@ public sealed class DcmsDbContext(DbContextOptions<DcmsDbContext> options)
     public DbSet<PatientProfile> Patients => Set<PatientProfile>();
     public DbSet<PatientAccountLink> PatientAccountLinks => Set<PatientAccountLink>();
     public DbSet<PatientLinkAudit> PatientLinkAudits => Set<PatientLinkAudit>();
+    public DbSet<Appointment> Appointments => Set<Appointment>();
+    public DbSet<AppointmentReceipt> AppointmentReceipts => Set<AppointmentReceipt>();
+    public DbSet<AppointmentOutboxEvent> AppointmentOutboxEvents => Set<AppointmentOutboxEvent>();
 
     protected override void OnModelCreating(ModelBuilder model)
     {
         base.OnModelCreating(model);
         SchedulingModel.Configure(model);
+        AppointmentModel.Configure(model);
         model.Entity<ApplicationUser>(b =>
         {
             b.ToTable("USER_ACCOUNT");
