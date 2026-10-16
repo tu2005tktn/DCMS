@@ -9,6 +9,8 @@ using DCMS.Application.Features.Authentication;
 using DCMS.Infrastructure.Features.Accounts;
 using DCMS.Infrastructure.Features.Authentication;
 using Microsoft.Extensions.Hosting;
+using DCMS.Infrastructure.Features.Appointments;
+using DCMS.Application.Features.Appointments;
 
 namespace DCMS.Infrastructure;
 
@@ -42,6 +44,7 @@ public static class DependencyInjection
         services.AddScoped<IAccountService, AccountService>();
         services.AddScoped<IAuthenticationService, AuthenticationService>();
         services.AddScoped<DevelopmentAccountSeeder>();
+        services.AddScoped<IAppointmentRepository, AppointmentRepository>();
         if (environment.IsDevelopment())
         {
             // The development adapter is never registered outside Development. The concrete type is
