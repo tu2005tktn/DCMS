@@ -10,7 +10,7 @@ import { bookingApi } from './booking.api';
 import type { AvailabilitySlot, BookingOptions, BookingResult } from './booking.types';
 
 type Relation = 'Self' | 'Relative';
-type FieldName = 'bookerName' | 'contact' | 'attendeeName' | 'birthDate';
+type FieldName = 'bookerName' | 'contact' | 'attendeeName';
 const nextDate = () => new Date(Date.now() + 86400000).toISOString().slice(0, 10);
 const formatTime = (value: string) => new Date(value).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh',
   day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -37,7 +37,6 @@ export default function BookingScreen() {
   const [bookerName, setBookerName] = useState(state.status === 'authenticated' ? state.user.fullName : '');
   const [contact, setContact] = useState('');
   const [attendeeName, setAttendeeName] = useState(state.status === 'authenticated' ? state.user.fullName : '');
-  const [birthDate, setBirthDate] = useState('');
   const [result, setResult] = useState<BookingResult | null>(null);
 
   const services = useMemo(() => options?.services.filter(x => x.branchId === branchId) ?? [], [options, branchId]);
@@ -78,8 +77,6 @@ export default function BookingScreen() {
     if (!/^0\d{9}$/.test(value) && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value))
       errors.contact = 'Nhập số điện thoại Việt Nam hoặc email hợp lệ.';
     if (!attendeeName.trim() || attendeeName.trim().length > 100) errors.attendeeName = 'Nhập họ tên người khám (1–100 ký tự).';
-    if (birthDate && (!/^\d{4}-\d{2}-\d{2}$/.test(birthDate) || Number.isNaN(Date.parse(birthDate)) || birthDate > nextDate()))
-      errors.birthDate = 'Nhập ngày sinh hợp lệ dạng YYYY-MM-DD.';
     setFieldErrors(errors);
     return Object.keys(errors).length === 0;
   }
@@ -93,7 +90,7 @@ export default function BookingScreen() {
       const value = await bookingApi.create({
         branchId, booker: { name: bookerName.trim(), phone: /^0\d{9}$/.test(contact.trim()) ? contact.trim() : null,
           email: /^0\d{9}$/.test(contact.trim()) ? null : contact.trim() },
-        attendee: { patientId: null, name: attendeeName.trim(), birthDate: birthDate || null },
+        attendee: { patientId: null, name: attendeeName.trim(), birthDate: null },
         attendeeRelation: relation, kind: 'Standard', source: 'App', serviceId: service.id,
         reason: reason.trim() || null, dentistId, assistantId: null, chairId: null,
         startAt: slot.start, durationMinutes: service.publicDurationMinutes, followUpId: null,
@@ -151,7 +148,6 @@ export default function BookingScreen() {
         <Field label="Họ tên người đặt" value={bookerName} onChangeText={setBookerName} error={fieldErrors.bookerName} />
         <Field label="Số điện thoại Việt Nam hoặc email" value={contact} onChangeText={setContact} error={fieldErrors.contact} />
         <Field label="Họ tên người khám" value={attendeeName} onChangeText={setAttendeeName} error={fieldErrors.attendeeName} />
-        <Field label="Ngày sinh người khám (YYYY-MM-DD, nếu có)" value={birthDate} onChangeText={setBirthDate} error={fieldErrors.birthDate} />
         {relation === 'Relative' && <Text>Đặt lịch cho người thân không cấp quyền xem hồ sơ bệnh án của họ.</Text>}
         <PrimaryButton label="Xem lại" onPress={() => { if (validateContact()) { setError(null); setStep(2); } }} />
         <Choice label="Quay lại chọn lịch" selected={false} onPress={() => setStep(0)} />
