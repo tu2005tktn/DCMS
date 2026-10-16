@@ -19,6 +19,7 @@ export default function RootLayout() {
         <Stack.Screen name="(home)" options={{ headerShown: false }} />
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         <Stack.Screen name="(account)" options={{ headerShown: false }} />
+        <Stack.Screen name="book-appointment" options={{ title: 'Đặt lịch khám' }} />
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="+not-found" options={{ title: 'Không tìm thấy' }} />
       </Stack>

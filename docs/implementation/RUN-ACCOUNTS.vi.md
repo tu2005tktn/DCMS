@@ -41,9 +41,9 @@ Mở **http://localhost:5173/sign-in**. API ở **http://localhost:5080**, trang
 ## Thử từng chức năng
 
 1. Đăng nhập `admin.demo` bằng mật khẩu riêng trong `.env`. Trang tài khoản của tôi hiển thị vai trò được cấp, vai trò hiệu lực và nút cập nhật quyền. Sai mật khẩu phải hiện đúng MSG09.
-2. Mở **Quản lý tài khoản**, tìm theo username/họ tên/email; chọn page size và chuyển trang. Tìm chuỗi không có kết quả để kiểm tra empty state; nút Tải lại gọi API thật.
-3. Chọn **Tạo nhân viên**. Nhập username duy nhất, mã nhân viên, fullname, mật khẩu theo policy được hiển thị và một/nhiều vai trò. Lưu thành công nhận MSG14. Dùng lại username hoặc mã nhân viên phải nhận MSG139.
-4. Chọn **Sửa** ở account Staff, đổi fullname/contact hoặc tập vai trò, nhập lý do và xác nhận. Public account chỉ có khóa/mở khóa/audit. Không có form tạo Patient hoặc phê duyệt liên kết hồ sơ.
+2. Mở **Quản lý tài khoản**, tìm theo ID/mã nhân viên/username/họ tên/email/phone; lọc role/trạng thái, bấm header để sort server; chọn page size 20/50/100 và chuyển trang. Tìm chuỗi không có kết quả để kiểm tra empty state; nút Tải lại gọi API thật.
+3. Chọn **Tạo nhân viên**. Nhập username duy nhất, mã nhân viên, fullname, ít nhất email hoặc phone, mật khẩu theo policy được hiển thị và một/nhiều vai trò. Lưu thành công nhận MSG14. Dùng lại username/mã nhân viên hoặc normalized contact phải nhận MSG139.
+4. Chọn **Chi tiết** để đọc dữ liệu mới nhất trong Drawer, gồm liên hệ, roles, trạng thái, created/updated time và version. Chọn **Sửa** ở account Staff, đổi fullname/contact hoặc tập vai trò, nhập lý do và xác nhận. Public account chỉ có đọc/khóa/mở khóa/audit. Không có form tạo Patient hoặc phê duyệt liên kết hồ sơ.
 5. Chọn **Khóa**, nhập lý do và xác nhận. MSG15 thông báo thu hồi các phiên hiện tại. Chọn **Mở khóa** với lý do, nhận MSG16; đăng nhập mới được phép, token cũ vẫn không dùng được.
 6. Chọn **Audit** để xem actor/time/target, lý do và JSON trước/sau. Timestamp hiển thị theo múi giờ Việt Nam, database lưu UTC. Không có mật khẩu, hash hoặc token trong audit.
 7. Chọn **Đăng xuất** để server vô hiệu hóa phiên rồi quay về đăng nhập. Reload trang cũng cần đăng nhập lại vì web giữ JWT trong bộ nhớ, chưa có persistent login/refresh token.
@@ -51,7 +51,9 @@ Mở **http://localhost:5173/sign-in**. API ở **http://localhost:5080**, trang
 
 Để thử phiên cũ: mở hai cửa sổ trình duyệt riêng (ví dụ thường và ẩn danh). Admin tạo một account thử có Admin + Dentist; đăng nhập account thử ở cửa sổ thứ hai. Từ Admin ở cửa sổ thứ nhất, thu hồi Admin; cửa sổ thứ hai gọi tải lại danh sách sẽ nhận MSG06. Khóa account đó thì request riêng tư tiếp theo nhận MSG07. Đừng khóa/thu hồi account Admin duy nhất nếu không còn quản trị viên khác để khôi phục quyền.
 
-Để thử conflict: hai cửa sổ Admin cùng mở form Sửa một account. Lưu ở cửa sổ A rồi lưu form vẫn đang mở ở B. B phải nhận MSG111; hủy form, tải lại dữ liệu và kiểm tra thay đổi trước khi sửa tiếp.
+Để thử conflict: hai cửa sổ Admin cùng mở form Sửa một account. Lưu ở cửa sổ A rồi lưu form vẫn đang mở ở B. B phải nhận MSG111 và giữ draft; chọn **Tải phiên bản mới, giữ bản nháp**, đối chiếu dữ liệu mới nhất được hiển thị rồi xác nhận lại nếu phù hợp. Hủy form có thay đổi chưa lưu cần xác nhận bỏ draft.
+
+Bổ sung S04 / DCMS-75: xem [đặc tả](../specs/S04-UC31.md) và [bằng chứng, migration, lệnh chạy](S04-DCMS-75.md). Kết quả 15 integration / 4 browser ở phần cuối là đợt nền tảng trước S04.
 
 Recovery chưa triển khai: không có endpoint reset. Kênh xác minh, proof expiry và retry policy chưa được xác nhận trong đặc tả; không dùng thao tác quản lý account để bỏ qua xác minh hoặc phê duyệt liên kết bệnh án.
 

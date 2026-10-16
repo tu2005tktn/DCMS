@@ -1,19 +1,22 @@
 import { useRouter } from 'expo-router';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { useSession } from '@/features/auth/session/useSession';
 import { useSignOut } from '@/features/auth/sign-in/hooks/useSignOut';
-import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { colors } from '@/theme/colors';
 import { spacing } from '@/theme/spacing';
 import { typography } from '@/theme/typography';
 
-export default function AccountLinkScreen() {
+export default function AccountHomeScreen() {
   const { state, signOut } = useSession();
   const router = useRouter();
+  const [signingOut, setSigningOut] = useState(false);
 
   const user = state.status === 'authenticated' ? state.user : null;
 
-  const { signingOut, signOut: doSignOut } = useSignOut({
+  // useSignOut của main nhận accessToken — dùng helper này để tránh trùng với state machine cũ.
+  const doSignOut = useSignOut({
     onCleared: () => {
       // Về menu trung tâm — "Trang chủ tài khoản" sẽ tự biến mất vì session trở về anonymous.
       router.replace('/(home)/' as never);
@@ -21,22 +24,18 @@ export default function AccountLinkScreen() {
   });
 
   async function handleSignOut() {
-    Alert.alert(
-      'Đăng xuất',
-      'Bạn có chắc muốn đăng xuất khỏi tài khoản này?',
-      [
-        { text: 'Hủy', style: 'cancel' },
-        {
-          text: 'Đăng xuất',
-          style: 'destructive',
-          onPress: async () => {
-            if (state.status === 'authenticated') {
-              await doSignOut(state.accessToken);
-            }
-          },
-        },
-      ],
-    );
+    if (signingOut) return;
+    setSigningOut(true);
+    try {
+      try {
+        const accessToken = state.status === 'authenticated' ? state.accessToken : '';
+        await doSignOut.signOut(accessToken);
+      } catch {
+        await signOut();
+      }
+    } finally {
+      setSigningOut(false);
+    }
   }
 
   if (!user) {
@@ -55,7 +54,7 @@ export default function AccountLinkScreen() {
     .slice(0, 2);
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
       {/* Avatar */}
       <View style={styles.avatar}>
         <Text style={styles.avatarText}>{initials}</Text>
@@ -77,6 +76,14 @@ export default function AccountLinkScreen() {
         ))}
       </View>
 
+      {user.accountType === 'Public' && (
+        <View style={styles.bookingSection}>
+          <Text style={styles.bookingTitle}>Đặt lịch khám</Text>
+          <Text style={styles.linkDescription}>Chọn lịch khám cho bản thân hoặc người thân.</Text>
+          <PrimaryButton label="Bắt đầu đặt lịch" onPress={() => router.push('/book-appointment')} disabled={signingOut} testID="start-booking" />
+        </View>
+      )}
+
       {/* Account details */}
       <View style={styles.card}>
         <Row label="ID tài khoản" value={String(user.id)} />
@@ -86,10 +93,22 @@ export default function AccountLinkScreen() {
         <Row label="Vai trò" value={user.roles.join(', ')} />
       </View>
 
+      {user.accountType === 'Public' && (
+        <View style={styles.linkSection}>
+          <Text style={styles.linkDescription}>Gửi yêu cầu hoặc xem trạng thái liên kết hồ sơ của bạn.</Text>
+          <PrimaryButton
+            label="Liên kết hồ sơ của tôi"
+            onPress={() => router.push('/(account)/account-link')}
+            disabled={signingOut}
+            testID="open-account-link"
+          />
+        </View>
+      )}
+
       {/* Sign out */}
       <View style={styles.footer}>
         <Pressable
-          onPress={handleSignOut}
+          onPress={() => void handleSignOut()}
           disabled={signingOut}
           style={({ pressed }) => [
             styles.signOutBtn,
@@ -103,7 +122,7 @@ export default function AccountLinkScreen() {
           )}
         </Pressable>
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -118,8 +137,9 @@ function Row({ label, value }: { label: string; value: string }) {
 
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
+  scroll: { flex: 1, backgroundColor: colors.background },
   container: {
-    flex: 1,
+    flexGrow: 1,
     backgroundColor: colors.background,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.xl,
@@ -186,6 +206,11 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginTop: spacing.sm,
   },
+  linkSection: { gap: spacing.sm, marginTop: spacing.sm },
+  bookingSection: { gap: spacing.sm, padding: spacing.md, backgroundColor: colors.surface,
+    borderRadius: 12, borderWidth: 1, borderColor: colors.border },
+  bookingTitle: { fontSize: typography.body + 2, fontWeight: '700', color: colors.text },
+  linkDescription: { color: colors.muted, fontSize: typography.body - 2 },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',

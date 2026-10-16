@@ -17,4 +17,3 @@ export type SubmitLinkRequest = {
 };
 export type SelfLinkChange = { request: SelfLinkRequest; notification: SystemMessage; created: boolean };
 export type OwnRecordSummary = { patientCode: string; fullName: string; birthDate: string | null; linkedAt: string };
-export type SignInResult = { accessToken: string; user: { userName: string; accountType: string } };
