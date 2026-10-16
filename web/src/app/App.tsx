@@ -10,13 +10,29 @@ import PatientSearchPage from '../features/patients/PatientSearchPage';
 import PatientProfilePage from '../features/patients/PatientProfilePage';
 import { roleLabels } from '../features/accounts/types';
 import HealthStatus from '../features/HealthStatus';
+import { AccessPage, CustomerGuard, CustomerHomePage, CustomerRegisterPage, CustomerShell, CustomerSignInPage } from '../features/customer-auth/CustomerPages';
+import { useCustomerAuth } from '../features/customer-auth/CustomerAuthContext';
+import CustomerBookingPage from '../features/customer-booking/CustomerBookingPage';
+import CustomerPatientLinkPage from '../features/customer-patient-link/CustomerPatientLinkPage';
 
 export default function App() {
   return <Routes>
     <Route path="/sign-in" element={<SignInPage />} />
+    <Route path="/access" element={<AccessPage />} />
+    <Route path="/customer/sign-in" element={<CustomerSignInPage />} />
+    <Route path="/customer/register" element={<CustomerRegisterPage />} />
+    <Route path="/customer/book" element={<CustomerBookingPage />} />
+    <Route path="/customer" element={<CustomerGuard><CustomerShell /></CustomerGuard>}>
+      <Route index element={<Navigate to="/customer/home" replace />} />
+      <Route path="home" element={<CustomerHomePage />} />
+      <Route path="patient-link" element={<CustomerPatientLinkPage />} />
+    </Route>
+    <Route path="/customer/*" element={<Result status="404" title="Không tìm thấy trang" extra={<Link to="/customer/home">Về trang chủ</Link>} />} />
     <Route path="/health" element={<HealthStatus />} />
-    <Route element={<Protected><Workspace /></Protected>}>
+    <Route element={<Entry />}>
       <Route index element={<Home />} />
+    </Route>
+    <Route element={<Protected><Workspace /></Protected>}>
       <Route path="working-schedules" element={<WorkingSchedulesPage />} />
       <Route path="accounts" element={<Protected permission="accounts.manage"><AccountsPage /></Protected>} />
       <Route path="patients" element={<Protected permission="patients.read"><PatientSearchPage /></Protected>} />
@@ -25,6 +41,15 @@ export default function App() {
       <Route path="*" element={<Result status="404" title="Không tìm thấy trang" extra={<Link to="/">Về trang chủ</Link>} />} />
     </Route>
   </Routes>;
+}
+
+function Entry() {
+  const staff = useAuth();
+  const customer = useCustomerAuth();
+  if (staff.user) return <Workspace />;
+  if (customer.state.status === 'initializing') return <main className="page"><Typography.Text>Đang kiểm tra phiên…</Typography.Text></main>;
+  if (customer.state.status === 'authenticated') return <Navigate to="/customer/home" replace />;
+  return <Navigate to="/access" replace />;
 }
 
 function Protected({ children, permission }: { children: ReactNode; permission?: string }) {
@@ -41,7 +66,7 @@ function Workspace() {
   const [error, setError] = useState<string | null>(null);
   async function signOut() {
     setBusy(true); setError(null);
-    try { await auth.signOut(); } catch (failure) { setError((failure as Error).message); }
+    try { await auth.signOut(); window.location.replace('/sign-in'); } catch (failure) { setError((failure as Error).message); }
     finally { setBusy(false); }
   }
   return <Layout className="workspace">
