@@ -19,6 +19,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddInfrastructure(builder.Configuration, builder.Environment);
 builder.Services.AddOpenApi();
 builder.Services.Configure<RouteHandlerOptions>(options => options.ThrowOnBadRequest = true);
+builder.Services.AddScoped<IAppointmentService, AppointmentService>();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
 {
     options.MapInboundClaims = false;
@@ -100,6 +101,7 @@ app.MapAuthenticationEndpoints();
 app.MapRecoveryEndpoints();
 app.MapAccountEndpoints();
 app.MapDevelopmentRecoveryEndpoints();
+app.MapAppointmentEndpoints();
 
 app.Run();
 

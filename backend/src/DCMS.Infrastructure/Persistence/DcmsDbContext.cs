@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using DCMS.Infrastructure.Features.Accounts;
 using DCMS.Domain.Features.Accounts;
 using DCMS.Domain.Features.Authentication;
+using DCMS.Domain.Features.Appointments;
 
 namespace DCMS.Infrastructure.Persistence;
 
@@ -16,6 +17,7 @@ public sealed class DcmsDbContext(DbContextOptions<DcmsDbContext> options)
     public DbSet<RecoveryToken> RecoveryTokens => Set<RecoveryToken>();
     public DbSet<RecoveryAudit> RecoveryAudits => Set<RecoveryAudit>();
     public DbSet<RecoveryOutbox> RecoveryOutbox => Set<RecoveryOutbox>();
+    public DbSet<Appointment> Appointments => Set<Appointment>();
 
     protected override void OnModelCreating(ModelBuilder model)
     {
@@ -92,6 +94,35 @@ public sealed class DcmsDbContext(DbContextOptions<DcmsDbContext> options)
             b.Property(x => x.ProviderMessageId).HasMaxLength(64);
             b.HasIndex(x => new { x.AccountId, x.OccurredAt });
             b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.AccountId).OnDelete(DeleteBehavior.Restrict);
+        });
+        
+        model.Entity<Appointment>(b =>
+        {
+            b.ToTable("APPOINTMENT");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.StartTime).IsRequired();
+            b.Property(x => x.EndTime).IsRequired();
+            b.Property(x => x.DurationInMinutes).IsRequired();
+            b.Property(x => x.Service).HasMaxLength(200).IsRequired();
+            b.Property(x => x.Reason).HasMaxLength(500).IsRequired();
+            b.Property(x => x.Source).HasMaxLength(20).IsRequired(); // phone/Zalo/Facebook/in person/app
+            b.Property(x => x.PatientId).IsRequired();
+            b.Property(x => x.RelativeId);
+            b.Property(x => x.DentistId).IsRequired();
+            b.Property(x => x.BranchId).IsRequired();
+            b.Property(x => x.ChairId).IsRequired();
+            b.Property(x => x.Status).HasMaxLength(50).IsRequired();
+            b.Property(x => x.IsAttendanceConfirmed).IsRequired();
+            b.Property(x => x.PlannedEndTime);
+            b.Property(x => x.ExceptionReason).HasMaxLength(500);
+            b.Property(x => x.Version).IsConcurrencyToken();
+            
+            b.HasIndex(x => x.StartTime);
+            b.HasIndex(x => x.EndTime);
+            b.HasIndex(x => x.DentistId);
+            b.HasIndex(x => x.BranchId);
+            b.HasIndex(x => x.ChairId);
+            b.HasIndex(x => x.PatientId);
         });
     }
 }

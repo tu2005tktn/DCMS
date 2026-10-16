@@ -18,6 +18,7 @@ import RecoverAccountPage from '../features/recovery/RecoverAccountPage';
 import { roleLabels } from '../features/accounts/types';
 import HealthStatus from '../features/HealthStatus';
 import BrandLogo from '../components/BrandLogo';
+import AppointmentRoutes from '../routes/Appointments';
 
 export default function App() {
   return <Routes>
@@ -27,6 +28,7 @@ export default function App() {
     <Route element={<Protected><Workspace /></Protected>}>
       <Route index element={<Home />} />
       <Route path="accounts" element={<Protected permission="accounts.manage"><AccountsPage /></Protected>} />
+      <Route path="appointments" element={<AppointmentRoutes />} />
       <Route path="*" element={<Result status="404" title="Không tìm thấy trang" extra={<Link to="/">Về trang chủ</Link>} />} />
     </Route>
   </Routes>;
