@@ -10,6 +10,9 @@ import type { OwnRecordSummary, SelfLinkOverview } from '../patient-link.types';
 
 // S07 Account Link Request (UC-36). The account always comes from the session; no Patient search is exposed.
 export default function AccountLinkScreen() {
+  // The (account) layout only renders for an authenticated S01 session.
+  const session = useSession();
+  const token = session.state.status === 'authenticated' ? session.state.accessToken : null;
   const router = useRouter();
   const { state, signOut: signOutSession } = useSession();
   const token = state.status === 'authenticated' ? state.accessToken : null;
@@ -29,6 +32,12 @@ export default function AccountLinkScreen() {
 
   const handleAuthFailure = useCallback((failure: unknown) => {
     if (failure instanceof LinkApiError && failure.status === 401) {
+      // Expired or revoked session: S01 clears it and the guard returns to sign-in.
+      setOverview(null); void session.signOut('expired');
+      return true;
+    }
+    return false;
+  }, [session.signOut]);
       setOverview(null);
       void signOutSession('expired');
       return true;
@@ -88,6 +97,11 @@ export default function AccountLinkScreen() {
   }
 
   async function signOut() {
+    setOverview(null); setRecord(null); setNotice(null); setActionError(null); setForm(emptyLinkForm); setErrors({});
+    await session.signOut('user');
+  }
+
+  if (!token) return null;
     await signOutSession();
     router.replace('/(auth)/sign-in');
   }

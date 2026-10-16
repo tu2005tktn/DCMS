@@ -49,6 +49,7 @@ public sealed class DevelopmentPatientLinkSeeder(DcmsDbContext db, UserManager<A
         {
             if (await db.Patients.AnyAsync(x => x.PatientCode == patient.PatientCode, ct)) continue;
             patient.CreatedAt = patient.UpdatedAt = now;
+            patient.NormalizedName = PatientLinkSupport.NormalizeName(patient.FullName);
             db.Patients.Add(patient);
         }
         await db.SaveChangesAsync(ct);

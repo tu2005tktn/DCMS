@@ -47,9 +47,10 @@ async function send(path: string, options: RequestInit, accessToken?: string): P
     headers: buildHeaders(options.headers, accessToken),
   });
   if (!response.ok) {
+    // Keep the server's System Message (code + text) when present; status stays available for S01 mapping.
     const body: unknown = await response.json().catch(() => null);
     const message = body && typeof body === 'object' && 'message' in body && typeof body.message === 'string'
-      ? body.message : 'Yêu cầu API thất bại.';
+      ? body.message : `Yêu cầu API thất bại (${response.status}).`;
     const code = body && typeof body === 'object' && 'code' in body && typeof body.code === 'string'
       ? body.code : undefined;
     throw new ApiError(message, response.status, code);

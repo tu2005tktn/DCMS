@@ -10,6 +10,8 @@ using DCMS.Infrastructure.Features.Accounts;
 using DCMS.Infrastructure.Features.Authentication;
 using DCMS.Application.Features.PatientLinks;
 using DCMS.Infrastructure.Features.PatientLinks;
+using DCMS.Application.Features.Patients;
+using DCMS.Infrastructure.Features.Patients;
 using DCMS.Application.Features.Appointments;
 using DCMS.Infrastructure.Features.Appointments;
 
@@ -45,6 +47,7 @@ public static class DependencyInjection
         services.AddScoped<IPatientLinkService, PatientLinkService>();
         services.AddScoped<IPatientLinkReviewService, PatientLinkReviewService>();
         services.AddScoped<DevelopmentPatientLinkSeeder>();
+        services.AddScoped<IPatientService, PatientService>();
         services.AddSingleton(TimeProvider.System);
         services.AddScoped<Features.Scheduling.WorkingScheduleService>();
         services.AddScoped<DCMS.Application.Features.Scheduling.IWorkingScheduleService>(sp => sp.GetRequiredService<Features.Scheduling.WorkingScheduleService>());

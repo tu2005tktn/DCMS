@@ -27,3 +27,19 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }
 .multiline { white-space: pre-wrap; }
 @media (max-width: 1100px) { .link-filters { grid-template-columns: 1fr 1fr; } .link-filter-actions { grid-column: 1 / -1; } }
 @media (max-width: 680px) { .link-filters { grid-template-columns: 1fr; } }
+
+/* S05/S06 patients */
+.patient-filters { display: grid; grid-template-columns: minmax(220px, 1fr) 170px auto auto; gap: 12px; align-items: end; margin-bottom: 16px; }
+.patient-filters label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: #475467; }
+.patient-filters .ant-checkbox-wrapper { margin-bottom: 6px; }
+.patient-banner { margin-bottom: 16px; }
+.patient-banner-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.patient-name { margin: 0 0 6px !important; }
+.patient-section { margin-top: 20px; }
+.patient-actions { margin-bottom: 16px; }
+.patient-changes { margin: 4px 0 0; padding-left: 20px; }
+.patient-form-grid { display: grid; grid-template-columns: 1fr 1fr; column-gap: 16px; }
+.patient-review { margin-top: 12px; }
+.patient-tag { margin-left: 8px; }
+@media (max-width: 900px) { .patient-filters { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 680px) { .patient-filters, .patient-form-grid { grid-template-columns: 1fr; } .patient-banner-row { flex-direction: column; } }

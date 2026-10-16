@@ -5,7 +5,7 @@ public sealed record SystemMessage(string Code, string Message);
 
 public static class SystemMessages
 {
-    public static SystemMessage Get(string code, string field = "Thông tin", int maxLength = 0) => new(code, code switch
+    public static SystemMessage Get(string code, string field = "Thông tin", int maxLength = 0, string? value = null) => new(code, code switch
     {
         "MSG22" => "Không tìm thấy khung giờ phù hợp. Vui lòng đổi ngày, bác sĩ hoặc dịch vụ.",
         "MSG23" => "Vui lòng nhập thông tin người khám thực tế.",
@@ -38,10 +38,17 @@ public static class SystemMessages
         "MSG20" => "Yêu cầu liên kết chưa được chấp thuận hoặc liên kết đã bị thu hồi. Vui lòng liên hệ phòng khám để được hỗ trợ.",
         "MSG109" => "Mật khẩu chưa đáp ứng yêu cầu được hiển thị. Vui lòng kiểm tra và nhập lại.",
         "MSG111" => "Dữ liệu đã được cập nhật bởi thao tác khác. Vui lòng tải lại và kiểm tra trước khi xác nhận.",
+        "MSG113" => "Không tìm thấy dữ liệu được yêu cầu. Vui lòng tải lại danh sách.",
+        "MSG115" => "Không tìm thấy hồ sơ bệnh nhân phù hợp.",
+        "MSG116" => "Đã cập nhật thông tin hành chính của bệnh nhân.",
         "MSG139" => "Thông tin tài khoản chưa thể sử dụng. Vui lòng kiểm tra hoặc dùng chức năng khôi phục tài khoản.",
         "MSG142" => "Tài khoản hoặc hồ sơ đã có liên kết tự thân đang hiệu lực. Vui lòng liên hệ phòng khám để kiểm tra.",
         "MSG143" => "Chưa đủ căn cứ xác minh tài khoản với hồ sơ tự thân. Vui lòng bổ sung hoặc đối chiếu thông tin nhận diện.",
         "MSG144" => "Không thể hoàn tất thao tác. Vui lòng kiểm tra kết nối và thử lại.",
+        // v2.0 operational messages; {entity} uses `field`, {code} uses `value`.
+        "MSG201" => $"Mã {field} đã tồn tại. Vui lòng chọn mã khác.",
+        "MSG202" => "Bản ghi đã ngừng sử dụng. Vui lòng khôi phục hoặc chọn bản ghi hợp lệ.",
+        "MSG222" => $"Đã ghi nhận {field} với mã {value}.",
         _ => throw new ArgumentOutOfRangeException(nameof(code))
     });
 }

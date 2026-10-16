@@ -18,6 +18,7 @@ public sealed class DcmsDbContext(DbContextOptions<DcmsDbContext> options)
     public DbSet<AuthRefreshToken> AuthRefreshTokens => Set<AuthRefreshToken>();
     public DbSet<AccountAudit> AccountAudits => Set<AccountAudit>();
     public DbSet<PatientProfile> Patients => Set<PatientProfile>();
+    public DbSet<PatientAudit> PatientAudits => Set<PatientAudit>();
     public DbSet<PatientAccountLink> PatientAccountLinks => Set<PatientAccountLink>();
     public DbSet<PatientLinkAudit> PatientLinkAudits => Set<PatientLinkAudit>();
     public DbSet<Appointment> Appointments => Set<Appointment>();
@@ -83,13 +84,35 @@ public sealed class DcmsDbContext(DbContextOptions<DcmsDbContext> options)
         });
         model.Entity<PatientProfile>(b =>
         {
-            b.ToTable("PATIENT_PROFILE");
+            b.ToTable("PATIENT_PROFILE", t => t.HasCheckConstraint("CK_PATIENT_PROFILE_Gender",
+                "\"Gender\" IS NULL OR \"Gender\" IN ('MALE','FEMALE','OTHER')"));
             b.HasIndex(x => x.PatientCode).IsUnique();
+            b.HasIndex(x => x.NormalizedName);
+            b.HasIndex(x => x.Phone);
             b.Property(x => x.PatientCode).HasMaxLength(40);
             b.Property(x => x.FullName).HasMaxLength(160);
+            b.Property(x => x.NormalizedName).HasMaxLength(160);
             b.Property(x => x.Gender).HasMaxLength(16);
             b.Property(x => x.Phone).HasMaxLength(24);
+            b.Property(x => x.Address).HasMaxLength(255);
+            b.Property(x => x.GuardianName).HasMaxLength(160);
+            b.Property(x => x.GuardianRelationship).HasMaxLength(40);
+            b.Property(x => x.GuardianPhone).HasMaxLength(24);
+            b.Property(x => x.Note).HasMaxLength(1000);
+            b.Property(x => x.ArchiveReason).HasMaxLength(500);
             b.Property(x => x.Version).IsConcurrencyToken();
+        });
+        // UC-38: automatic patient codes BN000001... [PROPOSED format].
+        model.HasSequence<long>("patient_code_seq");
+        model.Entity<PatientAudit>(b =>
+        {
+            b.ToTable("PATIENT_AUDIT");
+            b.Property(x => x.Action).HasMaxLength(16);
+            b.Property(x => x.Reason).HasMaxLength(500);
+            b.Property(x => x.ChangesJson).HasColumnType("jsonb");
+            b.HasIndex(x => new { x.PatientId, x.OccurredAt });
+            b.HasOne<PatientProfile>().WithMany().HasForeignKey(x => x.PatientId).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.ActorAccountId).OnDelete(DeleteBehavior.Restrict);
         });
         model.Entity<PatientAccountLink>(b =>
         {

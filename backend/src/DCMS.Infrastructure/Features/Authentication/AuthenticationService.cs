@@ -187,6 +187,11 @@ public sealed class AuthenticationService(DcmsDbContext db, UserManager<Applicat
         var effective = AccountRoles.Effective(roles);
         string[] permissions = [
             .. effective.Contains(AccountRoles.Admin) ? ["accounts.manage"] : Array.Empty<string>(),
+            .. effective.Contains(AccountRoles.ClinicAssistant) ? ["patient-links.verify"] : Array.Empty<string>(),
+            .. effective.Contains(AccountRoles.ClinicAssistant) || effective.Contains(AccountRoles.Dentist) ? ["patients.read"] : Array.Empty<string>(),
+            .. effective.Contains(AccountRoles.ClinicAssistant) ? ["patients.manage"] : Array.Empty<string>()
+        ];
+        // UC-36: only a current VERIFIED self link counts; never inferred from a role or contact. Re-read on every request.
             .. effective.Contains(AccountRoles.ClinicAssistant) ? ["patient-links.verify"] : Array.Empty<string>()
         ];
         var verifiedLink = user.AccountType == "Public" && await db.PatientAccountLinks.AsNoTracking()
