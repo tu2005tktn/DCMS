@@ -52,6 +52,8 @@ public static class DependencyInjection
             services.AddScoped<DevelopmentContactDeliveryAdapter>();
             services.AddScoped<IContactDeliveryAdapter>(sp => sp.GetRequiredService<DevelopmentContactDeliveryAdapter>());
         }
-        return services;
+            services.AddScoped<DCMS.Application.Features.Appointments.Interfaces.IAppointmentService, DCMS.Application.Features.Appointments.AppointmentService>();`n    services.AddKeyedScoped<DCMS.Application.Features.Appointments.IAppointmentService, DCMS.Infrastructure.Features.Appointments.AppointmentService>(\"Infrastructure\AppointmentService\">);`n        services.AddScoped<DCMS.Application.Features.Appointments.Interfaces.IAppointmentService, DCMS.Application.Features.Appointments.AppointmentService>();`n    services.AddKeyedScoped<DCMS.Application.Features.Appointments.IAppointmentService, DCMS.Infrastructure.Features.Appointments.AppointmentService>(\"Infrastructure\AppointmentService\">);`n    return services;
     }
 }
+
+
