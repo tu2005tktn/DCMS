@@ -10,11 +10,8 @@ import type { OwnRecordSummary, SelfLinkOverview } from '../patient-link.types';
 
 // S07 Account Link Request (UC-36). The account always comes from the session; no Patient search is exposed.
 export default function AccountLinkScreen() {
-  // The (account) layout only renders for an authenticated S01 session.
-  const session = useSession();
-  const token = session.state.status === 'authenticated' ? session.state.accessToken : null;
   const router = useRouter();
-  const { state, signOut: signOutSession } = useSession();
+  const { state, signOut: clearSession } = useSession();
   const token = state.status === 'authenticated' ? state.accessToken : null;
   const [overview, setOverview] = useState<SelfLinkOverview | null>(null);
   const [loading, setLoading] = useState(false);
@@ -32,18 +29,12 @@ export default function AccountLinkScreen() {
 
   const handleAuthFailure = useCallback((failure: unknown) => {
     if (failure instanceof LinkApiError && failure.status === 401) {
-      // Expired or revoked session: S01 clears it and the guard returns to sign-in.
-      setOverview(null); void session.signOut('expired');
+      setOverview(null); setRecord(null);
+      void clearSession('expired').catch(() => null);
       return true;
     }
     return false;
-  }, [session.signOut]);
-      setOverview(null);
-      void signOutSession('expired');
-      return true;
-    }
-    return false;
-  }, [signOutSession]);
+  }, [clearSession]);
 
   const load = useCallback(async (current: string, mode: 'initial' | 'refresh' = 'initial') => {
     if (mode === 'refresh') setRefreshing(true); else setLoading(true);
@@ -97,16 +88,11 @@ export default function AccountLinkScreen() {
   }
 
   async function signOut() {
-    setOverview(null); setRecord(null); setNotice(null); setActionError(null); setForm(emptyLinkForm); setErrors({});
-    await session.signOut('user');
+    try { await clearSession(); router.replace('/(auth)/sign-in'); }
+    catch { setActionError('Không thể đăng xuất. Vui lòng thử lại.'); }
   }
 
   if (!token) return null;
-    await signOutSession();
-    router.replace('/(auth)/sign-in');
-  }
-
-  if (!token) return <View style={styles.center}><ActivityIndicator size="large" color={palette.primary} /></View>;
 
   if (loading && !overview) return <View style={styles.center}><ActivityIndicator size="large" color={palette.primary} /><Text style={styles.muted}>Đang tải…</Text></View>;
 

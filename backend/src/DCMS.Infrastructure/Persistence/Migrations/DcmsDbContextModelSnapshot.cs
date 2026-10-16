@@ -1060,6 +1060,10 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasOne("DCMS.Domain.Features.Patients.PatientProfile", null)
                         .WithMany()
                         .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("DCMS.Domain.Features.Scheduling.ResourceReservation", b =>
                 {
                     b.HasOne("DCMS.Domain.Features.Accounts.EmployeeProfile", null)
