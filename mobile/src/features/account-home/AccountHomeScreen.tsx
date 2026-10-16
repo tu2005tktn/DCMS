@@ -74,6 +74,7 @@ export default function AccountHomeScreen() {
 
       {user.accountType === 'Public' && (
         <View style={styles.linkSection}>
+          <PrimaryButton label="Đặt lịch khám" onPress={() => router.push('/book-appointment')} disabled={signingOut} />
           <Text style={styles.linkDescription}>Gửi yêu cầu hoặc xem trạng thái liên kết hồ sơ của bạn.</Text>
           <PrimaryButton
             label="Liên kết hồ sơ của tôi"

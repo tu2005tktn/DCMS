@@ -61,7 +61,7 @@ public sealed class ResourceReservation
     public int DentistId { get; set; }
     public int? AssistantId { get; set; }
     public int ChairId { get; set; }
-    public int ServiceId { get; set; }
+    public int? ServiceId { get; set; }
     public DateTimeOffset Start { get; set; }
     public DateTimeOffset End { get; set; }
     public string? AttendeeKey { get; set; }
