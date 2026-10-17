@@ -14,6 +14,9 @@ import { useCallback, useState } from 'react';
 import { signInApi } from '../sign-in.api';
 import { tokenStorage } from '@/services/storage/token-storage';
 
+// eslint-disable-next-line no-console
+const debug = (...args: unknown[]) => console.log('[useSignOut]', ...args);
+
 interface UseSignOutOptions {
   onCleared: () => void | Promise<void>;
 }
@@ -34,12 +37,22 @@ export function useSignOut({ onCleared }: UseSignOutOptions): UseSignOutResult {
       }
       setSigningOut(true);
       try {
-        await signInApi.signOut(accessToken);
-      } catch {
+        const result = await signInApi.signOut(accessToken);
+        debug('signOut API done', { revoked: result.revoked, status: result.status });
+      } catch (error) {
         // Bỏ qua lỗi mạng/5xx — local vẫn phải xóa token để bảo vệ tài khoản.
+        debug('signOut API failed (continuing local clear)', error);
       } finally {
-        await tokenStorage.clear();
-        await onCleared();
+        try {
+          await tokenStorage.clear();
+        } catch (e) {
+          debug('tokenStorage.clear failed', e);
+        }
+        try {
+          await onCleared();
+        } catch (e) {
+          debug('onCleared callback failed', e);
+        }
         setSigningOut(false);
       }
     },

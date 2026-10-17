@@ -1,12 +1,24 @@
+/**
+ * AccountHomeScreen — Trang chủ tài khoản.
+ *
+ * Đăng xuất đi qua SessionProvider.signOut (state machine chính thức). Trước đây từng
+ * trộn useSignOut mới ở đây, gây trạng thái lệch: hook mới chỉ clear token storage mà
+ * KHÔNG cập nhật state của SessionProvider, nên (account)/_layout vẫn authorized và
+ * expo-router không tự pop — user thấy "bấm Đăng xuất nhưng không có gì xảy ra".
+ * Xem docs/implementation/S01-ACCOUNT-HOME-LOGOUT.vi.md (sẽ tạo nếu cần) để tra log.
+ */
+
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { useSession } from '@/features/auth/session/useSession';
-import { useSignOut } from '@/features/auth/sign-in/hooks/useSignOut';
 import { colors } from '@/theme/colors';
 import { spacing } from '@/theme/spacing';
 import { typography } from '@/theme/typography';
+
+// eslint-disable-next-line no-console
+const debug = (...args: unknown[]) => console.log('[AccountHome/sign-out]', ...args);
 
 export default function AccountHomeScreen() {
   const { state, signOut } = useSession();
@@ -15,24 +27,18 @@ export default function AccountHomeScreen() {
 
   const user = state.status === 'authenticated' ? state.user : null;
 
-  // useSignOut của main nhận accessToken — dùng helper này để tránh trùng với state machine cũ.
-  const doSignOut = useSignOut({
-    onCleared: () => {
-      // Về menu trung tâm — "Trang chủ tài khoản" sẽ tự biến mất vì session trở về anonymous.
-      router.replace('/(home)/' as never);
-    },
-  });
-
   async function handleSignOut() {
     if (signingOut) return;
     setSigningOut(true);
+    debug('clicked', { state: state.status });
     try {
-      try {
-        const accessToken = state.status === 'authenticated' ? state.accessToken : '';
-        await doSignOut.signOut(accessToken);
-      } catch {
-        await signOut();
-      }
+      // Dùng state machine chính thức: state -> anonymous, (account)/_layout tự pop về home.
+      // Lý do không router.replace thủ công: useAuthGuard đã lo việc đó khi state đổi,
+      // và replace thủ công dễ đẩy về path không hợp lệ.
+      await signOut('user');
+      debug('signOut resolved', { state: 'anonymous (expected)' });
+    } catch (error) {
+      debug('signOut failed', error);
     } finally {
       setSigningOut(false);
     }
