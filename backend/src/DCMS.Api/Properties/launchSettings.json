@@ -3,7 +3,7 @@
     "http": {
       "commandName": "Project",
       "launchBrowser": false,
-      "environmentVariables": { "ASPNETCORE_ENVIRONMENT": "Development" },
+      "environmentVariables": { "ASPNETCORE_ENVIRONMENT": "Development", "ConnectionStrings__DefaultConnection": "Host=localhost;Port=5432;Database=dcms_dev;Username=dcms;Password=password123" },
       "applicationUrl": "http://localhost:5080"
     }
   }
