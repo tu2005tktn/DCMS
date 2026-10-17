@@ -19,8 +19,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSession } from '@/features/auth/session/useSession';
-import { notificationMockRepo } from '@/features/appointments/notification.mock';
-import type { NotificationDto } from '@/features/appointments/appointment.types';
+import { notificationRepo, NOTIFICATION_BACKEND } from '@/features/appointments/notification.repo';
+import type { NotificationDto } from '@/features/appointments/notification.types';
 import { colors } from '@/theme/colors';
 import { spacing } from '@/theme/spacing';
 import { typography } from '@/theme/typography';
@@ -35,6 +35,7 @@ export default function NotificationListScreen() {
   const router = useRouter();
   const { state } = useSession();
   const accountId = state.status === 'authenticated' ? state.user.id : null;
+  const accessToken = state.status === 'authenticated' ? state.accessToken : null;
 
   const [load, setLoad] = useState<LoadState>({ kind: 'loading' });
   const [refreshing, setRefreshing] = useState(false);
@@ -45,12 +46,13 @@ export default function NotificationListScreen() {
       return;
     }
     try {
-      const items = await notificationMockRepo.listForAccount(accountId);
+      const result = await notificationRepo.list(accountId, { limit: 50 }, accessToken);
+      const items = result.items;
       setLoad(items.length === 0 ? { kind: 'empty' } : { kind: 'ready', items });
     } catch {
       setLoad({ kind: 'error', message: 'Không thể kết nối máy chủ. Vui lòng thử lại.' });
     }
-  }, [accountId]);
+  }, [accountId, accessToken]);
 
   useEffect(() => { void reload(); }, [reload]);
   useFocusEffect(useCallback(() => { void reload(); }, [reload]));
@@ -58,11 +60,11 @@ export default function NotificationListScreen() {
   const openNotification = useCallback(async (n: NotificationDto) => {
     // 1. Mark read trước (KHÔNG đổi lifecycle lịch).
     if (accountId !== null && n.readAt === null) {
-      await notificationMockRepo.markRead(n.id, accountId);
+      await notificationRepo.markReadOne(n.id, accountId, accessToken);
     }
     // 2. Nếu có deep link: server re-check quyền.
     if (n.deepLink && accountId !== null) {
-      const check = await notificationMockRepo.checkDeepLinkPermission(n.deepLink, accountId);
+      const check = await notificationRepo.checkDeepLink({ deepLink: n.deepLink }, accountId, accessToken);
       if (!check.allowed) {
         setLoad({ kind: 'error', message: check.reason ?? 'Không có quyền mở thông báo này.' });
         return;
@@ -71,7 +73,7 @@ export default function NotificationListScreen() {
     }
     // Refresh để cập nhật read state.
     void reload();
-  }, [accountId, router, reload]);
+  }, [accountId, accessToken, router, reload]);
 
   if (load.kind === 'loading') {
     return (
@@ -85,7 +87,12 @@ export default function NotificationListScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
-        <Text style={styles.title}>Thông báo</Text>
+        <View style={styles.headerRow}>
+          <Text style={styles.title}>Thông báo</Text>
+          <View style={styles.backendBadge}>
+            <Text style={styles.backendText}>{NOTIFICATION_BACKEND === 'real' ? 'API' : 'MOCK'}</Text>
+          </View>
+        </View>
         <Text style={styles.subtitle}>Chỉ thông báo lịch hẹn của tài khoản hiện tại.</Text>
       </View>
 
@@ -152,8 +159,11 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm, backgroundColor: colors.background },
   header: { padding: spacing.lg, gap: spacing.xs, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.surface },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   title: { fontSize: typography.heading, fontWeight: '700', color: colors.text },
   subtitle: { color: colors.muted, fontSize: typography.caption + 1 },
+  backendBadge: { paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: 6, backgroundColor: colors.infoSoft ?? '#E6F0FA' },
+  backendText: { fontSize: typography.caption, color: colors.primary, fontWeight: '700' },
   listContent: { padding: spacing.md, paddingBottom: spacing.xl },
   card: { backgroundColor: colors.surface, borderRadius: 12, padding: spacing.md, gap: spacing.xs, borderWidth: 1, borderColor: colors.border },
   cardUnread: { borderColor: colors.primary, backgroundColor: colors.infoSoft },
