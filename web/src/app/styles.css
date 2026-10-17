@@ -788,3 +788,66 @@ h1, h2, h3, h4 { color: var(--dcms-text); }
   .form-grid { grid-template-columns: 1fr; }
   .auth-panel { padding: 30px 26px 26px; }
 }
+:root { font-family: Inter, system-ui, sans-serif; color: #17233d; background: #f4f7fb; }
+body { margin: 0; }
+.page { min-height: 100vh; display: grid; place-items: center; padding: 24px; box-sizing: border-box; }
+.content { width: min(100%, 680px); }
+.eyebrow { color: #175cd3; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.intro { font-size: 17px; color: #475467; margin-bottom: 28px; }
+.login-content { max-width: 440px; }
+.login-help { margin-top: 24px; color: #667085; }
+.form-alert { margin-bottom: 18px; }
+.workspace { min-height: 100vh; }
+.workspace-header { background: white; display: flex; align-items: center; justify-content: space-between; padding: 0 32px; border-bottom: 1px solid #edf0f5; }
+.brand { font-size: 24px; font-weight: 800; color: #175cd3; }
+.workspace-content { width: min(100%, 1440px); margin: 0 auto; padding: 32px; box-sizing: border-box; }
+.page-heading, .table-tools { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 24px; }
+.page-heading h2 { margin-top: 0; }
+.audit-entry { margin-bottom: 16px; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }
+@media (max-width: 680px) { .workspace-header { padding: 0 16px; } .workspace-content { padding: 16px; } .page-heading, .table-tools { align-items: stretch; flex-direction: column; } }
+.link-filters { display: grid; grid-template-columns: 180px 160px 160px minmax(200px, 1fr) auto; gap: 12px; align-items: end; margin-bottom: 16px; }
+.link-filters label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: #475467; }
+.link-row, .link-row-selected { cursor: pointer; }
+.link-row-selected > td { background: #e6f0ff !important; }
+.link-section { margin-top: 20px; }
+.link-hint { margin-top: 12px; }
+.link-inline-alert { margin-top: 8px; }
+.link-candidates { margin-top: 12px; }
+.multiline { white-space: pre-wrap; }
+@media (max-width: 1100px) { .link-filters { grid-template-columns: 1fr 1fr; } .link-filter-actions { grid-column: 1 / -1; } }
+@media (max-width: 680px) { .link-filters { grid-template-columns: 1fr; } }
+
+/* S05/S06 patients */
+.patient-filters { display: grid; grid-template-columns: minmax(220px, 1fr) 170px auto auto; gap: 12px; align-items: end; margin-bottom: 16px; }
+.patient-filters label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: #475467; }
+.patient-filters .ant-checkbox-wrapper { margin-bottom: 6px; }
+.patient-banner { margin-bottom: 16px; }
+.patient-banner-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.patient-name { margin: 0 0 6px !important; }
+.patient-section { margin-top: 20px; }
+.patient-actions { margin-bottom: 16px; }
+.patient-changes { margin: 4px 0 0; padding-left: 20px; }
+.patient-form-grid { display: grid; grid-template-columns: 1fr 1fr; column-gap: 16px; }
+.patient-review { margin-top: 12px; }
+.patient-tag { margin-left: 8px; }
+@media (max-width: 900px) { .patient-filters { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 680px) { .patient-filters, .patient-form-grid { grid-template-columns: 1fr; } .patient-banner-row { flex-direction: column; } }
+
+/* Public customer portal */
+.customer-links { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.customer-or { text-align: center; margin: 24px 0 12px !important; color: #667085; }
+.customer-google { display: grid; justify-items: center; gap: 12px; }
+.customer-shell { min-height: 100vh; }
+.customer-header { min-height: 64px; background: #fff; border-bottom: 1px solid #edf0f5; padding: 0 32px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.customer-content { width: min(100%, 960px); margin: 0 auto; padding: 32px; box-sizing: border-box; }
+.customer-home { max-width: 680px; margin: 0 auto; }
+.customer-booking .ant-steps { margin-bottom: 24px; }
+.customer-back { margin-bottom: 12px; }
+.customer-field { display: block; width: 100%; margin-top: 6px; }
+.customer-booking label { display: block; font-weight: 600; }
+.customer-booking label .ant-input, .customer-booking label .ant-input-textarea { margin-top: 6px; }
+.customer-slots { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.customer-loading { height: 120px; }
+.customer-link-details { margin-top: 16px; }
+@media (max-width: 680px) { .customer-header { padding: 0 16px; } .customer-content { padding: 16px; } .customer-booking .ant-steps-item-title { font-size: 12px; } }

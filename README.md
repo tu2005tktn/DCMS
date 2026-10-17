@@ -1,5 +1,7 @@
 # DCMS
 
+**S04 / DCMS-75:** [Đặc tả quản lý tài khoản Web](docs/specs/S04-UC31.md) và [hướng dẫn chạy, migration, bằng chứng nghiệm thu](docs/implementation/S04-DCMS-75.md). Đăng nhập Admin dùng API/phiên chung S01; recovery S03 vẫn hoãn.
+
 **Team setup (Tiếng Việt): [Hướng dẫn cài đặt và chạy dự án](docs/SETUP.vi.md).** Includes required tools, first-run commands, daily startup, verification, and troubleshooting for Windows/PowerShell.
 
 **Hướng dẫn chạy & demo nhanh (tiếng Việt, file text): [HUONG-DAN-SU-DUNG.txt](HUONG-DAN-SU-DUNG.txt).**

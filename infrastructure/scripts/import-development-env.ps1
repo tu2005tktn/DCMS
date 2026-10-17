@@ -6,7 +6,7 @@ if (-not (Test-Path -LiteralPath $environmentFile)) {
 }
 $settings = @{}
 foreach ($line in Get-Content -LiteralPath $environmentFile) {
-    if ($line -match '^\s*(POSTGRES_DB|POSTGRES_USER|POSTGRES_PASSWORD|POSTGRES_PORT|JWT_SIGNING_KEY|DEV_SEED_PASSWORD)=(.*)$') {
+    if ($line -match '^\s*(POSTGRES_DB|POSTGRES_USER|POSTGRES_PASSWORD|POSTGRES_PORT|JWT_SIGNING_KEY|DEV_SEED_PASSWORD|GOOGLE_WEB_CLIENT_ID)=(.*)$') {
         $settings[$Matches[1]] = $Matches[2].Trim()
     }
 }
@@ -22,5 +22,6 @@ $connection['Password'] = $settings['POSTGRES_PASSWORD']
 $env:ConnectionStrings__DefaultConnection = $connection.ConnectionString
 if ($settings['JWT_SIGNING_KEY']) { $env:Jwt__SigningKey = $settings['JWT_SIGNING_KEY'] }
 if ($settings['DEV_SEED_PASSWORD']) { $env:DevSeed__Password = $settings['DEV_SEED_PASSWORD'] }
+if ($settings['GOOGLE_WEB_CLIENT_ID']) { $env:Google__WebClientId = $settings['GOOGLE_WEB_CLIENT_ID'] }
 $localDotnet = Join-Path $repositoryRoot '.tools\dotnet\dotnet.exe'
 $dotnet = if (Test-Path -LiteralPath $localDotnet) { $localDotnet } else { 'dotnet' }

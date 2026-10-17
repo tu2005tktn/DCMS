@@ -9,6 +9,10 @@ using DCMS.Application.Features.Authentication;
 using DCMS.Infrastructure.Features.Accounts;
 using DCMS.Infrastructure.Features.Authentication;
 using Microsoft.Extensions.Hosting;
+using DCMS.Application.Features.PatientLinks;
+using DCMS.Infrastructure.Features.PatientLinks;
+using DCMS.Application.Features.Patients;
+using DCMS.Infrastructure.Features.Patients;
 using DCMS.Application.Features.Appointments;
 using DCMS.Infrastructure.Features.Appointments;
 
@@ -42,8 +46,15 @@ public static class DependencyInjection
         services.AddMemoryCache(options => options.SizeLimit = 8192);
         services.AddScoped<IRecoveryOutbox, RecoveryOutboxWriter>();
         services.AddScoped<IAccountRecoveryService, AccountRecoveryService>();
+                && x.SessionMinutes is >= 1 and <= 1440
+                && x.AccessTokenMinutes is >= 1 and <= 60
+                && x.RefreshTokenDays is >= 1 and <= 365, "Invalid JWT configuration.").ValidateOnStart();
         services.AddScoped<IAccountService, AccountService>();
         services.AddScoped<IAuthenticationService, AuthenticationService>();
+        services.AddScoped<IRegistrationService, RegistrationService>();
+        services.AddHttpClient();
+        services.AddSingleton<IGoogleTokenVerifier, GoogleTokenVerifier>();
+        services.AddScoped<IGoogleAuthenticationService, GoogleAuthenticationService>();
         services.AddScoped<DevelopmentAccountSeeder>();
         if (environment.IsDevelopment())
         {
@@ -52,6 +63,17 @@ public static class DependencyInjection
             services.AddScoped<DevelopmentContactDeliveryAdapter>();
             services.AddScoped<IContactDeliveryAdapter>(sp => sp.GetRequiredService<DevelopmentContactDeliveryAdapter>());
         }
+        services.AddScoped<IPatientLinkService, PatientLinkService>();
+        services.AddScoped<IPatientLinkReviewService, PatientLinkReviewService>();
+        services.AddScoped<DevelopmentPatientLinkSeeder>();
+        services.AddScoped<IPatientService, PatientService>();
+        services.AddSingleton(TimeProvider.System);
+        services.AddScoped<Features.Scheduling.WorkingScheduleService>();
+        services.AddScoped<DCMS.Application.Features.Scheduling.IWorkingScheduleService>(sp => sp.GetRequiredService<Features.Scheduling.WorkingScheduleService>());
+        services.AddScoped<DCMS.Application.Features.Scheduling.IAvailabilityService>(sp => sp.GetRequiredService<Features.Scheduling.WorkingScheduleService>());
+        services.AddScoped<Features.Scheduling.DevelopmentSchedulingSeeder>();
+        services.AddScoped<IAppointmentService, AppointmentService>();
+        services.AddScoped<IFollowUpBookingPort, UnavailableFollowUpBookingPort>();
         return services;
     }
 }

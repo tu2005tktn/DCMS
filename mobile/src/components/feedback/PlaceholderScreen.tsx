@@ -6,10 +6,10 @@ import { spacing } from '@/theme/spacing';
 const routes: { label: string; href: Href }[] = [
   { label: 'S01 · Đăng nhập', href: '/(auth)/sign-in' },
   { label: 'S02 · Đăng ký', href: '/(auth)/register' },
-  { label: 'S02 · Xác minh liên hệ', href: '/(auth)/verify-contact' },
   { label: 'S03 · Khôi phục tài khoản', href: '/(auth)/recover-account' },
   { label: 'S03 · Đặt lại mật khẩu', href: '/(auth)/reset-password' },
   { label: 'S07 · Liên kết tài khoản', href: '/(account)/account-link' },
+  { label: 'Trang chủ tài khoản', href: '/(account)/home' },
 ];
 export function PlaceholderScreen({ title, description }: { title: string; description: string }) {
   return <ScrollView contentContainerStyle={styles.container}>
