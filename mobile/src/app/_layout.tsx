@@ -7,12 +7,21 @@
  *  - Có thêm (account)/_layout và (auth)/_layout để chặn route ngược.
  *  - (home) là menu trung tâm — mọi màn hình được liệt kê ở đây để tester điều hướng
  *    nhanh; mục "Trang chủ tài khoản" chỉ xuất hiện khi đã authenticated.
+ *  - S26+: hydrate persist store (AsyncStorage) lúc boot để data local sẵn sàng trước
+ *    khi user mở các màn Appointments / Notifications.
  */
 
 import { Stack } from 'expo-router';
+import { useEffect } from 'react';
 import { SessionProvider } from '@/features/auth/session/SessionProvider';
+import { appointmentRepo } from '@/features/appointments/appointment.repo';
+import { notificationRepoPersist } from '@/features/appointments/notification.repo.persist';
 
 export default function RootLayout() {
+  useEffect(() => {
+    void appointmentRepo.hydrate();
+    void notificationRepoPersist.hydrate();
+  }, []);
   return (
     <SessionProvider>
       <Stack>

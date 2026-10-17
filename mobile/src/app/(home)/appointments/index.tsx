@@ -20,6 +20,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSession } from '@/features/auth/session/useSession';
+import { appointmentRepo } from '@/features/appointments/appointment.repo';
 import { appointmentMockRepo } from '@/features/appointments/appointment.mock';
 import type { AppointmentDto, AppointmentStatus } from '@/features/appointments/appointment.types';
 import { colors } from '@/theme/colors';
@@ -55,14 +56,16 @@ export default function AppointmentHubScreen() {
       return;
     }
     try {
-      const items = await appointmentMockRepo.listForAccount(accountId);
+      // S26+ — dùng persist repo thay mock trực tiếp để thấy booking mới qua reload.
+      const items = await appointmentRepo.listForAccount(accountId);
       setLoad(items.length === 0 ? { kind: 'empty' } : { kind: 'ready', items });
     } catch {
       setLoad({ kind: 'error', message: 'Không thể kết nối máy chủ. Vui lòng thử lại.' });
     }
   }, [accountId]);
 
-  useEffect(() => { void loadData(); }, [loadData]);
+  // Hydrate persist store lúc mount.
+  useEffect(() => { void appointmentRepo.hydrate(); void loadData(); }, [loadData]);
   useFocusEffect(useCallback(() => { void loadData(); }, [loadData]));
 
   const onRefresh = useCallback(async () => {

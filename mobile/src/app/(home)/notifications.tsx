@@ -19,6 +19,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSession } from '@/features/auth/session/useSession';
+import { notificationRepoPersist } from '@/features/appointments/notification.repo.persist';
 import { notificationRepo, NOTIFICATION_BACKEND } from '@/features/appointments/notification.repo';
 import type { NotificationDto } from '@/features/appointments/notification.types';
 import { colors } from '@/theme/colors';
@@ -46,25 +47,26 @@ export default function NotificationListScreen() {
       return;
     }
     try {
-      const result = await notificationRepo.list(accountId, { limit: 50 }, accessToken);
-      const items = result.items;
+      // S26+ — dùng persist repo thay mock để giữ thông báo qua reload.
+      const result = await notificationRepoPersist.listForAccount(accountId, { limit: 50 });
+      const items = result;
       setLoad(items.length === 0 ? { kind: 'empty' } : { kind: 'ready', items });
     } catch {
       setLoad({ kind: 'error', message: 'Không thể kết nối máy chủ. Vui lòng thử lại.' });
     }
-  }, [accountId, accessToken]);
+  }, [accountId]);
 
-  useEffect(() => { void reload(); }, [reload]);
+  useEffect(() => { void notificationRepoPersist.hydrate(); void reload(); }, [reload]);
   useFocusEffect(useCallback(() => { void reload(); }, [reload]));
 
   const openNotification = useCallback(async (n: NotificationDto) => {
     // 1. Mark read trước (KHÔNG đổi lifecycle lịch).
     if (accountId !== null && n.readAt === null) {
-      await notificationRepo.markReadOne(n.id, accountId, accessToken);
+      await notificationRepoPersist.markRead(n.id, accountId);
     }
     // 2. Nếu có deep link: server re-check quyền.
     if (n.deepLink && accountId !== null) {
-      const check = await notificationRepo.checkDeepLink({ deepLink: n.deepLink }, accountId, accessToken);
+      const check = await notificationRepoPersist.checkDeepLinkPermission(n.deepLink, accountId);
       if (!check.allowed) {
         setLoad({ kind: 'error', message: check.reason ?? 'Không có quyền mở thông báo này.' });
         return;
