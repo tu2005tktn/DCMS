@@ -17,6 +17,7 @@ export default function RootLayout() {
         <Stack.Screen name="index" options={{ title: 'DCMS Mobile' }} />
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         <Stack.Screen name="(account)" options={{ headerShown: false }} />
+        <Stack.Screen name="book-appointment" options={{ title: 'Đặt lịch khám' }} />
       </Stack>
     </SessionProvider>
   );

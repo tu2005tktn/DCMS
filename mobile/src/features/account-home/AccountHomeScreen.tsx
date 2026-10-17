@@ -63,6 +63,14 @@ export default function AccountHomeScreen() {
         ))}
       </View>
 
+      {user.accountType === 'Public' && (
+        <View style={styles.bookingSection}>
+          <Text style={styles.bookingTitle}>Đặt lịch khám</Text>
+          <Text style={styles.linkDescription}>Chọn lịch khám cho bản thân hoặc người thân.</Text>
+          <PrimaryButton label="Bắt đầu đặt lịch" onPress={() => router.push('/book-appointment')} disabled={signingOut} testID="start-booking" />
+        </View>
+      )}
+
       {/* Account details */}
       <View style={styles.card}>
         <Row label="ID tài khoản" value={String(user.id)} />
@@ -198,6 +206,9 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   linkSection: { gap: spacing.sm, marginTop: spacing.sm },
+  bookingSection: { gap: spacing.sm, padding: spacing.md, backgroundColor: colors.surface,
+    borderRadius: 12, borderWidth: 1, borderColor: colors.border },
+  bookingTitle: { fontSize: typography.body + 2, fontWeight: '700', color: colors.text },
   linkDescription: { color: colors.muted, fontSize: typography.body - 2 },
   row: {
     flexDirection: 'row',

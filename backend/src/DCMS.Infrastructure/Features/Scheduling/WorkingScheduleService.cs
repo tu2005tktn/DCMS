@@ -149,8 +149,10 @@ public sealed class WorkingScheduleService(DcmsDbContext db, TimeProvider clock)
         var members = await ActiveMembers(ct);
         if (!members.Any(x => x.BranchId == q.BranchId && x.EmployeeId == q.DentistId && x.CanDentist)
             || (q.AssistantId.HasValue && !members.Any(x => x.BranchId == q.BranchId && x.EmployeeId == q.AssistantId))) throw Error("MSG110");
-        var service = await db.Set<SchedulingService>().AsNoTracking().SingleOrDefaultAsync(x => x.Id == q.ServiceId && x.BranchId == q.BranchId && x.Active, ct);
-        if (service == null || (isPublic && service.PublicDurationMinutes != q.DurationMinutes)) throw Error("MSG110");
+        var service = q.ServiceId.HasValue
+            ? await db.Set<SchedulingService>().AsNoTracking().SingleOrDefaultAsync(x => x.Id == q.ServiceId && x.BranchId == q.BranchId && x.Active, ct)
+            : null;
+        if ((q.ServiceId.HasValue && service == null) || (isPublic && (service == null || service.PublicDurationMinutes != q.DurationMinutes))) throw Error("MSG110");
     }
     private async Task<AvailabilityResult> Query(AvailabilityQuery q, bool isPublic, ScheduleCommand? draft, CancellationToken ct)
     {
@@ -190,7 +192,7 @@ public sealed class WorkingScheduleService(DcmsDbContext db, TimeProvider clock)
         var end = start.AddMinutes(q.DurationMinutes); var minute = start.Hour * 60 + start.Minute; var day = q.Date.DayNumber - Monday(q.Date).DayNumber;
         if (start.Second != 0 || start.Ticks % TimeSpan.TicksPerSecond != 0 || minute % 15 != 0 || minute + q.DurationMinutes > 1440
             ) return Fail("MSG110");
-        if (isPublic && start < clock.GetUtcNow().AddMinutes(60)) return Fail("MSG25");
+        if (isPublic && start < clock.GetUtcNow().AddMinutes(60)) return Fail("MSG24");
         if (!ScheduleRules.Covers(data.MainPeriods, day, minute, minute + q.DurationMinutes)
             || (q.AssistantId.HasValue && !ScheduleRules.Covers(data.AssistantPeriods, day, minute, minute + q.DurationMinutes))) return Fail("MSG26");
         var overlaps = data.Occupied.Where(r => r.Id != exclude && r.Start < end && start < r.End).ToArray();

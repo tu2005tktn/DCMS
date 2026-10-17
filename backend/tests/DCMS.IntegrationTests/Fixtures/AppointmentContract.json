@@ -1,0 +1,52 @@
+{
+  "route": "POST /api/appointments",
+  "publicRequest": {
+    "branchId": 1,
+    "booker": { "name": "Nguyen Van A", "phone": "0912345678", "email": null },
+    "attendee": { "patientId": null, "name": "Nguyen Van B", "birthDate": "2000-01-02" },
+    "attendeeRelation": "Relative",
+    "kind": "Standard",
+    "source": "App",
+    "serviceId": 1,
+    "reason": "Kham rang",
+    "dentistId": 2,
+    "assistantId": null,
+    "chairId": null,
+    "startAt": "2030-01-07T09:00:00+07:00",
+    "durationMinutes": 30,
+    "followUpId": null,
+    "exceptionReason": null,
+    "requestKey": "329e2eb4-ac35-47eb-a7d4-c6704fc61b0c",
+    "scheduleVersion": 1,
+    "assistantScheduleVersion": null
+  },
+  "staffReasonOnlyRequest": {
+    "branchId": 1,
+    "booker": { "name": "Khach vang lai", "phone": "0912345678", "email": null },
+    "attendee": { "patientId": null, "name": "Nguoi kham", "birthDate": null },
+    "attendeeRelation": "Self",
+    "kind": "WalkIn",
+    "source": "InPerson",
+    "serviceId": null,
+    "reason": "Kham khan",
+    "dentistId": 2,
+    "assistantId": null,
+    "chairId": 3,
+    "startAt": "2030-01-07T09:00:00+07:00",
+    "durationMinutes": 15,
+    "followUpId": null,
+    "exceptionReason": "Ca gap duoc tiep nhan",
+    "requestKey": "f9988bea-bdb9-44b7-9dd9-ab2dcbdcb5ef",
+    "scheduleVersion": 1,
+    "assistantScheduleVersion": null
+  },
+  "createdResponse": {
+    "appointmentId": "bcc04642-5e10-4165-86cf-d89b7fa26358",
+    "code": "AP-BCC046425E10416586CFD89B7FA26358",
+    "version": 1,
+    "status": "Confirmed",
+    "startAt": "2030-01-07T02:00:00Z",
+    "endAt": "2030-01-07T02:30:00Z",
+    "notification": { "code": "MSG29", "message": "Đặt lịch thành công. Vui lòng lưu mã lịch hẹn để tra cứu." }
+  }
+}
