@@ -89,10 +89,27 @@ export async function startRealtime(token: string): Promise<void> {
     emitToast(payload);
   });
 
+  // S26+ — SignalR set connectionId sau khi start() resolve (race condition với skipNegotiation).
+  // Đăng ký callback để lưu lại khi có.
+  hub.onreconnected((id) => {
+    startedConnectionId = id ?? hub.connectionId ?? null;
+    // eslint-disable-next-line no-console
+    console.log('[realtime] reconnected', { connectionId: startedConnectionId });
+  });
+  hub.onreconnecting(() => {
+    // eslint-disable-next-line no-console
+    console.log('[realtime] reconnecting…');
+  });
+  hub.onclose((err) => {
+    // eslint-disable-next-line no-console
+    console.log('[realtime] closed', err?.message ?? '(no error)');
+  });
+
   try {
     await hub.start();
     connection = hub;
-    startedConnectionId = hub.connectionId ?? null;
+    // Đọc lại sau start() — thường giờ đã có.
+    startedConnectionId = hub.connectionId ?? startedConnectionId;
     lastToken = token;
     // eslint-disable-next-line no-console
     console.log('[realtime] connected', { connectionId: startedConnectionId });

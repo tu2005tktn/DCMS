@@ -79,26 +79,33 @@ export function RealtimeToast() {
         styles.container,
         { top: insets.top + spacing.sm, opacity },
       ]}
-      pointerEvents={toast.visible ? 'auto' : 'none'}
+      pointerEvents={toast.visible ? 'box-none' : 'none'}
     >
-      <Pressable
-        onPress={handlePress}
-        style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
-        accessibilityRole="button"
-        accessibilityLabel={`Thông báo: ${item.title}`}
-      >
-        <View style={styles.content}>
-          <View style={styles.header}>
-            <Text style={styles.label}>Thông báo mới</Text>
-            <View style={styles.dot} />
+      {/* S26+ — Tách nút đóng ra ngoài Pressable lớn để tránh nested-interactive (a11y warning). */}
+      <View style={styles.card} accessibilityRole="alert" accessibilityLabel={`Thông báo: ${item.title}`}>
+        <Pressable
+          onPress={handlePress}
+          style={({ pressed }) => [styles.cardPressable, pressed && styles.cardPressed]}
+        >
+          <View style={styles.content}>
+            <View style={styles.header}>
+              <Text style={styles.label}>Thông báo mới</Text>
+              <View style={styles.dot} />
+            </View>
+            <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
+            <Text style={styles.body} numberOfLines={2}>{item.body}</Text>
           </View>
-          <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
-          <Text style={styles.body} numberOfLines={2}>{item.body}</Text>
-        </View>
-        <Pressable onPress={hide} style={styles.close} hitSlop={12} accessibilityLabel="Đóng thông báo">
+        </Pressable>
+        <Pressable
+          onPress={hide}
+          style={({ pressed }) => [styles.close, pressed && styles.closePressed]}
+          hitSlop={12}
+          accessibilityRole="button"
+          accessibilityLabel="Đóng thông báo"
+        >
           <Text style={styles.closeText}>✕</Text>
         </Pressable>
-      </Pressable>
+      </View>
     </Animated.View>
   );
 }
@@ -113,7 +120,6 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
     borderRadius: 14,
-    padding: spacing.md,
     borderWidth: 1,
     borderColor: colors.primary,
     shadowColor: '#000',
@@ -124,7 +130,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: spacing.sm,
+    overflow: 'hidden',
   },
+  cardPressable: { flex: 1, padding: spacing.md },
   cardPressed: { opacity: 0.85 },
   content: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: 2 },
@@ -132,6 +140,7 @@ const styles = StyleSheet.create({
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.primary },
   title: { fontSize: typography.body, fontWeight: '700', color: colors.text },
   body: { fontSize: typography.caption + 1, color: colors.text, marginTop: 2 },
-  close: { padding: spacing.xs },
+  close: { padding: spacing.md, alignItems: 'center', justifyContent: 'center' },
+  closePressed: { opacity: 0.5 },
   closeText: { fontSize: 16, color: colors.muted },
 });
