@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { api, ApiError, onSessionLost, setAccessToken } from '../../services/api';
+import { api, ApiError, onSessionLost, readAccessToken, setAccessToken } from '../../services/api';
 
 export type CurrentUser = {
   id: number; userName: string; fullName: string; accountType: string; roles: string[];
@@ -15,10 +15,28 @@ const Context = createContext<AuthState | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [sessionMessage, setSessionMessage] = useState<string | null>(null);
+
+  // S26+ — đăng ký callback khi token hết hạn hoặc bị thu hồi.
   useEffect(() => {
-    onSessionLost(error => { setAccessToken(null); setUser(null); setSessionMessage(error.message); });
+    onSessionLost(error => { setUser(null); setSessionMessage(error.message); });
     return () => onSessionLost(undefined);
   }, []);
+
+  // S26+ — hydrate session khi F5: nếu sessionStorage còn accessToken thì thử lấy user.
+  // Nếu token hết hạn / sai, setAccessToken(null) đã được api.ts gọi → user = null.
+  useEffect(() => {
+    const token = readAccessToken();
+    if (!token) return;
+    let active = true;
+    api<CurrentUser>('/api/auth/me')
+      .then(me => { if (active) { setUser(me); setSessionMessage(null); } })
+      .catch(error => { if (active && error instanceof ApiError && error.status !== 401) {
+        // 401 đã được api.ts xử lý (xoá token + gọi sessionLost). Lỗi khác (0, 5xx) hiển thị nhẹ.
+        setSessionMessage('Không thể khôi phục phiên. Vui lòng đăng nhập lại.');
+      } });
+    return () => { active = false; };
+  }, []);
+
   async function refresh() { setUser(await api<CurrentUser>('/api/auth/me')); }
   useEffect(() => {
     if (!user) return;
@@ -27,6 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.addEventListener('focus', update);
     return () => { window.clearInterval(timer); window.removeEventListener('focus', update); };
   }, [user?.id]);
+
   async function signIn(userName: string, password: string) {
     const response = await api<{ accessToken: string; user: CurrentUser }>('/api/auth/sign-in',
       { method: 'POST', body: JSON.stringify({ userName, password }) }, false);

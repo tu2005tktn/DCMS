@@ -7,6 +7,9 @@ import { useSession } from '@/features/auth/session/useSession';
 import { ApiError } from '@/services/api/api-error';
 import { colors } from '@/theme/colors';
 import { bookingApi } from './booking.api';
+import { notificationMockRepo } from './notification.mock';
+import { notificationRepoPersist } from './notification.repo.persist';
+import { appointmentRepo } from './appointment.repo';
 import type { AvailabilitySlot, BookingOptions, BookingResult } from './booking.types';
 
 type Relation = 'Self' | 'Relative';
@@ -98,6 +101,40 @@ export default function BookingScreen() {
         assistantScheduleVersion: null,
       }, token);
       setResult(value); setStep(3);
+      // S26+ — fix bug "đặt lịch xong list trống" + "thông báo biến mất":
+      //  1. Inject appointment mới vào persist store để AppointmentHubScreen thấy ngay.
+      //  2. Tạo notification 'AppointmentBooked' qua persist repo (mock cũ không persist).
+      const accountId = state.status === 'authenticated' ? state.user.id : null;
+      const branch = options?.branches.find(x => x.id === branchId);
+      const dentist = options?.employees.find(x => x.id === dentistId);
+      const svc = options?.services.find(x => x.id === serviceId);
+      void appointmentRepo.addFromBooking(value, {
+        accountId,
+        bookerName: bookerName.trim(),
+        attendeeName: attendeeName.trim(),
+        branchName: branch?.name ?? '',
+        dentistName: dentist?.name ?? '',
+        serviceName: svc?.name ?? '',
+        durationMinutes: svc?.publicDurationMinutes ?? 0,
+        branchId: branchId ?? 0,
+        dentistId: dentistId ?? 0,
+        serviceId: serviceId ?? 0,
+      }).catch(err => console.warn('[BookingScreen] appointmentRepo.addFromBooking failed', err));
+      void notificationRepoPersist.create({
+        accountId,
+        kind: 'AppointmentBooked',
+        title: 'Đặt lịch thành công',
+        body: `Lịch khám ${value.code} đã được tạo. Trạng thái: ${value.status}.`,
+        appointmentId: value.appointmentId,
+        requestId: null,
+        deepLink: accountId !== null ? `/appointments/${value.appointmentId}` : null,
+        channels: accountId !== null ? ['InApp', 'Email'] : ['InApp'],
+        dedupeKey: `appt:${value.appointmentId}:booked`,
+      }).catch(err => console.warn('[BookingScreen] notification.create failed', err));
+      // Lập reminder 24h/2h cho account (recheck khi load lại trang này).
+      if (accountId !== null) {
+        void notificationMockRepo.rebuildRemindersForAppointment(value.appointmentId, value.version);
+      }
     } catch (e) {
       const code = e instanceof ApiError ? e.code : undefined;
       setError(e instanceof ApiError ? `${code ? `${code}: ` : ''}${e.message}` : 'Không thể kết nối máy chủ. Vui lòng thử lại.');

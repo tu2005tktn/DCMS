@@ -1,6 +1,8 @@
 using DCMS.Api.Features.Health;
 using DCMS.Api.Features.Scheduling;
 using DCMS.Api.Features.Appointments;
+using DCMS.Api.Features.Notifications;
+using DCMS.Api.Features.Realtime;
 using DCMS.Infrastructure;
 using System.Security.Claims;
 using System.Text;
@@ -9,9 +11,11 @@ using DCMS.Api.Features.Accounts;
 using DCMS.Api.Features.Authentication;
 using DCMS.Api.Features.PatientLinks;
 using DCMS.Api.Features.Patients;
+using DCMS.Infrastructure.Features.Notifications;
 using DCMS.Infrastructure.Features.PatientLinks;
 using DCMS.Application.Common;
 using DCMS.Application.Features.Authentication;
+using DCMS.Application.Features.Notifications;
 using DCMS.Domain.Features.Accounts;
 using DCMS.Infrastructure.Features.Accounts;
 using DCMS.Infrastructure.Persistence;
@@ -64,6 +68,18 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
         {
             context.Response.StatusCode = 403;
             return context.Response.WriteAsJsonAsync(SystemMessages.Get("MSG06"));
+        },
+        // S26+ — SignalR browser client không gửi Authorization header tuỳ ý được; cho phép
+        // negotiate kèm ?access_token=... (chỉ khi path là /hubs/*).
+        OnMessageReceived = context =>
+        {
+            var accessToken = context.Request.Query["access_token"];
+            var path = context.HttpContext.Request.Path;
+            if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
+            {
+                context.Token = accessToken;
+            }
+            return Task.CompletedTask;
         }
     };
 });
@@ -80,9 +96,23 @@ builder.Services.AddAuthorizationBuilder()
 
 var webOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 builder.Services.AddCors(options => options.AddPolicy("WebDevelopment", policy =>
-    policy.WithOrigins(webOrigins).AllowAnyHeader().AllowAnyMethod()));
+    policy.WithOrigins(webOrigins).AllowAnyHeader().AllowAnyMethod().AllowCredentials()));
+
+// S26+ — SignalR + notification. Đăng ký trước Build() để hub có thể inject.
+builder.Services.AddSignalR(options =>
+{
+    options.EnableDetailedErrors = builder.Environment.IsDevelopment();
+});
+builder.Services.AddSingleton<INotificationStore, InMemoryNotificationStore>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddSingleton<IRealtimeNotifier, SignalRRealtimeNotifier>();
 
 var app = builder.Build();
+
+// StaffBranchAccessor: hub join group staff:branch:{id} cho staff user. Cấu hình SAU Build()
+// vì cần app.Services.
+StaffBranchAccessor.Configure((accountId, context) =>
+    StaffBranchResolver.ResolveAsync(accountId, context, app.Services));
 
 if (args.Contains("--migrate") || args.Contains("--seed-demo"))
 {
@@ -119,6 +149,10 @@ app.MapPatientLinkEndpoints();
 app.MapPatientEndpoints();
 app.MapSchedulingEndpoints();
 app.MapAppointmentEndpoints();
+app.MapNotificationEndpoints();
+// S26+ SignalR: hub + test endpoint (chỉ Dev).
+app.MapHub<NotificationsHub>("/hubs/notifications");
+app.MapRealtimeEndpoints(isDevelopment: app.Environment.IsDevelopment());
 
 app.Run();
 

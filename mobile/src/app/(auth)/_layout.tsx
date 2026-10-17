@@ -18,7 +18,9 @@ export default function AuthLayout() {
     );
   }
   if (state.status === 'authenticated') {
-    return <Redirect href="/(account)/home" />;
+    // Đã đăng nhập mà lại vào route thuộc nhóm (auth) -> đẩy về menu trung tâm.
+    // Ở đó user sẽ thấy mục "Trang chủ tài khoản" mới xuất hiện.
+    return <Redirect href="/(home)/" />;
   }
   return <Stack screenOptions={{ headerTitle: 'Tài khoản' }} />;
 }
