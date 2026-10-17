@@ -8,7 +8,7 @@
  *  - Liên kết S02 (đăng ký) + S03 (khôi phục) — chỉ là link navigation, S02/S03 ngoài scope.
  *  - Lỗi sai hiển thị thông báo chung (MSG09), không phân biệt username hay password.
  *  - Loading: chặn submit, hiển thị FormError khi lỗi mạng.
- *  - Thành công -> trang tài khoản; từ đó người dùng Public mở S07 khi cần.
+ *  - Thành công -> về menu trung tâm (/(home)); "Trang chủ tài khoản" tự xuất hiện.
  *
  * Lưu ý cảnh báo thay đổi chưa lưu: SignInScreen không có form dirty state nên không cần chặn
  * sign-out. PatientData, v.v. sẽ dùng useUnsavedChanges() riêng.
@@ -57,7 +57,9 @@ export default function SignInScreen() {
   const handleSignIn = useCallback(
     async (snapshot: SessionSnapshot) => {
       await signIn(snapshot);
-      router.replace('/(account)/home');
+      // Sau khi đăng nhập, về menu trung tâm — "Trang chủ tài khoản" sẽ tự xuất hiện
+      // trong menu vì lúc này session đã authenticated.
+      router.replace('/(home)/' as never);
     },
     [signIn, router],
   );

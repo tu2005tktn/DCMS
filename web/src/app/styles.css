@@ -43,3 +43,21 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }
 .patient-tag { margin-left: 8px; }
 @media (max-width: 900px) { .patient-filters { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 680px) { .patient-filters, .patient-form-grid { grid-template-columns: 1fr; } .patient-banner-row { flex-direction: column; } }
+
+/* Public customer portal */
+.customer-links { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.customer-or { text-align: center; margin: 24px 0 12px !important; color: #667085; }
+.customer-google { display: grid; justify-items: center; gap: 12px; }
+.customer-shell { min-height: 100vh; }
+.customer-header { min-height: 64px; background: #fff; border-bottom: 1px solid #edf0f5; padding: 0 32px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.customer-content { width: min(100%, 960px); margin: 0 auto; padding: 32px; box-sizing: border-box; }
+.customer-home { max-width: 680px; margin: 0 auto; }
+.customer-booking .ant-steps { margin-bottom: 24px; }
+.customer-back { margin-bottom: 12px; }
+.customer-field { display: block; width: 100%; margin-top: 6px; }
+.customer-booking label { display: block; font-weight: 600; }
+.customer-booking label .ant-input, .customer-booking label .ant-input-textarea { margin-top: 6px; }
+.customer-slots { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.customer-loading { height: 120px; }
+.customer-link-details { margin-top: 16px; }
+@media (max-width: 680px) { .customer-header { padding: 0 16px; } .customer-content { padding: 16px; } .customer-booking .ant-steps-item-title { font-size: 12px; } }

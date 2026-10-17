@@ -8,23 +8,50 @@ import WorkingSchedulesPage from '../features/working-schedules/WorkingSchedules
 import LinkVerificationPage from '../features/patient-links/LinkVerificationPage';
 import PatientSearchPage from '../features/patients/PatientSearchPage';
 import PatientProfilePage from '../features/patients/PatientProfilePage';
+import SupportInboxPage from '../features/support-inbox/SupportInboxPage';
 import { roleLabels } from '../features/accounts/types';
 import HealthStatus from '../features/HealthStatus';
+import { AccessPage, CustomerGuard, CustomerHomePage, CustomerRegisterPage, CustomerShell, CustomerSignInPage } from '../features/customer-auth/CustomerPages';
+import { useCustomerAuth } from '../features/customer-auth/CustomerAuthContext';
+import CustomerBookingPage from '../features/customer-booking/CustomerBookingPage';
+import CustomerPatientLinkPage from '../features/customer-patient-link/CustomerPatientLinkPage';
 
 export default function App() {
   return <Routes>
     <Route path="/sign-in" element={<SignInPage />} />
+    <Route path="/access" element={<AccessPage />} />
+    <Route path="/customer/sign-in" element={<CustomerSignInPage />} />
+    <Route path="/customer/register" element={<CustomerRegisterPage />} />
+    <Route path="/customer/book" element={<CustomerBookingPage />} />
+    <Route path="/customer" element={<CustomerGuard><CustomerShell /></CustomerGuard>}>
+      <Route index element={<Navigate to="/customer/home" replace />} />
+      <Route path="home" element={<CustomerHomePage />} />
+      <Route path="patient-link" element={<CustomerPatientLinkPage />} />
+    </Route>
+    <Route path="/customer/*" element={<Result status="404" title="Không tìm thấy trang" extra={<Link to="/customer/home">Về trang chủ</Link>} />} />
     <Route path="/health" element={<HealthStatus />} />
-    <Route element={<Protected><Workspace /></Protected>}>
+    <Route element={<Entry />}>
       <Route index element={<Home />} />
+    </Route>
+    <Route element={<Protected><Workspace /></Protected>}>
       <Route path="working-schedules" element={<WorkingSchedulesPage />} />
       <Route path="accounts" element={<Protected permission="accounts.manage"><AccountsPage /></Protected>} />
       <Route path="patients" element={<Protected permission="patients.read"><PatientSearchPage /></Protected>} />
       <Route path="patients/:id" element={<Protected permission="patients.read"><PatientProfilePage /></Protected>} />
       <Route path="link-verification" element={<Protected permission="patient-links.verify"><LinkVerificationPage /></Protected>} />
+      <Route path="support-inbox" element={<Protected permission="appointments.support.handle"><SupportInboxPage /></Protected>} />
       <Route path="*" element={<Result status="404" title="Không tìm thấy trang" extra={<Link to="/">Về trang chủ</Link>} />} />
     </Route>
   </Routes>;
+}
+
+function Entry() {
+  const staff = useAuth();
+  const customer = useCustomerAuth();
+  if (staff.user) return <Workspace />;
+  if (customer.state.status === 'initializing') return <main className="page"><Typography.Text>Đang kiểm tra phiên…</Typography.Text></main>;
+  if (customer.state.status === 'authenticated') return <Navigate to="/customer/home" replace />;
+  return <Navigate to="/access" replace />;
 }
 
 function Protected({ children, permission }: { children: ReactNode; permission?: string }) {
@@ -41,7 +68,7 @@ function Workspace() {
   const [error, setError] = useState<string | null>(null);
   async function signOut() {
     setBusy(true); setError(null);
-    try { await auth.signOut(); } catch (failure) { setError((failure as Error).message); }
+    try { await auth.signOut(); window.location.replace('/sign-in'); } catch (failure) { setError((failure as Error).message); }
     finally { setBusy(false); }
   }
   return <Layout className="workspace">
@@ -49,6 +76,7 @@ function Workspace() {
       <Space><Typography.Text>{auth.user?.fullName}</Typography.Text><Button loading={busy} onClick={() => void signOut()}>Đăng xuất</Button></Space></Layout.Header>
     <Menu mode="horizontal" selectedKeys={[location.pathname.startsWith('/patients') ? '/patients' : location.pathname]} items={[
       ...(auth.user?.accountType === 'Staff' ? [{ key: '/working-schedules', label: <Link to="/working-schedules">Lịch làm việc</Link> }] : []),
+      ...(auth.user?.permissions.includes('appointments.support.handle') ? [{ key: '/support-inbox', label: <Link to="/support-inbox">Hộp thư hỗ trợ</Link> }] : []),
       { key: '/', label: <Link to="/">Tài khoản của tôi</Link> },
       ...(auth.user?.permissions.includes('accounts.manage') ? [{ key: '/accounts', label: <Link to="/accounts">Quản lý tài khoản</Link> }] : []),
       ...(auth.user?.permissions.includes('patients.read') ? [{ key: '/patients', label: <Link to="/patients">Bệnh nhân</Link> }] : []),

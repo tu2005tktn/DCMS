@@ -22,6 +22,9 @@ export const SessionContext = createContext<SessionContextValue | undefined>(und
 
 const REFRESH_INTERVAL_MS = 30_000;
 
+// eslint-disable-next-line no-console
+const debug = (...args: unknown[]) => console.log('[SessionProvider]', ...args);
+
 interface SessionProviderProps extends PropsWithChildren {
   /**
    * Bật auto refresh. Mặc định bật; tắt để test/SSR.
@@ -157,15 +160,23 @@ export function SessionProvider({ children, enableAutoRefresh = true }: SessionP
 
   const signOut = useCallback<SessionContextValue['signOut']>(async (reason = 'user') => {
     const current = state;
+    debug('signOut called', { reason, status: current.status });
     if (current.status === 'authenticated') {
       try {
-        await signInApi.signOut(current.accessToken);
-      } catch {
-        // ignore
+        const result = await signInApi.signOut(current.accessToken);
+        debug('signOut API response', { revoked: result.revoked, status: result.status });
+      } catch (error) {
+        // ignore — vẫn phải clear local để bảo vệ tài khoản
+        debug('signOut API error (continuing)', error);
       }
     }
-    await tokenStorage.clear();
+    try {
+      await tokenStorage.clear();
+    } catch (e) {
+      debug('tokenStorage.clear error', e);
+    }
     setState({ status: 'anonymous' });
+    debug('state -> anonymous');
     // Lý do có thể được UI dùng để hiển thị thông báo (ví dụ "Phiên đã hết hạn").
     if (reason === 'expired' || reason === 'role-revoked') {
       // Đẩy thông báo qua global event — screen đang hiển thị sẽ tự subscribe nếu cần.

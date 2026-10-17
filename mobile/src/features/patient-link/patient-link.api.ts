@@ -8,8 +8,8 @@ export class LinkApiError extends ApiError {
   constructor(message: string, status: number, public readonly code: string) { super(message, status); }
 }
 
-// The S01 session token is passed explicitly by the caller.
-async function call<T>(path: string, token: string | null, init: RequestInit = {}): Promise<T> {
+// Every S07 operation uses the access token from the shared S01 session.
+async function call<T>(path: string, token: string, init: RequestInit = {}): Promise<T> {
   const headers: Record<string, string> = { Accept: 'application/json' };
   if (init.body) headers['Content-Type'] = 'application/json';
   if (token) headers.Authorization = `Bearer ${token}`;

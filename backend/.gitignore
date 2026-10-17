@@ -1,0 +1,15 @@
+# Transient build outputs từ `dotnet run` / `dotnet test` redirect
+api.out
+api.err
+
+# Local .NET artifacts
+bin/
+obj/
+*.user
+.vs/
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
