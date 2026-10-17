@@ -6,7 +6,7 @@ if (-not (Test-Path -LiteralPath $environmentFile)) {
 }
 $settings = @{}
 foreach ($line in Get-Content -LiteralPath $environmentFile) {
-    if ($line -match '^\s*(POSTGRES_DB|POSTGRES_USER|POSTGRES_PASSWORD|POSTGRES_PORT|JWT_SIGNING_KEY|DEV_SEED_PASSWORD|GOOGLE_WEB_CLIENT_ID)=(.*)$') {
+    if ($line -match '^\s*(POSTGRES_DB|POSTGRES_USER|POSTGRES_PASSWORD|POSTGRES_PORT|JWT_SIGNING_KEY|DEV_SEED_PASSWORD|GOOGLE_WEB_CLIENT_ID|SMTP_HOST|SMTP_PORT|SMTP_ENABLE_SSL|SMTP_USERNAME|SMTP_PASSWORD|SMTP_FROM_ADDRESS|SMTP_FROM_NAME)=(.*)$') {
         $settings[$Matches[1]] = $Matches[2].Trim()
     }
 }
@@ -23,5 +23,9 @@ $env:ConnectionStrings__DefaultConnection = $connection.ConnectionString
 if ($settings['JWT_SIGNING_KEY']) { $env:Jwt__SigningKey = $settings['JWT_SIGNING_KEY'] }
 if ($settings['DEV_SEED_PASSWORD']) { $env:DevSeed__Password = $settings['DEV_SEED_PASSWORD'] }
 if ($settings['GOOGLE_WEB_CLIENT_ID']) { $env:Google__WebClientId = $settings['GOOGLE_WEB_CLIENT_ID'] }
+# Optional SMTP for S03 recovery email; values stay in the untracked .env.
+$smtp = @{ SMTP_HOST = 'Host'; SMTP_PORT = 'Port'; SMTP_ENABLE_SSL = 'EnableSsl'; SMTP_USERNAME = 'UserName'
+    SMTP_PASSWORD = 'Password'; SMTP_FROM_ADDRESS = 'FromAddress'; SMTP_FROM_NAME = 'FromName' }
+foreach ($key in $smtp.Keys) { if ($settings[$key]) { Set-Item -Path "env:Smtp__$($smtp[$key])" -Value $settings[$key] } }
 $localDotnet = Join-Path $repositoryRoot '.tools\dotnet\dotnet.exe'
 $dotnet = if (Test-Path -LiteralPath $localDotnet) { $localDotnet } else { 'dotnet' }
