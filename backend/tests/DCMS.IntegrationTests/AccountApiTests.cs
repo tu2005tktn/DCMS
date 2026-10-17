@@ -29,7 +29,7 @@ using Xunit;
 
 namespace DCMS.IntegrationTests;
 
-public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
+public class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
 {
     public string Password { get; } = "Aa1!" + Convert.ToBase64String(RandomNumberGenerator.GetBytes(36));
     private readonly string schema = "dcms_test_" + Guid.NewGuid().ToString("N");
@@ -82,6 +82,12 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
         db.PatientAccountLinks.Add(link);
         await db.SaveChangesAsync();
         sentinel = (patient.Id, link.Id, await db.Patients.CountAsync(), await db.PatientAccountLinks.CountAsync());
+        // Clinical sentinel stays test-only until the medical record module is implemented.
+        await using var clinicalSentinel = new NpgsqlCommand("""
+            CREATE TABLE "MEDICAL_RECORD" ("Id" integer PRIMARY KEY, "Content" text NOT NULL);
+            INSERT INTO "MEDICAL_RECORD" VALUES (1, 'SYNTHETIC clinical sentinel');
+            """, connection);
+        await clinicalSentinel.ExecuteNonQueryAsync();
     }
 
     private (int PatientId, int LinkId, int Patients, int Links) sentinel;
@@ -94,6 +100,15 @@ public sealed class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
         Assert.Equal("SYNTHETIC patient sentinel", (await db.Patients.AsNoTracking().SingleAsync(x => x.Id == sentinel.PatientId)).FullName);
         Assert.Equal(sentinel.Links, await db.PatientAccountLinks.CountAsync());
         Assert.Equal(PatientLinkStatus.Revoked, (await db.PatientAccountLinks.AsNoTracking().SingleAsync(x => x.Id == sentinel.LinkId)).Status);
+        await using var connection = new NpgsqlConnection(Connection);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand("""
+            SELECT count(*), min("Content") FROM "MEDICAL_RECORD"
+            """, connection);
+        await using var result = await command.ExecuteReaderAsync();
+        Assert.True(await result.ReadAsync());
+        Assert.Equal(1L, result.GetInt64(0));
+        Assert.Equal("SYNTHETIC clinical sentinel", result.GetString(1));
     }
 
     async Task IAsyncLifetime.DisposeAsync() { await DisposeAsync(); }
@@ -116,7 +131,7 @@ public sealed class AccountApiTests(ApiFixture fixture) : IClassFixture<ApiFixtu
     {
         var suffix = Guid.NewGuid().ToString("N")[..12];
         var response = await admin.PostAsJsonAsync("/api/accounts", new CreateStaffRequest("test." + suffix,
-            fixture.Password, "Nhân viên kiểm thử", "TEST-" + suffix, null, null, roles ?? [AccountRoles.Dentist]));
+            fixture.Password, "Nhân viên kiểm thử", "TEST-" + suffix, suffix + "@example.invalid", null, roles ?? [AccountRoles.Dentist]));
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var result = (await response.Content.ReadFromJsonAsync<AccountChange>())!;
         Assert.Equal("MSG14", result.Notification.Code);
@@ -127,11 +142,11 @@ public sealed class AccountApiTests(ApiFixture fixture) : IClassFixture<ApiFixtu
         admin.PutAsJsonAsync($"/api/accounts/{account.Id}", new UpdateStaffRequest(account.Version, account.UserName,
             account.FullName, account.Email, account.Phone, roles, "Kiểm thử đổi vai trò"));
 
-    private static async Task AssertMessage(HttpResponseMessage response, HttpStatusCode status, string code)
+    private static async Task AssertMessage(HttpResponseMessage response, HttpStatusCode status, string code, string field = "Thông tin")
     {
         Assert.Equal(status, response.StatusCode);
         var message = (await response.Content.ReadFromJsonAsync<SystemMessage>())!;
-        Assert.Equal(SystemMessages.Get(code).Message, message.Message);
+        Assert.Equal(SystemMessages.Get(code, field).Message, message.Message);
         Assert.Equal(code, message.Code);
     }
 
@@ -227,7 +242,7 @@ public sealed class AccountApiTests(ApiFixture fixture) : IClassFixture<ApiFixtu
     {
         var (admin, _) = await Login();
         var account = await Create(admin);
-        var duplicate = new CreateStaffRequest(account.UserName.ToUpperInvariant(), fixture.Password, "Duplicate", "OTHER-" + account.Id, null, null, [AccountRoles.Dentist]);
+        var duplicate = new CreateStaffRequest(account.UserName.ToUpperInvariant(), fixture.Password, "Duplicate", "OTHER-" + account.Id, "duplicate-" + account.Id + "@example.invalid", null, [AccountRoles.Dentist]);
         await AssertMessage(await admin.PostAsJsonAsync("/api/accounts", duplicate), HttpStatusCode.Conflict, "MSG139");
         var uniqueName = "test." + Guid.NewGuid().ToString("N")[..12];
         await AssertMessage(await admin.PostAsJsonAsync("/api/accounts", duplicate with { UserName = uniqueName, EmployeeCode = account.EmployeeCode! }), HttpStatusCode.Conflict, "MSG139");
@@ -267,7 +282,8 @@ public sealed class AccountApiTests(ApiFixture fixture) : IClassFixture<ApiFixtu
         foreach (var roles in new[] { new[] { AccountRoles.Patient }, new[] { AccountRoles.Guest }, new[] { "Unknown" }, Array.Empty<string>() })
             await AssertMessage(await Update(admin, account, roles), HttpStatusCode.Forbidden, "MSG06");
         var guest = (await admin.GetFromJsonAsync<AccountPage>("/api/accounts?search=guest.demo"))!.Items.Single();
-        await AssertMessage(await Update(admin, guest, [AccountRoles.Admin]), HttpStatusCode.Forbidden, "MSG06");
+        await AssertMessage(await admin.PutAsJsonAsync($"/api/accounts/{guest.Id}", new UpdateStaffRequest(guest.Version,
+            guest.UserName, guest.FullName, "guest-edit@example.invalid", null, [AccountRoles.Admin], "Denied")), HttpStatusCode.Forbidden, "MSG06");
         var locked = await admin.PutAsJsonAsync($"/api/accounts/{guest.Id}/state", new AccountStateRequest(guest.Version, true, "Public lock"));
         var revised = (await locked.Content.ReadFromJsonAsync<AccountChange>())!.Account;
         Assert.Equal(HttpStatusCode.OK, (await admin.PutAsJsonAsync($"/api/accounts/{guest.Id}/state", new AccountStateRequest(revised.Version, false, "Public unlock"))).StatusCode);
@@ -281,7 +297,7 @@ public sealed class AccountApiTests(ApiFixture fixture) : IClassFixture<ApiFixtu
     public async Task MalformedInputAndWeakPasswordUseSpecifiedMessages()
     {
         var (admin, _) = await Login();
-        var request = new CreateStaffRequest("not valid", fixture.Password, "Invalid", "INVALID", null, null, [AccountRoles.Dentist]);
+        var request = new CreateStaffRequest("not valid", fixture.Password, "Invalid", "INVALID", "invalid@example.invalid", null, [AccountRoles.Dentist]);
         var malformed = await admin.PostAsJsonAsync("/api/accounts", request);
         Assert.Equal(HttpStatusCode.BadRequest, malformed.StatusCode);
         Assert.Equal("MSG04", (await malformed.Content.ReadFromJsonAsync<SystemMessage>())!.Code);
@@ -327,11 +343,16 @@ public sealed class AccountApiTests(ApiFixture fixture) : IClassFixture<ApiFixtu
         var (admin, _) = await Login();
         var target = await Create(admin);
         var (dentist, _) = await Login("dentist.demo");
-        foreach (var client in new[] { fixture.CreateClient(), dentist })
+        var (guest, _) = await Login("guest.demo");
+        var (owner, _) = await Login("owner.demo");
+        var (assistant, _) = await Login("assistant.demo");
+        foreach (var client in new[] { fixture.CreateClient(), dentist, guest, owner, assistant })
         {
             var status = client.DefaultRequestHeaders.Authorization == null ? HttpStatusCode.Unauthorized : HttpStatusCode.Forbidden;
             var code = status == HttpStatusCode.Unauthorized ? "MSG07" : "MSG06";
             await AssertMessage(await client.GetAsync("/api/accounts/roles"), status, code);
+            await AssertMessage(await client.GetAsync("/api/accounts/catalog"), status, code);
+            await AssertMessage(await client.GetAsync($"/api/accounts/{target.Id}"), status, code);
             await AssertMessage(await client.GetAsync($"/api/accounts/{target.Id}/audit"), status, code);
             await AssertMessage(await Update(client, target, [AccountRoles.Admin]), status, code);
             await AssertMessage(await client.PostAsJsonAsync("/api/accounts", new CreateStaffRequest("denied.account", fixture.Password,
@@ -352,5 +373,141 @@ public sealed class AccountApiTests(ApiFixture fixture) : IClassFixture<ApiFixtu
             .Select(x => new { x.Id, x.PasswordHash, x.Version, x.IsActive }).ToArrayAsync();
         Assert.Equal(before, after);
         Assert.Equal(auditCount, await db.AccountAudits.CountAsync());
+    }
+
+    [Fact]
+    public async Task ListSearchesCodeNameEmailPhoneAndFiltersAssignedRoleAndStateWithServerSorting()
+    {
+        var (admin, _) = await Login();
+        var first = await Create(admin, [AccountRoles.ClinicOwner]);
+        var phone = "+" + RandomNumberGenerator.GetInt32(100000000, 999999999).ToString() + "77";
+        var response = await admin.PutAsJsonAsync($"/api/accounts/{first.Id}", new UpdateStaffRequest(first.Version,
+            first.UserName, "S04-list-" + first.Id, first.Email, phone, first.Roles, "Search setup"));
+        first = (await response.Content.ReadFromJsonAsync<AccountChange>())!.Account;
+        foreach (var term in new[] { first.Id.ToString(), first.EmployeeCode!, first.FullName, first.Email!, phone.Insert(4, "-") })
+        {
+            var found = (await admin.GetFromJsonAsync<AccountPage>($"/api/accounts?search={Uri.EscapeDataString(term)}"))!;
+            Assert.Contains(found.Items, account => account.Id == first.Id);
+        }
+        var owners = (await admin.GetFromJsonAsync<AccountPage>($"/api/accounts?search={first.UserName}&role=ClinicOwner&status=Active"))!;
+        Assert.Single(owners.Items);
+        var dentist = (await admin.GetFromJsonAsync<AccountPage>($"/api/accounts?search={first.UserName}&role=Dentist"))!;
+        Assert.Empty(dentist.Items); // Role filter means assigned roles, not inherited capabilities.
+        var locked = (await admin.GetFromJsonAsync<AccountPage>($"/api/accounts?search={first.UserName}&status=Locked"))!;
+        Assert.Empty(locked.Items);
+        await admin.PutAsJsonAsync($"/api/accounts/{first.Id}/state", new AccountStateRequest(first.Version, true, "Filter test"));
+        locked = (await admin.GetFromJsonAsync<AccountPage>($"/api/accounts?search={first.UserName}&status=Locked"))!;
+        Assert.Single(locked.Items);
+        var page1 = (await admin.GetFromJsonAsync<AccountPage>("/api/accounts?sortBy=fullName&sortDirection=asc&pageSize=2"))!;
+        var page2 = (await admin.GetFromJsonAsync<AccountPage>("/api/accounts?sortBy=fullName&sortDirection=asc&pageSize=2&page=2"))!;
+        Assert.Equal(page1.Total, page2.Total);
+        Assert.Empty(page1.Items.Select(x => x.Id).Intersect(page2.Items.Select(x => x.Id)));
+        var descending = (await admin.GetFromJsonAsync<AccountPage>("/api/accounts?sortBy=id&sortDirection=desc&pageSize=2"))!;
+        Assert.True(descending.Items[0].Id > descending.Items[1].Id);
+        foreach (var field in new[] { "employeeCode", "userName", "email", "phone", "isActive", "updatedAt" })
+            Assert.Equal(HttpStatusCode.OK, (await admin.GetAsync($"/api/accounts?sortBy={field}&sortDirection=desc&pageSize=1")).StatusCode);
+    }
+
+    [Fact]
+    public async Task InvalidListQueriesAndMissingDetailUseSpecifiedMessages()
+    {
+        var (admin, _) = await Login();
+        foreach (var (query, field) in new[] { ("role=Unknown", "Vai trò"), ("status=Deleted", "Trạng thái"),
+            ("sortBy=PasswordHash", "Sắp xếp"), ("sortDirection=sideways", "Sắp xếp"), ("page=0", "Phân trang hoặc tìm kiếm"),
+            ("pageSize=101", "Phân trang hoặc tìm kiếm"), ("search=" + new string('a', 161), "Phân trang hoặc tìm kiếm") })
+            await AssertMessage(await admin.GetAsync("/api/accounts?" + query), HttpStatusCode.BadRequest, "MSG04", field);
+        await AssertMessage(await admin.GetAsync("/api/accounts/2147483647"), HttpStatusCode.NotFound, "MSG01");
+        await AssertMessage(await admin.GetAsync("/api/accounts/2147483647/audit"), HttpStatusCode.NotFound, "MSG01");
+    }
+
+    [Fact]
+    public async Task DetailAndAuditHaveActorAndDatesWithoutCredentialsAndNoWriteAuditEndpoint()
+    {
+        var (admin, _) = await Login();
+        var account = await Create(admin);
+        var response = await admin.GetAsync($"/api/accounts/{account.Id}");
+        var detail = (await response.Content.ReadFromJsonAsync<AccountDto>())!;
+        Assert.Equal(account.Id, detail.Id); Assert.Equal(account.Version, detail.Version);
+        Assert.Equal(account.Email, detail.Email); Assert.Equal(account.Roles, detail.Roles);
+        Assert.NotEqual(default, detail.CreatedAt); Assert.Equal(detail.CreatedAt, detail.UpdatedAt);
+        var raw = await response.Content.ReadAsStringAsync();
+        Assert.DoesNotContain("password", raw, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("token", raw, StringComparison.OrdinalIgnoreCase);
+        var audit = (await admin.GetFromJsonAsync<AccountAuditDto[]>($"/api/accounts/{account.Id}/audit"))!;
+        Assert.Single(audit); Assert.Equal("admin.demo", audit[0].ActorUserName); Assert.NotEmpty(audit[0].ActorFullName);
+        Assert.DoesNotContain(fixture.Password, audit[0].AfterJson);
+        Assert.DoesNotContain("PasswordHash", audit[0].AfterJson);
+        Assert.Equal(HttpStatusCode.MethodNotAllowed, (await admin.PutAsJsonAsync($"/api/accounts/{account.Id}/audit", new { reason = "Forbidden" })).StatusCode);
+    }
+
+    [Theory]
+    [InlineData(AccountRoles.Admin)]
+    [InlineData(AccountRoles.Dentist)]
+    [InlineData(AccountRoles.ClinicAssistant)]
+    [InlineData(AccountRoles.ClinicOwner)]
+    public async Task AdminCanCreateEachStaffRoleWithoutAffectingPatientRecords(string role)
+    {
+        var (admin, _) = await Login();
+        Assert.Equal([role], (await Create(admin, [role])).Roles);
+        await fixture.AssertPatientUnchangedAsync();
+    }
+
+    [Fact]
+    public async Task DuplicateNormalizedContactsAreRejectedOnCreateAndUpdateWithNoPartialAudit()
+    {
+        var (admin, _) = await Login();
+        var original = await Create(admin);
+        var suffix = Guid.NewGuid().ToString("N")[..12];
+        var duplicate = new CreateStaffRequest("contact." + suffix, fixture.Password, "Duplicate contact", "CONTACT-" + suffix,
+            " " + original.Email!.ToUpperInvariant() + " ", null, [AccountRoles.Dentist]);
+        await AssertMessage(await admin.PostAsJsonAsync("/api/accounts", duplicate), HttpStatusCode.Conflict, "MSG139");
+        var other = await Create(admin);
+        await AssertMessage(await admin.PutAsJsonAsync($"/api/accounts/{other.Id}", new UpdateStaffRequest(other.Version,
+            other.UserName, other.FullName, original.Email, null, other.Roles, "Duplicate email")), HttpStatusCode.Conflict, "MSG139");
+        var phone = "+" + RandomNumberGenerator.GetInt32(100000000, 999999999) + "88";
+        var changed = await admin.PutAsJsonAsync($"/api/accounts/{original.Id}", new UpdateStaffRequest(original.Version,
+            original.UserName, original.FullName, original.Email, phone, original.Roles, "Phone setup"));
+        original = (await changed.Content.ReadFromJsonAsync<AccountChange>())!.Account;
+        await AssertMessage(await admin.PostAsJsonAsync("/api/accounts", duplicate with { Email = null, Phone = phone.Insert(4, "- ") }), HttpStatusCode.Conflict, "MSG139");
+        await AssertMessage(await admin.PutAsJsonAsync($"/api/accounts/{other.Id}", new UpdateStaffRequest(other.Version,
+            other.UserName, other.FullName, null, phone.Insert(3, " (" ) + ")", other.Roles, "Duplicate phone")), HttpStatusCode.Conflict, "MSG139");
+        Assert.Equal(HttpStatusCode.OK, (await Update(admin, original, original.Roles)).StatusCode); // Own contact is allowed.
+        var audit = (await admin.GetFromJsonAsync<AccountAuditDto[]>($"/api/accounts/{other.Id}/audit"))!;
+        Assert.Single(audit);
+        Assert.Equal(other.Version, (await admin.GetFromJsonAsync<AccountDto>($"/api/accounts/{other.Id}"))!.Version);
+    }
+
+    [Fact]
+    public async Task ConcurrentDuplicateContactsCommitOnlyOneAccount()
+    {
+        var (admin, _) = await Login(); var (second, _) = await Login();
+        var suffix = Guid.NewGuid().ToString("N")[..12];
+        var first = new CreateStaffRequest("race.a." + suffix, fixture.Password, "Race", "RACE-A-" + suffix,
+            suffix + "@example.invalid", null, [AccountRoles.Dentist]);
+        var results = await Task.WhenAll(admin.PostAsJsonAsync("/api/accounts", first),
+            second.PostAsJsonAsync("/api/accounts", first with { UserName = "race.b." + suffix, EmployeeCode = "RACE-B-" + suffix }));
+        Assert.Single(results, x => x.StatusCode == HttpStatusCode.Created);
+        var denied = Assert.Single(results, x => x.StatusCode != HttpStatusCode.Created);
+        Assert.Equal(HttpStatusCode.Conflict, denied.StatusCode);
+        Assert.Contains((await denied.Content.ReadFromJsonAsync<SystemMessage>())!.Code, new[] { "MSG139", "MSG111" });
+        Assert.Equal(1, (await admin.GetFromJsonAsync<AccountPage>($"/api/accounts?search={suffix}@example.invalid"))!.Total);
+    }
+
+    [Fact]
+    public async Task ContactRequiredValidationAndConfirmationFlagsRemainUnverified()
+    {
+        var (admin, _) = await Login();
+        var suffix = Guid.NewGuid().ToString("N")[..12];
+        var request = new CreateStaffRequest("required." + suffix, fixture.Password, "Required", "REQ-" + suffix, null, null, [AccountRoles.Dentist]);
+        await AssertMessage(await admin.PostAsJsonAsync("/api/accounts", request), HttpStatusCode.BadRequest, "MSG02", "Email hoặc số điện thoại");
+        await AssertMessage(await admin.PostAsJsonAsync("/api/accounts", request with { Email = "not-email" }), HttpStatusCode.BadRequest, "MSG04", "Email");
+        await AssertMessage(await admin.PostAsJsonAsync("/api/accounts", request with { Phone = "letters1234" }), HttpStatusCode.BadRequest, "MSG04", "Số điện thoại");
+        await AssertMessage(await admin.PostAsJsonAsync("/api/accounts", request with { Phone = "-------" }), HttpStatusCode.BadRequest, "MSG04", "Số điện thoại");
+        var response = await admin.PostAsJsonAsync("/api/accounts", request with { Email = suffix + "@example.invalid" });
+        var account = (await response.Content.ReadFromJsonAsync<AccountChange>())!.Account;
+        using var scope = fixture.Services.CreateScope();
+        var user = await scope.ServiceProvider.GetRequiredService<DcmsDbContext>().Users.SingleAsync(x => x.Id == account.Id);
+        Assert.False(user.EmailConfirmed); Assert.False(user.PhoneNumberConfirmed);
+        await fixture.AssertPatientUnchangedAsync();
     }
 }

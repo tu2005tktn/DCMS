@@ -7,6 +7,12 @@ public static class SystemMessages
 {
     public static SystemMessage Get(string code, string field = "Thông tin", int maxLength = 0, string? value = null) => new(code, code switch
     {
+        "MSG25" => "Khung giờ bạn chọn không còn khả dụng. Vui lòng chọn khung giờ khác.",
+        "MSG27" => "Thời gian này trùng với lịch hẹn đã có. Vui lòng chọn giờ khác.",
+        "MSG28" => "Khung giờ này đã hết chỗ. Vui lòng chọn giờ khác.",
+        "MSG38" => "Thay đổi này ảnh hưởng đến các lịch hẹn đã xác nhận. Vui lòng xử lý các lịch liên quan trước khi cập nhật.",
+        "MSG39" => "Đã cập nhật lịch làm việc. Hệ thống sẽ hiển thị các khung giờ đặt lịch phù hợp.",
+        "MSG110" => "Giờ làm việc hoặc giờ nghỉ chưa hợp lệ. Vui lòng kiểm tra thời gian bắt đầu, kết thúc và các khoảng bị trùng.",
         "MSG01" => "Không tìm thấy kết quả phù hợp.",
         "MSG02" => $"Vui lòng nhập {field}.",
         "MSG03" => $"{field} không được vượt quá {maxLength} ký tự.",

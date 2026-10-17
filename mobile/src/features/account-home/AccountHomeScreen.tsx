@@ -1,41 +1,28 @@
 import { useRouter } from 'expo-router';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
-import { useSession } from '@/features/auth/session/useSession';
-import { useSignOut } from '@/features/auth/sign-in/hooks/useSignOut';
+import { useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
+import { useSession } from '@/features/auth/session/useSession';
 import { colors } from '@/theme/colors';
 import { spacing } from '@/theme/spacing';
 import { typography } from '@/theme/typography';
 
-export default function AccountLinkScreen() {
+export default function AccountHomeScreen() {
   const { state, signOut } = useSession();
   const router = useRouter();
+  const [signingOut, setSigningOut] = useState(false);
 
   const user = state.status === 'authenticated' ? state.user : null;
 
-  const { signingOut, signOut: doSignOut } = useSignOut({
-    onCleared: () => {
-      router.replace('/(auth)/sign-in');
-    },
-  });
-
   async function handleSignOut() {
-    Alert.alert(
-      'Đăng xuất',
-      'Bạn có chắc muốn đăng xuất khỏi tài khoản này?',
-      [
-        { text: 'Hủy', style: 'cancel' },
-        {
-          text: 'Đăng xuất',
-          style: 'destructive',
-          onPress: async () => {
-            if (state.status === 'authenticated') {
-              await doSignOut(state.accessToken);
-            }
-          },
-        },
-      ],
-    );
+    if (signingOut) return;
+    setSigningOut(true);
+    try {
+      await signOut();
+      router.replace('/(auth)/sign-in');
+    } finally {
+      setSigningOut(false);
+    }
   }
 
   if (!user) {
@@ -54,7 +41,7 @@ export default function AccountLinkScreen() {
     .slice(0, 2);
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
       {/* Avatar */}
       <View style={styles.avatar}>
         <Text style={styles.avatarText}>{initials}</Text>
@@ -85,10 +72,22 @@ export default function AccountLinkScreen() {
         <Row label="Vai trò" value={user.roles.join(', ')} />
       </View>
 
+      {user.accountType === 'Public' && (
+        <View style={styles.linkSection}>
+          <Text style={styles.linkDescription}>Gửi yêu cầu hoặc xem trạng thái liên kết hồ sơ của bạn.</Text>
+          <PrimaryButton
+            label="Liên kết hồ sơ của tôi"
+            onPress={() => router.push('/(account)/account-link')}
+            disabled={signingOut}
+            testID="open-account-link"
+          />
+        </View>
+      )}
+
       {/* Sign out */}
       <View style={styles.footer}>
         <Pressable
-          onPress={handleSignOut}
+          onPress={() => void handleSignOut()}
           disabled={signingOut}
           style={({ pressed }) => [
             styles.signOutBtn,
@@ -102,7 +101,7 @@ export default function AccountLinkScreen() {
           )}
         </Pressable>
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -117,8 +116,9 @@ function Row({ label, value }: { label: string; value: string }) {
 
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
+  scroll: { flex: 1, backgroundColor: colors.background },
   container: {
-    flex: 1,
+    flexGrow: 1,
     backgroundColor: colors.background,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.xl,
@@ -185,6 +185,8 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginTop: spacing.sm,
   },
+  linkSection: { gap: spacing.sm, marginTop: spacing.sm },
+  linkDescription: { color: colors.muted, fontSize: typography.body - 2 },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',

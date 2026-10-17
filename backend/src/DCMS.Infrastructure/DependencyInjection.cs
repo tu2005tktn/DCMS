@@ -38,11 +38,19 @@ public static class DependencyInjection
         services.AddScoped<IAccountService, AccountService>();
         services.AddScoped<IAuthenticationService, AuthenticationService>();
         services.AddScoped<IRegistrationService, RegistrationService>();
+        services.AddHttpClient();
+        services.AddSingleton<IGoogleTokenVerifier, GoogleTokenVerifier>();
+        services.AddScoped<IGoogleAuthenticationService, GoogleAuthenticationService>();
         services.AddScoped<DevelopmentAccountSeeder>();
         services.AddScoped<IPatientLinkService, PatientLinkService>();
         services.AddScoped<IPatientLinkReviewService, PatientLinkReviewService>();
         services.AddScoped<DevelopmentPatientLinkSeeder>();
         services.AddScoped<IPatientService, PatientService>();
+        services.AddSingleton(TimeProvider.System);
+        services.AddScoped<Features.Scheduling.WorkingScheduleService>();
+        services.AddScoped<DCMS.Application.Features.Scheduling.IWorkingScheduleService>(sp => sp.GetRequiredService<Features.Scheduling.WorkingScheduleService>());
+        services.AddScoped<DCMS.Application.Features.Scheduling.IAvailabilityService>(sp => sp.GetRequiredService<Features.Scheduling.WorkingScheduleService>());
+        services.AddScoped<Features.Scheduling.DevelopmentSchedulingSeeder>();
         return services;
     }
 }
