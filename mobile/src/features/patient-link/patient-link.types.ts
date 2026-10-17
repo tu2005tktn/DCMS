@@ -17,3 +17,13 @@ export type SubmitLinkRequest = {
 };
 export type SelfLinkChange = { request: SelfLinkRequest; notification: SystemMessage; created: boolean };
 export type OwnRecordSummary = { patientCode: string; fullName: string; birthDate: string | null; linkedAt: string };
+
+// "Hồ sơ của tôi" (docs/implementation/UC08-09-38-S05-S06.md §10). The clinic's internal note is never returned.
+export type Gender = 'MALE' | 'FEMALE' | 'OTHER';
+export type OwnPatientRecord = {
+  patientCode: string; fullName: string; birthDate: string | null; gender: Gender | null; phone: string | null;
+  address: string | null; guardianName: string | null; guardianRelationship: string | null; guardianPhone: string | null;
+  isArchived: boolean; linkedAt: string; updatedAt: string; version: number;
+};
+export type UpdateOwnRecord = Omit<OwnPatientRecord, 'patientCode' | 'isArchived' | 'linkedAt' | 'updatedAt'>;
+export type OwnRecordChange = { record: OwnPatientRecord; notification: SystemMessage };

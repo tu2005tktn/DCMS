@@ -29,8 +29,18 @@ public sealed record PatientFieldChange(string Field, string? Before, string? Af
 public sealed record PatientAuditEntry(long Id, string Action, string ActorName, string? Reason,
     IReadOnlyList<PatientFieldChange> Changes, DateTimeOffset OccurredAt);
 
+// Patient app "Hồ sơ của tôi" [PROPOSED]: own record through a VERIFIED self link; no internal administrative note.
+public sealed record OwnPatientRecord(string PatientCode, string FullName, DateOnly? BirthDate, string? Gender, string? Phone,
+    string? Address, string? GuardianName, string? GuardianRelationship, string? GuardianPhone, bool IsArchived,
+    DateTimeOffset LinkedAt, DateTimeOffset UpdatedAt, int Version);
+public sealed record UpdateOwnPatientRequest(int Version, string? FullName, DateOnly? BirthDate, string? Gender, string? Phone,
+    string? Address, string? GuardianName, string? GuardianRelationship, string? GuardianPhone);
+public sealed record OwnPatientChange(OwnPatientRecord Record, SystemMessage Notification);
+
 public interface IPatientService
 {
+    Task<OwnPatientRecord> OwnAsync(int accountId, CancellationToken ct);
+    Task<OwnPatientChange> UpdateOwnAsync(int accountId, UpdateOwnPatientRequest request, CancellationToken ct);
     Task<PatientPage> SearchAsync(string? keyword, DateOnly? birthDate, bool includeArchived, int page, int pageSize, CancellationToken ct);
     Task<IReadOnlyList<DuplicateCandidate>> DuplicatesAsync(DuplicateCheckRequest request, CancellationToken ct);
     Task<PatientDetail> GetAsync(int id, CancellationToken ct);

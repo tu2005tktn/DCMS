@@ -13,6 +13,7 @@
 - [Chạy thử đăng nhập và quản lý tài khoản](implementation/RUN-ACCOUNTS.vi.md): migration, demo và kiểm tra tự động.
 - [UC-36 S07/S08 liên kết hồ sơ tự thân](implementation/UC36-S07-S08.md): quy tắc, API contract, dữ liệu, kiểm thử, phần hoãn.
 - [UC-08/09/38 S05/S06 tìm kiếm và hồ sơ bệnh nhân](implementation/UC08-09-38-S05-S06.md): quyền, dữ liệu, nghi trùng, API, màn hình, phần hoãn.
+- [UC-05/06 S14/S16 lịch hẹn của tôi, đổi/hủy, yêu cầu hỗ trợ](implementation/UC05-06-S14-S16.md): hợp đồng API dùng chung với TV2/TV3/TV5, quy tắc 12 giờ, mock DTO, phần chờ.
 
 Architecture: `Domain` contains business rules, `Application` defines use cases and contracts, `Infrastructure` supplies PostgreSQL/EF Core implementations, and `Api` configures HTTP endpoints and dependency injection. Add feature folders within each layer when implementing business features.
 

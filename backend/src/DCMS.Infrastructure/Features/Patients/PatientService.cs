@@ -114,6 +114,55 @@ public sealed partial class PatientService(DcmsDbContext db) : IPatientService
             SystemMessages.Get("MSG222", archive ? "ngừng sử dụng hồ sơ" : "khôi phục hồ sơ", value: patient.PatientCode));
     }
 
+    public async Task<OwnPatientRecord> OwnAsync(int accountId, CancellationToken ct)
+    {
+        var (link, patient) = await OwnLinkAsync(accountId, tracked: false, ct);
+        db.PatientLinkAudits.Add(new PatientLinkAudit
+        {
+            LinkId = link.Id, ActorAccountId = accountId, Action = "OwnRecordRead", OccurredAt = DateTimeOffset.UtcNow,
+            AfterJson = $"{{\"patientId\":{patient.Id}}}"
+        });
+        await db.SaveChangesAsync(ct);
+        return ToOwn(patient, link);
+    }
+
+    public async Task<OwnPatientChange> UpdateOwnAsync(int accountId, UpdateOwnPatientRequest request, CancellationToken ct)
+    {
+        var (link, patient) = await OwnLinkAsync(accountId, tracked: true, ct);
+        if (patient.IsArchived) throw new BusinessException(409, SystemMessages.Get("MSG202"));
+        if (patient.Version != request.Version) throw Stale();
+        // The administrative note is internal to the clinic: kept as is, never shown or edited by the patient.
+        var input = Validate(request.FullName, request.BirthDate, request.Gender, request.Phone, request.Address,
+            request.GuardianName, request.GuardianRelationship, request.GuardianPhone, patient.Note);
+        var changes = Apply(patient, input);
+        if (changes.Count > 0)
+        {
+            var now = DateTimeOffset.UtcNow;
+            patient.UpdatedAt = now;
+            patient.Version++;
+            await using var transaction = await db.Database.BeginTransactionAsync(ct);
+            await SaveAsync(() => Task.CompletedTask, ct);
+            await AuditAsync(patient.Id, accountId, PatientAuditActions.Update, "Bệnh nhân tự cập nhật qua ứng dụng", changes, now, ct);
+            await transaction.CommitAsync(ct);
+        }
+        return new(ToOwn(patient, link), SystemMessages.Get("MSG116"));
+    }
+
+    // Rechecked against the database on every request so a revoked link blocks the next read or save (GBR-075).
+    private async Task<(PatientAccountLink Link, PatientProfile Patient)> OwnLinkAsync(int accountId, bool tracked, CancellationToken ct)
+    {
+        var link = await db.PatientAccountLinks.AsNoTracking()
+            .SingleOrDefaultAsync(x => x.AccountId == accountId && x.Status == PatientLinkStatus.Verified, ct)
+            ?? throw new BusinessException(403, SystemMessages.Get("MSG06"));
+        var patients = tracked ? db.Patients : db.Patients.AsNoTracking();
+        var patient = await patients.SingleAsync(x => x.Id == link.PatientId, ct);
+        return (link, patient);
+    }
+
+    private static OwnPatientRecord ToOwn(PatientProfile x, PatientAccountLink link) =>
+        new(x.PatientCode, x.FullName, x.BirthDate, x.Gender, x.Phone, x.Address, x.GuardianName, x.GuardianRelationship,
+            x.GuardianPhone, x.IsArchived, link.ReviewedAt ?? link.RequestedAt, x.UpdatedAt, x.Version);
+
     public async Task<IReadOnlyList<PatientAuditEntry>> AuditAsync(int id, CancellationToken ct)
     {
         if (!await db.Patients.AnyAsync(x => x.Id == id, ct)) throw Missing();

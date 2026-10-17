@@ -6,7 +6,7 @@ import { useSession } from '@/features/auth/session/useSession';
 import { Banner, Button, Card, Field, StatusBadge, formatTime, palette } from '../components/LinkUi';
 import { LinkApiError, patientLinkApi } from '../patient-link.api';
 import { emptyLinkForm, formatBirthDateInput, limits, validateLinkForm, type LinkForm, type LinkFormErrors } from '../patient-link.schema';
-import type { OwnRecordSummary, SelfLinkOverview } from '../patient-link.types';
+import type { SelfLinkOverview } from '../patient-link.types';
 
 // S07 Account Link Request (UC-36). The account always comes from the session; no Patient search is exposed.
 export default function AccountLinkScreen() {
@@ -25,8 +25,6 @@ export default function AccountLinkScreen() {
   const [notice, setNotice] = useState<string | null>(null);
   const [confirmWithdraw, setConfirmWithdraw] = useState(false);
   const [withdrawing, setWithdrawing] = useState(false);
-  const [record, setRecord] = useState<OwnRecordSummary | null>(null);
-  const [recordBusy, setRecordBusy] = useState(false);
 
   const handleAuthFailure = useCallback((failure: unknown) => {
     if (failure instanceof LinkApiError && failure.status === 401) {
@@ -61,7 +59,7 @@ export default function AccountLinkScreen() {
     try {
       const result = await patientLinkApi.submit(token, request);
       setNotice(result.notification.message);
-      setForm(emptyLinkForm); setRecord(null);
+      setForm(emptyLinkForm);
       await load(token, 'refresh');
     } catch (failure) { if (!handleAuthFailure(failure)) setActionError((failure as Error).message); }
     finally { setSubmitting(false); }
@@ -80,16 +78,8 @@ export default function AccountLinkScreen() {
     } finally { setWithdrawing(false); }
   }
 
-  async function openRecord() {
-    if (!token || recordBusy) return;
-    setRecordBusy(true); setActionError(null);
-    try { setRecord(await patientLinkApi.ownRecord(token)); }
-    catch (failure) { if (!handleAuthFailure(failure)) { setRecord(null); setActionError((failure as Error).message); await load(token, 'refresh'); } }
-    finally { setRecordBusy(false); }
-  }
-
   async function signOut() {
-    setOverview(null); setRecord(null); setNotice(null); setActionError(null); setForm(emptyLinkForm); setErrors({});
+    setOverview(null); setNotice(null); setActionError(null); setForm(emptyLinkForm); setErrors({});
     await signOutSession();
     router.replace('/(auth)/sign-in');
   }
@@ -143,12 +133,7 @@ export default function AccountLinkScreen() {
           : <Button title="Rút yêu cầu" variant="secondary" onPress={() => setConfirmWithdraw(true)} />}
       </>}
       {linkStatus === 'VERIFIED' && <>
-        <Button title="Xem hồ sơ của tôi" busy={recordBusy} onPress={() => void openRecord()} />
-        {record && <View style={styles.record}>
-          <Row label="Mã hồ sơ" value={record.patientCode} />
-          <Row label="Họ tên" value={record.fullName} />
-          <Row label="Ngày sinh" value={record.birthDate ? record.birthDate.split('-').reverse().join('/') : '—'} />
-        </View>}
+        <Button title="Xem hồ sơ của tôi" onPress={() => router.push('/my-record')} />
       </>}
       {rejectedOrRevoked && <Text style={styles.muted}>Vui lòng liên hệ phòng khám để được hỗ trợ, hoặc bổ sung thông tin và gửi yêu cầu mới bên dưới.</Text>}
       <Button title="Tải lại trạng thái" variant="secondary" busy={refreshing} onPress={() => void load(token, 'refresh')} />
@@ -198,7 +183,6 @@ const styles = StyleSheet.create({
   rowLabel: { color: palette.muted },
   rowValue: { color: palette.text, fontWeight: '600', flexShrink: 1, textAlign: 'right' },
   actions: { gap: spacing.sm },
-  record: { gap: spacing.xs, paddingTop: spacing.sm },
   switchRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   switchText: { flex: 1, color: palette.text },
   historyItem: { gap: spacing.xs, paddingVertical: spacing.xs },
