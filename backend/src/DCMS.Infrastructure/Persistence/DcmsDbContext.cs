@@ -17,10 +17,6 @@ public sealed class DcmsDbContext(DbContextOptions<DcmsDbContext> options)
     public DbSet<AuthSession> AuthSessions => Set<AuthSession>();
     public DbSet<AuthRefreshToken> AuthRefreshTokens => Set<AuthRefreshToken>();
     public DbSet<AccountAudit> AccountAudits => Set<AccountAudit>();
-    public DbSet<RecoveryToken> RecoveryTokens => Set<RecoveryToken>();
-    public DbSet<RecoveryAudit> RecoveryAudits => Set<RecoveryAudit>();
-    public DbSet<RecoveryOutbox> RecoveryOutbox => Set<RecoveryOutbox>();
-    public DbSet<Appointment> Appointments => Set<Appointment>();
     public DbSet<PatientProfile> Patients => Set<PatientProfile>();
     public DbSet<PatientAudit> PatientAudits => Set<PatientAudit>();
     public DbSet<PatientAccountLink> PatientAccountLinks => Set<PatientAccountLink>();
@@ -86,71 +82,6 @@ public sealed class DcmsDbContext(DbContextOptions<DcmsDbContext> options)
             b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.ActorId).OnDelete(DeleteBehavior.Restrict);
             b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.TargetId).OnDelete(DeleteBehavior.Restrict);
         });
-        model.Entity<RecoveryToken>(b =>
-        {
-            b.ToTable("RECOVERY_TOKEN");
-            b.HasKey(x => x.Id);
-            b.Property(x => x.TokenHash).HasMaxLength(256).IsRequired();
-            b.Property(x => x.ResetGrantHash).HasMaxLength(256).IsRequired();
-            b.Property(x => x.ChannelType).HasMaxLength(16).IsRequired();
-            b.Property(x => x.NormalizedDestination).HasMaxLength(256).IsRequired();
-            b.HasIndex(x => new { x.AccountId, x.UsedAt });
-            b.HasIndex(x => x.ExpiresAt);
-            b.HasIndex(x => new { x.AccountId, x.CreatedAt });
-            b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.AccountId).OnDelete(DeleteBehavior.Cascade);
-        });
-        model.Entity<RecoveryAudit>(b =>
-        {
-            b.ToTable("RECOVERY_AUDIT");
-            b.HasKey(x => x.Id);
-            b.Property(x => x.Action).HasMaxLength(40).IsRequired();
-            b.Property(x => x.Reason).HasMaxLength(500);
-            b.Property(x => x.ChannelType).HasMaxLength(16);
-            b.Property(x => x.Result).HasMaxLength(20);
-            b.HasIndex(x => new { x.TargetId, x.OccurredAt });
-            b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.ActorId).OnDelete(DeleteBehavior.Restrict);
-            b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.TargetId).OnDelete(DeleteBehavior.Restrict);
-        });
-        model.Entity<RecoveryOutbox>(b =>
-        {
-            b.ToTable("RECOVERY_OUTBOX");
-            b.HasKey(x => x.Id);
-            b.Property(x => x.ChannelType).HasMaxLength(16).IsRequired();
-            b.Property(x => x.Destination).HasMaxLength(256).IsRequired();
-            b.Property(x => x.Provider).HasMaxLength(32).IsRequired();
-            b.Property(x => x.Status).HasMaxLength(16).IsRequired();
-            b.Property(x => x.ProviderMessageId).HasMaxLength(64);
-            b.HasIndex(x => new { x.AccountId, x.OccurredAt });
-            b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.AccountId).OnDelete(DeleteBehavior.Restrict);
-        });
-        
-        model.Entity<Appointment>(b =>
-        {
-            b.ToTable("APPOINTMENT");
-            b.HasKey(x => x.Id);
-            b.Property(x => x.StartTime).IsRequired();
-            b.Property(x => x.EndTime).IsRequired();
-            b.Property(x => x.DurationInMinutes).IsRequired();
-            b.Property(x => x.Service).HasMaxLength(200).IsRequired();
-            b.Property(x => x.Reason).HasMaxLength(500).IsRequired();
-            b.Property(x => x.Source).HasMaxLength(20).IsRequired(); // phone/Zalo/Facebook/in person/app
-            b.Property(x => x.PatientId).IsRequired();
-            b.Property(x => x.RelativeId);
-            b.Property(x => x.DentistId).IsRequired();
-            b.Property(x => x.BranchId).IsRequired();
-            b.Property(x => x.ChairId).IsRequired();
-            b.Property(x => x.Status).HasMaxLength(50).IsRequired();
-            b.Property(x => x.IsAttendanceConfirmed).IsRequired();
-            b.Property(x => x.PlannedEndTime);
-            b.Property(x => x.ExceptionReason).HasMaxLength(500);
-            b.Property(x => x.Version).IsConcurrencyToken();
-            
-            b.HasIndex(x => x.StartTime);
-            b.HasIndex(x => x.EndTime);
-            b.HasIndex(x => x.DentistId);
-            b.HasIndex(x => x.BranchId);
-            b.HasIndex(x => x.ChairId);
-            b.HasIndex(x => x.PatientId);
         model.Entity<PatientProfile>(b =>
         {
             b.ToTable("PATIENT_PROFILE", t => t.HasCheckConstraint("CK_PATIENT_PROFILE_Gender",

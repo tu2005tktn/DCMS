@@ -6,10 +6,7 @@ using System.Security.Claims;
 using System.Text;
 using DCMS.Api.Common;
 using DCMS.Api.Features.Accounts;
-using DCMS.Api.Features.Appointments;
 using DCMS.Api.Features.Authentication;
-using DCMS.Application.Features.Appointments;
-using DCMS.Application.Features.Appointments.Interfaces;
 using DCMS.Api.Features.PatientLinks;
 using DCMS.Api.Features.Patients;
 using DCMS.Infrastructure.Features.PatientLinks;
@@ -24,10 +21,9 @@ using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddInfrastructure(builder.Configuration, builder.Environment);
-// builder.Services.AddOpenApi();
+builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddOpenApi();
 builder.Services.Configure<RouteHandlerOptions>(options => options.ThrowOnBadRequest = true);
-builder.Services.AddScoped<IAppointmentService, AppointmentService>();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
 {
     options.MapInboundClaims = false;
@@ -104,7 +100,7 @@ if (args.Contains("--migrate") || args.Contains("--seed-demo"))
 
 if (app.Environment.IsDevelopment())
 {
-//     app.MapOpenApi().AllowAnonymous();
+    app.MapOpenApi().AllowAnonymous();
 }
 
 app.UseCors("WebDevelopment");
@@ -118,9 +114,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapHealthEndpoints();
 app.MapAuthenticationEndpoints();
-app.MapRecoveryEndpoints();
 app.MapAccountEndpoints();
-app.MapDevelopmentRecoveryEndpoints();
 app.MapPatientLinkEndpoints();
 app.MapPatientEndpoints();
 app.MapSchedulingEndpoints();

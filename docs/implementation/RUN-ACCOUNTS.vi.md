@@ -55,59 +55,7 @@ Mở **http://localhost:5173/sign-in**. API ở **http://localhost:5080**, trang
 
 Bổ sung S04 / DCMS-75: xem [đặc tả](../specs/S04-UC31.md) và [bằng chứng, migration, lệnh chạy](S04-DCMS-75.md). Kết quả 15 integration / 4 browser ở phần cuối là đợt nền tảng trước S04.
 
-## Thử khôi phục tài khoản (UC-02 / S03)
-
-Luồng có 4 bước và chạy giống nhau trên web lẫn mobile. Mở **http://localhost:5173/recover** hoặc bấm **Khôi phục tài khoản** ở trang đăng nhập.
-
-1. Nhập tên đăng nhập (ví dụ `dentist.demo`) rồi **Gửi yêu cầu**. Phản hồi luôn là MSG12 với cùng một nội dung bất kể tài khoản có tồn tại hay không.
-2. Nhập mã xác minh rồi **Xác minh**. Mã sai/hết hạn/đã dùng đều nhận MSG108 và không đổi mật khẩu.
-3. Nhập mật khẩu mới theo gợi ý policy (gợi ý đọc từ `/api/auth/policy`) rồi **Đặt lại mật khẩu**. Mật khẩu không đạt policy nhận MSG109.
-4. Thành công nhận MSG13, các phiên đăng nhập cũ bị thu hồi, rồi chuyển sang trang đăng nhập.
-
-Nút **Gửi lại mã** có đếm ngược. API `/resend` trả lời trung lập nên giao diện tự ước lượng thời gian chờ; gửi lại quá sớm vẫn bị từ chối phía server.
-
-### Đọc mã xác minh khi chưa có kênh gửi thật
-
-Chưa cấu hình provider gửi mail/SMS thật, nên ở **Development** adapter giữ mã đã phát trong bộ nhớ và cho đọc lại qua endpoint bắt buộc đăng nhập:
-
-```powershell
-# đăng nhập lấy token, rồi thay {accountId}
-Invoke-RestMethod http://localhost:5080/api/dev/recovery/proof/{accountId} `
-  -Headers @{ Authorization = "Bearer $token" }
-```
-
-Mã xác minh **không** được ghi vào database, outbox, log hay audit. Endpoint này chỉ tồn tại ở Development và không được map ở Production.
-
-> Account demo tạo **trước** thay đổi này không có email đã xác minh vì seeder bỏ qua account đã có. Hãy dùng account vừa seed hoặc cập nhật contact đã xác minh cho account trước.
-
-### Cấu hình kênh và giới hạn khôi phục
-
-Khóa nằm trong `backend/src/DCMS.Api/appsettings.Development.json`, mặc định `[PROPOSED]`:
-
-| Khóa | Mặc định | Ý nghĩa |
-| --- | --- | --- |
-| `TokenLifetimeMinutes` | 30 | Thời gian sống của mã xác minh / reset grant |
-| `ResendCooldownMinutes` | 2 | Khoảng cách tối thiểu giữa hai lần gửi |
-| `MaxResends` | 3 | Số lần gửi lại tối đa trong một phiên |
-| `MaxVerifyAttempts` | 5 | Số lần nhập sai trước khi chặn |
-| `RateLimitPerAccountPerHour` | 50 (dev) | Số request tối đa mỗi account mỗi giờ; [PROPOSED] cho production |
-| `RateLimitPerIpPerHour` | 500 (dev) | Số request tối đa mỗi IP mỗi giờ; dev nới rộng để chạy test/thử nghiệm, production tự đặt lại |
-| `Channel` | `Email` | Kênh gửi: `Email`, `Phone` hoặc `Link` |
-| `CodeLength` | 6 | Độ dài mã số |
-| `VerificationBaseUrl` | rỗng | Base URL cho kênh `Link`; link chỉ mang id mờ, không mang mã |
-
-Giá trị không hợp lệ làm API dừng khởi động (validate on start) thay vì chạy với cấu hình sai.
-
-### Mobile
-
-```powershell
-Set-Location mobile
-npm.cmd install
-npm.cmd run typecheck
-npx.cmd expo start
-```
-
-Cùng 4 bước, cùng hành vi. Deep link `/(auth)/reset-password` là điểm vào cho kênh `Link`, chỉ mang id mờ.
+Recovery chưa triển khai: không có endpoint reset. Kênh xác minh, proof expiry và retry policy chưa được xác nhận trong đặc tả; không dùng thao tác quản lý account để bỏ qua xác minh hoặc phê duyệt liên kết bệnh án.
 
 ## Lặp lại kiểm tra tự động
 
@@ -170,37 +118,4 @@ Trong ví dụ này, `$dotnet` từ helper là đường dẫn tuyệt đối ch
 | Kiểm tra secret và script | Không có secret local trong file text Git-visible; `.env`, `.tools`, test-results bị ignore; PowerShell scripts parse thành công |
 | Kiểm tra giao diện bằng ảnh | Đã xem trang đăng nhập và quản lý tài khoản desktop/mobile; bảng tài khoản cuộn ngang trên màn hình nhỏ |
 
-### Bổ sung đợt 12–13/10/2026 (UC-02 / S03)
-
-| Kiểm tra đã chạy | Kết quả |
-| --- | --- |
-| `.NET 10` restore và build solution | Thành công, 0 warning, 0 error |
-| Migration `AccountRecovery` | Đã sinh file; chỉ tạo thêm `RECOVERY_TOKEN`, `RECOVERY_AUDIT`, `RECOVERY_OUTBOX` và index, không drop/xóa gì. **Chưa áp dụng lên database nào tại máy thực hiện** |
-| Backend unit tests (`DCMS.UnitTests`) | **30 passed**, 0 failed, không cần database |
-| Backend integration tests (`RecoveryApiTests`) | Biên dịch được, **chưa chạy** — máy thực hiện không có Docker/PostgreSQL |
-| Web `npm run build` (tsc + Vite) | Thành công |
-| Mobile `npm run typecheck` | Thành công |
-| Web browser tests khôi phục | Đã viết `web/tests/recovery.spec.ts`, **chưa chạy** — cần API, Vite, PostgreSQL và `E2E_DEMO_PASSWORD` |
-| Chạy thử Expo trên thiết bị | **Chưa chạy** — cần thiết bị/máy ảo |
-
-Tiêu chí nghiệm thu 1–7 hiện được **chứng minh bằng test đã viết, chưa bằng lần chạy xanh**. Xem chi tiết map test trong [evidence S03](../s03-account-recovery-evidence.md). Các quyết định `[PROPOSED]` cần chốt cũng liệt kê ở đó.
-
-Đã rà soát bảo mật và vá: `/recovery/status` và `/recovery/resend` ban đầu để lộ tài khoản có tồn tại; audit của luồng Admin ban đầu ghi thiếu actor. Chi tiết trong commit history nhánh `tuan`.
-
 Browser test loading/error chủ động trì hoãn và giả lập một response 503 rồi bỏ giả lập để retry API thật; các luồng chức năng dùng API/database thật. Backend tests có Patient/link sentinel để kiểm chứng bảo toàn dữ liệu ở boundary, không kiểm thử UC Patient chưa triển khai. Chưa kiểm thử production deployment hoặc kênh khôi phục chưa có.
-
-### Đợt 13/10/2026 (máy local: Docker Desktop, PostgreSQL, .NET 10 SDK local)
-
-| Kiểm tra đã chạy | Kết quả |
-| --- | --- |
-| API khởi động (`start-api.ps1`) | **Thất bại trước khi sửa**: `Body was inferred but the method does not allow inferred body parameters` do inject concrete adapter không có `[FromServices]` trên endpoint `/api/dev/recovery/proof/{accountId}`; đã sửa (khớp docs s03 §7) |
-| Đăng nhập `admin.demo`, `/health` | Thành công; HTTP 200, API/database healthy |
-| Luồng khôi phục thật qua API | **Thất bại trước khi sửa**: reset trả 503 do thiếu `.AddDefaultTokenProviders()`; sau khi sửa request→verify→reset→đăng nhập lại chạy đúng, mật khẩu cũ bị từ chối |
-| Chuỗi tiếng Việt UC-02 | Phát hiện mojibake trong `AccountRecoveryService.cs`; đã viết lại đúng UTF-8, audit đọc lại tiếng Việt chính xác |
-| Backend unit tests | **30/30 passed** |
-| Backend integration tests | Trước sửa: **21/33 passed (12 fail)**; sau khi vá sản phẩm và tăng cường cách ly test: **33/33 passed** (hai lần chạy liên tiếp) |
-| Web `npm run build` | Thành công; chỉ còn cảnh báo bundle > 500 kB (khoảng 1.14 MB trước gzip) như đợt trước |
-| Browser tests (Chromium) | `accounts.spec.ts` **4/4 passed**. `recovery.spec.ts` sửa lỗi cú pháp `=> 'POST'` từng chặn toàn bộ file; các test chức năng xanh, test injected-fault (mock 503/400) còn flaky do tên accessible của nút đổi khi in-flight — ghi nhận làm follow-up cho team web |
-| Trạng thái thay đổi | Các bản sửa đang ở working tree, **chưa commit**; mô tả trong [RUN-DEMO.vi.md](RUN-DEMO.vi.md) |
-
-Các sửa đổi sản phẩm chính: đăng ký concrete `DevelopmentContactDeliveryAdapter` + `[FromServices]`; `.AddDefaultTokenProviders()`; proof aid lưu ở store tĩnh (adapter scoped không giữ được proof giữa các request); viết lại mojibake; bắt mọi chuỗi lỗi concurrency 40001 (bao gồm wrapper `InvalidOperationException` của Npgsql execution strategy) và `ChangeTracker.Clear()` trước khi ghi audit. Test: mỗi test khôi phục tự tạo account riêng có email đã xác minh, kỳ vọng message theo field, ép kiểu cột JSON sang text, chấp nhận 401 cho endpoint status ẩn.
