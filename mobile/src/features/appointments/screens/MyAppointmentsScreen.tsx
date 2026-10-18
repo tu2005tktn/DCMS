@@ -4,7 +4,7 @@ import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, T
 import { spacing } from '@/theme/spacing';
 import { useSession } from '@/features/auth/session/useSession';
 import { Banner, Button, Card, Field, palette } from '@/features/patient-link/components/LinkUi';
-import { AppointmentApiError, appointmentsApi, usingMockAppointments } from '../appointments.api';
+import { AppointmentApiError, appointmentsApi } from '../appointments.api';
 import { formatClock, formatDate, formatDateInput, formatWeekday, parseInputDate, statusColors, statusLabels } from '../appointments.rules';
 import type { AccessSource, AppointmentCard, AppointmentScope, AppointmentStatus } from '../appointments.types';
 
@@ -43,7 +43,6 @@ export default function MyAppointmentsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<AppointmentApiError | null>(null);
   const [showFilters, setShowFilters] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
   const request = useRef(0);
 
   const load = useCallback(async (nextPage: number, mode: 'replace' | 'refresh' | 'more') => {
@@ -90,8 +89,6 @@ export default function MyAppointmentsScreen() {
 
   return <ScrollView contentContainerStyle={styles.container}
     refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void load(1, 'refresh')} />}>
-    {usingMockAppointments && <Banner tone="info" message="Dữ liệu minh họa (mock) — API lịch hẹn chưa sẵn sàng. Thao tác chỉ lưu tạm trên ứng dụng." />}
-    {notice && <Banner tone="info" message={notice} />}
     <View style={styles.tabs}>
       {(['UPCOMING', 'HISTORY'] as AppointmentScope[]).map(value =>
         <Pressable key={value} accessibilityRole="tab" accessibilityState={{ selected: scope === value }} onPress={() => setScope(value)}
@@ -103,7 +100,7 @@ export default function MyAppointmentsScreen() {
       <Pressable accessibilityRole="button" onPress={() => setShowFilters(value => !value)}>
         <Text style={styles.link}>{showFilters ? 'Ẩn bộ lọc' : 'Bộ lọc'}{filters.status !== 'ALL' || filters.from || filters.to ? ' •' : ''}</Text>
       </Pressable>
-      <Pressable accessibilityRole="button" onPress={() => setNotice('Đặt lịch (S15) đang được nhóm triển khai.')}>
+      <Pressable accessibilityRole="button" onPress={() => router.push('/book-appointment')}>
         <Text style={styles.link}>+ Đặt lịch</Text>
       </Pressable>
     </View>

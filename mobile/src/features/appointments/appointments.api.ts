@@ -1,6 +1,5 @@
 import { env } from '@/config/env';
 import { AppointmentApiError } from './appointments.errors';
-import { mockAppointmentsApi } from './appointments.mock';
 import type {
   AppointmentChangeResult, AppointmentDetail, AppointmentPage, AppointmentQuery, AvailabilitySlot, CancelCommand,
   RescheduleCommand, SupportCommand, SupportRequest, SupportResult, SystemMessage,
@@ -53,9 +52,9 @@ const httpAppointmentsApi: AppointmentsApi = {
   reschedule: (token, code, command) => call(`/api/appointments/${encodeURIComponent(code)}/reschedule`, token, post(command)),
   cancel: (token, code, command) => call(`/api/appointments/${encodeURIComponent(code)}/cancel`, token, post(command)),
   requestSupport: (token, code, command) => call(`/api/appointments/${encodeURIComponent(code)}/support-requests`, token, post(command)),
-  withdrawSupport: (token, id, expectedVersion) => call(`/api/support-requests/${id}/withdraw`, token, post({ expectedVersion })),
+  withdrawSupport: async (token, id, expectedVersion) =>
+    (await call<{ request: SupportRequest }>(`/api/support-requests/${id}/withdraw`, token, post({ expectedVersion }))).request,
 };
 
-// Mock DTOs until TV2/TV3 ship the Appointment API; set EXPO_PUBLIC_APPOINTMENTS_MOCK=false to use the server.
-export const usingMockAppointments = process.env.EXPO_PUBLIC_APPOINTMENTS_MOCK?.trim().toLowerCase() !== 'false';
-export const appointmentsApi: AppointmentsApi = usingMockAppointments ? mockAppointmentsApi : httpAppointmentsApi;
+// S14/S16 always talk to the real API; there is no local data source.
+export const appointmentsApi: AppointmentsApi = httpAppointmentsApi;

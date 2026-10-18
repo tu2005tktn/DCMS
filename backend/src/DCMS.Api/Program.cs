@@ -152,6 +152,7 @@ app.MapPatientEndpoints();
 app.MapSchedulingEndpoints();
 app.MapAppointmentEndpoints();
 app.MapAppointmentQueryEndpoints();
+app.MapAppointmentSupportEndpoints();
 app.MapNotificationEndpoints();
 // S26+ SignalR: hub + test endpoint (chỉ Dev).
 app.MapHub<NotificationsHub>("/hubs/notifications");

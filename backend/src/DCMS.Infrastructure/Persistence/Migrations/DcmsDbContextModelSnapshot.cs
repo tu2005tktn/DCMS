@@ -391,6 +391,77 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.ToTable("APPOINTMENT_RECEIPT", (string)null);
                 });
 
+            modelBuilder.Entity("DCMS.Domain.Features.Appointments.AppointmentSupportRequest", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AccountId")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("AppointmentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("DecidedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("DecidedBy")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("PublicNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid>("RequestKey")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("WithdrawnAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DecidedBy");
+
+                    b.HasIndex("Status", "CreatedAt");
+
+                    b.HasIndex(new[] { "AccountId", "RequestKey" }, "UX_APPOINTMENT_SUPPORT_REQUEST_Key")
+                        .IsUnique();
+
+                    b.HasIndex(new[] { "AppointmentId", "AccountId" }, "UX_APPOINTMENT_SUPPORT_REQUEST_Pending")
+                        .IsUnique()
+                        .HasFilter("\"Status\" = 'Pending'");
+
+                    b.ToTable("APPOINTMENT_SUPPORT_REQUEST", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_APPOINTMENT_SUPPORT_REQUEST_Values", "\"Kind\" IN ('RESCHEDULE','CANCEL','OTHER') AND \"Status\" IN ('Pending','Resolved','Rejected','Withdrawn')");
+                        });
+                });
+
             modelBuilder.Entity("DCMS.Domain.Features.Authentication.AuthRefreshToken", b =>
                 {
                     b.Property<long>("Id")
@@ -1585,6 +1656,26 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasForeignKey("AppointmentId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Appointments.AppointmentSupportRequest", b =>
+                {
+                    b.HasOne("DCMS.Infrastructure.Features.Accounts.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DCMS.Domain.Features.Appointments.Appointment", null)
+                        .WithMany()
+                        .HasForeignKey("AppointmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DCMS.Infrastructure.Features.Accounts.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("DecidedBy")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("DCMS.Domain.Features.Authentication.AuthRefreshToken", b =>

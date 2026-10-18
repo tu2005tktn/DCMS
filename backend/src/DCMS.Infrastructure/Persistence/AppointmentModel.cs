@@ -65,6 +65,23 @@ internal static class AppointmentModel
             b.Property(x => x.ResultJson).HasColumnType("jsonb");
             b.HasOne<Appointment>().WithMany().HasForeignKey(x => x.AppointmentId).OnDelete(DeleteBehavior.Restrict);
         });
+        model.Entity<AppointmentSupportRequest>(b =>
+        {
+            b.ToTable("APPOINTMENT_SUPPORT_REQUEST", t => t.HasCheckConstraint("CK_APPOINTMENT_SUPPORT_REQUEST_Values",
+                "\"Kind\" IN ('RESCHEDULE','CANCEL','OTHER') AND \"Status\" IN ('Pending','Resolved','Rejected','Withdrawn')"));
+            b.Property(x => x.Kind).HasMaxLength(16);
+            b.Property(x => x.Status).HasMaxLength(16);
+            b.Property(x => x.Reason).HasMaxLength(500);
+            b.Property(x => x.PublicNote).HasMaxLength(500);
+            b.Property(x => x.Version).IsConcurrencyToken();
+            // One pending request per account and appointment; a retried command is recognised by its key.
+            b.HasIndex(x => new { x.AppointmentId, x.AccountId }, "UX_APPOINTMENT_SUPPORT_REQUEST_Pending").IsUnique().HasFilter("\"Status\" = 'Pending'");
+            b.HasIndex(x => new { x.AccountId, x.RequestKey }, "UX_APPOINTMENT_SUPPORT_REQUEST_Key").IsUnique();
+            b.HasIndex(x => new { x.Status, x.CreatedAt });
+            b.HasOne<Appointment>().WithMany().HasForeignKey(x => x.AppointmentId).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.AccountId).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.DecidedBy).OnDelete(DeleteBehavior.Restrict);
+        });
         model.Entity<AppointmentOutboxEvent>(b =>
         {
             b.ToTable("APPOINTMENT_OUTBOX");

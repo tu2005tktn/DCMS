@@ -4,7 +4,7 @@ import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, T
 import { spacing } from '@/theme/spacing';
 import { useSession } from '@/features/auth/session/useSession';
 import { Banner, Button, Card, Field, palette } from '@/features/patient-link/components/LinkUi';
-import { AppointmentApiError, appointmentsApi, usingMockAppointments } from '../appointments.api';
+import { AppointmentApiError, appointmentsApi } from '../appointments.api';
 import {
   addDays, clinicDate, formatClock, formatDate, formatDateTime, formatWeekday, ineligibleLabels, newRequestKey, reasonError,
   REASON_MAX, remainingLabel, statusLabels, supportKindLabels, supportStatusLabels,
@@ -141,7 +141,6 @@ export default function AppointmentDetailScreen() {
 
   return <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled"
     refreshControl={mode === 'view' ? <RefreshControl refreshing={refreshing} onRefresh={() => void load(true)} /> : undefined}>
-    {usingMockAppointments && <Banner tone="info" message="Dữ liệu minh họa (mock) — API lịch hẹn chưa sẵn sàng." />}
     {notice && <Banner tone="success" message={notice} />}
 
     <View style={styles.head}>

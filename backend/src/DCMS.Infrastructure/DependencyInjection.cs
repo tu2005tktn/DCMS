@@ -66,6 +66,7 @@ public static class DependencyInjection
         services.AddScoped<IAppointmentService, AppointmentService>();
         services.AddScoped<IAppointmentQueryService, AppointmentQueryService>();
         services.AddScoped<IAppointmentChangeService, AppointmentChangeService>();
+        services.AddScoped<IAppointmentSupportService, AppointmentSupportService>();
         services.AddScoped<IFollowUpAppointmentChangePort, UnavailableFollowUpAppointmentChangePort>();
         services.AddScoped<DevelopmentAppointmentSeeder>();
         services.AddScoped<IFollowUpBookingPort, UnavailableFollowUpBookingPort>();

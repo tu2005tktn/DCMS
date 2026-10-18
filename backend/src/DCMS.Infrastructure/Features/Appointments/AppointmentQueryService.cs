@@ -181,6 +181,11 @@ public sealed class AppointmentQueryService(DcmsDbContext db, UserManager<Applic
         var hours = (row.StartAt - clock.GetUtcNow()).TotalHours;
         var reason = row.Status is "CheckedIn" or "InProgress" || hours <= 0 ? "STARTED"
             : row.Status != "Confirmed" ? "NOT_CONFIRMED" : hours < SelfServiceHours ? "WITHIN_12H" : null;
+        var supports = db.AppointmentSupportRequests.AsNoTracking().Where(x => x.AppointmentId == row.Id);
+        if (!staff) supports = supports.Where(x => x.AccountId == accountId);
+        var supportRequests = await supports.OrderByDescending(x => x.CreatedAt).ThenByDescending(x => x.Id)
+            .Select(x => new SupportRequestDto(x.Id, row.Code, x.Kind, x.Reason, x.Status, x.CreatedAt,
+                x.WithdrawnAt ?? x.DecidedAt, x.PublicNote, x.Version)).ToArrayAsync(ct);
         var history = await db.AppointmentChanges.AsNoTracking().Where(x => x.AppointmentId == row.Id)
             .OrderByDescending(x => x.OccurredAt).ThenByDescending(x => x.Id)
             .Select(x => new MyAppointmentChange(x.Action, x.ActorKind, x.OldStart, x.NewStart, x.Reason, x.OccurredAt)).ToArrayAsync(ct);
@@ -188,7 +193,7 @@ public sealed class AppointmentQueryService(DcmsDbContext db, UserManager<Applic
             card.Status, staff ? "STAFF" : card.Access, card.Version, row.BranchId, branch ?? "", row.DentistId, row.ServiceId, service ?? "Khám và tư vấn",
             row.BookerName, MaskPhone(row.BookerPhone) ?? MaskEmail(row.BookerEmail) ?? "",
             row.FollowUpId.HasValue ? new { id = row.FollowUpId, status = row.Status == "Cancelled" ? "NeedsBooking" : "Booked" } : null,
-            new(reason == null, Math.Round(hours, 2), reason, reason == "WITHIN_12H"), [], history,
+            new(reason == null, Math.Round(hours, 2), reason, reason == "WITHIN_12H"), supportRequests, history,
             new(configuration["Clinic:Phone"] ?? "0234 3 888 999", configuration["Clinic:Hours"] ?? "Thứ 2 – Thứ 7, 08:00 – 17:00"), row.AssistantId);
     }
 

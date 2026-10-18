@@ -23,6 +23,7 @@ public sealed class DcmsDbContext(DbContextOptions<DcmsDbContext> options)
     public DbSet<PatientLinkAudit> PatientLinkAudits => Set<PatientLinkAudit>();
     public DbSet<Appointment> Appointments => Set<Appointment>();
     public DbSet<AppointmentChange> AppointmentChanges => Set<AppointmentChange>();
+    public DbSet<AppointmentSupportRequest> AppointmentSupportRequests => Set<AppointmentSupportRequest>();
     public DbSet<AppointmentChangeReceipt> AppointmentChangeReceipts => Set<AppointmentChangeReceipt>();
     public DbSet<AppointmentReceipt> AppointmentReceipts => Set<AppointmentReceipt>();
     public DbSet<AppointmentOutboxEvent> AppointmentOutboxEvents => Set<AppointmentOutboxEvent>();
