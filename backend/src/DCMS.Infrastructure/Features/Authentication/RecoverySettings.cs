@@ -11,7 +11,7 @@ namespace DCMS.Infrastructure.Features.Authentication;
 public sealed class RecoverySettings
 {
     /// [PROPOSED] How long a verification code / reset grant stays valid, in minutes.
-    public int TokenLifetimeMinutes { get; set; } = 30;
+    public int TokenLifetimeMinutes { get; set; } = 15;
 
     /// [PROPOSED] Minimum wait between two sends for the same account, in minutes.
     public int ResendCooldownMinutes { get; set; } = 2;

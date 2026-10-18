@@ -85,7 +85,7 @@ export function CustomerSignInPage() {
         </Form.Item>
         <Button type="primary" htmlType="submit" block loading={busy}>Đăng nhập</Button>
       </Form>
-      <div className="customer-links"><Link to="/customer/register">Tạo tài khoản</Link><Link to="/customer/book">Đặt lịch không cần tài khoản</Link></div>
+      <div className="customer-links"><Link to="/customer/register">Tạo tài khoản</Link><Link to="/recover">Quên mật khẩu</Link><Link to="/customer/book">Đặt lịch không cần tài khoản</Link></div>
       <Typography.Paragraph className="customer-or">Hoặc đăng nhập bằng Google</Typography.Paragraph>
       <CustomerGoogleButton onCredential={google} />
     </Card>
