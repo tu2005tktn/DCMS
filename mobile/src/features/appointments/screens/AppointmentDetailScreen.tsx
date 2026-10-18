@@ -62,11 +62,11 @@ export default function AppointmentDetailScreen() {
   useEffect(() => { void load(); }, [load]);
 
   const loadSlots = useCallback(async (day: string) => {
-    if (!detail) return;
+    if (!detail || !token) return;
     setSlots(null); setSlotsError(null); setSlot(null);
-    try { setSlots(await appointmentsApi.availability(detail, day)); }
-    catch (failure) { setSlotsError((failure as Error).message); }
-  }, [detail]);
+    try { setSlots(await appointmentsApi.availability(token, detail, day)); }
+    catch (failure) { if (!handleAuth(failure)) setSlotsError((failure as Error).message); }
+  }, [detail, token, handleAuth]);
 
   useEffect(() => { if (mode === 'reschedule') void loadSlots(date); }, [mode, date, loadSlots]);
 

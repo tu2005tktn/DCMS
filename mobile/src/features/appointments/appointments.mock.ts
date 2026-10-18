@@ -128,7 +128,7 @@ export const mockAppointmentsApi: AppointmentsApi = {
     return { items: page.map(card), total: rows.length, page: q.page, pageSize: q.pageSize };
   },
   async detail(_token, code) { await delay(); return detailOf(own(code)); },
-  async availability(detail, date) {
+  async availability(_token, detail, date) {
     await delay();
     return freeSlots(own(detail.code), date);
   },

@@ -47,7 +47,11 @@ export function CustomerShell() {
       <Space><Typography.Text>{state.status === 'authenticated' ? state.user.fullName : ''}</Typography.Text>
         <Button loading={busy} onClick={() => void leave()}>Đăng xuất</Button></Space>
     </header>
-    <main className="customer-content"><Outlet /></main>
+    <main className="customer-content"><nav aria-label="Điều hướng khách hàng" className="customer-navigation">
+      <Space wrap size="middle"><Link to="/customer/home">Trang chủ</Link>
+        <Link to="/customer/appointments">Lịch hẹn của tôi</Link>
+        <Link to="/customer/patient-link">Liên kết hồ sơ</Link></Space>
+    </nav><Outlet /></main>
   </div>;
 }
 
@@ -179,6 +183,8 @@ export function CustomerHomePage() {
     <Space direction="vertical" size="middle" style={{ width: '100%' }}>
       <Card title="Đặt lịch khám"><Typography.Paragraph>Chọn lịch cho bản thân hoặc người thân.</Typography.Paragraph>
         <Link to="/customer/book"><Button type="primary">Bắt đầu đặt lịch</Button></Link></Card>
+      <Card title="Lịch hẹn của tôi"><Typography.Paragraph>Xem lịch sắp tới, lịch sử và đổi hoặc hủy lịch đủ điều kiện.</Typography.Paragraph>
+        <Link to="/customer/appointments"><Button>Xem lịch hẹn</Button></Link></Card>
       <Card title="Liên kết hồ sơ của tôi"><Typography.Paragraph>Gửi yêu cầu hoặc xem trạng thái liên kết hồ sơ của chính bạn.</Typography.Paragraph>
         <Link to="/customer/patient-link"><Button>Liên kết hồ sơ của tôi</Button></Link></Card>
     </Space>

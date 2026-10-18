@@ -23,8 +23,23 @@ public sealed record PreviewAvailabilityRequest(ScheduleCommand Schedule, Availa
 public sealed record ResourceCheck(int BranchId, int DentistId, int? ServiceId, DateTimeOffset Start, int DurationMinutes,
     int? ChairId, int? AssistantId, string? AttendeeKey, int ExpectedScheduleVersion,
     int? ExpectedAssistantScheduleVersion = null, Guid? ExcludeReservationId = null, bool Public = false);
+public sealed record BranchPeriod(int BranchId, int Day, int StartMinute, int EndMinute, string Kind, string Reason = "");
+public sealed record RecurringCommand(int DentistId, DateOnly Date, string Kind, int ExpectedVersion,
+    BranchPeriod[] Intervals, Guid RequestKey, string Reason = "");
+public sealed record RevisionDto(Guid Id, int DentistId, DateOnly Date, string Kind, int Version,
+    BranchPeriod[] Intervals, string Reason, int PublishedBy, DateTimeOffset PublishedAt);
+public sealed record RecurringScheduleDto(int DentistId, int Version, RevisionDto? Template, RevisionDto? Exception,
+    RevisionDto[] FutureChanges, ScheduleDto[] LegacyWeek);
+public sealed record RecurringPublishResult(RecurringScheduleDto Schedule, SystemMessage Notification);
+public sealed record RecurringPreviewRequest(RecurringCommand Schedule, int BranchId, int? ServiceId,
+    DateOnly From, DateOnly To, int DurationMinutes, int? AssistantId = null);
+public sealed record RecurringAvailabilityResult(AvailabilityResult[] Days);
 public interface IWorkingScheduleService
 {
+    Task<RecurringScheduleDto> GetRecurringAsync(int actorId, int dentistId, DateOnly date, CancellationToken ct);
+    Task<SchedulePreview> PreviewRecurringAsync(int actorId, RecurringCommand command, CancellationToken ct);
+    Task<RecurringPublishResult> PublishRecurringAsync(int actorId, RecurringCommand command, CancellationToken ct);
+    Task<RecurringAvailabilityResult> PreviewRecurringAvailabilityAsync(int actorId, RecurringPreviewRequest request, CancellationToken ct);
     Task<ScheduleOptions> OptionsAsync(int actorId, CancellationToken ct);
     Task<ScheduleOptions> PublicOptionsAsync(int branchId, CancellationToken ct);
     Task<ScheduleDto> GetAsync(int actorId, int branchId, int dentistId, DateOnly weekStart, CancellationToken ct);
@@ -35,6 +50,8 @@ public interface IWorkingScheduleService
 public interface IAvailabilityService
 {
     Task<AvailabilityResult> QueryAsync(AvailabilityQuery query, int? staffActorId, CancellationToken ct);
+    // Caller must authorize the existing appointment and supply its immutable resource requirements.
+    Task<AvailabilityResult> QueryForReservationAsync(AvailabilityQuery query, Guid reservationId, string? attendeeKey, CancellationToken ct);
     // TV2: caller MUST begin a transaction on the same scoped DbContext and persist reservations before commit.
     Task<AvailabilitySlot> CheckInTransactionAsync(ResourceCheck request, CancellationToken ct);
 }

@@ -65,6 +65,8 @@ public static class DependencyInjection
         services.AddScoped<Features.Scheduling.DevelopmentSchedulingSeeder>();
         services.AddScoped<IAppointmentService, AppointmentService>();
         services.AddScoped<IAppointmentQueryService, AppointmentQueryService>();
+        services.AddScoped<IAppointmentChangeService, AppointmentChangeService>();
+        services.AddScoped<IFollowUpAppointmentChangePort, UnavailableFollowUpAppointmentChangePort>();
         services.AddScoped<DevelopmentAppointmentSeeder>();
         services.AddScoped<IFollowUpBookingPort, UnavailableFollowUpBookingPort>();
         // S03 recovery delivery: a configured SMTP server sends real email in any environment; otherwise

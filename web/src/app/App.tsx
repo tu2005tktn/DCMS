@@ -17,6 +17,8 @@ import { AccessPage, CustomerGuard, CustomerHomePage, CustomerRegisterPage, Cust
 import { useCustomerAuth } from '../features/customer-auth/CustomerAuthContext';
 import CustomerBookingPage from '../features/customer-booking/CustomerBookingPage';
 import CustomerPatientLinkPage from '../features/customer-patient-link/CustomerPatientLinkPage';
+import CustomerAppointmentsPage from '../features/customer-appointments/CustomerAppointmentsPage';
+import CustomerAppointmentDetailPage from '../features/customer-appointments/CustomerAppointmentDetailPage';
 
 export default function App() {
   return <Routes>
@@ -29,6 +31,8 @@ export default function App() {
       <Route index element={<Navigate to="/customer/home" replace />} />
       <Route path="home" element={<CustomerHomePage />} />
       <Route path="patient-link" element={<CustomerPatientLinkPage />} />
+      <Route path="appointments" element={<CustomerAppointmentsPage />} />
+      <Route path="appointments/:code" element={<CustomerAppointmentDetailPage />} />
     </Route>
     <Route path="/customer/*" element={<Result status="404" title="Không tìm thấy trang" extra={<Link to="/customer/home">Về trang chủ</Link>} />} />
     <Route path="/recover" element={<RecoverAccountPage />} />

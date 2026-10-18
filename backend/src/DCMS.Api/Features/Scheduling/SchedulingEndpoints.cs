@@ -9,6 +9,14 @@ public static class SchedulingEndpoints
     public static void MapSchedulingEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var group = endpoints.MapGroup("/api/working-schedules").RequireAuthorization().WithTags("S09 UC-03");
+        group.MapGet("/recurring", async (HttpContext context, int dentistId, DateOnly date, IWorkingScheduleService service, CancellationToken ct) =>
+            Results.Ok(await service.GetRecurringAsync(AuthenticationEndpoints.AccountId(context.User), dentistId, date, ct)));
+        group.MapPost("/recurring/preview", async (HttpContext context, RecurringCommand request, IWorkingScheduleService service, CancellationToken ct) =>
+            Results.Ok(await service.PreviewRecurringAsync(AuthenticationEndpoints.AccountId(context.User), request, ct)));
+        group.MapPost("/recurring/publish", async (HttpContext context, RecurringCommand request, IWorkingScheduleService service, CancellationToken ct) =>
+            Results.Ok(await service.PublishRecurringAsync(AuthenticationEndpoints.AccountId(context.User), request, ct)));
+        group.MapPost("/recurring/preview-availability", async (HttpContext context, RecurringPreviewRequest request, IWorkingScheduleService service, CancellationToken ct) =>
+            Results.Ok(await service.PreviewRecurringAvailabilityAsync(AuthenticationEndpoints.AccountId(context.User), request, ct)));
         group.MapGet("/options", async (HttpContext context, IWorkingScheduleService service, CancellationToken ct) =>
             Results.Ok(await service.OptionsAsync(AuthenticationEndpoints.AccountId(context.User), ct)));
         group.MapGet("/", async (HttpContext context, int branchId, int dentistId, DateOnly weekStart, IWorkingScheduleService service, CancellationToken ct) =>

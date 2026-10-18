@@ -21,7 +21,7 @@ export type AppointmentChange = {
   action: 'RESCHEDULE' | 'CANCEL'; actorKind: 'SELF' | 'STAFF'; oldStart: string; newStart: string | null; reason: string; occurredAt: string;
 };
 export type AppointmentDetail = AppointmentCard & {
-  branchId: number; branchName: string; dentistId: number; serviceId: number; serviceName: string;
+  branchId: number; branchName: string; dentistId: number; assistantId?: number | null; serviceId: number; serviceName: string;
   bookerName: string; bookerContactMasked: string; followUp: { id: number; status: string } | null;
   eligibility: { canSelfService: boolean; hoursRemaining: number; reasonCode: IneligibleReason | null; canRequestSupport: boolean };
   supportRequests: SupportRequest[]; history: AppointmentChange[]; clinicContact: { phone: string; hours: string };

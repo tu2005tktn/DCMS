@@ -13,7 +13,7 @@ export { AppointmentApiError };
 export type AppointmentsApi = {
   list: (token: string, query: AppointmentQuery) => Promise<AppointmentPage>;
   detail: (token: string, code: string) => Promise<AppointmentDetail>;
-  availability: (detail: AppointmentDetail, date: string) => Promise<AvailabilitySlot[]>;
+  availability: (token: string, detail: AppointmentDetail, date: string) => Promise<AvailabilitySlot[]>;
   reschedule: (token: string, code: string, command: RescheduleCommand) => Promise<AppointmentChangeResult>;
   cancel: (token: string, code: string, command: CancelCommand) => Promise<AppointmentChangeResult>;
   requestSupport: (token: string, code: string, command: SupportCommand) => Promise<SupportResult>;
@@ -46,10 +46,9 @@ const httpAppointmentsApi: AppointmentsApi = {
     return call<AppointmentPage>(`/api/me/appointments?${query}`, token);
   },
   detail: (token, code) => call<AppointmentDetail>(`/api/me/appointments/${encodeURIComponent(code)}`, token),
-  availability: async (detail, date) => {
-    const query = new URLSearchParams({ branchId: String(detail.branchId), dentistId: String(detail.dentistId),
-      serviceId: String(detail.serviceId), date, durationMinutes: String(detail.durationMinutes) });
-    return (await call<{ slots: AvailabilitySlot[] }>(`/api/availability?${query}`, null)).slots;
+  availability: async (token, detail, date) => {
+    const query = new URLSearchParams({ date });
+    return (await call<{ slots: AvailabilitySlot[] }>(`/api/appointments/${encodeURIComponent(detail.code)}/availability?${query}`, token)).slots;
   },
   reschedule: (token, code, command) => call(`/api/appointments/${encodeURIComponent(code)}/reschedule`, token, post(command)),
   cancel: (token, code, command) => call(`/api/appointments/${encodeURIComponent(code)}/cancel`, token, post(command)),

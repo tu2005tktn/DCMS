@@ -34,7 +34,7 @@ public sealed record MyAppointmentDetail(string Code, DateTimeOffset Start, Date
     string DentistName, string AttendeeName, string AttendeeKind, string Status, string Access, int Version,
     int BranchId, string BranchName, int DentistId, int? ServiceId, string ServiceName, string BookerName,
     string BookerContactMasked, object? FollowUp, MyEligibility Eligibility, IReadOnlyList<object> SupportRequests,
-    IReadOnlyList<object> History, MyClinicContact ClinicContact);
+    IReadOnlyList<MyAppointmentChange> History, MyClinicContact ClinicContact, int? AssistantId = null);
 public sealed record MyAppointmentQuery(string Scope, string? Status, DateOnly? From, DateOnly? To, int Page, int PageSize);
 
 public interface IAppointmentQueryService
@@ -45,4 +45,5 @@ public interface IAppointmentQueryService
     Task<StaffAppointmentDetail> DetailAsync(int actorId, Guid id, CancellationToken ct);
     Task<MyAppointmentPage> MineAsync(int accountId, MyAppointmentQuery query, CancellationToken ct);
     Task<MyAppointmentDetail> MineDetailAsync(int accountId, string code, CancellationToken ct);
+    Task<MyAppointmentDetail> ChangeDetailAsync(int accountId, string code, CancellationToken ct);
 }

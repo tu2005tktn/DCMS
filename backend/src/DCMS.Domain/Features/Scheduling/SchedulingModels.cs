@@ -42,6 +42,31 @@ public sealed class WorkingWeek
     public DateTimeOffset PublishedAt { get; set; }
     public List<WorkingPeriod> Periods { get; set; } = [];
 }
+
+// Immutable publications; a later revision on the same effective date supersedes the earlier one.
+public sealed class WorkingScheduleRevision
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public int EmployeeId { get; set; }
+    public int Version { get; set; }
+    public DateOnly Date { get; set; }
+    public string Kind { get; set; } = "Template";
+    public string Reason { get; set; } = "";
+    public int PublishedBy { get; set; }
+    public DateTimeOffset PublishedAt { get; set; }
+    public List<RevisionPeriod> Periods { get; set; } = [];
+}
+public sealed class RevisionPeriod
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid RevisionId { get; set; }
+    public int BranchId { get; set; }
+    public int Day { get; set; }
+    public int StartMinute { get; set; }
+    public int EndMinute { get; set; }
+    public string Kind { get; set; } = "Work";
+    public string Reason { get; set; } = "";
+}
 public sealed class WorkingPeriod
 {
     public Guid Id { get; set; } = Guid.NewGuid();
