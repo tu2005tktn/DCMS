@@ -1,4 +1,5 @@
 using DCMS.Application.Common;
+using DCMS.Application.Features.Accounts;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
@@ -22,6 +23,8 @@ public sealed class BusinessErrorMiddleware(RequestDelegate next, ILogger<Busine
                 BusinessException business => (business.Status, business.Response),
                 BadHttpRequestException => (400, SystemMessages.Get("MSG04", "Yêu cầu")),
                 DbUpdateConcurrencyException => (409, SystemMessages.Get("MSG111")),
+                _ when context.Request.Path.StartsWithSegments("/api/accounts")
+                    && postgres?.SqlState == PostgresErrorCodes.UniqueViolation => (409, StaffAccountConflicts.ForConstraint(postgres.ConstraintName)),
                 _ when (context.Request.Path.StartsWithSegments("/api/accounts")
                         || context.Request.Path.StartsWithSegments("/api/auth/register")
                         || context.Request.Path.StartsWithSegments("/api/auth/google"))

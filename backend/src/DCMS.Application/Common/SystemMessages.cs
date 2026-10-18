@@ -1,7 +1,11 @@
 namespace DCMS.Application.Common;
 
 // Exact Vietnamese wording from the v1.2 specification, section 3.
-public sealed record SystemMessage(string Code, string Message);
+public sealed record SystemMessage(string Code, string Message)
+{
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? Field { get; init; }
+}
 
 public static class SystemMessages
 {

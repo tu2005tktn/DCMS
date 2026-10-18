@@ -12,10 +12,10 @@
  * KHÔNG log body request/response vì có thể chứa token.
  */
 
-export type SystemMessage = { code: string; message: string };
+export type SystemMessage = { code: string; message: string; field?: string };
 
 export class ApiError extends Error {
-  constructor(public status: number, public code: string, message: string) { super(message); }
+  constructor(public status: number, public code: string, message: string, public field?: string) { super(message); }
 }
 
 const base = (import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5080').replace(/\/$/, '');
@@ -63,7 +63,7 @@ export async function api<T>(path: string, init: RequestInit = {}, authenticated
   if (!response.ok) {
     const fallback = { code: 'MSG144', message: 'Không thể hoàn tất thao tác. Vui lòng kiểm tra kết nối và thử lại.' };
     const body = await response.json().catch(() => fallback) as SystemMessage;
-    const error = new ApiError(response.status, body.code ?? fallback.code, body.message ?? fallback.message);
+    const error = new ApiError(response.status, body.code ?? fallback.code, body.message ?? fallback.message, body.field);
     if (response.status === 401 && authenticated) {
       // S26+ — token invalid/expired → xoá khỏi storage, gọi sessionLost callback.
       setAccessToken(null);

@@ -138,7 +138,7 @@ export default function SignInScreen() {
                 validateField('password', password);
               }}
               error={touched.password ? fieldErrors.password : null}
-              hint="Ít nhất 12 ký tự, có chữ hoa, chữ thường, số và ký tự đặc biệt."
+              hint="Nhập mật khẩu hiện tại của bạn."
               disabled={isSubmitting}
               testID="sign-in-password"
             />
