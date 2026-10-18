@@ -1,10 +1,16 @@
-import { GoogleSignin, isErrorWithCode, isSuccessResponse, statusCodes } from '@react-native-google-signin/google-signin';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { useState } from 'react';
 import { Platform, Text } from 'react-native';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { ApiError } from '@/services/api/api-error';
 import { colors } from '@/theme/colors';
 import { googleAuthApi } from './google-auth.api';
+
+// The native Google module is not part of Expo Go; loading it there crashes the whole app at startup.
+// It is required lazily and only in a development/standalone build.
+const inExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+type GoogleModule = typeof import('@react-native-google-signin/google-signin');
+const loadGoogle = (): GoogleModule => require('@react-native-google-signin/google-signin') as GoogleModule;
 
 interface Props {
   onCredential: (token: string) => Promise<void>;
@@ -18,6 +24,7 @@ export function GoogleIdentityButton({ onCredential, onError }: Props) {
     if (busy) return;
     setBusy(true);
     onError('');
+    const { GoogleSignin, isErrorWithCode, isSuccessResponse, statusCodes } = loadGoogle();
     try {
       const config = await googleAuthApi.config();
       if (!config.enabled || !config.clientId) {
@@ -46,6 +53,10 @@ export function GoogleIdentityButton({ onCredential, onError }: Props) {
     } finally {
       setBusy(false);
     }
+  }
+
+  if (inExpoGo) {
+    return <Text style={{ color: colors.muted, textAlign: 'center' }}>Đăng nhập Google cần bản build Android riêng, không chạy trên Expo Go.</Text>;
   }
 
   if (Platform.OS !== 'android') {

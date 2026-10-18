@@ -101,6 +101,18 @@ export default function AccountHomeScreen() {
 
       {user.accountType === 'Public' && (
         <View style={styles.linkSection}>
+          <Text style={styles.linkDescription}>Xem, đổi hoặc hủy lịch hẹn bạn đã đặt.</Text>
+          <PrimaryButton
+            label="Lịch hẹn của tôi"
+            onPress={() => router.push('/(account)/appointments')}
+            disabled={signingOut}
+            testID="open-appointments"
+          />
+        </View>
+      )}
+
+      {user.accountType === 'Public' && (
+        <View style={styles.linkSection}>
           <Text style={styles.linkDescription}>Gửi yêu cầu hoặc xem trạng thái liên kết hồ sơ của bạn.</Text>
           <PrimaryButton
             label="Liên kết hồ sơ của tôi"

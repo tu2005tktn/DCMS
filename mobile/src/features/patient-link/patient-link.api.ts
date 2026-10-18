@@ -1,6 +1,6 @@
 import { env } from '@/config/env';
 import { ApiError } from '@/services/api/api-error';
-import type { OwnRecordSummary, SelfLinkChange, SelfLinkOverview, SelfLinkRequest, SubmitLinkRequest, SystemMessage } from './patient-link.types';
+import type { OwnPatientRecord, OwnRecordChange, OwnRecordSummary, SelfLinkChange, UpdateOwnRecord, SelfLinkOverview, SelfLinkRequest, SubmitLinkRequest, SystemMessage } from './patient-link.types';
 
 const connectionMessage = 'Không thể hoàn tất thao tác. Vui lòng kiểm tra kết nối và thử lại.';
 
@@ -31,4 +31,7 @@ export const patientLinkApi = {
   withdraw: (token: string, id: number, version: number) =>
     call<SelfLinkRequest>(`/api/patient-links/me/requests/${id}/withdraw`, token, { method: 'POST', body: JSON.stringify({ version }) }),
   ownRecord: (token: string) => call<OwnRecordSummary>('/api/patient-links/me/record', token),
+  myRecord: (token: string) => call<OwnPatientRecord>('/api/patients/me', token),
+  updateMyRecord: (token: string, request: UpdateOwnRecord) =>
+    call<OwnRecordChange>('/api/patients/me', token, { method: 'PUT', body: JSON.stringify(request) }),
 };

@@ -1,4 +1,5 @@
 using DCMS.Api.Features.Authentication;
+using DCMS.Api.Features.PatientLinks;
 using DCMS.Application.Features.Patients;
 
 namespace DCMS.Api.Features.Patients;
@@ -10,6 +11,14 @@ public static class PatientEndpoints
 
     public static void MapPatientEndpoints(this IEndpointRouteBuilder endpoints)
     {
+        // Patient app "Hồ sơ của tôi": subject from the session; the service requires a VERIFIED self link.
+        var own = endpoints.MapGroup("/api/patients/me").RequireAuthorization(PatientLinkEndpoints.PublicAccountPolicy)
+            .WithTags("UC-36 Own patient record");
+        own.MapGet("/", async (HttpContext context, IPatientService service, CancellationToken ct) =>
+            Results.Ok(await service.OwnAsync(AuthenticationEndpoints.AccountId(context.User), ct)));
+        own.MapPut("/", async (HttpContext context, UpdateOwnPatientRequest request, IPatientService service, CancellationToken ct) =>
+            Results.Ok(await service.UpdateOwnAsync(AuthenticationEndpoints.AccountId(context.User), request, ct)));
+
         // S05/S06: read for Clinic Assistant and Dentist (Owner via effective Dentist); writes for Clinic Assistant only.
         var group = endpoints.MapGroup("/api/patients").RequireAuthorization(ReadPolicy).WithTags("UC-08/09/38 S05/S06 Patients");
         group.MapGet("/", async (IPatientService service, string? keyword, DateOnly? birthDate, bool? includeArchived,
