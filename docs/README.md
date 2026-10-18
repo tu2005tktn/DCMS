@@ -13,6 +13,8 @@
 - [Chạy thử đăng nhập và quản lý tài khoản](implementation/RUN-ACCOUNTS.vi.md): migration, demo và kiểm tra tự động.
 - [UC-36 S07/S08 liên kết hồ sơ tự thân](implementation/UC36-S07-S08.md): quy tắc, API contract, dữ liệu, kiểm thử, phần hoãn.
 - [UC-08/09/38 S05/S06 tìm kiếm và hồ sơ bệnh nhân](implementation/UC08-09-38-S05-S06.md): quyền, dữ liệu, nghi trùng, API, màn hình, phần hoãn.
+- [UC-04/05 S10/S11 lịch hẹn web, đặt lịch tại quầy, API đọc lịch](implementation/UC04-05-S10-S11.md): phạm vi xem, API đọc dùng chung, lưới 15 phút, form quầy dùng lệnh đặt lịch chung.
+- [Runbook chạy demo DCMS](implementation/RUN-DEMO.vi.md): khởi động nhanh 3 terminal, kịch bản demo, cách đọc mã xác minh, lỗi đã sửa 13/10/2026 và các việc cần chuẩn bị để deploy thật.
 
 Architecture: `Domain` contains business rules, `Application` defines use cases and contracts, `Infrastructure` supplies PostgreSQL/EF Core implementations, and `Api` configures HTTP endpoints and dependency injection. Add feature folders within each layer when implementing business features.
 
