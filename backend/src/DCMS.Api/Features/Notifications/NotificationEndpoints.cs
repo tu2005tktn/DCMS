@@ -32,11 +32,12 @@ public static class NotificationEndpoints
         group.MapPost("/mark-read", async (HttpContext ctx, MarkReadRequest request,
             INotificationService service, CancellationToken ct) =>
         {
-            if (request is null || request.NotificationIds is null || request.NotificationIds.Count == 0)
-                throw new BusinessException(400, SystemMessages.Get("MSG09"));
-            if (request.ExpectedAccountId <= 0)
+            if (request is null || request.NotificationIds is null || request.NotificationIds.Count == 0
+                || request.NotificationIds.Count > 100)
                 throw new BusinessException(400, SystemMessages.Get("MSG09"));
             var accountId = AuthenticationEndpoints.AccountId(ctx.User);
+            if (request.ExpectedAccountId != accountId)
+                throw new BusinessException(409, SystemMessages.Get("MSG111"));
             // Đảm bảo chỉ mark của account hiện tại.
             var result = await service.MarkReadAsync(accountId, request with { ExpectedAccountId = accountId }, ct);
             return Results.Ok(result);

@@ -137,4 +137,5 @@ public interface INotificationStore
     Task<bool> MarkReadAsync(string id, int expectedAccountId, CancellationToken ct);
     Task<bool> ExistsByDedupeKeyAsync(string dedupeKey, CancellationToken ct);
     Task<string?> GetCursorForAccountAsync(int accountId, DateTimeOffset since, CancellationToken ct);
+    Task<bool> CanOpenAppointmentAsync(int accountId, string appointmentRef, CancellationToken ct);
 }

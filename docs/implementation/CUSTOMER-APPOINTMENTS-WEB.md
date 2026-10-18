@@ -8,7 +8,7 @@ Triển khai S14/S16 cho cổng `/customer`, dùng API thật của UC-05/06. Kh
 
 - `/customer/appointments`: Sắp tới/Lịch sử, trạng thái, khoảng ngày UTC+7, phân trang, nhãn người đặt/người khám và đường vào chi tiết.
 - `/customer/appointments/:code`: thông tin lịch, người đặt/người khám, eligibility, liên hệ phòng khám và timeline lịch sử thật.
-- Hai dialog đổi/hủy có lý do, xem lại và xác nhận; lấy slot theo lịch có xác thực. Chỉ cập nhật chi tiết từ response thành công. Chặn double-submit; giữ requestKey khi retry mạng/5xx; MSG34 giữ lý do và lấy lại slot; MSG111/MSG31 yêu cầu reload. 401 xóa phiên, 403/404 xóa dữ liệu lịch còn trong màn hình và giữ phiên khách hàng.
+- Hai dialog đổi/hủy có lý do, xem lại và xác nhận. Dialog đổi lịch tái sử dụng options của màn đặt lịch để chọn nha sĩ active cùng chi nhánh, rồi lấy slot có xác thực theo mã lịch + nha sĩ + ngày; phần xem lại hiển thị cả nha sĩ cũ/mới. Chỉ cập nhật chi tiết từ response thành công. Chặn double-submit; giữ requestKey khi retry mạng/5xx; MSG34 giữ nha sĩ/ngày/lý do và lấy lại slot; MSG111/MSG31 yêu cầu reload. 401 xóa phiên, 403/404 xóa dữ liệu lịch còn trong màn hình và giữ phiên khách hàng.
 - Link từ trang chủ, thanh điều hướng khách hàng và kết quả đặt lịch đã đăng nhập. Lịch đã hủy nằm trong Lịch sử; quay về danh sách tải lại từ API.
 
 ## Kiểm chứng 18/10/2026

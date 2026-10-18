@@ -100,7 +100,12 @@ function requireSelfService(x: Stored, expectedVersion: number) {
   if (!eligibility(x).canSelfService) throw fail(409, 'MSG31');
 }
 
-function freeSlots(x: Stored, date: string): AvailabilitySlot[] {
+const mockDentists = [
+  { id: 2, branchId: 1, name: 'BS. Nha sĩ demo' },
+  { id: 3, branchId: 1, name: 'BS. Nguyễn Minh Anh' },
+];
+
+function freeSlots(x: Stored, date: string, dentistId = x.dentistId): AvailabilitySlot[] {
   const dayStart = clinicMidnight(date).getTime();
   const slots: AvailabilitySlot[] = [];
   for (let minute = 8 * 60; minute + x.durationMinutes <= 17 * 60; minute += 30) {
@@ -108,9 +113,9 @@ function freeSlots(x: Stored, date: string): AvailabilitySlot[] {
     const start = new Date(dayStart + minute * 60_000).toISOString();
     const end = plusMinutes(start, x.durationMinutes);
     if (Date.parse(start) < Date.now() + HOUR) continue; // public lead time ≥ 60 minutes
-    const busy = store.some(o => o.code !== x.code && o.dentistId === x.dentistId && (o.status === 'Confirmed' || o.status === 'CheckedIn')
+    const busy = store.some(o => o.code !== x.code && o.dentistId === dentistId && (o.status === 'Confirmed' || o.status === 'CheckedIn')
       && Date.parse(o.start) < Date.parse(end) && Date.parse(start) < Date.parse(o.end));
-    if (!busy && start !== x.start) slots.push({ start, end, chairId: 1 + (minute / 30) % 2, dentistId: x.dentistId, assistantId: null,
+    if (!busy && (dentistId !== x.dentistId || start !== x.start)) slots.push({ start, end, chairId: 1 + (minute / 30) % 2, dentistId, assistantId: null,
       scheduleVersion: 1, assistantScheduleVersion: null });
   }
   return slots;
@@ -128,22 +133,28 @@ export const mockAppointmentsApi: AppointmentsApi = {
     return { items: page.map(card), total: rows.length, page: q.page, pageSize: q.pageSize };
   },
   async detail(_token, code) { await delay(); return detailOf(own(code)); },
-  async availability(_token, detail, date) {
+  async rescheduleDentists(_token, detail) {
     await delay();
-    return freeSlots(own(detail.code), date);
+    return copy(mockDentists.filter(value => value.branchId === detail.branchId && value.id !== detail.assistantId));
+  },
+  async availability(_token, detail, date, dentistId) {
+    await delay();
+    return freeSlots(own(detail.code), date, dentistId);
   },
   async reschedule(_token, code, c) {
     await delay();
     const x = own(code);
-    return replay(c.requestKey, JSON.stringify(['reschedule', code, c.expectedVersion, c.newStart, c.chairId, c.reason]), () => {
+    return replay(c.requestKey, JSON.stringify(['reschedule', code, c.expectedVersion, c.dentistId, c.newStart, c.chairId, c.reason]), () => {
       if (!c.reason.trim()) throw invalid('Lý do');
       requireSelfService(x, c.expectedVersion);
       // Recheck the chosen slot as the server would; failure keeps the original interval untouched.
       const date = clinicDate(new Date(c.newStart));
       const local = formatDateTime(c.newStart).slice(0, 5);
-      if (local === RACED_LOCAL_TIME || !freeSlots(x, date).some(s => s.start === c.newStart && s.chairId === c.chairId)) throw fail(409, 'MSG34');
+      if (local === RACED_LOCAL_TIME || !mockDentists.some(value => value.id === c.dentistId && value.branchId === x.branchId)
+        || !freeSlots(x, date, c.dentistId).some(s => s.start === c.newStart && s.chairId === c.chairId)) throw fail(409, 'MSG34');
       x.history.unshift({ action: 'RESCHEDULE', actorKind: 'SELF', oldStart: x.start, newStart: c.newStart, reason: c.reason.trim(), occurredAt: new Date().toISOString() });
-      x.start = c.newStart; x.end = plusMinutes(c.newStart, x.durationMinutes); x.version += 1;
+      x.start = c.newStart; x.end = plusMinutes(c.newStart, x.durationMinutes);
+      x.dentistId = c.dentistId; x.dentistName = mockDentists.find(value => value.id === c.dentistId)!.name; x.version += 1;
       // The follow-up link is kept (GBR-076).
       return { appointment: detailOf(x), notification: { code: 'MSG35', message: `Đã đổi lịch hẹn sang ${formatDateTime(x.start)}. Mọi thông báo nhắc lịch sẽ theo giờ hẹn mới.` } };
     });
@@ -169,7 +180,7 @@ export const mockAppointmentsApi: AppointmentsApi = {
       if (supports.some(s => s.appointmentCode === code && s.status === 'Pending')) throw fail(409, 'MSG111');
       if (!eligibility(x).canRequestSupport) throw fail(409, 'MSG31');
       const request: SupportRequest = { id: nextSupportId++, appointmentCode: code, kind: c.kind, reason: c.reason.trim(), status: 'Pending',
-        createdAt: new Date().toISOString(), decidedAt: null, publicNote: null, version: 1 };
+        createdAt: new Date().toISOString(), decidedAt: null, publicNote: null, version: 1, proposedStartAt: c.newStartAt ?? null };
       supports.push(request);
       // The appointment is untouched: still Confirmed, no slot is held.
       return { request: copy(request), notification: { code: 'MSG33', message: MESSAGES.MSG33 } };
@@ -177,7 +188,7 @@ export const mockAppointmentsApi: AppointmentsApi = {
   },
   async withdrawSupport(_token, id, expectedVersion) {
     await delay();
-    const request = supports.find(s => s.id === id);
+    const request = supports.find(s => String(s.id) === String(id));
     if (!request) throw fail(404, 'MSG102');
     if (request.version !== expectedVersion || request.status !== 'Pending') throw fail(409, 'MSG111');
     request.status = 'Withdrawn'; request.decidedAt = new Date().toISOString(); request.version += 1;
@@ -187,3 +198,48 @@ export const mockAppointmentsApi: AppointmentsApi = {
 
 // Development helper for demos: restore the seeded data.
 export function resetMockAppointments() { store = seed(); supports = []; nextSupportId = 1; receipts.clear(); }
+
+export function addMockBooking(result: {
+  code: string;
+  startAt: string;
+  endAt: string;
+  status: string;
+  version: number;
+}, meta: {
+  branchId: number;
+  branchName: string;
+  dentistId: number;
+  dentistName: string;
+  serviceId: number;
+  serviceName: string;
+  durationMinutes: number;
+  bookerName: string;
+  attendeeName: string;
+  attendeeKind: 'SELF' | 'RELATIVE';
+}) {
+  const existing = store.find(x => x.code === result.code);
+  if (existing) return;
+  const row: Stored = {
+    code: result.code,
+    start: result.startAt,
+    end: result.endAt,
+    durationMinutes: meta.durationMinutes,
+    dentistId: meta.dentistId,
+    dentistName: meta.dentistName || 'BS. Nha sĩ demo',
+    branchId: meta.branchId,
+    branchName: meta.branchName || 'DCMS',
+    serviceId: meta.serviceId,
+    serviceName: meta.serviceName || 'Khám tổng quát',
+    attendeeName: meta.attendeeName,
+    attendeeKind: meta.attendeeKind,
+    status: (result.status as AppointmentStatus) || 'Confirmed',
+    access: 'BOOKED_BY_ME',
+    bookerName: meta.bookerName,
+    bookerContactMasked: '09******88',
+    clinicContact: contact,
+    version: result.version || 1,
+    followUp: null,
+    history: [],
+  };
+  store.unshift(row);
+}

@@ -230,6 +230,7 @@ export type NotificationKind =
   | 'AppointmentRescheduled' // đã đổi
   | 'AppointmentCancelled'   // đã huỷ
   | 'ReminderUpcoming'       // reminder 24h / 2h
+  | 'SupportRequestCreated'  // gửi yêu cầu hỗ trợ / đổi lịch < 12h
   | 'SupportRequestUpdate'   // staff phản hồi request
   | 'NoShow'                 // staff đánh dấu không đến
   | 'ScheduleReduced';       // lịch bị ảnh hưởng

@@ -10,6 +10,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@microsoft/signalr": "^8.0.29",
     "antd": "5.24.0",
     "react": "19.0.0",
     "react-dom": "19.0.0",

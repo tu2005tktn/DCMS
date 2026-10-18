@@ -184,11 +184,27 @@ public sealed class AppointmentQueryService(DcmsDbContext db, UserManager<Applic
         var history = await db.AppointmentChanges.AsNoTracking().Where(x => x.AppointmentId == row.Id)
             .OrderByDescending(x => x.OccurredAt).ThenByDescending(x => x.Id)
             .Select(x => new MyAppointmentChange(x.Action, x.ActorKind, x.OldStart, x.NewStart, x.Reason, x.OccurredAt)).ToArrayAsync(ct);
+        var supportRequests = await db.AppointmentSupportRequests.AsNoTracking()
+            .Where(x => x.AppointmentId == row.Id)
+            .OrderByDescending(x => x.CreatedAt)
+            .Select(x => new
+            {
+                id = x.Code,
+                appointmentCode = row.Code,
+                kind = x.Kind == "Change" ? "RESCHEDULE" : x.Kind == "Cancel" ? "CANCEL" : x.Kind,
+                reason = x.Reason ?? "",
+                status = x.Status,
+                createdAt = x.CreatedAt,
+                decidedAt = x.DecidedAt,
+                publicNote = x.PublicNote,
+                version = x.Version,
+                proposedStartAt = x.ProposedStartAt
+            }).ToListAsync(ct);
         return new(card.Code, card.Start, card.End, card.DurationMinutes, card.DentistName, card.AttendeeName, card.AttendeeKind,
             card.Status, staff ? "STAFF" : card.Access, card.Version, row.BranchId, branch ?? "", row.DentistId, row.ServiceId, service ?? "Khám và tư vấn",
             row.BookerName, MaskPhone(row.BookerPhone) ?? MaskEmail(row.BookerEmail) ?? "",
             row.FollowUpId.HasValue ? new { id = row.FollowUpId, status = row.Status == "Cancelled" ? "NeedsBooking" : "Booked" } : null,
-            new(reason == null, Math.Round(hours, 2), reason, reason == "WITHIN_12H"), [], history,
+            new(reason == null, Math.Round(hours, 2), reason, reason == "WITHIN_12H"), supportRequests, history,
             new(configuration["Clinic:Phone"] ?? "0234 3 888 999", configuration["Clinic:Hours"] ?? "Thứ 2 – Thứ 7, 08:00 – 17:00"), row.AssistantId);
     }
 

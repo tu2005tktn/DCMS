@@ -25,16 +25,23 @@ public sealed class AppointmentChangeService(DcmsDbContext db, IAvailabilityServ
     private static BusinessException Error(string code, int status = 409) => new(status, SystemMessages.Get(code));
     private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
-    public async Task<AvailabilityResult> AvailabilityAsync(int actorId, string code, DateOnly date, CancellationToken ct)
+    public async Task<AvailabilityResult> AvailabilityAsync(int actorId, string code, DateOnly date, int? dentistId, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(code) || code.Length > 40 || date.Year is < 2000 or > 2100) throw Error("MSG04", 400);
         var (appointment, staff) = await AuthorizeAsync(actorId, code, ct);
-        RequireEligible(appointment, staff, clock.GetUtcNow());
+        RequireAvailabilityEligible(appointment, clock.GetUtcNow());
+        var selectedDentistId = dentistId ?? appointment.DentistId;
+        if (selectedDentistId <= 0 || selectedDentistId == appointment.AssistantId) throw Error("MSG04", 400);
         var reservation = await db.Set<ResourceReservation>().AsNoTracking().SingleAsync(x => x.Id == appointment.ReservationId, ct);
-        var result = await availability.QueryForReservationAsync(new(appointment.BranchId, appointment.DentistId,
+        var result = await availability.QueryForReservationAsync(new(appointment.BranchId, selectedDentistId,
             appointment.ServiceId, date, (int)(appointment.EndAt - appointment.StartAt).TotalMinutes, appointment.AssistantId),
             reservation.Id, reservation.AttendeeKey, ct);
-        return result with { Slots = result.Slots.Where(x => x.Start != appointment.StartAt).ToArray() };
+        return result with { Slots = result.Slots.Where(x => selectedDentistId != appointment.DentistId || x.Start != appointment.StartAt).ToArray() };
+    }
+
+    private static void RequireAvailabilityEligible(Appointment appointment, DateTimeOffset now)
+    {
+        if (appointment.Status != "Confirmed" || appointment.StartAt <= now) throw Error("MSG31");
     }
 
     private static void RequireEligible(Appointment appointment, bool staff, DateTimeOffset now)
@@ -91,7 +98,8 @@ public sealed class AppointmentChangeService(DcmsDbContext db, IAvailabilityServ
         var fingerprint = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
         {
             action, code, expectedVersion, reason, verification,
-            NewStart = move?.NewStart.ToUniversalTime(), move?.ChairId, move?.ScheduleVersion, move?.AssistantScheduleVersion
+            NewStart = move?.NewStart.ToUniversalTime(), move?.ChairId, move?.ScheduleVersion,
+            move?.AssistantScheduleVersion, move?.DentistId
         }))));
 
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
@@ -116,17 +124,21 @@ public sealed class AppointmentChangeService(DcmsDbContext db, IAvailabilityServ
         {
             AppointmentId = appointment.Id, ActorAccountId = actorId, ActorKind = staff ? "STAFF" : "SELF",
             Action = action, OldStart = appointment.StartAt, OldEnd = appointment.EndAt, OldChairId = appointment.ChairId,
+            OldDentistId = appointment.DentistId,
             Reason = reason, RequesterVerification = verification, RequestKey = requestKey, OccurredAt = now
         };
         if (move != null)
         {
+            var selectedDentistId = move.DentistId ?? appointment.DentistId;
+            if (selectedDentistId <= 0 || selectedDentistId == appointment.AssistantId) throw Error("MSG34");
             if (!AppointmentRules.PublicLeadTimeValid(now, move.NewStart)) throw Error("MSG34");
-            if (move.NewStart == appointment.StartAt && move.ChairId == appointment.ChairId) throw Error("MSG34");
+            if (move.NewStart == appointment.StartAt && move.ChairId == appointment.ChairId
+                && selectedDentistId == appointment.DentistId) throw Error("MSG34");
             AvailabilitySlot slot;
             try
             {
                 slot = await availability.CheckInTransactionAsync(new ResourceCheck(appointment.BranchId,
-                    appointment.DentistId, appointment.ServiceId, move.NewStart.ToUniversalTime(),
+                    selectedDentistId, appointment.ServiceId, move.NewStart.ToUniversalTime(),
                     (int)(appointment.EndAt - appointment.StartAt).TotalMinutes, move.ChairId, appointment.AssistantId,
                     reservation.AttendeeKey, move.ScheduleVersion, move.AssistantScheduleVersion, reservation.Id, Public: false), ct);
             }
@@ -134,7 +146,9 @@ public sealed class AppointmentChangeService(DcmsDbContext db, IAvailabilityServ
             appointment.StartAt = reservation.Start = slot.Start.ToUniversalTime();
             appointment.EndAt = reservation.End = slot.End.ToUniversalTime();
             appointment.ChairId = reservation.ChairId = slot.ChairId;
-            change.NewStart = appointment.StartAt; change.NewEnd = appointment.EndAt; change.NewChairId = appointment.ChairId;
+            appointment.DentistId = reservation.DentistId = slot.DentistId;
+            change.NewStart = appointment.StartAt; change.NewEnd = appointment.EndAt;
+            change.NewDentistId = appointment.DentistId; change.NewChairId = appointment.ChairId;
         }
         else
         {
@@ -150,7 +164,7 @@ public sealed class AppointmentChangeService(DcmsDbContext db, IAvailabilityServ
             AggregateId = appointment.Id, EventType = move == null ? "appointment.cancelled" : "appointment.rescheduled", OccurredAt = now,
             PayloadJson = JsonSerializer.Serialize(new { appointmentId = appointment.Id, appointment.Code, appointment.Version,
                 appointment.Status, appointment.BranchId, oldStart = change.OldStart, oldEnd = change.OldEnd,
-                newStart = change.NewStart, newEnd = change.NewEnd, appointment.ChairId })
+                newStart = change.NewStart, newEnd = change.NewEnd, appointment.DentistId, appointment.ChairId })
         });
         await db.SaveChangesAsync(ct);
         var result = new AppointmentChangeResult(await queries.ChangeDetailAsync(actorId, code, ct),
