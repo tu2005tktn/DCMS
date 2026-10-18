@@ -66,6 +66,10 @@ export default function AccountEditor({ account, roles, onClose, onSaved }: {
     } catch (failure) {
       if (failure instanceof Error) setError(failure.message);
       if (failure instanceof ApiError && failure.code === 'MSG111') setConflict(true);
+      if (failure instanceof ApiError && failure.code === 'MSG139'
+        && failure.field && ['userName', 'employeeCode', 'email', 'phone'].includes(failure.field)) {
+        form.setFields([{ name: failure.field, errors: [failure.message] }]);
+      }
     }
     finally { submitting.current = false; setBusy(false); }
   }

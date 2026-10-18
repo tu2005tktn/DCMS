@@ -220,7 +220,8 @@ public sealed class AccountApiTests(ApiFixture fixture) : IClassFixture<ApiFixtu
     {
         Assert.Equal(status, response.StatusCode);
         var message = (await response.Content.ReadFromJsonAsync<SystemMessage>())!;
-        Assert.Equal(SystemMessages.Get(code, field).Message, message.Message);
+        Assert.Equal(code == "MSG139" && message.Field != null
+            ? StaffAccountConflicts.ForField(message.Field).Message : SystemMessages.Get(code, field).Message, message.Message);
         Assert.Equal(code, message.Code);
     }
 
@@ -233,6 +234,53 @@ public sealed class AccountApiTests(ApiFixture fixture) : IClassFixture<ApiFixtu
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/auth/me")).StatusCode);
         foreach (var credentials in new[] { new SignInRequest("admin.demo", "wrong"), new SignInRequest("missing-user", fixture.Password) })
             await AssertMessage(await client.PostAsJsonAsync("/api/auth/sign-in", credentials), HttpStatusCode.Unauthorized, "MSG09");
+    }
+
+    [Theory]
+    [InlineData("userName")]
+    [InlineData("employeeCode")]
+    [InlineData("email")]
+    [InlineData("phone")]
+    public async Task DuplicateStaffFieldIsIdentifiedWithoutPartialWrites(string field)
+    {
+        var (admin, _) = await Login();
+        var suffix = Guid.NewGuid().ToString("N")[..12];
+        var phone = "09" + System.Security.Cryptography.RandomNumberGenerator.GetInt32(10000000, 100000000);
+        var original = new CreateStaffRequest("field." + suffix, fixture.Password, "Conflict field test",
+            "FIELD-" + suffix, suffix + "@example.invalid", phone, [AccountRoles.Dentist]);
+        Assert.Equal(HttpStatusCode.Created, (await admin.PostAsJsonAsync("/api/accounts", original)).StatusCode);
+        var next = original with { UserName = "next." + suffix, EmployeeCode = "NEXT-" + suffix,
+            Email = "next." + suffix + "@example.invalid", Phone = null };
+        next = field switch
+        {
+            "userName" => next with { UserName = original.UserName.ToUpperInvariant() },
+            "employeeCode" => next with { EmployeeCode = original.EmployeeCode.ToLowerInvariant() },
+            "email" => next with { Email = original.Email!.ToUpperInvariant() },
+            "phone" => next with { Phone = phone.Insert(4, "- ") },
+            _ => throw new InvalidOperationException()
+        };
+        var before = await admin.GetFromJsonAsync<AccountPage>("/api/accounts?pageSize=100");
+        var response = await admin.PostAsJsonAsync("/api/accounts", next);
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        var conflict = (await response.Content.ReadFromJsonAsync<SystemMessage>())!;
+        Assert.Equal("MSG139", conflict.Code);
+        Assert.Equal(field, conflict.Field);
+        Assert.Equal(StaffAccountConflicts.ForField(field).Message, conflict.Message);
+        Assert.Equal(before!.Total, (await admin.GetFromJsonAsync<AccountPage>("/api/accounts?pageSize=100"))!.Total);
+    }
+
+    [Fact]
+    public async Task StaffCreationAcceptsEightDigitPassword()
+    {
+        var (admin, _) = await Login();
+        var suffix = Guid.NewGuid().ToString("N")[..12];
+        var name = "numeric." + suffix;
+        var created = await admin.PostAsJsonAsync("/api/accounts", new CreateStaffRequest(name,
+            "12345678", "Numeric password test", "NUM-" + suffix,
+            suffix + "@example.invalid", null, [AccountRoles.Dentist]));
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await fixture.CreateClient().PostAsJsonAsync("/api/auth/sign-in",
+            new SignInRequest(name, "12345678"))).StatusCode);
     }
 
     [Fact]

@@ -178,8 +178,12 @@ test('S04 validates contact, rejects duplicate through real API and prevents rep
   await editor.getByLabel('Email', { exact: true }).fill(original.email.toUpperCase());
   const rejected = page.waitForResponse(r => r.url().endsWith('/api/accounts') && r.request().method() === 'POST');
   await editor.getByRole('button', { name: 'Xác nhận tạo', exact: true }).click();
-  expect((await rejected).status()).toBe(409);
-  await expect(editor).toContainText('Thông tin tài khoản chưa thể sử dụng. Vui lòng kiểm tra hoặc dùng chức năng khôi phục tài khoản.');
+  const duplicateResponse = await rejected;
+  expect(duplicateResponse.status()).toBe(409);
+  expect((await duplicateResponse.json()).field).toBe('email');
+  await expect(editor.getByText('Email đã được sử dụng. Vui lòng nhập email khác.', { exact: true })).toHaveCount(2);
+  await expect(editor.getByLabel('Email', { exact: true })).toHaveAttribute('aria-invalid', 'true');
+  await expect(editor.getByLabel('Họ tên', { exact: true })).toHaveValue('S04 duplicate validation');
   await editor.getByLabel('Email', { exact: true }).fill(`${suffix}@example.invalid`);
   let submissions = 0;
   page.on('request', req => { if (req.url().endsWith('/api/accounts') && req.method() === 'POST') submissions++; });

@@ -76,6 +76,10 @@ public sealed partial class AccountService(DcmsDbContext db, UserManager<Applica
         if (request.Password.Length > 256) Invalid("Mật khẩu");
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
         await RequireAdminAsync(actorId, ct);
+        await CheckUserNameAsync(request.UserName, null, ct);
+        var normalizedCode = request.EmployeeCode.Trim().ToUpperInvariant();
+        if (await db.Employees.AnyAsync(x => x.EmployeeCode == normalizedCode, ct))
+            throw new BusinessException(409, StaffAccountConflicts.ForField("employeeCode"));
         await CheckContactsAsync(request.Email, request.Phone, null, ct);
         var now = DateTimeOffset.UtcNow;
         var user = new ApplicationUser
@@ -107,6 +111,7 @@ public sealed partial class AccountService(DcmsDbContext db, UserManager<Applica
         var user = await GetAsync(id, ct);
         if (user.AccountType != "Staff") Forbidden();
         CheckVersion(user, request.Version);
+        await CheckUserNameAsync(request.UserName, id, ct);
         await CheckContactsAsync(request.Email, request.Phone, id, ct);
         var employee = await db.Employees.SingleAsync(x => x.AccountId == id, ct);
         var oldRoles = await users.GetRolesAsync(user);
@@ -176,10 +181,20 @@ public sealed partial class AccountService(DcmsDbContext db, UserManager<Applica
     {
         var normalizedEmail = users.NormalizeEmail(Clean(email));
         var normalizedPhone = ContactRules.NormalizePhone(phone);
+        if (normalizedEmail != null && await db.Users.AnyAsync(x => (!excludeId.HasValue || x.Id != excludeId.Value)
+            && x.NormalizedEmail == normalizedEmail, ct))
+            throw new BusinessException(409, StaffAccountConflicts.ForField("email"));
+        if (normalizedPhone != null && await db.Users.AnyAsync(x => (!excludeId.HasValue || x.Id != excludeId.Value)
+            && x.NormalizedPhone == normalizedPhone, ct))
+            throw new BusinessException(409, StaffAccountConflicts.ForField("phone"));
+    }
+
+    private async Task CheckUserNameAsync(string name, int? excludeId, CancellationToken ct)
+    {
+        var normalized = users.NormalizeName(name.Trim());
         if (await db.Users.AnyAsync(x => (!excludeId.HasValue || x.Id != excludeId.Value)
-            && ((normalizedEmail != null && x.NormalizedEmail == normalizedEmail)
-                || (normalizedPhone != null && x.NormalizedPhone == normalizedPhone)), ct))
-            throw new BusinessException(409, SystemMessages.Get("MSG139"));
+            && x.NormalizedUserName == normalized, ct))
+            throw new BusinessException(409, StaffAccountConflicts.ForField("userName"));
     }
 
     private async Task RequireAdminAsync(int actorId, CancellationToken ct)
@@ -222,6 +237,8 @@ public sealed partial class AccountService(DcmsDbContext db, UserManager<Applica
     {
         if (result.Succeeded) return;
         if (result.Errors.Any(x => x.Code == "ConcurrencyFailure")) throw new BusinessException(409, SystemMessages.Get("MSG111"));
+        if (result.Errors.Any(x => x.Code == "DuplicateUserName")) throw new BusinessException(409, StaffAccountConflicts.ForField("userName"));
+        if (result.Errors.Any(x => x.Code == "DuplicateEmail")) throw new BusinessException(409, StaffAccountConflicts.ForField("email"));
         if (result.Errors.Any(x => x.Code.StartsWith("Duplicate", StringComparison.Ordinal))) throw new BusinessException(409, SystemMessages.Get("MSG139"));
         if (result.Errors.Any(x => x.Code.StartsWith("Password", StringComparison.Ordinal))) throw new BusinessException(400, SystemMessages.Get("MSG109"));
         Invalid("Thông tin tài khoản");

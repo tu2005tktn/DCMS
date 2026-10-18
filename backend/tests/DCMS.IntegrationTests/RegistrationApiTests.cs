@@ -16,6 +16,50 @@ public sealed class RegistrationApiTests(ApiFixture fixture) : IClassFixture<Api
     private static string NewPhone() => "09" + RandomNumberGenerator.GetInt32(10_000_000, 100_000_000);
     private static string NewEmail(string phone) => $"guest{phone}@example.com";
 
+    [Fact]
+    public async Task SharedPolicyAdvertisesEightCharactersWithoutCompositionRules()
+    {
+        var policy = await fixture.CreateClient().GetFromJsonAsync<CredentialPolicy>("/api/auth/policy");
+        Assert.NotNull(policy);
+        Assert.Equal(8, policy.RequiredLength);
+        Assert.Equal(256, policy.MaximumLength);
+        Assert.False(policy.RequireDigit);
+        Assert.False(policy.RequireLowercase);
+        Assert.False(policy.RequireUppercase);
+        Assert.False(policy.RequireNonAlphanumeric);
+    }
+
+    [Theory]
+    [InlineData("12345678")]
+    [InlineData("abcdefgh")]
+    [InlineData("ABCDEFGH")]
+    [InlineData("!!!!!!!!")]
+    public async Task RegistrationAcceptsEightCharactersWithoutComposition(string password)
+    {
+        using var client = fixture.CreateClient();
+        var phone = NewPhone();
+        var response = await client.PostAsJsonAsync("/api/auth/register",
+            new RegisterRequest("Password policy test", phone, NewEmail(phone), password, password));
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/auth/sign-in",
+            new SignInRequest(phone, password))).StatusCode);
+    }
+
+    [Theory]
+    [InlineData(7, false)]
+    [InlineData(256, true)]
+    [InlineData(257, false)]
+    public async Task RegistrationEnforcesPasswordLengthBoundaries(int length, bool accepted)
+    {
+        using var client = fixture.CreateClient();
+        var phone = NewPhone();
+        var password = new string('a', length);
+        var response = await client.PostAsJsonAsync("/api/auth/register",
+            new RegisterRequest("Password length test", phone, NewEmail(phone), password, password));
+        if (accepted) Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        else await AssertMessage(response, HttpStatusCode.BadRequest, "MSG109");
+    }
+
     private static async Task AssertMessage(HttpResponseMessage response, HttpStatusCode status, string code)
     {
         Assert.Equal(status, response.StatusCode);

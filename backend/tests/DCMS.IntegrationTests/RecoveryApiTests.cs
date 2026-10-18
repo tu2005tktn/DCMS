@@ -73,17 +73,20 @@ public sealed class RecoveryApiTests(ApiFixture fixture) : IClassFixture<ApiFixt
         Assert.Equal(code, message.Code);
     }
 
-    [Fact]
-    public async Task C1_ValidRecoveryChangesPasswordAndOldPasswordNoLongerSignsIn()
+    [Theory]
+    [InlineData(null)]
+    [InlineData("12345678")]
+    public async Task C1_ValidRecoveryChangesPasswordAndOldPasswordNoLongerSignsIn(string? password)
     {
+        var newPassword = password ?? NewPassword;
         var userName = await CreateRecoveryAccountAsync();
-        var (reset, _) = await CompleteRecoveryAsync(userName);
+        var (reset, _) = await CompleteRecoveryAsync(userName, newPassword);
         await AssertMessageAsync(reset, HttpStatusCode.OK, "MSG13");
 
         await AssertMessageAsync(await fixture.CreateClient().PostAsJsonAsync("/api/auth/sign-in",
             new SignInRequest(userName, fixture.Password)), HttpStatusCode.Unauthorized, "MSG09");
         Assert.Equal(HttpStatusCode.OK, (await fixture.CreateClient().PostAsJsonAsync("/api/auth/sign-in",
-            new SignInRequest(userName, NewPassword))).StatusCode);
+            new SignInRequest(userName, newPassword))).StatusCode);
     }
 
     [Fact]
