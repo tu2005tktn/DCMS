@@ -35,7 +35,10 @@ public sealed class DevelopmentAccountSeeder(DcmsDbContext db, UserManager<Appli
             var user = new ApplicationUser
             {
                 UserName = entry.Name, FullName = entry.FullName,
-                AccountType = entry.Name == "guest.demo" ? "Public" : "Staff", CreatedAt = now, UpdatedAt = now
+                AccountType = entry.Name == "guest.demo" ? "Public" : "Staff", CreatedAt = now, UpdatedAt = now,
+                // Synthetic Development-only contact so UC-02 recovery can be exercised locally.
+                // This is not real contact verification and never applies outside Development.
+                Email = entry.Name + "@example.invalid", EmailConfirmed = true
             };
             Ensure(await users.CreateAsync(user, password));
             Ensure(await users.AddToRolesAsync(user, entry.Roles));

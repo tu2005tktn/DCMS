@@ -25,7 +25,7 @@ using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddInfrastructure(builder.Configuration, builder.Environment);
 builder.Services.AddOpenApi();
 builder.Services.Configure<RouteHandlerOptions>(options => options.ThrowOnBadRequest = true);
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
@@ -124,6 +124,7 @@ if (args.Contains("--migrate") || args.Contains("--seed-demo"))
         await scope.ServiceProvider.GetRequiredService<DevelopmentAccountSeeder>().SeedAsync();
         await scope.ServiceProvider.GetRequiredService<DevelopmentPatientLinkSeeder>().SeedAsync();
         await scope.ServiceProvider.GetRequiredService<DCMS.Infrastructure.Features.Scheduling.DevelopmentSchedulingSeeder>().SeedAsync();
+        await scope.ServiceProvider.GetRequiredService<DCMS.Infrastructure.Features.Appointments.DevelopmentAppointmentSeeder>().SeedAsync();
     }
     return;
 }
@@ -144,15 +145,18 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapHealthEndpoints();
 app.MapAuthenticationEndpoints();
+app.MapRecoveryEndpoints();
 app.MapAccountEndpoints();
 app.MapPatientLinkEndpoints();
 app.MapPatientEndpoints();
 app.MapSchedulingEndpoints();
 app.MapAppointmentEndpoints();
+app.MapAppointmentQueryEndpoints();
 app.MapNotificationEndpoints();
 // S26+ SignalR: hub + test endpoint (chỉ Dev).
 app.MapHub<NotificationsHub>("/hubs/notifications");
 app.MapRealtimeEndpoints(isDevelopment: app.Environment.IsDevelopment());
+app.MapDevelopmentRecoveryEndpoints();
 
 app.Run();
 

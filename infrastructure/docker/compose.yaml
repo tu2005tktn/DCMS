@@ -16,5 +16,13 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+  # Local mail catcher for S03 recovery email; only started with "--profile mail". Nothing leaves the machine.
+  mailpit:
+    image: axllent/mailpit:v1.27
+    profiles: ["mail"]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:1025:1025"
+      - "127.0.0.1:8025:8025"
 volumes:
   dcms_postgres_data:
