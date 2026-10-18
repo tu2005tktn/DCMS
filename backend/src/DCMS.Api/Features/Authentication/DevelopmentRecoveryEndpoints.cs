@@ -8,7 +8,7 @@ namespace DCMS.Api.Features.Authentication;
 ///
 /// The production recovery channel is not configured yet, so the Development contact adapter keeps
 /// the delivered proof in process memory. This endpoint exposes it so a developer can complete the
-/// flow locally. It is registered only when the host runs in Development, requires an authenticated
+/// flow locally. It is registered only when the host runs in Development, requires an Admin
 /// session, and never appears in Production. The proof is never stored in the database, the outbox,
 /// the logs or an audit entry.
 /// </summary>
@@ -21,11 +21,10 @@ public static class DevelopmentRecoveryEndpoints
 
             [FromServices] DevelopmentContactDeliveryAdapter adapter) =>
         {
-            // Guard: a signed-in session is required so this aid cannot be used anonymously, even in
-            // Development.
+            // Guard: only an Admin can inspect the proof, even in Development.
             var proof = adapter.TryGetProof(accountId);
             if (string.IsNullOrEmpty(proof)) return Results.NotFound();
             return Results.Ok(new { accountId, proof });
-        }).RequireAuthorization();
+        }).RequireAuthorization("ManageAccounts");
     }
 }

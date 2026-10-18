@@ -62,10 +62,14 @@ public class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
             services.RemoveAll<IContactDeliveryAdapter>();
             services.AddSingleton<FakeContactDeliveryAdapter>();
             services.AddSingleton<IContactDeliveryAdapter>(provider => provider.GetRequiredService<FakeContactDeliveryAdapter>());
+            services.RemoveAll<IEmailVerificationDelivery>();
+            services.AddSingleton<FakeEmailVerificationDelivery>();
+            services.AddSingleton<IEmailVerificationDelivery>(provider => provider.GetRequiredService<FakeEmailVerificationDelivery>());
         });
     }
 
     public FakeContactDeliveryAdapter Delivery => Services.GetRequiredService<FakeContactDeliveryAdapter>();
+    public FakeEmailVerificationDelivery EmailDelivery => Services.GetRequiredService<FakeEmailVerificationDelivery>();
 
     // Test-only connection string for the isolated schema this fixture created.
     public string ConnectionString => new NpgsqlConnectionStringBuilder(
@@ -170,6 +174,23 @@ public sealed class FakeContactDeliveryAdapter : IContactDeliveryAdapter
 }
 
 public sealed record DevelopmentProofResponse(int AccountId, string Proof);
+
+public sealed class FakeEmailVerificationDelivery : IEmailVerificationDelivery
+{
+    private readonly Lock gate = new();
+    private readonly Dictionary<string, string> proofs = [];
+    public bool Fail { get; set; }
+    public Task<bool> SendAsync(string destination, string code, int lifetimeMinutes, CancellationToken ct)
+    {
+        if (Fail) return Task.FromResult(false);
+        lock (gate) proofs[destination.ToLowerInvariant()] = code;
+        return Task.FromResult(true);
+    }
+    public string? ProofFor(string destination)
+    {
+        lock (gate) return proofs.GetValueOrDefault(destination.ToLowerInvariant());
+    }
+}
 
 /// <summary>
 /// Adapter that records every attempt, used to show the development adapter is not reachable

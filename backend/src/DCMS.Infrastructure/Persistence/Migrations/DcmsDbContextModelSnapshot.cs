@@ -472,6 +472,25 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.ToTable("AUTH_SESSION", (string)null);
                 });
 
+            modelBuilder.Entity("DCMS.Domain.Features.Authentication.EmailVerificationToken", b =>
+                {
+                    b.Property<long>("Id").ValueGeneratedOnAdd().HasColumnType("bigint");
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                    b.Property<int>("AccountId").HasColumnType("integer");
+                    b.Property<string>("CodeHash").IsRequired().HasMaxLength(64).HasColumnType("character varying(64)");
+                    b.Property<DateTimeOffset>("CreatedAt").HasColumnType("timestamp with time zone");
+                    b.Property<DateTimeOffset>("ExpiresAt").HasColumnType("timestamp with time zone");
+                    b.Property<DateTimeOffset>("LastSentAt").HasColumnType("timestamp with time zone");
+                    b.Property<string>("NormalizedEmail").IsRequired().HasMaxLength(256).HasColumnType("character varying(256)");
+                    b.Property<int>("ResendCount").HasColumnType("integer");
+                    b.Property<DateTimeOffset?>("UsedAt").HasColumnType("timestamp with time zone");
+                    b.Property<int>("VerifyAttempts").HasColumnType("integer");
+                    b.HasKey("Id");
+                    b.HasIndex("AccountId", "CreatedAt");
+                    b.HasIndex("ExpiresAt");
+                    b.ToTable("EMAIL_VERIFICATION_TOKEN", (string)null);
+                });
+
             modelBuilder.Entity("DCMS.Domain.Features.Authentication.RecoveryAudit", b =>
                 {
                     b.Property<long>("Id")
@@ -1631,6 +1650,15 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("AccountId")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Authentication.EmailVerificationToken", b =>
+                {
+                    b.HasOne("DCMS.Infrastructure.Features.Accounts.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 

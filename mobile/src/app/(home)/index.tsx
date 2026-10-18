@@ -81,7 +81,6 @@ const GROUPS: MenuGroup[] = [
     title: 'S02 · Đăng ký',
     items: [
       { label: 'S02 · Đăng ký', description: 'Tạo tài khoản Public mới.', href: '/(auth)/register' },
-      { label: 'S02 · Xác minh liên hệ', description: 'Nhập mã OTP xác minh email/điện thoại.', href: '/(auth)/verify-contact' },
     ],
   },
   {

@@ -25,11 +25,14 @@ public interface IAccountRecoveryService
 {
     // UC-02 self-service recovery (anonymous caller). Every response is neutral: the same text,
     // the same status and the same shape whether or not the account exists.
-    Task<RecoveryRequestOutcome> RequestAsync(string identifier, string? ipAddress, CancellationToken ct);
-    Task<RecoveryVerifyOutcome> VerifyAsync(string identifier, string proof, string? ipAddress, CancellationToken ct);
+    Task<RecoveryRequestOutcome> RequestAsync(string identifier, string? ipAddress, CancellationToken ct,
+        bool publicOnly = false);
+    Task<RecoveryVerifyOutcome> VerifyAsync(string identifier, string proof, string? ipAddress, CancellationToken ct,
+        bool publicOnly = false);
     Task<RecoveryResetOutcome> ResetAsync(string identifier, string resetGrant, string newPassword,
-        string confirmPassword, CancellationToken ct);
-    Task<RecoveryResendOutcome> ResendAsync(string identifier, string? ipAddress, CancellationToken ct);
+        string confirmPassword, CancellationToken ct, bool publicOnly = false);
+    Task<RecoveryResendOutcome> ResendAsync(string identifier, string? ipAddress, CancellationToken ct,
+        bool publicOnly = false);
 
     // UC-31 / S04 Admin-assisted recovery. The service re-checks the Admin permission server-side
     // on every call instead of trusting the caller (GBR-075).

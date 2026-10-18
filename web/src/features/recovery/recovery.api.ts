@@ -19,26 +19,28 @@ export type RecoveryPolicy = {
 /** Marks a step of the recovery flow. */
 export type RecoveryStepId = 'request' | 'verify' | 'reset' | 'done';
 
-export async function requestRecovery(identifier: string): Promise<SystemMessage> {
+const base = (customer: boolean) => customer ? '/api/customer/recovery' : '/api/auth/recovery';
+
+export async function requestRecovery(identifier: string, customer = false): Promise<SystemMessage> {
   return api<SystemMessage>(
-    '/api/auth/recovery/request',
+    `${base(customer)}/request`,
     { method: 'POST', body: JSON.stringify({ identifier }) },
     false,
   );
 }
 
-export async function resendRecovery(identifier: string): Promise<SystemMessage> {
+export async function resendRecovery(identifier: string, customer = false): Promise<SystemMessage> {
   return api<SystemMessage>(
-    '/api/auth/recovery/resend',
+    `${base(customer)}/resend`,
     { method: 'POST', body: JSON.stringify({ identifier }) },
     false,
   );
 }
 
 /** Returns the reset grant on success, or throws an ApiError carrying MSG108. */
-export async function verifyRecovery(identifier: string, proof: string): Promise<string> {
+export async function verifyRecovery(identifier: string, proof: string, customer = false): Promise<string> {
   const response = await api<{ resetGrant: string }>(
-    '/api/auth/recovery/verify',
+    `${base(customer)}/verify`,
     { method: 'POST', body: JSON.stringify({ identifier, proof }) },
     false,
   );
@@ -51,9 +53,10 @@ export async function resetPassword(
   resetGrant: string,
   newPassword: string,
   confirmPassword: string,
+  customer = false,
 ): Promise<SystemMessage> {
   return api<SystemMessage>(
-    '/api/auth/recovery/reset',
+    `${base(customer)}/reset`,
     {
       method: 'POST',
       body: JSON.stringify({ identifier, resetGrant, newPassword, confirmPassword }),

@@ -22,17 +22,17 @@ const json = (options: RequestOptions = {}): RequestInit => ({
 
 /** Always answers with the same neutral MSG12 body, matching an account or not. */
 export async function requestRecovery(identifier: string): Promise<ServerMessage> {
-  return request<ServerMessage>('/api/auth/recovery/request', json({ body: JSON.stringify({ identifier }) }));
+  return request<ServerMessage>('/api/customer/recovery/request', json({ body: JSON.stringify({ identifier }) }));
 }
 
 export async function resendRecovery(identifier: string): Promise<ServerMessage> {
-  return request<ServerMessage>('/api/auth/recovery/resend', json({ body: JSON.stringify({ identifier }) }));
+  return request<ServerMessage>('/api/customer/recovery/resend', json({ body: JSON.stringify({ identifier }) }));
 }
 
 /** Returns the reset grant, or throws an ApiError carrying MSG108. */
 export async function verifyRecovery(identifier: string, proof: string): Promise<string> {
   const response = await request<{ resetGrant: string }>(
-    '/api/auth/recovery/verify',
+    '/api/customer/recovery/verify',
     json({ body: JSON.stringify({ identifier, proof }) }),
   );
   return response.resetGrant;
@@ -46,7 +46,7 @@ export async function resetPassword(
   confirmPassword: string,
 ): Promise<ServerMessage> {
   return request<ServerMessage>(
-    '/api/auth/recovery/reset',
+    '/api/customer/recovery/reset',
     json({ body: JSON.stringify({ identifier, resetGrant, newPassword, confirmPassword }) }),
   );
 }

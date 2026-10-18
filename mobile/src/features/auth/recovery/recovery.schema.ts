@@ -8,11 +8,11 @@ export const PASSWORD_MAX_LENGTH = 256;
 
 export type FieldErrors = Partial<Record<string, string>>;
 
-export function validateAccount(identifier: string): FieldErrors {
+export function validateAccount(identifier: string, maxLength = ACCOUNT_MAX_LENGTH): FieldErrors {
   const value = identifier.trim();
   if (!value) return { identifier: `Vui lòng nhập ${recoveryFields.account}.` };
-  if (value.length > ACCOUNT_MAX_LENGTH)
-    return { identifier: `${recoveryFields.account} không được vượt quá ${ACCOUNT_MAX_LENGTH} ký tự.` };
+  if (value.length > maxLength)
+    return { identifier: `${recoveryFields.account} không được vượt quá ${maxLength} ký tự.` };
   return {};
 }
 

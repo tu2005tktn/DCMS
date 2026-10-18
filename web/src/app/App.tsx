@@ -26,10 +26,12 @@ export default function App() {
     <Route path="/access" element={<AccessPage />} />
     <Route path="/customer/sign-in" element={<CustomerSignInPage />} />
     <Route path="/customer/register" element={<CustomerRegisterPage />} />
+    <Route path="/customer/recover" element={<RecoverAccountPage customer />} />
     <Route path="/customer/book" element={<CustomerBookingPage />} />
     <Route path="/customer" element={<CustomerGuard><CustomerShell /></CustomerGuard>}>
       <Route index element={<Navigate to="/customer/home" replace />} />
       <Route path="home" element={<CustomerHomePage />} />
+      <Route path="verify-email" element={<Navigate to="/customer/home" replace />} />
       <Route path="patient-link" element={<CustomerPatientLinkPage />} />
       <Route path="appointments" element={<CustomerAppointmentsPage />} />
       <Route path="appointments/:code" element={<CustomerAppointmentDetailPage />} />

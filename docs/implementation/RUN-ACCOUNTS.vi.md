@@ -68,7 +68,7 @@ Nút **Gửi lại mã** có đếm ngược. API `/resend` trả lời trung l�
 
 ### Đọc mã xác minh khi chưa có kênh gửi thật
 
-Chưa cấu hình provider gửi mail/SMS thật, nên ở **Development** adapter giữ mã đã phát trong bộ nhớ và cho đọc lại qua endpoint bắt buộc đăng nhập:
+Nếu chưa cấu hình SMTP, **Development** adapter có thể giữ mã trong bộ nhớ cho luồng cũ. Endpoint đọc mã hiện yêu cầu phiên **Admin** và chỉ phục vụ kiểm thử chức năng nhân viên; khách hàng dùng xác minh email và Mailpit theo [hướng dẫn S03 Public](RUN-S03-PUBLIC-EMAIL.vi.md):
 
 ```powershell
 # đăng nhập lấy token, rồi thay {accountId}
