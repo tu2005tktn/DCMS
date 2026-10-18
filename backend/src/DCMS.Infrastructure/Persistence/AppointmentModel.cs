@@ -25,6 +25,8 @@ internal static class AppointmentModel
             b.Property(x => x.ExceptionReason).HasMaxLength(500);
             b.Property(x => x.Status).HasMaxLength(24);
             b.Property(x => x.Version).IsConcurrencyToken();
+            b.Property(x => x.CancelReason).HasMaxLength(500);
+            b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.CancelledBy).OnDelete(DeleteBehavior.Restrict);
             b.HasIndex(x => x.Code).IsUnique();
             b.HasIndex(x => x.ReservationId).IsUnique();
             b.HasIndex(x => new { x.BranchId, x.StartAt });
@@ -32,6 +34,27 @@ internal static class AppointmentModel
             b.HasOne<ResourceReservation>().WithOne().HasForeignKey<Appointment>(x => x.ReservationId).OnDelete(DeleteBehavior.Restrict);
             b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.BookerAccountId).OnDelete(DeleteBehavior.Restrict);
             b.HasOne<PatientProfile>().WithMany().HasForeignKey(x => x.PatientId).OnDelete(DeleteBehavior.Restrict);
+        });
+        model.Entity<AppointmentChange>(b =>
+        {
+            b.ToTable("APPOINTMENT_CHANGE");
+            b.Property(x => x.ActorKind).HasMaxLength(8);
+            b.Property(x => x.Action).HasMaxLength(16);
+            b.Property(x => x.Reason).HasMaxLength(500);
+            b.Property(x => x.RequesterVerification).HasMaxLength(500);
+            b.HasIndex(x => new { x.ActorAccountId, x.RequestKey }).IsUnique();
+            b.HasIndex(x => new { x.AppointmentId, x.OccurredAt });
+            b.HasOne<Appointment>().WithMany().HasForeignKey(x => x.AppointmentId).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.ActorAccountId).OnDelete(DeleteBehavior.Restrict);
+        });
+        model.Entity<AppointmentChangeReceipt>(b =>
+        {
+            b.ToTable("APPOINTMENT_CHANGE_RECEIPT");
+            b.HasKey(x => new { x.ActorAccountId, x.RequestKey });
+            b.Property(x => x.Fingerprint).HasMaxLength(64);
+            b.Property(x => x.ResultJson).HasColumnType("jsonb");
+            b.HasOne<Appointment>().WithMany().HasForeignKey(x => x.AppointmentId).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.ActorAccountId).OnDelete(DeleteBehavior.Restrict);
         });
         model.Entity<AppointmentReceipt>(b =>
         {

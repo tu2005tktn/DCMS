@@ -63,6 +63,10 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }
 @media (max-width: 680px) { .customer-header { padding: 0 16px; } .customer-content { padding: 16px; } .customer-booking .ant-steps-item-title { font-size: 12px; } }
 
 /* S10/S11 appointments */
+.customer-navigation { margin-bottom: 24px; }
+.customer-appointment-filters { margin-bottom: 20px; }
+.customer-appointment-filter-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+@media (max-width: 680px) { .customer-appointment-filter-grid { grid-template-columns: 1fr; gap: 0; } }
 .calendar-toolbar { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
 .calendar-legend { margin-bottom: 12px; color: #475467; font-size: 13px; }
 .legend { display: inline-block; width: 14px; height: 14px; border: 1px solid #d0d5dd; vertical-align: middle; margin-right: 4px; }

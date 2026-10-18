@@ -158,6 +158,21 @@ public sealed class AppointmentQueryService(DcmsDbContext db, UserManager<Applic
         var (source, patientId) = await MineQueryAsync(accountId, ct);
         // Out of scope and missing are indistinguishable so a code cannot be used to probe other bookings.
         var row = await source.SingleOrDefaultAsync(x => x.Code == code, ct) ?? throw Error("MSG102", 404);
+        return await DetailOfAsync(row, accountId, patientId, false, ct);
+    }
+
+    public async Task<MyAppointmentDetail> ChangeDetailAsync(int accountId, string code, CancellationToken ct)
+    {
+        var user = await users.FindByIdAsync(accountId.ToString());
+        if (user?.AccountType != "Staff") return await MineDetailAsync(accountId, code, ct);
+        var row = await db.Appointments.AsNoTracking().SingleOrDefaultAsync(x => x.Code == code, ct) ?? throw Error("MSG102", 404);
+        var scope = await ScopeAsync(accountId, row.BranchId, ct);
+        if (scope.OwnDentistId.HasValue && row.DentistId != scope.OwnDentistId) throw Error("MSG102", 404);
+        return await DetailOfAsync(row, accountId, null, true, ct);
+    }
+
+    private async Task<MyAppointmentDetail> DetailOfAsync(Appointment row, int accountId, int? patientId, bool staff, CancellationToken ct)
+    {
         var names = await EmployeeNamesAsync([row.DentistId], ct);
         var card = Card(row, names, accountId, patientId);
         var branch = await db.Set<SchedulingBranch>().AsNoTracking().Where(x => x.Id == row.BranchId).Select(x => x.Name).SingleOrDefaultAsync(ct);
@@ -166,12 +181,15 @@ public sealed class AppointmentQueryService(DcmsDbContext db, UserManager<Applic
         var hours = (row.StartAt - clock.GetUtcNow()).TotalHours;
         var reason = row.Status is "CheckedIn" or "InProgress" || hours <= 0 ? "STARTED"
             : row.Status != "Confirmed" ? "NOT_CONFIRMED" : hours < SelfServiceHours ? "WITHIN_12H" : null;
+        var history = await db.AppointmentChanges.AsNoTracking().Where(x => x.AppointmentId == row.Id)
+            .OrderByDescending(x => x.OccurredAt).ThenByDescending(x => x.Id)
+            .Select(x => new MyAppointmentChange(x.Action, x.ActorKind, x.OldStart, x.NewStart, x.Reason, x.OccurredAt)).ToArrayAsync(ct);
         return new(card.Code, card.Start, card.End, card.DurationMinutes, card.DentistName, card.AttendeeName, card.AttendeeKind,
-            card.Status, card.Access, card.Version, row.BranchId, branch ?? "", row.DentistId, row.ServiceId, service ?? "Khám và tư vấn",
+            card.Status, staff ? "STAFF" : card.Access, card.Version, row.BranchId, branch ?? "", row.DentistId, row.ServiceId, service ?? "Khám và tư vấn",
             row.BookerName, MaskPhone(row.BookerPhone) ?? MaskEmail(row.BookerEmail) ?? "",
-            row.FollowUpId.HasValue ? new { id = row.FollowUpId, status = "Booked" } : null,
-            new(reason == null, Math.Round(hours, 2), reason, reason == "WITHIN_12H"), [], [],
-            new(configuration["Clinic:Phone"] ?? "0234 3 888 999", configuration["Clinic:Hours"] ?? "Thứ 2 – Thứ 7, 08:00 – 17:00"));
+            row.FollowUpId.HasValue ? new { id = row.FollowUpId, status = row.Status == "Cancelled" ? "NeedsBooking" : "Booked" } : null,
+            new(reason == null, Math.Round(hours, 2), reason, reason == "WITHIN_12H"), [], history,
+            new(configuration["Clinic:Phone"] ?? "0234 3 888 999", configuration["Clinic:Hours"] ?? "Thứ 2 – Thứ 7, 08:00 – 17:00"), row.AssistantId);
     }
 
     private static MyAppointmentCard Card(Appointment x, IReadOnlyDictionary<int, string> names, int accountId, int? patientId)

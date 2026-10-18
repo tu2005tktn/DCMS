@@ -10,7 +10,7 @@ using Microsoft.EntityFrameworkCore.Storage;
 
 namespace DCMS.Infrastructure.Features.Scheduling;
 
-public sealed class WorkingScheduleService(DcmsDbContext db, TimeProvider clock) : IWorkingScheduleService, IAvailabilityService
+public sealed partial class WorkingScheduleService(DcmsDbContext db, TimeProvider clock) : IWorkingScheduleService, IAvailabilityService
 {
     public const long TransactionLock = 90403;
     private static BusinessException Error(string code, int status = 400) => new(status, SystemMessages.Get(code));
@@ -76,6 +76,7 @@ public sealed class WorkingScheduleService(DcmsDbContext db, TimeProvider clock)
     private async Task<WorkingWeek?> Validate(int actorId, ScheduleCommand command, CancellationToken ct)
     {
         await Authorize(actorId, command.BranchId, command.DentistId, ct);
+        if (await db.Set<WorkingScheduleRevision>().AnyAsync(x => x.EmployeeId == command.DentistId, ct)) throw Error("MSG111", 409);
         if (command.RequestKey == Guid.Empty || command.Intervals == null || !ScheduleRules.ValidWeek(command.WeekStart, command.Intervals)) throw Error("MSG110");
         var previous = await Week(command.BranchId, command.DentistId, command.WeekStart, ct);
         if (command.ExpectedVersion != (previous?.Version ?? 0)) throw Error("MSG111", 409);
@@ -136,6 +137,18 @@ public sealed class WorkingScheduleService(DcmsDbContext db, TimeProvider clock)
         if (staffActorId.HasValue) await Authorize(staffActorId.Value, query.BranchId, null, ct);
         return await Query(query, !staffActorId.HasValue, null, ct);
     }
+    public async Task<AvailabilityResult> QueryForReservationAsync(AvailabilityQuery query, Guid reservationId, string? attendeeKey, CancellationToken ct)
+    {
+        await ValidateQuery(query, false, ct);
+        var data = await Load(query, null, ct);
+        var slots = new List<AvailabilitySlot>();
+        for (var minute = 0; minute + query.DurationMinutes <= 1440; minute += 15)
+        {
+            var slot = Evaluate(query, true, Local(query.Date, minute), null, attendeeKey, reservationId, data);
+            if (slot != null) slots.Add(slot);
+        }
+        return new("Asia/Ho_Chi_Minh", query.Date, slots.ToArray());
+    }
     public async Task<AvailabilityResult> PreviewAvailabilityAsync(int actorId, PreviewAvailabilityRequest request, CancellationToken ct)
     {
         await Validate(actorId, request.Schedule, ct);
@@ -154,12 +167,12 @@ public sealed class WorkingScheduleService(DcmsDbContext db, TimeProvider clock)
             : null;
         if ((q.ServiceId.HasValue && service == null) || (isPublic && (service == null || service.PublicDurationMinutes != q.DurationMinutes))) throw Error("MSG110");
     }
-    private async Task<AvailabilityResult> Query(AvailabilityQuery q, bool isPublic, ScheduleCommand? draft, CancellationToken ct)
+    private async Task<AvailabilityResult> Query(AvailabilityQuery q, bool isPublic, ScheduleCommand? draft, CancellationToken ct, RecurringCommand? recurringDraft = null)
     {
         await ValidateQuery(q, isPublic, ct);
         var slots = new List<AvailabilitySlot>();
         // Load resources once per query; candidate starts all share the same resource snapshot.
-        var data = await Load(q, draft, ct);
+        var data = await Load(q, draft, ct, recurringDraft);
         for (var minute = 0; minute + q.DurationMinutes <= 1440; minute += 15)
         {
             var slot = Evaluate(q, isPublic, Local(q.Date, minute), null, null, null, data);
@@ -169,11 +182,10 @@ public sealed class WorkingScheduleService(DcmsDbContext db, TimeProvider clock)
     }
     private sealed record Resources(WorkingWeek? Main, WorkingWeek? Assistant, SchedulePeriod[] MainPeriods,
         SchedulePeriod[] AssistantPeriods, SchedulingChair[] Chairs, ResourceReservation[] Occupied);
-    private async Task<Resources> Load(AvailabilityQuery q, ScheduleCommand? draft, CancellationToken ct)
+    private async Task<Resources> Load(AvailabilityQuery q, ScheduleCommand? draft, CancellationToken ct, RecurringCommand? recurringDraft = null)
     {
-        var weekStart = Monday(q.Date);
-        var main = await Week(q.BranchId, q.DentistId, weekStart, ct);
-        var assistant = q.AssistantId.HasValue ? await Week(q.BranchId, q.AssistantId.Value, weekStart, ct) : null;
+        var main = await Resolve(q.BranchId, q.DentistId, q.Date, recurringDraft, ct);
+        var assistant = q.AssistantId.HasValue ? await Resolve(q.BranchId, q.AssistantId.Value, q.Date, recurringDraft, ct) : null;
         var from = Local(q.Date).ToUniversalTime(); var to = from.AddDays(1);
         return new(main, assistant,
             draft != null && draft.DentistId == q.DentistId ? draft.Intervals : Periods(main),

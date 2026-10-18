@@ -9,6 +9,22 @@ internal static class SchedulingModel
 {
     public static void Configure(ModelBuilder model)
     {
+        model.Entity<WorkingScheduleRevision>(b =>
+        {
+            b.ToTable("WORKING_SCHEDULE_REVISION", t => t.HasCheckConstraint("CK_REVISION_KIND", "\"Kind\" IN ('Template','Exception') AND \"Version\" > 0"));
+            b.Property(x => x.Kind).HasMaxLength(16); b.Property(x => x.Reason).HasMaxLength(500);
+            b.HasIndex(x => new { x.EmployeeId, x.Version }).IsUnique();
+            b.HasIndex(x => new { x.EmployeeId, x.Date });
+            b.HasOne<EmployeeProfile>().WithMany().HasForeignKey(x => x.EmployeeId).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.PublishedBy).OnDelete(DeleteBehavior.Restrict);
+            b.HasMany(x => x.Periods).WithOne().HasForeignKey(x => x.RevisionId).OnDelete(DeleteBehavior.Cascade);
+        });
+        model.Entity<RevisionPeriod>(b =>
+        {
+            b.ToTable("WORKING_REVISION_PERIOD", t => t.HasCheckConstraint("CK_REVISION_PERIOD_RANGE", "\"Day\" BETWEEN 0 AND 6 AND \"StartMinute\" >= 0 AND \"EndMinute\" <= 1440 AND \"StartMinute\" < \"EndMinute\" AND \"StartMinute\" % 30 = 0 AND \"EndMinute\" % 30 = 0 AND \"Kind\" IN ('Work','Break','Block')"));
+            b.Property(x => x.Kind).HasMaxLength(16); b.Property(x => x.Reason).HasMaxLength(500);
+            b.HasOne<SchedulingBranch>().WithMany().HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Restrict);
+        });
         model.Entity<SchedulingBranch>(b => { b.ToTable("SCHEDULING_BRANCH"); b.Property(x => x.Name).HasMaxLength(160); });
         model.Entity<SchedulingMember>(b =>
         {

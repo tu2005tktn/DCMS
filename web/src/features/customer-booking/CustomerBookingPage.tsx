@@ -193,6 +193,7 @@ export default function CustomerBookingPage() {
         <Typography.Text>Trạng thái: {result.status}</Typography.Text>
         <Typography.Text>Thời gian: {formatTime(result.startAt)} – {formatTime(result.endAt)}</Typography.Text>
         <Typography.Text>Hãy lưu mã lịch hẹn để liên hệ phòng khám khi cần.</Typography.Text>
+        {token && <Link to={`/customer/appointments/${encodeURIComponent(result.code)}`}><Button type="primary">Xem và quản lý lịch hẹn</Button></Link>}
       </Space>}
     </Card>}
   </main>;

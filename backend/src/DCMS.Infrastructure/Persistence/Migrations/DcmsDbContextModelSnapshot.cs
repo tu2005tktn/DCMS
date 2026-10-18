@@ -141,6 +141,16 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<int>("BranchId")
                         .HasColumnType("integer");
 
+                    b.Property<string>("CancelReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset?>("CancelledAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("CancelledBy")
+                        .HasColumnType("integer");
+
                     b.Property<int>("ChairId")
                         .HasColumnType("integer");
 
@@ -204,6 +214,8 @@ namespace DCMS.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("BookerAccountId");
 
+                    b.HasIndex("CancelledBy");
+
                     b.HasIndex("Code")
                         .IsUnique();
 
@@ -222,6 +234,98 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("CK_APPOINTMENT_RANGE", "\"StartAt\" < \"EndAt\"");
                         });
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Appointments.AppointmentChange", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<int>("ActorAccountId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ActorKind")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)");
+
+                    b.Property<Guid>("AppointmentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("NewChairId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("NewEnd")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("NewStart")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("OldChairId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("OldEnd")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("OldStart")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid>("RequestKey")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("RequesterVerification")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ActorAccountId", "RequestKey")
+                        .IsUnique();
+
+                    b.HasIndex("AppointmentId", "OccurredAt");
+
+                    b.ToTable("APPOINTMENT_CHANGE", (string)null);
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Appointments.AppointmentChangeReceipt", b =>
+                {
+                    b.Property<int>("ActorAccountId")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("RequestKey")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AppointmentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Fingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("ResultJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.HasKey("ActorAccountId", "RequestKey");
+
+                    b.HasIndex("AppointmentId");
+
+                    b.ToTable("APPOINTMENT_CHANGE_RECEIPT", (string)null);
                 });
 
             modelBuilder.Entity("DCMS.Domain.Features.Appointments.AppointmentOutboxEvent", b =>
@@ -860,6 +964,49 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("DCMS.Domain.Features.Scheduling.RevisionPeriod", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("BranchId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Day")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("EndMinute")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid>("RevisionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("StartMinute")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BranchId");
+
+                    b.HasIndex("RevisionId");
+
+                    b.ToTable("WORKING_REVISION_PERIOD", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_REVISION_PERIOD_RANGE", "\"Day\" BETWEEN 0 AND 6 AND \"StartMinute\" >= 0 AND \"EndMinute\" <= 1440 AND \"StartMinute\" < \"EndMinute\" AND \"StartMinute\" % 30 = 0 AND \"EndMinute\" % 30 = 0 AND \"Kind\" IN ('Work','Break','Block')");
+                        });
+                });
+
             modelBuilder.Entity("DCMS.Domain.Features.Scheduling.ScheduleReceipt", b =>
                 {
                     b.Property<int>("ActorId")
@@ -1029,6 +1176,52 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.ToTable("WORKING_PERIOD", null, t =>
                         {
                             t.HasCheckConstraint("CK_PERIOD_RANGE", "\"Day\" BETWEEN 0 AND 6 AND \"StartMinute\" >= 0 AND \"EndMinute\" <= 1440 AND \"StartMinute\" < \"EndMinute\" AND \"StartMinute\" % 15 = 0 AND \"EndMinute\" % 15 = 0 AND \"Kind\" IN ('Work','Break','Block')");
+                        });
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Scheduling.WorkingScheduleRevision", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date");
+
+                    b.Property<int>("EmployeeId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<DateTimeOffset>("PublishedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("PublishedBy")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PublishedBy");
+
+                    b.HasIndex("EmployeeId", "Date");
+
+                    b.HasIndex("EmployeeId", "Version")
+                        .IsUnique();
+
+                    b.ToTable("WORKING_SCHEDULE_REVISION", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_REVISION_KIND", "\"Kind\" IN ('Template','Exception') AND \"Version\" > 0");
                         });
                 });
 
@@ -1329,6 +1522,11 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasForeignKey("BookerAccountId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("DCMS.Infrastructure.Features.Accounts.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("CancelledBy")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("DCMS.Domain.Features.Patients.PatientProfile", null)
                         .WithMany()
                         .HasForeignKey("PatientId")
@@ -1337,6 +1535,36 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasOne("DCMS.Domain.Features.Scheduling.ResourceReservation", null)
                         .WithOne()
                         .HasForeignKey("DCMS.Domain.Features.Appointments.Appointment", "ReservationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Appointments.AppointmentChange", b =>
+                {
+                    b.HasOne("DCMS.Infrastructure.Features.Accounts.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("ActorAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DCMS.Domain.Features.Appointments.Appointment", null)
+                        .WithMany()
+                        .HasForeignKey("AppointmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Appointments.AppointmentChangeReceipt", b =>
+                {
+                    b.HasOne("DCMS.Infrastructure.Features.Accounts.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("ActorAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DCMS.Domain.Features.Appointments.Appointment", null)
+                        .WithMany()
+                        .HasForeignKey("AppointmentId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
@@ -1498,6 +1726,21 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
                 });
 
+            modelBuilder.Entity("DCMS.Domain.Features.Scheduling.RevisionPeriod", b =>
+                {
+                    b.HasOne("DCMS.Domain.Features.Scheduling.SchedulingBranch", null)
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DCMS.Domain.Features.Scheduling.WorkingScheduleRevision", null)
+                        .WithMany("Periods")
+                        .HasForeignKey("RevisionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("DCMS.Domain.Features.Scheduling.ScheduleReceipt", b =>
                 {
                     b.HasOne("DCMS.Infrastructure.Features.Accounts.ApplicationUser", null)
@@ -1546,6 +1789,21 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .WithMany("Periods")
                         .HasForeignKey("WeekId")
                         .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Scheduling.WorkingScheduleRevision", b =>
+                {
+                    b.HasOne("DCMS.Domain.Features.Accounts.EmployeeProfile", null)
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DCMS.Infrastructure.Features.Accounts.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("PublishedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 
@@ -1613,6 +1871,11 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Scheduling.WorkingScheduleRevision", b =>
+                {
+                    b.Navigation("Periods");
                 });
 
             modelBuilder.Entity("DCMS.Domain.Features.Scheduling.WorkingWeek", b =>
