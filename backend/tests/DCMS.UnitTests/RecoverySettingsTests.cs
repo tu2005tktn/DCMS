@@ -11,7 +11,7 @@ public sealed class RecoverySettingsTests
     {
         var settings = new RecoverySettings();
         Assert.True(settings.IsValid());
-        Assert.Equal(30, settings.TokenLifetimeMinutes);
+        Assert.Equal(15, settings.TokenLifetimeMinutes); // GBR-082 baseline: 15 minutes
         Assert.Equal(2, settings.ResendCooldownMinutes);
         Assert.Equal(3, settings.MaxResends);
         Assert.Equal(5, settings.MaxVerifyAttempts);
