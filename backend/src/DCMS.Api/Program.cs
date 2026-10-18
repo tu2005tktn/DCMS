@@ -146,6 +146,7 @@ app.UseAuthorization();
 app.MapHealthEndpoints();
 app.MapAuthenticationEndpoints();
 app.MapRecoveryEndpoints();
+app.MapEmailVerificationEndpoints();
 app.MapAccountEndpoints();
 app.MapPatientLinkEndpoints();
 app.MapPatientEndpoints();

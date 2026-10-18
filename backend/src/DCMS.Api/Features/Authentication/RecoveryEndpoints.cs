@@ -53,6 +53,41 @@ public static class RecoveryEndpoints
                 : Results.BadRequest(SystemMessages.Get("MSG108"));
         }).AllowAnonymous();
 
+        // Customer Web/Mobile use an email-only Public boundary. The staff S03 routes above keep
+        // their existing contract and S04 remains separate.
+        var customer = endpoints.MapGroup("/api/customer/recovery")
+            .WithTags("UC-02 Public email recovery");
+        customer.MapPost("/request", async (RecoveryRequest request, IAccountRecoveryService service,
+            HttpContext context, CancellationToken ct) =>
+        {
+            await service.RequestAsync(request.Identifier, context.Connection.RemoteIpAddress?.ToString(), ct,
+                publicOnly: true);
+            return Results.Ok(SystemMessages.Get("MSG12"));
+        }).AllowAnonymous();
+        customer.MapPost("/resend", async (RecoveryRequest request, IAccountRecoveryService service,
+            HttpContext context, CancellationToken ct) =>
+        {
+            await service.ResendAsync(request.Identifier, context.Connection.RemoteIpAddress?.ToString(), ct,
+                publicOnly: true);
+            return Results.Ok(SystemMessages.Get("MSG12"));
+        }).AllowAnonymous();
+        customer.MapPost("/verify", async (RecoveryVerifyRequest request, IAccountRecoveryService service,
+            HttpContext context, CancellationToken ct) =>
+        {
+            var result = await service.VerifyAsync(request.Identifier, request.Proof,
+                context.Connection.RemoteIpAddress?.ToString(), ct, publicOnly: true);
+            return result.Valid ? Results.Ok(new RecoveryGrantResponse(result.ResetGrant!))
+                : Results.BadRequest(SystemMessages.Get("MSG108"));
+        }).AllowAnonymous();
+        customer.MapPost("/reset", async (RecoveryResetRequest request, IAccountRecoveryService service,
+            CancellationToken ct) =>
+        {
+            var result = await service.ResetAsync(request.Identifier, request.ResetGrant,
+                request.NewPassword, request.ConfirmPassword, ct, publicOnly: true);
+            return result.Succeeded ? Results.Ok(SystemMessages.Get("MSG13"))
+                : Results.BadRequest(SystemMessages.Get("MSG108"));
+        }).AllowAnonymous();
+
         // S04 integration point: an authorized Admin may start the same recovery process for an
         // account. The service re-checks the Admin permission server-side on every call.
         var admin = endpoints.MapGroup("/api/admin/recovery").RequireAuthorization("ManageAccounts")

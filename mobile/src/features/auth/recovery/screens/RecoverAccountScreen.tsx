@@ -25,7 +25,6 @@ import {
 } from '../recovery.api';
 import {
   RESEND_COOLDOWN_SECONDS,
-  channelHelpText,
   recoveryFields,
   recoveryMessages,
 } from '../recovery.messages';
@@ -109,7 +108,9 @@ export default function RecoverAccountScreen() {
   }
 
   async function submitRequest(value: string) {
-    const errors = validateAccount(value);
+    const errors = validateAccount(value, 254);
+    if (!errors.identifier && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim()))
+      errors.identifier = 'Email không đúng định dạng.';
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
       return;
@@ -242,10 +243,10 @@ export default function RecoverAccountScreen() {
         {step === 'request' ? (
           <View style={styles.form}>
             <Text style={styles.hint}>
-              Nhập tên đăng nhập hoặc email đã đăng ký để nhận hướng dẫn đặt lại mật khẩu.
+              Nhập email đã đăng ký của tài khoản khách hàng để nhận mã đặt lại mật khẩu.
             </Text>
             <LabelledField
-              label={recoveryFields.account}
+              label="Email"
               value={identifierValue}
               onChange={setIdentifierValue}
               error={fieldErrors.identifier}
@@ -255,7 +256,7 @@ export default function RecoverAccountScreen() {
               autoCorrect={false}
               returnKeyType="go"
               onSubmitEditing={() => void submitRequest(identifierValue)}
-              maxLength={64}
+              maxLength={254}
             />
             <PrimaryButton
               label="Gửi yêu cầu"
@@ -263,14 +264,14 @@ export default function RecoverAccountScreen() {
               disabled={busy}
               onPress={() => void submitRequest(identifierValue)}
             />
-            <Text style={styles.hint}>{channelHelpText}</Text>
+            <Text style={styles.hint}>Nếu email có tài khoản phù hợp, mã sẽ được gửi tới hộp thư này.</Text>
           </View>
         ) : null}
 
         {step === 'verify' ? (
           <View style={styles.form}>
             <Text style={styles.hint}>
-              Nhập mã xác minh đã được gửi qua kênh liên hệ đã đăng ký.
+              Nhập mã trong email nếu địa chỉ này đủ điều kiện khôi phục.
             </Text>
             <LabelledField
               label={recoveryFields.proof}

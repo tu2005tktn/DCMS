@@ -38,8 +38,9 @@ const stepNames: Record<RecoveryStepId, string> = {
  * existence. The reset grant lives in memory only: it is never put in a URL, a console log or
  * analytics.
  */
-export default function RecoverAccountPage() {
+export default function RecoverAccountPage({ customer = false }: { customer?: boolean }) {
   const navigate = useNavigate();
+  const signInPath = customer ? '/customer/sign-in' : '/sign-in';
   const [toast, toastContext] = message.useMessage();
   const [step, setStep] = useState<RecoveryStepId>('request');
   const [busy, setBusy] = useState(false);
@@ -82,7 +83,7 @@ export default function RecoverAccountPage() {
   }
 
   async function submitRequest(values: { identifier: string }) {
-    const errors = validateAccount(values.identifier);
+    const errors = validateAccount(values.identifier, customer ? 254 : 64);
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
       return;
@@ -91,7 +92,7 @@ export default function RecoverAccountPage() {
     setError(null);
     await run(async () => {
       try {
-        const result = await requestRecovery(values.identifier.trim());
+        const result = await requestRecovery(values.identifier.trim(), customer);
         identifier.current = values.identifier.trim();
         setCooldown(RESEND_COOLDOWN_SECONDS);
         setStep('verify');
@@ -113,7 +114,7 @@ export default function RecoverAccountPage() {
     setError(null);
     await run(async () => {
       try {
-        const grant = await verifyRecovery(identifier.current, values.proof.trim());
+        const grant = await verifyRecovery(identifier.current, values.proof.trim(), customer);
         setResetGrant(grant);
         setStep('reset');
       } catch (failure) {
@@ -137,6 +138,7 @@ export default function RecoverAccountPage() {
           resetGrant,
           values.newPassword,
           values.confirmPassword,
+          customer,
         );
         // Drop the grant as soon as it is consumed; it is single-use on the server too.
         setResetGrant('');
@@ -157,7 +159,7 @@ export default function RecoverAccountPage() {
         // The answer is the same neutral message; the cooldown restarts either way so a user
         // cannot hammer the endpoint when the account does not exist.
         setNotice(recoveryMessages.MSG12);
-        await resendRecovery(identifier.current);
+        await resendRecovery(identifier.current, customer);
         setCooldown(RESEND_COOLDOWN_SECONDS);
       } catch (failure) {
         setError(connectionError(failure));
@@ -214,22 +216,24 @@ export default function RecoverAccountPage() {
                 className="recovery-fade-in"
               >
                 <Typography.Paragraph className="recovery-hint">
-                  Nhập tên đăng nhập hoặc email đã đăng ký để nhận hướng dẫn đặt lại mật khẩu.
+                  {customer ? 'Nhập email đã đăng ký của tài khoản khách hàng để nhận mã đặt lại mật khẩu.'
+                    : 'Nhập tên đăng nhập hoặc email đã đăng ký để nhận hướng dẫn đặt lại mật khẩu.'}
                 </Typography.Paragraph>
                 <Form.Item
                   name="identifier"
-                  label={recoveryFields.account}
+                  label={customer ? 'Email' : recoveryFields.account}
                   validateStatus={fieldErrors.identifier ? 'error' : ''}
                   help={fieldErrors.identifier}
-                  rules={[{ required: true, message: requiredMessage(recoveryFields.account) }]}
+                  rules={[{ required: true, message: requiredMessage(customer ? 'Email' : recoveryFields.account) },
+                    ...(customer ? [{ type: 'email' as const, message: 'Email không đúng định dạng.' }] : [])]}
                 >
-                  <Input autoFocus maxLength={64} disabled={disableForm} autoComplete="username" />
+                  <Input autoFocus maxLength={customer ? 254 : 64} disabled={disableForm} autoComplete={customer ? 'email' : 'username'} />
                 </Form.Item>
                 <Button type="primary" htmlType="submit" block loading={busy} disabled={busy}>
                   Gửi yêu cầu
                 </Button>
                 <Typography.Paragraph className="recovery-hint" style={{ marginTop: 14 }}>
-                  {channelHelpText}
+                  {customer ? 'Nếu email có tài khoản phù hợp, mã sẽ được gửi tới hộp thư này.' : channelHelpText}
                 </Typography.Paragraph>
               </Form>
             )}
@@ -242,7 +246,8 @@ export default function RecoverAccountPage() {
                 className="recovery-fade-in"
               >
                 <Typography.Paragraph className="recovery-hint" style={{ marginTop: 14 }}>
-                  Nhập mã xác minh đã được gửi qua kênh liên hệ đã đăng ký.
+                  {customer ? 'Nhập mã trong email nếu địa chỉ này đủ điều kiện khôi phục.'
+                    : 'Nhập mã xác minh đã được gửi qua kênh liên hệ đã đăng ký.'}
                 </Typography.Paragraph>
                 <Form.Item
                   name="proof"
@@ -317,7 +322,7 @@ export default function RecoverAccountPage() {
                   Các phiên đăng nhập trước đã bị thu hồi. Hãy đăng nhập lại bằng mật khẩu mới.
                 </Typography.Paragraph>
                 <Space>
-                  <Button type="primary" onClick={() => navigate('/sign-in', { replace: true })}>
+                  <Button type="primary" onClick={() => navigate(signInPath, { replace: true })}>
                     Về trang đăng nhập
                   </Button>
                   <Button onClick={startOver}>Khôi phục tài khoản khác</Button>
@@ -327,7 +332,7 @@ export default function RecoverAccountPage() {
           </Card>
 
           <Typography.Paragraph className="login-help">
-            <Link to="/sign-in">Quay lại đăng nhập</Link>
+            <Link to={signInPath}>Quay lại đăng nhập</Link>
           </Typography.Paragraph>
         </div>
       </div>
