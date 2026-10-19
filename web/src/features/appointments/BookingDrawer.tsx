@@ -2,6 +2,7 @@ import { Alert, Button, Descriptions, Drawer, Form, Input, InputNumber, Radio, S
 import { useEffect, useRef, useState } from 'react';
 import { api, ApiError } from '../../services/api';
 import { useAuth } from '../authentication/AuthContext';
+import type { FollowUpHandoff } from '../follow-ups/types';
 import {
   clinicToday, clock, formatClock, formatDate, kindLabels, localMinute, newRequestKey, sourceLabels,
   type AppointmentOptions, type AppointmentResult, type AvailabilitySlot,
@@ -9,7 +10,7 @@ import {
 
 export type BookingPrefill = { branchId: number; dentistId?: number; date: string; minute?: number };
 type Values = {
-  kind: 'Standard' | 'WalkIn'; source: string; bookerName: string; bookerContact: string; patientId?: number;
+  kind: 'Standard' | 'WalkIn' | 'FollowUp'; source: string; bookerName: string; bookerContact: string; patientId?: number;
   attendeeName?: string; attendeeBirthDate?: string; relation: 'Self' | 'Relative'; serviceId?: number; reason?: string;
   branchId: number; dentistId?: number; chairId?: number; date: string; duration: number; exceptionReason?: string;
 };
@@ -18,8 +19,11 @@ const slotChangedCodes = ['MSG25', 'MSG27', 'MSG28', 'MSG34'];
 
 // S11 counter booking (UC-04). Slots come from Tư's availability for the exact staff duration; the booking itself is
 // Vinh's shared POST /api/appointments with the staff session. Contract: docs/implementation/UC04-05-S10-S11.md §5.
-export default function BookingDrawer({ open, prefill, options, onClose, onBooked }: {
+// `followUp` (S24, docs/specs/S24-FOLLOW-UP-INSTRUCTION-WEB.md): mở từ chỉ định quay lại — kind FollowUp + followUpId
+// theo contract POST /api/appointments, patient/nha sĩ/thời lượng/cửa sổ khóa theo chỉ định, không tự chọn slot.
+export default function BookingDrawer({ open, prefill, options, followUp, onClose, onBooked }: {
   open: boolean; prefill: BookingPrefill | null; options: AppointmentOptions | null;
+  followUp?: FollowUpHandoff | null;
   onClose: () => void; onBooked: (result: AppointmentResult) => void;
 }) {
   const auth = useAuth();
@@ -40,18 +44,31 @@ export default function BookingDrawer({ open, prefill, options, onClose, onBooke
   useEffect(() => {
     if (!open || !prefill) return;
     form.resetFields();
-    form.setFieldsValue({ kind: 'Standard', source: 'Phone', relation: 'Self', branchId: prefill.branchId, dentistId: prefill.dentistId,
-      date: prefill.date, duration: 30 });
+    if (followUp) {
+      form.setFieldsValue({ kind: 'FollowUp', source: 'Phone', relation: 'Self', branchId: followUp.branchId,
+        dentistId: followUp.dentistId ?? undefined, date: prefill.date, duration: followUp.durationMinutes,
+        patientId: followUp.patientId, bookerName: auth.user?.fullName ?? '' });
+    } else {
+      form.setFieldsValue({ kind: 'Standard', source: 'Phone', relation: 'Self', branchId: prefill.branchId, dentistId: prefill.dentistId,
+        date: prefill.date, duration: 30 });
+    }
     wantedMinute.current = prefill.minute;
     setSlots(null); setSlot(null); setReviewing(false); setError(null); setSlotsError(null); requestKey.current = null;
-  }, [open, prefill]);
+  }, [open, prefill, followUp]);
 
   const branchId = values?.branchId;
   const branchDentists = options?.dentists.filter(x => x.branchId === branchId) ?? [];
   const branchChairs = options?.chairs.filter(x => x.branchId === branchId) ?? [];
   const branchServices = options?.services.filter(x => x.branchId === branchId) ?? [];
-  const durationValid = !!values?.duration && values.duration >= 15 && values.duration <= 480 && values.duration % 15 === 0;
-  const canQuery = !!values?.branchId && !!values.dentistId && !!values.serviceId && !!values.date && durationValid;
+  // Ở chế độ tái khám các field kind/relation/duration/patientId không có Form.Item (hiển thị dạng khóa),
+  // nên giá trị hiệu lực lấy từ bối cảnh chỉ định thay vì form watch.
+  const effectiveKind = followUp ? 'FollowUp' as const : values?.kind;
+  const effectiveDuration = followUp ? followUp.durationMinutes : values?.duration;
+  const durationValid = !!effectiveDuration && effectiveDuration >= 15 && effectiveDuration <= 480 && effectiveDuration % 15 === 0;
+  const windowExpired = !!followUp && followUp.latestOn < clinicToday();
+  const outsideWindow = !!followUp && !!values?.date && (values.date < followUp.earliestOn || values.date > followUp.latestOn);
+  const canQuery = !!values?.branchId && !!values.dentistId && !!values.serviceId && !!values.date && durationValid
+    && !windowExpired && !outsideWindow;
   const needsException = !!slot && Date.parse(slot.start) < Date.now() + 60 * 60_000;
   const shownSlots = (slots ?? []).filter(s => !values?.chairId || s.chairId === values.chairId);
 
@@ -102,11 +119,15 @@ export default function BookingDrawer({ open, prefill, options, onClose, onBooke
       const result = await api<AppointmentResult>('/api/appointments', { method: 'POST', body: JSON.stringify({
         branchId: values.branchId,
         booker: { name: values.bookerName.trim(), phone: contact.includes('@') ? null : contact, email: contact.includes('@') ? contact : null },
-        attendee: { patientId: values.patientId ?? null, name: patient?.fullName ?? values.attendeeName?.trim() ?? null,
-          birthDate: values.patientId ? null : values.attendeeBirthDate || null },
-        attendeeRelation: values.relation, kind: values.kind, source: values.source, serviceId: values.serviceId ?? null,
+        attendee: followUp
+          ? { patientId: followUp.patientId, name: followUp.patientLabel, birthDate: null }
+          : { patientId: values.patientId ?? null, name: patient?.fullName ?? values.attendeeName?.trim() ?? null,
+            birthDate: values.patientId ? null : values.attendeeBirthDate || null },
+        attendeeRelation: followUp ? 'Self' : values.relation, kind: effectiveKind,
+        source: values.source, serviceId: values.serviceId ?? null,
         reason: values.reason?.trim() || null, dentistId: values.dentistId, assistantId: null, chairId: slot.chairId,
-        startAt: slot.start, durationMinutes: values.duration, followUpId: null,
+        startAt: slot.start, durationMinutes: effectiveDuration,
+        followUpId: followUp?.instructionId ?? null,
         exceptionReason: needsException ? values.exceptionReason?.trim() : null,
         requestKey: requestKey.current, scheduleVersion: slot.scheduleVersion, assistantScheduleVersion: slot.assistantScheduleVersion,
       }) });
@@ -129,14 +150,21 @@ export default function BookingDrawer({ open, prefill, options, onClose, onBooke
       {reviewing ? <Button type="primary" loading={busy} onClick={() => void confirm()}>Xác nhận đặt lịch</Button>
         : <Button type="primary" disabled={!slot} onClick={() => void review()}>Xem lại</Button>}</Space>}>
     {error && <Alert className="form-alert" type="error" showIcon message={error.message}
-      description={slotChangedCodes.includes(error.code) ? 'Khung giờ đã thay đổi. Danh sách khung giờ đã được tải lại; thông tin đã nhập được giữ nguyên.' : undefined} />}
-    <Form<Values> form={form} layout="vertical" disabled={reviewing || busy} style={{ display: reviewing ? 'none' : undefined }}>
-      <div className="patient-form-grid">
-        <Form.Item name="kind" label="Loại lịch"><Radio.Group optionType="button" options={[
-          { value: 'Standard', label: kindLabels.Standard }, { value: 'WalkIn', label: kindLabels.WalkIn },
-          { value: 'FollowUp', label: <Tooltip title="Cần module hướng dẫn tái khám (TV4), chưa có">{kindLabels.FollowUp}</Tooltip>, disabled: true }]} /></Form.Item>
+      description={slotChangedCodes.includes(error.code) ? 'Khung giờ đã thay đổi. Danh sách khung giờ đã được tải lại; thông tin đã nhập được giữ nguyên.'
+        : error.code === 'MSG230' ? 'Chỉ định bị chặn (cửa sổ, điều kiện bước hoặc kết quả Labo) — xem lại chỉ định S24 trước khi đặt lịch; dữ liệu được giữ nguyên.'
+        : error.code === 'MSG127' ? 'Chỉ định đã gắn với lịch hẹn khác — tải lại danh sách chỉ định trong S24.'
+        : error.code === 'MSG06' ? 'Phiên bản không còn quyền với chỉ định hoặc bệnh nhân này — dữ liệu được giữ nguyên.'
+        : undefined} />}
+    <Form<Values> form={form} layout="vertical" disabled={reviewing || busy} style={{ display: reviewing ? 'none' : undefined }}>      <div className="patient-form-grid">
+        {followUp ? <div><Typography.Text type="secondary">Loại lịch</Typography.Text>
+          <div><Tag color="purple">{kindLabels.FollowUp}</Tag> <Typography.Text type="secondary">
+            Theo chỉ định {followUp.instructionId.slice(0, 8)} · v{followUp.version}</Typography.Text></div></div>
+          : <Form.Item name="kind" label="Loại lịch"><Radio.Group optionType="button" options={[
+            { value: 'Standard', label: kindLabels.Standard }, { value: 'WalkIn', label: kindLabels.WalkIn },
+            { value: 'FollowUp', label: <Tooltip title="Chỉ mở từ chỉ định quay lại S24">{kindLabels.FollowUp}</Tooltip>, disabled: !followUp }]} /></Form.Item>}
         <Form.Item name="source" label="Nguồn" extra="Chỉ ghi nhận nguồn, không kết nối kênh.">
-          <Select options={Object.entries(sourceLabels).map(([value, label]) => ({ value, label }))} /></Form.Item>
+          <Select options={Object.entries(sourceLabels).map(([value, label]) => ({ value, label }))} />
+        </Form.Item>
       </div>
       <Typography.Title level={5}>Người đặt</Typography.Title>
       <div className="patient-form-grid">
@@ -147,36 +175,61 @@ export default function BookingDrawer({ open, prefill, options, onClose, onBooke
             ? Promise.resolve() : Promise.reject(new Error('Liên hệ người đặt không đúng định dạng.')) }]}><Input maxLength={254} /></Form.Item>
       </div>
       <Typography.Title level={5}>Người khám</Typography.Title>
-      <div className="patient-form-grid">
-        <Form.Item name="relation" label="Quan hệ với người đặt"><Radio.Group options={[{ value: 'Self', label: 'Bản thân' }, { value: 'Relative', label: 'Người thân' }]} /></Form.Item>
-        {canSearchPatients && <Form.Item name="patientId" label="Hồ sơ bệnh nhân có sẵn (tùy chọn)">
-          <Select showSearch allowClear filterOption={false} placeholder="Gõ mã, tên hoặc SĐT" onSearch={value => void searchPatients(value)}
-            notFoundContent={null} options={patients.map(p => ({ value: p.id, label: `${p.patientCode} · ${p.fullName}${p.birthDate ? ` · ${formatDate(p.birthDate)}` : ''}` }))} /></Form.Item>}
-      </div>
-      {!values?.patientId && <div className="patient-form-grid">
-        <Form.Item name="attendeeName" label="Họ tên người khám" rules={[{ required: true, whitespace: true, message: 'Vui lòng nhập Họ tên người khám.' },
-          { max: 100, message: 'Họ tên người khám không được vượt quá 100 ký tự.' }]}><Input maxLength={100} /></Form.Item>
-        <Form.Item name="attendeeBirthDate" label="Ngày sinh (nếu biết)"><Input type="date" max={clinicToday()} /></Form.Item>
-      </div>}
+      {followUp ? <div className="patient-form-grid">
+        <div><Typography.Text type="secondary">Bệnh nhân theo chỉ định</Typography.Text>
+          <div><strong>{followUp.patientLabel}</strong> · Bệnh nhân #{followUp.patientId}</div></div>
+        <div><Typography.Text type="secondary">Quan hệ</Typography.Text>
+          <div>Bản thân (khóa theo chỉ định)</div></div>
+      </div> : <>
+        <div className="patient-form-grid">
+          <Form.Item name="relation" label="Quan hệ với người đặt"><Radio.Group options={[{ value: 'Self', label: 'Bản thân' }, { value: 'Relative', label: 'Người thân' }]} /></Form.Item>
+          {canSearchPatients && <Form.Item name="patientId" label="Hồ sơ bệnh nhân có sẵn (tùy chọn)">
+            <Select showSearch allowClear filterOption={false} placeholder="Gõ mã, tên hoặc SĐT" onSearch={value => void searchPatients(value)}
+              notFoundContent={null} options={patients.map(p => ({ value: p.id, label: `${p.patientCode} · ${p.fullName}${p.birthDate ? ` · ${formatDate(p.birthDate)}` : ''}` }))} /></Form.Item>}
+        </div>
+        {!values?.patientId && <div className="patient-form-grid">
+          <Form.Item name="attendeeName" label="Họ tên người khám" rules={[{ required: true, whitespace: true, message: 'Vui lòng nhập Họ tên người khám.' },
+            { max: 100, message: 'Họ tên người khám không được vượt quá 100 ký tự.' }]}><Input maxLength={100} /></Form.Item>
+          <Form.Item name="attendeeBirthDate" label="Ngày sinh (nếu biết)"><Input type="date" max={clinicToday()} /></Form.Item>
+        </div>}
+      </>}
       <Typography.Title level={5}>Dịch vụ và tài nguyên</Typography.Title>
       <div className="patient-form-grid">
         <Form.Item name="serviceId" label="Dịch vụ" rules={[{ required: true, message: 'Vui lòng nhập Dịch vụ.' }]}>
           <Select options={branchServices.map(s => ({ value: s.id, label: s.name }))} /></Form.Item>
-        <Form.Item name="reason" label="Lý do khám (tùy chọn)" rules={[{ max: 1000, message: 'Lý do không được vượt quá 1000 ký tự.' }]}><Input maxLength={1000} /></Form.Item>
-        <Form.Item name="branchId" label="Chi nhánh" rules={[{ required: true, message: 'Vui lòng nhập Chi nhánh.' }]}>
-          <Select options={options?.branches.map(b => ({ value: b.id, label: b.name }))} onChange={() => form.setFieldsValue({ dentistId: undefined, chairId: undefined, serviceId: undefined })} /></Form.Item>
-        <Form.Item name="dentistId" label="Nha sĩ" rules={[{ required: true, message: 'Vui lòng nhập Nha sĩ.' }]}>
-          <Select options={branchDentists.map(d => ({ value: d.id, label: d.name }))} /></Form.Item>
+        <Form.Item name="reason" label="Lý do khám (tùy chọn)" rules={[{ max: 1000, message: 'Lý do không được vượt quá 1000 ký tự.' }]}><Input maxLength={1000} /></Form.Item>        <Form.Item name="branchId" label="Chi nhánh" rules={[{ required: true, message: 'Vui lòng nhập Chi nhánh.' }]}>
+          <Select disabled={!!followUp} options={options?.branches.map(b => ({ value: b.id, label: b.name }))}
+            onChange={() => form.setFieldsValue({ dentistId: undefined, chairId: undefined, serviceId: undefined })} />
+        </Form.Item>
+        <Form.Item name="dentistId" label="Nha sĩ" extra={followUp && followUp.dentistId !== null ? 'Khóa theo nha sĩ của chỉ định.' : undefined}
+          rules={[{ required: true, message: 'Vui lòng nhập Nha sĩ.' }]}>
+          <Select disabled={!!followUp && followUp.dentistId !== null} options={branchDentists.map(d => ({ value: d.id, label: d.name }))} />
+        </Form.Item>
         <Form.Item name="chairId" label="Ghế (để trống: tự chọn)"><Select allowClear options={branchChairs.map(c => ({ value: c.id, label: c.name }))} /></Form.Item>
-        <Form.Item name="date" label="Ngày" rules={[{ required: true, message: 'Vui lòng nhập Ngày.' }]}><Input type="date" min={clinicToday()} /></Form.Item>
-        <Form.Item name="duration" label="Thời lượng (phút)" extra="15–480 phút, bội số của 15." rules={[{ required: true, message: 'Vui lòng nhập Thời lượng.' },
-          { validator: (_, v?: number) => !v || (v >= 15 && v <= 480 && v % 15 === 0) ? Promise.resolve() : Promise.reject(new Error('Thời lượng không đúng định dạng.')) }]}>
-          <InputNumber min={15} max={480} step={15} style={{ width: '100%' }} /></Form.Item>
+        <Form.Item name="date" label="Ngày"
+          extra={followUp ? `Trong cửa sổ ${formatDate(followUp.earliestOn)} – ${formatDate(followUp.latestOn)} của chỉ định.` : undefined}
+          rules={[{ required: true, message: 'Vui lòng nhập Ngày.' }]}>
+          <Input type="date" min={followUp && clinicToday() < followUp.earliestOn ? followUp.earliestOn : clinicToday()}
+            max={followUp?.latestOn} />
+        </Form.Item>
+        {followUp ? <div><Typography.Text type="secondary">Thời lượng</Typography.Text>
+          <div>{followUp.durationMinutes} phút (khóa theo chỉ định)</div></div>
+          : <Form.Item name="duration" label="Thời lượng (phút)" extra="15–480 phút, bội số của 15." rules={[{ required: true, message: 'Vui lòng nhập Thời lượng.' },
+            { validator: (_, v?: number) => !v || (v >= 15 && v <= 480 && v % 15 === 0) ? Promise.resolve() : Promise.reject(new Error('Thời lượng không đúng định dạng.')) }]}>
+            <InputNumber min={15} max={480} step={15} style={{ width: '100%' }} />
+          </Form.Item>}
       </div>
       <Typography.Title level={5}>Khung giờ hợp lệ</Typography.Title>
+      {followUp && windowExpired && <Alert type="error" showIcon style={{ marginBottom: 8 }}
+        message={`Cửa sổ chỉ định đã qua (muộn nhất ${formatDate(followUp.latestOn)}).`}
+        description="Cập nhật cửa sổ trong S24 trước khi tìm khung giờ — không tự đổi nha sĩ hay cửa sổ." />}
+      {followUp && !windowExpired && outsideWindow && <Alert type="warning" showIcon style={{ marginBottom: 8 }}
+        message="Ngày đang chọn nằm ngoài cửa sổ của chỉ định."
+        description={`Chọn ngày trong khoảng ${formatDate(followUp.earliestOn)} – ${formatDate(followUp.latestOn)}.`} />}
       {!canQuery ? <Typography.Text type="secondary">Chọn chi nhánh, nha sĩ, dịch vụ, ngày và thời lượng để xem khung giờ.</Typography.Text>
         : loadingSlots ? <Spin /> : slotsError ? <Alert type="error" showIcon message={slotsError} action={<Button size="small" onClick={() => void loadSlots()}>Thử lại</Button>} />
-        : shownSlots.length === 0 ? <Alert type="info" showIcon message="Không còn khung giờ đủ tài nguyên cho thời lượng này. Chọn ngày, nha sĩ, ghế hoặc thời lượng khác." />
+        : shownSlots.length === 0 ? <Alert type="info" showIcon message="Không còn khung giờ đủ tài nguyên cho thời lượng này. Chọn ngày, nha sĩ, ghế hoặc thời lượng khác."
+          description={followUp ? 'Theo chỉ định, nha sĩ/thời lượng/cửa sổ không tự thay đổi — xem lại chỉ định S24 nếu cần.' : undefined} />
         : <div className="booking-slots">{shownSlots.map(s => {
           const selected = slot?.start === s.start && slot.chairId === s.chairId;
           return <Button key={`${s.start}-${s.chairId}`} type={selected ? 'primary' : 'default'} onClick={() => setSlot(s)}>
@@ -189,12 +242,15 @@ export default function BookingDrawer({ open, prefill, options, onClose, onBooke
     {reviewing && slot && values && <>
       <Typography.Title level={5}>Xem lại trước khi xác nhận</Typography.Title>
       <Descriptions column={1} bordered size="small" items={[
-        { label: 'Loại / nguồn', children: `${kindLabels[values.kind]} · ${sourceLabels[values.source]}` },
+        { label: 'Loại / nguồn', children: `${kindLabels[effectiveKind ?? 'Standard']} · ${sourceLabels[values.source]}` },
         { label: 'Người đặt', children: `${values.bookerName} · ${values.bookerContact}` },
-        { label: 'Người khám', children: <>{patients.find(p => p.id === values.patientId)?.fullName ?? values.attendeeName} <Tag>{values.relation === 'Self' ? 'Bản thân' : 'Người thân'}</Tag></> },
+        { label: 'Người khám', children: followUp
+          ? <>{followUp.patientLabel} <Tag>{kindLabels.FollowUp}</Tag></>
+          : <>{patients.find(p => p.id === values.patientId)?.fullName ?? values.attendeeName} <Tag>{values.relation === 'Self' ? 'Bản thân' : 'Người thân'}</Tag></> },
+        ...(followUp ? [{ label: 'Chỉ định', children: `${followUp.instructionId.slice(0, 8)} · v${followUp.version} · ${followUp.durationMinutes} phút · cửa sổ ${formatDate(followUp.earliestOn)}–${formatDate(followUp.latestOn)}` }] : []),
         { label: 'Dịch vụ', children: branchServices.find(s => s.id === values.serviceId)?.name },
         { label: 'Nha sĩ / ghế', children: `${dentistName} · ${chairName(slot.chairId)}` },
-        { label: 'Thời gian', children: `${formatDate(values.date)} · ${formatClock(slot.start)}–${formatClock(slot.end)} (${values.duration} phút)` },
+        { label: 'Thời gian', children: `${formatDate(values.date)} · ${formatClock(slot.start)}–${formatClock(slot.end)} (${effectiveDuration} phút)` },
         ...(needsException ? [{ label: 'Lý do ngoại lệ', children: values.exceptionReason }] : []),
       ]} />
       <Button className="patient-section" disabled={busy} onClick={() => setReviewing(false)}>Sửa thông tin</Button>

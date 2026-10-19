@@ -4,6 +4,7 @@ import { Link, useParams } from 'react-router-dom';
 import { api, type ApiError } from '../../services/api';
 import type { TreatmentChange, TreatmentDossier, TreatmentItem } from './types';
 import { decisionLabel, money, stateLabel } from './types';
+import FollowUpPanel from '../follow-ups/FollowUpPanel';
 import './treatment.css';
 
 const eventLabels: Record<string, string> = {
@@ -125,6 +126,7 @@ export default function DossierPage() {
               description="Kế hoạch và các mốc thanh toán không phải khoản đã thu. Số dư sẽ hiển thị khi module tài chính cung cấp dữ liệu chính thức." />}
       </Card>
     </div>
+    <FollowUpPanel dossier={dossier} />
     <Card title="Dòng thời gian" className="treatment-timeline">
       {dossier.timeline.length === 0 ? <Empty description="Chưa có sự kiện chính thức." />
         : <Timeline items={dossier.timeline.map(event => ({ key: event.id,

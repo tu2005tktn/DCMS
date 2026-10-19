@@ -20,6 +20,8 @@
 - [Web khách hàng xem/đổi/hủy lịch](specs/CUSTOMER-APPOINTMENTS-WEB.md): màn S14/S16 tại `/customer/appointments`, dùng API thật, review/xác nhận và xử lý lỗi.
 - [UC-04/05 S10/S11 lịch hẹn web, đặt lịch tại quầy, API đọc lịch](implementation/UC04-05-S10-S11.md): phạm vi xem, API đọc dùng chung, lưới 15 phút, form quầy dùng lệnh đặt lịch chung.
 - [Runbook chạy demo DCMS](implementation/RUN-DEMO.vi.md): khởi động nhanh 3 terminal, kịch bản demo, cách đọc mã xác minh, lỗi đã sửa 13/10/2026 và các việc cần chuẩn bị để deploy thật.
+- [S24 chỉ định quay lại (Web)](specs/S24-FOLLOW-UP-INSTRUCTION-WEB.md): form chỉ định, trạng thái/lịch sử, handoff S11; [triển khai DCMS-92](implementation/S24-S41-DCMS-92.md).
+- [S41 My Medical Records (Mobile)](specs/S41-MOBILE-MEDICAL-RECORDS.md): self-link gate, summary/detail, trạng thái nguồn DCMS-95, an ninh read-only; [triển khai DCMS-92](implementation/S24-S41-DCMS-92.md).
 
 Architecture: `Domain` contains business rules, `Application` defines use cases and contracts, `Infrastructure` supplies PostgreSQL/EF Core implementations, and `Api` configures HTTP endpoints and dependency injection. Add feature folders within each layer when implementing business features.
 
