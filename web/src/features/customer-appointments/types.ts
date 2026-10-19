@@ -3,6 +3,18 @@ export type AppointmentCard = {
   code: string; start: string; end: string; durationMinutes: number; dentistName: string; attendeeName: string;
   attendeeKind: 'SELF' | 'RELATIVE'; status: AppointmentStatus; access: 'BOOKED_BY_ME' | 'MY_OWN' | 'BOTH'; version: number;
 };
+export type CustomerSupportRequest = {
+  id: string;
+  appointmentCode: string;
+  kind: string;
+  reason: string;
+  status: 'Pending' | 'Resolved' | 'Rejected' | 'Withdrawn';
+  createdAt: string;
+  decidedAt: string | null;
+  publicNote: string | null;
+  version: number;
+  proposedStartAt?: string | null;
+};
 export type AppointmentPage = { items: AppointmentCard[]; total: number; page: number; pageSize: number };
 export type AppointmentDetail = AppointmentCard & {
   branchId: number; branchName: string; dentistId: number; assistantId: number | null; serviceId: number | null;
@@ -10,11 +22,15 @@ export type AppointmentDetail = AppointmentCard & {
   eligibility: { canSelfService: boolean; hoursRemaining: number; reasonCode: string | null; canRequestSupport: boolean };
   followUp: { id: string; status: string } | null;
   history: { action: 'RESCHEDULE' | 'CANCEL'; actorKind: string; oldStart: string; newStart: string | null; reason: string; occurredAt: string }[];
+  supportRequests?: CustomerSupportRequest[];
   clinicContact: { phone: string; hours: string };
 };
 export type Slot = { start: string; end: string; chairId: number; dentistId: number; assistantId: number | null;
   scheduleVersion: number; assistantScheduleVersion: number | null };
+export type DentistOption = { id: number; branchId: number; name: string; canDentist: boolean };
+export type AvailabilityOptions = { employees: DentistOption[] };
 export type ChangeResult = { appointment: AppointmentDetail; notification: { code: string; message: string } };
+export type SupportResult = { request: CustomerSupportRequest; notification: { code: string; message: string } };
 export const statusLabels: Record<AppointmentStatus, string> = {
   Confirmed: 'Đã xác nhận', CheckedIn: 'Đã tiếp nhận', InProgress: 'Đang khám', Completed: 'Hoàn thành', Cancelled: 'Đã hủy', NoShow: 'Vắng mặt',
 };

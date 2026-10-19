@@ -23,10 +23,16 @@ public sealed class DcmsDbContext(DbContextOptions<DcmsDbContext> options)
     public DbSet<PatientLinkAudit> PatientLinkAudits => Set<PatientLinkAudit>();
     public DbSet<Appointment> Appointments => Set<Appointment>();
     public DbSet<AppointmentChange> AppointmentChanges => Set<AppointmentChange>();
-    public DbSet<AppointmentSupportRequest> AppointmentSupportRequests => Set<AppointmentSupportRequest>();
     public DbSet<AppointmentChangeReceipt> AppointmentChangeReceipts => Set<AppointmentChangeReceipt>();
     public DbSet<AppointmentReceipt> AppointmentReceipts => Set<AppointmentReceipt>();
     public DbSet<AppointmentOutboxEvent> AppointmentOutboxEvents => Set<AppointmentOutboxEvent>();
+    public DbSet<AppointmentSupportRequest> AppointmentSupportRequests => Set<AppointmentSupportRequest>();
+    public DbSet<AppointmentSupportHistory> AppointmentSupportHistories => Set<AppointmentSupportHistory>();
+    public DbSet<SupportRequestReceipt> SupportRequestReceipts => Set<SupportRequestReceipt>();
+    public DbSet<InAppNotification> InAppNotifications => Set<InAppNotification>();
+    public DbSet<NotificationDelivery> NotificationDeliveries => Set<NotificationDelivery>();
+    public DbSet<AppointmentReminder> AppointmentReminders => Set<AppointmentReminder>();
+    public DbSet<StaffHandlingItem> StaffHandlingItems => Set<StaffHandlingItem>();
     public DbSet<RecoveryToken> RecoveryTokens => Set<RecoveryToken>();
     public DbSet<EmailVerificationToken> EmailVerificationTokens => Set<EmailVerificationToken>();
     public DbSet<RecoveryAudit> RecoveryAudits => Set<RecoveryAudit>();

@@ -1,10 +1,10 @@
 # S26 — Staff Support Inbox (Web)
 
-> **Trạng thái**: UI mock đầy đủ, chờ backend TV5. Build web (`web/`), Playwright 4/4 pass.
+> **Trạng thái**: UI đã dùng API thật TV5, có EF migration và kiểm thử tích hợp.
 
 Phạm vi: module web cho staff **xem và xử lý** các yêu cầu hỗ trợ (đổi/huỷ/xác nhận) do booker & attendee gửi lên. Bám sát đặc tả S26 (`docs/specs/S26-Notifications-Reminders.md`) và màn hình mobile S12 (`mobile/src/app/(home)/staff/requests`).
 
-Tài liệu này mô tả phần UI web — backend TV4/TV5 đã được đặc tả trong S26. Web chỉ là lớp hiển thị + gọi command theo hợp đồng mock DTO chung (`mobile/src/features/appointments/appointment.types.ts`).
+Tài liệu này mô tả UI web và API TV5. Web gọi `supportInbox.api.ts`; mock cũ chỉ còn làm fixture tham khảo/offline và không nằm trên production path.
 
 ## Phạm vi đợt này
 
@@ -64,11 +64,36 @@ web/src/features/support-inbox/
 | `GET /api/support-requests?statuses=&branchId=&page=&pageSize=` | Hàng đợi cho staff | `{ items: SupportRequestDto[], total, page, pageSize }` |
 | `GET /api/support-requests/{id}` | Chi tiết yêu cầu + appointment | `SupportRequestDetail` (mở rộng từ `SupportRequestDto` thêm `appointment` đầy đủ) |
 | `POST /api/support-requests/{id}/verify-requester` | `{ requestKey, expectedVersion, notes? }` | `SupportRequestDto` |
-| `POST /api/support-requests/{id}/change-appointment` | `StaffChangeCommand` (Change/Cancel) | `StaffChangeResult` |
+| `POST /api/support-requests/{id}/change-appointment` | `StaffChangeCommand` (Change/Cancel) | `StaffChangeResult` gồm appointment và request/version mới |
 | `POST /api/support-requests/{id}/resolve` | `StaffResolveCommand` | `StaffResolveResult` |
 | `POST /api/support-requests/{id}/reject` | `StaffResolveCommand` với `decision='Reject'` | `StaffResolveResult` |
 
-Cho tới khi backend có, UI sử dụng `supportInbox.mock.ts` (in-memory) để staff thấy luồng đầy đủ.
+UI production sử dụng các endpoint trên. Mỗi thao tác phát sinh `requestKey` riêng;
+server kiểm `expectedVersion`, quyền và membership chi nhánh lại trước mutation.
+UI lấy `appointmentActionCommitted` từ request detail để bật Resolve; không quét lịch
+sử appointment để đoán. Response change được áp dụng trực tiếp nên một GET đọc lại
+không còn là điều kiện để nút Resolve hoạt động. Request key của verify/change/resolve/
+reject được giữ khi retry lỗi mạng hoặc 5xx và chỉ thay khi command hoàn tất hoặc stale.
+
+## Realtime (SignalR)
+
+- Dùng hub sẵn có `/hubs/notifications`; web client dùng `@microsoft/signalr` và token trong session hiện tại.
+- Backend resolve branch thật từ `SchedulingMember -> Employee.AccountId`, không dùng account id giả làm branch id.
+- `SupportRequestService` phát `supportRequestUpdated` sau commit tới `staff:branch:{branchId}` cho create/verify/change/resolve/reject/withdraw.
+- `SupportInboxPage` coi event là tín hiệu reload danh sách hiện tại. `RequestDrawer` nhận một `refreshToken` riêng để reload detail khi request đang mở bị thay đổi từ tab/account khác.
+- Client reconnect tự động và reload một lần khi kết nối được khôi phục; unsubscribe/stop connection khi staff logout hoặc component unmount.
+- Không cập nhật lạc quan lifecycle từ payload SignalR; mọi nội dung hiển thị vẫn lấy lại qua API có kiểm quyền.
+
+## Persistence và transaction
+
+- `APPOINTMENT_SUPPORT_REQUEST`, `APPOINTMENT_SUPPORT_HISTORY` và
+  `SUPPORT_REQUEST_RECEIPT` giữ lifecycle, audit và idempotency.
+- Đổi/hủy gọi `IAppointmentChangeService`; support service không sao chép logic
+  availability/reservation. Resolve kiểm `AppointmentChange.RequestKey` đã commit.
+- Resolve/reject ghi support history và appointment outbox trong transaction; notification
+  cho requester được dispatcher tạo sau commit.
+- `ConfirmedToAttend` là cột riêng trên Appointment; command không tạo Visit và không
+  thay đổi `Appointment.Status`.
 
 ## Dữ liệu mock (chỉ Development)
 

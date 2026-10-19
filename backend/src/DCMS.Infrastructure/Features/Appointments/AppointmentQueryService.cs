@@ -181,14 +181,25 @@ public sealed class AppointmentQueryService(DcmsDbContext db, UserManager<Applic
         var hours = (row.StartAt - clock.GetUtcNow()).TotalHours;
         var reason = row.Status is "CheckedIn" or "InProgress" || hours <= 0 ? "STARTED"
             : row.Status != "Confirmed" ? "NOT_CONFIRMED" : hours < SelfServiceHours ? "WITHIN_12H" : null;
-        var supports = db.AppointmentSupportRequests.AsNoTracking().Where(x => x.AppointmentId == row.Id);
-        if (!staff) supports = supports.Where(x => x.AccountId == accountId);
-        var supportRequests = await supports.OrderByDescending(x => x.CreatedAt).ThenByDescending(x => x.Id)
-            .Select(x => new SupportRequestDto(x.Id, row.Code, x.Kind, x.Reason, x.Status, x.CreatedAt,
-                x.WithdrawnAt ?? x.DecidedAt, x.PublicNote, x.Version)).ToArrayAsync(ct);
         var history = await db.AppointmentChanges.AsNoTracking().Where(x => x.AppointmentId == row.Id)
             .OrderByDescending(x => x.OccurredAt).ThenByDescending(x => x.Id)
             .Select(x => new MyAppointmentChange(x.Action, x.ActorKind, x.OldStart, x.NewStart, x.Reason, x.OccurredAt)).ToArrayAsync(ct);
+        var supportRequests = await db.AppointmentSupportRequests.AsNoTracking()
+            .Where(x => x.AppointmentId == row.Id)
+            .OrderByDescending(x => x.CreatedAt)
+            .Select(x => new
+            {
+                id = x.Code,
+                appointmentCode = row.Code,
+                kind = x.Kind == "Change" ? "RESCHEDULE" : x.Kind == "Cancel" ? "CANCEL" : x.Kind,
+                reason = x.Reason ?? "",
+                status = x.Status,
+                createdAt = x.CreatedAt,
+                decidedAt = x.DecidedAt,
+                publicNote = x.PublicNote,
+                version = x.Version,
+                proposedStartAt = x.ProposedStartAt
+            }).ToListAsync(ct);
         return new(card.Code, card.Start, card.End, card.DurationMinutes, card.DentistName, card.AttendeeName, card.AttendeeKind,
             card.Status, staff ? "STAFF" : card.Access, card.Version, row.BranchId, branch ?? "", row.DentistId, row.ServiceId, service ?? "Khám và tư vấn",
             row.BookerName, MaskPhone(row.BookerPhone) ?? MaskEmail(row.BookerEmail) ?? "",

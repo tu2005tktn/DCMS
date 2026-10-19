@@ -4,7 +4,7 @@ import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, T
 import { spacing } from '@/theme/spacing';
 import { useSession } from '@/features/auth/session/useSession';
 import { Banner, Button, Card, Field, palette } from '@/features/patient-link/components/LinkUi';
-import { AppointmentApiError, appointmentsApi } from '../appointments.api';
+import { AppointmentApiError, appointmentsApi, usingMockAppointments } from '../appointments.api';
 import { formatClock, formatDate, formatDateInput, formatWeekday, parseInputDate, statusColors, statusLabels } from '../appointments.rules';
 import type { AccessSource, AppointmentCard, AppointmentScope, AppointmentStatus } from '../appointments.types';
 
@@ -43,6 +43,7 @@ export default function MyAppointmentsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<AppointmentApiError | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
   const request = useRef(0);
 
   const load = useCallback(async (nextPage: number, mode: 'replace' | 'refresh' | 'more') => {
@@ -89,6 +90,8 @@ export default function MyAppointmentsScreen() {
 
   return <ScrollView contentContainerStyle={styles.container}
     refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void load(1, 'refresh')} />}>
+    {usingMockAppointments && <Banner tone="info" message="Dữ liệu minh họa (mock) — API lịch hẹn chưa sẵn sàng. Thao tác chỉ lưu tạm trên ứng dụng." />}
+    {notice && <Banner tone="info" message={notice} />}
     <View style={styles.tabs}>
       {(['UPCOMING', 'HISTORY'] as AppointmentScope[]).map(value =>
         <Pressable key={value} accessibilityRole="tab" accessibilityState={{ selected: scope === value }} onPress={() => setScope(value)}
@@ -96,12 +99,13 @@ export default function MyAppointmentsScreen() {
           <Text style={[styles.tabText, scope === value && styles.tabTextSelected]}>{value === 'UPCOMING' ? 'Sắp tới' : 'Lịch sử'}</Text>
         </Pressable>)}
     </View>
+    <Text style={styles.muted}>Bạn xem được lịch do mình đặt và lịch của chính mình qua liên kết hồ sơ đã xác minh. Giờ hẹn theo giờ Việt Nam.</Text>
     <View style={styles.toolbar}>
       <Pressable accessibilityRole="button" onPress={() => setShowFilters(value => !value)}>
         <Text style={styles.link}>{showFilters ? 'Ẩn bộ lọc' : 'Bộ lọc'}{filters.status !== 'ALL' || filters.from || filters.to ? ' •' : ''}</Text>
       </Pressable>
       <Pressable accessibilityRole="button" onPress={() => router.push('/book-appointment')}>
-        <Text style={styles.link}>+ Đặt lịch</Text>
+        <Text style={styles.link}>+ Đặt lịch mới</Text>
       </Pressable>
     </View>
     {showFilters && <Card>
@@ -121,13 +125,14 @@ export default function MyAppointmentsScreen() {
       : error ? <Banner tone="error" message={error.message} action={{ label: 'Thử lại', onPress: () => void load(1, 'replace') }} />
       : items.length === 0 ? <Card>
         <Text style={styles.emptyTitle}>Không có lịch hẹn phù hợp với bộ lọc đã chọn.</Text>
+        <Button title="Đặt lịch mới" onPress={() => router.push('/book-appointment')} />
         {!verified && <Text style={styles.muted}>Lịch khám của chính bạn chỉ hiển thị sau khi tài khoản được liên kết với hồ sơ tại phòng khám.</Text>}
         {!verified && <Button title="Liên kết hồ sơ của tôi" variant="secondary" onPress={() => router.push('/account-link')} />}
       </Card>
       : <>
         <Text style={styles.muted}>{total} lịch hẹn</Text>
         {items.map(item => <Pressable key={item.code} accessibilityRole="button" accessibilityLabel={`Lịch hẹn ${item.code}`}
-          onPress={() => router.push({ pathname: '/appointments/[code]', params: { code: item.code } })}
+          onPress={() => router.push(`/(account)/appointments/${encodeURIComponent(item.code)}` as never)}
           style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
           <View style={styles.cardHead}><Text style={styles.code}>{item.code}</Text><StatusPill status={item.status} /></View>
           <Text style={styles.when}>{formatWeekday(item.start)}, {formatDate(item.start)} · {formatClock(item.start)}–{formatClock(item.end)}</Text>

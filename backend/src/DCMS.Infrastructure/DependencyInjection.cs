@@ -15,6 +15,8 @@ using DCMS.Infrastructure.Features.Patients;
 using DCMS.Application.Features.Appointments;
 using DCMS.Infrastructure.Features.Appointments;
 using Microsoft.Extensions.Hosting;
+using DCMS.Infrastructure.Features.Notifications;
+using DCMS.Application.Features.SupportRequests;
 
 namespace DCMS.Infrastructure;
 
@@ -67,10 +69,12 @@ public static class DependencyInjection
         services.AddScoped<IAppointmentService, AppointmentService>();
         services.AddScoped<IAppointmentQueryService, AppointmentQueryService>();
         services.AddScoped<IAppointmentChangeService, AppointmentChangeService>();
-        services.AddScoped<IAppointmentSupportService, AppointmentSupportService>();
+        services.AddScoped<ISupportRequestService, SupportRequestService>();
         services.AddScoped<IFollowUpAppointmentChangePort, UnavailableFollowUpAppointmentChangePort>();
         services.AddScoped<DevelopmentAppointmentSeeder>();
         services.AddScoped<IFollowUpBookingPort, UnavailableFollowUpBookingPort>();
+        services.AddScoped<IAppointmentNotificationDispatcher, AppointmentNotificationDispatcher>();
+        services.AddScoped<IExternalNotificationAdapter, UnavailableExternalNotificationAdapter>();
         // S03 recovery delivery: a configured SMTP server sends real email in any environment; otherwise
         // only Development gets the logged-only adapter, so no environment can claim a message was sent.
         var smtp = configuration.GetSection("Smtp").Get<SmtpSettings>() ?? new SmtpSettings();

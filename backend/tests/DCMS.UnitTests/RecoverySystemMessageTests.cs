@@ -16,6 +16,7 @@ public sealed class RecoverySystemMessageTests
     [InlineData("MSG109", "Mật khẩu chưa đáp ứng yêu cầu được hiển thị. Vui lòng kiểm tra và nhập lại.")]
     [InlineData("MSG144", "Không thể hoàn tất thao tác. Vui lòng kiểm tra kết nối và thử lại.")]
     [InlineData("MSG06", "Bạn không có quyền thực hiện thao tác này.")]
+    [InlineData("MSG33", "Đã gửi yêu cầu hỗ trợ. Lịch hẹn hiện tại vẫn có hiệu lực cho đến khi phòng khám xử lý thành công.")]
     public void RecoveryMessagesMatchTheSpecification(string code, string expected)
     {
         Assert.Equal(expected, SystemMessages.Get(code).Message);

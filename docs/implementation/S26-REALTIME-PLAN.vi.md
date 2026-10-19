@@ -16,7 +16,7 @@ Tôi đã đọc codebase và thấy **một số giả định ban đầu của
 | "Thông báo biến mất khi reload" | `NotificationListScreen` đang dùng `notificationMockRepo` (vì `EXPO_PUBLIC_USE_REAL_NOTIFICATION_API=false`). Backend TV5 (notification API) **CHƯA TỒN TẠI** trong `DCMS.Api` — không có file `*Notification*.cs`, không có `MapGet("/api/notifications")`. Reload = re-seed từ 4 hardcode items. |
 | "SignalR" | Backend chưa có `AddSignalR`, `MapHub`, package `Microsoft.AspNetCore.SignalR` chưa được thêm vào `.csproj`. Mobile chưa có `@microsoft/signalr`. Web staff inbox chỉ dùng mock, không có SignalR client. |
 
-**Tóm lại**: trước khi có SignalR thật sự, tôi cần fix bug 1 và 2 bằng cách **persist mock + chuyển sang real API khi backend sẵn sàng**. Phần SignalR làm sau.
+**Trạng thái hiện tại**: hub và notification realtime đã có. Staff support inbox dùng cùng hub, join group theo branch thật và nhận `supportRequestUpdated` để tự đồng bộ list/detail qua API mà không cần tải lại trang.
 
 ---
 

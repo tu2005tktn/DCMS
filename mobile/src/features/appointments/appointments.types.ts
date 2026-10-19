@@ -14,8 +14,9 @@ export type AppointmentPage = { items: AppointmentCard[]; total: number; page: n
 export type SupportRequestStatus = 'Pending' | 'Resolved' | 'Rejected' | 'Withdrawn';
 export type SupportRequestKind = 'RESCHEDULE' | 'CANCEL' | 'OTHER';
 export type SupportRequest = {
-  id: number; appointmentCode: string; kind: SupportRequestKind; reason: string; status: SupportRequestStatus;
+  id: number | string; appointmentCode: string; kind: SupportRequestKind; reason: string; status: SupportRequestStatus;
   createdAt: string; decidedAt: string | null; publicNote: string | null; version: number;
+  proposedStartAt?: string | null;
 };
 export type AppointmentChange = {
   action: 'RESCHEDULE' | 'CANCEL'; actorKind: 'SELF' | 'STAFF'; oldStart: string; newStart: string | null; reason: string; occurredAt: string;
@@ -32,13 +33,17 @@ export type AvailabilitySlot = {
   start: string; end: string; chairId: number; dentistId: number; assistantId: number | null;
   scheduleVersion: number; assistantScheduleVersion: number | null;
 };
+export type RescheduleDentist = { id: number; branchId: number; name: string };
 
 export type AppointmentQuery = { scope: AppointmentScope; status: AppointmentStatus | 'ALL'; from: string | null; to: string | null; page: number; pageSize: number };
 export type RescheduleCommand = {
-  expectedVersion: number; requestKey: string; newStart: string; chairId: number; scheduleVersion: number;
+  expectedVersion: number; requestKey: string; dentistId: number; newStart: string; chairId: number; scheduleVersion: number;
   assistantScheduleVersion: number | null; reason: string;
 };
 export type CancelCommand = { expectedVersion: number; requestKey: string; reason: string };
-export type SupportCommand = { requestKey: string; kind: SupportRequestKind; reason: string };
+export type SupportCommand = {
+  requestKey: string; kind: SupportRequestKind; reason: string;
+  newStartAt?: string | null; dentistId?: number | null; chairId?: number | null;
+};
 export type AppointmentChangeResult = { appointment: AppointmentDetail; notification: SystemMessage };
 export type SupportResult = { request: SupportRequest; notification: SystemMessage };

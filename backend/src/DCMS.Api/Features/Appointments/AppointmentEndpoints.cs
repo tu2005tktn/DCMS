@@ -1,5 +1,6 @@
 using DCMS.Application.Common;
 using DCMS.Application.Features.Appointments;
+using DCMS.Application.Features.SupportRequests;
 using DCMS.Api.Features.Authentication;
 
 namespace DCMS.Api.Features.Appointments;
@@ -9,9 +10,9 @@ public static class AppointmentEndpoints
     public static void MapAppointmentEndpoints(this IEndpointRouteBuilder endpoints)
     {
         // AllowAnonymous lets UC-06 distinguish an unauthenticated guest (MSG32) from an invalid bearer (MSG07).
-        endpoints.MapGet("/api/appointments/{code}/availability", async (HttpContext context, string code, DateOnly date,
+        endpoints.MapGet("/api/appointments/{code}/availability", async (HttpContext context, string code, DateOnly date, int? dentistId,
             IAppointmentChangeService service, CancellationToken ct) =>
-            Results.Ok(await service.AvailabilityAsync(ChangeActor(context), code, date, ct)))
+            Results.Ok(await service.AvailabilityAsync(ChangeActor(context), code, date, dentistId, ct)))
             .AllowAnonymous().WithTags("UC-06 S12/S16 Appointment changes");
         endpoints.MapPost("/api/appointments/{code}/reschedule", async (HttpContext context, string code,
             RescheduleAppointmentRequest request, IAppointmentChangeService service, CancellationToken ct) =>
@@ -21,6 +22,15 @@ public static class AppointmentEndpoints
             CancelAppointmentRequest request, IAppointmentChangeService service, CancellationToken ct) =>
             Results.Ok(await service.CancelAsync(ChangeActor(context), code, request, ct)))
             .AllowAnonymous().WithTags("UC-06 S12/S16 Appointment changes");
+        endpoints.MapPost("/api/appointments/{code}/support-requests", async (HttpContext context, string code,
+            CustomerSupportRequestCommand command, ISupportRequestService service, CancellationToken ct) =>
+            Results.Json(await service.CreateCustomerRequestAsync(ChangeActor(context), code, command, ct),
+                statusCode: StatusCodes.Status201Created))
+            .AllowAnonymous().WithTags("UC-06 S14/S16 Support requests");
+        endpoints.MapPost("/api/support-requests/{id}/withdraw", async (HttpContext context, string id,
+            WithdrawSupportCommand command, ISupportRequestService service, CancellationToken ct) =>
+            Results.Ok(await service.WithdrawCustomerRequestAsync(ChangeActor(context), id, command, ct)))
+            .AllowAnonymous().WithTags("UC-06 S14/S16 Support requests");
         endpoints.MapPost("/api/appointments", async (HttpContext context, CreateAppointmentRequest request,
             IAppointmentService service, CancellationToken ct) =>
         {

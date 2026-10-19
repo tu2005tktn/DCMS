@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using DCMS.Application.Common;
 using DCMS.Application.Features.Notifications;
 using Microsoft.Extensions.Logging;
@@ -16,9 +15,6 @@ public sealed class NotificationService(
     IRealtimeNotifier realtime,
     ILogger<NotificationService> logger) : INotificationService
 {
-    private readonly ConcurrentDictionary<string, byte> _seen = new(StringComparer.Ordinal);
-    private long _seq;
-
     public Task<ListNotificationsResult> ListAsync(int accountId, ListNotificationsQuery query, CancellationToken ct)
     {
         return ListInternalAsync(accountId, query, ct);
@@ -26,7 +22,7 @@ public sealed class NotificationService(
 
     private async Task<ListNotificationsResult> ListInternalAsync(int accountId, ListNotificationsQuery query, CancellationToken ct)
     {
-        var limit = query.Limit is > 0 and <= 200 ? query.Limit.Value : 50;
+        var limit = query.Limit is > 0 and <= 100 ? query.Limit.Value : 20;
         var items = await store.ListAsync(accountId, query.UnreadOnly, limit, query.Cursor, ct);
         string? nextCursor = items.Count == limit
             ? items[^1].CreatedAt.ToString("O")
@@ -63,11 +59,9 @@ public sealed class NotificationService(
         if (!deepLink.StartsWith("/appointments/", StringComparison.Ordinal))
             return new CheckDeepLinkResult(false, "Loại liên kết chưa hỗ trợ.");
 
-        // Server re-check: tìm notification của account có appointmentId khớp deepLink.
-        var list = await store.ListAsync(accountId, null, 200, null, ct);
         var id = deepLink["/appointments/".Length..];
-        var match = list.FirstOrDefault(n => string.Equals(n.AppointmentId, id, StringComparison.Ordinal));
-        return match is null
+        var allowed = await store.CanOpenAppointmentAsync(accountId, id, ct);
+        return !allowed
             ? new CheckDeepLinkResult(false, "Bạn không có quyền mở thông báo này.")
             : new CheckDeepLinkResult(true, null);
     }
@@ -85,18 +79,10 @@ public sealed class NotificationService(
         string dedupeKey,
         CancellationToken ct)
     {
-        if (await store.ExistsByDedupeKeyAsync(dedupeKey, ct))
-        {
-            // Idempotent — trả về bản đã tồn tại.
-            var list = await store.ListAsync(accountId, null, 1, null, ct);
-            var existing = list.FirstOrDefault(n => string.Equals(n.DedupeKey, dedupeKey, StringComparison.Ordinal));
-            if (existing is not null) return existing;
-        }
-
-        var id = $"NT-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}-{Interlocked.Increment(ref _seq):D6}";
+        var id = $"NT-{Guid.NewGuid():N}";
         var effectiveChannels = channels is { Count: > 0 }
             ? channels
-            : (IReadOnlyList<NotificationChannel>)new[] { NotificationChannel.InApp, NotificationChannel.Email };
+            : (IReadOnlyList<NotificationChannel>)new[] { NotificationChannel.InApp };
 
         var now = DateTimeOffset.UtcNow;
         var attempts = effectiveChannels.Select(ch => new NotificationAttempt(
@@ -104,7 +90,7 @@ public sealed class NotificationService(
             ch == NotificationChannel.InApp ? DispatchStatus.Delivered : DispatchStatus.Pending,
             ch == NotificationChannel.InApp ? 1 : 0,
             ch == NotificationChannel.InApp ? now : null,
-            ch == NotificationChannel.InApp ? null : now,
+            ch == NotificationChannel.InApp ? null : now.AddMinutes(1),
             null)).ToList();
 
         var dto = new NotificationDto(
@@ -122,7 +108,7 @@ public sealed class NotificationService(
             HasExternalFailure: false,
             DedupeKey: dedupeKey);
 
-        await store.UpsertAsync(dto, ct);
+        dto = await store.UpsertAsync(dto, ct);
 
         // Push realtime — Phase 2: tới group account (cho user) HOẶC group staff:branch (cho staff).
         try

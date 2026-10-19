@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace DCMS.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(DcmsDbContext))]
-    [Migration("20261018143322_AppointmentSupportRequests")]
-    partial class AppointmentSupportRequests
+    [Migration("20261018173750_S12S26BookingExceptionsNotifications")]
+    partial class S12S26BookingExceptionsNotifications
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -161,6 +161,12 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)");
+
+                    b.Property<string>("ConfirmedToAttend")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasDefaultValue("Pending");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -394,19 +400,109 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.ToTable("APPOINTMENT_RECEIPT", (string)null);
                 });
 
-            modelBuilder.Entity("DCMS.Domain.Features.Appointments.AppointmentSupportRequest", b =>
+            modelBuilder.Entity("DCMS.Domain.Features.Appointments.AppointmentReminder", b =>
                 {
-                    b.Property<int>("Id")
+                    b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("uuid");
 
                     b.Property<int>("AccountId")
                         .HasColumnType("integer");
 
                     b.Property<Guid>("AppointmentId")
                         .HasColumnType("uuid");
+
+                    b.Property<int>("AppointmentVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("DueAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("LeadMinutes")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("ProcessedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AccountId");
+
+                    b.HasIndex("Status", "DueAt");
+
+                    b.HasIndex("AppointmentId", "AppointmentVersion", "LeadMinutes")
+                        .IsUnique();
+
+                    b.ToTable("APPOINTMENT_REMINDER", (string)null);
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Appointments.AppointmentSupportHistory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<int?>("ActorAccountId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ActorKind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<Guid>("AppointmentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("RequestId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ActorAccountId");
+
+                    b.HasIndex("AppointmentId");
+
+                    b.HasIndex("RequestId", "OccurredAt");
+
+                    b.ToTable("APPOINTMENT_SUPPORT_HISTORY", (string)null);
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Appointments.AppointmentSupportRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("AppointmentActionRequestKey")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AppointmentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -417,21 +513,189 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<int?>("DecidedBy")
                         .HasColumnType("integer");
 
+                    b.Property<string>("DecisionReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<string>("Kind")
                         .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)");
+
+                    b.Property<string>("ProposedReason")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<DateTimeOffset?>("ProposedStartAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("PublicNote")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
                     b.Property<string>("Reason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<Guid>("RequestKey")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("RequesterAccountId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("RequesterName")
                         .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
+                    b.Property<string>("RequesterPhone")
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)");
+
+                    b.Property<string>("RequesterVerification")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
-                    b.Property<Guid>("RequestKey")
+                    b.Property<DateTimeOffset?>("RequesterVerifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("RequesterVerifiedBy")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AppointmentId");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.HasIndex("DecidedBy");
+
+                    b.HasIndex("RequestKey")
+                        .IsUnique();
+
+                    b.HasIndex("RequesterAccountId");
+
+                    b.HasIndex("RequesterVerifiedBy");
+
+                    b.HasIndex("Status", "UpdatedAt");
+
+                    b.ToTable("APPOINTMENT_SUPPORT_REQUEST", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_SUPPORT_REQUEST_STATUS", "\"Status\" IN ('Pending','Resolved','Rejected','Withdrawn')");
+                        });
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Appointments.InAppNotification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("AccountId")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("AppointmentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<int?>("BranchId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DedupeKey")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
+                    b.Property<string>("DeepLink")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<bool>("HasExternalFailure")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("PublicId")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<DateTimeOffset?>("ReadAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("RequestId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AppointmentId");
+
+                    b.HasIndex("DedupeKey")
+                        .IsUnique();
+
+                    b.HasIndex("PublicId")
+                        .IsUnique();
+
+                    b.HasIndex("RequestId");
+
+                    b.HasIndex("AccountId", "CreatedAt");
+
+                    b.ToTable("IN_APP_NOTIFICATION", (string)null);
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Appointments.NotificationDelivery", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Channel")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<DateTimeOffset?>("LastAttemptAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTimeOffset?>("NextRetryAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("NotificationId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("Status")
@@ -439,30 +703,88 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)");
 
-                    b.Property<int>("Version")
-                        .IsConcurrencyToken()
+                    b.HasKey("Id");
+
+                    b.HasIndex("NotificationId", "Channel")
+                        .IsUnique();
+
+                    b.HasIndex("Status", "NextRetryAt");
+
+                    b.ToTable("NOTIFICATION_DELIVERY", (string)null);
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Appointments.StaffHandlingItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("AppointmentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("AttemptCount")
                         .HasColumnType("integer");
 
-                    b.Property<DateTimeOffset?>("WithdrawnAt")
+                    b.Property<int?>("BranchId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Error")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<Guid?>("NotificationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("DecidedBy");
+                    b.HasIndex("AppointmentId");
+
+                    b.HasIndex("NotificationId");
 
                     b.HasIndex("Status", "CreatedAt");
 
-                    b.HasIndex(new[] { "AccountId", "RequestKey" }, "UX_APPOINTMENT_SUPPORT_REQUEST_Key")
-                        .IsUnique();
+                    b.ToTable("STAFF_HANDLING_ITEM", (string)null);
+                });
 
-                    b.HasIndex(new[] { "AppointmentId", "AccountId" }, "UX_APPOINTMENT_SUPPORT_REQUEST_Pending")
-                        .IsUnique()
-                        .HasFilter("\"Status\" = 'Pending'");
+            modelBuilder.Entity("DCMS.Domain.Features.Appointments.SupportRequestReceipt", b =>
+                {
+                    b.Property<int>("ActorAccountId")
+                        .HasColumnType("integer");
 
-                    b.ToTable("APPOINTMENT_SUPPORT_REQUEST", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_APPOINTMENT_SUPPORT_REQUEST_Values", "\"Kind\" IN ('RESCHEDULE','CANCEL','OTHER') AND \"Status\" IN ('Pending','Resolved','Rejected','Withdrawn')");
-                        });
+                    b.Property<Guid>("RequestKey")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Fingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("ResultJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<Guid>("SupportRequestId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("ActorAccountId", "RequestKey");
+
+                    b.HasIndex("SupportRequestId");
+
+                    b.ToTable("SUPPORT_REQUEST_RECEIPT", (string)null);
                 });
 
             modelBuilder.Entity("DCMS.Domain.Features.Authentication.AuthRefreshToken", b =>
@@ -544,6 +866,54 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasIndex("AccountId", "RevokedAt");
 
                     b.ToTable("AUTH_SESSION", (string)null);
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Authentication.EmailVerificationToken", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("AccountId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("CodeHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("LastSentAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("NormalizedEmail")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<int>("ResendCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("UsedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("VerifyAttempts")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExpiresAt");
+
+                    b.HasIndex("AccountId", "CreatedAt");
+
+                    b.ToTable("EMAIL_VERIFICATION_TOKEN", (string)null);
                 });
 
             modelBuilder.Entity("DCMS.Domain.Features.Authentication.RecoveryAudit", b =>
@@ -1661,7 +2031,7 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("DCMS.Domain.Features.Appointments.AppointmentSupportRequest", b =>
+            modelBuilder.Entity("DCMS.Domain.Features.Appointments.AppointmentReminder", b =>
                 {
                     b.HasOne("DCMS.Infrastructure.Features.Accounts.ApplicationUser", null)
                         .WithMany()
@@ -1674,11 +2044,105 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasForeignKey("AppointmentId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Appointments.AppointmentSupportHistory", b =>
+                {
+                    b.HasOne("DCMS.Infrastructure.Features.Accounts.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("ActorAccountId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("DCMS.Domain.Features.Appointments.Appointment", null)
+                        .WithMany()
+                        .HasForeignKey("AppointmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DCMS.Domain.Features.Appointments.AppointmentSupportRequest", null)
+                        .WithMany()
+                        .HasForeignKey("RequestId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Appointments.AppointmentSupportRequest", b =>
+                {
+                    b.HasOne("DCMS.Domain.Features.Appointments.Appointment", null)
+                        .WithMany()
+                        .HasForeignKey("AppointmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
                     b.HasOne("DCMS.Infrastructure.Features.Accounts.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("DecidedBy")
                         .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("DCMS.Infrastructure.Features.Accounts.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("RequesterAccountId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("DCMS.Infrastructure.Features.Accounts.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("RequesterVerifiedBy")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Appointments.InAppNotification", b =>
+                {
+                    b.HasOne("DCMS.Infrastructure.Features.Accounts.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("DCMS.Domain.Features.Appointments.Appointment", null)
+                        .WithMany()
+                        .HasForeignKey("AppointmentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("DCMS.Domain.Features.Appointments.AppointmentSupportRequest", null)
+                        .WithMany()
+                        .HasForeignKey("RequestId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Appointments.NotificationDelivery", b =>
+                {
+                    b.HasOne("DCMS.Domain.Features.Appointments.InAppNotification", null)
+                        .WithMany("Deliveries")
+                        .HasForeignKey("NotificationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Appointments.StaffHandlingItem", b =>
+                {
+                    b.HasOne("DCMS.Domain.Features.Appointments.Appointment", null)
+                        .WithMany()
+                        .HasForeignKey("AppointmentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("DCMS.Domain.Features.Appointments.InAppNotification", null)
+                        .WithMany()
+                        .HasForeignKey("NotificationId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Appointments.SupportRequestReceipt", b =>
+                {
+                    b.HasOne("DCMS.Infrastructure.Features.Accounts.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("ActorAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DCMS.Domain.Features.Appointments.AppointmentSupportRequest", null)
+                        .WithMany()
+                        .HasForeignKey("SupportRequestId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("DCMS.Domain.Features.Authentication.AuthRefreshToken", b =>
@@ -1702,6 +2166,15 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("AccountId")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Authentication.EmailVerificationToken", b =>
+                {
+                    b.HasOne("DCMS.Infrastructure.Features.Accounts.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
@@ -1965,6 +2438,11 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Appointments.InAppNotification", b =>
+                {
+                    b.Navigation("Deliveries");
                 });
 
             modelBuilder.Entity("DCMS.Domain.Features.Scheduling.WorkingScheduleRevision", b =>

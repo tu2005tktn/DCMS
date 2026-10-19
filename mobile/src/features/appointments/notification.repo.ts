@@ -4,10 +4,8 @@
  * UI gọi qua `notificationRepo.list/markRead/checkDeepLink/...`. Bên trong tự chọn
  * implementation dựa trên `EXPO_PUBLIC_USE_REAL_NOTIFICATION_API`.
  *
- * Mặc định: **mock** (vì backend TV5 chưa expose endpoint). Khi backend sẵn sàng:
- *   1. Bật env `EXPO_PUBLIC_USE_REAL_NOTIFICATION_API=true`
- *   2. Cấp token cho user (đã có qua SessionProvider)
- *   3. UI chạy không đổi source.
+ * Mặc định dùng API thật; đặt `EXPO_PUBLIC_USE_REAL_NOTIFICATION_API=false` chỉ khi
+ * cần demo offline. Token được lấy từ SessionProvider.
  *
  * Các method đều nhận `token` từ SessionProvider để truyền cho `authedRequest`.
  */
@@ -25,7 +23,7 @@ import type {
   UnreadCountResult,
 } from './notification.types';
 
-const USE_REAL = process.env.EXPO_PUBLIC_USE_REAL_NOTIFICATION_API === 'true';
+const USE_REAL = process.env.EXPO_PUBLIC_USE_REAL_NOTIFICATION_API !== 'false';
 
 function mapApiError(error: unknown): Error {
   if (error instanceof ApiError) {

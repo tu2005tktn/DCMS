@@ -36,16 +36,28 @@ S26 đặc tả hai mảng nghiệp vụ gắn với luồng đặt lịch:
 | Cờ `ConfirmedToAttend` | GBR-031/077 | Độc lập với Appointment lifecycle; đổi flag không check-in/complete Visit. |
 | Lịch bị ảnh hưởng khi giảm giờ làm | GBR-123; MSG31–38 | Hiển thị staff xử lý; publish schedule bị chặn cho tới khi hợp lệ. |
 
-## Quyết định cấu hình (PROPOSED, chờ chốt)
+## Quyết định cấu hình (chốt cho S12/S26)
 
-- **[PROPOSED]** In-app notification là nguồn authoritative; external push (email/SMS) là phương thức phụ thuộc adapter/cấu hình. Khi external fail, in-app vẫn đúng và tạo staff handling item; không bao giờ báo "đã gửi" nếu mutation thất bại.
-- **[PROPOSED]** Reminder mặc định `24h` và `2h` trước `Appointment.StartAt`; tự recheck `currentVersion`/`status`/preference trước khi dispatch. Đổi/hủy làm reminder cũ `Superseded`; lập reminder mới theo lịch hiện tại.
-- **[PROPOSED]** Retry: tối đa 3 lần, backoff 1/5/15 phút. Sau 3 lần thất bại, tạo staff handling item (loại `ExternalDeliveryFailed`) chứ `notificationId`, `attemptCount`, `lastError`, `appointmentId`; không rollback Appointment.
-- **[PROPOSED]** Support request `Resolved` chỉ commit sau khi booking action cần thiết đã thành công; dùng `expectedVersion` của request và `currentVersion` của appointment. Nếu mutation thất bại, request vẫn `Pending` và trả lỗi tương ứng (MSG111 stale, MSG06 quyền, MSG144 dịch vụ).
-- **[PROPOSED]** `ConfirmedToAttend` là cờ boolean thuộc Appointment; thay đổi cờ không tạo Visit mới, không đổi `Appointment.Status` (giữ `Scheduled`/`Completed`/...).
-- **[PROPOSED]** S26 list mặc định 20/trang, 20/50/100 tuỳ chọn; sort `createdAt desc`, ID tie-breaker; chỉ lấy notification của account hiện tại, không lẫn của booking anonymous khác.
-- **[PROPOSED]** Deep link từ notification: server kiểm quyền lại; anonymous booking mở UI chỉ-đọc với mã lịch, không expose danh tính bệnh nhân khác.
-- **[PROPOSED]** Notification **không bao giờ** chứa chẩn đoán, kết quả xét nghiệm hay thông tin lâm sàng. Chỉ thông tin lịch (mã, branch/chair/staff, thời gian, trạng thái, lý do đổi/hủy nếu có).
+- In-app notification là nguồn authoritative; external push (email/SMS) là phương thức phụ thuộc adapter/cấu hình. Khi external fail, in-app vẫn đúng và tạo staff handling item; không bao giờ báo "đã gửi" nếu mutation thất bại.
+- Reminder mặc định `24h` và `2h` trước `Appointment.StartAt`; tự recheck `currentVersion`/`status`/preference trước khi dispatch. Đổi/hủy làm reminder cũ `Superseded`; lập reminder mới theo lịch hiện tại.
+- Retry tối đa 3 lần với khoảng chờ `1/5/15` phút. Sau lần cuối thất bại, tạo staff handling item loại `ExternalDeliveryFailed` chứa `notificationId`, `attemptCount`, `lastError`, `appointmentId`; không rollback Appointment.
+- Support request `Resolved` chỉ commit sau khi booking action cần thiết đã thành công; dùng `expectedVersion` của request và `currentVersion` của appointment. Nếu mutation thất bại, request vẫn `Pending` và trả lỗi tương ứng (MSG111 stale, MSG06 quyền, MSG144 dịch vụ).
+- `ConfirmedToAttend` là cờ boolean thuộc Appointment; thay đổi cờ không tạo Visit mới, không đổi `Appointment.Status` (giữ `Confirmed`/`Completed`/...).
+- S26 list mặc định 20/trang, tối đa 100; sort `createdAt desc`, ID tie-breaker; chỉ lấy notification của account hiện tại, không lẫn của booking anonymous khác.
+- Deep link từ notification: server kiểm quyền lại với Appointment hiện tại; quyền không được suy ra chỉ vì account từng nhận notification.
+- Notification **không bao giờ** chứa chẩn đoán, kết quả xét nghiệm hay thông tin lâm sàng. Chỉ thông tin lịch (mã, branch/chair/staff, thời gian, trạng thái, lý do đổi/hủy nếu có).
+
+## Persistence và transaction hook
+
+- Booking/change/cancel ghi `AppointmentOutboxEvent` trong cùng transaction với
+  Appointment. Event chỉ được dispatcher nhận sau commit.
+- `NOTIFICATION` có unique `DedupeKey`; dispatch lại cùng event không tạo row mới.
+- `APPOINTMENT_REMINDER` có appointment version và due time; đổi/hủy supersede mọi
+  reminder Pending/Retry của version cũ trước khi tạo lịch 24h/2h mới.
+- Trước dispatch, worker nạp lại Appointment và preference; chỉ gửi khi version,
+  status, account ownership và due time vẫn hợp lệ.
+- External adapter update attempt/outbox độc lập; lỗi external không rollback giao
+  dịch booking đã commit.
 
 ## Phối hợp & hợp đồng
 

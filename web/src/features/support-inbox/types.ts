@@ -173,6 +173,7 @@ export interface SupportRequestDto {
     isAnonymous: boolean;
   };
   permission: StaffPermission;
+  appointmentActionCommitted: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -184,6 +185,8 @@ export interface SupportRequestDetail extends SupportRequestDto {
   decisionReason: string | null;
   decidedAt: string | null;
   deciderName: string | null;
+  requesterVerifiedAt?: string | null;
+  requesterVerification?: string | null;
 }
 
 // ============================================================================
@@ -215,6 +218,7 @@ export interface StaffChangeCommand {
 export interface StaffChangeResult {
   ok: boolean;
   appointment?: AppointmentSummary;
+  request?: SupportRequestDetail;
   notificationCode?: string;   // MSG37/94/144
   errorCode?: 'CONFLICT' | 'FORBIDDEN' | 'NOT_FOUND' | 'BAD_REQUEST' | 'STALE_VERSION' | 'NETWORK' | 'SERVER';
   errorMessage?: string;
