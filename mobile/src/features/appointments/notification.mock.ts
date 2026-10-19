@@ -269,9 +269,10 @@ export const notificationMockRepo = {
     accountId: number,
   ): Promise<{ allowed: boolean; reason?: string }> {
     await sleep(40);
-    if (!deepLink.startsWith('/appointments/')) return { allowed: false, reason: 'Liên kết không hợp lệ.' };
-    const id = deepLink.replace('/appointments/', '');
-    const n = notifications.find((x) => x.appointmentId === id && x.accountId === accountId);
+    const cleanId = deepLink.replace('/(account)/appointments/', '').replace('/appointments/', '');
+    if (!deepLink.startsWith('/appointments/') && !deepLink.startsWith('/(account)/appointments/'))
+      return { allowed: false, reason: 'Liên kết không hợp lệ.' };
+    const n = notifications.find((x) => (x.appointmentId === cleanId || x.deepLink === deepLink || x.deepLink?.includes(cleanId)) && (x.accountId === accountId || x.accountId === null));
     if (!n) return { allowed: false, reason: 'Bạn không có quyền mở thông báo này.' };
     return { allowed: true };
   },

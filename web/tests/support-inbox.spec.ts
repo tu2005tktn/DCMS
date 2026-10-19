@@ -56,6 +56,8 @@ test('resolve without prior change is blocked for change/cancel requests', async
   // Nút Xử lý yêu cầu phải bị disabled khi chưa đổi lịch.
   const resolveButton = page.getByRole('button', { name: 'Xử lý yêu cầu', exact: true });
   await expect(resolveButton).toBeDisabled();
+  await page.getByRole('button', { name: 'Xác minh người yêu cầu', exact: true }).click();
+  await expect(page.getByText('Đã xác minh người yêu cầu.', { exact: true })).toBeVisible();
   // Bấm Đổi lịch → command chạy trực tiếp.
   await page.getByRole('button', { name: 'Đổi lịch', exact: true }).click();
   // Sau khi commit, nút "Đổi lịch" chuyển thành "Đã thay đổi lịch" + resolve bật.

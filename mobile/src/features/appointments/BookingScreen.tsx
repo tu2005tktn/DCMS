@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -10,6 +11,7 @@ import { bookingApi } from './booking.api';
 import { notificationMockRepo } from './notification.mock';
 import { notificationRepoPersist } from './notification.repo.persist';
 import { appointmentRepo } from './appointment.repo';
+import { addMockBooking } from './appointments.mock';
 import type { AvailabilitySlot, BookingOptions, BookingResult } from './booking.types';
 
 type Relation = 'Self' | 'Relative';
@@ -19,6 +21,7 @@ const formatTime = (value: string) => new Date(value).toLocaleString('vi-VN', { 
   day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
 export default function BookingScreen() {
+  const router = useRouter();
   const { state } = useSession();
   const token = state.status === 'authenticated' ? state.accessToken : undefined;
   const [options, setOptions] = useState<BookingOptions | null>(null);
@@ -108,6 +111,18 @@ export default function BookingScreen() {
       const branch = options?.branches.find(x => x.id === branchId);
       const dentist = options?.employees.find(x => x.id === dentistId);
       const svc = options?.services.find(x => x.id === serviceId);
+      addMockBooking(value, {
+        branchId: branchId ?? 0,
+        branchName: branch?.name ?? '',
+        dentistId: dentistId ?? 0,
+        dentistName: dentist?.name ?? '',
+        serviceId: serviceId ?? 0,
+        serviceName: svc?.name ?? '',
+        durationMinutes: svc?.publicDurationMinutes ?? 30,
+        bookerName: bookerName.trim(),
+        attendeeName: attendeeName.trim(),
+        attendeeKind: relation === 'Self' ? 'SELF' : 'RELATIVE',
+      });
       void appointmentRepo.addFromBooking(value, {
         accountId,
         bookerName: bookerName.trim(),
@@ -125,15 +140,15 @@ export default function BookingScreen() {
         kind: 'AppointmentBooked',
         title: 'Đặt lịch thành công',
         body: `Lịch khám ${value.code} đã được tạo. Trạng thái: ${value.status}.`,
-        appointmentId: value.appointmentId,
+        appointmentId: value.code,
         requestId: null,
-        deepLink: accountId !== null ? `/appointments/${value.appointmentId}` : null,
+        deepLink: accountId !== null ? `/appointments/${value.code}` : null,
         channels: accountId !== null ? ['InApp', 'Email'] : ['InApp'],
-        dedupeKey: `appt:${value.appointmentId}:booked`,
+        dedupeKey: `appt:${value.code}:booked`,
       }).catch(err => console.warn('[BookingScreen] notification.create failed', err));
       // Lập reminder 24h/2h cho account (recheck khi load lại trang này).
       if (accountId !== null) {
-        void notificationMockRepo.rebuildRemindersForAppointment(value.appointmentId, value.version);
+        void notificationMockRepo.rebuildRemindersForAppointment(value.code, value.version);
       }
     } catch (e) {
       const code = e instanceof ApiError ? e.code : undefined;
@@ -202,6 +217,11 @@ export default function BookingScreen() {
         <Text style={styles.code}>{result.code}</Text><Text>Trạng thái: {result.status}</Text>
         <Text>Thời gian: {formatTime(result.startAt)} – {formatTime(result.endAt)}</Text>
         <Text>Hãy lưu mã lịch hẹn để liên hệ phòng khám khi cần.</Text>
+        <PrimaryButton
+          label="Xem chi tiết lịch hẹn"
+          onPress={() => router.replace(`/(account)/appointments/${encodeURIComponent(result.code)}` as never)}
+        />
+        <Choice label="Về danh sách lịch hẹn" selected={false} onPress={() => router.replace('/(account)/appointments')} />
       </>}
     </ScrollView>
   </SafeAreaView>;

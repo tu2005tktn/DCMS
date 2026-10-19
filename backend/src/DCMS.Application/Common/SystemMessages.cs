@@ -22,6 +22,7 @@ public static class SystemMessages
         "MSG30" => "Yêu cầu đặt lịch này đã được xử lý. Hệ thống trả lại lịch hẹn đã tạo.",
         "MSG31" => "Không thể tự đổi hoặc hủy lịch này. Vui lòng liên hệ phòng khám để được hỗ trợ.",
         "MSG32" => "Vui lòng liên hệ phòng khám, cung cấp mã lịch hẹn và xác minh kênh liên hệ đã dùng khi đặt lịch.",
+        "MSG33" => "Đã gửi yêu cầu hỗ trợ. Lịch hẹn hiện tại vẫn có hiệu lực cho đến khi phòng khám xử lý thành công.",
         "MSG34" => "Không thể đổi sang khung giờ đã chọn. Lịch hẹn cũ của bạn vẫn được giữ nguyên.",
         "MSG35" => $"Đã đổi lịch hẹn sang {value}. Mọi thông báo nhắc lịch sẽ theo giờ hẹn mới.",
         "MSG37" => $"Đã hủy lịch hẹn {value}.",

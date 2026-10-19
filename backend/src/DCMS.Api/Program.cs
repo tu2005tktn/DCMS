@@ -103,9 +103,10 @@ builder.Services.AddSignalR(options =>
 {
     options.EnableDetailedErrors = builder.Environment.IsDevelopment();
 });
-builder.Services.AddSingleton<INotificationStore, InMemoryNotificationStore>();
+builder.Services.AddScoped<INotificationStore, EfNotificationStore>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddSingleton<IRealtimeNotifier, SignalRRealtimeNotifier>();
+builder.Services.AddHostedService<AppointmentNotificationWorker>();
 
 var app = builder.Build();
 
@@ -153,6 +154,7 @@ app.MapPatientEndpoints();
 app.MapSchedulingEndpoints();
 app.MapAppointmentEndpoints();
 app.MapAppointmentQueryEndpoints();
+app.MapSupportRequestEndpoints();
 app.MapNotificationEndpoints();
 // S26+ SignalR: hub + test endpoint (chỉ Dev).
 app.MapHub<NotificationsHub>("/hubs/notifications");

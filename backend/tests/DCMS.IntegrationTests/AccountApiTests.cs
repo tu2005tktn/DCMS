@@ -5,6 +5,8 @@ using System.Security.Cryptography;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using System.Collections.Concurrent;
+using System.Text.Json;
 using DCMS.Application.Common;
 using DCMS.Application.Features.Accounts;
 using DCMS.Application.Features.Authentication;
@@ -13,6 +15,7 @@ using DCMS.Domain.Features.Authentication;
 using DCMS.Infrastructure.Features.Accounts;
 using DCMS.Infrastructure.Features.Authentication;
 using DCMS.Infrastructure.Features.PatientLinks;
+using DCMS.Infrastructure.Features.Notifications;
 using DCMS.Domain.Features.PatientLinks;
 using DCMS.Domain.Features.Patients;
 using DCMS.Infrastructure.Persistence;
@@ -65,11 +68,15 @@ public class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
             services.RemoveAll<IEmailVerificationDelivery>();
             services.AddSingleton<FakeEmailVerificationDelivery>();
             services.AddSingleton<IEmailVerificationDelivery>(provider => provider.GetRequiredService<FakeEmailVerificationDelivery>());
+            services.RemoveAll<IRealtimeNotifier>();
+            services.AddSingleton<FakeRealtimeNotifier>();
+            services.AddSingleton<IRealtimeNotifier>(provider => provider.GetRequiredService<FakeRealtimeNotifier>());
         });
     }
 
     public FakeContactDeliveryAdapter Delivery => Services.GetRequiredService<FakeContactDeliveryAdapter>();
     public FakeEmailVerificationDelivery EmailDelivery => Services.GetRequiredService<FakeEmailVerificationDelivery>();
+    public FakeRealtimeNotifier Realtime => Services.GetRequiredService<FakeRealtimeNotifier>();
 
     // Test-only connection string for the isolated schema this fixture created.
     public string ConnectionString => new NpgsqlConnectionStringBuilder(
@@ -134,6 +141,32 @@ public class ApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
 
     async Task IAsyncLifetime.DisposeAsync() { await DisposeAsync(); }
     // Test schemas are deliberately retained for inspection; no development data is deleted.
+}
+
+public sealed record RealtimeCall(int? AccountId, int? BranchId, string Method, JsonElement Payload);
+
+public sealed class FakeRealtimeNotifier : IRealtimeNotifier
+{
+    private readonly ConcurrentQueue<RealtimeCall> calls = new();
+    public IReadOnlyList<RealtimeCall> Calls => calls.ToArray();
+
+    public Task SendToAccountAsync(int accountId, string method, object payload, CancellationToken ct = default)
+    {
+        calls.Enqueue(new RealtimeCall(accountId, null, method, JsonSerializer.SerializeToElement(payload)));
+        return Task.CompletedTask;
+    }
+
+    public Task SendToStaffBranchAsync(int branchId, string method, object payload, CancellationToken ct = default)
+    {
+        calls.Enqueue(new RealtimeCall(null, branchId, method, JsonSerializer.SerializeToElement(payload)));
+        return Task.CompletedTask;
+    }
+
+    public Task SendToAllAsync(string method, object payload, CancellationToken ct = default)
+    {
+        calls.Enqueue(new RealtimeCall(null, null, method, JsonSerializer.SerializeToElement(payload)));
+        return Task.CompletedTask;
+    }
 }
 
 /// <summary>
