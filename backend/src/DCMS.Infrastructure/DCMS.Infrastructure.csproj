@@ -10,5 +10,8 @@
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.0" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.14.0" />
+    <!-- Mail transport for S03 recovery email. System.Net.Mail.SmtpClient cannot do implicit SSL
+         on port 465 (STARTTLS only), so MailKit is used for both 465 and 587. -->
+    <PackageReference Include="MailKit" Version="4.18.1" />
   </ItemGroup>
 </Project>
