@@ -11,7 +11,8 @@ import {
   type SupportRequestDto,
   type SupportRequestPage,
 } from './types';
-import { supportInboxMockRepo } from './supportInbox.mock';
+import { supportInboxApi } from './supportInbox.api';
+import { subscribeSupportInbox, type RealtimeState } from './supportInbox.realtime';
 import RequestDrawer from './RequestDrawer';
 
 type LoadState =
@@ -36,11 +37,10 @@ export default function SupportInboxPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [revision, setRevision] = useState(0);
+  const [drawerRevision, setDrawerRevision] = useState(0);
+  const [realtimeState, setRealtimeState] = useState<RealtimeState>('connecting');
   const [load, setLoad] = useState<LoadState>({ kind: 'loading' });
   const [selectedId, setSelectedId] = useState<string | null>(null);
-
-  // Demo: staff mặc định thuộc branch 1. Khi backend có, lấy theo `auth.user.branchId`.
-  const staffBranchId = 1;
 
   const isStaff = useMemo(() => {
     const user = auth.user;
@@ -50,6 +50,18 @@ export default function SupportInboxPage() {
   }, [auth.user]);
 
   useEffect(() => {
+    if (!isStaff || !auth.user) {
+      setRealtimeState('offline');
+      return;
+    }
+    const refresh = () => {
+      setRevision(value => value + 1);
+      setDrawerRevision(value => value + 1);
+    };
+    return subscribeSupportInbox(refresh, refresh, setRealtimeState);
+  }, [isStaff, auth.user?.id]);
+
+  useEffect(() => {
     if (!isStaff) {
       setLoad({ kind: 'denied' });
       return;
@@ -57,8 +69,8 @@ export default function SupportInboxPage() {
     let active = true;
     setLoad({ kind: 'loading' });
     const statuses = statusFilterOptions.find(option => option.value === filter)?.statuses ?? [];
-    supportInboxMockRepo
-      .listRequestsForStaff({ statuses, branchId: staffBranchId, page, pageSize })
+    supportInboxApi
+      .listRequestsForStaff({ statuses, page, pageSize })
       .then(result => { if (active) setLoad({ kind: 'ready', page: result }); })
       .catch((failure: Error) => {
         if (active) setLoad({ kind: 'error', message: failure.message || 'Không thể kết nối máy chủ.' });
@@ -88,6 +100,11 @@ export default function SupportInboxPage() {
         </Typography.Paragraph>
       </div>
       <Space>
+        <Tag color={realtimeState === 'connected' ? 'green' : realtimeState === 'offline' ? 'default' : 'blue'}>
+          {realtimeState === 'connected' ? 'Tự động cập nhật' :
+            realtimeState === 'reconnecting' ? 'Đang kết nối lại' :
+              realtimeState === 'connecting' ? 'Đang kết nối' : 'Realtime ngoại tuyến'}
+        </Tag>
         <Button onClick={() => setRevision(value => value + 1)} loading={load.kind === 'loading'}>Tải lại</Button>
       </Space>
     </div>
@@ -162,6 +179,7 @@ export default function SupportInboxPage() {
 
     <RequestDrawer
       id={selectedId}
+      refreshToken={drawerRevision}
       onClose={() => setSelectedId(null)}
       onChanged={() => {
         setRevision(value => value + 1);

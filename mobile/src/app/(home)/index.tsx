@@ -51,9 +51,9 @@ const GROUPS: MenuGroup[] = [
         requireAuth: 'authenticated',
       },
       {
-        label: 'Lịch hẹn của tôi (S12)',
-        description: 'Xem code, lifecycle, booker/attendee, lịch sử và trạng thái yêu cầu hỗ trợ.',
-        href: '/(home)/appointments',
+        label: 'Lịch hẹn của tôi (S14)',
+        description: 'Xem danh sách lịch hẹn, bộ lọc sắp tới/lịch sử, đổi và hủy lịch.',
+        href: '/(account)/appointments',
         requireAuth: 'authenticated',
       },
       {

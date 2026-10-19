@@ -34,7 +34,7 @@ public sealed class BusinessErrorMiddleware(RequestDelegate next, ILogger<Busine
                     && postgres?.SqlState is PostgresErrorCodes.SerializationFailure or PostgresErrorCodes.DeadlockDetected => (409, SystemMessages.Get("MSG111")),
                 _ => (503, SystemMessages.Get("MSG144"))
             };
-            if (status == 503) logger.LogError("Operation failed ({ExceptionType}); trace {TraceId}", ex.GetType().Name, context.TraceIdentifier);
+            if (status == 503) logger.LogError(ex, "Operation failed ({ExceptionType}); trace {TraceId}", ex.GetType().Name, context.TraceIdentifier);
             context.Response.StatusCode = status;
             if (status == 401) context.Response.Headers.WWWAuthenticate = "Bearer";
             await context.Response.WriteAsJsonAsync(response, context.RequestAborted);

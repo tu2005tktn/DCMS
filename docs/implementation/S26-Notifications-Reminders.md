@@ -1,6 +1,21 @@
 # S26 — Notifications & Appointment Reminders (mobile patient app)
 
-Bằng chứng tích hợp mobile cho S26 theo spec [S26-Notifications-Reminders.md](../specs/S26-Notifications-Reminders.md). Triển khai theo hướng contract-first: UI và repo đã sẵn sàng, chờ backend TV5 expose endpoint thật.
+Bằng chứng tích hợp S26 theo spec [S26-Notifications-Reminders.md](../specs/S26-Notifications-Reminders.md). Backend TV5 và mobile HTTP adapter đã được nối thật; mock chỉ còn là lựa chọn offline khi đặt `EXPO_PUBLIC_USE_REAL_NOTIFICATION_API=false`.
+
+## Backend đã triển khai
+
+- EF schema/migration cho `IN_APP_NOTIFICATION`, `NOTIFICATION_DELIVERY`,
+  `APPOINTMENT_REMINDER` và `STAFF_HANDLING_ITEM`.
+- `AppointmentOutboxEvent` được booking/change/cancel ghi trong transaction hiện có;
+  background dispatcher chỉ xử lý event sau commit.
+- Dedupe theo unique `DedupeKey`; chạy dispatcher lặp không tạo notification/reminder trùng.
+- Đổi/hủy supersede reminder cũ; reminder mới giữ appointment version và recheck
+  version/status/account trước khi gửi.
+- External delivery có tối đa 3 lần theo các mốc 1/5/15 phút. Sau lần cuối,
+  delivery là `Failed`, notification phản ánh `hasExternalFailure` và tạo staff
+  handling item; Appointment không rollback.
+- Deep link nạp lại Appointment và kiểm ownership/patient link hiện tại; mark-read
+  không đổi Appointment lifecycle.
 
 ## Phạm vi đã code (mobile patient app)
 
@@ -68,8 +83,8 @@ npm.cmd start
 5. Sửa `dedupeKey` trong seed để có notification của account 2 → đăng nhập account khác (mock chưa hỗ trợ đổi user, dùng test API giả lập).
 6. Bật `EXPO_PUBLIC_USE_REAL_NOTIFICATION_API=true` + chạy backend → đảm bảo mọi case (list/markRead/deepLink) đều dùng API thật.
 
-## Việc còn lại (chờ backend TV5)
+## Ghi chú vận hành
 
-- Backend expose 5 endpoint ở trên.
-- Khi backend sẵn sàng, set `EXPO_PUBLIC_USE_REAL_NOTIFICATION_API=true` — UI chạy không đổi source.
-- Sau khi verify, có thể xoá `notification.mock.ts` và adapter (giữ lại tạm để test offline).
+- API thật là mặc định. Mock vẫn được giữ để demo offline có chủ đích.
+- External email/push chỉ được tạo khi caller chọn kênh và adapter đã cấu hình; không
+  có adapter sẽ retry hữu hạn rồi tạo handling item, không giả trạng thái delivered.

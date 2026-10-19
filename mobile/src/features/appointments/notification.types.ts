@@ -22,6 +22,7 @@ export type NotificationKind =
   | 'AppointmentRescheduled'
   | 'AppointmentCancelled'
   | 'ReminderUpcoming'
+  | 'SupportRequestCreated'
   | 'SupportRequestUpdate'
   | 'NoShow'
   | 'ScheduleReduced';

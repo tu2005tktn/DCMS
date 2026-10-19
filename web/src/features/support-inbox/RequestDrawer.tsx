@@ -15,10 +15,11 @@ import {
   type StaffResolveResult,
   type SupportRequestDetail,
 } from './types';
-import { supportInboxMockRepo } from './supportInbox.mock';
+import { supportInboxApi } from './supportInbox.api';
 
 type Props = {
   id: string | null;
+  refreshToken: number;
   onClose: () => void;
   onChanged: () => void;
 };
@@ -35,7 +36,7 @@ type RejectFormValues = {
 };
 
 /** Drawer chi tiết + command bar cho staff xử lý yêu cầu (TV4/TV5). */
-export default function RequestDrawer({ id, onClose, onChanged }: Props) {
+export default function RequestDrawer({ id, refreshToken, onClose, onChanged }: Props) {
   const [toast, toastContext] = message.useMessage();
   const [modal, modalContext] = Modal.useModal();
   const [detail, setDetail] = useState<SupportRequestDetail | null>(null);
@@ -47,6 +48,20 @@ export default function RequestDrawer({ id, onClose, onChanged }: Props) {
   const [changeForm] = Form.useForm<ChangeFormValues>();
   const [rejectForm] = Form.useForm<RejectFormValues>();
   const latest = useRef(0);
+  const loadedId = useRef<string | null>(null);
+  const retryKeys = useRef<Record<string, { fingerprint: string; key: string }>>({});
+
+  function requestKey(action: string, fingerprint: string): string {
+    const previous = retryKeys.current[action];
+    if (previous?.fingerprint === fingerprint) return previous.key;
+    const key = crypto.randomUUID();
+    retryKeys.current[action] = { fingerprint, key };
+    return key;
+  }
+
+  function finishRequest(action: string, errorCode?: string) {
+    if (!errorCode || !['NETWORK', 'SERVER'].includes(errorCode)) delete retryKeys.current[action];
+  }
 
   useEffect(() => {
     if (id == null) {
@@ -54,18 +69,24 @@ export default function RequestDrawer({ id, onClose, onChanged }: Props) {
       setDetail(null);
       setError(null);
       setActionNotice(null);
+      retryKeys.current = {};
+      loadedId.current = null;
       return;
     }
+    const shouldResetForms = loadedId.current !== id;
     const request = ++latest.current;
     setLoading(true);
     setError(null);
     setActionNotice(null);
-    supportInboxMockRepo.getRequest(id)
+    supportInboxApi.getRequest(id)
       .then(result => {
         if (request !== latest.current) return;
         setDetail(result);
-        changeForm.resetFields();
-        rejectForm.resetFields();
+        loadedId.current = id;
+        if (shouldResetForms) {
+          changeForm.resetFields();
+          rejectForm.resetFields();
+        }
       })
       .catch((failure: Error) => {
         if (request !== latest.current) return;
@@ -74,14 +95,15 @@ export default function RequestDrawer({ id, onClose, onChanged }: Props) {
       .finally(() => {
         if (request === latest.current) setLoading(false);
       });
-  }, [id, changeForm, rejectForm]);
+  }, [id, refreshToken, changeForm, rejectForm]);
 
   async function runChange(): Promise<StaffChangeResult | null> {
     if (!detail) return null;
     const values = await changeForm.validateFields().catch(() => null);
     if (!values) return null;
+    const fingerprint = JSON.stringify({ id: detail.id, version: detail.expectedVersion, values });
     const command: StaffChangeCommand = {
-      requestKey: detail.requestKey,
+      requestKey: requestKey('change', fingerprint),
       expectedVersion: detail.expectedVersion,
       reason: values.reason,
       notes: values.notes,
@@ -89,14 +111,19 @@ export default function RequestDrawer({ id, onClose, onChanged }: Props) {
     };
     setSaving(true); setError(null); setActionNotice(null);
     try {
-      const result = await supportInboxMockRepo.staffChange(detail.id, command);
+      const result = await supportInboxApi.staffChange(detail.id, command);
       if (!result.ok) {
+        finishRequest('change', result.errorCode);
         const messageText = result.errorMessage ?? 'Không thể thay đổi lịch.';
         setActionNotice({ kind: 'error', message: messageText });
+        if (result.errorCode === 'STALE_VERSION') {
+          const refreshed = await supportInboxApi.getRequest(detail.id).catch(() => null);
+          if (refreshed) setDetail(refreshed);
+        }
         return result;
       }
-      // Tải lại detail để đồng bộ version + appointment.
-      const refreshed = await supportInboxMockRepo.getRequest(detail.id);
+      finishRequest('change');
+      const refreshed = result.request ?? await supportInboxApi.getRequest(detail.id);
       setDetail(refreshed);
       setActionNotice({ kind: 'success', message: 'Đã thay đổi lịch. Bây giờ bạn có thể xử lý yêu cầu.' });
       void toast.success(notificationMessage(result.notificationCode));
@@ -107,13 +134,39 @@ export default function RequestDrawer({ id, onClose, onChanged }: Props) {
     }
   }
 
+  async function verifyRequester(): Promise<void> {
+    if (!detail) return;
+    setSaving(true); setError(null); setActionNotice(null);
+    try {
+      const fingerprint = JSON.stringify({ id: detail.id, version: detail.expectedVersion,
+        notes: 'Đã đối chiếu người yêu cầu với thông tin đặt lịch.' });
+      const refreshed = await supportInboxApi.verifyRequester(detail.id, {
+        requestKey: requestKey('verify', fingerprint),
+        expectedVersion: detail.expectedVersion,
+        notes: 'Đã đối chiếu người yêu cầu với thông tin đặt lịch.',
+      });
+      finishRequest('verify');
+      setDetail(refreshed);
+      setActionNotice({ kind: 'success', message: 'Đã xác minh người yêu cầu.' });
+      onChanged();
+    } catch (failure) {
+      const code = (failure as { status?: number }).status;
+      if (code && code < 500) finishRequest('verify', 'BAD_REQUEST');
+      const messageText = failure instanceof Error ? failure.message : 'Không thể xác minh người yêu cầu.';
+      setActionNotice({ kind: 'error', message: messageText });
+    } finally { setSaving(false); }
+  }
+
   async function runResolve(decisionKind: 'Resolve' | 'Reject'): Promise<StaffResolveResult | null> {
     if (!detail) return null;
     const form = rejectForm;
-    const values = await form.validateFields().catch(() => null);
+    const values = decisionKind === 'Reject'
+      ? await form.validateFields().catch(() => null)
+      : ({ decisionReason: '', publicNote: undefined } as RejectFormValues);
     if (!values) return null;
+    const fingerprint = JSON.stringify({ id: detail.id, version: detail.expectedVersion, decisionKind, values });
     const command: StaffResolveCommand = {
-      requestKey: detail.requestKey,
+      requestKey: requestKey(`decision-${decisionKind}`, fingerprint),
       expectedVersion: detail.expectedVersion,
       decision: decisionKind,
       decisionReason: values.decisionReason,
@@ -121,11 +174,17 @@ export default function RequestDrawer({ id, onClose, onChanged }: Props) {
     };
     setSaving(true); setError(null); setActionNotice(null);
     try {
-      const result = await supportInboxMockRepo.resolveRequest(detail.id, command);
+      const result = await supportInboxApi.resolveRequest(detail.id, command);
       if (!result.ok || !result.request) {
+        finishRequest(`decision-${decisionKind}`, result.errorCode);
         setActionNotice({ kind: 'error', message: result.errorMessage ?? 'Không thể xử lý yêu cầu.' });
+        if (result.errorCode === 'STALE_VERSION') {
+          const refreshed = await supportInboxApi.getRequest(detail.id).catch(() => null);
+          if (refreshed) setDetail(refreshed);
+        }
         return result;
       }
+      finishRequest(`decision-${decisionKind}`);
       setDetail(result.request);
       setActionNotice({
         kind: 'success',
@@ -153,22 +212,13 @@ export default function RequestDrawer({ id, onClose, onChanged }: Props) {
     });
   }
 
-  function confirmReject() {
-    modal.confirm({
-      title: 'Từ chối yêu cầu?',
-      content: 'Người yêu cầu sẽ nhận thông báo từ chối kèm lý do. Bệnh nhân có thể gửi yêu cầu mới.',
-      okText: 'Từ chối', cancelText: 'Hủy', okButtonProps: { danger: true, loading: saving },
-      onOk: async () => { await runResolve('Reject'); },
-    });
-  }
-
   const open = id != null;
   const permission = detail?.permission;
   const canEdit = !!permission?.canEdit && !!permission?.branchMatch && (detail?.status === 'Pending' || detail?.status === 'InReview');
   const canResolve = !!permission?.canResolve && (detail?.status === 'Pending' || detail?.status === 'InReview');
   const isWithdrawn = detail?.status === 'Withdrawn';
   const showChangeForm = !!detail && (detail.kind === 'Change' || detail.kind === 'Cancel') && canEdit;
-  const hasChangeCommitted = !!detail && (detail.appointment.status === 'Rescheduled' || detail.appointment.status === 'Cancelled');
+  const hasChangeCommitted = !!detail?.appointmentActionCommitted;
 
   return (
     <Drawer
@@ -206,6 +256,9 @@ export default function RequestDrawer({ id, onClose, onChanged }: Props) {
                 { label: 'SĐT liên hệ', children: detail.requester.phone ?? '—' },
                 { label: 'Gửi lúc', children: formatDateTime(detail.createdAt) },
                 { label: 'Cập nhật', children: formatDateTime(detail.updatedAt) },
+                { label: 'Xác minh requester', children: detail.requesterVerifiedAt
+                  ? `Đã xác minh — ${formatDateTime(detail.requesterVerifiedAt)}`
+                  : <Tag color="warning">Chưa xác minh</Tag> },
                 { label: 'Lý do bệnh nhân', children: detail.reason
                   ? <span className="multiline">{detail.reason}</span>
                   : <Typography.Text type="secondary">—</Typography.Text>, span: 2 },
@@ -305,8 +358,13 @@ export default function RequestDrawer({ id, onClose, onChanged }: Props) {
             key: 'commands',
             label: 'Xử lý',
             children: <>
+              {!detail.requesterVerifiedAt && !isWithdrawn && canEdit && <Button loading={saving}
+                onClick={() => void verifyRequester()}>
+                Xác minh người yêu cầu
+              </Button>}
+
               {!isWithdrawn && canEdit && showChangeForm && <Button type="primary" loading={saving} onClick={() => void runChange()}
-                disabled={hasChangeCommitted}>
+                disabled={hasChangeCommitted || !detail.requesterVerifiedAt}>
                 {hasChangeCommitted
                   ? 'Đã thay đổi lịch'
                   : detail.kind === 'Change' ? 'Đổi lịch' : 'Huỷ lịch'}
@@ -340,7 +398,7 @@ export default function RequestDrawer({ id, onClose, onChanged }: Props) {
         okButtonProps={{ danger: true, loading: saving }}
         cancelText="Hủy"
         onCancel={() => setDecision(null)}
-        onOk={confirmReject}
+        onOk={async () => { await runResolve('Reject'); }}
         destroyOnClose
       >
         <Form form={rejectForm} layout="vertical">

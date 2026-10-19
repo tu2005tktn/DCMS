@@ -9,7 +9,8 @@ import {
   addDays, clinicDate, formatClock, formatDate, formatDateTime, formatWeekday, ineligibleLabels, newRequestKey, reasonError,
   REASON_MAX, remainingLabel, statusLabels, supportKindLabels, supportStatusLabels,
 } from '../appointments.rules';
-import type { AppointmentDetail, AvailabilitySlot, SupportRequest, SupportRequestKind } from '../appointments.types';
+import type { AppointmentDetail, AvailabilitySlot, RescheduleDentist, SupportRequest, SupportRequestKind } from '../appointments.types';
+import { notificationRepoPersist } from '../notification.repo.persist';
 import { StatusPill } from './MyAppointmentsScreen';
 
 type Mode = 'view' | 'reschedule' | 'cancel' | 'support';
@@ -22,7 +23,8 @@ function Row({ label, value }: { label: string; value: string }) {
 
 // S16 Appointment Detail and Change (UC-05, UC-06). Access is rechecked by code on every request; the URL is not trusted.
 export default function AppointmentDetailScreen() {
-  const { code } = useLocalSearchParams<{ code: string }>();
+  const params = useLocalSearchParams<{ code?: string; id?: string }>();
+  const code = params.code || params.id || '';
   const router = useRouter();
   const session = useSession();
   const token = session.state.status === 'authenticated' ? session.state.accessToken : null;
@@ -38,6 +40,9 @@ export default function AppointmentDetailScreen() {
   const [reason, setReason] = useState('');
   const [reasonMessage, setReasonMessage] = useState<string | undefined>();
   const [date, setDate] = useState(clinicDate(new Date()));
+  const [dentists, setDentists] = useState<RescheduleDentist[] | null>(null);
+  const [dentistsError, setDentistsError] = useState<string | null>(null);
+  const [dentistId, setDentistId] = useState<number | null>(null);
   const [slots, setSlots] = useState<AvailabilitySlot[] | null>(null);
   const [slotsError, setSlotsError] = useState<string | null>(null);
   const [slot, setSlot] = useState<AvailabilitySlot | null>(null);
@@ -61,21 +66,37 @@ export default function AppointmentDetailScreen() {
 
   useEffect(() => { void load(); }, [load]);
 
-  const loadSlots = useCallback(async (day: string) => {
+  const loadDentists = useCallback(async () => {
     if (!detail || !token) return;
-    setSlots(null); setSlotsError(null); setSlot(null);
-    try { setSlots(await appointmentsApi.availability(token, detail, day)); }
-    catch (failure) { if (!handleAuth(failure)) setSlotsError((failure as Error).message); }
+    setDentists(null); setDentistsError(null);
+    try {
+      const values = await appointmentsApi.rescheduleDentists(token, detail);
+      setDentists(values);
+      setDentistId(current => values.some(value => value.id === current) ? current : values[0]?.id ?? null);
+    } catch (failure) {
+      if (!handleAuth(failure)) setDentistsError((failure as Error).message);
+    }
   }, [detail, token, handleAuth]);
 
-  useEffect(() => { if (mode === 'reschedule') void loadSlots(date); }, [mode, date, loadSlots]);
+  const loadSlots = useCallback(async (day: string) => {
+    if (!detail || !token || !dentistId) return;
+    setSlots(null); setSlotsError(null); setSlot(null);
+    try { setSlots(await appointmentsApi.availability(token, detail, day, dentistId)); }
+    catch (failure) { if (!handleAuth(failure)) setSlotsError((failure as Error).message); }
+  }, [detail, token, dentistId, handleAuth]);
+
+  useEffect(() => { if (mode === 'reschedule') void loadDentists(); }, [mode, loadDentists]);
+  useEffect(() => { if (mode === 'reschedule' && dentistId) void loadSlots(date); }, [mode, date, dentistId, loadSlots]);
 
   function open(next: Mode) {
     setMode(next); setNotice(null); setActionError(null); setReasonMessage(undefined); setReviewing(false);
     pending.current = null;
-    if (next === 'reschedule' && detail) setDate(clinicDate(new Date(Math.max(Date.now(), Date.parse(detail.start) - 86_400_000))));
+    if (next === 'reschedule' && detail) {
+      setDentistId(detail.dentistId); setDentists(null); setDentistsError(null);
+      setDate(clinicDate(new Date(Math.max(Date.now(), Date.parse(detail.start) - 86_400_000))));
+    }
   }
-  function close() { setMode('view'); setReason(''); setSlot(null); setReviewing(false); setActionError(null); pending.current = null; }
+  function close() { setMode('view'); setReason(''); setSlot(null); setDentists(null); setDentistId(null); setReviewing(false); setActionError(null); pending.current = null; }
 
   function checkReason() {
     const message = reasonError(reason);
@@ -101,24 +122,134 @@ export default function AppointmentDetailScreen() {
   }
 
   function confirmReschedule() {
-    if (!detail || !slot) return;
-    void run(key => appointmentsApi.reschedule(token!, detail.code, { expectedVersion: detail.version, requestKey: key, newStart: slot.start,
+    if (!detail || !slot || !dentistId) return;
+    if (!e.canSelfService) {
+      void run(key => appointmentsApi.requestSupport(token!, detail.code, {
+        requestKey: key, kind: 'RESCHEDULE', reason: reason.trim(), newStartAt: slot.start,
+        dentistId, chairId: slot.chairId
+      }),
+      result => {
+        close();
+        setNotice(result.notification.message);
+        const accountId = session.state.status === 'authenticated' ? session.state.user.id : null;
+        void notificationRepoPersist.create({
+          accountId,
+          kind: 'SupportRequestCreated',
+          title: 'Đã gửi yêu cầu đổi lịch',
+          body: `Yêu cầu đổi lịch ${detail.code} sang ${formatDateTime(slot.start)} đã được gửi cho nhân viên phòng khám xử lý.`,
+          appointmentId: detail.code,
+          requestId: String(result.request.id),
+          deepLink: `/appointments/${detail.code}`,
+          channels: ['InApp'],
+          dedupeKey: `req:${result.request.id}:created`,
+        }).catch(err => console.warn('[AppointmentDetailScreen] notification.create failed', err));
+        void load(true);
+      });
+      return;
+    }
+    void run(key => appointmentsApi.reschedule(token!, detail.code, { expectedVersion: detail.version, requestKey: key, dentistId, newStart: slot.start,
       chairId: slot.chairId, scheduleVersion: slot.scheduleVersion, assistantScheduleVersion: slot.assistantScheduleVersion, reason: reason.trim() }),
-    result => { setDetail(result.appointment); close(); setNotice(result.notification.message); });
+    result => {
+      setDetail(result.appointment);
+      close();
+      setNotice(result.notification.message);
+      const accountId = session.state.status === 'authenticated' ? session.state.user.id : null;
+      void notificationRepoPersist.create({
+        accountId,
+        kind: 'AppointmentRescheduled',
+        title: 'Đổi lịch hẹn thành công',
+        body: `Lịch hẹn ${detail.code} đã được đổi sang ${formatDateTime(result.appointment.start)}.`,
+        appointmentId: detail.code,
+        requestId: null,
+        deepLink: `/appointments/${detail.code}`,
+        channels: ['InApp'],
+        dedupeKey: `appt:${detail.code}:rescheduled:${result.appointment.version}`,
+      }).catch(err => console.warn('[AppointmentDetailScreen] notification.create failed', err));
+    });
   }
   function confirmCancel() {
     if (!detail || !checkReason()) return;
+    if (!e.canSelfService) {
+      void run(key => appointmentsApi.requestSupport(token!, detail.code, {
+        requestKey: key, kind: 'CANCEL', reason: reason.trim()
+      }),
+      result => {
+        close();
+        setNotice(result.notification.message);
+        const accountId = session.state.status === 'authenticated' ? session.state.user.id : null;
+        void notificationRepoPersist.create({
+          accountId,
+          kind: 'SupportRequestCreated',
+          title: 'Đã gửi yêu cầu hủy lịch',
+          body: `Yêu cầu hủy lịch ${detail.code} đã được gửi cho nhân viên phòng khám xử lý.`,
+          appointmentId: detail.code,
+          requestId: String(result.request.id),
+          deepLink: `/appointments/${detail.code}`,
+          channels: ['InApp'],
+          dedupeKey: `req:${result.request.id}:created`,
+        }).catch(err => console.warn('[AppointmentDetailScreen] notification.create failed', err));
+        void load(true);
+      });
+      return;
+    }
     void run(key => appointmentsApi.cancel(token!, detail.code, { expectedVersion: detail.version, requestKey: key, reason: reason.trim() }),
-      result => { setDetail(result.appointment); close(); setNotice(result.notification.message); });
+      result => {
+        setDetail(result.appointment);
+        close();
+        setNotice(result.notification.message);
+        const accountId = session.state.status === 'authenticated' ? session.state.user.id : null;
+        void notificationRepoPersist.create({
+          accountId,
+          kind: 'AppointmentCancelled',
+          title: 'Đã hủy lịch hẹn',
+          body: `Lịch hẹn ${detail.code} đã được hủy thành công.`,
+          appointmentId: detail.code,
+          requestId: null,
+          deepLink: `/appointments/${detail.code}`,
+          channels: ['InApp'],
+          dedupeKey: `appt:${detail.code}:cancelled:${result.appointment.version}`,
+        }).catch(err => console.warn('[AppointmentDetailScreen] notification.create failed', err));
+      });
   }
   function submitSupport() {
     if (!detail || !checkReason()) return;
     void run(key => appointmentsApi.requestSupport(token!, detail.code, { requestKey: key, kind, reason: reason.trim() }),
-      result => { close(); setNotice(result.notification.message); void load(true); });
+      result => {
+        close();
+        setNotice(result.notification.message);
+        const accountId = session.state.status === 'authenticated' ? session.state.user.id : null;
+        void notificationRepoPersist.create({
+          accountId,
+          kind: 'SupportRequestCreated',
+          title: 'Đã gửi yêu cầu hỗ trợ',
+          body: `Yêu cầu hỗ trợ cho lịch hẹn ${detail.code} đã được gửi.`,
+          appointmentId: detail.code,
+          requestId: String(result.request.id),
+          deepLink: `/appointments/${detail.code}`,
+          channels: ['InApp'],
+          dedupeKey: `req:${result.request.id}:created`,
+        }).catch(err => console.warn('[AppointmentDetailScreen] notification.create failed', err));
+        void load(true);
+      });
   }
   function withdraw(request: SupportRequest) {
+    if (!detail) return;
+    const apptCode = detail.code;
     void run(() => appointmentsApi.withdrawSupport(token!, request.id, request.version), () => {
-      setNotice('Đã rút yêu cầu hỗ trợ. Lịch hẹn không thay đổi.'); void load(true);
+      setNotice('Đã rút yêu cầu hỗ trợ. Lịch hẹn không thay đổi.');
+      const accountId = session.state.status === 'authenticated' ? session.state.user.id : null;
+      void notificationRepoPersist.create({
+        accountId,
+        kind: 'SupportRequestUpdate',
+        title: 'Đã rút yêu cầu hỗ trợ',
+        body: `Bạn đã rút yêu cầu hỗ trợ cho lịch hẹn ${apptCode}. Lịch hẹn không thay đổi.`,
+        appointmentId: apptCode,
+        requestId: String(request.id),
+        deepLink: `/appointments/${apptCode}`,
+        channels: ['InApp'],
+        dedupeKey: `req:${request.id}:withdrawn:${request.version + 1}`,
+      }).catch(err => console.warn('[AppointmentDetailScreen] notification.create failed', err));
+      void load(true);
     });
   }
 
@@ -127,11 +258,12 @@ export default function AppointmentDetailScreen() {
   if (!detail) return <ScrollView contentContainerStyle={styles.container}>
     <Banner tone="error" message={loadError?.message ?? 'Không thể hoàn tất thao tác. Vui lòng kiểm tra kết nối và thử lại.'}
       action={loadError && loadError.status !== 404 && loadError.status !== 403 ? { label: 'Thử lại', onPress: () => void load() } : undefined} />
-    <Button title="Về danh sách lịch hẹn" variant="secondary" onPress={() => router.replace('/appointments')} />
+    <Button title="Về danh sách lịch hẹn" variant="secondary" onPress={() => router.replace('/(account)/appointments')} />
   </ScrollView>;
 
   const e = detail.eligibility;
   const pendingSupport = detail.supportRequests.find(r => r.status === 'Pending');
+  const selectedDentist = dentists?.find(value => value.id === dentistId);
   const stale = actionError?.code === 'MSG111';
   const errorBanner = actionError && <Banner tone="error" message={actionError.message}
     action={stale ? { label: 'Tải lại lịch hẹn', onPress: () => { close(); void load(true); } } : undefined} />;
@@ -172,6 +304,16 @@ export default function AppointmentDetailScreen() {
         <Text style={styles.muted}>Bạn có thể tự đổi hoặc hủy khi còn ít nhất 12 giờ trước giờ hẹn.</Text>
         <Button title="Đổi lịch" onPress={() => open('reschedule')} />
         <Button title="Hủy lịch" variant="danger" onPress={() => open('cancel')} />
+      </> : e.reasonCode === 'WITHIN_12H' ? <>
+        <Text style={styles.muted}>Còn dưới 12 giờ trước giờ hẹn. Bạn có thể gửi yêu cầu đổi hoặc hủy lịch để nhân viên phòng khám xác nhận.</Text>
+        {!pendingSupport ? (
+          <>
+            <Button title="Đổi lịch" onPress={() => open('reschedule')} />
+            <Button title="Hủy lịch" variant="danger" onPress={() => open('cancel')} />
+          </>
+        ) : (
+          <Text style={styles.muted}>Bạn đã có một yêu cầu đang chờ xử lý cho lịch này.</Text>
+        )}
       </> : <>
         <Text style={styles.muted}>{e.reasonCode ? ineligibleLabels[e.reasonCode] : ''}</Text>
         {e.canRequestSupport && !pendingSupport && <Button title="Gửi yêu cầu hỗ trợ" onPress={() => open('support')} />}
@@ -181,8 +323,18 @@ export default function AppointmentDetailScreen() {
 
     {mode === 'reschedule' && <Card title="Đổi lịch hẹn">
       {errorBanner}
-      <Text style={styles.muted}>Giờ hiện tại vẫn giữ nguyên cho đến khi đổi thành công. Thời lượng {detail.durationMinutes} phút và nha sĩ giữ như lịch gốc.</Text>
+      <Text style={styles.muted}>Giờ hiện tại vẫn giữ nguyên cho đến khi đổi thành công. Dịch vụ và thời lượng {detail.durationMinutes} phút được giữ như lịch gốc.</Text>
       {!reviewing ? <>
+        <Text style={styles.rowValue}>Chọn bác sĩ</Text>
+        {dentistsError ? <Banner tone="error" message={dentistsError} action={{ label: 'Thử lại', onPress: () => void loadDentists() }} />
+          : dentists === null ? <ActivityIndicator color={palette.primary} />
+          : dentists.length === 0 ? <Text style={styles.muted}>Không có bác sĩ đang nhận lịch tại chi nhánh này.</Text>
+          : <View style={styles.slots}>{dentists.map(value => {
+            const selected = dentistId === value.id;
+            return <Pressable key={value.id} accessibilityRole="radio" accessibilityLabel={`Bác sĩ ${value.name}`}
+              accessibilityState={{ selected }} onPress={() => { setDentistId(value.id); setSlot(null); setReviewing(false); }}
+              style={[styles.slot, selected && styles.slotSelected]}><Text style={[styles.slotText, selected && styles.slotTextSelected]}>{value.name}</Text></Pressable>;
+          })}</View>}
         <View style={styles.dateBar}>
           <Button title="‹" variant="secondary" disabled={date <= clinicDate(new Date())} onPress={() => setDate(addDays(date, -1))} />
           <Text style={styles.dateText}>{formatWeekday(`${date}T05:00:00Z`)}, {formatDate(`${date}T05:00:00Z`)}</Text>
@@ -197,13 +349,17 @@ export default function AppointmentDetailScreen() {
               style={[styles.slot, selected && styles.slotSelected]}><Text style={[styles.slotText, selected && styles.slotTextSelected]}>{formatClock(s.start)}</Text></Pressable>;
           })}</View>}
         {reasonField}
-        <Button title="Xem lại" disabled={!slot} onPress={() => { if (checkReason()) setReviewing(true); }} />
+        <Button title="Xem lại" disabled={!dentistId || !slot} onPress={() => { if (checkReason()) setReviewing(true); }} />
       </> : <>
         <Row label="Giờ cũ" value={formatDateTime(detail.start)} />
         <Row label="Giờ mới" value={slot ? formatDateTime(slot.start) : '—'} />
-        <Row label="Nha sĩ" value={detail.dentistName} />
+        <Row label="Nha sĩ cũ" value={detail.dentistName} />
+        <Row label="Nha sĩ mới" value={selectedDentist?.name ?? '—'} />
         <Row label="Lý do" value={reason.trim()} />
-        <Button title="Xác nhận đổi lịch" busy={busy} onPress={confirmReschedule} />
+        {!e.canSelfService && (
+          <Text style={styles.muted}>Lịch hẹn còn dưới 12 giờ. Yêu cầu đổi lịch sẽ được gửi cho nhân viên phòng khám xác nhận trước khi áp dụng. Lịch cũ vẫn được giữ nguyên.</Text>
+        )}
+        <Button title={!e.canSelfService ? 'Gửi yêu cầu đổi lịch' : 'Xác nhận đổi lịch'} busy={busy} onPress={confirmReschedule} />
         <Button title="Chọn lại" variant="secondary" disabled={busy} onPress={() => setReviewing(false)} />
       </>}
       <Button title="Không đổi nữa" variant="secondary" disabled={busy} onPress={close} />
@@ -211,9 +367,11 @@ export default function AppointmentDetailScreen() {
 
     {mode === 'cancel' && <Card title="Hủy lịch hẹn">
       {errorBanner}
-      <Text style={styles.muted}>Lịch {detail.code} lúc {formatDateTime(detail.start)} sẽ bị hủy. {detail.followUp ? 'Lịch tái khám liên quan sẽ chuyển về trạng thái cần đặt lại.' : ''}</Text>
+      <Text style={styles.muted}>{!e.canSelfService
+        ? 'Lịch hẹn còn dưới 12 giờ. Yêu cầu hủy lịch sẽ được gửi cho nhân viên phòng khám xác nhận. Lịch cũ vẫn được giữ nguyên cho đến khi nhân viên duyệt.'
+        : `Lịch ${detail.code} lúc ${formatDateTime(detail.start)} sẽ bị hủy. ${detail.followUp ? 'Lịch tái khám liên quan sẽ chuyển về trạng thái cần đặt lại.' : ''}`}</Text>
       {reasonField}
-      <Button title="Xác nhận hủy lịch" variant="danger" busy={busy} onPress={confirmCancel} />
+      <Button title={!e.canSelfService ? 'Gửi yêu cầu hủy lịch' : 'Xác nhận hủy lịch'} variant="danger" busy={busy} onPress={confirmCancel} />
       <Button title="Không hủy" variant="secondary" disabled={busy} onPress={close} />
     </Card>}
 
@@ -232,8 +390,9 @@ export default function AppointmentDetailScreen() {
 
     {detail.supportRequests.length > 0 && <Card title="Yêu cầu hỗ trợ">
       {detail.supportRequests.map(r => <View key={r.id} style={styles.request}>
-        <Text style={styles.rowValue}>{supportKindLabels[r.kind]} · {supportStatusLabels[r.status]}</Text>
+        <Text style={styles.rowValue}>{supportKindLabels[r.kind] ?? r.kind} · {supportStatusLabels[r.status] ?? r.status}</Text>
         <Text style={styles.muted}>Gửi lúc {formatDateTime(r.createdAt)}{r.decidedAt ? ` · Cập nhật ${formatDateTime(r.decidedAt)}` : ''}</Text>
+        {r.proposedStartAt && <Text style={styles.line}>Khung giờ đề xuất: {formatDateTime(r.proposedStartAt)}</Text>}
         <Text style={styles.line}>Lý do: {r.reason}</Text>
         {r.publicNote && <Text style={styles.line}>Phản hồi: {r.publicNote}</Text>}
         {r.status === 'Pending' && <Button title="Rút yêu cầu" variant="secondary" busy={busy} onPress={() => withdraw(r)} />}

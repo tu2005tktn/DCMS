@@ -82,4 +82,8 @@ public sealed class InMemoryNotificationStore : INotificationStore
             .FirstOrDefault();
         return Task.FromResult(last?.ToString("O"));
     }
+
+    public Task<bool> CanOpenAppointmentAsync(int accountId, string appointmentRef, CancellationToken ct) =>
+        Task.FromResult(_byId.Values.Any(x => x.AccountId == accountId &&
+            string.Equals(x.AppointmentId, appointmentRef, StringComparison.Ordinal)));
 }

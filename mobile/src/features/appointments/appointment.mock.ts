@@ -29,6 +29,7 @@ import type {
   SupportRequestKind,
   SupportRequestStatus,
 } from './appointment.types';
+import { notificationMockRepo } from './notification.mock';
 
 // ---------------------------------------------------------------------------
 // In-memory store
@@ -420,6 +421,23 @@ export const appointmentMockRepo = {
       action: cmd.decision === 'Resolve' ? 'RequestResolved' : 'RequestRejected',
       notes: cmd.notes,
     });
+    if (r.requester.accountId) {
+      void notificationMockRepo.create({
+        accountId: r.requester.accountId,
+        kind: 'SupportRequestUpdate',
+        title: cmd.decision === 'Resolve' ? 'Yêu cầu hỗ trợ đã được chấp thuận' : 'Yêu cầu hỗ trợ bị từ chối',
+        body: cmd.decision === 'Resolve'
+          ? (r.kind === 'Change' && r.proposedChange?.newStartAt
+              ? `Lịch hẹn ${a.code} đã được đổi sang ${new Date(r.proposedChange.newStartAt).toLocaleString('vi-VN')} theo yêu cầu của bạn.`
+              : `Yêu cầu cho lịch hẹn ${a.code} đã được nhân viên phòng khám xử lý thành công.`)
+          : `Yêu cầu cho lịch hẹn ${a.code} đã bị từ chối: ${cmd.notes || 'Không thể đáp ứng yêu cầu'}. Lịch hẹn cũ vẫn được giữ nguyên.`,
+        appointmentId: a.code,
+        requestId: r.id,
+        deepLink: `/appointments/${a.code}`,
+        channels: ['InApp'],
+        dedupeKey: `req:${r.id}:${cmd.decision.toLowerCase()}:${r.expectedVersion}`,
+      }).catch(err => console.warn('[appointmentMockRepo] notification.create failed', err));
+    }
     return { ok: true, request: { ...r }, appointment: { ...a } };
   },
 

@@ -118,6 +118,7 @@ const seedDetails: SupportRequestDetail[] = [
     proposedChange: { newStartAt: isoFromOffset(1, 14, 0), reason: 'PatientRequest' },
     requester: { accountId: 501, name: 'Nguyễn Văn An', phone: '0901000001', isAnonymous: false },
     permission: { canResolve: true, canEdit: true, branchMatch: true, ownershipMatch: true },
+    appointmentActionCommitted: false,
     createdAt: isoFromOffset(0, 9, 0), updatedAt: isoFromOffset(0, 9, 5),
     appointment: appointment1, history: baseHistory, decisionReason: null, decidedAt: null, deciderName: null,
   },
@@ -128,6 +129,7 @@ const seedDetails: SupportRequestDetail[] = [
     proposedChange: { newStartAt: isoFromOffset(7, 9, 0), reason: 'PatientRequest' },
     requester: { accountId: 502, name: 'Trần Thị Bình', phone: '0901000002', isAnonymous: false },
     permission: { canResolve: true, canEdit: true, branchMatch: true, ownershipMatch: true },
+    appointmentActionCommitted: false,
     createdAt: isoFromOffset(0, 10, 0), updatedAt: isoFromOffset(0, 10, 0),
     appointment: appointment2, history: baseHistory, decisionReason: null, decidedAt: null, deciderName: null,
   },
@@ -137,6 +139,7 @@ const seedDetails: SupportRequestDetail[] = [
     reason: 'Con bị sốt, muốn dời sang tuần sau; staff đang liên hệ đặt lịch mới.',
     requester: { accountId: 503, name: 'Phạm Thị Lan', phone: '0901000003', isAnonymous: false },
     permission: { canResolve: true, canEdit: true, branchMatch: true, ownershipMatch: true },
+    appointmentActionCommitted: false,
     createdAt: isoFromOffset(0, 7, 30), updatedAt: isoFromOffset(0, 11, 0),
     appointment: appointment3, history: baseHistory, decisionReason: null, decidedAt: null, deciderName: null,
   },
@@ -146,6 +149,7 @@ const seedDetails: SupportRequestDetail[] = [
     reason: null,
     requester: { accountId: 501, name: 'Nguyễn Văn An', phone: '0901000001', isAnonymous: false },
     permission: { canResolve: true, canEdit: true, branchMatch: true, ownershipMatch: true },
+    appointmentActionCommitted: false,
     createdAt: isoFromOffset(0, 12, 0), updatedAt: isoFromOffset(0, 12, 0),
     appointment: appointment1, history: baseHistory, decisionReason: null, decidedAt: null, deciderName: null,
   },
@@ -156,6 +160,7 @@ const seedDetails: SupportRequestDetail[] = [
     proposedChange: { newStartAt: appointment4.startAt, reason: 'PatientRequest' },
     requester: { accountId: 504, name: 'Lê Minh Châu', phone: '0901000004', isAnonymous: false },
     permission: { canResolve: true, canEdit: true, branchMatch: true, ownershipMatch: true },
+    appointmentActionCommitted: true,
     createdAt: isoFromOffset(-1, 9, 0), updatedAt: isoFromOffset(-1, 9, 30),
     appointment: appointment4,
     history: [
@@ -172,6 +177,7 @@ const seedDetails: SupportRequestDetail[] = [
     reason: 'Khách vãng lai gọi điện xin huỷ; staff lên yêu cầu nhưng khách đã gọi lại tự huỷ qua điện thoại lễ tân.',
     requester: { accountId: null, name: 'Khách vãng lai', phone: '0901000005', isAnonymous: true },
     permission: { canResolve: false, canEdit: false, branchMatch: true, ownershipMatch: true },
+    appointmentActionCommitted: false,
     createdAt: isoFromOffset(-2, 14, 0), updatedAt: isoFromOffset(-2, 14, 30),
     appointment: appointment5,
     history: [
@@ -253,6 +259,9 @@ export const supportInboxMockRepo = {
       at: nowIso(), actor: 'Staff', actorUserId: 1,
       action: 'ConfirmedToAttend', notes: command.notes ?? 'Đã xác minh requester.',
     });
+    detail.requesterVerifiedAt = nowIso();
+    detail.requesterVerification = command.notes ?? 'Đã xác minh requester.';
+    detail.expectedVersion += 1;
     return clone(detail);
   },
 
@@ -289,6 +298,7 @@ export const supportInboxMockRepo = {
         : detail.appointment.endAt,
     };
     detail.appointment = newAppointment;
+    detail.appointmentActionCommitted = true;
     detail.expectedVersion += 1;
     appendHistory(detail, {
       at: nowIso(), actor: 'Staff', actorUserId: 1,
@@ -296,7 +306,7 @@ export const supportInboxMockRepo = {
       after: { status: newAppointment.status, startAt: newAppointment.startAt, reason: command.reason },
       notes: command.notes,
     });
-    return { ok: true, appointment: newAppointment, notificationCode: isCancel ? 'MSG35' : 'MSG34' };
+    return { ok: true, appointment: newAppointment, request: clone(detail), notificationCode: isCancel ? 'MSG35' : 'MSG34' };
   },
 
   /** Resolve/Reject request. Resolve chỉ `ok=true` khi đã có action cần thiết commit. */
@@ -335,7 +345,7 @@ export const supportInboxMockRepo = {
     }
     if (detail.kind === 'Change' || detail.kind === 'Cancel') {
       // Bắt buộc đã có staffChange commit; nếu appointment vẫn 'Confirmed'/'Pending' thì coi như chưa đổi.
-      if (detail.appointment.status !== 'Rescheduled' && detail.appointment.status !== 'Cancelled') {
+      if (!detail.appointmentActionCommitted) {
         return {
           ok: false, errorCode: 'BAD_REQUEST',
           errorMessage: 'Cần đổi hoặc huỷ lịch trước khi xử lý yêu cầu này.',
@@ -378,6 +388,7 @@ export const supportInboxMockRepo = {
       reason: 'Bệnh nhân không thể tham dự, xin rút xác nhận.',
       requester: { accountId: 501, name: 'Nguyễn Văn An', phone: '0901000001', isAnonymous: false },
       permission: { canResolve: true, canEdit: true, branchMatch: true, ownershipMatch: true },
+      appointmentActionCommitted: false,
       createdAt: nowIso(), updatedAt: nowIso(),
       appointment: appointment1, history: baseHistory, decisionReason: null, decidedAt: null, deciderName: null,
     };
