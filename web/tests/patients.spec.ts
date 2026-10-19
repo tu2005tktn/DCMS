@@ -60,7 +60,7 @@ test('assistant creates, searches, edits, archives, restores and reads audit usi
     await expect(page.locator('.audit-entry strong').filter({ hasText: new RegExp(`^${action}$`) })).toBeVisible();
   await page.screenshot({ path: '../.artifacts/test-results/trinm/patient-audit.png', fullPage: true });
   await page.getByRole('tab', { name: 'Điều trị & Thanh toán', exact: true }).click();
-  await expect(page.getByText('Chức năng chưa triển khai', { exact: true })).toBeVisible();
+  await expect(page.getByText('Hồ sơ điều trị chỉ dành cho bác sĩ được phân quyền.', { exact: true })).toBeVisible();
   expect(patient.id).toBeGreaterThan(0);
   expect(errors).toEqual([]);
 });

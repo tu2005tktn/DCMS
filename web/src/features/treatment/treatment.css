@@ -1,0 +1,33 @@
+.treatment-page { display: grid; gap: 20px; max-width: 1320px; margin: 0 auto; }
+.treatment-page-heading, .treatment-section-heading, .treatment-list-row, .treatment-item-row {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+}
+.treatment-page-heading .ant-typography, .treatment-section-heading .ant-typography { margin-bottom: 4px; }
+.treatment-detail-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(280px, 1fr); gap: 20px; }
+.treatment-item-stack, .treatment-list-cards { display: grid; gap: 12px; }
+.treatment-item-row { padding: 12px 0; border-bottom: 1px solid #e5eaf2; }
+.treatment-item-row:last-child { border-bottom: 0; }
+.treatment-item-row > :first-child { min-width: 0; overflow-wrap: anywhere; }
+.treatment-plan-intro .ant-input { margin-top: 8px; }
+.treatment-plan-intro .ant-typography { margin: 8px 0 0; }
+.treatment-section-note { margin-top: 16px; }
+.treatment-plan-actions { padding-bottom: 24px; }
+.treatment-number-full { width: 100%; }
+.treatment-scope-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.treatment-estimate { display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  margin: -8px 0 16px; padding: 12px 16px; border-radius: 8px; background: #eaf2ff; color: #17233d; }
+.treatment-estimate strong { color: #175cd3; font-size: 18px; }
+.treatment-muted { color: #667085; font-size: 12px; }
+.treatment-order-actions { display: inline-flex; gap: 4px; }
+.treatment-order-actions .ant-btn { min-width: 28px; }
+.treatment-list { display: grid; gap: 16px; }
+.treatment-timeline .ant-timeline { margin-top: 12px; }
+@media (max-width: 767px) {
+  .treatment-page-heading, .treatment-section-heading, .treatment-list-row { flex-direction: column; align-items: stretch; }
+  .treatment-detail-grid { grid-template-columns: 1fr; }
+  .treatment-page { gap: 16px; }
+  .treatment-item-row { flex-wrap: wrap; }
+  .treatment-plan-actions .ant-btn { min-height: 44px; }
+  .treatment-scope-grid { grid-template-columns: 1fr; gap: 0; }
+  .treatment-estimate { align-items: flex-start; flex-direction: column; }
+}

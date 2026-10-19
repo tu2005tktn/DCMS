@@ -17,6 +17,8 @@ using DCMS.Infrastructure.Features.Appointments;
 using Microsoft.Extensions.Hosting;
 using DCMS.Infrastructure.Features.Notifications;
 using DCMS.Application.Features.SupportRequests;
+using DCMS.Application.Features.Treatment;
+using DCMS.Infrastructure.Features.Treatment;
 
 namespace DCMS.Infrastructure;
 
@@ -61,6 +63,12 @@ public static class DependencyInjection
         services.AddScoped<IPatientLinkReviewService, PatientLinkReviewService>();
         services.AddScoped<DevelopmentPatientLinkSeeder>();
         services.AddScoped<IPatientService, PatientService>();
+        services.AddScoped<ITreatmentDossierService, TreatmentDossierService>();
+        services.AddScoped<ITreatmentProgressionService, TreatmentProgressionService>();
+        services.AddScoped<ITreatmentActualEvidencePort, UnavailableTreatmentActualEvidencePort>();
+        services.AddScoped<ITreatmentLabReadinessPort, UnavailableTreatmentLabReadinessPort>();
+        services.AddScoped<TreatmentDueScanner>();
+        services.AddHostedService<TreatmentDueScanWorker>();
         services.AddSingleton(TimeProvider.System);
         services.AddScoped<Features.Scheduling.WorkingScheduleService>();
         services.AddScoped<DCMS.Application.Features.Scheduling.IWorkingScheduleService>(sp => sp.GetRequiredService<Features.Scheduling.WorkingScheduleService>());
@@ -70,9 +78,10 @@ public static class DependencyInjection
         services.AddScoped<IAppointmentQueryService, AppointmentQueryService>();
         services.AddScoped<IAppointmentChangeService, AppointmentChangeService>();
         services.AddScoped<ISupportRequestService, SupportRequestService>();
-        services.AddScoped<IFollowUpAppointmentChangePort, UnavailableFollowUpAppointmentChangePort>();
+        services.AddScoped<FollowUpAppointmentPort>();
+        services.AddScoped<IFollowUpAppointmentChangePort>(sp => sp.GetRequiredService<FollowUpAppointmentPort>());
         services.AddScoped<DevelopmentAppointmentSeeder>();
-        services.AddScoped<IFollowUpBookingPort, UnavailableFollowUpBookingPort>();
+        services.AddScoped<IFollowUpBookingPort>(sp => sp.GetRequiredService<FollowUpAppointmentPort>());
         services.AddScoped<IAppointmentNotificationDispatcher, AppointmentNotificationDispatcher>();
         services.AddScoped<IExternalNotificationAdapter, UnavailableExternalNotificationAdapter>();
         // S03 recovery delivery: a configured SMTP server sends real email in any environment; otherwise

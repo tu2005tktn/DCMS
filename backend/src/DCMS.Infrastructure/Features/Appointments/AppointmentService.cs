@@ -117,7 +117,8 @@ public sealed class AppointmentService(DcmsDbContext db, IAvailabilityService av
         if (staff && start < now.AddMinutes(60) && exceptionReason == null) throw Error("MSG24");
 
         if (request.FollowUpId.HasValue)
-            await followUps.ValidateAsync(request.FollowUpId.Value, patientId!.Value, request.DentistId, request.DurationMinutes, ct);
+            await followUps.ValidateAsync(request.FollowUpId.Value, patientId!.Value, request.BranchId, request.DentistId,
+                request.DurationMinutes, start, ct);
 
         var slot = await availability.CheckInTransactionAsync(new ResourceCheck(request.BranchId, request.DentistId,
             request.ServiceId, start, request.DurationMinutes, staff ? request.ChairId : null, request.AssistantId,
@@ -174,7 +175,8 @@ public sealed class AppointmentService(DcmsDbContext db, IAvailabilityService av
 // A missing TV4 module must not silently create a booking that claims a follow-up was booked.
 public sealed class UnavailableFollowUpBookingPort : IFollowUpBookingPort
 {
-    public Task ValidateAsync(Guid followUpId, int patientId, int dentistId, int durationMinutes, CancellationToken ct) =>
+    public Task ValidateAsync(Guid followUpId, int patientId, int branchId, int dentistId, int durationMinutes,
+        DateTimeOffset startAt, CancellationToken ct) =>
         throw new BusinessException(503, SystemMessages.Get("MSG144"));
     public Task MarkBookedAsync(Guid followUpId, Guid appointmentId, CancellationToken ct) =>
         throw new BusinessException(503, SystemMessages.Get("MSG144"));
