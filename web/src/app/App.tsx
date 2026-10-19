@@ -30,7 +30,7 @@ export default function App() {
     <Route path="/customer/sign-in" element={<CustomerSignInPage />} />
     <Route path="/customer/register" element={<CustomerRegisterPage />} />
     <Route path="/customer/recover" element={<RecoverAccountPage customer />} />
-    <Route path="/customer/book" element={<CustomerBookingPage />} />
+    <Route path="/customer/book" element={<CustomerGuard><CustomerBookingPage /></CustomerGuard>} />
     <Route path="/customer" element={<CustomerGuard><CustomerShell /></CustomerGuard>}>
       <Route index element={<Navigate to="/customer/home" replace />} />
       <Route path="home" element={<CustomerHomePage />} />
