@@ -15,8 +15,8 @@ async function mockCommon(page: Page) {
 test('entry offers separate customer and unchanged staff login', async ({ page }) => {
   await page.goto('/');
   await expect(page).toHaveURL(/\/access$/);
-  await expect(page.getByRole('link', { name: 'Khách hàng' })).toHaveAttribute('href', '/customer/sign-in');
-  await page.getByRole('link', { name: 'Nhân viên' }).click();
+  await expect(page.getByRole('link', { name: 'Khách hàng', exact: true })).toHaveAttribute('href', '/customer/sign-in');
+  await page.getByRole('link', { name: 'Nhân viên', exact: true }).click();
   await expect(page).toHaveURL(/\/sign-in$/);
   await expect(page.getByLabel('Tên đăng nhập', { exact: true })).toBeVisible();
   await expect(page.getByLabel('Mật khẩu', { exact: true })).toBeVisible();
@@ -128,6 +128,8 @@ test('guest booking retains form after a slot conflict and confirms another slot
       startAt: second, endAt: second, notification: { code: 'MSG29', message: 'Đặt lịch thành công.' } }, 201));
   });
   await page.goto('/customer/book');
+  await page.getByRole('button', { name: 'Tiếp tục' }).click();
+  await expect(page.locator('.customer-booking-progress')).toContainText('Bước 2/5');
   await page.locator('.ant-select').nth(0).click();
   await page.getByText('Chi nhánh A').last().click();
   await page.locator('.ant-select').nth(1).click();
@@ -135,7 +137,11 @@ test('guest booking retains form after a slot conflict and confirms another slot
   await page.locator('.ant-select').nth(2).click();
   await page.getByText('Bác sĩ B').last().click();
   await page.locator('.customer-slots button').first().click();
+  await expect(page.getByRole('complementary', { name: 'Lịch đã chọn' })).toContainText('Giờ khám');
+  await expect(page.getByRole('complementary', { name: 'Lịch đã chọn' })).not.toContainText('Chưa chọn giờ');
   await page.getByRole('button', { name: 'Tiếp tục' }).click();
+  await expect(page.getByRole('group', { name: 'Người đặt lịch' })).toBeVisible();
+  await expect(page.getByRole('group', { name: 'Người đến khám' })).toBeVisible();
   await page.getByLabel('Họ tên người đặt').fill('Khách A');
   await page.getByLabel('Số điện thoại Việt Nam hoặc email').fill('0912345678');
   await page.getByLabel('Họ tên người khám').fill('Người thân B');
@@ -148,7 +154,7 @@ test('guest booking retains form after a slot conflict and confirms another slot
   await page.getByRole('button', { name: 'Xem lại' }).click();
   await page.getByRole('button', { name: 'Xác nhận đặt lịch' }).click();
   await expect(page.getByText('AP-123')).toBeVisible();
-  await expect(page.getByText('Trạng thái: Confirmed')).toBeVisible();
+  await expect(page.getByText('Trạng thái: Đã xác nhận')).toBeVisible();
   expect(calls).toBe(2);
   expect(requestKeys[0]).not.toBe(requestKeys[1]);
 });

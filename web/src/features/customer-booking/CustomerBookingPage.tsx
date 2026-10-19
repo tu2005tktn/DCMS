@@ -1,4 +1,4 @@
-import { Alert, Button, Card, Empty, Input, Select, Space, Spin, Steps, Typography } from 'antd';
+import { Alert, Button, Card, Empty, Input, Select, Spin, Steps, Typography } from 'antd';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ApiError } from '../../services/api';
@@ -18,10 +18,16 @@ type ContactErrors = { bookerName?: string; contact?: string; attendeeName?: str
 const formatTime = (value: string) => new Date(value).toLocaleString('vi-VN', {
   timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
 });
+const formatClock = (value: string) => new Date(value).toLocaleTimeString('vi-VN', {
+  timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+});
+const formatBookingDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value)
+  ? `${value.slice(8, 10)}/${value.slice(5, 7)}/${value.slice(0, 4)}` : value;
 const tomorrow = () => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh',
   year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(Date.now() + 86_400_000));
 const phonePattern = /^0\d{9}$/;
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const stepNames = ['Người khám', 'Chọn lịch', 'Liên hệ', 'Xem lại', 'Hoàn tất'];
 
 export default function CustomerBookingPage() {
   const { state, expire, reload } = useCustomerAuth();
@@ -54,6 +60,10 @@ export default function CustomerBookingPage() {
   const service = services.find(item => item.id === serviceId);
   const dentist = dentists.find(item => item.id === dentistId);
   const branch = options?.branches.find(item => item.id === branchId);
+  const slotGroups = useMemo(() => [
+    { label: 'Buổi sáng', items: slots.filter(item => Number(formatClock(item.start).slice(0, 2)) < 12) },
+    { label: 'Buổi chiều', items: slots.filter(item => Number(formatClock(item.start).slice(0, 2)) >= 12) },
+  ].filter(group => group.items.length > 0), [slots]);
 
   useEffect(() => {
     if (state.status === 'initializing' || state.status === 'error') return;
@@ -110,7 +120,7 @@ export default function CustomerBookingPage() {
       const value = await customerApi<BookingResult>('/api/appointments', {
         method: 'POST', body: JSON.stringify({ ...payload, requestKey: key }),
       }, token);
-      setResult(value); setStep(3);
+      setResult(value); setStep(4);
     } catch (failure) {
       if (failure instanceof ApiError && failure.status === 401 && token) {
         setAuthExpired(true); expire();
@@ -119,7 +129,7 @@ export default function CustomerBookingPage() {
         const code = failure instanceof ApiError ? failure.code : '';
         setError(`${code ? `${code}: ` : ''}${(failure as Error).message}`);
         if (['MSG24', 'MSG25', 'MSG26', 'MSG27', 'MSG28', 'MSG111'].includes(code)) {
-          setSlot(null); setStep(0); retryRef.current = null;
+          setSlot(null); setStep(1); retryRef.current = null;
           const query = new URLSearchParams({ branchId: String(branchId), dentistId: String(dentistId),
             serviceId: String(service.id), date, durationMinutes: String(service.publicDurationMinutes) });
           void customerApi<{ slots: Slot[] }>(`/api/availability?${query}`, {}, token)
@@ -129,72 +139,133 @@ export default function CustomerBookingPage() {
     } finally { submittingRef.current = false; setSubmitting(false); }
   }
 
-  if (state.status === 'initializing') return <main className="page"><Spin size="large" /></main>;
-  if (state.status === 'error') return <main className="page"><Alert type="error" showIcon message={state.message}
+  if (state.status === 'initializing') return <main className="customer-portal page"><Spin size="large" /></main>;
+  if (state.status === 'error') return <main className="customer-portal page"><Alert type="error" showIcon message={state.message}
     action={<Button onClick={() => void reload()}>Thử lại</Button>} /></main>;
 
-  return <main className="customer-content customer-booking">
-    <Space className="customer-back"><Link to={state.status === 'authenticated' ? '/customer/home' : '/customer/sign-in'}>← Quay lại</Link></Space>
-    <Typography.Title level={2}>Đặt lịch khám</Typography.Title>
-    <Steps current={step} size="small" items={[{ title: 'Chọn lịch' }, { title: 'Thông tin' }, { title: 'Xem lại' }, { title: 'Hoàn tất' }]} />
+  return <main className="customer-portal"><div className="customer-content customer-booking">
+    <div className="customer-booking-header"><Link to={state.status === 'authenticated' ? '/customer/home' : '/customer/sign-in'} className="customer-back">← Quay lại</Link>
+      <span className="customer-kicker">Đặt lịch trực tuyến</span><h1>Đặt lịch khám</h1>
+      <p>Chọn khung giờ phù hợp. Phòng khám sẽ xác nhận lịch ngay khi đặt thành công.</p></div>
+    <div className="customer-booking-progress"><span>Bước {step + 1}/5</span><strong>{stepNames[step]}</strong></div>
+    <Steps current={step} size="small" items={stepNames.map(title => ({ title }))} />
     {error && <Alert className="form-alert" type="error" showIcon message={error}
       action={authExpired ? <Link to="/customer/sign-in">Đăng nhập</Link> : undefined} />}
-    {optionsBusy ? <Spin tip="Đang tải dữ liệu đặt lịch"><div className="customer-loading" /></Spin> : <Card>
-      {step === 0 && <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-        <div><Typography.Text strong>Người khám</Typography.Text><div><Space>
-          <Button type={relation === 'Self' ? 'primary' : 'default'} onClick={() => setRelation('Self')}>Bản thân</Button>
-          <Button type={relation === 'Relative' ? 'primary' : 'default'} onClick={() => setRelation('Relative')}>Người thân</Button>
-        </Space></div></div>
-        <label>Chi nhánh<Select className="customer-field" value={branchId} placeholder="Chọn chi nhánh"
-          options={options?.branches.map(item => ({ value: item.id, label: item.name }))}
-          onChange={value => { setBranchId(value); setServiceId(null); setDentistId(null); }} /></label>
-        {!options?.branches.length && <Empty description="Chưa có chi nhánh nhận đặt lịch" />}
-        <label>Dịch vụ<Select className="customer-field" value={serviceId} placeholder="Chọn dịch vụ"
-          options={services.map(item => ({ value: item.id, label: `${item.name} · ${item.publicDurationMinutes} phút` }))}
-          onChange={setServiceId} /></label>
-        <label>Lý do khám (không bắt buộc)<Input.TextArea value={reason} maxLength={1000} onChange={event => setReason(event.target.value)} /></label>
-        <label>Bác sĩ<Select className="customer-field" value={dentistId} placeholder="Chọn bác sĩ"
-          options={dentists.map(item => ({ value: item.id, label: item.name }))} onChange={setDentistId} /></label>
-        <label>Ngày khám<Input className="customer-field" type="date" value={date} onChange={event => setDate(event.target.value)} /></label>
-        <div><Typography.Text strong>Khung giờ · Asia/Ho_Chi_Minh</Typography.Text>
-          {slotsBusy ? <div><Spin /></div> : slots.length ? <div className="customer-slots">
-            {slots.map(item => <Button key={`${item.start}-${item.chairId}`} type={slot === item ? 'primary' : 'default'}
-              onClick={() => { setSlot(item); retryRef.current = null; }}>{formatTime(item.start)}</Button>)}
-          </div> : branchId && serviceId && dentistId ? <Empty description="Không có khung giờ phù hợp. Hãy chọn ngày hoặc bác sĩ khác." /> : null}
+    {optionsBusy ? <Spin tip="Đang tải dữ liệu đặt lịch"><div className="customer-loading" /></Spin> : <Card className="customer-booking-card">
+      {step === 0 && <div className="customer-booking-section">
+        <h2>Bạn đặt lịch cho ai?</h2><p>Chúng tôi sẽ dùng lựa chọn này để hiển thị đúng thông tin người khám.</p>
+        <div className="customer-relation-options" role="group" aria-label="Người khám">
+          <Button className="customer-relation-option" aria-pressed={relation === 'Self'} onClick={() => {
+            setRelation('Self'); if (state.status === 'authenticated') setAttendeeName(state.user.fullName);
+          }}><strong>Bản thân</strong><span>Tôi là người đến khám</span></Button>
+          <Button className="customer-relation-option" aria-pressed={relation === 'Relative'} onClick={() => {
+            setRelation('Relative'); if (state.status === 'authenticated' && attendeeName === state.user.fullName) setAttendeeName('');
+          }}><strong>Người thân</strong><span>Tôi đặt lịch cho một người khác</span></Button>
         </div>
-        <Button type="primary" disabled={!slot} onClick={() => { setError(null); setStep(1); }}>Tiếp tục</Button>
-      </Space>}
-      {step === 1 && <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-        <Typography.Title level={4}>Người đặt và người khám</Typography.Title>
-        <label>Họ tên người đặt<Input value={bookerName} maxLength={100} onChange={event => setBookerName(event.target.value)}
-          status={fieldErrors.bookerName ? 'error' : undefined} />{fieldErrors.bookerName && <Typography.Text type="danger">{fieldErrors.bookerName}</Typography.Text>}</label>
-        <label>Số điện thoại Việt Nam hoặc email<Input value={contact} onChange={event => setContact(event.target.value)}
-          status={fieldErrors.contact ? 'error' : undefined} />{fieldErrors.contact && <Typography.Text type="danger">{fieldErrors.contact}</Typography.Text>}</label>
-        <label>Họ tên người khám<Input value={attendeeName} maxLength={100} onChange={event => setAttendeeName(event.target.value)}
-          status={fieldErrors.attendeeName ? 'error' : undefined} />{fieldErrors.attendeeName && <Typography.Text type="danger">{fieldErrors.attendeeName}</Typography.Text>}</label>
-        {relation === 'Relative' && <Alert type="info" message="Đặt lịch cho người thân không cấp quyền xem hồ sơ bệnh án của họ." />}
-        <Space><Button onClick={() => setStep(0)}>Quay lại chọn lịch</Button>
-          <Button type="primary" onClick={() => { if (validateContact()) { setError(null); setStep(2); } }}>Xem lại</Button></Space>
-      </Space>}
-      {step === 2 && <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-        <Typography.Title level={4}>Xem lại và xác nhận</Typography.Title>
-        <Typography.Text>Chi nhánh: {branch?.name}</Typography.Text>
-        <Typography.Text>Bác sĩ: {dentist?.name}</Typography.Text>
-        <Typography.Text>Dịch vụ: {service?.name}</Typography.Text>
-        <Typography.Text>Thời gian: {slot && formatTime(slot.start)}</Typography.Text>
-        <Typography.Text>Người đặt: {bookerName} · {contact}</Typography.Text>
-        <Typography.Text>Người khám: {attendeeName} ({relation === 'Self' ? 'Bản thân' : 'Người thân'})</Typography.Text>
-        <Space><Button onClick={() => setStep(1)}>Sửa thông tin</Button>
-          <Button type="primary" loading={submitting} disabled={authExpired} onClick={() => void confirm()}>Xác nhận đặt lịch</Button></Space>
-      </Space>}
-      {step === 3 && result && <Space direction="vertical" size="middle">
-        <Typography.Title level={3}>Đặt lịch thành công</Typography.Title>
-        <Typography.Title level={2}>{result.code}</Typography.Title>
-        <Typography.Text>Trạng thái: {result.status}</Typography.Text>
-        <Typography.Text>Thời gian: {formatTime(result.startAt)} – {formatTime(result.endAt)}</Typography.Text>
-        <Typography.Text>Hãy lưu mã lịch hẹn để liên hệ phòng khám khi cần.</Typography.Text>
-        {token && <Link to={`/customer/appointments/${encodeURIComponent(result.code)}`}><Button type="primary">Xem và quản lý lịch hẹn</Button></Link>}
-      </Space>}
+        {relation === 'Relative' && <Alert type="info" showIcon message="Đặt lịch cho người thân không cấp quyền xem hồ sơ bệnh án của họ." />}
+        <div className="customer-booking-actions"><Button type="primary" onClick={() => setStep(1)}>Tiếp tục</Button></div>
+      </div>}
+      {step === 1 && <div className="customer-booking-section">
+        <h2>Chọn nơi khám và khung giờ</h2>
+        <p>Chọn nơi khám và ngày phù hợp để xem các giờ còn trống.</p>
+        <div className="customer-schedule-layout">
+          <section className="customer-schedule-filters" aria-label="Thông tin lịch khám">
+            <div className="customer-booking-fields">
+              <div><label htmlFor="booking-branch">Chi nhánh</label><Select id="booking-branch" className="customer-field" value={branchId} placeholder="Chọn chi nhánh"
+                options={options?.branches.map(item => ({ value: item.id, label: item.name }))}
+                onChange={value => { setBranchId(value); setServiceId(null); setDentistId(null); }} /></div>
+              <div><label htmlFor="booking-service">Dịch vụ</label><Select id="booking-service" className="customer-field" value={serviceId} placeholder="Chọn dịch vụ"
+                options={services.map(item => ({ value: item.id, label: `${item.name} · ${item.publicDurationMinutes} phút` }))}
+                onChange={setServiceId} /></div>
+              <div><label htmlFor="booking-dentist">Bác sĩ</label><Select id="booking-dentist" className="customer-field" value={dentistId} placeholder="Chọn bác sĩ"
+                options={dentists.map(item => ({ value: item.id, label: item.name }))} onChange={setDentistId} /></div>
+              <div><label htmlFor="booking-date">Ngày khám</label><Input id="booking-date" className="customer-field" type="date" value={date} onChange={event => setDate(event.target.value)} /></div>
+            </div>
+            {!options?.branches.length && <Empty description="Chưa có chi nhánh nhận đặt lịch" />}
+          </section>
+          <section className="customer-schedule-times" aria-labelledby="customer-schedule-times-title">
+            <div className="customer-schedule-times-heading"><h3 id="customer-schedule-times-title">Chọn khung giờ khám</h3>
+              <span>Giờ Việt Nam</span></div>
+            <div aria-live="polite" className="customer-schedule-times-body">
+              {slotsBusy ? <div><Spin tip="Đang tìm khung giờ"><div className="customer-loading" /></Spin></div> : slotGroups.length ? slotGroups.map(group =>
+                <section className="customer-slot-group" key={group.label}><h4>{group.label}</h4>
+                  <div className="customer-slots" role="group" aria-label={`Khung giờ ${group.label.toLowerCase()}`}>
+                    {group.items.map(item => <Button key={`${item.start}-${item.chairId}`} type={slot === item ? 'primary' : 'default'}
+                      aria-pressed={slot === item} onClick={() => { setSlot(item); retryRef.current = null; }}>{formatClock(item.start)}</Button>)}
+                  </div></section>) : branchId && serviceId && dentistId ?
+                  <Empty description="Không có khung giờ phù hợp. Hãy chọn ngày hoặc bác sĩ khác." /> :
+                  <p>Chọn chi nhánh, dịch vụ, bác sĩ và ngày để xem khung giờ.</p>}
+            </div>
+          </section>
+          <aside className="customer-schedule-summary" aria-label="Lịch đã chọn">
+            <h3>Lịch đã chọn</h3>
+            <dl>
+              <div><dt>Chi nhánh</dt><dd>{branch?.name ?? 'Chưa chọn'}</dd></div>
+              <div><dt>Dịch vụ</dt><dd>{service ? `${service.name} · ${service.publicDurationMinutes} phút` : 'Chưa chọn'}</dd></div>
+              <div><dt>Bác sĩ</dt><dd>{dentist?.name ?? 'Chưa chọn'}</dd></div>
+              <div><dt>Ngày khám</dt><dd>{formatBookingDate(date)}</dd></div>
+              <div className="customer-schedule-summary-time"><dt>Giờ khám</dt><dd>{slot ? formatClock(slot.start) : 'Chưa chọn giờ'}</dd></div>
+            </dl>
+            <p>Thông tin này chưa phải lịch hẹn đã xác nhận.</p>
+          </aside>
+        </div>
+        <details className="customer-booking-reason">
+          <summary>{reason ? 'Lý do khám đã nhập (có thể sửa)' : 'Thêm lý do khám (không bắt buộc)'}</summary>
+          <label htmlFor="booking-reason">Lý do khám</label>
+          <Input.TextArea id="booking-reason" value={reason} maxLength={1000} onChange={event => setReason(event.target.value)} />
+        </details>
+        <div className="customer-booking-actions"><Button onClick={() => setStep(0)}>Quay lại</Button>
+          <Button type="primary" disabled={!slot} onClick={() => { setError(null); setStep(2); }}>Tiếp tục</Button></div>
+      </div>}
+      {step === 2 && <div className="customer-booking-section">
+        <h2>Thông tin người đặt và người khám</h2><p>Phòng khám dùng thông tin liên hệ để trao đổi về lịch hẹn.</p>
+        {slot && <div className="customer-booking-selection"><span>Lịch đang đặt</span><strong>{formatTime(slot.start)}</strong>
+          <span>{branch?.name} · {dentist?.name}</span></div>}
+        <div className="customer-booking-contact-grid">
+          <fieldset className="customer-booking-person"><legend>Người đặt lịch</legend><p>Người phòng khám sẽ liên hệ khi cần.</p>
+            <div className="customer-booking-fields">
+              <label>Họ tên người đặt<Input value={bookerName} maxLength={100} onChange={event => setBookerName(event.target.value)}
+                status={fieldErrors.bookerName ? 'error' : undefined} />{fieldErrors.bookerName && <Typography.Text type="danger">{fieldErrors.bookerName}</Typography.Text>}</label>
+              <label>Số điện thoại Việt Nam hoặc email<Input value={contact} onChange={event => setContact(event.target.value)}
+                status={fieldErrors.contact ? 'error' : undefined} />{fieldErrors.contact && <Typography.Text type="danger">{fieldErrors.contact}</Typography.Text>}</label>
+            </div></fieldset>
+          <fieldset className="customer-booking-person"><legend>Người đến khám</legend><p>{relation === 'Self' ? 'Thông tin của bạn.' : 'Thông tin người thân sẽ đến khám.'}</p>
+            <label>Họ tên người khám<Input value={attendeeName} maxLength={100} onChange={event => setAttendeeName(event.target.value)}
+              status={fieldErrors.attendeeName ? 'error' : undefined} />{fieldErrors.attendeeName && <Typography.Text type="danger">{fieldErrors.attendeeName}</Typography.Text>}</label>
+          </fieldset>
+        </div>
+        {relation === 'Relative' && <Alert type="info" showIcon message="Đặt lịch cho người thân không cấp quyền xem hồ sơ bệnh án của họ." />}
+        <div className="customer-booking-actions"><Button onClick={() => setStep(1)}>Quay lại chọn lịch</Button>
+          <Button type="primary" onClick={() => { if (validateContact()) { setError(null); setStep(3); } }}>Xem lại</Button></div>
+      </div>}
+      {step === 3 && <div className="customer-booking-section">
+        <h2>Xem lại và xác nhận</h2><p>Kiểm tra thông tin trước khi gửi yêu cầu đặt lịch.</p>
+        <h3 className="customer-review-heading">Lịch khám</h3>
+        <dl className="customer-review-grid">
+          <div className="customer-review-item"><dt>Chi nhánh</dt><dd>{branch?.name}</dd></div>
+          <div className="customer-review-item"><dt>Dịch vụ</dt><dd>{service?.name}</dd></div>
+          <div className="customer-review-item"><dt>Bác sĩ</dt><dd>{dentist?.name}</dd></div>
+          <div className="customer-review-item"><dt>Thời gian</dt><dd>{slot && formatTime(slot.start)}</dd></div>
+        </dl>
+        <h3 className="customer-review-heading">Người đặt và người khám</h3>
+        <dl className="customer-review-grid">
+          <div className="customer-review-item"><dt>Người đặt</dt><dd>{bookerName} · {contact}</dd></div>
+          <div className="customer-review-item"><dt>Người khám</dt><dd>{attendeeName} ({relation === 'Self' ? 'Bản thân' : 'Người thân'})</dd></div>
+        </dl>
+        <div className="customer-booking-actions"><Button onClick={() => setStep(2)}>Sửa thông tin</Button>
+          <Button type="primary" loading={submitting} disabled={authExpired} onClick={() => void confirm()}>Xác nhận đặt lịch</Button></div>
+      </div>}
+      {step === 4 && result && <div className="customer-confirmation" role="status">
+        <span className="customer-confirmation-mark" aria-hidden="true">✓</span>
+        <h2>Đặt lịch thành công</h2><p>Lịch khám của bạn đã được xác nhận. Hãy lưu mã này để tiện liên hệ phòng khám.</p>
+        <div className="customer-confirmation-code">{result.code}</div>
+        <div className="customer-confirmation-details"><p>Trạng thái: <strong>{result.status === 'Confirmed' ? 'Đã xác nhận' : result.status}</strong></p>
+          <p>Thời gian: <strong>{formatTime(result.startAt)} – {formatTime(result.endAt)}</strong></p></div>
+        <div className="customer-confirmation-next">
+          {token && <Link className="customer-link-button customer-link-button-primary" to={`/customer/appointments/${encodeURIComponent(result.code)}`}>Xem và quản lý lịch hẹn</Link>}
+          <Link to={token ? '/customer/home' : '/customer/sign-in'}>{token ? 'Về trang chủ' : 'Đăng nhập để quản lý lịch hẹn'}</Link>
+        </div>
+      </div>}
     </Card>}
-  </main>;
+  </div></main>;
 }
