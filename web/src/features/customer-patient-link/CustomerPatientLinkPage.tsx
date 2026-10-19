@@ -1,4 +1,4 @@
-import { Alert, Button, Card, Descriptions, Empty, Form, Input, Popconfirm, Space, Spin, Switch, Tag, Typography } from 'antd';
+import { Alert, Button, Card, Checkbox, Descriptions, Empty, Form, Input, Popconfirm, Space, Spin, Tag, Typography } from 'antd';
 import { useCallback, useEffect, useState } from 'react';
 import { ApiError } from '../../services/api';
 import { customerApi } from '../../services/customerApi';
@@ -86,21 +86,20 @@ export default function CustomerPatientLinkPage() {
   }
 
   return <div className="customer-link">
-    <Typography.Title level={2}>Liên kết hồ sơ của tôi</Typography.Title>
-    <Typography.Paragraph>Phòng khám xác minh danh tính trước khi cấp quyền xem hồ sơ. Đặt lịch cho người thân không tạo liên kết.</Typography.Paragraph>
+    <div className="customer-page-heading customer-link-intro"><span className="customer-kicker">Hồ sơ của tôi</span>
+      <Typography.Title level={2}>Liên kết hồ sơ của tôi</Typography.Title>
+      <Typography.Paragraph>Phòng khám xác minh danh tính trước khi cấp quyền xem hồ sơ. Đặt lịch cho người thân không tạo liên kết.</Typography.Paragraph></div>
     {notice && <Alert className="form-alert" type="success" showIcon message={notice} />}
     {error && <Alert className="form-alert" type="error" showIcon message={error}
       action={<Button onClick={() => void load()}>Thử lại</Button>} />}
     {busy && !overview ? <Spin size="large" /> : overview ? <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-      <Card title="Tài khoản hiện tại"><Descriptions column={1} size="small" items={[
-        { key: 'user', label: 'Tên đăng nhập', children: overview.account.userName },
-        { key: 'id', label: 'Mã tài khoản', children: `#${overview.account.id}` },
-        { key: 'contact', label: 'Liên hệ đã xác minh',
-          children: overview.account.verifiedEmail ?? overview.account.verifiedPhone ?? 'Chưa có' },
-      ]} /></Card>
-      <Card title="Trạng thái liên kết" extra={<Button loading={busy} onClick={() => void load()}>Tải lại</Button>}>
+      <Card className="customer-link-status" title="Trạng thái hồ sơ của bạn" extra={<Button loading={busy} onClick={() => void load()}>Tải lại</Button>}>
         <Tag color={overview.linkStatus === 'VERIFIED' ? 'green' : overview.linkStatus === 'PENDING' ? 'blue' : 'default'}>
           {labels[overview.linkStatus]}</Tag>
+        <Typography.Paragraph className="customer-link-state-note">{overview.linkStatus === 'VERIFIED'
+          ? 'Bạn có thể xem thông tin tóm tắt của hồ sơ đã xác minh cho chính mình.'
+          : overview.linkStatus === 'PENDING' ? 'Phòng khám đang kiểm tra yêu cầu; bạn chưa có quyền xem hồ sơ.'
+            : 'Phòng khám cần xác minh danh tính trước khi bạn xem hồ sơ của mình.'}</Typography.Paragraph>
         {overview.current && <Descriptions column={1} size="small" className="customer-link-details" items={[
           { key: 'code', label: 'Mã yêu cầu', children: overview.current.requestCode },
           { key: 'time', label: 'Gửi lúc', children: formatTime(overview.current.requestedAt) },
@@ -108,7 +107,7 @@ export default function CustomerPatientLinkPage() {
           ...(overview.current.publicNote ? [{ key: 'note', label: 'Phòng khám', children: overview.current.publicNote }] : []),
         ]} />}
         {overview.linkStatus === 'NOT_LINKED' && <Typography.Paragraph>Chỉ gửi yêu cầu sau khi đã đến khám và được tiếp nhận tại phòng khám.</Typography.Paragraph>}
-        {overview.linkStatus === 'PENDING' && <div><Typography.Paragraph>Yêu cầu đang chờ xác minh; bạn chưa có quyền xem hồ sơ.</Typography.Paragraph>
+        {overview.linkStatus === 'PENDING' && <div>
           <Popconfirm title="Rút yêu cầu liên kết?" okText="Rút yêu cầu" cancelText="Hủy" onConfirm={() => void withdraw()}>
             <Button loading={actionBusy}>Rút yêu cầu</Button></Popconfirm></div>}
         {overview.linkStatus === 'VERIFIED' && <div className="customer-link-details">
@@ -133,15 +132,20 @@ export default function CustomerPatientLinkPage() {
             <Input.TextArea maxLength={1000} showCount /></Form.Item>
           <Form.Item name="confirmSelf" label="Xác nhận" valuePropName="checked"
             rules={[{ validator: async (_, value: boolean) => { if (!value) throw new Error('Vui lòng xác nhận đây là hồ sơ của chính bạn.'); } }]}>
-            <Switch checkedChildren="Tôi xác nhận" unCheckedChildren="Chưa xác nhận" /></Form.Item>
-          <Typography.Paragraph>Tôi xác nhận đây là hồ sơ của chính tôi, không phải của người thân.</Typography.Paragraph>
+            <Checkbox>Đây là hồ sơ của chính tôi, không phải của người thân.</Checkbox></Form.Item>
           <Button htmlType="submit" type="primary" loading={actionBusy}>Gửi yêu cầu</Button>
         </Form>
       </Card>}
       {overview.history.length > 0 && <Card title="Yêu cầu trước đây">
-        {overview.history.filter(item => item.id !== overview.current?.id).map(item =>
-          <Typography.Paragraph key={item.id}>{item.requestCode} · {formatTime(item.requestedAt)} · {labels[item.status]}</Typography.Paragraph>)}
+        <ul className="customer-link-history">{overview.history.filter(item => item.id !== overview.current?.id).map(item =>
+          <li key={item.id}><strong>{item.requestCode}</strong><span>{formatTime(item.requestedAt)}</span><Tag>{labels[item.status]}</Tag></li>)}</ul>
       </Card>}
+      <Card className="customer-link-account" title="Thông tin tài khoản"><Descriptions column={1} size="small" items={[
+        { key: 'user', label: 'Tên đăng nhập', children: overview.account.userName },
+        { key: 'id', label: 'Mã tài khoản', children: `#${overview.account.id}` },
+        { key: 'contact', label: 'Liên hệ đã xác minh',
+          children: overview.account.verifiedEmail ?? overview.account.verifiedPhone ?? 'Chưa có' },
+      ]} /></Card>
     </Space> : !busy && !error ? <Empty description="Không có thông tin liên kết" /> : null}
   </div>;
 }

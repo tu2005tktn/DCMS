@@ -18,12 +18,12 @@ const slot: Slot = { start: `${date}T10:00:00+07:00`, end: `${date}T10:30:00+07:
   assistantId: null, scheduleVersion: 3, assistantScheduleVersion: null };
 const alternateSlot: Slot = { ...slot, start: `${date}T11:00:00+07:00`, end: `${date}T11:30:00+07:00`, dentistId: 3 };
 const json = (body: unknown, status = 200) => ({ status, contentType: 'application/json', body: JSON.stringify(body) });
-async function mockSession(page: Page, detail = original) {
+async function mockSession(page: Page, detail = original, currentDetail: () => AppointmentDetail = () => detail) {
   await page.addInitScript(() => sessionStorage.setItem('dcms.customer.accessToken', 'customer-test-token'));
   await page.route('**/api/auth/me', route => route.fulfill(json(user)));
   await page.route('**/api/auth/google/config', route => route.fulfill(json({ enabled: false })));
   await page.route('**/api/me/appointments?*', route => route.fulfill(json({ items: [detail], total: 1, page: 1, pageSize: 20 })));
-  await page.route('**/api/me/appointments/*', route => route.fulfill(json(detail)));
+  await page.route('**/api/me/appointments/*', route => route.fulfill(json(currentDetail())));
   await page.route('**/api/availability/options?*', route => route.fulfill(json({ employees: [
     { id: 2, branchId: 1, name: 'SYNTHETIC dentist', canDentist: true },
     { id: 3, branchId: 1, name: 'SYNTHETIC alternate dentist', canDentist: true },
@@ -57,31 +57,45 @@ test('date validation, empty state and responsive detail preserve ownership labe
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBeTruthy();
   await page.route('**/api/me/appointments?*', route => route.fulfill(json({ items: [], total: 0, page: 1, pageSize: 20 })));
   await page.getByRole('link', { name: '← Lịch hẹn của tôi', exact: true }).click();
-  await expect(page.getByText('Không có lịch hẹn phù hợp.')).toBeVisible();
+  await expect(page.locator('.customer-appointment-mobile-list').getByText('Không có lịch hẹn phù hợp.')).toBeVisible();
 });
 
 test('under twelve hours allows requesting reschedule with staff confirmation', async ({ page }) => {
-  await mockSession(page, { ...original, eligibility: { canSelfService: false, hoursRemaining: 6, reasonCode: 'WITHIN_12H', canRequestSupport: true } });
+  const within12Hours: AppointmentDetail = { ...original, eligibility: { canSelfService: false, hoursRemaining: 6, reasonCode: 'WITHIN_12H', canRequestSupport: true } };
+  let submitted = false;
+  await mockSession(page, within12Hours, () => submitted ? { ...within12Hours, supportRequests: [{
+    id: 'SR-TEST', appointmentCode: original.code, kind: 'Change', reason: 'Bận việc đột xuất', status: 'Pending',
+    createdAt: new Date().toISOString(), decidedAt: null, publicNote: null, version: 1, proposedStartAt: slot.start,
+  }] } : within12Hours);
   let requestedSupport: Record<string, unknown> | null = null;
   await page.route('**/api/appointments/*/support-requests', route => {
     requestedSupport = route.request().postDataJSON() as Record<string, unknown>;
+    submitted = true;
     return route.fulfill(json({ request: { id: 'SR-TEST', appointmentCode: original.code, kind: 'RESCHEDULE', status: 'Pending', version: 1 },
       notification: { code: 'MSG33', message: 'Yêu cầu đổi lịch của bạn đã được gửi tới phòng khám.' } }, 201));
   });
   await page.goto('/customer/appointments/AP-WEB-TEST');
   await expect(page.getByText(/còn dưới 12 giờ/i)).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Hủy lịch', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Yêu cầu hủy lịch', exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: original.clinicContact.phone })).toHaveAttribute('href', 'tel:02343888999');
-  await page.getByRole('button', { name: 'Đổi lịch', exact: true }).click();
-  const dialog = page.getByRole('dialog', { name: 'Đổi lịch hẹn' });
+  await page.getByRole('button', { name: 'Yêu cầu đổi lịch', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Yêu cầu đổi lịch' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(dialog.getByText('Giờ hẹn hiện tại')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBeTruthy();
+  await page.screenshot({ path: test.info().outputPath('reschedule-mobile.png'), fullPage: true });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.screenshot({ path: test.info().outputPath('reschedule-desktop.png'), fullPage: true });
   await dialog.getByRole('group', { name: 'Khung giờ mới' }).getByRole('button').first().click();
   await dialog.getByLabel('Lý do', { exact: true }).fill('Bận việc đột xuất');
   await dialog.getByRole('button', { name: 'Xem lại', exact: true }).click();
-  await expect(dialog.getByText(/nhân viên phòng khám để kiểm tra và xác nhận/)).toBeVisible();
+  await expect(dialog.getByText(/yêu cầu chờ phòng khám xử lý/)).toBeVisible();
   await dialog.getByRole('button', { name: 'Gửi yêu cầu đổi lịch', exact: true }).click();
   expect(requestedSupport).toBeTruthy();
   expect(requestedSupport!['reason']).toBe('Bận việc đột xuất');
   expect(requestedSupport!['newStartAt']).toBe(slot.start);
+  await expect(page.getByRole('status').getByText('Yêu cầu đang chờ xử lý')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Yêu cầu đổi lịch', exact: true })).toHaveCount(0);
 });
 
 test('slot race keeps original booking and entered reason, reloads slots for review', async ({ page }) => {
@@ -126,7 +140,7 @@ test('stale version requires reload instead of allowing another confirmation', a
   const dialog = await reviewMove(page);
   await dialog.getByRole('button', { name: 'Xác nhận đổi lịch', exact: true }).click();
   await expect(dialog.getByText('MSG111: Dữ liệu đã thay đổi.')).toBeVisible();
-  await expect(dialog.getByRole('button', { name: 'Xác nhận đổi lịch', exact: true })).toBeDisabled();
+  await expect(dialog.getByRole('button', { name: /Xác nhận đổi lịch$/ })).toBeDisabled();
   await dialog.getByRole('button', { name: 'Tải lại lịch hẹn', exact: true }).click();
   await expect(dialog).not.toBeVisible();
   await expect(page.getByRole('button', { name: 'Đổi lịch', exact: true })).toBeVisible();
@@ -147,7 +161,9 @@ test('network retry reuses requestKey and never updates the displayed appointmen
   await dialog.getByRole('button', { name: 'Xác nhận đổi lịch', exact: true }).click();
   await expect(dialog.getByText(/Không thể hoàn tất thao tác/)).toBeVisible();
   await expect(page.getByText(formatTime(original.start), { exact: true }).first()).toBeVisible();
-  await dialog.getByRole('button', { name: 'Xác nhận đổi lịch', exact: true }).click();
+  const retryButton = dialog.getByRole('button', { name: /Xác nhận đổi lịch$/ });
+  await expect(retryButton).not.toHaveClass(/ant-btn-loading/);
+  await retryButton.click();
   await expect(page.getByText('Đã đổi lịch thử nghiệm.')).toBeVisible();
   expect(keys).toHaveLength(2); expect(keys[0]).toBe(keys[1]);
 });

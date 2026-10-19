@@ -181,12 +181,13 @@ export default function RecoverAccountPage({ customer = false }: { customer?: bo
   const disableForm = busy;
 
   return (
-    <main className="page">
+    <main className={customer ? 'page customer-portal customer-recovery-page' : 'page'}>
       <div className="content">
         <div className="recovery-shell">
           <div>
-            <Typography.Text className="eyebrow">DCMS · Phòng khám nha khoa</Typography.Text>
+            <Typography.Text className="eyebrow">{customer ? 'DCMS · Cổng bệnh nhân' : 'DCMS · Phòng khám nha khoa'}</Typography.Text>
             <Typography.Title level={1} style={{ marginBottom: 10 }}>Khôi phục tài khoản</Typography.Title>
+            {customer && <Typography.Paragraph className="customer-recovery-current-step">Bước {currentIndex + 1}/4 · {stepNames[step]}</Typography.Paragraph>}
             <ol className="recovery-step" aria-label="Tiến trình khôi phục">
               {stepOrder.map((item, index) => (
                 <li

@@ -32,19 +32,21 @@ export default function CustomerAppointmentDetailPage() {
       .finally(() => { if (active) setBusy(false); });
     return () => { active = false; controller.abort(); };
   }, [code, token, revision, accessError]);
+  const pendingSupport = detail?.supportRequests?.find(request => request.status === 'Pending');
 
-  return <section>
+  return <section className="customer-appointment-detail">
     <Link to="/customer/appointments">← Lịch hẹn của tôi</Link>
-    <div className="calendar-toolbar"><Typography.Title level={2}>Chi tiết lịch hẹn</Typography.Title>
+    <div className="calendar-toolbar customer-page-heading"><div><span className="customer-kicker">Lịch khám</span>
+      <Typography.Title level={2}>Chi tiết lịch hẹn</Typography.Title></div>
       <Button loading={busy} onClick={() => setRevision(value => value + 1)}>Tải lại lịch hẹn</Button></div>
     {notice && <Alert className="form-alert" type="success" showIcon message={notice} />}
     {busy ? <Spin tip="Đang tải lịch hẹn…"><div className="customer-loading" /></Spin> : error ?
       <Alert type="error" showIcon message={error.message}
         action={error.status !== 403 && error.status !== 404 ? <Button onClick={() => setRevision(value => value + 1)}>Thử lại</Button> : undefined} /> :
       detail && <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-        <Card title={detail.code} extra={<Tag color={statusColors[detail.status]}>{statusLabels[detail.status]}</Tag>}>
+        <Card className="customer-detail-summary" title={detail.code} extra={<Tag color={statusColors[detail.status]}>{statusLabels[detail.status]}</Tag>}>
+          <p className="customer-detail-time">{formatTime(detail.start)}</p>
           <Descriptions column={{ xs: 1, sm: 2 }} items={[
-            { key: 'time', label: 'Giờ hẹn', children: formatTime(detail.start) },
             { key: 'end', label: 'Kết thúc', children: formatTime(detail.end) },
             { key: 'duration', label: 'Thời lượng', children: `${detail.durationMinutes} phút` },
             { key: 'dentist', label: 'Nha sĩ', children: detail.dentistName },
@@ -57,27 +59,29 @@ export default function CustomerAppointmentDetailPage() {
           ]} />
           <Typography.Text type="secondary">Thời gian hiển thị theo giờ Việt Nam (UTC+7).</Typography.Text>
         </Card>
-        <Card title="Đổi hoặc hủy lịch">
+        <Card className="customer-change-card" title="Đổi hoặc hủy lịch">
+          <div className="customer-change-current"><span>Giờ hẹn hiện tại</span>
+            <strong>{formatTime(detail.start)}</strong><span>{detail.dentistName} · {detail.branchName}</span></div>
           {detail.status === 'Confirmed' && !detail.eligibility.canSelfService && detail.eligibility.reasonCode === 'WITHIN_12H' ? <>
-            <Alert type="warning" showIcon style={{ marginBottom: 12 }}
-              message="Lịch hẹn còn dưới 12 giờ trước giờ hẹn. Bạn có thể gửi yêu cầu đổi hoặc hủy lịch để nhân viên phòng khám xác nhận." />
-            {detail.supportRequests?.some(r => r.status === 'Pending') ? (
-              <Alert type="info" showIcon message="Bạn đã có một yêu cầu đang chờ nhân viên phòng khám xử lý cho lịch này." />
+            {pendingSupport ? (
+              <div className="customer-change-pending" role="status"><strong>Yêu cầu đang chờ xử lý</strong>
+                <p>Lịch hẹn hiện tại vẫn có hiệu lực cho đến khi phòng khám xác nhận thay đổi.</p>
+                {pendingSupport.proposedStartAt && <p>Giờ đề xuất: <strong>{formatTime(pendingSupport.proposedStartAt)}</strong></p>}
+                <a href="#customer-support-requests">Xem và rút yêu cầu</a></div>
             ) : (
-              <Space wrap>
-                <Button type="primary" onClick={() => { setNotice(null); setMode('reschedule'); }}>Đổi lịch</Button>
-                <Button danger onClick={() => { setNotice(null); setMode('cancel'); }}>Hủy lịch</Button>
-              </Space>
+              <><p className="customer-change-explanation">Còn dưới 12 giờ trước giờ hẹn. Bạn có thể đề xuất giờ mới; phòng khám sẽ kiểm tra và xác nhận. <strong>Lịch cũ vẫn được giữ nguyên trong lúc chờ.</strong></p>
+                <Space wrap><Button type="primary" onClick={() => { setNotice(null); setMode('reschedule'); }}>Yêu cầu đổi lịch</Button>
+                  <Button onClick={() => { setNotice(null); setMode('cancel'); }}>Yêu cầu hủy lịch</Button></Space></>
             )}
           </> : detail.eligibility.canSelfService && detail.status === 'Confirmed' ? <>
-            <Typography.Paragraph>Bạn có thể tự đổi hoặc hủy khi lịch còn ít nhất 12 giờ và chưa được tiếp nhận. Đúng mốc 12 giờ vẫn hợp lệ; phòng khám kiểm tra lại khi bạn xác nhận.</Typography.Paragraph>
+            <Typography.Paragraph>Bạn có thể đổi hoặc hủy trực tiếp vì lịch còn ít nhất 12 giờ. Phòng khám sẽ kiểm tra lại khi bạn xác nhận.</Typography.Paragraph>
             <Space wrap><Button type="primary" onClick={() => { setNotice(null); setMode('reschedule'); }}>Đổi lịch</Button>
               <Button danger onClick={() => { setNotice(null); setMode('cancel'); }}>Hủy lịch</Button></Space>
           </> : <Alert type="info" showIcon message={ineligibleReasons[detail.eligibility.reasonCode ?? 'NOT_CONFIRMED'] ?? 'Lịch hẹn này không thể tự đổi hoặc hủy.'} />}
-          <Typography.Paragraph className="customer-link-details">Liên hệ phòng khám: <a href={`tel:${detail.clinicContact.phone.replace(/[^+\d]/g, '')}`}>{detail.clinicContact.phone}</a> · {detail.clinicContact.hours}</Typography.Paragraph>
+          <Typography.Paragraph className="customer-change-contact">Cần hỗ trợ? Gọi <a href={`tel:${detail.clinicContact.phone.replace(/[^+\d]/g, '')}`}>{detail.clinicContact.phone}</a> · {detail.clinicContact.hours}</Typography.Paragraph>
         </Card>
         {detail.supportRequests && detail.supportRequests.length > 0 && (
-          <Card title="Yêu cầu hỗ trợ">
+          <Card id="customer-support-requests" className="customer-support-card" title="Yêu cầu hỗ trợ">
             <Timeline items={detail.supportRequests.map((req, index) => ({
               key: index,
               color: req.status === 'Resolved' ? 'green' : req.status === 'Rejected' ? 'red' : req.status === 'Pending' ? 'blue' : 'gray',
@@ -156,6 +160,10 @@ function ChangeDialog({ detail, token, mode, onClose, onChanged, onAccessError, 
   const retry = useRef<{ fingerprint: string; key: string } | null>(null);
   const conflict = error?.code === 'MSG111' || error?.code === 'MSG31';
   const selectedDentistName = dentists.find(value => value.id === dentistId)?.name ?? detail.dentistName;
+  const slotGroups = [
+    { label: 'Buổi sáng', slots: slots.filter(value => Number(formatClock(value.start).slice(0, 2)) < 12) },
+    { label: 'Buổi chiều', slots: slots.filter(value => Number(formatClock(value.start).slice(0, 2)) >= 12) },
+  ].filter(group => group.slots.length > 0);
   useEffect(() => {
     if (!moving) return;
     let active = true;
@@ -227,54 +235,61 @@ function ChangeDialog({ detail, token, mode, onClose, onChanged, onAccessError, 
     } finally { submitting.current = false; setBusy(false); }
   }
 
-  return <Modal open title={moving ? 'Đổi lịch hẹn' : 'Hủy lịch hẹn'} footer={null} width={640}
+  return <Modal open title={moving ? isUnder12h ? 'Yêu cầu đổi lịch' : 'Đổi lịch hẹn' : 'Hủy lịch hẹn'} footer={null} width={680}
+    className="customer-change-dialog"
     onCancel={() => { if (!busy) onClose(); }} closable={!busy} maskClosable={!busy} keyboard={!busy}>
+    {moving && <ol className="customer-change-steps" aria-label="Các bước đổi lịch">
+      <li aria-current={!reviewing ? 'step' : undefined} className={!reviewing ? 'active' : ''}><span>1</span> Chọn lịch mới</li>
+      <li aria-current={reviewing ? 'step' : undefined} className={reviewing ? 'active' : ''}><span>2</span> Kiểm tra yêu cầu</li>
+    </ol>}
     {error && <Alert className="form-alert" type="error" showIcon message={error.message}
       action={conflict ? <Button onClick={() => onReload()}>Tải lại lịch hẹn</Button> : undefined} />}
     {reviewing ? <>
-      <Typography.Title level={5}>{moving ? 'Xem lại lịch mới' : 'Xác nhận thông tin hủy'}</Typography.Title>
-      <Descriptions column={1} items={[
-        { key: 'code', label: 'Mã lịch', children: detail.code },
-        { key: 'old', label: 'Giờ hẹn hiện tại', children: formatTime(detail.start) },
-        ...(moving ? [{ key: 'dentist', label: 'Bác sĩ mới', children: selectedDentistName }] : []),
-        ...(moving && slot ? [{ key: 'new', label: 'Giờ hẹn mới', children: formatTime(slot.start) }] : []),
-        { key: 'duration', label: 'Thời lượng', children: `${detail.durationMinutes} phút` },
-        { key: 'reason', label: 'Lý do', children: reason },
-      ]} />
+      <div className="customer-change-review"><Typography.Title level={5}>{moving ? 'Kiểm tra trước khi gửi' : 'Xác nhận thông tin hủy'}</Typography.Title>
+        <dl><div><dt>Mã lịch</dt><dd>{detail.code}</dd></div>
+          <div><dt>Giờ hẹn hiện tại</dt><dd>{formatTime(detail.start)}</dd></div>
+          {moving && <div><dt>Bác sĩ đề xuất</dt><dd>{selectedDentistName}</dd></div>}
+          {moving && slot && <div className="customer-change-proposed"><dt>Giờ đề xuất</dt><dd>{formatTime(slot.start)}</dd></div>}
+          <div><dt>Thời lượng</dt><dd>{detail.durationMinutes} phút</dd></div>
+          <div><dt>Lý do</dt><dd>{reason}</dd></div></dl></div>
       {isUnder12h && <Alert className="form-alert" type="info" showIcon
         message={moving
-          ? "Lịch hẹn còn dưới 12 giờ. Sau khi bạn gửi yêu cầu, thông tin sẽ được chuyển đến nhân viên phòng khám để kiểm tra và xác nhận. Lịch hẹn cũ vẫn được giữ nguyên cho đến khi nhân viên duyệt."
+          ? "Đây là yêu cầu chờ phòng khám xử lý. Giờ hẹn hiện tại vẫn có hiệu lực cho đến khi phòng khám xác nhận."
           : "Lịch hẹn còn dưới 12 giờ. Sau khi bạn gửi yêu cầu hủy, thông tin sẽ được chuyển đến nhân viên phòng khám để kiểm tra và xác nhận. Lịch hẹn cũ vẫn được giữ nguyên cho đến khi nhân viên duyệt."} />}
       {!moving && !isUnder12h && <Alert className="form-alert" type="warning" showIcon message="Sau khi xác nhận, lịch hẹn này sẽ bị hủy." />}
-      <Space wrap><Button onClick={() => setReviewing(false)} disabled={busy}>Quay lại chỉnh sửa</Button>
+      <Space className="customer-change-actions" wrap><Button onClick={() => setReviewing(false)} disabled={busy}>Quay lại chỉnh sửa</Button>
         <Button type="primary" danger={!moving} loading={busy} disabled={Boolean(conflict)} onClick={() => void confirm()}>
           {moving ? (isUnder12h ? 'Gửi yêu cầu đổi lịch' : 'Xác nhận đổi lịch') : (isUnder12h ? 'Gửi yêu cầu hủy lịch' : 'Xác nhận hủy lịch')}</Button></Space>
     </> : <Form form={form} layout="vertical" onFinish={values => {
       if (moving && !slot) return;
       setReason(values.reason.trim()); setReviewing(true);
     }}>
-      <Typography.Paragraph>Giờ hẹn hiện tại: <strong>{formatTime(detail.start)}</strong> · {detail.durationMinutes} phút.</Typography.Paragraph>
+      <div className="customer-change-dialog-current"><span>Giờ hẹn hiện tại</span><strong>{formatTime(detail.start)}</strong>
+        <span>{detail.dentistName} · {detail.durationMinutes} phút</span></div>
+      {moving && isUnder12h && <p className="customer-change-hint">Chọn giờ muốn chuyển tới. Phòng khám sẽ xác nhận yêu cầu; lịch hiện tại chưa thay đổi khi bạn gửi.</p>}
       {moving && <>
-        <label htmlFor="reschedule-dentist">Bác sĩ mới</label>
-        <Select id="reschedule-dentist" aria-label="Bác sĩ mới" value={dentistId} loading={dentistsBusy}
-          disabled={busy || Boolean(conflict)} options={dentists.map(value => ({ value: value.id, label: value.name }))}
-          onChange={value => { setDentistId(value); setSlot(null); setReviewing(false); }} />
+        <div className="customer-change-fields"><div><label htmlFor="reschedule-dentist">Bác sĩ mới</label>
+          <Select id="reschedule-dentist" aria-label="Bác sĩ mới" value={dentistId} loading={dentistsBusy}
+            disabled={busy || Boolean(conflict)} options={dentists.map(value => ({ value: value.id, label: value.name }))}
+            onChange={value => { setDentistId(value); setSlot(null); setReviewing(false); }} /></div>
+          <div><label htmlFor="reschedule-date">Ngày hẹn mới (giờ Việt Nam)</label>
+            <Input id="reschedule-date" type="date" value={date} min={clinicDate()} disabled={busy || Boolean(conflict)} onChange={event => setDate(event.target.value)} /></div></div>
         {dentistsError && <Alert className="form-alert" type="error" message={dentistsError} />}
-        <label htmlFor="reschedule-date">Ngày hẹn mới (giờ Việt Nam)</label>
-        <Input id="reschedule-date" type="date" value={date} min={clinicDate()} disabled={busy || Boolean(conflict)} onChange={event => setDate(event.target.value)} />
-        {slotsBusy ? <Spin><div className="customer-loading" /></Spin> : slotsError ?
+        <h3 className="customer-change-slot-title">Giờ còn trống <small>Giờ Việt Nam (UTC+7)</small></h3>
+        {slotsBusy ? <Spin tip="Đang tìm giờ trống"><div className="customer-loading" /></Spin> : slotsError ?
           <Alert className="form-alert" type="error" message={slotsError} action={<Button onClick={() => setRevision(value => value + 1)}>Tải lại khung giờ</Button>} /> :
           date && slots.length === 0 ? <Empty description="Không có khung giờ phù hợp trong ngày này. Vui lòng chọn ngày khác." /> :
-            <div className="customer-slots" role="group" aria-label="Khung giờ mới">{slots.map(value =>
-              <Button key={`${value.start}-${value.chairId}`} aria-pressed={slot?.start === value.start && slot.chairId === value.chairId}
-                type={slot?.start === value.start && slot.chairId === value.chairId ? 'primary' : 'default'}
-                onClick={() => setSlot(value)}>{formatClock(value.start)}–{formatClock(value.end)}</Button>)}</div>}
+            <div className="customer-change-slot-groups" role="group" aria-label="Khung giờ mới">{slotGroups.map(group =>
+              <section key={group.label}><h4>{group.label}</h4><div className="customer-slots">{group.slots.map(value =>
+                <Button key={`${value.start}-${value.chairId}`} aria-pressed={slot?.start === value.start && slot.chairId === value.chairId}
+                  type={slot?.start === value.start && slot.chairId === value.chairId ? 'primary' : 'default'}
+                  onClick={() => setSlot(value)}>{formatClock(value.start)}–{formatClock(value.end)}</Button>)}</div></section>)}</div>}
       </>}
       <Form.Item className="customer-link-details" name="reason" label="Lý do" rules={[
         { required: true, whitespace: true, message: 'Vui lòng nhập Lý do.' }, { max: 500, message: 'Lý do không được vượt quá 500 ký tự.' },
       ]}><Input.TextArea rows={3} maxLength={500} showCount /></Form.Item>
       <Typography.Paragraph type="secondary">Không ghi thông tin bệnh lý trong lý do.</Typography.Paragraph>
-      <Space><Button onClick={onClose}>Đóng</Button><Button type="primary" htmlType="submit"
+      <Space className="customer-change-actions" wrap><Button onClick={onClose}>Đóng</Button><Button type="primary" htmlType="submit"
         disabled={Boolean(conflict) || (moving && (!dentistId || !slot || slotsBusy || dentistsBusy))}>Xem lại</Button></Space>
     </Form>}
   </Modal>;
