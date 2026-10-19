@@ -11,6 +11,7 @@ using DCMS.Api.Features.Accounts;
 using DCMS.Api.Features.Authentication;
 using DCMS.Api.Features.PatientLinks;
 using DCMS.Api.Features.Patients;
+using DCMS.Api.Features.Treatment;
 using DCMS.Infrastructure.Features.Notifications;
 using DCMS.Infrastructure.Features.PatientLinks;
 using DCMS.Application.Common;
@@ -92,7 +93,8 @@ builder.Services.AddAuthorizationBuilder()
     .AddPolicy(PatientLinkEndpoints.VerifyPolicy, policy => policy.RequireRole(AccountRoles.ClinicAssistant))
     // S05/S06: Admin has no patient access (GBR-026); Clinic Owner reads through effective Dentist.
     .AddPolicy(PatientEndpoints.ReadPolicy, policy => policy.RequireRole(AccountRoles.ClinicAssistant, AccountRoles.Dentist))
-    .AddPolicy(PatientEndpoints.ManagePolicy, policy => policy.RequireRole(AccountRoles.ClinicAssistant));
+    .AddPolicy(PatientEndpoints.ManagePolicy, policy => policy.RequireRole(AccountRoles.ClinicAssistant))
+    .AddPolicy(TreatmentEndpoints.DentistPolicy, policy => policy.RequireRole(AccountRoles.Dentist));
 
 var webOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 builder.Services.AddCors(options => options.AddPolicy("WebDevelopment", policy =>
@@ -151,6 +153,7 @@ app.MapEmailVerificationEndpoints();
 app.MapAccountEndpoints();
 app.MapPatientLinkEndpoints();
 app.MapPatientEndpoints();
+app.MapTreatmentEndpoints();
 app.MapSchedulingEndpoints();
 app.MapAppointmentEndpoints();
 app.MapAppointmentQueryEndpoints();

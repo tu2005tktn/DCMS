@@ -17,6 +17,8 @@ using DCMS.Infrastructure.Features.Appointments;
 using Microsoft.Extensions.Hosting;
 using DCMS.Infrastructure.Features.Notifications;
 using DCMS.Application.Features.SupportRequests;
+using DCMS.Application.Features.Treatment;
+using DCMS.Infrastructure.Features.Treatment;
 
 namespace DCMS.Infrastructure;
 
@@ -61,6 +63,7 @@ public static class DependencyInjection
         services.AddScoped<IPatientLinkReviewService, PatientLinkReviewService>();
         services.AddScoped<DevelopmentPatientLinkSeeder>();
         services.AddScoped<IPatientService, PatientService>();
+        services.AddScoped<ITreatmentDossierService, TreatmentDossierService>();
         services.AddSingleton(TimeProvider.System);
         services.AddScoped<Features.Scheduling.WorkingScheduleService>();
         services.AddScoped<DCMS.Application.Features.Scheduling.IWorkingScheduleService>(sp => sp.GetRequiredService<Features.Scheduling.WorkingScheduleService>());

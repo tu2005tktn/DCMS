@@ -2458,6 +2458,10 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                 {
                     b.Navigation("Periods");
                 });
+
+            // Frozen mapping for 20261019120000_TreatmentDossiers. Keep this snapshot
+            // independent from the live TreatmentModel when later migrations evolve it.
+            TreatmentMigrationSnapshot.Configure(modelBuilder);
 #pragma warning restore 612, 618
         }
     }

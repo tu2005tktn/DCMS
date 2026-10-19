@@ -7,6 +7,7 @@ using DCMS.Domain.Features.Authentication;
 using DCMS.Domain.Features.PatientLinks;
 using DCMS.Domain.Features.Patients;
 using DCMS.Domain.Features.Appointments;
+using DCMS.Domain.Features.Treatment;
 
 namespace DCMS.Infrastructure.Persistence;
 
@@ -37,12 +38,17 @@ public sealed class DcmsDbContext(DbContextOptions<DcmsDbContext> options)
     public DbSet<EmailVerificationToken> EmailVerificationTokens => Set<EmailVerificationToken>();
     public DbSet<RecoveryAudit> RecoveryAudits => Set<RecoveryAudit>();
     public DbSet<RecoveryOutbox> RecoveryOutbox => Set<RecoveryOutbox>();
+    public DbSet<TreatmentDossier> TreatmentDossiers => Set<TreatmentDossier>();
+    public DbSet<TreatmentItem> TreatmentItems => Set<TreatmentItem>();
+    public DbSet<TreatmentEvent> TreatmentEvents => Set<TreatmentEvent>();
+    public DbSet<TreatmentReceipt> TreatmentReceipts => Set<TreatmentReceipt>();
 
     protected override void OnModelCreating(ModelBuilder model)
     {
         base.OnModelCreating(model);
         SchedulingModel.Configure(model);
         AppointmentModel.Configure(model);
+        TreatmentModel.Configure(model);
         model.Entity<ApplicationUser>(b =>
         {
             b.ToTable("USER_ACCOUNT");
