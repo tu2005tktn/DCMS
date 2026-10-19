@@ -93,9 +93,9 @@ test('duration correction and range preview preserve draft; invalid range sends 
   });
   await page.getByLabel('Preview từ ngày', { exact: true }).fill('2032-01-05');
   await page.getByLabel('Preview đến ngày', { exact: true }).fill('2032-01-19');
-  await page.getByRole('spinbutton', { name: 'Thời lượng phút' }).fill('70');
+  await page.getByRole('spinbutton', { name: 'Thời lượng phút' }).fill('0');
   await page.getByRole('button', { name: 'Preview slot', exact: true }).click();
-  await expect(page.getByRole('alert').filter({ hasText: '60' }).first()).toBeVisible(); expect(calls).toBe(0);
+  await expect(page.getByRole('alert').filter({ hasText: '480' }).first()).toBeVisible(); expect(calls).toBe(0);
   await page.getByRole('spinbutton', { name: 'Thời lượng phút' }).fill('');
   await page.getByRole('button', { name: 'Preview slot', exact: true }).click(); expect(calls).toBe(0);
   await page.getByRole('spinbutton', { name: 'Thời lượng phút' }).fill('75');

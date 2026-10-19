@@ -24,6 +24,7 @@ export const supportInboxApi = {
   async listRequestsForStaff(query: {
     statuses: SupportRequestStatus[];
     branchId?: number;
+    appointmentId?: string;
     page: number;
     pageSize: number;
   }): Promise<SupportRequestPage> {
@@ -33,6 +34,7 @@ export const supportInboxApi = {
       pageSize: String(query.pageSize),
     });
     if (query.branchId) params.set('branchId', String(query.branchId));
+    if (query.appointmentId) params.set('appointmentId', query.appointmentId);
     return api<SupportRequestPage>(`/api/support-requests?${params}`);
   },
 

@@ -6,6 +6,7 @@ export type CurrentUser = {
   effectiveRoles: string[]; permissions: string[]; hasVerifiedPatientLink: boolean;
 };
 type AuthState = {
+  initializing: boolean;
   user: CurrentUser | null; sessionMessage: string | null;
   signIn: (userName: string, password: string) => Promise<void>;
   signOut: () => Promise<void>; refresh: () => Promise<void>;
@@ -13,6 +14,7 @@ type AuthState = {
 const Context = createContext<AuthState | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const [initializing, setInitializing] = useState(() => !!readAccessToken());
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [sessionMessage, setSessionMessage] = useState<string | null>(null);
 
@@ -33,7 +35,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .catch(error => { if (active && error instanceof ApiError && error.status !== 401) {
         // 401 đã được api.ts xử lý (xoá token + gọi sessionLost). Lỗi khác (0, 5xx) hiển thị nhẹ.
         setSessionMessage('Không thể khôi phục phiên. Vui lòng đăng nhập lại.');
-      } });
+      } })
+      .finally(() => { if (active) setInitializing(false); });
     return () => { active = false; };
   }, []);
 
@@ -56,7 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     catch (error) { if (!(error instanceof ApiError && error.status === 401)) throw error; }
     setAccessToken(null); setUser(null); setSessionMessage(null);
   }
-  return <Context.Provider value={{ user, sessionMessage, signIn, signOut, refresh }}>{children}</Context.Provider>;
+  return <Context.Provider value={{ user, initializing, sessionMessage, signIn, signOut, refresh }}>{children}</Context.Provider>;
 }
 export function useAuth() {
   const context = useContext(Context);

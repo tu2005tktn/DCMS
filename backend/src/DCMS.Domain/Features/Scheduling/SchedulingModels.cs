@@ -2,6 +2,8 @@ namespace DCMS.Domain.Features.Scheduling;
 
 public sealed class SchedulingBranch
 {
+    public int SlotIntervalMinutes { get; set; } = 15;
+    public int BookingSettingsVersion { get; set; } = 1;
     public int Id { get; set; }
     public string Name { get; set; } = "";
     public bool Active { get; set; } = true;
@@ -25,6 +27,8 @@ public sealed class SchedulingChair
 }
 public sealed class SchedulingService
 {
+    public bool IsInitialExamination { get; set; }
+    public bool PublicBookable { get; set; } = true;
     public int Id { get; set; }
     public int BranchId { get; set; }
     public string Name { get; set; } = "";
@@ -105,7 +109,7 @@ public readonly record struct SchedulePeriod(int Day, int StartMinute, int EndMi
 public static class ScheduleRules
 {
     public static bool Overlaps(int start, int end, int otherStart, int otherEnd) => start < otherEnd && otherStart < end;
-    public static bool ValidDuration(int minutes, bool isPublic) => isPublic ? minutes is 30 or 60 : minutes is >= 15 and <= 480 && minutes % 15 == 0;
+    public static bool ValidDuration(int minutes, bool isPublic) => minutes is >= 1 and <= 480;
     public static bool ValidWeek(DateOnly weekStart, IReadOnlyList<SchedulePeriod> periods)
     {
         if (weekStart.DayOfWeek != DayOfWeek.Monday || periods.Count > 140) return false;

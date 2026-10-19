@@ -1488,14 +1488,28 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<bool>("Active")
                         .HasColumnType("boolean");
 
+                    b.Property<int>("BookingSettingsVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(160)
                         .HasColumnType("character varying(160)");
 
+                    b.Property<int>("SlotIntervalMinutes")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(15);
+
                     b.HasKey("Id");
 
-                    b.ToTable("SCHEDULING_BRANCH", (string)null);
+                    b.ToTable("SCHEDULING_BRANCH", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_BRANCH_SLOT_INTERVAL", "\"SlotIntervalMinutes\" BETWEEN 1 AND 120 AND \"BookingSettingsVersion\" > 0");
+                        });
                 });
 
             modelBuilder.Entity("DCMS.Domain.Features.Scheduling.SchedulingChair", b =>
@@ -1571,21 +1585,31 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<int>("BranchId")
                         .HasColumnType("integer");
 
+                    b.Property<bool>("IsInitialExamination")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(160)
                         .HasColumnType("character varying(160)");
+
+                    b.Property<bool>("PublicBookable")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
 
                     b.Property<int>("PublicDurationMinutes")
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("BranchId");
+                    b.HasIndex("BranchId")
+                        .IsUnique()
+                        .HasFilter("\"IsInitialExamination\" = TRUE");
 
                     b.ToTable("SCHEDULING_SERVICE", null, t =>
                         {
-                            t.HasCheckConstraint("CK_SERVICE_DURATION", "\"PublicDurationMinutes\" IN (30,60)");
+                            t.HasCheckConstraint("CK_SERVICE_DURATION", "\"PublicDurationMinutes\" BETWEEN 1 AND 480");
                         });
                 });
 

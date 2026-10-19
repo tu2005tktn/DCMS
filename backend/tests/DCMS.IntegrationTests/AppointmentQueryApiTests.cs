@@ -6,6 +6,7 @@ using DCMS.Application.Features.Appointments;
 using DCMS.Application.Features.Authentication;
 using DCMS.Application.Features.Scheduling;
 using DCMS.Domain.Features.Accounts;
+using DCMS.Domain.Features.Appointments;
 using DCMS.Domain.Features.PatientLinks;
 using DCMS.Domain.Features.Patients;
 using DCMS.Domain.Features.Scheduling;
@@ -37,7 +38,7 @@ public sealed class AppointmentQueryApiTests(ApiFixture fixture) : IClassFixture
         db.AddRange(new SchedulingMember { BranchId = branch.Id, EmployeeId = dentist.Id, CanDentist = true },
             new SchedulingMember { BranchId = branch.Id, EmployeeId = owner.Id, CanDentist = true });
         if (assistantMember) db.Add(new SchedulingMember { BranchId = branch.Id, EmployeeId = staff.Single(x => x.UserName == "assistant.demo").Id });
-        var service = new SchedulingService { BranchId = branch.Id, Name = "Khám", PublicDurationMinutes = 30 };
+        var service = new SchedulingService { BranchId = branch.Id, Name = "Khám", PublicDurationMinutes = 30, IsInitialExamination = true };
         db.Add(service);
         db.Add(new SchedulingChair { BranchId = branch.Id, Name = "Ghế 1", OpenMinute = 0, CloseMinute = 1440 });
         db.Add(new SchedulingChair { BranchId = branch.Id, Name = "Ghế 2", OpenMinute = 0, CloseMinute = 1440 });
@@ -108,6 +109,66 @@ public sealed class AppointmentQueryApiTests(ApiFixture fixture) : IClassFixture
     {
         Assert.Equal(status, response.StatusCode);
         Assert.Equal(code, (await response.Content.ReadFromJsonAsync<SystemMessage>())!.Code);
+    }
+
+    [Fact]
+    public async Task PatientAppointmentsUseExactPatientAndStaffScopeWithHistoryAndPaging()
+    {
+        var s = await PrepareAsync();
+        var hidden = await PrepareAsync(false);
+        int patientId;
+        Guid ownFuture;
+        using (var scope = fixture.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
+            var now = DateTimeOffset.UtcNow;
+            var patient = new PatientProfile { PatientCode = "P-" + Guid.NewGuid(), FullName = "Synthetic shared name",
+                CreatedAt = now, UpdatedAt = now, IsArchived = true, ArchivedAt = now, ArchiveReason = "Synthetic" };
+            var other = new PatientProfile { PatientCode = "P-" + Guid.NewGuid(), FullName = patient.FullName, CreatedAt = now, UpdatedAt = now };
+            db.Patients.AddRange(patient, other); await db.SaveChangesAsync(); patientId = patient.Id;
+            async Task<Guid> Add(Setup branch, int dentist, int? patientKey, int days, string status = "Confirmed")
+            {
+                var chair = await db.Set<SchedulingChair>().FirstAsync(x => x.BranchId == branch.BranchId);
+                var id = Guid.NewGuid(); var start = now.AddDays(days);
+                db.Set<ResourceReservation>().Add(new ResourceReservation { Id = id, Code = "RS-" + id.ToString("N"),
+                    BranchId = branch.BranchId, DentistId = dentist, ChairId = chair.Id, ServiceId = branch.ServiceId,
+                    Start = start, End = start.AddMinutes(30), AttendeeLabel = patient.FullName, Status = status });
+                db.Appointments.Add(new Appointment { Id = id, ReservationId = id, Code = "AP-" + id.ToString("N"),
+                    BranchId = branch.BranchId, DentistId = dentist, ChairId = chair.Id, ServiceId = branch.ServiceId,
+                    PatientId = patientKey, AttendeeName = patient.FullName, BookerName = "Synthetic booker",
+                    StartAt = start, EndAt = start.AddMinutes(30), Status = status, CreatedAt = now });
+                return id;
+            }
+            ownFuture = await Add(s, s.DentistId, patientId, 3);
+            await Add(s, s.OtherDentistId, patientId, 4);
+            await Add(s, s.DentistId, patientId, -2);
+            await Add(s, s.DentistId, patientId, 5, "Cancelled");
+            await Add(s, s.DentistId, other.Id, 6);
+            await Add(s, s.DentistId, null, 7);
+            await Add(hidden, hidden.OtherDentistId, patientId, 8);
+            await db.SaveChangesAsync();
+        }
+        using var assistant = await Login("assistant.demo");
+        var path = $"/api/patients/{patientId}/appointments";
+        var all = (await assistant.GetFromJsonAsync<AppointmentListPage>(path))!;
+        Assert.Equal(4, all.Total); Assert.Equal(4, all.Items.Count);
+        Assert.All(all.Items, a => Assert.Equal(s.BranchId, a.BranchId));
+        var upcoming = (await assistant.GetFromJsonAsync<AppointmentListPage>(path + "?scope=UPCOMING"))!;
+        Assert.Equal(2, upcoming.Total); Assert.Equal(ownFuture, upcoming.Items[0].Id);
+        Assert.Equal(2, (await assistant.GetFromJsonAsync<AppointmentListPage>(path + "?scope=HISTORY"))!.Total);
+        var second = (await assistant.GetFromJsonAsync<AppointmentListPage>(path + "?page=2&pageSize=20"))!;
+        Assert.Equal(4, second.Total); Assert.Empty(second.Items);
+        using var dentist = await Login("dentist.demo");
+        var own = (await dentist.GetFromJsonAsync<AppointmentListPage>(path))!;
+        Assert.Equal(3, own.Total); Assert.All(own.Items, a => Assert.Equal(s.DentistId, a.DentistId));
+        Assert.Equal(HttpStatusCode.BadRequest, (await assistant.GetAsync(path + "?scope=WRONG")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await assistant.GetAsync("/api/patients/2147483647/appointments")).StatusCode);
+        using var anonymous = fixture.CreateClient();
+        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync(path)).StatusCode);
+        using var guest = await Login("guest.demo");
+        Assert.Equal(HttpStatusCode.Forbidden, (await guest.GetAsync(path)).StatusCode);
+        var detail = (await assistant.GetFromJsonAsync<StaffAppointmentDetail>($"/api/appointments/{ownFuture}"))!;
+        Assert.Equal(ownFuture, detail.Appointment.Id);
     }
 
     [Fact]

@@ -88,6 +88,13 @@ là bản đọc lại sau save với `expectedVersion` mới và
 - Khi giảm giờ làm, staff thấy danh sách lịch bị ảnh hưởng; schedule publish vẫn do
   luồng S09 chặn cho tới khi dữ liệu hợp lệ.
 
+## Calendar detail entry (19 October 2026)
+
+- Clicking an S10 appointment opens `/appointments/{id}` directly, with the authorized staff detail for that exact appointment. A refresh preserves this route while the staff session is restored.
+- The detail page shows appointment information and, for `appointments.support.handle`, its own support requests with pagination. Opening a request reuses the existing S12 command drawer on the same page; changes refresh both appointment information and request list.
+- `GET /api/support-requests` accepts optional GUID `appointmentId`, applied before count/pagination alongside existing status and staff branch restrictions. No unrelated request is returned. An appointment with no matching requests shows an empty state; failed reads have a retry state.
+- Other appointment readers see the appointment detail without support commands. Check-in remains outside the implemented support workflow. Navigating or viewing does not create a request or change appointment lifecycle.
+
 ## Traceability
 
 UC-05/06 và booking portion UC-34; S12/S26;

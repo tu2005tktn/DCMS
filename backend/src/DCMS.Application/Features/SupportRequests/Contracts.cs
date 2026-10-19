@@ -48,7 +48,7 @@ public sealed record WithdrawSupportCommand(int ExpectedVersion);
 
 public interface ISupportRequestService
 {
-    Task<SupportRequestPage> ListAsync(int actorId, string? statuses, int? branchId, int page, int pageSize, CancellationToken ct);
+    Task<SupportRequestPage> ListAsync(int actorId, string? statuses, int? branchId, int page, int pageSize, CancellationToken ct, Guid? appointmentId = null);
     Task<SupportRequestDetail> DetailAsync(int actorId, string id, CancellationToken ct);
     Task<SupportRequestDetail> VerifyRequesterAsync(int actorId, string id, VerifyRequesterCommand command, CancellationToken ct);
     Task<StaffSupportChangeResult> ChangeAppointmentAsync(int actorId, string id, StaffSupportChangeCommand command, CancellationToken ct);
