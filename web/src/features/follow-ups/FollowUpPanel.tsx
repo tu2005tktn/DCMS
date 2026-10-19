@@ -273,10 +273,6 @@ export default function FollowUpPanel({ dossier }: { dossier: TreatmentDossier }
         ? <Empty description="Chưa có chỉ định quay lại cho bệnh nhân này." />
         : <Collapse items={instructions.map(instruction => ({
           key: instruction.id,
-          onChange: keys => {
-            const open = Array.isArray(keys) ? keys.map(String) : [String(keys)];
-            if (open.includes(instruction.id)) void loadAppointment(instruction);
-          },
           label: <Space wrap>
             <Typography.Text strong>{purposeLabels[instruction.purpose]}</Typography.Text>
             <Tag color={statusColors[instruction.status]}>{statusLabels[instruction.status]}</Tag>
