@@ -28,6 +28,7 @@ public sealed class DcmsDbContext(DbContextOptions<DcmsDbContext> options)
     public DbSet<AppointmentReceipt> AppointmentReceipts => Set<AppointmentReceipt>();
     public DbSet<AppointmentOutboxEvent> AppointmentOutboxEvents => Set<AppointmentOutboxEvent>();
     public DbSet<RecoveryToken> RecoveryTokens => Set<RecoveryToken>();
+    public DbSet<EmailVerificationToken> EmailVerificationTokens => Set<EmailVerificationToken>();
     public DbSet<RecoveryAudit> RecoveryAudits => Set<RecoveryAudit>();
     public DbSet<RecoveryOutbox> RecoveryOutbox => Set<RecoveryOutbox>();
 
@@ -167,6 +168,16 @@ public sealed class DcmsDbContext(DbContextOptions<DcmsDbContext> options)
             b.HasIndex(x => new { x.AccountId, x.UsedAt });
             b.HasIndex(x => x.ExpiresAt);
             b.HasIndex(x => new { x.AccountId, x.CreatedAt });
+            b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.AccountId).OnDelete(DeleteBehavior.Cascade);
+        });
+        model.Entity<EmailVerificationToken>(b =>
+        {
+            b.ToTable("EMAIL_VERIFICATION_TOKEN");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.NormalizedEmail).HasMaxLength(256).IsRequired();
+            b.Property(x => x.CodeHash).HasMaxLength(64).IsRequired();
+            b.HasIndex(x => new { x.AccountId, x.CreatedAt });
+            b.HasIndex(x => x.ExpiresAt);
             b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.AccountId).OnDelete(DeleteBehavior.Cascade);
         });
         model.Entity<RecoveryAudit>(b =>

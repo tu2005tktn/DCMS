@@ -204,3 +204,19 @@ API so a message can be rendered from either side, and unit tests pin the text o
   active session and `RecoveryApiTests.C5_...` asserts it.
 - The recovery channel has no production provider. `RecoverySettings.Channel` selects the channel,
   but only the Development adapter ships today.
+
+## 10. Public email scope — observed 18/10/2026
+
+This section records the newer, narrower customer implementation. Earlier sections describe the original staff/general S03 baseline and historical test state; use [the Public email specification](specs/S03-PUBLIC-EMAIL-RECOVERY.md) for the current customer behavior.
+
+- Added the authenticated Public email-confirmation API and an additive `EMAIL_VERIFICATION_TOKEN` migration. New Public registration remains unconfirmed until a code is delivered through configured SMTP and accepted. No SMS or Patient link is created. The migration ran successfully in isolated PostgreSQL test schemas; it was **not applied to the project's existing database**.
+- Added `/api/customer/recovery/{request,resend,verify,reset}` for email-only Public recovery. Existing `/api/auth/recovery/*`, staff Web sign-in and Admin S04 routes remain available. The development proof endpoint now requires `ManageAccounts` so a Public session cannot read any account's proof.
+- A successful Public reset invalidates existing access sessions and active refresh tokens. The API returns neutral MSG12 for unconfirmed and unknown valid emails. No SMTP configuration means Public email confirmation returns a service error instead of claiming a send.
+- Observed with a separate temporary PostgreSQL 17 container and synthetic accounts: **22/22** integration tests passed (`PublicEmailRecoveryTests` 3, existing `RecoveryApiTests` 19); **7/7** SMTP adapter unit tests passed. `dotnet build backend/DCMS.sln --no-restore` passed with 0 warnings and 0 errors. Web `npm run build` and Mobile `npm run typecheck` passed. Web build emitted the existing Vite bundle-size warning.
+- Browser and physical-device testing, and delivery through a real SMTP provider, were not run in this automated pass. [Development run instructions](implementation/RUN-S03-PUBLIC-EMAIL.vi.md) use Mailpit. No project database test data was inserted.
+
+## 11. Registered email is recovery-eligible — decision 18/10/2026
+
+The user removed the prerequisite to verify an email separately after Public registration. Customer Web and Mobile now request a recovery code for the email stored on any Public account, including an existing account with `EmailConfirmed=false`. The code sent to that inbox is still required before password reset. Registration and recovery do not set `EmailConfirmed=true`, alter roles, link a Patient, or change staff/S04 recovery policy. The customer home no longer prompts for separate email verification.
+
+Observed with a new isolated PostgreSQL 17 container and synthetic accounts: **22/22** integration tests passed (`PublicEmailRecoveryTests` 3 and existing `RecoveryApiTests` 19). Backend solution build passed with 0 warnings and 0 errors; Web build and Mobile typecheck passed. No production Gmail message was sent by these tests and no project account was modified. The already-applied migration does not need a new migration or data update for this policy change.

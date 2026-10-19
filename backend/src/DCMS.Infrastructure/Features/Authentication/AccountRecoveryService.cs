@@ -30,17 +30,21 @@ public sealed class AccountRecoveryService(
 {
     private readonly RecoverySettings settings = options.Value;
 
-    public async Task<RecoveryRequestOutcome> RequestAsync(string identifier, string? ipAddress, CancellationToken ct)
+    public async Task<RecoveryRequestOutcome> RequestAsync(string identifier, string? ipAddress, CancellationToken ct,
+        bool publicOnly = false)
     {
         // One neutral answer for every valid-format request, matching an account or not (UC-02 step 3).
         var neutral = new RecoveryRequestOutcome(true, "MSG12");
-        var invalid = ValidateIdentifier(identifier);
+        var invalid = ValidateIdentifier(identifier, publicOnly ? 254 : 64);
         if (invalid != null) throw invalid;
+        ValidateCustomerEmail(identifier, publicOnly);
+        // Customer recovery never falls back to Phone or Link when staff configuration changes.
+        if (publicOnly && settings.Channel != RecoveryChannel.Email) return neutral;
 
         // Limits are checked before the lookup so "throttled" cannot be told apart from "unknown".
         if (!AllowRequest(identifier, ipAddress)) return neutral;
 
-        var user = await FindAsync(identifier, ct);
+        var user = await FindAsync(identifier, ct, publicOnly);
         if (user == null)
         {
             await EqualizeTimingAsync(ct);
@@ -50,7 +54,7 @@ public sealed class AccountRecoveryService(
         try
         {
             var current = await LatestTokenAsync(user.Id, ct);
-            var token = await IssueAsync(user, current, ct);
+            var token = await IssueAsync(user, current, ct, publicOnly);
             await AuditAsync(null, user.Id, "RecoveryRequested", "Yêu cầu đặt lại mật khẩu",
                 ChannelName(token), "Succeeded", ct);
         }
@@ -63,16 +67,20 @@ public sealed class AccountRecoveryService(
         return neutral;
     }
 
-    public async Task<RecoveryResendOutcome> ResendAsync(string identifier, string? ipAddress, CancellationToken ct)
+    public async Task<RecoveryResendOutcome> ResendAsync(string identifier, string? ipAddress, CancellationToken ct,
+        bool publicOnly = false)
     {
         // The resend answer is the same for every valid-format request: the neutral text with no
         // field that would reveal whether an account exists or whether a send actually happened.
         // Cooldown, cap and rate limits are still enforced before any send.
-        var invalid = ValidateIdentifier(identifier);
+        var invalid = ValidateIdentifier(identifier, publicOnly ? 254 : 64);
         if (invalid != null) throw invalid;
+        ValidateCustomerEmail(identifier, publicOnly);
+        if (publicOnly && settings.Channel != RecoveryChannel.Email)
+            return new RecoveryResendOutcome(false, "MSG12", null);
         if (!AllowRequest(identifier, ipAddress)) return new RecoveryResendOutcome(false, "MSG12", null);
 
-        var user = await FindAsync(identifier, ct);
+        var user = await FindAsync(identifier, ct, publicOnly);
         if (user == null)
         {
             await EqualizeTimingAsync(ct);
@@ -86,7 +94,7 @@ public sealed class AccountRecoveryService(
 
         try
         {
-            var token = await IssueAsync(user, current, ct);
+            var token = await IssueAsync(user, current, ct, publicOnly);
             await AuditAsync(null, user.Id, "RecoveryRequested", "Gửi lại hướng dẫn đặt lại mật khẩu",
                 ChannelName(token), "Succeeded", ct);
         }
@@ -100,12 +108,15 @@ public sealed class AccountRecoveryService(
     }
 
     public async Task<RecoveryVerifyOutcome> VerifyAsync(string identifier, string proof, string? ipAddress,
-        CancellationToken ct)
+        CancellationToken ct, bool publicOnly = false)
     {
-        var invalid = ValidateIdentifier(identifier) ?? ValidateProof(proof);
+        var invalid = ValidateIdentifier(identifier, publicOnly ? 254 : 64) ?? ValidateProof(proof);
         if (invalid != null) throw invalid;
+        ValidateCustomerEmail(identifier, publicOnly);
+        if (publicOnly && settings.Channel != RecoveryChannel.Email)
+            return new RecoveryVerifyOutcome(false, null);
 
-        var user = await FindAsync(identifier, ct);
+        var user = await FindAsync(identifier, ct, publicOnly);
         if (user == null)
         {
             await EqualizeTimingAsync(ct);
@@ -116,13 +127,16 @@ public sealed class AccountRecoveryService(
     }
 
     public async Task<RecoveryResetOutcome> ResetAsync(string identifier, string resetGrant, string newPassword,
-        string confirmPassword, CancellationToken ct)
+        string confirmPassword, CancellationToken ct, bool publicOnly = false)
     {
-        var invalid = ValidateIdentifier(identifier) ?? ValidateProof(resetGrant)
+        var invalid = ValidateIdentifier(identifier, publicOnly ? 254 : 64) ?? ValidateProof(resetGrant)
             ?? ValidatePassword(newPassword, confirmPassword);
         if (invalid != null) throw invalid;
+        ValidateCustomerEmail(identifier, publicOnly);
+        if (publicOnly && settings.Channel != RecoveryChannel.Email)
+            return new RecoveryResetOutcome(false, "MSG108");
 
-        var user = await FindAsync(identifier, ct);
+        var user = await FindAsync(identifier, ct, publicOnly);
         return await ApplyResetAsync(user, resetGrant, newPassword, adminActor: null, ct);
     }
 
@@ -304,6 +318,9 @@ public sealed class AccountRecoveryService(
             // with the old one (shared S01 session policy).
             await db.AuthSessions.Where(x => x.AccountId == user.Id && x.RevokedAt == null)
                 .ExecuteUpdateAsync(s => s.SetProperty(x => x.RevokedAt, now), ct);
+            await db.AuthRefreshTokens.Where(x => x.AccountId == user.Id && x.Status == "ACTIVE")
+                .ExecuteUpdateAsync(s => s.SetProperty(x => x.Status, "REVOKED")
+                    .SetProperty(x => x.RevokedAt, now), ct);
 
             var before = Snapshot(user);
             await db.SaveChangesAsync(ct);
@@ -332,7 +349,8 @@ public sealed class AccountRecoveryService(
         }
     }
 
-    private async Task<RecoveryToken> IssueAsync(ApplicationUser user, RecoveryToken? previous, CancellationToken ct)
+    private async Task<RecoveryToken> IssueAsync(ApplicationUser user, RecoveryToken? previous, CancellationToken ct,
+        bool allowRegisteredPublicEmail = false)
     {
         var now = DateTimeOffset.UtcNow;
 
@@ -345,8 +363,8 @@ public sealed class AccountRecoveryService(
                 throw new RecoveryBlockedException("Gửi lại quá sớm", "OverResendLimit");
         }
 
-        if (!await HasVerifiedChannelAsync(user, ct))
-            throw new RecoveryBlockedException("Không có kênh liên hệ đã xác minh", "DeliveryFailure");
+        if (!await HasVerifiedChannelAsync(user, ct, allowRegisteredPublicEmail))
+            throw new RecoveryBlockedException("Không có kênh liên hệ đủ điều kiện", "DeliveryFailure");
 
         var proof = GenerateCode();
         var token = new RecoveryToken
@@ -386,11 +404,13 @@ public sealed class AccountRecoveryService(
         return token;
     }
 
-    private async Task<bool> HasVerifiedChannelAsync(ApplicationUser user, CancellationToken ct)
+    private async Task<bool> HasVerifiedChannelAsync(ApplicationUser user, CancellationToken ct,
+        bool allowRegisteredPublicEmail)
     {
         if (settings.Channel == RecoveryChannel.Phone)
             return !string.IsNullOrEmpty(user.PhoneNumber) && user.PhoneNumberConfirmed;
-        return !string.IsNullOrEmpty(user.Email) && user.EmailConfirmed;
+        return !string.IsNullOrEmpty(user.Email)
+            && (user.EmailConfirmed || (allowRegisteredPublicEmail && user.AccountType == "Public"));
     }
 
     private async Task<string> DestinationAsync(ApplicationUser user, CancellationToken ct)
@@ -489,18 +509,24 @@ public sealed class AccountRecoveryService(
         }
     }
 
-    private async Task<ApplicationUser?> FindAsync(string identifier, CancellationToken ct)
+    private async Task<ApplicationUser?> FindAsync(string identifier, CancellationToken ct, bool publicOnly = false)
     {
         var value = identifier.Trim();
         var normalizedUserName = value.ToUpperInvariant();
         // One tracked query: the entity is reused by both the read-only paths and the reset path.
         var user = await db.Users.FirstOrDefaultAsync(x => x.NormalizedUserName == normalizedUserName, ct);
-        if (user != null) return user;
+        if (user != null) return !publicOnly || user.AccountType == "Public" ? user : null;
 
         if (!delivery.IsValid(value)) return null;
         var contact = delivery.Normalize(value).ToUpperInvariant();
-        return await db.Users.FirstOrDefaultAsync(x => x.NormalizedEmail == contact
-            || (x.PhoneNumber != null && x.PhoneNumber.ToUpper() == contact), ct);
+        return await db.Users.FirstOrDefaultAsync(x => (!publicOnly || x.AccountType == "Public")
+            && (x.NormalizedEmail == contact || (x.PhoneNumber != null && x.PhoneNumber.ToUpper() == contact)), ct);
+    }
+
+    private void ValidateCustomerEmail(string identifier, bool publicOnly)
+    {
+        if (publicOnly && delivery.DetectChannel(identifier) != RecoveryChannel.Email)
+            throw new BusinessException(400, SystemMessages.Get("MSG04", "Email"));
     }
 
     private static string Snapshot(ApplicationUser user) => System.Text.Json.JsonSerializer.Serialize(new
@@ -590,14 +616,14 @@ public sealed class AccountRecoveryService(
         try { await transaction.RollbackAsync(ct); } catch (Exception) { /* already rolled back */ }
     }
 
-    private static BusinessException? ValidateIdentifier(string? identifier)
+    private static BusinessException? ValidateIdentifier(string? identifier, int maxLength = 64)
     {
         if (string.IsNullOrWhiteSpace(identifier))
             return new BusinessException(400, SystemMessages.Get("MSG02", "Tài khoản"));
         var value = identifier.Trim();
         // Any non-empty identifier is accepted: an unknown or malformed one simply gets the same
         // neutral answer, so the format itself is never used to test whether an account exists.
-        if (value.Length > 64) return new BusinessException(400, SystemMessages.Get("MSG03", "Tài khoản", 64));
+        if (value.Length > maxLength) return new BusinessException(400, SystemMessages.Get("MSG03", "Tài khoản", maxLength));
         return null;
     }
 

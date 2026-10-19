@@ -47,6 +47,7 @@ public static class DependencyInjection
         services.AddMemoryCache(options => options.SizeLimit = 8192);
         services.AddScoped<IRecoveryOutbox, RecoveryOutboxWriter>();
         services.AddScoped<IAccountRecoveryService, AccountRecoveryService>();
+        services.AddScoped<IEmailVerificationService, EmailVerificationService>();
         services.AddScoped<IAccountService, AccountService>();
         services.AddScoped<IAuthenticationService, AuthenticationService>();
         services.AddScoped<IRegistrationService, RegistrationService>();
@@ -85,8 +86,11 @@ public static class DependencyInjection
         if (smtp.IsConfigured)
         {
             services.AddScoped<IMailSender, SmtpMailSender>();
-            services.AddScoped<IContactDeliveryAdapter, SmtpContactDeliveryAdapter>();
+            services.AddScoped<SmtpContactDeliveryAdapter>();
+            services.AddScoped<IContactDeliveryAdapter>(sp => sp.GetRequiredService<SmtpContactDeliveryAdapter>());
+            services.AddScoped<IEmailVerificationDelivery>(sp => sp.GetRequiredService<SmtpContactDeliveryAdapter>());
         }
+        else services.AddScoped<IEmailVerificationDelivery, UnavailableEmailVerificationDelivery>();
         return services;
     }
 }

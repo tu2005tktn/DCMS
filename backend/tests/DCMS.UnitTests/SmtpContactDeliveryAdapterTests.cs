@@ -98,6 +98,31 @@ public sealed class SmtpContactDeliveryAdapterTests
     }
 
     [Fact]
+    public async Task EmailConfirmationUsesSmtpWithoutLeakingCodeToLogs()
+    {
+        var (sender, outbox, logger) = (new StubSender(), new StubOutbox(), new CapturingLogger());
+        var sent = await Create(sender, outbox, logger).SendAsync(" Patient@Example.COM ", "482913", 15, default);
+
+        Assert.True(sent);
+        var mail = Assert.Single(sender.Sent);
+        Assert.Equal("patient@example.com", mail.To);
+        Assert.Contains("482913", mail.Body);
+        Assert.Contains("15 phút", mail.Body);
+        Assert.Empty(outbox.Entries);
+        Assert.DoesNotContain(logger.Lines, line => line.Contains("482913"));
+    }
+
+    [Fact]
+    public async Task EmailConfirmationSmtpFailureDoesNotClaimDelivery()
+    {
+        var (sender, outbox, logger) = (new StubSender(new SmtpException("mailbox unavailable")), new StubOutbox(), new CapturingLogger());
+        Assert.False(await Create(sender, outbox, logger).SendAsync("a@example.com", "482913", 15, default));
+        Assert.Empty(sender.Sent);
+        Assert.Empty(outbox.Entries);
+        Assert.DoesNotContain(logger.Lines, line => line.Contains("482913"));
+    }
+
+    [Fact]
     public void SettingsNeedHostAndSender()
     {
         Assert.False(new SmtpSettings().IsConfigured);

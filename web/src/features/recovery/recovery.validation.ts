@@ -23,11 +23,11 @@ export const RESEND_COOLDOWN_SECONDS = 120;
 
 export type FieldErrors = Partial<Record<string, string>>;
 
-export function validateAccount(identifier: string): FieldErrors {
+export function validateAccount(identifier: string, maxLength = ACCOUNT_MAX_LENGTH): FieldErrors {
   const value = identifier.trim();
   if (!value) return { identifier: requiredMessage(recoveryFields.account) };
-  if (value.length > ACCOUNT_MAX_LENGTH)
-    return { identifier: maxLengthMessage(recoveryFields.account, ACCOUNT_MAX_LENGTH) };
+  if (value.length > maxLength)
+    return { identifier: maxLengthMessage(recoveryFields.account, maxLength) };
   return {};
 }
 

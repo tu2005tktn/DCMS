@@ -51,13 +51,39 @@ public sealed class SmtpContactDeliveryAdapter(
     IRecoveryOutbox outbox,
     IOptions<SmtpSettings> smtp,
     IOptions<RecoverySettings> recovery,
-    ILogger<SmtpContactDeliveryAdapter> logger) : IContactDeliveryAdapter
+    ILogger<SmtpContactDeliveryAdapter> logger) : IContactDeliveryAdapter, IEmailVerificationDelivery
 {
     public const string Subject = "Mã khôi phục tài khoản DCMS";
 
     public RecoveryChannel DetectChannel(string contact) => RecoveryContactFormat.DetectChannel(contact);
     public bool IsValid(string contact) => DetectChannel(contact) != RecoveryChannel.Unknown;
     public string Normalize(string contact) => RecoveryContactFormat.Normalize(contact);
+
+    public async Task<bool> SendAsync(string destination, string code, int lifetimeMinutes, CancellationToken ct)
+    {
+        var address = RecoveryContactFormat.Normalize(destination);
+        if (RecoveryContactFormat.DetectChannel(address) != RecoveryChannel.Email) return false;
+        var settings = smtp.Value;
+        using var message = new MailMessage(
+            new MailAddress(settings.FromAddress, settings.FromName, Encoding.UTF8), new MailAddress(address))
+        {
+            Subject = "Xác minh email tài khoản DCMS",
+            SubjectEncoding = Encoding.UTF8,
+            Body = $"Mã xác minh email của bạn: {code}\nMã có hiệu lực trong {lifetimeMinutes} phút và chỉ dùng một lần.\nNếu bạn không yêu cầu, hãy bỏ qua email này.",
+            BodyEncoding = Encoding.UTF8,
+            IsBodyHtml = false
+        };
+        try
+        {
+            await sender.SendAsync(message, ct);
+            return true;
+        }
+        catch (Exception ex) when (ex is SmtpException or InvalidOperationException or IOException)
+        {
+            logger.LogWarning("Email verification delivery failed: {ExceptionType}", ex.GetType().Name);
+            return false;
+        }
+    }
 
     public async Task<bool> SendRecoveryAsync(int accountId, RecoveryChannel channel, string destination,
         string proof, string resetLink, CancellationToken ct)
