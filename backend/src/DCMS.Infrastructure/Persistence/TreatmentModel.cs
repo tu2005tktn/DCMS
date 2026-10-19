@@ -24,6 +24,7 @@ internal static class TreatmentModel
             b.Property(x => x.PlanState).HasMaxLength(16);
             b.Property(x => x.Goals).HasMaxLength(4000);
             b.Property(x => x.PaymentTermsJson).HasColumnType("jsonb");
+            b.HasIndex(x => x.SourceTemplateId);
             b.Property(x => x.Version).IsConcurrencyToken();
             b.HasOne<PatientProfile>().WithMany().HasForeignKey(x => x.PatientId).OnDelete(DeleteBehavior.Restrict);
             b.HasOne<SchedulingBranch>().WithMany().HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Restrict);
@@ -67,6 +68,79 @@ internal static class TreatmentModel
             b.Property(x => x.Fingerprint).HasMaxLength(64);
             b.Property(x => x.ResultJson).HasColumnType("jsonb");
             b.HasOne<TreatmentDossier>().WithMany().HasForeignKey(x => x.DossierId).OnDelete(DeleteBehavior.Restrict);
+        });
+        model.Entity<TreatmentTemplate>(b =>
+        {
+            b.ToTable("TREATMENT_TEMPLATE"); b.HasKey(x => x.Id);
+            b.HasIndex(x => new { x.BranchId, x.Name });
+            b.Property(x => x.Name).HasMaxLength(160);
+            b.Property(x => x.Version).IsConcurrencyToken();
+            b.HasMany(x => x.Versions).WithOne().HasForeignKey(x => x.TemplateId).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<SchedulingBranch>().WithMany().HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Restrict);
+        });
+        model.Entity<TreatmentTemplateVersion>(b =>
+        {
+            b.ToTable("TREATMENT_TEMPLATE_VERSION"); b.HasKey(x => x.Id);
+            b.HasIndex(x => new { x.TemplateId, x.Number }).IsUnique();
+            b.HasIndex(x => x.TemplateId).IsUnique().HasDatabaseName("IX_TREATMENT_TEMPLATE_VERSION_Active")
+                .HasFilter("\"State\" = 'Active'");
+            b.Property(x => x.State).HasMaxLength(16);
+            b.Property(x => x.StepsJson).HasColumnType("jsonb");
+        });
+        model.Entity<TreatmentStep>(b =>
+        {
+            b.ToTable("TREATMENT_STEP"); b.HasKey(x => x.Id);
+            b.HasIndex(x => new { x.DossierId, x.PlanVersion });
+            b.Property(x => x.Name).HasMaxLength(160);
+            b.Property(x => x.Region).HasMaxLength(80);
+            b.Property(x => x.Capability).HasMaxLength(160);
+            b.Property(x => x.LabRequirement).HasMaxLength(160);
+            b.Property(x => x.ChargingCoverage).HasMaxLength(40);
+            b.Property(x => x.Outcome).HasMaxLength(16);
+            b.Property(x => x.HoldReason).HasMaxLength(1000);
+            b.Property(x => x.ReviewCondition).HasMaxLength(1000);
+            b.Property(x => x.PredecessorsJson).HasColumnType("jsonb");
+            b.Property(x => x.Version).IsConcurrencyToken();
+            b.HasOne<TreatmentDossier>().WithMany().HasForeignKey(x => x.DossierId).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<TreatmentItem>().WithMany().HasForeignKey(x => x.ItemId).OnDelete(DeleteBehavior.Restrict);
+            b.ToTable(t => t.HasCheckConstraint("CK_STEP_DURATION", "\"EstimatedMinutes\" > 0 AND \"ReservedMinutes\" BETWEEN 15 AND 480 AND \"ReservedMinutes\" % 15 = 0 AND \"ReservedMinutes\" >= \"EstimatedMinutes\""));
+        });
+        model.Entity<FollowUpInstruction>(b =>
+        {
+            b.ToTable("FOLLOW_UP_INSTRUCTION"); b.HasKey(x => x.Id);
+            b.HasIndex(x => new { x.PatientId, x.Status });
+            b.HasIndex(x => new { x.StepId, x.SourceCompletionEventId }).IsUnique()
+                .HasDatabaseName("IX_FOLLOW_UP_INSTRUCTION_Step_Completion")
+                .HasFilter("\"StepId\" IS NOT NULL AND \"SourceCompletionEventId\" IS NOT NULL");
+            b.HasIndex(x => x.ActiveAppointmentId).IsUnique().HasFilter("\"ActiveAppointmentId\" IS NOT NULL");
+            b.Property(x => x.Purpose).HasMaxLength(40);
+            b.Property(x => x.Reason).HasMaxLength(2000);
+            b.Property(x => x.Guidance).HasMaxLength(4000);
+            b.Property(x => x.Capability).HasMaxLength(160);
+            b.Property(x => x.Status).HasMaxLength(20);
+            b.Property(x => x.Version).IsConcurrencyToken();
+            b.HasOne<PatientProfile>().WithMany().HasForeignKey(x => x.PatientId).OnDelete(DeleteBehavior.Restrict);
+            b.ToTable(t =>
+            {
+                t.HasCheckConstraint("CK_FOLLOW_UP_WINDOW", "\"EarliestOn\" <= \"TargetOn\" AND \"TargetOn\" <= \"LatestOn\"");
+                t.HasCheckConstraint("CK_FOLLOW_UP_DURATION", "\"DurationMinutes\" BETWEEN 15 AND 480 AND \"DurationMinutes\" % 15 = 0");
+            });
+        });
+        model.Entity<TreatmentProgressionReceipt>(b =>
+        {
+            b.ToTable("TREATMENT_PROGRESSION_RECEIPT"); b.HasKey(x => x.RequestKey);
+            b.Property(x => x.Command).HasMaxLength(40);
+            b.Property(x => x.Fingerprint).HasMaxLength(64);
+            b.Property(x => x.ResultJson).HasColumnType("jsonb");
+        });
+        model.Entity<TreatmentProgressionEvent>(b =>
+        {
+            b.ToTable("TREATMENT_PROGRESSION_EVENT"); b.HasKey(x => x.Id);
+            b.HasIndex(x => x.StableKey).IsUnique().HasFilter("\"StableKey\" IS NOT NULL");
+            b.HasIndex(x => new { x.AggregateId, x.OccurredAt });
+            b.Property(x => x.Kind).HasMaxLength(80);
+            b.Property(x => x.StableKey).HasMaxLength(160);
+            b.Property(x => x.PayloadJson).HasColumnType("jsonb");
         });
     }
 }

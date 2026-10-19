@@ -21,6 +21,8 @@ public sealed class TreatmentDossier
     public int PlanVersion { get; set; }
     public string PlanState { get; set; } = "None";
     public string? Goals { get; set; }
+    public Guid? SourceTemplateId { get; set; }
+    public int? SourceTemplateVersion { get; set; }
     public string PaymentTermsJson { get; set; } = "[]";
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }

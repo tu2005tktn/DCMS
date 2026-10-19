@@ -177,6 +177,10 @@ public sealed class TreatmentDossierService(DcmsDbContext db, UserManager<Applic
         var services = await db.Set<SchedulingService>().AsNoTracking().Where(x => x.BranchId == dossier.BranchId
             && x.Active && serviceIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, ct);
         if (services.Count != serviceIds.Length) throw Error("MSG04");
+        var linkedItems = await db.TreatmentSteps.AsNoTracking().Where(x => x.DossierId == dossierId)
+            .Select(x => x.ItemId).Distinct().ToArrayAsync(ct);
+        if (linkedItems.Any(id => request.Items.All(x => x.Id != id || x.Decision != "Agreed")))
+            throw Error("MSG233", 409);
         var existing = dossier.Items.ToDictionary(x => x.Id);
         var incoming = new HashSet<Guid>();
         foreach (var input in request.Items)
@@ -299,8 +303,16 @@ public sealed class TreatmentDossierService(DcmsDbContext db, UserManager<Applic
             d.Outcome is not ("Stopped" or "Skipped" or "Cancelled") || Clean(d.Reason) is not { Length: > 0 and <= 1000 }))
             throw Error("MSG243", 409);
         if (request.Outcome == "CompletedAsAgreed" && unresolved.Length > 0) throw Error("MSG243", 409);
+        if (await db.FollowUpInstructions.AsNoTracking().AnyAsync(x => x.DossierId == dossierId &&
+            (x.Status == "NeedsBooking" || x.Status == "Booked"), ct)) throw Error("MSG233", 409);
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
         foreach (var item in unresolved) item.Progress = dispositions[item.Id].Outcome;
+        var openSteps = await db.TreatmentSteps.Where(x => x.DossierId == dossierId && x.Outcome != "Completed").ToListAsync(ct);
+        foreach (var step in openSteps.Where(x => dispositions.ContainsKey(x.ItemId)))
+        {
+            step.Outcome = dispositions[step.ItemId].Outcome;
+            step.Version++;
+        }
         dossier.State = request.Outcome == "StoppedIncomplete" ? "Stopped" : "Completed";
         dossier.ClosureOutcome = request.Outcome;
         dossier.ClosureReason = reason;

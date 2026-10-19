@@ -2,6 +2,8 @@
 
 Nguồn: DCMS_Screen_Specifications_v2.2.docx và DCMS_Use_Cases_Business_Rules_Messages_v2.2.docx, 19/10/2026. Phạm vi triển khai của Nguyễn Thành Vinh: staff Web S43/S21, API dossier/plan và projection chính thức cho S41; không triển khai UI patient app, actual S22, revision S62, file S20 hoặc ledger S38/S39 trong task này.
 
+Phần mở rộng S58/S21 và backend S24 theo [TREATMENT-PROGRESSION.vi.md](TREATMENT-PROGRESSION.vi.md): template version được copy vào Draft riêng của Patient, tab Steps có outcome/readiness tách biệt, completion dựa trên actual và chỉ định quay lại không tự tạo Appointment hoặc charge. UI S24 do DCMS-106 thực hiện.
+
 ## Nghiệp vụ và quyền
 
 - Một Patient có nhiều dossier độc lập; dossier Open có thể đi qua nhiều lượt khám. S43 là tóm tắt theo thời gian, S21 là một editor kế hoạch; không sao chép form ở S43.
@@ -52,7 +54,7 @@ Ví dụ lệnh lưu nháp sau khi đã tạo dossier (ID và version lấy từ
 
 Visit/diagnosis DCMS-93/94, active service catalog, S20 consent, DCMS-97 progression, DCMS-99 actual, DCMS-101 ledger và DCMS-95 own-record synchronization dùng interface/fixture contract khi chưa có module. Fixture chỉ dùng test; production không khẳng định nguồn chưa có là dữ liệu thật. S21 có item table mặc định và tab Steps/Payment Terms/History; quyết định ban đầu là drawer. S43 hiển thị patient/course header, clinical state, next work, timeline và tài chính đọc-only, điều hướng giữ đúng item. Hiển thị loading, empty, validation, 401, 403, 404, MSG111, MSG144 và lỗi nguồn chưa sẵn sàng riêng biệt. Nút lưu chặn gửi lặp, giữ form khi lỗi.
 
-Trong iteration này, backend xác thực service active cùng branch và lưu snapshot từ catalog; catalog hiện không có unit/price nên bác sĩ chọn đơn vị từ danh sách trên Web và nhập giá đã thỏa thuận, server đóng băng chúng khi chốt. `sourceDiagnosisId` khác null bị trả MSG239 cho tới khi DCMS-93/94 cung cấp nguồn xác thực; `consentDocumentId` chưa được nhận làm bằng chứng khi S20 chưa có, chốt kế hoạch có tham chiếu consent chưa kiểm chứng bị chặn MSG240. S21 chỉ hiển thị Steps chưa có nguồn DCMS-97, không có thao tác đánh dấu item/step hoàn tất. S43 trả `financialSummaryAvailable=false` khi DCMS-101 chưa cung cấp số liệu; không tự suy công nợ từ payment terms. API bảo hành chỉ nhận item Agreed + Completed và vì thế chưa có item đủ điều kiện qua giao diện này trước khi DCMS-99/progression nối vào. S41 chỉ nhận projection kế hoạch đã chốt của Patient có liên kết Verified, chưa thay cho nguồn actual/review của DCMS-95.
+Trong iteration này, backend xác thực service active cùng branch và lưu snapshot từ catalog; catalog hiện không có unit/price nên bác sĩ chọn đơn vị từ danh sách trên Web và nhập giá đã thỏa thuận, server đóng băng chúng khi chốt. `sourceDiagnosisId` khác null bị trả MSG239 cho tới khi DCMS-93/94 cung cấp nguồn xác thực; `consentDocumentId` chưa được nhận làm bằng chứng khi S20 chưa có, chốt kế hoạch có tham chiếu consent chưa kiểm chứng bị chặn MSG240. Tab Steps của S21 đọc nguồn progression mới, cho áp dụng mẫu và ghi Partial/hold; Completed bị chặn trong production cho tới khi DCMS-99 cung cấp actual/evidence thật. S43 trả `financialSummaryAvailable=false` khi DCMS-101 chưa cung cấp số liệu; không tự suy công nợ từ payment terms. API bảo hành chỉ nhận item Agreed + Completed và vì thế chưa có item đủ điều kiện qua giao diện này trước khi DCMS-99/progression nối vào. S41 chỉ nhận projection kế hoạch đã chốt của Patient có liên kết Verified, chưa thay cho nguồn actual/review của DCMS-95.
 
 ### Nhập hạng mục S21 trên Web
 

@@ -5,6 +5,7 @@ import { api, type ApiError } from '../../services/api';
 import type { AppointmentOptions, PaymentTerm, TreatmentChange, TreatmentDossier, TreatmentItem } from './types';
 import { decisionLabel, money } from './types';
 import './treatment.css';
+import PlanStepsPanel from './PlanStepsPanel';
 
 type ItemDraft = Omit<Pick<TreatmentItem, 'id' | 'serviceId' | 'region' | 'unit' | 'quantity' | 'plannedOrder' |
   'estimatedMinutes' | 'estimatedStart' | 'estimatedEnd' | 'agreedUnitPriceVnd' | 'decision' |
@@ -197,9 +198,8 @@ export default function PlanPage() {
         {dossier.planState === 'Committed' && <Alert type="info" showIcon className="treatment-section-note"
           message="Thay đổi hạng mục đã chốt cần phiên bản mới ở S62. Ghi điều trị thực tế tại S22." />}
       </Card> },
-      { key: 'steps', label: 'Các bước', children: <Card><Alert type="info" showIcon
-        message="Tiến độ bước và điều kiện sẵn sàng sẽ lấy từ module progression DCMS-97."
-        description="Không suy ra bước hoàn tất từ thời gian dự kiến, giá hay quyết định đồng ý." /></Card> },
+      { key: 'steps', label: 'Các bước', children: <PlanStepsPanel dossier={dossier} dirty={dirty}
+        onChanged={() => setRevision(value => value + 1)} /> },
       { key: 'terms', label: `Điều khoản thanh toán (${terms.length})`, children: <Card title="Mốc thanh toán dự kiến"
         extra={editable && <Button onClick={() => { termForm.resetFields(); setTermOpen(true); }}>Thêm mốc</Button>}>
         <Typography.Paragraph type="secondary">Ngày đến hạn không tạo khoản phải thu hoặc xác nhận đã trả.</Typography.Paragraph>

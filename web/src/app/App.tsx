@@ -21,6 +21,7 @@ import CustomerAppointmentsPage from '../features/customer-appointments/Customer
 import CustomerAppointmentDetailPage from '../features/customer-appointments/CustomerAppointmentDetailPage';
 import DossierPage from '../features/treatment/DossierPage';
 import PlanPage from '../features/treatment/PlanPage';
+import TemplatePage from '../features/treatment/TemplatePage';
 
 export default function App() {
   return <Routes>
@@ -51,6 +52,7 @@ export default function App() {
       <Route path="patients/:id" element={<Protected permission="patients.read"><PatientProfilePage /></Protected>} />
       <Route path="patients/:id/dossiers/:dossierId" element={<Protected permission="patients.read"><DossierPage /></Protected>} />
       <Route path="patients/:id/dossiers/:dossierId/plan" element={<Protected permission="patients.read"><PlanPage /></Protected>} />
+      <Route path="treatment-templates" element={<Protected><TemplatePage /></Protected>} />
       <Route path="appointments" element={<Protected><AppointmentCalendarPage /></Protected>} />
       <Route path="link-verification" element={<Protected permission="patient-links.verify"><LinkVerificationPage /></Protected>} />
       <Route path="support-inbox" element={<Protected permission="appointments.support.handle"><SupportInboxPage /></Protected>} />
@@ -95,6 +97,7 @@ function Workspace() {
       { key: '/', label: <Link to="/">Tài khoản của tôi</Link> },
       ...(auth.user?.permissions.includes('accounts.manage') ? [{ key: '/accounts', label: <Link to="/accounts">Quản lý tài khoản</Link> }] : []),
       ...(auth.user?.permissions.includes('patients.read') ? [{ key: '/patients', label: <Link to="/patients">Bệnh nhân</Link> }] : []),
+      ...(auth.user?.effectiveRoles.includes('Dentist') ? [{ key: '/treatment-templates', label: <Link to="/treatment-templates">Mẫu điều trị</Link> }] : []),
       ...(auth.user?.permissions.includes('patient-links.verify') ? [{ key: '/link-verification', label: <Link to="/link-verification">Xác minh liên kết hồ sơ</Link> }] : []),
     ]} />
     <Layout.Content className="workspace-content">{error && <Alert className="form-alert" type="error" message={error} showIcon />}<Outlet /></Layout.Content>

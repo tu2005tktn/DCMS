@@ -42,6 +42,12 @@ public sealed class DcmsDbContext(DbContextOptions<DcmsDbContext> options)
     public DbSet<TreatmentItem> TreatmentItems => Set<TreatmentItem>();
     public DbSet<TreatmentEvent> TreatmentEvents => Set<TreatmentEvent>();
     public DbSet<TreatmentReceipt> TreatmentReceipts => Set<TreatmentReceipt>();
+    public DbSet<TreatmentTemplate> TreatmentTemplates => Set<TreatmentTemplate>();
+    public DbSet<TreatmentTemplateVersion> TreatmentTemplateVersions => Set<TreatmentTemplateVersion>();
+    public DbSet<TreatmentStep> TreatmentSteps => Set<TreatmentStep>();
+    public DbSet<FollowUpInstruction> FollowUpInstructions => Set<FollowUpInstruction>();
+    public DbSet<TreatmentProgressionReceipt> TreatmentProgressionReceipts => Set<TreatmentProgressionReceipt>();
+    public DbSet<TreatmentProgressionEvent> TreatmentProgressionEvents => Set<TreatmentProgressionEvent>();
 
     protected override void OnModelCreating(ModelBuilder model)
     {
