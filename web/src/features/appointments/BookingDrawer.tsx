@@ -7,7 +7,11 @@ import {
   type AppointmentOptions, type AppointmentResult, type AvailabilitySlot,
 } from './types';
 
-export type BookingPrefill = { branchId: number; dentistId?: number; date: string; minute?: number };
+// patient: optional existing Patient to book for (e.g. a care task rebooking from S25/S60); kind defaults to Standard.
+export type BookingPrefill = {
+  branchId: number; dentistId?: number; date: string; minute?: number;
+  patient?: { id: number; patientCode: string; fullName: string; birthDate: string | null };
+};
 type Values = {
   kind: 'Standard' | 'WalkIn'; source: string; bookerName: string; bookerContact: string; patientId?: number;
   attendeeName?: string; attendeeBirthDate?: string; relation: 'Self' | 'Relative'; serviceId?: number; reason?: string;
@@ -41,7 +45,8 @@ export default function BookingDrawer({ open, prefill, options, onClose, onBooke
     if (!open || !prefill) return;
     form.resetFields();
     form.setFieldsValue({ kind: 'Standard', source: 'Phone', relation: 'Self', branchId: prefill.branchId, dentistId: prefill.dentistId,
-      date: prefill.date, duration: 30 });
+      date: prefill.date, duration: 30, patientId: prefill.patient?.id });
+    setPatients(prefill.patient ? [{ ...prefill.patient, phone: null }] : []);
     wantedMinute.current = prefill.minute;
     setSlots(null); setSlot(null); setReviewing(false); setError(null); setSlotsError(null); requestKey.current = null;
   }, [open, prefill]);

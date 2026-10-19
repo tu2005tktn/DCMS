@@ -5,6 +5,9 @@ import { api, ApiError } from '../../services/api';
 import { useAuth } from '../authentication/AuthContext';
 import { formatDate, formatTime } from '../patient-links/types';
 import PatientFormDrawer from './PatientFormDrawer';
+import DocumentList, { type DocumentFilters } from '../clinical-documents/DocumentList';
+import { usePatientDocumentContexts } from '../clinical-documents/PatientDocumentsPage';
+import { PreviewBanner } from '../ui-preview/preview';
 import { auditActionLabels, genderLabels, type PatientAuditEntry, type PatientChange, type PatientDetail } from './types';
 
 const unknown = <Typography.Text type="secondary">Chưa rõ</Typography.Text>;
@@ -123,7 +126,7 @@ export default function PatientProfilePage() {
           <Typography.Paragraph type="secondary">Tạo lúc {formatTime(patient.createdAt)} · Cập nhật lúc {formatTime(patient.updatedAt)} · Phiên bản {patient.version}</Typography.Paragraph>
         </> },
         { key: 'treatment', label: 'Điều trị & Thanh toán', children: <Pending feature="hồ sơ điều trị và thanh toán (S43)" /> },
-        { key: 'files', label: 'Hình ảnh & Tệp', children: <Pending feature="hình ảnh và tài liệu (S20)" /> },
+        { key: 'files', label: 'Hình ảnh & Tệp', children: <PatientFilesTab patientId={patient.id} /> },
         { key: 'appointments', label: 'Lịch hẹn', children: <Pending feature="lịch hẹn (S11/S12)" /> },
         { key: 'prescriptions', label: 'Đơn thuốc', children: <Pending feature="đơn thuốc (S23)" /> },
         { key: 'audit', label: 'Lịch sử thay đổi', children: auditError
@@ -173,4 +176,15 @@ function ArchiveModal({ patient, open, onClose, onSaved }: {
         { max: 500, message: 'Lý do không được vượt quá 500 ký tự.' }]}><Input.TextArea rows={3} maxLength={500} showCount /></Form.Item>
     </Form>
   </Modal>;
+}
+
+// Images and Files tab: the same S20 list/viewer as /patients/:id/documents, so there is a single implementation.
+function PatientFilesTab({ patientId }: { patientId: number }) {
+  const { contexts } = usePatientDocumentContexts(patientId);
+  const [filters, setFilters] = useState<DocumentFilters>({});
+  return <>
+    <PreviewBanner />
+    <Typography.Paragraph><Link to={`/patients/${patientId}/documents`}>Mở trang tài liệu đầy đủ (S20)</Link></Typography.Paragraph>
+    <DocumentList patientId={patientId} contexts={contexts} filters={filters} onFiltersChange={setFilters} uploadContext={{}} />
+  </>;
 }
