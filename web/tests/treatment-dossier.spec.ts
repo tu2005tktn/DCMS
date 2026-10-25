@@ -21,6 +21,9 @@ const dossier = {
 };
 
 test('S43 opens S21 and a version conflict keeps the edited plan in the form', async ({ page }) => {
+  let draftRequest: { items: { quantity: number; estimatedMinMinutes: number;
+    estimatedMaxMinutes: number; estimatedMinutes: number; reservedMinutes: number;
+    acknowledgeShortReservation: boolean }[] } | null = null;
   const user = {
     id: 9, userName: 'synthetic.dentist', fullName: 'SYNTHETIC Dentist', accountType: 'Staff',
     roles: ['Dentist'], effectiveRoles: ['Dentist'], permissions: ['patients.read'], hasVerifiedPatientLink: false,
@@ -28,14 +31,24 @@ test('S43 opens S21 and a version conflict keeps the edited plan in the form', a
   await page.route('**/api/auth/me', route => route.fulfill({ json: user }));
   await page.route('**/api/auth/sign-in', route => route.fulfill({ json: { accessToken: 'synthetic-token', user } }));
   await page.route(`**/api/dossiers/${dossierId}`, route => route.fulfill({ json: dossier }));
+  await page.route(`**/api/dossiers/${dossierId}/plan/preview`, route => route.fulfill({ json: {
+    dossierId, dossierVersion: 2, planVersion: 0,
+    items: [{ itemId, grossVnd: 300000, approvedDiscountVnd: 0, netVnd: 300000,
+      referenceUnitPriceVnd: 320000 }], grossVnd: 300000, approvedDiscountVnd: 0,
+    netBeforeTaxVnd: 300000,
+  } }));
+  await page.route('**/api/service-prices/3', route => route.fulfill({ json: {
+    serviceId: 3, branchId: 1, name: 'Trám răng', referenceUnitPriceVnd: 320000, priceVersion: 1,
+  } }));
   await page.route('**/api/appointments/options', route => route.fulfill({ json: {
     branches: [{ id: 1, name: 'Chi nhánh thử nghiệm' }],
     dentists: [{ id: 2, branchId: 1, name: 'Bác sĩ thử nghiệm' }],
     services: [{ id: 3, branchId: 1, name: 'Trám răng' }],
   } }));
-  await page.route(`**/api/dossiers/${dossierId}/plan/draft`, route => route.fulfill({
-    status: 409, json: { code: 'MSG111', message: 'Phiên bản đã thay đổi.' },
-  }));
+  await page.route(`**/api/dossiers/${dossierId}/plan/draft`, route => {
+    draftRequest = route.request().postDataJSON();
+    return route.fulfill({ status: 409, json: { code: 'MSG111', message: 'Phiên bản đã thay đổi.' } });
+  });
   await page.goto('http://127.0.0.1:5173/sign-in');
   await page.getByLabel('Tên đăng nhập', { exact: true }).fill('synthetic.dentist');
   await page.getByLabel('Mật khẩu', { exact: true }).fill('synthetic');
@@ -60,6 +73,14 @@ test('S43 opens S21 and a version conflict keeps the edited plan in the form', a
   await page.locator('.ant-select-item-option').filter({ hasText: /^2$/ }).click();
   await scope.getByRole('spinbutton', { name: /Giá thỏa thuận mỗi đơn vị/ }).fill('300000');
   await expect(scope.getByText('600.000 ₫')).toBeVisible();
+  await scope.getByText('Dự kiến thực hiện (không bắt buộc)').click();
+  await scope.getByRole('spinbutton', { name: 'Ước lượng ngắn nhất (phút)' }).fill('20');
+  await scope.getByRole('spinbutton', { name: 'Ước lượng dài nhất (phút)' }).fill('40');
+  await scope.getByRole('spinbutton', { name: 'Thời gian bác sĩ chọn (phút)' }).fill('25');
+  await scope.getByRole('combobox', { name: 'Thời gian dự kiến giữ ghế' }).click();
+  await page.locator('.ant-select-item-option').filter({ hasText: /^30 phút$/ }).click();
+  await expect(scope.getByText('Thời gian giữ ghế ngắn hơn mức ước lượng dài nhất.')).toBeVisible();
+  await scope.getByRole('checkbox', { name: 'Tôi đã cân nhắc và xác nhận thời gian giữ ghế này' }).check();
   await scope.getByRole('button', { name: 'Lưu hạng mục' }).click();
   await expect(page.getByText('2 răng × 300.000 ₫')).toBeVisible();
   await page.getByRole('button', { name: 'Ghi quyết định' }).last().click();
@@ -76,4 +97,8 @@ test('S43 opens S21 and a version conflict keeps the edited plan in the form', a
   await page.getByRole('button', { name: 'Lưu nháp kế hoạch' }).click();
   await expect(page.getByText('Phiên bản đã thay đổi.')).toBeVisible();
   await expect(page.getByLabel('Mục tiêu và phương án')).toHaveValue('Mục tiêu mới giữ lại khi xung đột');
+  expect(draftRequest).not.toBeNull();
+  const timedItem = draftRequest!.items.find(item => item.quantity === 2);
+  expect(timedItem).toMatchObject({ estimatedMinMinutes: 20, estimatedMaxMinutes: 40,
+    estimatedMinutes: 25, reservedMinutes: 30, acknowledgeShortReservation: true });
 });

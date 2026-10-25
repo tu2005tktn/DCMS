@@ -10,6 +10,14 @@ public static class TreatmentEndpoints
 
     public static void MapTreatmentEndpoints(this IEndpointRouteBuilder endpoints)
     {
+        var prices = endpoints.MapGroup("/api/service-prices").RequireAuthorization().WithTags("S21 reference prices");
+        prices.MapGet("/", async (HttpContext context, IServicePriceService service, CancellationToken ct) =>
+            Results.Ok(await service.ListAsync(AuthenticationEndpoints.AccountId(context.User), ct)));
+        prices.MapGet("/{serviceId:int}", async (HttpContext context, int serviceId, IServicePriceService service,
+            CancellationToken ct) => Results.Ok(await service.GetAsync(AuthenticationEndpoints.AccountId(context.User), serviceId, ct)));
+        prices.MapPut("/{serviceId:int}", async (HttpContext context, int serviceId, SaveServicePriceRequest request,
+            IServicePriceService service, CancellationToken ct) => Results.Ok(await service.SaveAsync(
+                AuthenticationEndpoints.AccountId(context.User), serviceId, request, ct)));
         var patient = endpoints.MapGroup("/api/patients/{patientId:int}/dossiers")
             .RequireAuthorization(DentistPolicy).WithTags("UC-13/39 S21/S43 Treatment");
         patient.MapGet("/", async (HttpContext context, int patientId, int? branchId, int? page, int? pageSize,
@@ -33,6 +41,26 @@ public static class TreatmentEndpoints
         dossier.MapPost("/plan/commit", async (HttpContext context, Guid dossierId, CommitPlanRequest request,
             ITreatmentDossierService service, CancellationToken ct) =>
             Results.Ok(await service.CommitAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, request, ct)));
+        dossier.MapGet("/plan/preview", async (HttpContext context, Guid dossierId,
+            ITreatmentDossierService service, CancellationToken ct) => Results.Ok(await service.PricePreviewAsync(
+                AuthenticationEndpoints.AccountId(context.User), dossierId, ct)));
+        var commercial = endpoints.MapGroup("/api/commercial/dossiers/{dossierId:guid}")
+            .RequireAuthorization().WithTags("S21 commercial review");
+        endpoints.MapGet("/api/commercial/dossiers", async (HttpContext context,
+            ITreatmentDossierService service, CancellationToken ct) => Results.Ok(await service.CommercialDossiersAsync(
+                AuthenticationEndpoints.AccountId(context.User), ct))).RequireAuthorization()
+            .WithTags("S21 commercial review");
+        commercial.MapGet("/plan", async (HttpContext context, Guid dossierId,
+            ITreatmentDossierService service, CancellationToken ct) => Results.Ok(await service.CommercialPlanAsync(
+                AuthenticationEndpoints.AccountId(context.User), dossierId, ct)));
+        commercial.MapPost("/items/{itemId:guid}/discount/decision", async (HttpContext context,
+            Guid dossierId, Guid itemId, DecideDiscountRequest request, ITreatmentDossierService service,
+            CancellationToken ct) => Results.Ok(await service.DecideDiscountAsync(
+                AuthenticationEndpoints.AccountId(context.User), dossierId, itemId, request, ct)));
+        commercial.MapPost("/deposit-exception", async (HttpContext context, Guid dossierId,
+            DepositExceptionRequest request, ITreatmentDossierService service, CancellationToken ct) =>
+            Results.Ok(await service.SetDepositExceptionAsync(AuthenticationEndpoints.AccountId(context.User),
+                dossierId, request, ct)));
         dossier.MapGet("/plan/history", async (HttpContext context, Guid dossierId, ITreatmentDossierService service, CancellationToken ct) =>
             Results.Ok(await service.HistoryAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, ct)));
         dossier.MapGet("/plan/revisions/context", async (HttpContext context, Guid dossierId, Guid itemId,

@@ -1,4 +1,4 @@
-import { Alert, Button, Card, Descriptions, Input, InputNumber, Result, Select, Skeleton, Space, Steps, Tag, Typography } from 'antd';
+import { Alert, Button, Card, Checkbox, Descriptions, Input, InputNumber, Result, Select, Skeleton, Space, Steps, Tag, Typography } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { api, type ApiError } from '../../services/api';
@@ -7,7 +7,9 @@ import { decisionLabel, money } from './types';
 import './treatment.css';
 
 type Proposal = Pick<TreatmentItem, 'serviceId' | 'material' | 'region' | 'unit' | 'quantity' |
-  'estimatedMinutes' | 'agreedUnitPriceVnd'>;
+  'estimatedMinutes' | 'agreedUnitPriceVnd' | 'estimatedMinMinutes' | 'estimatedMaxMinutes' |
+  'reservedMinutes' | 'estimatedSessions' | 'returnEarliestOn' | 'returnTargetOn' |
+  'returnLatestOn'> & { acknowledgeShortReservation: boolean };
 type Disposition = { stepId: string; outcome: 'Stopped' | 'Cancelled' | 'Skipped'; reason: string };
 type Draft = { dossierId: string; itemId: string; actorId: number; basePlanVersion: number;
   version: number; proposed: Proposal; reason: string; counseling: string; decision: TreatmentItem['decision'];
@@ -83,6 +85,14 @@ export default function RevisionPage() {
         serviceId: current.item.serviceId, material: current.item.material,
         region: current.item.region, unit: current.item.unit, quantity: current.item.quantity,
         estimatedMinutes: current.item.estimatedMinutes,
+        estimatedMinMinutes: current.item.estimatedMinMinutes,
+        estimatedMaxMinutes: current.item.estimatedMaxMinutes,
+        reservedMinutes: current.item.reservedMinutes,
+        estimatedSessions: current.item.estimatedSessions,
+        returnEarliestOn: current.item.returnEarliestOn,
+        returnTargetOn: current.item.returnTargetOn,
+        returnLatestOn: current.item.returnLatestOn,
+        acknowledgeShortReservation: Boolean(current.item.shortReservationAcknowledgedAt),
         agreedUnitPriceVnd: current.item.agreedUnitPriceVnd,
       });
       setReason(saved?.reason ?? ''); setCounseling(saved?.counseling ?? '');
@@ -209,9 +219,31 @@ export default function RevisionPage() {
         <label>Giá thỏa thuận mỗi đơn vị (VND)<InputNumber min={0} precision={0}
           value={proposal.agreedUnitPriceVnd}
           onChange={value => updateProposal('agreedUnitPriceVnd', value ?? 0)} /></label>
-        <label>Thời gian dự kiến (phút)<Select allowClear value={proposal.estimatedMinutes}
-          options={[30, 60, 90, 120, 180, 240].map(value => ({ value, label: `${value} phút` }))}
-          onChange={value => updateProposal('estimatedMinutes', value ?? null)} /></label>
+        <label>Ước lượng ngắn nhất (phút)<InputNumber min={1} max={480}
+          value={proposal.estimatedMinMinutes} onChange={value => updateProposal('estimatedMinMinutes', value)} /></label>
+        <label>Ước lượng dài nhất (phút)<InputNumber min={1} max={480}
+          value={proposal.estimatedMaxMinutes} onChange={value => updateProposal('estimatedMaxMinutes', value)} /></label>
+        <label>Thời gian bác sĩ chọn (phút)<InputNumber min={1} max={480}
+          value={proposal.estimatedMinutes} onChange={value => updateProposal('estimatedMinutes', value)} /></label>
+        <label>Thời gian giữ ghế<Select allowClear value={proposal.reservedMinutes}
+          options={Array.from({ length: 32 }, (_, index) => ({ value: (index + 1) * 15,
+            label: `${(index + 1) * 15} phút` }))}
+          onChange={value => updateProposal('reservedMinutes', value ?? null)} /></label>
+        {proposal.estimatedMaxMinutes && proposal.reservedMinutes &&
+          proposal.reservedMinutes < proposal.estimatedMaxMinutes && <label className="treatment-revision-wide">
+          <Checkbox checked={proposal.acknowledgeShortReservation}
+            onChange={event => updateProposal('acknowledgeShortReservation', event.target.checked)}>
+            Tôi xác nhận giữ ghế ngắn hơn mức ước lượng dài nhất</Checkbox></label>}
+        <label>Số buổi ước lượng<Select allowClear value={proposal.estimatedSessions}
+          options={Array.from({ length: 12 }, (_, index) => ({ value: index + 1,
+            label: `${index + 1} buổi` }))}
+          onChange={value => updateProposal('estimatedSessions', value ?? null)} /></label>
+        <label>Quay lại sớm nhất<Input type="date" value={proposal.returnEarliestOn ?? ''}
+          onChange={event => updateProposal('returnEarliestOn', event.target.value || null)} /></label>
+        <label>Ngày mục tiêu<Input type="date" value={proposal.returnTargetOn ?? ''}
+          onChange={event => updateProposal('returnTargetOn', event.target.value || null)} /></label>
+        <label>Muộn nhất<Input type="date" value={proposal.returnLatestOn ?? ''}
+          onChange={event => updateProposal('returnLatestOn', event.target.value || null)} /></label>
         <label className="treatment-revision-wide">Lý do điều chỉnh (1–1000 ký tự)
           <Input.TextArea value={reason} maxLength={1000} showCount rows={3}
             onChange={event => { setReason(event.target.value); changed(); }} /></label>

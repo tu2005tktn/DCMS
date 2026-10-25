@@ -64,6 +64,8 @@ public static class DependencyInjection
         services.AddScoped<DevelopmentPatientLinkSeeder>();
         services.AddScoped<IPatientService, PatientService>();
         services.AddScoped<ITreatmentDossierService, TreatmentDossierService>();
+        services.AddScoped<IServicePriceService, ServicePriceService>();
+        services.AddScoped<ITreatmentFinancialSummaryPort, UnavailableTreatmentFinancialSummaryPort>();
         services.AddScoped<ITreatmentRevisionService, TreatmentRevisionService>();
         services.AddScoped<ITreatmentRevisionActualPort, UnavailableRevisionActualPort>();
         services.AddScoped<ITreatmentRevisionFinancePort, UnavailableRevisionFinancePort>();

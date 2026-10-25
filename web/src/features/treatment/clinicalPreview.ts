@@ -45,6 +45,12 @@ function item(id: string, serviceId: number, serviceName: string, region: string
     consentPlanVersion: 1, decisionPlanVersion: 1,
     warrantyPolicy: null, warrantyPolicyVersion: null, warrantyScope: null,
     warrantyConfirmedAt: null, warrantyEndsOn: null,
+    estimatedMinMinutes: null, estimatedMaxMinutes: null, reservedMinutes: null,
+    estimatedSessions: null, returnEarliestOn: null, returnTargetOn: null, returnLatestOn: null,
+    shortReservationAcknowledgedBy: null, shortReservationAcknowledgedAt: null,
+    referenceUnitPriceVnd: null, referencePriceVersion: null, discount: null,
+    warrantyComponent: null, warrantyExclusions: null, warrantyActivatedOn: null,
+    warrantyExplanation: null, expectedServiceLifeMonths: null,
   };
 }
 

@@ -3,7 +3,11 @@ using DCMS.Application.Common;
 namespace DCMS.Application.Features.Treatment;
 
 public sealed record RevisionProposal(int ServiceId, string? Material, string? Region, string Unit,
-    decimal Quantity, int? EstimatedMinutes, long AgreedUnitPriceVnd);
+    decimal Quantity, int? EstimatedMinutes, long AgreedUnitPriceVnd,
+    int? EstimatedMinMinutes = null, int? EstimatedMaxMinutes = null,
+    int? ReservedMinutes = null, bool AcknowledgeShortReservation = false,
+    int? EstimatedSessions = null, DateOnly? ReturnEarliestOn = null,
+    DateOnly? ReturnTargetOn = null, DateOnly? ReturnLatestOn = null);
 public sealed record RevisionDisposition(Guid StepId, string Outcome, string Reason);
 public sealed record SaveRevisionDraftRequest(int ExpectedDraftVersion, int BasePlanVersion,
     RevisionProposal Proposed, string Reason, string Counseling, string Decision,

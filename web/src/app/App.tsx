@@ -25,6 +25,7 @@ import DossierPage from '../features/treatment/DossierPage';
 import PlanPage from '../features/treatment/PlanPage';
 import RevisionPage from '../features/treatment/RevisionPage';
 import TemplatePage from '../features/treatment/TemplatePage';
+import CommercialTreatmentPage from '../features/treatment/CommercialTreatmentPage';
 import { ActualTreatmentPage, PostoperativeReviewPage } from '../features/treatment/ClinicalWorkPages';
 import ClinicalPreviewPage from '../features/treatment/ClinicalPreviewPage';
 import { clinicalPreviewTreatment } from '../features/treatment/clinicalPreview';
@@ -68,6 +69,7 @@ export default function App() {
       <Route path="patients/:id/visits/:visitId/treatment" element={<Protected permission="patients.read"><ActualTreatmentPage /></Protected>} />
       <Route path="patients/:id/visits/:visitId/review" element={<Protected permission="patients.read"><PostoperativeReviewPage /></Protected>} />
       <Route path="treatment-templates" element={<Protected><TemplatePage /></Protected>} />
+      <Route path="commercial/treatment" element={<Protected><CommercialTreatmentPage /></Protected>} />
       <Route path="appointments" element={<Protected><AppointmentCalendarPage /></Protected>} />
       <Route path="appointments/:id" element={<Protected><AppointmentDetailPage /></Protected>} />
       <Route path="link-verification" element={<Protected permission="patient-links.verify"><LinkVerificationPage /></Protected>} />
@@ -117,6 +119,8 @@ function Workspace() {
       ...(auth.user?.permissions.includes('accounts.manage') ? [{ key: '/accounts', label: <Link to="/accounts">Quản lý tài khoản</Link> }] : []),
       ...(auth.user?.permissions.includes('patients.read') ? [{ key: '/patients', label: <Link to="/patients">Bệnh nhân</Link> }] : []),
       ...(auth.user?.effectiveRoles.includes('Dentist') ? [{ key: '/treatment-templates', label: <Link to="/treatment-templates">Mẫu điều trị</Link> }] : []),
+      ...(auth.user?.effectiveRoles.some(r => ['Admin', 'ClinicOwner', 'Dentist'].includes(r)) ? [{ key: '/commercial/treatment',
+        label: <Link to="/commercial/treatment">Giá và duyệt điều trị</Link> }] : []),
       ...(auth.user?.permissions.includes('patient-links.verify') ? [{ key: '/link-verification', label: <Link to="/link-verification">Xác minh liên kết hồ sơ</Link> }] : []),
     ]} />
     <Layout.Content className="workspace-content">{error && <Alert className="form-alert" type="error" message={error} showIcon />}<Outlet /></Layout.Content>

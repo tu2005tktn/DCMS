@@ -55,6 +55,142 @@ public sealed class TreatmentDossierApiTests(ApiFixture fixture) : IClassFixture
     }
 
     [Fact]
+    public async Task WarrantyIsItemSpecificAndPrognosisDoesNotExtendCoverage()
+    {
+        var setup = await Prepare();
+        using var dentist = await Login("dentist.demo");
+        var createdResponse = await dentist.PostAsJsonAsync($"/api/patients/{setup.PatientId}/dossiers",
+            new CreateDossierRequest(setup.BranchId, setup.DentistId, "SYNTHETIC warranty", null,
+                null, Guid.NewGuid()));
+        var created = (await createdResponse.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
+        var item = new TreatmentItemInput(null, null, setup.ServiceId, "25", "răng", 1, 1,
+            30, null, null, 1000000, "Agreed", "Đã giải thích bảo hành", "Bệnh nhân", null, null);
+        var draftResponse = await dentist.PostAsJsonAsync($"/api/dossiers/{created.Id}/plan/draft",
+            new SavePlanDraftRequest(created.Version, "SYNTHETIC warranty plan", [item], [], Guid.NewGuid()));
+        var draft = (await draftResponse.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
+        var committedResponse = await dentist.PostAsJsonAsync($"/api/dossiers/{created.Id}/plan/commit",
+            new CommitPlanRequest(draft.Version, Guid.NewGuid()));
+        var committed = (await committedResponse.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
+        var itemId = Assert.Single(committed.Items).Id;
+        var activation = DateOnly.FromDateTime(DateTime.UtcNow.Date);
+        var warranty = new ConfirmWarrantyRequest(committed.Version, "SYNTHETIC policy", "v1",
+            "Mão sứ răng 25", activation.AddYears(2), Guid.NewGuid(), "Mão sứ",
+            "Không bao gồm tổn thương do chấn thương", activation,
+            "Đã giải thích điều kiện và loại trừ", 120);
+        var url = $"/api/dossiers/{created.Id}/items/{itemId}/warranty/confirm";
+        await AssertMessage(await dentist.PostAsJsonAsync(url, warranty), HttpStatusCode.BadRequest, "MSG244");
+        using (var scope = fixture.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
+            var row = await db.TreatmentItems.SingleAsync(x => x.Id == itemId);
+            row.Progress = "Completed"; // isolated clinical fixture, not a production actual.
+            await db.SaveChangesAsync();
+        }
+        var confirmedResponse = await dentist.PostAsJsonAsync(url, warranty);
+        Assert.Equal(HttpStatusCode.OK, confirmedResponse.StatusCode);
+        var confirmed = (await confirmedResponse.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
+        var covered = Assert.Single(confirmed.Items);
+        Assert.Equal("Mão sứ", covered.WarrantyComponent);
+        Assert.Equal(activation.AddYears(2), covered.WarrantyEndsOn);
+        Assert.Equal(120, covered.ExpectedServiceLifeMonths);
+        Assert.NotEqual(activation.AddYears(10), covered.WarrantyEndsOn);
+    }
+
+    [Fact]
+    public async Task V23DurationsReferenceDiscountAndPaymentTermsStayPlanned()
+    {
+        var setup = await Prepare();
+        using var dentist = await Login("dentist.demo");
+        using var admin = await Login("admin.demo");
+        using var assistant = await Login("assistant.demo");
+        var priceUrl = $"/api/service-prices/{setup.ServiceId}";
+        Assert.Equal(HttpStatusCode.Forbidden, (await assistant.PutAsJsonAsync(priceUrl,
+            new SaveServicePriceRequest(1, 600000, Guid.NewGuid()))).StatusCode);
+        var setPrice = await dentist.PutAsJsonAsync(priceUrl,
+            new SaveServicePriceRequest(1, 600000, Guid.NewGuid()));
+        Assert.Equal(HttpStatusCode.OK, setPrice.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await admin.GetAsync(priceUrl)).StatusCode);
+        var createdResponse = await dentist.PostAsJsonAsync($"/api/patients/{setup.PatientId}/dossiers",
+            new CreateDossierRequest(setup.BranchId, setup.DentistId, "SYNTHETIC v23 plan", null,
+                null, Guid.NewGuid()));
+        Assert.Equal(HttpStatusCode.Created, createdResponse.StatusCode);
+        var created = (await createdResponse.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
+        var first = new TreatmentItemInput(null, null, setup.ServiceId, "46", "răng", 1, 1,
+            25, null, null, 600000, "Agreed", "Đã tư vấn", "Bệnh nhân", null, null,
+            EstimatedMinMinutes: 20, EstimatedMaxMinutes: 25, ReservedMinutes: 30,
+            EstimatedSessions: 2, ReturnEarliestOn: new DateOnly(2027, 1, 1),
+            ReturnTargetOn: new DateOnly(2027, 1, 8), ReturnLatestOn: new DateOnly(2027, 1, 15));
+        var second = first with { Region = "25", PlannedOrder = 2, AgreedUnitPriceVnd = 1000000,
+            EstimatedSessions = 4, Decision = "Deferred", Counseling = "Hoãn sau tư vấn" };
+        var draft = new SavePlanDraftRequest(created.Version, "Điều trị nhiều buổi", [first, second],
+            [new PaymentTermInput("Đợt một", 200000, new DateOnly(2027, 1, 1), "Thỏa thuận",
+                "Sau buổi đầu")], Guid.NewGuid());
+        await AssertMessage(await dentist.PostAsJsonAsync($"/api/dossiers/{created.Id}/plan/draft",
+            draft with { Items = [first with { ReservedMinutes = 20 }, second] }), HttpStatusCode.BadRequest, "MSG04");
+        var savedResponse = await dentist.PostAsJsonAsync($"/api/dossiers/{created.Id}/plan/draft", draft);
+        Assert.Equal(HttpStatusCode.OK, savedResponse.StatusCode);
+        var saved = (await savedResponse.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
+        Assert.Equal(20, saved.Items[0].EstimatedMinMinutes);
+        Assert.Equal(25, saved.Items[0].EstimatedMaxMinutes);
+        Assert.Equal(30, saved.Items[0].ReservedMinutes);
+        Assert.Equal(600000, saved.Items[0].ReferenceUnitPriceVnd);
+        Assert.Equal("Sau buổi đầu", saved.PaymentTerms[0].Milestone);
+        Assert.Equal(600000, saved.FinancialSummary!.PlannedVnd); // Deferred item is not agreed cost.
+        await AssertMessage(await dentist.PostAsJsonAsync($"/api/dossiers/{created.Id}/plan/draft",
+            draft with { ExpectedVersion = saved.Version, RequestKey = Guid.NewGuid(),
+                Items = [first with { Id = saved.Items[0].Id, EstimatedMaxMinutes = 40 },
+                    second with { Id = saved.Items[1].Id }] }), HttpStatusCode.BadRequest, "MSG04");
+
+        var proposal = new TreatmentDiscountInput("Fixed", 300000, "Ưu đãi chụp sứ", saved.Items[0].Id);
+        var proposedResponse = await dentist.PostAsJsonAsync($"/api/dossiers/{created.Id}/plan/draft",
+            draft with { ExpectedVersion = saved.Version, RequestKey = Guid.NewGuid(),
+                Items = [first with { Id = saved.Items[0].Id }, second with { Id = saved.Items[1].Id,
+                    Decision = "Agreed", Discount = proposal }] });
+        Assert.Equal(HttpStatusCode.OK, proposedResponse.StatusCode);
+        var proposed = (await proposedResponse.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
+        Assert.Equal("Proposed", proposed.Items[1].Discount!.Status);
+        await AssertMessage(await dentist.PostAsJsonAsync($"/api/dossiers/{created.Id}/plan/commit",
+            new CommitPlanRequest(proposed.Version, Guid.NewGuid())), HttpStatusCode.BadRequest, "MSG240");
+        var decision = new DecideDiscountRequest(proposed.Version, "Approved", Guid.NewGuid());
+        var decisionUrl = $"/api/commercial/dossiers/{created.Id}/items/{proposed.Items[1].Id}/discount/decision";
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await assistant.PostAsJsonAsync(decisionUrl, decision)).StatusCode);
+        var approvedResponse = await dentist.PostAsJsonAsync(decisionUrl, decision);
+        Assert.Equal(HttpStatusCode.OK, approvedResponse.StatusCode);
+        var approved = (await approvedResponse.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
+        Assert.Equal(300000, approved.Items[1].Discount!.AmountVnd);
+        var repeatedDecision = await dentist.PostAsJsonAsync(decisionUrl, decision);
+        Assert.Equal(HttpStatusCode.OK, repeatedDecision.StatusCode);
+        Assert.Equal(approved.Version,
+            (await repeatedDecision.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier.Version);
+        await AssertMessage(await dentist.PostAsJsonAsync(decisionUrl,
+            decision with { Decision = "Rejected" }), HttpStatusCode.Conflict, "MSG111");
+        Assert.Equal(HttpStatusCode.OK, (await dentist.PutAsJsonAsync(priceUrl,
+            new SaveServicePriceRequest(2, 700000, Guid.NewGuid()))).StatusCode);
+        var afterCatalogChange = await dentist.GetFromJsonAsync<TreatmentDossierDto>($"/api/dossiers/{created.Id}");
+        Assert.Equal(600000, afterCatalogChange!.Items[0].ReferenceUnitPriceVnd);
+        var preview = await dentist.GetFromJsonAsync<PlanPricePreviewDto>($"/api/dossiers/{created.Id}/plan/preview");
+        Assert.Equal(1300000, preview!.NetBeforeTaxVnd);
+        var depositUrl = $"/api/commercial/dossiers/{created.Id}/deposit-exception";
+        Assert.Equal(HttpStatusCode.Forbidden, (await assistant.PostAsJsonAsync(depositUrl,
+            new DepositExceptionRequest(approved.Version, "Không cọc", Guid.NewGuid()))).StatusCode);
+        var deposit = await dentist.PostAsJsonAsync(depositUrl,
+            new DepositExceptionRequest(approved.Version, "Thỏa thuận không cọc", Guid.NewGuid()));
+        Assert.Equal(HttpStatusCode.OK, deposit.StatusCode);
+        var deposited = (await deposit.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
+        var committedResponse = await dentist.PostAsJsonAsync($"/api/dossiers/{created.Id}/plan/commit",
+            new CommitPlanRequest(deposited.Version, Guid.NewGuid()));
+        Assert.Equal(HttpStatusCode.OK, committedResponse.StatusCode);
+        var committed = (await committedResponse.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
+        Assert.Equal(1300000, committed.FinancialSummary!.PlannedVnd);
+        Assert.False(committed.FinancialSummary.Available);
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
+        Assert.Equal(0, await db.Appointments.CountAsync(x => x.PatientId == setup.PatientId));
+        Assert.Equal(0, await db.ClinicalActivities.CountAsync(x => x.PatientId == setup.PatientId));
+    }
+
+    [Fact]
     public async Task DraftDecisionSnapshotRetryAndClosureRemainIndependentOfActualAndCharges()
     {
         var setup = await Prepare();

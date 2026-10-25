@@ -11,8 +11,27 @@ export type TreatmentItem = {
   decisionPlanVersion: number | null;
   warrantyPolicy: string | null; warrantyPolicyVersion: string | null; warrantyScope: string | null;
   warrantyConfirmedAt: string | null; warrantyEndsOn: string | null;
+  estimatedMinMinutes: number | null; estimatedMaxMinutes: number | null; reservedMinutes: number | null;
+  estimatedSessions: number | null; returnEarliestOn: string | null; returnTargetOn: string | null;
+  returnLatestOn: string | null; shortReservationAcknowledgedBy: number | null;
+  shortReservationAcknowledgedAt: string | null;
+  referenceUnitPriceVnd: number | null; referencePriceVersion: number | null;
+  discount: TreatmentDiscount | null; warrantyComponent: string | null; warrantyExclusions: string | null;
+  warrantyActivatedOn: string | null; warrantyExplanation: string | null;
+  expectedServiceLifeMonths: number | null;
 };
-export type PaymentTerm = { purpose: string; amountVnd: number; dueOn: string; evidence: string | null };
+export type TreatmentDiscount = { type: 'Fixed' | 'Percent'; value: number; reason: string;
+  qualifyingItemId: string | null; status: 'Proposed' | 'Approved' | 'Rejected';
+  decidedBy: number | null; decidedAt: string | null; amountVnd: number };
+export type PaymentTerm = { purpose: string; amountVnd: number; dueOn: string; evidence: string | null;
+  milestone: string | null; planVersion: number | null };
+export type ServicePrice = { serviceId: number; branchId: number; name: string;
+  referenceUnitPriceVnd: number | null; priceVersion: number };
+export type PricePreview = { dossierId: string; dossierVersion: number; planVersion: number;
+  items: { itemId: string; grossVnd: number; approvedDiscountVnd: number; netVnd: number;
+    referenceUnitPriceVnd: number | null; decision: TreatmentItem['decision'];
+    includedInTotal: boolean }[]; grossVnd: number; approvedDiscountVnd: number;
+  netBeforeTaxVnd: number };
 export type TreatmentEvent = { id: string; kind: string; dossierVersion: number; actorId: number;
   occurredAt: string; payloadJson: string };
 export type TreatmentDossier = {
@@ -22,6 +41,11 @@ export type TreatmentDossier = {
   planId: string; planVersion: number; planState: 'None' | 'Draft' | 'Committed'; goals: string | null;
   items: TreatmentItem[]; paymentTerms: PaymentTerm[]; timeline: TreatmentEvent[];
   financialSummaryAvailable: boolean; createdAt: string; updatedAt: string;
+  financialSummary?: { available: boolean; plannedVnd: number; postedChargeVnd: number | null;
+    receivedVnd: number | null; allocatedVnd: number | null; outstandingVnd: number | null;
+    sourceVersion: string | null };
+  depositExceptionReason?: string | null; depositExceptionBy?: number | null;
+  depositExceptionAt?: string | null;
 };
 export type DossierListItem = Pick<TreatmentDossier, 'id' | 'code' | 'patientId' | 'branchId' |
   'dentistId' | 'diagnosis' | 'state' | 'closureOutcome' | 'version' | 'planVersion' | 'updatedAt'>;

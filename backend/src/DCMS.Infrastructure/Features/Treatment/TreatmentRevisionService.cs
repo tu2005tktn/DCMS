@@ -198,6 +198,11 @@ public sealed class TreatmentRevisionService(DcmsDbContext db, UserManager<Appli
             Clean(p.Unit) is not { Length: <= 40 } || p.Quantity <= 0 || p.Quantity > 999999999 ||
             decimal.Round(p.Quantity, 3) != p.Quantity || p.AgreedUnitPriceVnd < 0 ||
             p.EstimatedMinutes is < 1 or > 480 || Clean(request.Reason)?.Length > 1000 ||
+            !TreatmentPlanRules.ValidDuration(p.EstimatedMinMinutes, p.EstimatedMinutes,
+                p.EstimatedMaxMinutes, p.ReservedMinutes, p.AcknowledgeShortReservation) ||
+            p.EstimatedSessions is < 1 or > 100 ||
+            !TreatmentPlanRules.ValidReturnWindow(p.ReturnEarliestOn, p.ReturnTargetOn,
+                p.ReturnLatestOn) ||
             Clean(request.Counseling)?.Length > 4000 ||
             Clean(request.DecisionMaker)?.Length > 160 ||
             Clean(request.RepresentativeBasis)?.Length > 1000 ||
@@ -320,12 +325,19 @@ public sealed class TreatmentRevisionService(DcmsDbContext db, UserManager<Appli
         if (needsFinance && (!financeState.Available || !financeState.CommitSafe ||
             string.IsNullOrWhiteSpace(financeState.VersionToken) || financeState.Summary == null))
             blockers.Add("MSG245");
+        if (item.DiscountStatus == "Approved" && (p.ServiceId != item.ServiceId ||
+            p.Quantity != item.Quantity || p.AgreedUnitPriceVnd != item.AgreedUnitPriceVnd))
+            blockers.Add("MSG245");
         if (item.Decision == "Agreed" && (Clean(draft.Counseling) == null ||
             Clean(draft.DecisionMaker) == null || draft.Decision is not ("Agreed" or "Refused" or "Deferred")))
             blockers.Add("MSG240");
         if (p.ServiceId == item.ServiceId && Clean(p.Material) == Clean(item.Material) &&
             Clean(p.Region) == Clean(item.Region) && p.Quantity == item.Quantity &&
             p.AgreedUnitPriceVnd == item.AgreedUnitPriceVnd && p.EstimatedMinutes == item.EstimatedMinutes &&
+            p.EstimatedMinMinutes == item.EstimatedMinMinutes &&
+            p.EstimatedMaxMinutes == item.EstimatedMaxMinutes && p.ReservedMinutes == item.ReservedMinutes &&
+            p.EstimatedSessions == item.EstimatedSessions && p.ReturnEarliestOn == item.ReturnEarliestOn &&
+            p.ReturnTargetOn == item.ReturnTargetOn && p.ReturnLatestOn == item.ReturnLatestOn &&
             p.Unit == item.Unit && draft.Decision == item.Decision) blockers.Add("MSG04");
         return new(dossier.Id, item.Id, row.Version, dossier.Version, dossier.PlanVersion,
             (await dossiers.GetAsync(row.ActorId, dossier.Id, ct)).Items.Single(x => x.Id == item.Id), p,
@@ -402,6 +414,7 @@ public sealed class TreatmentRevisionService(DcmsDbContext db, UserManager<Appli
                 instruction.Version++;
                 instruction.UpdatedAt = clock.GetUtcNow();
             }
+            var serviceChanged = item.ServiceId != service.Id;
             item.ServiceId = service.Id;
             item.ServiceName = service.Name;
             item.Material = Clean(draft.Proposed.Material);
@@ -409,6 +422,28 @@ public sealed class TreatmentRevisionService(DcmsDbContext db, UserManager<Appli
             item.Unit = draft.Proposed.Unit.Trim();
             item.Quantity = draft.Proposed.Quantity;
             item.EstimatedMinutes = draft.Proposed.EstimatedMinutes;
+            item.EstimatedMinMinutes = draft.Proposed.EstimatedMinMinutes;
+            item.EstimatedMaxMinutes = draft.Proposed.EstimatedMaxMinutes;
+            item.ReservedMinutes = draft.Proposed.ReservedMinutes;
+            item.EstimatedSessions = draft.Proposed.EstimatedSessions;
+            item.ReturnEarliestOn = draft.Proposed.ReturnEarliestOn;
+            item.ReturnTargetOn = draft.Proposed.ReturnTargetOn;
+            item.ReturnLatestOn = draft.Proposed.ReturnLatestOn;
+            if (item.EstimatedMaxMinutes.HasValue && item.ReservedMinutes < item.EstimatedMaxMinutes)
+            {
+                item.ShortReservationAcknowledgedBy = actorId;
+                item.ShortReservationAcknowledgedAt = clock.GetUtcNow();
+            }
+            else
+            {
+                item.ShortReservationAcknowledgedBy = null;
+                item.ShortReservationAcknowledgedAt = null;
+            }
+            if (serviceChanged)
+            {
+                item.ReferenceUnitPriceVnd = service.ReferenceUnitPriceVnd;
+                item.ReferencePriceVersion = service.PriceVersion;
+            }
             item.AgreedUnitPriceVnd = draft.Proposed.AgreedUnitPriceVnd;
             item.Decision = draft.Decision;
             item.Counseling = Clean(draft.Counseling);

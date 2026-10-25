@@ -12,6 +12,10 @@ Preview hiển thị step, hold, dependency, follow-up instruction, Appointment 
 
 ## API contract
 
+### Bổ sung dữ liệu v2.3
+
+Revision proposal của item đã chốt phải mang các trường thời lượng min/max/selected/reserved, số buổi/cửa sổ quay lại, giá tham chiếu snapshot, giá thỏa thuận trước giảm trừ và liên kết discount. Preview dùng cùng phép tính với S21 nhưng không ghi charge. Thay đổi giá, số lượng, service hoặc qualifying/target item làm phê duyệt giảm trừ cũ hết hiệu lực; nếu nguồn tài chính DCMS-101 chưa xác thực được phần đã post, chặn commit và giữ draft. Payment terms version cũ và bảo hành đã xác nhận không bị ghi đè. Theo quyết định người dùng ngày 25/10/2026, Dentist thuộc chi nhánh được phân công cũng được phê duyệt giảm trừ và ngoại lệ cọc; các command thương mại kiểm quyền server và ghi actor/time riêng. S62 vẫn chỉ xem ảnh hưởng, không tự duyệt hay ghi tiền. S62 không tự sửa Appointment, actual hay ledger.
+
 Các route dùng chính sách `TreatmentDentist`; server xác minh scope cho mỗi request:
 
 | Route | Kết quả |

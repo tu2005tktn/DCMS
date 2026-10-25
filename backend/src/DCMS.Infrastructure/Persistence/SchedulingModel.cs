@@ -50,6 +50,8 @@ internal static class SchedulingModel
             b.Property(x => x.PublicBookable).HasDefaultValue(true);
             b.ToTable("SCHEDULING_SERVICE", t => t.HasCheckConstraint("CK_SERVICE_DURATION", "\"PublicDurationMinutes\" BETWEEN 1 AND 480"));
             b.Property(x => x.Name).HasMaxLength(160);
+            b.Property(x => x.PriceVersion).IsConcurrencyToken().HasDefaultValue(1);
+            b.ToTable(t => t.HasCheckConstraint("CK_SERVICE_REFERENCE_PRICE", "\"ReferenceUnitPriceVnd\" IS NULL OR \"ReferenceUnitPriceVnd\" >= 0"));
             b.HasAlternateKey(x => new { x.Id, x.BranchId });
             b.HasOne<SchedulingBranch>().WithMany().HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Restrict);
         });

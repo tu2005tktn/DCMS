@@ -24,6 +24,9 @@ public sealed class TreatmentDossier
     public Guid? SourceTemplateId { get; set; }
     public int? SourceTemplateVersion { get; set; }
     public string PaymentTermsJson { get; set; } = "[]";
+    public string? DepositExceptionReason { get; set; }
+    public int? DepositExceptionBy { get; set; }
+    public DateTimeOffset? DepositExceptionAt { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
     public List<TreatmentItem> Items { get; set; } = [];
@@ -42,9 +45,28 @@ public sealed class TreatmentItem
     public decimal Quantity { get; set; }
     public int PlannedOrder { get; set; }
     public int? EstimatedMinutes { get; set; }
+    public int? EstimatedMinMinutes { get; set; }
+    public int? EstimatedMaxMinutes { get; set; }
+    public int? ReservedMinutes { get; set; }
+    public int? ShortReservationAcknowledgedBy { get; set; }
+    public DateTimeOffset? ShortReservationAcknowledgedAt { get; set; }
+    public int? EstimatedSessions { get; set; }
+    public DateOnly? ReturnEarliestOn { get; set; }
+    public DateOnly? ReturnTargetOn { get; set; }
+    public DateOnly? ReturnLatestOn { get; set; }
     public DateOnly? EstimatedStart { get; set; }
     public DateOnly? EstimatedEnd { get; set; }
     public long AgreedUnitPriceVnd { get; set; }
+    public long? ReferenceUnitPriceVnd { get; set; }
+    public int? ReferencePriceVersion { get; set; }
+    public string? DiscountType { get; set; }
+    public decimal? DiscountValue { get; set; }
+    public string? DiscountReason { get; set; }
+    public Guid? DiscountQualifyingItemId { get; set; }
+    public string? DiscountStatus { get; set; }
+    public string? DiscountBasisHash { get; set; }
+    public int? DiscountDecidedBy { get; set; }
+    public DateTimeOffset? DiscountDecidedAt { get; set; }
     public string Decision { get; set; } = "Proposed";
     public string Progress { get; set; } = "NotStarted";
     public string? Counseling { get; set; }
@@ -61,6 +83,11 @@ public sealed class TreatmentItem
     public DateTimeOffset? WarrantyConfirmedAt { get; set; }
     public DateOnly? WarrantyEndsOn { get; set; }
     public int? WarrantyConfirmedBy { get; set; }
+    public string? WarrantyComponent { get; set; }
+    public string? WarrantyExclusions { get; set; }
+    public DateOnly? WarrantyActivatedOn { get; set; }
+    public string? WarrantyExplanation { get; set; }
+    public int? ExpectedServiceLifeMonths { get; set; }
 }
 
 // One append-only source for plan snapshots, clinical state changes and warranty confirmation.

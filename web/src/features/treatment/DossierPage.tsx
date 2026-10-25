@@ -1,4 +1,4 @@
-import { Alert, Button, Card, Descriptions, Empty, Form, Input, Modal, Result, Select, Skeleton, Space, Tag, Timeline, Typography } from 'antd';
+import { Alert, Button, Card, Descriptions, Empty, Form, Input, InputNumber, Modal, Result, Select, Skeleton, Space, Tag, Timeline, Typography } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { api, type ApiError } from '../../services/api';
@@ -34,7 +34,9 @@ export default function DossierPage() {
   const actionKey = useRef(crypto.randomUUID());
   const warrantyKey = useRef(crypto.randomUUID());
   const [form] = Form.useForm<{ outcome: string; reason?: string; dispositions: { itemId: string; reason: string }[] }>();
-  const [warrantyForm] = Form.useForm<{ policy: string; policyVersion: string; scope: string; endsOn?: string }>();
+  const [warrantyForm] = Form.useForm<{ policy: string; policyVersion: string; scope: string;
+    component: string; exclusions?: string; activationOn: string; endsOn?: string;
+    explanation: string; expectedServiceLifeMonths?: number }>();
 
   useEffect(() => {
     let active = true;
@@ -77,7 +79,9 @@ export default function DossierPage() {
     } finally { setBusy(false); }
   }
 
-  async function confirmWarranty(values: { policy: string; policyVersion: string; scope: string; endsOn?: string }) {
+  async function confirmWarranty(values: { policy: string; policyVersion: string; scope: string;
+    component: string; exclusions?: string; activationOn: string; endsOn?: string;
+    explanation: string; expectedServiceLifeMonths?: number }) {
     if (!dossier || !warrantyItem || busy) return;
     setBusy(true); setWarrantyError(null);
     try {
@@ -124,21 +128,39 @@ export default function DossierPage() {
           : <div className="treatment-item-stack">{dossier.items.map((item: TreatmentItem) =>
             <div key={item.id} className={`treatment-item-row${item.id === selectedItemId ? ' treatment-selected-item' : ''}`}>
               <div><strong>{item.serviceName}</strong>
-              <div>{item.region ? `Răng/vùng ${item.region} · ` : ''}{item.quantity} {item.unit} · {money(item.agreedUnitPriceVnd)}</div></div>
+              <div>{item.region ? `Răng/vùng ${item.region} · ` : ''}{item.quantity} {item.unit} · {money(item.agreedUnitPriceVnd)}</div>
+              {item.warrantyConfirmedAt && <div className="treatment-muted">Bảo hành {item.warrantyComponent || item.warrantyScope}
+                {item.warrantyExclusions ? ` · Loại trừ: ${item.warrantyExclusions}` : ''}
+                {item.warrantyEndsOn ? ` · Đến ${item.warrantyEndsOn}` : ''}</div>}
+              {item.expectedServiceLifeMonths && <div className="treatment-muted">Tuổi thọ dự kiến: {item.expectedServiceLifeMonths} tháng (khác thời hạn bảo hành)</div>}</div>
               <div><Tag>{decisionLabel[item.decision]}</Tag><Tag>{item.progress}</Tag>
                 {dossier.planState === 'Committed' && dossier.state === 'Open' &&
                   <Link to={`/patients/${id}/dossiers/${dossier.id}/plan/revise/${item.id}?from=dossier`}>
                     <Button size="small">Điều chỉnh kế hoạch</Button></Link>}
                 {item.progress === 'Completed' && !item.warrantyConfirmedAt && <Button size="small" onClick={() => {
                   warrantyKey.current = crypto.randomUUID(); setWarrantyError(null); setWarrantyItem(item);
+                  warrantyForm.setFieldsValue({ activationOn: new Intl.DateTimeFormat('sv-SE', {
+                    timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit',
+                  }).format(new Date()) });
                 }}>Xác nhận bảo hành</Button>}
                 {item.warrantyConfirmedAt && <Tag color="green">Bảo hành đã xác nhận</Tag>}</div></div>)}</div>}
       </Card>
-      <Card title="Tài chính">
-        {dossier.financialSummaryAvailable
-          ? <Typography.Text>Đọc số liệu đã ghi nhận tại màn hình hóa đơn.</Typography.Text>
+      <Card title="Kế hoạch và đối soát tài chính">
+        <Descriptions column={1} items={[{ label: 'Tổng dự kiến trước thuế',
+          children: money(dossier.financialSummary?.plannedVnd ?? dossier.items
+            .filter(item => item.decision === 'Agreed').reduce((sum, item) =>
+              sum + Math.round(item.quantity * item.agreedUnitPriceVnd)
+                - (item.discount?.status === 'Approved' ? item.discount.amountVnd : 0), 0)) }]} />
+        {dossier.financialSummary?.available
+          ? <Descriptions column={1} items={[
+            { label: 'Khoản đã ghi nhận', children: money(dossier.financialSummary.postedChargeVnd ?? 0) },
+            { label: 'Đã thu', children: money(dossier.financialSummary.receivedVnd ?? 0) },
+            { label: 'Đã phân bổ', children: money(dossier.financialSummary.allocatedVnd ?? 0) },
+            { label: 'Còn nợ', children: money(dossier.financialSummary.outstandingVnd ?? 0) },
+          ]} />
           : <Alert type="info" showIcon message="Chưa có dữ liệu tài chính từ nguồn đối soát"
-              description="Kế hoạch và các mốc thanh toán không phải khoản đã thu. Số dư sẽ hiển thị khi module tài chính cung cấp dữ liệu chính thức." />}
+              description="Giá kế hoạch và mốc thanh toán không phải khoản đã thu. Số đã ghi nhận, đã thu và còn nợ sẽ hiển thị khi DCMS-101 cung cấp dữ liệu." />}
+        {dossier.depositExceptionReason && <Typography.Paragraph>Đã duyệt ngoại lệ không cọc: {dossier.depositExceptionReason}</Typography.Paragraph>}
       </Card>
     </div>
     <Card title="Dòng thời gian" className="treatment-timeline">
@@ -185,7 +207,17 @@ export default function DossierPage() {
           <Input maxLength={40} /></Form.Item>
         <Form.Item name="scope" label="Phạm vi bảo hành" rules={[{ required: true, whitespace: true }]}>
           <Input.TextArea rows={3} maxLength={1000} /></Form.Item>
+        <Form.Item name="component" label="Bộ phận được bảo hành" rules={[{ required: true, whitespace: true }]}>
+          <Input maxLength={500} placeholder="Ví dụ: mão sứ răng 25" /></Form.Item>
+        <Form.Item name="exclusions" label="Trường hợp không được bảo hành">
+          <Input.TextArea rows={2} maxLength={1000} /></Form.Item>
+        <Form.Item name="activationOn" label="Ngày bắt đầu bảo hành" rules={[{ required: true }]}>
+          <Input type="date" /></Form.Item>
         <Form.Item name="endsOn" label="Ngày kết thúc (nếu có)"><Input type="date" /></Form.Item>
+        <Form.Item name="expectedServiceLifeMonths" label="Tuổi thọ dự kiến (tháng, nếu có)">
+          <InputNumber min={1} max={1200} className="treatment-number-full" /></Form.Item>
+        <Form.Item name="explanation" label="Nội dung đã giải thích cho bệnh nhân"
+          rules={[{ required: true, whitespace: true }]}><Input.TextArea rows={3} maxLength={2000} /></Form.Item>
       </Form>
     </Modal>
   </main>;

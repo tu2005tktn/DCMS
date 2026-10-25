@@ -1593,6 +1593,10 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(160)
                         .HasColumnType("character varying(160)");
 
+                    b.Property<long?>("ReferenceUnitPriceVnd").HasColumnType("bigint");
+
+                    b.Property<int>("PriceVersion").HasColumnType("integer").IsConcurrencyToken().HasDefaultValue(1);
+
                     b.Property<bool>("PublicBookable")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
@@ -1610,6 +1614,7 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.ToTable("SCHEDULING_SERVICE", null, t =>
                         {
                             t.HasCheckConstraint("CK_SERVICE_DURATION", "\"PublicDurationMinutes\" BETWEEN 1 AND 480");
+                            t.HasCheckConstraint("CK_SERVICE_REFERENCE_PRICE", "\"ReferenceUnitPriceVnd\" IS NULL OR \"ReferenceUnitPriceVnd\" >= 0");
                         });
                 });
 
@@ -2508,6 +2513,37 @@ namespace DCMS.Infrastructure.Persistence.Migrations
             {
                 b.Property(x => x.Material).HasMaxLength(160);
                 b.Property(x => x.DecisionPlanVersion).HasColumnType("integer");
+                b.Property(x => x.EstimatedMinMinutes).HasColumnType("integer");
+                b.Property(x => x.EstimatedMaxMinutes).HasColumnType("integer");
+                b.Property(x => x.ReservedMinutes).HasColumnType("integer");
+                b.Property(x => x.ShortReservationAcknowledgedBy).HasColumnType("integer");
+                b.Property(x => x.ShortReservationAcknowledgedAt).HasColumnType("timestamp with time zone");
+                b.Property(x => x.EstimatedSessions).HasColumnType("integer");
+                b.Property(x => x.ReturnEarliestOn).HasColumnType("date");
+                b.Property(x => x.ReturnTargetOn).HasColumnType("date");
+                b.Property(x => x.ReturnLatestOn).HasColumnType("date");
+                b.Property(x => x.ReferenceUnitPriceVnd).HasColumnType("bigint");
+                b.Property(x => x.ReferencePriceVersion).HasColumnType("integer");
+                b.Property(x => x.DiscountType).HasMaxLength(16);
+                b.Property(x => x.DiscountValue).HasPrecision(18, 3);
+                b.Property(x => x.DiscountReason).HasMaxLength(1000);
+                b.Property(x => x.DiscountQualifyingItemId).HasColumnType("uuid");
+                b.Property(x => x.DiscountStatus).HasMaxLength(16);
+                b.Property(x => x.DiscountBasisHash).HasMaxLength(64);
+                b.Property(x => x.DiscountDecidedBy).HasColumnType("integer");
+                b.Property(x => x.DiscountDecidedAt).HasColumnType("timestamp with time zone");
+                b.Property(x => x.WarrantyComponent).HasMaxLength(500);
+                b.Property(x => x.WarrantyExclusions).HasMaxLength(1000);
+                b.Property(x => x.WarrantyActivatedOn).HasColumnType("date");
+                b.Property(x => x.WarrantyExplanation).HasMaxLength(2000);
+                b.Property(x => x.ExpectedServiceLifeMonths).HasColumnType("integer");
+                b.ToTable(t => t.HasCheckConstraint("CK_TREATMENT_ITEM_DURATION_V23", "(\"EstimatedMinMinutes\" IS NULL AND \"EstimatedMaxMinutes\" IS NULL OR \"EstimatedMinMinutes\" > 0 AND \"EstimatedMinMinutes\" <= \"EstimatedMinutes\" AND \"EstimatedMinutes\" <= \"EstimatedMaxMinutes\" AND \"EstimatedMaxMinutes\" <= 480) AND (\"ReservedMinutes\" IS NULL OR \"ReservedMinutes\" BETWEEN 15 AND 480 AND \"ReservedMinutes\" % 15 = 0 AND \"ReservedMinutes\" >= \"EstimatedMinutes\")"));
+            });
+            modelBuilder.Entity<DCMS.Domain.Features.Treatment.TreatmentDossier>(b =>
+            {
+                b.Property(x => x.DepositExceptionReason).HasMaxLength(1000);
+                b.Property(x => x.DepositExceptionBy).HasColumnType("integer");
+                b.Property(x => x.DepositExceptionAt).HasColumnType("timestamp with time zone");
             });
             modelBuilder.Entity<DCMS.Domain.Features.Treatment.TreatmentRevisionDraft>(b =>
             {

@@ -17,6 +17,9 @@
 .treatment-estimate { display: flex; justify-content: space-between; align-items: center; gap: 12px;
   margin: -8px 0 16px; padding: 12px 16px; border-radius: 8px; background: #eaf2ff; color: #17233d; }
 .treatment-estimate strong { color: #175cd3; font-size: 18px; }
+.treatment-price-summary { display: grid; gap: 6px; justify-items: end; padding: 18px 4px 6px;
+  color: #17233d; font-variant-numeric: tabular-nums; }
+.treatment-price-summary strong { font-size: 18px; color: #175cd3; }
 .treatment-muted { color: #667085; font-size: 12px; }
 .treatment-order-actions { display: inline-flex; gap: 4px; }
 .treatment-order-actions .ant-btn { min-width: 28px; }
