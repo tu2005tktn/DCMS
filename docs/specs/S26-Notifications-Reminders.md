@@ -1,8 +1,10 @@
 # S26 Notifications & Appointment Reminders
 
+> Cập nhật nguồn 25/10/2026: [bộ đặc tả v2.4](README.md) là nguồn hiện hành. Nội dung và bằng chứng dưới đây giữ mốc triển khai ban đầu; chưa được nghiệm thu lại theo v2.4.
+
 Chủ màn hình: **Tư Nguyễn Văn** (theo ràng buộc spec chung). Quyết định người dùng ghi nhận theo yêu cầu 12/10/2026, nội dung đặc tả tham chiếu v2.0 ngày 15/10/2026.
 
-Nguồn: `DCMS_Screen_Specifications_v2.0.docx` (S26) và `DCMS_Use_Cases_Business_Rules_Messages_v2.0.docx` (UC-05/06, UC-34 booking portion; GBR-007/012–015/031/073/075/077/078/081/123; MSG31–38/94/111/144; AT16).
+Nguồn hiện hành: [Screen Specifications v2.4](DCMS_Screen_Specifications_v2.4.docx) (S26) và [UC/GBR/MSG v2.4](DCMS_Use_Cases_Business_Rules_Messages_v2.4.docx) (UC-05/06, UC-34 booking portion). Các mã GBR-007/012–015/031/073/075/077/078/081/123, MSG31–38/94/111/144 và AT16 bên dưới giữ ngữ cảnh v2.0 lúc viết hợp đồng.
 
 ## Phạm vi
 

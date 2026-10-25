@@ -83,7 +83,7 @@ npm.cmd run export:web # Bundle web (không thay thế kiểm tra trên thiết 
 
 ## Tài liệu tham khảo
 
-- Đặc tả S01: `docs/specs/DCMS_Screen_Specifications_English (1).docx`
+- Đặc tả S01 hiện hành: [Screen Specifications v2.4](../../../../../docs/specs/DCMS_Screen_Specifications_v2.4.docx); các kết quả kiểm thử trên giữ mốc triển khai ban đầu.
 - Đối chiếu UC: `docs/implementation/UC01-UC31.md`
 - Contract backend: `backend/src/DCMS.Application/Features/Authentication/Contracts.cs`
 - System Messages: `backend/src/DC..MS.Application/Common/SystemMessages.cs`
