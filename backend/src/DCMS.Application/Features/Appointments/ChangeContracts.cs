@@ -5,7 +5,7 @@ namespace DCMS.Application.Features.Appointments;
 
 public sealed record RescheduleAppointmentRequest(int ExpectedVersion, Guid RequestKey, DateTimeOffset NewStart,
     int ChairId, int ScheduleVersion, int? AssistantScheduleVersion, string? Reason,
-    string? RequesterVerification = null, int? DentistId = null);
+    string? RequesterVerification = null, int? DentistId = null, int? BookingSettingsVersion = null);
 public sealed record CancelAppointmentRequest(int ExpectedVersion, Guid RequestKey, string? Reason,
     string? RequesterVerification = null);
 public sealed record NoShowAppointmentRequest(int ExpectedVersion, Guid RequestKey, string? Reason);

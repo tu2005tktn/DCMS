@@ -153,7 +153,7 @@ public sealed class AppointmentChangeService(DcmsDbContext db, IAvailabilityServ
         {
             action, code, expectedVersion, reason, verification,
             NewStart = move?.NewStart.ToUniversalTime(), move?.ChairId, move?.ScheduleVersion,
-            move?.AssistantScheduleVersion, move?.DentistId
+            move?.AssistantScheduleVersion, move?.DentistId, move?.BookingSettingsVersion
         }))));
 
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
@@ -197,7 +197,7 @@ public sealed class AppointmentChangeService(DcmsDbContext db, IAvailabilityServ
                 slot = await availability.CheckInTransactionAsync(new ResourceCheck(appointment.BranchId,
                     selectedDentistId, appointment.ServiceId, move.NewStart.ToUniversalTime(),
                     (int)(appointment.EndAt - appointment.StartAt).TotalMinutes, move.ChairId, appointment.AssistantId,
-                    reservation.AttendeeKey, move.ScheduleVersion, move.AssistantScheduleVersion, reservation.Id, Public: false), ct);
+                    reservation.AttendeeKey, move.ScheduleVersion, move.AssistantScheduleVersion, reservation.Id, Public: false, BookingSettingsVersion: move.BookingSettingsVersion), ct);
             }
             catch (BusinessException error) when (error.Response.Code != "MSG111") { throw Error("MSG34"); }
             appointment.StartAt = reservation.Start = slot.Start.ToUniversalTime();

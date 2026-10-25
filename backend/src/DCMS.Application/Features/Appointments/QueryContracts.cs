@@ -42,6 +42,7 @@ public interface IAppointmentQueryService
     Task<AppointmentOptions> OptionsAsync(int actorId, CancellationToken ct);
     Task<CalendarView> CalendarAsync(int actorId, int branchId, DateOnly from, DateOnly to, int? dentistId, string? status, CancellationToken ct);
     Task<AppointmentListPage> ListAsync(int actorId, StaffAppointmentQuery query, CancellationToken ct);
+    Task<AppointmentListPage> ForPatientAsync(int actorId, int patientId, string scope, int page, int pageSize, CancellationToken ct);
     Task<StaffAppointmentDetail> DetailAsync(int actorId, Guid id, CancellationToken ct);
     Task<MyAppointmentPage> MineAsync(int accountId, MyAppointmentQuery query, CancellationToken ct);
     Task<MyAppointmentDetail> MineDetailAsync(int accountId, string code, CancellationToken ct);

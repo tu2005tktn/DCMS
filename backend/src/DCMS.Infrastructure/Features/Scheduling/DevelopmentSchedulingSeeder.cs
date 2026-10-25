@@ -15,8 +15,8 @@ public sealed class DevelopmentSchedulingSeeder(DcmsDbContext db)
         {
             branch = new() { Name = "S09 - Chi nhánh thử nghiệm" }; db.Add(branch); await db.SaveChangesAsync(ct);
             db.AddRange(new SchedulingChair { BranchId = branch.Id, Name = "Ghế thử nghiệm 1" }, new SchedulingChair { BranchId = branch.Id, Name = "Ghế thử nghiệm 2" });
-            db.AddRange(new SchedulingService { BranchId = branch.Id, Name = "Khám thử nghiệm", PublicDurationMinutes = 30 },
-                new SchedulingService { BranchId = branch.Id, Name = "Điều trị thử nghiệm", PublicDurationMinutes = 60 });
+            db.AddRange(new SchedulingService { BranchId = branch.Id, Name = "Khám", PublicDurationMinutes = 30, IsInitialExamination = true },
+                new SchedulingService { BranchId = branch.Id, Name = "Điều trị thử nghiệm", PublicDurationMinutes = 60, PublicBookable = false });
         }
         var employees = await (from employee in db.Employees join user in db.Users on employee.AccountId equals user.Id
             where user.UserName == "dentist.demo" || user.UserName == "owner.demo" || user.UserName == "assistant.demo" || user.UserName == "dual.demo"

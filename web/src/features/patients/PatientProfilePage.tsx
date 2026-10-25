@@ -5,6 +5,7 @@ import { api, ApiError } from '../../services/api';
 import { useAuth } from '../authentication/AuthContext';
 import { formatDate, formatTime } from '../patient-links/types';
 import PatientFormDrawer from './PatientFormDrawer';
+import PatientAppointmentsTab from './PatientAppointmentsTab';
 import { auditActionLabels, genderLabels, type PatientAuditEntry, type PatientChange, type PatientDetail } from './types';
 import DossierList from '../treatment/DossierList';
 import '../treatment/treatment.css';
@@ -12,7 +13,7 @@ import '../treatment/treatment.css';
 const unknown = <Typography.Text type="secondary">Chưa rõ</Typography.Text>;
 const empty = <Typography.Text type="secondary">—</Typography.Text>;
 
-// Tabs whose source features (S43/S20/S11/S23) are not built yet: say so instead of showing zero or an empty list.
+// Tabs whose source features (S43/S20/S23) are not built yet.
 function Pending({ feature }: { feature: string }) {
   return <Alert type="info" showIcon message="Chức năng chưa triển khai"
     description={`Dữ liệu ${feature} sẽ hiển thị tại đây khi chức năng tương ứng được triển khai. Hiện chưa có dữ liệu để hiển thị.`} />;
@@ -126,7 +127,7 @@ export default function PatientProfilePage() {
         </> },
         { key: 'treatment', label: 'Điều trị & Thanh toán', children: <DossierList patientId={patient.id} /> },
         { key: 'files', label: 'Hình ảnh & Tệp', children: <Pending feature="hình ảnh và tài liệu (S20)" /> },
-        { key: 'appointments', label: 'Lịch hẹn', children: <Pending feature="lịch hẹn (S11/S12)" /> },
+        { key: 'appointments', label: 'Lịch hẹn', children: <PatientAppointmentsTab key={patient.id} patientId={patient.id} active={tab === 'appointments'} revision={revision} /> },
         { key: 'prescriptions', label: 'Đơn thuốc', children: <Pending feature="đơn thuốc (S23)" /> },
         { key: 'audit', label: 'Lịch sử thay đổi', children: auditError
           ? <Alert type="error" showIcon message={auditError} action={<Button size="small" onClick={() => setRevision(value => value + 1)}>Thử lại</Button>} />

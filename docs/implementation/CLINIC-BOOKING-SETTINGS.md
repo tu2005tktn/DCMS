@@ -1,0 +1,15 @@
+# Clinic booking settings
+
+Latest decision: first/new-episode booking has only the system-designated Examination service, labelled Khám. Remove free service selection from web/mobile, auto-select the branch examination, and enforce the service classification in public options/availability/booking. A filtered unique index permits at most one examination per branch. Existing service history is retained; migration creates a separate canonical examination for existing branches. Other services remain internal/treatment catalog entries and cannot be enabled for new-visit self-booking. Treatment-plan booking itself remains unimplemented.
+
+Initial-examination-only validation: 49/49 isolated PostgreSQL integration tests passed, including rejecting treatment IDs from public and staff new-appointment commands, ignoring forged service classification in settings and retaining old appointments. 10/10 mocked browser checks passed for fixed examination display, duration-specific slots and the portal workflow. Web build and mobile typecheck passed. Applied `InitialExaminationOnly` migration locally and restarted API. Live public options return only Khám, at most one per branch, and API/database health passed. Mobile verification is TypeScript-only, not a physical-device flow.
+
+Contract: [configurable slots and service durations](../specs/CLINIC-SLOTS-AND-SERVICE-DURATIONS.vi.md).
+
+Add versioned branch slot intervals and service durations using existing scheduling persistence and shared transaction lock. Retain defaults and existing appointments. Expose staff settings with editable service rows. Patients choose service before generated availability; generation and commands use the same start grid. New web commands carry bookingSettingsVersion; legacy requests are revalidated against current settings.
+
+Validate 20-minute starts with a 35-minute service, break/closing/conflict boundaries, duration mismatch, stale settings, replay, access and old-duration rescheduling. Build backend/web, migrate local database and leave API/web running.
+
+The free service picker is for first/new-episode visits. Services have separate active and publicBookable flags; only active publicBookable services appear in public options and public availability. Continued treatment must come from a real patient plan instruction, not a free service choice. The plan module is not implemented here; keep the unavailable FollowUp port explicit and do not imply clinical validation exists.
+
+Validation: backend build and 42/42 scheduling/appointment read/change integration tests passed with isolated PostgreSQL. Web build and mobile typecheck passed. Browser/validation suites passed 34 tests with 1 opt-in real-editor test skipped; API responses were mocked for those browser flows. A separate real customer appointment E2E could not start because the local database had no suitable future published demo schedule; this is not counted as a pass. A real dentist session read settings options/detail successfully. Both migrations were applied locally; API/database health and web HTTP checks passed, and API/web remain running.

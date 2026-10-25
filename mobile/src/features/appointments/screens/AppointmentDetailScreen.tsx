@@ -148,7 +148,7 @@ export default function AppointmentDetailScreen() {
       return;
     }
     void run(key => appointmentsApi.reschedule(token!, detail.code, { expectedVersion: detail.version, requestKey: key, dentistId, newStart: slot.start,
-      chairId: slot.chairId, scheduleVersion: slot.scheduleVersion, assistantScheduleVersion: slot.assistantScheduleVersion, reason: reason.trim() }),
+      chairId: slot.chairId, scheduleVersion: slot.scheduleVersion, assistantScheduleVersion: slot.assistantScheduleVersion, bookingSettingsVersion: slot.bookingSettingsVersion, reason: reason.trim() }),
     result => {
       setDetail(result.appointment);
       close();

@@ -69,7 +69,7 @@ public sealed class AppointmentQueryService(DcmsDbContext db, UserManager<Applic
             .OrderBy(x => x.Name).ToArray();
         var chairs = await db.Set<SchedulingChair>().AsNoTracking().Where(x => branchIds.Contains(x.BranchId) && x.Active)
             .OrderBy(x => x.Name).Select(x => new CalendarChair(x.Id, x.BranchId, x.Name)).ToArrayAsync(ct);
-        var services = await db.Set<SchedulingService>().AsNoTracking().Where(x => branchIds.Contains(x.BranchId) && x.Active)
+        var services = await db.Set<SchedulingService>().AsNoTracking().Where(x => branchIds.Contains(x.BranchId) && x.Active && x.IsInitialExamination)
             .OrderBy(x => x.Name).Select(x => new CalendarService(x.Id, x.BranchId, x.Name, x.PublicDurationMinutes)).ToArrayAsync(ct);
         return new(branches, dentists, chairs, services, ownOnly.Count == branchIds.Length);
     }
@@ -109,6 +109,28 @@ public sealed class AppointmentQueryService(DcmsDbContext db, UserManager<Applic
         var rows = await source.OrderBy(x => x.StartAt).ThenBy(x => x.Code)
             .Skip((query.Page - 1) * query.PageSize).Take(query.PageSize).ToListAsync(ct);
         return new(await ItemsAsync(rows, ct), total, query.Page, query.PageSize);
+    }
+
+    public async Task<AppointmentListPage> ForPatientAsync(int actorId, int patientId, string scope, int page, int pageSize, CancellationToken ct)
+    {
+        if (scope is not ("ALL" or "UPCOMING" or "HISTORY") || page < 1 || !PageSizes.Contains(pageSize))
+            throw Error("MSG04");
+        var (employeeId, broad) = await ActorAsync(actorId, ct);
+        if (!await db.Patients.AsNoTracking().AnyAsync(x => x.Id == patientId, ct)) throw Error("MSG113", 404);
+        var memberships = db.Set<SchedulingMember>().AsNoTracking().Where(x => x.EmployeeId == employeeId && x.Active);
+        var activeBranches = db.Set<SchedulingBranch>().AsNoTracking().Where(x => x.Active);
+        var source = db.Appointments.AsNoTracking().Where(a => a.PatientId == patientId
+            && activeBranches.Any(b => b.Id == a.BranchId)
+            && memberships.Any(m => m.BranchId == a.BranchId
+                && (broad || m.CanManageSchedules || (m.CanDentist && a.DentistId == employeeId))));
+        var now = clock.GetUtcNow();
+        if (scope == "UPCOMING") source = source.Where(a => a.EndAt > now && ActiveStatuses.Contains(a.Status));
+        if (scope == "HISTORY") source = source.Where(a => a.EndAt <= now || !ActiveStatuses.Contains(a.Status));
+        var total = await source.CountAsync(ct);
+        var ordered = scope == "UPCOMING" ? source.OrderBy(a => a.StartAt).ThenBy(a => a.Id)
+            : source.OrderByDescending(a => a.StartAt).ThenBy(a => a.Id);
+        var rows = await ordered.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(ct);
+        return new(await ItemsAsync(rows, ct), total, page, pageSize);
     }
 
     public async Task<StaffAppointmentDetail> DetailAsync(int actorId, Guid id, CancellationToken ct)

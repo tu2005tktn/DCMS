@@ -147,9 +147,8 @@ test('signed-in customer booking retains form after a slot conflict and confirms
   await expect(page.locator('.customer-booking-progress')).toContainText('Bước 2/5');
   await page.locator('.ant-select').nth(0).click();
   await page.getByText('Chi nhánh A').last().click();
+  await expect(page.getByLabel('Dịch vụ', { exact: true })).toHaveValue('Khám · 30 phút');
   await page.locator('.ant-select').nth(1).click();
-  await page.getByText(/Khám tổng quát/).last().click();
-  await page.locator('.ant-select').nth(2).click();
   await page.getByText('Bác sĩ B').last().click();
   await page.locator('.customer-slots button').first().click();
   await expect(page.getByRole('complementary', { name: 'Lịch đã chọn' })).toContainText('Giờ khám');

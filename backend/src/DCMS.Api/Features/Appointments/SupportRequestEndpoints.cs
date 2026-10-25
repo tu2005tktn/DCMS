@@ -9,9 +9,9 @@ public static class SupportRequestEndpoints
     {
         var group = endpoints.MapGroup("/api/support-requests").RequireAuthorization()
             .WithTags("S12 Staff booking exceptions");
-        group.MapGet("", async (HttpContext context, string? statuses, int? branchId, int? page, int? pageSize,
+        group.MapGet("", async (HttpContext context, string? statuses, int? branchId, int? page, int? pageSize, Guid? appointmentId,
             ISupportRequestService service, CancellationToken ct) => Results.Ok(await service.ListAsync(
-                AuthenticationEndpoints.AccountId(context.User), statuses, branchId, page ?? 1, pageSize ?? 20, ct)));
+                AuthenticationEndpoints.AccountId(context.User), statuses, branchId, page ?? 1, pageSize ?? 20, ct, appointmentId)));
         group.MapGet("/{id}", async (HttpContext context, string id, ISupportRequestService service, CancellationToken ct) =>
             Results.Ok(await service.DetailAsync(AuthenticationEndpoints.AccountId(context.User), id, ct)));
         group.MapPost("/{id}/verify-requester", async (HttpContext context, string id, VerifyRequesterCommand command,

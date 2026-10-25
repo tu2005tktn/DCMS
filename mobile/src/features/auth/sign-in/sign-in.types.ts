@@ -21,6 +21,8 @@ export interface CurrentUser {
   effectiveRoles: string[];
   permissions: string[];
   hasVerifiedPatientLink: boolean;
+  phoneNumber?: string | null;
+  email?: string | null;
 }
 
 export interface SignInResponse {

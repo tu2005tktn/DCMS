@@ -10,7 +10,7 @@ type Dentist = { id: number; branchId: number; name: string; canDentist: boolean
 type Service = { id: number; branchId: number; name: string; publicDurationMinutes: number };
 type Options = { branches: Branch[]; employees: Dentist[]; services: Service[] };
 type Slot = { start: string; end: string; chairId: number; dentistId: number;
-  scheduleVersion: number; assistantScheduleVersion: number | null };
+  scheduleVersion: number; assistantScheduleVersion: number | null; bookingSettingsVersion?: number };
 type BookingResult = { appointmentId: string; code: string; version: number; status: string;
   startAt: string; endAt: string; notification: { code: string; message: string } };
 type ContactErrors = { bookerName?: string; contact?: string; attendeeName?: string };
@@ -41,7 +41,6 @@ export default function CustomerBookingPage() {
   const [step, setStep] = useState(0);
   const [relation, setRelation] = useState<'Self' | 'Relative'>('Self');
   const [branchId, setBranchId] = useState<number | null>(null);
-  const [serviceId, setServiceId] = useState<number | null>(null);
   const [dentistId, setDentistId] = useState<number | null>(null);
   const [date, setDate] = useState(tomorrow);
   const [reason, setReason] = useState('');
@@ -54,10 +53,22 @@ export default function CustomerBookingPage() {
   const [result, setResult] = useState<BookingResult | null>(null);
   const submittingRef = useRef(false);
   const retryRef = useRef<{ fingerprint: string; key: string } | null>(null);
+  const prefilledAccount = useRef<number | null>(null);
+  const account = state.status === 'authenticated' ? state.user : null;
+  useEffect(() => {
+    if (!account || prefilledAccount.current === account.id) return;
+    const changedAccount = prefilledAccount.current !== null;
+    prefilledAccount.current = account.id;
+    const accountContact = account.phoneNumber || account.email || '';
+    setBookerName(value => changedAccount ? account.fullName : value || account.fullName);
+    setContact(value => changedAccount ? accountContact : value || accountContact);
+    setAttendeeName(value => relation === 'Self' ? changedAccount ? account.fullName : value || account.fullName : changedAccount ? '' : value);
+  }, [account?.id, account?.fullName, account?.phoneNumber, account?.email, relation]);
 
   const services = useMemo(() => options?.services.filter(item => item.branchId === branchId) ?? [], [options, branchId]);
   const dentists = useMemo(() => options?.employees.filter(item => item.branchId === branchId && item.canDentist) ?? [], [options, branchId]);
-  const service = services.find(item => item.id === serviceId);
+  const service = services[0];
+  const serviceId = service?.id ?? null;
   const dentist = dentists.find(item => item.id === dentistId);
   const branch = options?.branches.find(item => item.id === branchId);
   const slotGroups = useMemo(() => [
@@ -110,7 +121,7 @@ export default function CustomerBookingPage() {
       attendee: { patientId: null, name: attendeeName.trim(), birthDate: null },
       attendeeRelation: relation, kind: 'Standard', source: 'App', serviceId: service.id, reason: reason.trim() || null,
       dentistId, assistantId: null, chairId: null, startAt: slot.start,
-      durationMinutes: service.publicDurationMinutes, followUpId: null, exceptionReason: null,
+      durationMinutes: service.publicDurationMinutes, followUpId: null, exceptionReason: null, bookingSettingsVersion: slot.bookingSettingsVersion,
       scheduleVersion: slot.scheduleVersion, assistantScheduleVersion: null,
     };
     const fingerprint = JSON.stringify(payload);
@@ -146,6 +157,8 @@ export default function CustomerBookingPage() {
   return <main className="customer-portal"><div className="customer-content customer-booking">
     <div className="customer-booking-header"><Link to={state.status === 'authenticated' ? '/customer/home' : '/customer/sign-in'} className="customer-back">← Quay lại</Link>
       <span className="customer-kicker">Đặt lịch trực tuyến</span><h1>Đặt lịch khám</h1>
+      <Alert type="info" showIcon message="Khám lần đầu hoặc đợt khám mới"
+        description="Dịch vụ cho lần khám này là Khám. Nếu đang tiếp tục một phác đồ điều trị, hãy liên hệ phòng khám để đặt buổi theo chỉ định của nha sĩ." />
       <p>Chọn khung giờ phù hợp. Phòng khám sẽ xác nhận lịch ngay khi đặt thành công.</p></div>
     <div className="customer-booking-progress"><span>Bước {step + 1}/5</span><strong>{stepNames[step]}</strong></div>
     <Steps current={step} size="small" items={stepNames.map(title => ({ title }))} />
@@ -156,10 +169,10 @@ export default function CustomerBookingPage() {
         <h2>Bạn đặt lịch cho ai?</h2><p>Chúng tôi sẽ dùng lựa chọn này để hiển thị đúng thông tin người khám.</p>
         <div className="customer-relation-options" role="group" aria-label="Người khám">
           <Button className="customer-relation-option" aria-pressed={relation === 'Self'} onClick={() => {
-            setRelation('Self'); if (state.status === 'authenticated') setAttendeeName(state.user.fullName);
+            if (relation !== 'Self') { setRelation('Self'); if (account) setAttendeeName(account.fullName); }
           }}><strong>Bản thân</strong><span>Tôi là người đến khám</span></Button>
           <Button className="customer-relation-option" aria-pressed={relation === 'Relative'} onClick={() => {
-            setRelation('Relative'); if (state.status === 'authenticated' && attendeeName === state.user.fullName) setAttendeeName('');
+            if (relation !== 'Relative') { setRelation('Relative'); setAttendeeName(''); }
           }}><strong>Người thân</strong><span>Tôi đặt lịch cho một người khác</span></Button>
         </div>
         {relation === 'Relative' && <Alert type="info" showIcon message="Đặt lịch cho người thân không cấp quyền xem hồ sơ bệnh án của họ." />}
@@ -173,10 +186,9 @@ export default function CustomerBookingPage() {
             <div className="customer-booking-fields">
               <div><label htmlFor="booking-branch">Chi nhánh</label><Select id="booking-branch" className="customer-field" value={branchId} placeholder="Chọn chi nhánh"
                 options={options?.branches.map(item => ({ value: item.id, label: item.name }))}
-                onChange={value => { setBranchId(value); setServiceId(null); setDentistId(null); }} /></div>
-              <div><label htmlFor="booking-service">Dịch vụ</label><Select id="booking-service" className="customer-field" value={serviceId} placeholder="Chọn dịch vụ"
-                options={services.map(item => ({ value: item.id, label: `${item.name} · ${item.publicDurationMinutes} phút` }))}
-                onChange={setServiceId} /></div>
+                onChange={value => { setBranchId(value); setDentistId(null); }} /></div>
+              <div><label htmlFor="booking-service">Dịch vụ</label><Input id="booking-service" readOnly className="customer-field"
+                value={service ? `Khám · ${service.publicDurationMinutes} phút` : 'Chưa có dịch vụ Khám khả dụng tại chi nhánh này'} /></div>
               <div><label htmlFor="booking-dentist">Bác sĩ</label><Select id="booking-dentist" className="customer-field" value={dentistId} placeholder="Chọn bác sĩ"
                 options={dentists.map(item => ({ value: item.id, label: item.name }))} onChange={setDentistId} /></div>
               <div><label htmlFor="booking-date">Ngày khám</label><Input id="booking-date" className="customer-field" type="date" value={date} onChange={event => setDate(event.target.value)} /></div>
@@ -191,10 +203,10 @@ export default function CustomerBookingPage() {
                 <section className="customer-slot-group" key={group.label}><h4>{group.label}</h4>
                   <div className="customer-slots" role="group" aria-label={`Khung giờ ${group.label.toLowerCase()}`}>
                     {group.items.map(item => <Button key={`${item.start}-${item.chairId}`} type={slot === item ? 'primary' : 'default'}
-                      aria-pressed={slot === item} onClick={() => { setSlot(item); retryRef.current = null; }}>{formatClock(item.start)}</Button>)}
+                      aria-pressed={slot === item} onClick={() => { setSlot(item); retryRef.current = null; }}>{formatClock(item.start)}–{formatClock(item.end)}</Button>)}
                   </div></section>) : branchId && serviceId && dentistId ?
                   <Empty description="Không có khung giờ phù hợp. Hãy chọn ngày hoặc bác sĩ khác." /> :
-                  <p>Chọn chi nhánh, dịch vụ, bác sĩ và ngày để xem khung giờ.</p>}
+                  <p>Chọn chi nhánh, bác sĩ và ngày để xem khung giờ khám.</p>}
             </div>
           </section>
           <aside className="customer-schedule-summary" aria-label="Lịch đã chọn">

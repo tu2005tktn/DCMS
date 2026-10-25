@@ -31,7 +31,7 @@ export type StaffAppointmentDetail = {
   bookedFromApp: boolean; reason: string | null; exceptionReason: string | null; createdAt: string;
 };
 export type AvailabilitySlot = {
-  start: string; end: string; chairId: number; dentistId: number; assistantId: number | null; scheduleVersion: number; assistantScheduleVersion: number | null;
+  start: string; end: string; chairId: number; dentistId: number; assistantId: number | null; scheduleVersion: number; assistantScheduleVersion: number | null; bookingSettingsVersion?: number;
 };
 export type AppointmentResult = { appointmentId: string; code: string; version: number; status: string; startAt: string; endAt: string; notification: SystemMessage };
 

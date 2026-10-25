@@ -4,6 +4,8 @@ Ngày: 18/10/2026. Nguồn: UC-06/S12/S16 và GBR-012/013/014/015/025/031/075/07
 
 ## Hợp đồng và quyền
 
+Cập nhật 19/10/2026: [cấu hình slot và thời lượng](CLINIC-SLOTS-AND-SERVICE-DURATIONS.vi.md) thay giới hạn thời lượng cũ bằng số nguyên 1–480 phút. Đổi lịch giữ thời lượng đã lưu và dùng bước slot hiện hành; nhận `bookingSettingsVersion` tùy chọn, token stale trả MSG111. Khám mới dùng catalog publicBookable; buổi tiếp tục điều trị phải giữ liên kết chỉ định/phác đồ khi module này được triển khai.
+
 - `POST /api/appointments/{code}/reschedule`: `{expectedVersion, requestKey, dentistId, newStart, chairId, scheduleVersion, assistantScheduleVersion?, reason, requesterVerification?}` (dành cho tự phục vụ >= 12h hoặc Staff đã xác minh dưới 12h).
 - `POST /api/appointments/{code}/cancel`: `{expectedVersion, requestKey, reason, requesterVerification?}`.
 - `POST /api/appointments/{code}/support-requests`: `{requestKey, kind, reason, newStartAt?, dentistId?, chairId?}`. Dành cho khách hàng gửi yêu cầu hỗ trợ đổi (`Change`/`RESCHEDULE`) hoặc hủy (`Cancel`/`CANCEL`) lịch khi dưới 12 giờ. Tạo yêu cầu `Pending` có `ProposedStartAt` (đối với đổi lịch), không tự đổi/hủy trực tiếp; trả về HTTP 201 với `{request, notification: MSG33}`. `MSG33`: "Đã gửi yêu cầu hỗ trợ. Lịch hẹn hiện tại vẫn có hiệu lực cho đến khi phòng khám xử lý thành công.".

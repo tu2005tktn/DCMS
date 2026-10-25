@@ -5,6 +5,7 @@ import { customerApi } from '../../services/customerApi';
 export type CustomerUser = {
   id: number; userName: string; fullName: string; accountType: string; roles: string[];
   effectiveRoles: string[]; permissions: string[]; hasVerifiedPatientLink: boolean;
+  phoneNumber?: string | null; email?: string | null;
 };
 type SignInResponse = { accessToken: string; user: CustomerUser };
 type CustomerState =

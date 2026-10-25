@@ -50,7 +50,7 @@ export default function BookingDrawer({ open, prefill, options, onClose, onBooke
   const branchDentists = options?.dentists.filter(x => x.branchId === branchId) ?? [];
   const branchChairs = options?.chairs.filter(x => x.branchId === branchId) ?? [];
   const branchServices = options?.services.filter(x => x.branchId === branchId) ?? [];
-  const durationValid = !!values?.duration && values.duration >= 15 && values.duration <= 480 && values.duration % 15 === 0;
+  const durationValid = !!values?.duration && Number.isInteger(values.duration) && values.duration >= 1 && values.duration <= 480;
   const canQuery = !!values?.branchId && !!values.dentistId && !!values.serviceId && !!values.date && durationValid;
   const needsException = !!slot && Date.parse(slot.start) < Date.now() + 60 * 60_000;
   const shownSlots = (slots ?? []).filter(s => !values?.chairId || s.chairId === values.chairId);
@@ -106,7 +106,7 @@ export default function BookingDrawer({ open, prefill, options, onClose, onBooke
           birthDate: values.patientId ? null : values.attendeeBirthDate || null },
         attendeeRelation: values.relation, kind: values.kind, source: values.source, serviceId: values.serviceId ?? null,
         reason: values.reason?.trim() || null, dentistId: values.dentistId, assistantId: null, chairId: slot.chairId,
-        startAt: slot.start, durationMinutes: values.duration, followUpId: null,
+        startAt: slot.start, durationMinutes: values.duration, followUpId: null, bookingSettingsVersion: slot.bookingSettingsVersion,
         exceptionReason: needsException ? values.exceptionReason?.trim() : null,
         requestKey: requestKey.current, scheduleVersion: slot.scheduleVersion, assistantScheduleVersion: slot.assistantScheduleVersion,
       }) });
@@ -161,7 +161,8 @@ export default function BookingDrawer({ open, prefill, options, onClose, onBooke
       <Typography.Title level={5}>Dịch vụ và tài nguyên</Typography.Title>
       <div className="patient-form-grid">
         <Form.Item name="serviceId" label="Dịch vụ" rules={[{ required: true, message: 'Vui lòng nhập Dịch vụ.' }]}>
-          <Select options={branchServices.map(s => ({ value: s.id, label: s.name }))} /></Form.Item>
+          <Select options={branchServices.map(s => ({ value: s.id, label: `${s.name} · ${s.publicDurationMinutes} phút` }))}
+            onChange={id => form.setFieldValue('duration', branchServices.find(s => s.id === id)?.publicDurationMinutes)} /></Form.Item>
         <Form.Item name="reason" label="Lý do khám (tùy chọn)" rules={[{ max: 1000, message: 'Lý do không được vượt quá 1000 ký tự.' }]}><Input maxLength={1000} /></Form.Item>
         <Form.Item name="branchId" label="Chi nhánh" rules={[{ required: true, message: 'Vui lòng nhập Chi nhánh.' }]}>
           <Select options={options?.branches.map(b => ({ value: b.id, label: b.name }))} onChange={() => form.setFieldsValue({ dentistId: undefined, chairId: undefined, serviceId: undefined })} /></Form.Item>
@@ -169,9 +170,9 @@ export default function BookingDrawer({ open, prefill, options, onClose, onBooke
           <Select options={branchDentists.map(d => ({ value: d.id, label: d.name }))} /></Form.Item>
         <Form.Item name="chairId" label="Ghế (để trống: tự chọn)"><Select allowClear options={branchChairs.map(c => ({ value: c.id, label: c.name }))} /></Form.Item>
         <Form.Item name="date" label="Ngày" rules={[{ required: true, message: 'Vui lòng nhập Ngày.' }]}><Input type="date" min={clinicToday()} /></Form.Item>
-        <Form.Item name="duration" label="Thời lượng (phút)" extra="15–480 phút, bội số của 15." rules={[{ required: true, message: 'Vui lòng nhập Thời lượng.' },
-          { validator: (_, v?: number) => !v || (v >= 15 && v <= 480 && v % 15 === 0) ? Promise.resolve() : Promise.reject(new Error('Thời lượng không đúng định dạng.')) }]}>
-          <InputNumber min={15} max={480} step={15} style={{ width: '100%' }} /></Form.Item>
+        <Form.Item name="duration" label="Thời lượng (phút)" extra="1–480 phút. Mặc định theo dịch vụ; có thể điều chỉnh cho ca này." rules={[{ required: true, message: 'Vui lòng nhập Thời lượng.' },
+          { validator: (_, v?: number) => !v || (Number.isInteger(v) && v >= 1 && v <= 480) ? Promise.resolve() : Promise.reject(new Error('Thời lượng không đúng định dạng.')) }]}>
+          <InputNumber min={1} max={480} precision={0} step={1} style={{ width: '100%' }} /></Form.Item>
       </div>
       <Typography.Title level={5}>Khung giờ hợp lệ</Typography.Title>
       {!canQuery ? <Typography.Text type="secondary">Chọn chi nhánh, nha sĩ, dịch vụ, ngày và thời lượng để xem khung giờ.</Typography.Text>
