@@ -2487,6 +2487,23 @@ namespace DCMS.Infrastructure.Persistence.Migrations
             // independent from the live TreatmentModel when later migrations evolve it.
             TreatmentMigrationSnapshot.Configure(modelBuilder);
             TreatmentProgressionMigrationSnapshot.Configure(modelBuilder);
+            modelBuilder.Entity<DCMS.Domain.Features.Treatment.TreatmentStep>(b =>
+            {
+                b.Property(x => x.EstimatedMinMinutes).HasColumnType("integer");
+                b.Property(x => x.EstimatedMaxMinutes).HasColumnType("integer");
+                b.Property(x => x.ShortReservationAcknowledgedBy).HasColumnType("integer");
+                b.Property(x => x.ShortReservationAcknowledgedAt).HasColumnType("timestamp with time zone");
+                b.ToTable(t => t.HasCheckConstraint("CK_STEP_ESTIMATE_RANGE", "(\"EstimatedMinMinutes\" IS NULL AND \"EstimatedMaxMinutes\" IS NULL) OR (\"EstimatedMinMinutes\" IS NOT NULL AND \"EstimatedMaxMinutes\" IS NOT NULL AND \"EstimatedMinMinutes\" > 0 AND \"EstimatedMinMinutes\" <= \"EstimatedMinutes\" AND \"EstimatedMinutes\" <= \"EstimatedMaxMinutes\" AND \"EstimatedMaxMinutes\" <= 480)"));
+            });
+            modelBuilder.Entity<DCMS.Domain.Features.Treatment.FollowUpInstruction>(b =>
+            {
+                b.HasIndex(x => x.StepId).IsUnique()
+                    .HasDatabaseName("IX_FOLLOW_UP_INSTRUCTION_ActiveStep")
+                    .HasFilter("\"StepId\" IS NOT NULL AND \"Status\" IN ('NeedsBooking','Booked')");
+                b.HasIndex(x => new { x.DossierId, x.ItemId }).IsUnique()
+                    .HasDatabaseName("IX_FOLLOW_UP_INSTRUCTION_ActiveItemOnly")
+                    .HasFilter("\"DossierId\" IS NOT NULL AND \"ItemId\" IS NOT NULL AND \"StepId\" IS NULL AND \"Status\" IN ('NeedsBooking','Booked')");
+            });
 #pragma warning restore 612, 618
         }
     }

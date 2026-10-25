@@ -8,7 +8,8 @@ test('dentist sees the active S58 template and can map its step to an agreed S21
   const user = { id: 9, userName: 'synthetic.dentist', fullName: 'SYNTHETIC Dentist',
     accountType: 'Staff', roles: ['Dentist'], effectiveRoles: ['Dentist'], permissions: ['patients.read'] };
   const step = { logicalStepId: stepId, itemId: null, name: 'Trám răng 25', region: '25',
-    estimatedMinutes: 20, reservedMinutes: 30, predecessorIds: [], capability: null,
+    estimatedMinMinutes: 15, estimatedMaxMinutes: 60,
+    estimatedMinutes: 30, reservedMinutes: 30, predecessorIds: [], capability: null,
     labRequirement: null, earliestOffsetDays: 1, targetOffsetDays: 3, latestOffsetDays: 5,
     chargingCoverage: 'IncludedInItem' };
   const template = { id: templateId, branchId: 1, name: 'Điều trị nhiều buổi', version: 2,
@@ -57,5 +58,8 @@ test('dentist sees the active S58 template and can map its step to an agreed S21
   await page.locator('.ant-select-item-option').filter({ hasText: 'Điều trị nhiều buổi' }).click();
   await expect(page.getByText('Nguồn: Điều trị nhiều buổi, phiên bản 1.')).toBeVisible();
   await expect(page.locator('.ant-select-selection-item').filter({ hasText: 'Trám răng · 25' })).toBeVisible();
+  await expect(page.getByText('Một số bước giữ ghế ngắn hơn mức ước tính dài nhất.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Sao chép vào kế hoạch' })).toBeDisabled();
+  await page.getByRole('checkbox', { name: 'Tôi đã xem và chấp nhận thời gian giữ ghế này' }).check();
   await expect(page.getByRole('button', { name: 'Sao chép vào kế hoạch' })).toBeEnabled();
 });

@@ -9,7 +9,8 @@ using Microsoft.EntityFrameworkCore;
 namespace DCMS.Infrastructure.Features.Treatment;
 
 // Appointment commands own the transaction and scheduling lock. This port never commits or calls an external service.
-public sealed class FollowUpAppointmentPort(DcmsDbContext db, ITreatmentLabReadinessPort lab, TimeProvider clock)
+public sealed class FollowUpAppointmentPort(DcmsDbContext db, ITreatmentLabReadinessPort lab,
+    ITreatmentDentistCapabilityPort capabilities, TimeProvider clock)
     : IFollowUpBookingPort, IFollowUpAppointmentChangePort
 {
     private static BusinessException Error(string code, int status = 409) => new(status, SystemMessages.Get(code));
@@ -25,7 +26,18 @@ public sealed class FollowUpAppointmentPort(DcmsDbContext db, ITreatmentLabReadi
 
     private async Task CheckReadinessAsync(FollowUpInstruction instruction, DateTimeOffset startAt, CancellationToken ct)
     {
-        if (!instruction.StepId.HasValue) return;
+        if (!instruction.StepId.HasValue)
+        {
+            if (!instruction.DossierId.HasValue || !instruction.ItemId.HasValue) return;
+            var sourceDossier = await db.TreatmentDossiers.Include(x => x.Items).AsNoTracking()
+                .SingleOrDefaultAsync(x => x.Id == instruction.DossierId, ct);
+            if (sourceDossier == null || sourceDossier.PatientId != instruction.PatientId ||
+                sourceDossier.BranchId != instruction.BranchId || sourceDossier.State != "Open" ||
+                sourceDossier.PlanState != "Committed" || sourceDossier.PlanVersion != instruction.PlanVersion ||
+                sourceDossier.Items.All(x => x.Id != instruction.ItemId || x.Decision != "Agreed"))
+                throw Error("MSG230");
+            return;
+        }
         var step = await db.TreatmentSteps.AsNoTracking().SingleOrDefaultAsync(x => x.Id == instruction.StepId, ct)
             ?? throw Error("MSG230");
         if (step.Outcome is "Completed" or "Stopped" or "Cancelled" ||
@@ -54,6 +66,8 @@ public sealed class FollowUpAppointmentPort(DcmsDbContext db, ITreatmentLabReadi
         if (row.Status != "NeedsBooking" || row.ActiveAppointmentId.HasValue) throw Error("MSG127");
         if (row.DentistId.HasValue && row.DentistId != dentistId || row.DurationMinutes != durationMinutes
             || !InWindow(row, startAt)) throw Error("MSG230");
+        if (row.Capability != null && !await capabilities.HasCapabilityAsync(branchId, dentistId,
+            row.Capability, ct)) throw Error("MSG230");
         await CheckReadinessAsync(row, startAt, ct);
     }
 
@@ -78,6 +92,8 @@ public sealed class FollowUpAppointmentPort(DcmsDbContext db, ITreatmentLabReadi
         if (row.Status != "Booked" || row.ActiveAppointmentId != appointmentId ||
             row.DentistId.HasValue && row.DentistId != dentistId || !InWindow(row, startAt))
             throw Error("MSG230");
+        if (row.Capability != null && !await capabilities.HasCapabilityAsync(row.BranchId, dentistId,
+            row.Capability, ct)) throw Error("MSG230");
         await CheckReadinessAsync(row, startAt, ct);
     }
 

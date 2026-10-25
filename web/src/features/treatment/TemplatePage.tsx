@@ -2,11 +2,12 @@ import { Alert, Button, Card, Drawer, Empty, Form, Input, InputNumber, Result, S
 import { useEffect, useRef, useState } from 'react';
 import { api, type ApiError } from '../../services/api';
 import type { AppointmentOptions } from './types';
-import type { StepDefinition, TemplateListItem, TreatmentTemplate } from './progressionTypes';
+import { durationOptions, durationOptionsFor, durationRangeValid, type StepDefinition, type TemplateListItem, type TreatmentTemplate } from './progressionTypes';
 import './treatment.css';
 
 type StepForm = Omit<StepDefinition, 'logicalStepId' | 'itemId'>;
 const blankStep = (): StepDefinition => ({ logicalStepId: crypto.randomUUID(), itemId: null, name: '', region: null,
+  estimatedMinMinutes: null, estimatedMaxMinutes: null,
   estimatedMinutes: 30, reservedMinutes: 30, predecessorIds: [], capability: null, labRequirement: null,
   earliestOffsetDays: null, targetOffsetDays: null, latestOffsetDays: null, chargingCoverage: 'IncludedInItem' });
 
@@ -24,6 +25,10 @@ export default function TemplatePage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [form] = Form.useForm<StepForm>();
+  const formMax = Form.useWatch('estimatedMaxMinutes', form);
+  const formMin = Form.useWatch('estimatedMinMinutes', form);
+  const formEstimate = Form.useWatch('estimatedMinutes', form);
+  const formReserved = Form.useWatch('reservedMinutes', form);
   const requestKey = useRef(crypto.randomUUID());
   const actionKeys = useRef(new Map<string, string>());
   function keyFor(action: string) {
@@ -116,7 +121,7 @@ export default function TemplatePage() {
         Bản sao trong hồ sơ bệnh nhân không đổi khi mẫu được sửa.</Typography.Paragraph>
       <Table rowKey="logicalStepId" pagination={false} size="small" dataSource={steps} scroll={{ x: 600 }} columns={[
         { title: 'Bước', render: (_: unknown, row: StepDefinition) => <><strong>{row.name || 'Bước mới'}</strong><div>{row.region}</div></> },
-        { title: 'Ước tính / giữ chỗ', render: (_: unknown, row: StepDefinition) => `${row.estimatedMinutes} / ${row.reservedMinutes} phút` },
+        { title: 'Ước tính / giữ chỗ', render: (_: unknown, row: StepDefinition) => `${row.estimatedMinMinutes != null && row.estimatedMaxMinutes != null ? `${row.estimatedMinMinutes}–${row.estimatedMaxMinutes} · ` : ''}${row.estimatedMinutes} / ${row.reservedMinutes} phút` },
         { title: 'Tiền nhiệm', render: (_: unknown, row: StepDefinition) => row.predecessorIds.length },
         { title: 'Thao tác', render: (_: unknown, row: StepDefinition, index: number) => !template || draft ?
           <Space><Button onClick={() => stepEditor(index)}>Sửa</Button><Button danger onClick={() => {
@@ -142,23 +147,37 @@ export default function TemplatePage() {
     <Drawer open={editing !== null} width={520} title={editing === steps.length ? 'Thêm bước' : 'Sửa bước'}
       onClose={() => setEditing(null)} extra={<Button type="primary" onClick={() => form.submit()}>Lưu bước</Button>}>
       <Form form={form} layout="vertical" onFinish={values => {
+        if (!durationRangeValid(values.estimatedMinMinutes, values.estimatedMaxMinutes,
+          values.estimatedMinutes, values.reservedMinutes)) {
+          form.setFields([{ name: 'reservedMinutes', errors: ['Kiểm tra khoảng ước tính và thời gian giữ ghế'] }]);
+          return;
+        }
         const previous = editing === null ? null : steps[editing];
         const next = { ...blankStep(), ...previous, ...values, logicalStepId: previous?.logicalStepId ?? crypto.randomUUID(),
           itemId: null, predecessorIds: values.predecessorIds ?? [],
           region: values.region || null, capability: values.capability || null,
           labRequirement: values.labRequirement || null,
           earliestOffsetDays: values.earliestOffsetDays ?? null, targetOffsetDays: values.targetOffsetDays ?? null,
-          latestOffsetDays: values.latestOffsetDays ?? null } as StepDefinition;
+          latestOffsetDays: values.latestOffsetDays ?? null,
+          estimatedMinMinutes: values.estimatedMinMinutes ?? null,
+          estimatedMaxMinutes: values.estimatedMaxMinutes ?? null } as StepDefinition;
         updateStep(editing ?? steps.length, next);
       }}>
         <Form.Item name="name" label="Tên bước điều trị" rules={[{ required: true, message: 'Nhập tên bước' }]}><Input maxLength={160} /></Form.Item>
         <Form.Item name="region" label="Răng hoặc vùng mặc định"><Input maxLength={80} /></Form.Item>
-        <div className="treatment-scope-grid"><Form.Item name="estimatedMinutes" label="Ước tính (phút)" rules={[{ required: true }]}>
-          <InputNumber min={1} max={480} style={{ width: '100%' }} /></Form.Item>
+        <Typography.Paragraph type="secondary">Khoảng thời gian là tùy chọn. Thời gian bác sĩ chọn phải nằm trong khoảng đó; giữ chỗ cho ghế có thể dài hơn.</Typography.Paragraph>
+        <div className="treatment-scope-grid"><Form.Item name="estimatedMinMinutes" label="Ước tính ngắn nhất (nếu có)">
+          <Select allowClear placeholder="Không đặt khoảng" options={durationOptionsFor(formMin)} /></Form.Item>
+          <Form.Item name="estimatedMaxMinutes" label="Ước tính dài nhất (nếu có)">
+            <Select allowClear placeholder="Không đặt khoảng" options={durationOptionsFor(formMax)} /></Form.Item></div>
+        <div className="treatment-scope-grid"><Form.Item name="estimatedMinutes" label="Thời gian chọn cho bước" rules={[{ required: true }]}>
+          <Select options={durationOptionsFor(formEstimate)} /></Form.Item>
           <Form.Item name="reservedMinutes" label="Giữ chỗ (phút, bội 15)" rules={[{ required: true },
-            { validator: async (_, value: number) => { if (value % 15 !== 0 || value < form.getFieldValue('estimatedMinutes')) throw new Error('Chọn bội 15, không nhỏ hơn ước tính'); } }]}>
-            <Select options={Array.from({ length: 32 }, (_, index) => ({ label: `${(index + 1) * 15} phút`, value: (index + 1) * 15 }))} />
+            { validator: async (_, value: number) => { if (!durationRangeValid(form.getFieldValue('estimatedMinMinutes'), form.getFieldValue('estimatedMaxMinutes'), form.getFieldValue('estimatedMinutes'), value)) throw new Error('Kiểm tra khoảng ước tính và thời gian giữ chỗ'); } }]}>
+            <Select options={durationOptions} />
           </Form.Item></div>
+        {formMax != null && formReserved != null && formReserved < formMax && <Alert type="warning" showIcon
+          message="Giữ ghế ngắn hơn mức ước tính dài nhất. Khi áp dụng cho bệnh nhân, bác sĩ phải xác nhận lựa chọn này." style={{ marginBottom: 16 }} />}
         <Form.Item name="predecessorIds" label="Bước cần hoàn thành trước"><Select mode="multiple" options={steps.filter(x => x.logicalStepId !== steps[editing ?? steps.length]?.logicalStepId)
           .map(x => ({ label: x.name || 'Bước chưa đặt tên', value: x.logicalStepId }))} /></Form.Item>
         <Form.Item name="capability" label="Năng lực bác sĩ cần có"><Input maxLength={160} /></Form.Item>

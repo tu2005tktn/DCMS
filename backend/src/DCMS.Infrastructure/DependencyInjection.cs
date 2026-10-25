@@ -67,6 +67,8 @@ public static class DependencyInjection
         services.AddScoped<ITreatmentProgressionService, TreatmentProgressionService>();
         services.AddScoped<ITreatmentActualEvidencePort, UnavailableTreatmentActualEvidencePort>();
         services.AddScoped<ITreatmentLabReadinessPort, UnavailableTreatmentLabReadinessPort>();
+        services.AddScoped<ITreatmentVisitActivitySourcePort, UnavailableTreatmentVisitActivitySourcePort>();
+        services.AddScoped<ITreatmentDentistCapabilityPort, UnavailableTreatmentDentistCapabilityPort>();
         services.AddScoped<TreatmentDueScanner>();
         services.AddHostedService<TreatmentDueScanWorker>();
         services.AddSingleton(TimeProvider.System);

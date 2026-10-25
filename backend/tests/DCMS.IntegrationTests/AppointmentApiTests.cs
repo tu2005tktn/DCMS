@@ -33,7 +33,10 @@ public sealed class AppointmentApiTests(ApiFixture fixture) : IClassFixture<ApiF
             new SchedulingMember { BranchId = branch.Id, EmployeeId = assistant });
         var service = new SchedulingService { BranchId = branch.Id, Name = "Khám", PublicDurationMinutes = 30, IsInitialExamination = true };
         db.Add(service);
-        db.Add(new SchedulingChair { BranchId = branch.Id, Name = "Ghế 1", OpenMinute = 0, CloseMinute = 1440 });
+        db.AddRange(
+            new SchedulingChair { BranchId = branch.Id, Name = "Ghế 1", OpenMinute = 0, CloseMinute = 1440 },
+            new SchedulingChair { BranchId = branch.Id, Name = "Ghế 2", OpenMinute = 0, CloseMinute = 1440 },
+            new SchedulingChair { BranchId = branch.Id, Name = "Ghế 3", OpenMinute = 0, CloseMinute = 1440 });
         var date = targetDate ?? DateOnly.FromDateTime(DateTime.UtcNow.AddDays(10));
         var monday = date.AddDays(-(((int)date.DayOfWeek + 6) % 7));
         var week = new WorkingWeek { BranchId = branch.Id, EmployeeId = dentist.Id, WeekStart = monday,
@@ -96,7 +99,9 @@ public sealed class AppointmentApiTests(ApiFixture fixture) : IClassFixture<ApiF
         Assert.Single(responses, x => x.StatusCode == HttpStatusCode.Created);
         Assert.Single(responses, x => x.StatusCode == HttpStatusCode.Conflict);
         using var scope = fixture.Services.CreateScope();
-        Assert.Equal(1, await scope.ServiceProvider.GetRequiredService<DcmsDbContext>().Appointments.CountAsync(x => x.BranchId == setup.BranchId));
+        var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
+        Assert.Equal(3, await db.Set<SchedulingChair>().CountAsync(x => x.BranchId == setup.BranchId));
+        Assert.Equal(1, await db.Appointments.CountAsync(x => x.BranchId == setup.BranchId));
     }
 
     [Fact]

@@ -5,7 +5,7 @@ namespace DCMS.Application.Features.Treatment;
 public sealed record StepDefinition(Guid LogicalStepId, Guid? ItemId, string Name, string? Region,
     int EstimatedMinutes, int ReservedMinutes, Guid[] PredecessorIds, string? Capability,
     string? LabRequirement, int? EarliestOffsetDays, int? TargetOffsetDays, int? LatestOffsetDays,
-    string ChargingCoverage);
+    string ChargingCoverage, int? EstimatedMinMinutes = null, int? EstimatedMaxMinutes = null);
 public sealed record CreateTemplateRequest(int BranchId, string Name, StepDefinition[] Steps, Guid RequestKey);
 public sealed record NewTemplateVersionRequest(int ExpectedVersion, StepDefinition[] Steps, Guid RequestKey);
 public sealed record UpdateTemplateDraftRequest(int ExpectedVersion, StepDefinition[] Steps, Guid RequestKey);
@@ -17,7 +17,12 @@ public sealed record TreatmentTemplateDto(Guid Id, int BranchId, string Name, in
 public sealed record TemplateListItem(Guid Id, int BranchId, string Name, int Version,
     int? ActiveVersion, DateTimeOffset CreatedAt);
 public sealed record ApplyTemplateRequest(int ExpectedVersion, Guid TemplateId, int TemplateVersion,
-    StepDefinition[] Steps, Guid RequestKey);
+    StepDefinition[] Steps, Guid RequestKey, bool AcknowledgeShortReservation = false);
+public sealed record AddPatientStepRequest(int ExpectedVersion, Guid ItemId, string Name, string? Region,
+    int EstimatedMinutes, int ReservedMinutes, Guid[] PredecessorIds, string? Capability,
+    string? LabRequirement, int? EarliestOffsetDays, int? TargetOffsetDays, int? LatestOffsetDays,
+    string ChargingCoverage, string Reason, Guid RequestKey, int? EstimatedMinMinutes = null,
+    int? EstimatedMaxMinutes = null, bool AcknowledgeShortReservation = false);
 public sealed record StepProgressRequest(int ExpectedVersion, int ExpectedStepVersion, string Outcome,
     string Reason, Guid RequestKey);
 public sealed record HoldStepRequest(int ExpectedVersion, int ExpectedStepVersion, string Reason,
@@ -28,7 +33,9 @@ public sealed record StepDto(Guid Id, Guid ItemId, string Name, string? Region, 
     int EstimatedMinutes, int ReservedMinutes, Guid[] PredecessorIds, string? Capability,
     string? LabRequirement, int? EarliestOffsetDays, int? TargetOffsetDays, int? LatestOffsetDays,
     string ChargingCoverage, string Outcome, string Readiness, string[] Blockers,
-    string? HoldReason, string? ReviewCondition, int Version);
+    string? HoldReason, string? ReviewCondition, int Version,
+    int? EstimatedMinMinutes = null, int? EstimatedMaxMinutes = null,
+    int? ShortReservationAcknowledgedBy = null, DateTimeOffset? ShortReservationAcknowledgedAt = null);
 public sealed record StepChange(IReadOnlyList<StepDto> Steps, Guid[] InstructionIds,
     SystemMessage Notification);
 
@@ -57,6 +64,7 @@ public interface ITreatmentProgressionService
     Task<TreatmentTemplateDto> TemplateStateAsync(int actorId, Guid id, int number, string state,
         TemplateStateRequest request, CancellationToken ct);
     Task<StepChange> ApplyTemplateAsync(int actorId, Guid dossierId, ApplyTemplateRequest request, CancellationToken ct);
+    Task<StepChange> AddPatientStepAsync(int actorId, Guid dossierId, AddPatientStepRequest request, CancellationToken ct);
     Task<IReadOnlyList<StepDto>> StepsAsync(int actorId, Guid dossierId, CancellationToken ct);
     Task<StepChange> ProgressAsync(int actorId, Guid dossierId, Guid stepId, StepProgressRequest request, CancellationToken ct);
     Task<StepChange> HoldAsync(int actorId, Guid dossierId, Guid stepId, HoldStepRequest request, CancellationToken ct);
@@ -83,3 +91,13 @@ public interface ITreatmentLabReadinessPort
         int planVersion, CancellationToken ct);
 }
 public sealed record LabReadinessResult(bool Available, bool IsAccepted, string? BlockerEpisodeKey);
+public interface ITreatmentVisitActivitySourcePort
+{
+    Task<VisitActivitySourceResult> VerifyAsync(int patientId, int branchId, Guid visitId,
+        Guid activityId, CancellationToken ct);
+}
+public sealed record VisitActivitySourceResult(bool Available, bool Matches);
+public interface ITreatmentDentistCapabilityPort
+{
+    Task<bool> HasCapabilityAsync(int branchId, int dentistId, string capability, CancellationToken ct);
+}

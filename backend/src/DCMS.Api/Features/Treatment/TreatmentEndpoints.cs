@@ -52,6 +52,9 @@ public static class TreatmentEndpoints
         dossier.MapGet("/steps", async (HttpContext context, Guid dossierId,
             ITreatmentProgressionService service, CancellationToken ct) =>
             Results.Ok(await service.StepsAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, ct)));
+        dossier.MapPost("/steps", async (HttpContext context, Guid dossierId, AddPatientStepRequest request,
+            ITreatmentProgressionService service, CancellationToken ct) =>
+            Results.Ok(await service.AddPatientStepAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, request, ct)));
         dossier.MapGet("/steps/{stepId:guid}/readiness", async (HttpContext context, Guid dossierId, Guid stepId,
             ITreatmentProgressionService service, CancellationToken ct) =>
             Results.Ok((await service.StepsAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, ct))

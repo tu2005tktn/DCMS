@@ -7,6 +7,7 @@ using DCMS.Application.Features.Patients;
 using DCMS.Application.Features.Treatment;
 using DCMS.Domain.Features.Scheduling;
 using DCMS.Infrastructure.Persistence;
+using DCMS.Infrastructure.Features.Treatment;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
@@ -64,7 +65,11 @@ public sealed class TreatmentProgressionApiTests(ProgressionFixture fixture) : I
         db.Add(branch); await db.SaveChangesAsync();
         var member = new SchedulingMember { BranchId = branch.Id, EmployeeId = dentist, CanDentist = true };
         var service = new SchedulingService { BranchId = branch.Id, Name = "Điều trị thử", PublicDurationMinutes = 30 };
-        db.AddRange(member, service); await db.SaveChangesAsync();
+        db.AddRange(member, service,
+            new SchedulingChair { BranchId = branch.Id, Name = "Ghế 1" },
+            new SchedulingChair { BranchId = branch.Id, Name = "Ghế 2" },
+            new SchedulingChair { BranchId = branch.Id, Name = "Ghế 3" });
+        await db.SaveChangesAsync();
         return (patient.Id, branch.Id, dentist, service.Id);
     }
 
@@ -176,5 +181,95 @@ public sealed class TreatmentProgressionApiTests(ProgressionFixture fixture) : I
                 [Definition(a) with { ReservedMinutes = 20 }], Guid.NewGuid()));
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal("MSG229", (await response.Content.ReadFromJsonAsync<SystemMessage>())!.Code);
+    }
+
+    [Fact]
+    public async Task EstimateRangeAcknowledgmentAndPatientStepArePersistedWithoutBooking()
+    {
+        var setup = await Prepare();
+        using var dentist = await Login("dentist.demo");
+        var logical = Guid.NewGuid();
+        var definition = Definition(logical) with { EstimatedMinMinutes = 15, EstimatedMinutes = 30,
+            EstimatedMaxMinutes = 60, ReservedMinutes = 30 };
+        var invalid = await dentist.PostAsJsonAsync("/api/treatment-templates",
+            new CreateTemplateRequest(setup.Branch, "Khoảng lỗi", [definition with { EstimatedMinMinutes = 45 }], Guid.NewGuid()));
+        Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
+        var created = await dentist.PostAsJsonAsync("/api/treatment-templates",
+            new CreateTemplateRequest(setup.Branch, "Khoảng thời gian", [definition], Guid.NewGuid()));
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var template = (await created.Content.ReadFromJsonAsync<TreatmentTemplateDto>())!;
+        var activated = await dentist.PostAsJsonAsync($"/api/treatment-templates/{template.Id}/versions/1/activate",
+            new TemplateStateRequest(template.Version, Guid.NewGuid()));
+        Assert.Equal(HttpStatusCode.OK, activated.StatusCode);
+        var dossierResponse = await dentist.PostAsJsonAsync($"/api/patients/{setup.Patient}/dossiers",
+            new CreateDossierRequest(setup.Branch, setup.Dentist, "Điều trị nhiều buổi", null, null, Guid.NewGuid()));
+        var dossier = (await dossierResponse.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
+        var draft = await dentist.PostAsJsonAsync($"/api/dossiers/{dossier.Id}/plan/draft",
+            new SavePlanDraftRequest(dossier.Version, "Điều trị theo đánh giá",
+                [new TreatmentItemInput(null, null, setup.Service, "25", "răng", 1, 1,
+                    30, null, null, 300000, "Agreed", "Đã tư vấn", "Bệnh nhân", null, null)],
+                [], Guid.NewGuid()));
+        dossier = (await draft.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
+        var itemId = dossier.Items.Single().Id;
+        var applyRequest = new ApplyTemplateRequest(dossier.Version, template.Id, 1,
+            [definition with { ItemId = itemId }], Guid.NewGuid());
+        var unacknowledged = await dentist.PostAsJsonAsync($"/api/dossiers/{dossier.Id}/plan/from-template", applyRequest);
+        Assert.Equal(HttpStatusCode.BadRequest, unacknowledged.StatusCode);
+        var applied = await dentist.PostAsJsonAsync($"/api/dossiers/{dossier.Id}/plan/from-template",
+            applyRequest with { AcknowledgeShortReservation = true });
+        Assert.Equal(HttpStatusCode.OK, applied.StatusCode);
+        var first = (await applied.Content.ReadFromJsonAsync<StepChange>())!.Steps.Single();
+        Assert.Equal(15, first.EstimatedMinMinutes);
+        Assert.Equal(60, first.EstimatedMaxMinutes);
+        Assert.NotNull(first.ShortReservationAcknowledgedAt);
+
+        dossier = (await dentist.GetFromJsonAsync<TreatmentDossierDto>($"/api/dossiers/{dossier.Id}"))!;
+        var commit = await dentist.PostAsJsonAsync($"/api/dossiers/{dossier.Id}/plan/commit",
+            new CommitPlanRequest(dossier.Version, Guid.NewGuid()));
+        dossier = (await commit.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
+        var add = new AddPatientStepRequest(dossier.Version, itemId, "Buổi theo đánh giá", "25",
+            30, 30, [first.Id], null, null, null, null, null,
+            "IncludedInItem", "Cần thêm buổi sau đánh giá", Guid.NewGuid(), 15, 60, true);
+        var added = await dentist.PostAsJsonAsync($"/api/dossiers/{dossier.Id}/steps", add);
+        Assert.Equal(HttpStatusCode.OK, added.StatusCode);
+        var second = (await added.Content.ReadFromJsonAsync<StepChange>())!.Steps.Single(x => x.Name == "Buổi theo đánh giá");
+        Assert.Equal("Blocked", second.Readiness);
+        Assert.Equal(60, second.EstimatedMaxMinutes);
+        var replay = await dentist.PostAsJsonAsync($"/api/dossiers/{dossier.Id}/steps", add);
+        Assert.Equal(second.Id, (await replay.Content.ReadFromJsonAsync<StepChange>())!.Steps.Single(x => x.Name == second.Name).Id);
+        var changedPayload = await dentist.PostAsJsonAsync($"/api/dossiers/{dossier.Id}/steps", add with { Reason = "Khác" });
+        Assert.Equal(HttpStatusCode.Conflict, changedPayload.StatusCode);
+
+        var source = new FollowUpSource(dossier.Id, itemId, second.Id, null, null);
+        var instructionRequest = new CreateFollowUpRequest(setup.Patient, setup.Branch, source,
+            "TreatmentContinuation", "Đánh giá thêm buổi", null,
+            new DateOnly(2026, 10, 1), new DateOnly(2026, 10, 2), new DateOnly(2026, 10, 3),
+            second.ReservedMinutes, setup.Dentist, null, Guid.NewGuid());
+        var instruction = await dentist.PostAsJsonAsync("/api/follow-up-instructions", instructionRequest);
+        Assert.Equal(HttpStatusCode.Created, instruction.StatusCode);
+        var instructionId = (await instruction.Content.ReadFromJsonAsync<FollowUpChange>())!.Instruction.Id;
+        var firstWithoutVisit = await dentist.PostAsJsonAsync("/api/follow-up-instructions",
+            instructionRequest with { Source = new FollowUpSource(dossier.Id, itemId, null, null, null),
+                RequestKey = Guid.NewGuid(), Reason = "Buổi đầu tiên từ hạng mục đã đồng ý" });
+        Assert.Equal(HttpStatusCode.Created, firstWithoutVisit.StatusCode);
+        Assert.Null((await firstWithoutVisit.Content.ReadFromJsonAsync<FollowUpChange>())!.Instruction.Source.VisitId);
+        var duplicate = await dentist.PostAsJsonAsync("/api/follow-up-instructions",
+            instructionRequest with { RequestKey = Guid.NewGuid() });
+        Assert.Equal(HttpStatusCode.Conflict, duplicate.StatusCode);
+
+        using (var scannerScope = fixture.Services.CreateScope())
+        {
+            var scanner = scannerScope.ServiceProvider.GetRequiredService<TreatmentDueScanner>();
+            await scanner.ScanAsync(default);
+            await scanner.ScanAsync(default);
+        }
+
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
+        Assert.Equal(3, await db.Set<SchedulingChair>().CountAsync(x => x.BranchId == setup.Branch));
+        Assert.False(await db.Appointments.AnyAsync(x => x.PatientId == setup.Patient));
+        Assert.Equal(2, await db.TreatmentSteps.CountAsync(x => x.DossierId == dossier.Id));
+        Assert.Equal(1, await db.TreatmentProgressionEvents.CountAsync(x => x.Kind == "followup.due"
+            && x.AggregateId == instructionId));
     }
 }
