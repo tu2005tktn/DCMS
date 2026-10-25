@@ -24,7 +24,6 @@
 - [S41 My Medical Records (Mobile)](specs/S41-MOBILE-MEDICAL-RECORDS.md): self-link gate, summary/detail, trạng thái nguồn DCMS-95, an ninh read-only; [triển khai DCMS-92](implementation/S24-S41-DCMS-92.md).
 - [Đặc tả UC-23 / UC-24 / UC-25](specs/UC23-24-25-SPEC.md): sửa ghi nhận thu tiền, theo dõi tái khám, liên hệ bệnh nhân — actor, tiền/hậu điều kiện, luồng chính/thay thế/ngoại lệ, `GBR-*`/`MSG*`; traceability theo phiên bản tài liệu.
 - [Đặc tả màn S38 / S39 / S40](specs/S38-40-SCREEN-SPEC.md): hóa đơn bệnh nhân, thu tiền & biên nhận, báo cáo — trường, thao tác, validation, trạng thái và quyền; ranh giới quy mô (đặc tả, chưa triển khai billing).
-- [Sơ đồ use case view Administrator](architecture/DCMS_UseCase_Administrator_View.puml): nguồn PlantUML chỉnh sửa được + [ảnh SVG](architecture/DCMS_UseCase_Administrator_View.svg) / [PNG](architecture/DCMS_UseCase_Administrator_View.png); chỉ UC-01 và UC-02, không include/extend, không actor hệ thống.
 
 Architecture: `Domain` contains business rules, `Application` defines use cases and contracts, `Infrastructure` supplies PostgreSQL/EF Core implementations, and `Api` configures HTTP endpoints and dependency injection. Add feature folders within each layer when implementing business features.
 
