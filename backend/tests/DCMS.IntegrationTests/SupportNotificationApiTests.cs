@@ -65,6 +65,40 @@ public sealed class SupportNotificationApiTests(ApiFixture fixture) : IClassFixt
     }
 
     [Fact]
+    public async Task AppointmentFilterScopesRequestsBeforePaginationAndPreservesBranchAuthorization()
+    {
+        var target = await SeedAsync("Change");
+        var other = await SeedAsync("Cancel");
+        using var staff = await Login("assistant.demo");
+        var filtered = (await staff.GetFromJsonAsync<SupportRequestPage>(
+            $"/api/support-requests?appointmentId={target.AppointmentId}&statuses=Pending&branchId={target.BranchId}&pageSize=1"))!;
+        Assert.Equal(1, filtered.Total);
+        Assert.Equal(target.RequestCode, Assert.Single(filtered.Items).Id);
+        var second = (await staff.GetFromJsonAsync<SupportRequestPage>(
+            $"/api/support-requests?appointmentId={target.AppointmentId}&statuses=Pending&pageSize=1&page=2"))!;
+        Assert.Equal(1, second.Total);
+        Assert.Empty(second.Items);
+        using (var scope = fixture.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
+            var employee = await (from e in db.Employees join u in db.Users on e.AccountId equals u.Id
+                where u.UserName == "assistant.demo" select e).SingleAsync();
+            var member = await db.Set<SchedulingMember>().SingleAsync(x => x.BranchId == other.BranchId && x.EmployeeId == employee.Id);
+            member.Active = false;
+            await db.SaveChangesAsync();
+        }
+        var deniedScope = (await staff.GetFromJsonAsync<SupportRequestPage>(
+            $"/api/support-requests?appointmentId={other.AppointmentId}&statuses=Pending"))!;
+        Assert.Equal(0, deniedScope.Total);
+        Assert.Empty(deniedScope.Items);
+        Assert.Equal(HttpStatusCode.Forbidden, (await staff.GetAsync(
+            $"/api/support-requests?appointmentId={other.AppointmentId}&branchId={other.BranchId}")).StatusCode);
+        using var patient = await Login("guest.demo");
+        Assert.Equal(HttpStatusCode.Forbidden, (await patient.GetAsync(
+            $"/api/support-requests?appointmentId={target.AppointmentId}")).StatusCode);
+    }
+
+    [Fact]
     public async Task ResolveConflictKeepsRequestPendingAndAttendanceDoesNotChangeLifecycle()
     {
         var change = await SeedAsync("Change");

@@ -4,7 +4,8 @@ namespace DCMS.Application.Features.Authentication;
 
 public sealed record SignInRequest(string UserName, string Password, string? DeviceLabel = null);
 public sealed record CurrentUser(int Id, string UserName, string FullName, string AccountType,
-    string[] Roles, string[] EffectiveRoles, string[] Permissions, bool HasVerifiedPatientLink = false);
+    string[] Roles, string[] EffectiveRoles, string[] Permissions, bool HasVerifiedPatientLink = false,
+    string? PhoneNumber = null, string? Email = null);
 public sealed record SignInResponse(string AccessToken, DateTimeOffset ExpiresAt, CurrentUser User,
     string RefreshToken, Guid SessionId);
 public sealed record RefreshRequest(string RefreshToken);

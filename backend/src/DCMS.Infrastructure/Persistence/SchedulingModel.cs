@@ -25,7 +25,12 @@ internal static class SchedulingModel
             b.Property(x => x.Kind).HasMaxLength(16); b.Property(x => x.Reason).HasMaxLength(500);
             b.HasOne<SchedulingBranch>().WithMany().HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Restrict);
         });
-        model.Entity<SchedulingBranch>(b => { b.ToTable("SCHEDULING_BRANCH"); b.Property(x => x.Name).HasMaxLength(160); });
+        model.Entity<SchedulingBranch>(b => {
+            b.ToTable("SCHEDULING_BRANCH", t => t.HasCheckConstraint("CK_BRANCH_SLOT_INTERVAL", "\"SlotIntervalMinutes\" BETWEEN 1 AND 120 AND \"BookingSettingsVersion\" > 0"));
+            b.Property(x => x.Name).HasMaxLength(160);
+            b.Property(x => x.SlotIntervalMinutes).HasDefaultValue(15);
+            b.Property(x => x.BookingSettingsVersion).HasDefaultValue(1).IsConcurrencyToken();
+        });
         model.Entity<SchedulingMember>(b =>
         {
             b.ToTable("SCHEDULING_MEMBER"); b.HasKey(x => new { x.BranchId, x.EmployeeId });
@@ -41,7 +46,9 @@ internal static class SchedulingModel
         });
         model.Entity<SchedulingService>(b =>
         {
-            b.ToTable("SCHEDULING_SERVICE", t => t.HasCheckConstraint("CK_SERVICE_DURATION", "\"PublicDurationMinutes\" IN (30,60)"));
+            b.HasIndex(x => x.BranchId).IsUnique().HasFilter("\"IsInitialExamination\" = TRUE");
+            b.Property(x => x.PublicBookable).HasDefaultValue(true);
+            b.ToTable("SCHEDULING_SERVICE", t => t.HasCheckConstraint("CK_SERVICE_DURATION", "\"PublicDurationMinutes\" BETWEEN 1 AND 480"));
             b.Property(x => x.Name).HasMaxLength(160);
             b.HasAlternateKey(x => new { x.Id, x.BranchId });
             b.HasOne<SchedulingBranch>().WithMany().HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Restrict);

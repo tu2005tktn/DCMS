@@ -63,6 +63,7 @@ public static class DependencyInjection
         services.AddScoped<IPatientService, PatientService>();
         services.AddSingleton(TimeProvider.System);
         services.AddScoped<Features.Scheduling.WorkingScheduleService>();
+        services.AddScoped<DCMS.Application.Features.Scheduling.IBookingSettingsService, Features.Scheduling.BookingSettingsService>();
         services.AddScoped<DCMS.Application.Features.Scheduling.IWorkingScheduleService>(sp => sp.GetRequiredService<Features.Scheduling.WorkingScheduleService>());
         services.AddScoped<DCMS.Application.Features.Scheduling.IAvailabilityService>(sp => sp.GetRequiredService<Features.Scheduling.WorkingScheduleService>());
         services.AddScoped<Features.Scheduling.DevelopmentSchedulingSeeder>();

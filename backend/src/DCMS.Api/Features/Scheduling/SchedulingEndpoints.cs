@@ -8,6 +8,13 @@ public static class SchedulingEndpoints
 {
     public static void MapSchedulingEndpoints(this IEndpointRouteBuilder endpoints)
     {
+        var settings = endpoints.MapGroup("/api/booking-settings").RequireAuthorization().WithTags("Clinic booking settings");
+        settings.MapGet("/options", async (HttpContext context, IBookingSettingsService service, CancellationToken ct) =>
+            Results.Ok(await service.OptionsAsync(AuthenticationEndpoints.AccountId(context.User), ct)));
+        settings.MapGet("/{branchId:int}", async (HttpContext context, int branchId, IBookingSettingsService service, CancellationToken ct) =>
+            Results.Ok(await service.GetAsync(AuthenticationEndpoints.AccountId(context.User), branchId, ct)));
+        settings.MapPut("/{branchId:int}", async (HttpContext context, int branchId, SaveBookingSettings command, IBookingSettingsService service, CancellationToken ct) =>
+            Results.Ok(await service.SaveAsync(AuthenticationEndpoints.AccountId(context.User), branchId, command, ct)));
         var group = endpoints.MapGroup("/api/working-schedules").RequireAuthorization().WithTags("S09 UC-03");
         group.MapGet("/recurring", async (HttpContext context, int dentistId, DateOnly date, IWorkingScheduleService service, CancellationToken ct) =>
             Results.Ok(await service.GetRecurringAsync(AuthenticationEndpoints.AccountId(context.User), dentistId, date, ct)));

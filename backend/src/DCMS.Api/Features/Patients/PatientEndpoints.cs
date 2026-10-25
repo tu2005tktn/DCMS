@@ -1,6 +1,7 @@
 using DCMS.Api.Features.Authentication;
 using DCMS.Api.Features.PatientLinks;
 using DCMS.Application.Features.Patients;
+using DCMS.Application.Features.Appointments;
 
 namespace DCMS.Api.Features.Patients;
 
@@ -30,6 +31,9 @@ public static class PatientEndpoints
             Results.Ok(await service.GetAsync(id, ct)));
         group.MapGet("/{id:int}/audit", async (int id, IPatientService service, CancellationToken ct) =>
             Results.Ok(await service.AuditAsync(id, ct)));
+        group.MapGet("/{id:int}/appointments", async (HttpContext context, int id, string? scope, int? page, int? pageSize,
+            IAppointmentQueryService service, CancellationToken ct) => Results.Ok(await service.ForPatientAsync(
+                AuthenticationEndpoints.AccountId(context.User), id, scope ?? "ALL", page ?? 1, pageSize ?? 20, ct)));
 
         group.MapPost("/", async (HttpContext context, CreatePatientRequest request, IPatientService service, CancellationToken ct) =>
         {

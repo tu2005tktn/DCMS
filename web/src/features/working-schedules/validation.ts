@@ -7,13 +7,11 @@ const overlap = (a: Period, b: Period) => a.startMinute < b.endMinute && b.start
 
 export function validateAvailabilityDuration(minutes: number | null, isPublic: boolean, catalogDuration?: number): string | null {
   if (minutes === null || !Number.isFinite(minutes) || !Number.isInteger(minutes))
-    return 'Nhập thời lượng bằng số nguyên phút. Nhân viên dùng 15–480 phút, bội số của 15.';
+    return 'Nhập thời lượng bằng số nguyên phút từ 1 đến 480.';
   if (isPublic)
-    return (minutes === 30 || minutes === 60) && minutes === catalogDuration
-      ? null : 'Thời lượng công khai phải theo dịch vụ đã chọn: 30 hoặc 60 phút.';
-  if (minutes < 15 || minutes > 480) return 'Thời lượng của nhân viên phải từ 15 đến 480 phút, bội số của 15.';
-  if (minutes % 15 !== 0)
-    return `Thời lượng ${minutes} phút chưa hợp lệ. Chọn bội số của 15 phút, ví dụ ${Math.floor(minutes / 15) * 15} hoặc ${Math.ceil(minutes / 15) * 15} phút.`;
+    return minutes >= 1 && minutes <= 480 && minutes === catalogDuration
+      ? null : 'Thời lượng công khai phải bằng thời lượng dịch vụ đã chọn (1–480 phút).';
+  if (minutes < 1 || minutes > 480) return 'Thời lượng phải từ 1 đến 480 phút.';
   return null;
 }
 

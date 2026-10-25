@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using DCMS.Application.Common;
 using DCMS.Application.Features.Authentication;
+using DCMS.Application.Features.Appointments;
 using DCMS.Application.Features.Scheduling;
 using DCMS.Domain.Features.Scheduling;
 using DCMS.Infrastructure.Persistence;
@@ -22,7 +23,7 @@ public sealed class ScheduleRulesTests
     [Theory]
     [InlineData(15, false, true)] [InlineData(480, false, true)] [InlineData(120, false, true)]
     [InlineData(485, false, false)] [InlineData(0, false, false)] [InlineData(30, true, true)]
-    [InlineData(60, true, true)] [InlineData(120, true, false)] [InlineData(15, true, false)]
+    [InlineData(60, true, true)] [InlineData(120, true, true)] [InlineData(15, true, true)] [InlineData(35, true, true)] [InlineData(1, false, true)]
     public void DurationPolicy(int duration, bool isPublic, bool valid) => Assert.Equal(valid, ScheduleRules.ValidDuration(duration, isPublic));
     [Fact]
     public void InvalidWeekOverlapAndBreakAreRejected()
@@ -59,11 +60,101 @@ public sealed class SchedulingApiTests(ApiFixture fixture) : IClassFixture<ApiFi
         var other = employees.Single(e => e.UserName == "dual.demo"); var owner = employees.Single(e => e.UserName == "owner.demo");
         db.AddRange(new SchedulingMember { BranchId = branch.Id, EmployeeId = dentist.Id, CanDentist = true }, new SchedulingMember { BranchId = branch.Id, EmployeeId = assistant.Id },
             new SchedulingMember { BranchId = branch.Id, EmployeeId = other.Id, CanDentist = true }, new SchedulingMember { BranchId = branch.Id, EmployeeId = owner.Id, CanDentist = true, CanManageSchedules = true });
-        var service = new SchedulingService { BranchId = branch.Id, Name = "Test 60", PublicDurationMinutes = 60 };
+        var service = new SchedulingService { BranchId = branch.Id, Name = "Khám", PublicDurationMinutes = 60, IsInitialExamination = true };
         var chair = new SchedulingChair { BranchId = branch.Id, Name = "Chair", OpenMinute = 480, CloseMinute = 1080 };
         db.AddRange(service, chair); await db.SaveChangesAsync();
         return new(branch.Id, dentist.Id, assistant.Id, other.Id, service.Id, chair.Id, dentist.AccountId, owner.AccountId, Date.AddDays(branch.Id * 7));
     }
+    [Fact]
+    public async Task DentistConfiguresFlexibleServicesAndSlotsWithReplayAndScopeProtection()
+    {
+        var s = await Create(); using var dentist = await Login();
+        var path = $"/api/booking-settings/{s.Branch}";
+        var original = (await dentist.GetFromJsonAsync<BookingSettings>(path))!;
+        Assert.Equal(15, original.SlotIntervalMinutes);
+        var command = new SaveBookingSettings(original.Version, Guid.NewGuid(), 20,
+            [new(s.Service, "Exam 35", 35, true), new(0, "Treatment 95", 95, true, true, true)]);
+        var savedResponse = await dentist.PutAsJsonAsync(path, command);
+        Assert.Equal(HttpStatusCode.OK, savedResponse.StatusCode);
+        var saved = (await savedResponse.Content.ReadFromJsonAsync<BookingSettings>())!;
+        Assert.Equal(2, saved.Version); Assert.Equal(20, saved.SlotIntervalMinutes);
+        Assert.Equal(95, saved.Services.Single(x => x.Name == "Treatment 95").DurationMinutes);
+        Assert.True(saved.Services.Single(x => x.Id == s.Service).IsInitialExamination);
+        Assert.Equal("Khám", saved.Services.Single(x => x.Id == s.Service).Name);
+        var treatment = saved.Services.Single(x => x.Name == "Treatment 95");
+        Assert.False(treatment.IsInitialExamination); Assert.False(treatment.PublicBookable);
+        using var anonymous = fixture.CreateClient();
+        var publicOptions = (await anonymous.GetFromJsonAsync<ScheduleOptions>($"/api/availability/options?branchId={s.Branch}"))!;
+        Assert.Equal(s.Service, Assert.Single(publicOptions.Services).Id);
+        await Message(await anonymous.GetAsync($"/api/availability?branchId={s.Branch}&dentistId={s.Dentist}&serviceId={treatment.Id}&date={s.Date:yyyy-MM-dd}&durationMinutes=95"), HttpStatusCode.BadRequest, "MSG110");
+        var forged = new CreateAppointmentRequest(s.Branch, new("Synthetic booker", "0987654321", null), new(null, "Synthetic attendee", null),
+            "Self", "Standard", "App", treatment.Id, null, s.Dentist, null, null, Start(s, 480), 95,
+            null, null, Guid.NewGuid(), 1, null);
+        await Message(await anonymous.PostAsJsonAsync("/api/appointments", forged), HttpStatusCode.BadRequest, "MSG110");
+        var replay = (await (await dentist.PutAsJsonAsync(path, command)).Content.ReadFromJsonAsync<BookingSettings>())!;
+        Assert.Equal(saved.Version, replay.Version); Assert.Equal(2, replay.Services.Length);
+        await Message(await dentist.PutAsJsonAsync(path, command with { RequestKey = Guid.NewGuid() }), HttpStatusCode.Conflict, "MSG111");
+        await Message(await dentist.PutAsJsonAsync(path, command with { SlotIntervalMinutes = 30 }), HttpStatusCode.Conflict, "MSG111");
+        await Message(await dentist.PutAsJsonAsync(path, new SaveBookingSettings(2, Guid.NewGuid(), 0, saved.Services)), HttpStatusCode.BadRequest, "MSG04");
+        await Message(await dentist.PutAsJsonAsync(path, new SaveBookingSettings(2, Guid.NewGuid(), 20,
+            [saved.Services[0] with { Id = int.MaxValue }, saved.Services[1]])), HttpStatusCode.BadRequest, "MSG04");
+        using var assistant = await Login("assistant.demo");
+        await Message(await assistant.PostAsJsonAsync("/api/appointments", forged with { Source = "InPerson", RequestKey = Guid.NewGuid() }), HttpStatusCode.BadRequest, "MSG110");
+        await Message(await assistant.GetAsync(path), HttpStatusCode.Forbidden, "MSG06");
+        using var guest = await Login("guest.demo");
+        await Message(await guest.GetAsync(path), HttpStatusCode.Forbidden, "MSG06");
+        await Message(await dentist.GetAsync("/api/booking-settings/2147483647"), HttpStatusCode.Forbidden, "MSG06");
+    }
+
+    [Fact]
+    public async Task ConfiguredGridAndServiceDurationApplyToQueryBookingStaleSettingsAndReschedule()
+    {
+        var s = await Create(); using var dentist = await Login();
+        await Publish(dentist, Command(s));
+        var path = $"/api/booking-settings/{s.Branch}";
+        var settings = (await dentist.GetFromJsonAsync<BookingSettings>(path))!;
+        var saved = (await (await dentist.PutAsJsonAsync(path, new SaveBookingSettings(settings.Version, Guid.NewGuid(), 20,
+            [new(s.Service, "Exam 35", 35, true)]))).Content.ReadFromJsonAsync<BookingSettings>())!;
+        using var anonymous = fixture.CreateClient();
+        var query = $"/api/availability?branchId={s.Branch}&dentistId={s.Dentist}&serviceId={s.Service}&date={s.Date:yyyy-MM-dd}&durationMinutes=35";
+        var slots = (await anonymous.GetFromJsonAsync<AvailabilityResult>(query))!.Slots;
+        Assert.Contains(slots, x => x.Start == Start(s, 500));
+        Assert.DoesNotContain(slots, x => x.Start == Start(s, 495));
+        Assert.All(slots, x => { Assert.Equal(35, (x.End - x.Start).TotalMinutes); Assert.Equal(saved.Version, x.BookingSettingsVersion); });
+        Assert.DoesNotContain(slots, x => x.Start == Start(s, 700) || x.Start == Start(s, 1060));
+        await Message(await anonymous.GetAsync(query.Replace("durationMinutes=35", "durationMinutes=30")), HttpStatusCode.BadRequest, "MSG110");
+        var slot = slots.First();
+        CreateAppointmentRequest Booking(AvailabilitySlot value) => new(s.Branch, new("Synthetic booker", "0987654321", null),
+            new(null, "Synthetic attendee", null), "Self", "Standard", "App", s.Service, null, s.Dentist, null, null,
+            value.Start, 35, null, null, Guid.NewGuid(), value.ScheduleVersion, null, value.BookingSettingsVersion);
+        await Message(await anonymous.PostAsJsonAsync("/api/appointments", Booking(slot) with { StartAt = slot.Start.AddMinutes(1) }), HttpStatusCode.Conflict, "MSG110");
+        var bookedResponse = await anonymous.PostAsJsonAsync("/api/appointments", Booking(slot));
+        Assert.Equal(HttpStatusCode.Created, bookedResponse.StatusCode);
+        var booked = (await bookedResponse.Content.ReadFromJsonAsync<AppointmentResult>())!;
+        var remaining = (await anonymous.GetFromJsonAsync<AvailabilityResult>(query))!.Slots;
+        Assert.DoesNotContain(remaining, x => x.Start < booked.EndAt && x.End > booked.StartAt);
+        var changed = (await (await dentist.PutAsJsonAsync(path, new SaveBookingSettings(saved.Version, Guid.NewGuid(), 20,
+            [new(s.Service, "Exam 55", 55, true)]))).Content.ReadFromJsonAsync<BookingSettings>())!;
+        await Message(await anonymous.PostAsJsonAsync("/api/appointments", Booking(remaining.Last())), HttpStatusCode.Conflict, "MSG111");
+        var detail = (await dentist.GetFromJsonAsync<StaffAppointmentDetail>($"/api/appointments/{booked.AppointmentId}"))!;
+        Assert.Equal(35, detail.Appointment.DurationMinutes);
+        using var assistant = await Login("assistant.demo");
+        var moves = (await assistant.GetFromJsonAsync<AvailabilityResult>($"/api/appointments/{booked.Code}/availability?date={s.Date:yyyy-MM-dd}"))!.Slots;
+        Assert.All(moves, x => Assert.Equal(35, (x.End - x.Start).TotalMinutes));
+        var target = moves.Last();
+        var moved = await assistant.PostAsJsonAsync($"/api/appointments/{booked.Code}/reschedule", new RescheduleAppointmentRequest(
+            booked.Version, Guid.NewGuid(), target.Start, target.ChairId, target.ScheduleVersion, null, "Synthetic move", "Verified requester",
+            BookingSettingsVersion: changed.Version));
+        Assert.Equal(HttpStatusCode.OK, moved.StatusCode);
+        var disabled = await dentist.PutAsJsonAsync(path, new SaveBookingSettings(changed.Version, Guid.NewGuid(), 20,
+            [new(s.Service, "Exam 55", 55, false, PublicBookable: false)]));
+        Assert.True(disabled.IsSuccessStatusCode, await disabled.Content.ReadAsStringAsync());
+        Assert.False((await disabled.Content.ReadFromJsonAsync<BookingSettings>())!.Services.Single().Active);
+        var publicOptions = (await anonymous.GetFromJsonAsync<ScheduleOptions>($"/api/availability/options?branchId={s.Branch}"))!;
+        Assert.DoesNotContain(publicOptions.Services, x => x.Id == s.Service);
+        await Message(await anonymous.GetAsync(query.Replace("durationMinutes=35", "durationMinutes=55")), HttpStatusCode.BadRequest, "MSG110");
+    }
+
     private async Task<HttpClient> Login(string name = "dentist.demo")
     {
         var client = fixture.CreateClient(); var response = await client.PostAsJsonAsync("/api/auth/sign-in", new SignInRequest(name, fixture.Password));

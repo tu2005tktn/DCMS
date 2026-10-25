@@ -57,7 +57,7 @@ public sealed class AppointmentChangeApiTests(AppointmentChangeFixture fixture) 
         db.Add(new SchedulingMember { BranchId = branch.Id, EmployeeId = dentist.Id, CanDentist = true });
         db.Add(new SchedulingMember { BranchId = branch.Id, EmployeeId = secondDentist.Id, CanDentist = true });
         if (assistantMember) db.Add(new SchedulingMember { BranchId = branch.Id, EmployeeId = assistant.Id });
-        var service = new SchedulingService { BranchId = branch.Id, Name = "UC06 exam", PublicDurationMinutes = 30 };
+        var service = new SchedulingService { BranchId = branch.Id, Name = "UC06 exam", PublicDurationMinutes = 30, IsInitialExamination = true };
         var chair = new SchedulingChair { BranchId = branch.Id, Name = "UC06 chair", OpenMinute = 0, CloseMinute = 1440 };
         db.AddRange(service, chair);
         var date = DateOnly.FromDateTime(fixture.Clock.Now.UtcDateTime).AddDays(14 + fixture.NextWeek() * 7);

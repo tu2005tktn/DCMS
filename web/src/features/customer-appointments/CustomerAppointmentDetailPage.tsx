@@ -210,7 +210,7 @@ function ChangeDialog({ detail, token, mode, onClose, onChanged, onAccessError, 
           : { reason, kind: 'Cancel' })
       : { expectedVersion: detail.version, reason,
           ...(moving && slot ? { dentistId, newStart: slot.start, chairId: slot.chairId, scheduleVersion: slot.scheduleVersion,
-            assistantScheduleVersion: slot.assistantScheduleVersion } : {}) };
+            assistantScheduleVersion: slot.assistantScheduleVersion, bookingSettingsVersion: slot.bookingSettingsVersion } : {}) };
     const fingerprint = JSON.stringify({ code: detail.code, mode, isUnder12h, ...payload });
     const requestKey = retry.current?.fingerprint === fingerprint ? retry.current.key : crypto.randomUUID();
     retry.current = { fingerprint, key: requestKey };

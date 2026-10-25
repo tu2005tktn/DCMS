@@ -27,7 +27,7 @@ public sealed class SupportRequestService(DcmsDbContext db, UserManager<Applicat
     private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     public async Task<SupportRequestPage> ListAsync(int actorId, string? statuses, int? branchId,
-        int page, int pageSize, CancellationToken ct)
+        int page, int pageSize, CancellationToken ct, Guid? appointmentId = null)
     {
         page = Math.Max(page, 1); pageSize = Math.Clamp(pageSize, 1, 100);
         var branches = await StaffBranchesAsync(actorId, ct);
@@ -39,6 +39,7 @@ public sealed class SupportRequestService(DcmsDbContext db, UserManager<Applicat
                     join appointment in db.Appointments.AsNoTracking() on request.AppointmentId equals appointment.Id
                     where selected.Contains(appointment.BranchId) && allowed.Contains(request.Status)
                     select new { request, appointment };
+        if (appointmentId.HasValue) query = query.Where(x => x.appointment.Id == appointmentId.Value);
         var total = await query.CountAsync(ct);
         var rows = await query.OrderBy(x => x.request.Status == "Pending" ? 0 : 1)
             .ThenByDescending(x => x.request.UpdatedAt).Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(ct);

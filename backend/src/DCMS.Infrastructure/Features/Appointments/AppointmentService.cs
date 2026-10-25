@@ -97,7 +97,7 @@ public sealed class AppointmentService(DcmsDbContext db, IAvailabilityService av
             Relation = relation, Kind = kind, Source = source,
             request.ServiceId, Reason = reason, request.DentistId, request.AssistantId,
             ChairId = staff ? request.ChairId : null, StartAt = start, request.DurationMinutes,
-            request.FollowUpId, ExceptionReason = exceptionReason, request.ScheduleVersion, request.AssistantScheduleVersion
+            request.FollowUpId, ExceptionReason = exceptionReason, request.ScheduleVersion, request.AssistantScheduleVersion, request.BookingSettingsVersion
         };
         var fingerprint = Hash(JsonSerializer.Serialize(canonical));
 
@@ -112,6 +112,8 @@ public sealed class AppointmentService(DcmsDbContext db, IAvailabilityService av
             return new(previous with { Notification = SystemMessages.Get("MSG30") }, true);
         }
 
+        if (kind != "FollowUp" && !await db.Set<SchedulingService>().AsNoTracking().AnyAsync(s =>
+            s.Id == request.ServiceId && s.BranchId == request.BranchId && s.Active && s.IsInitialExamination, ct)) throw Error("MSG110");
         if (start <= now) throw Error("MSG25", 409);
         if (!staff && !AppointmentRules.PublicLeadTimeValid(now, start)) throw Error("MSG24");
         if (staff && start < now.AddMinutes(60) && exceptionReason == null) throw Error("MSG24");
@@ -122,7 +124,7 @@ public sealed class AppointmentService(DcmsDbContext db, IAvailabilityService av
         var slot = await availability.CheckInTransactionAsync(new ResourceCheck(request.BranchId, request.DentistId,
             request.ServiceId, start, request.DurationMinutes, staff ? request.ChairId : null, request.AssistantId,
             patientId.HasValue ? $"patient:{patientId.Value}" : null, request.ScheduleVersion,
-            request.AssistantScheduleVersion, Public: !staff), ct);
+            request.AssistantScheduleVersion, Public: !staff, BookingSettingsVersion: request.BookingSettingsVersion), ct);
 
         var id = Guid.NewGuid();
         var code = "AP-" + id.ToString("N").ToUpperInvariant();
