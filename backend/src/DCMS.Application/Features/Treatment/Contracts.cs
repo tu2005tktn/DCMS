@@ -25,7 +25,8 @@ public sealed record TreatmentItemDto(Guid Id, int? SourceDiagnosisId, int Servi
     string Progress, string? Counseling, string? DecisionMaker, string? RepresentativeBasis,
     DateTimeOffset? DecidedAt, Guid? ConsentDocumentId, int? ConsentPlanVersion,
     string? WarrantyPolicy, string? WarrantyPolicyVersion, string? WarrantyScope,
-    DateTimeOffset? WarrantyConfirmedAt, DateOnly? WarrantyEndsOn);
+    DateTimeOffset? WarrantyConfirmedAt, DateOnly? WarrantyEndsOn, string? Material = null,
+    int? DecisionPlanVersion = null);
 public sealed record PaymentTermDto(string Purpose, long AmountVnd, DateOnly DueOn, string? Evidence);
 public sealed record TreatmentEventDto(Guid Id, string Kind, int DossierVersion, int ActorId,
     DateTimeOffset OccurredAt, string PayloadJson);

@@ -2,11 +2,13 @@ import type { SystemMessage } from '../../services/api';
 
 export type TreatmentItem = {
   id: string; sourceDiagnosisId: number | null; serviceId: number; serviceName: string; region: string | null;
+  material: string | null;
   unit: string; quantity: number; plannedOrder: number; estimatedMinutes: number | null;
   estimatedStart: string | null; estimatedEnd: string | null; agreedUnitPriceVnd: number;
   decision: 'Proposed' | 'Agreed' | 'Refused' | 'Deferred'; progress: string;
   counseling: string | null; decisionMaker: string | null; representativeBasis: string | null;
   decidedAt: string | null; consentDocumentId: string | null; consentPlanVersion: number | null;
+  decisionPlanVersion: number | null;
   warrantyPolicy: string | null; warrantyPolicyVersion: string | null; warrantyScope: string | null;
   warrantyConfirmedAt: string | null; warrantyEndsOn: string | null;
 };

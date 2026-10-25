@@ -70,6 +70,7 @@ public static class SystemMessages
         "MSG240" => "Nội dung đồng ý chưa khớp phương án hiện tại. Vui lòng tư vấn và ghi nhận lại quyết định trước khi thực hiện.",
         "MSG243" => "Còn hạng mục chưa được xử lý khi kết thúc kế hoạch. Vui lòng ghi kết quả và lý do cho phần chưa hoàn tất.",
         "MSG244" => "Vui lòng ghi căn cứ bảo hành hoặc miễn phí và phạm vi hạng mục được áp dụng.",
+        "MSG245" => "Phương án đã thay đổi. Vui lòng kiểm tra khoản đã ghi nhận, công nợ và số dư trước khi điều chỉnh; hệ thống không tự hoàn tiền.",
         "MSG139" => "Thông tin tài khoản chưa thể sử dụng. Vui lòng kiểm tra hoặc dùng chức năng khôi phục tài khoản.",
         "MSG142" => "Tài khoản hoặc hồ sơ đã có liên kết tự thân đang hiệu lực. Vui lòng liên hệ phòng khám để kiểm tra.",
         "MSG143" => "Chưa đủ căn cứ xác minh tài khoản với hồ sơ tự thân. Vui lòng bổ sung hoặc đối chiếu thông tin nhận diện.",

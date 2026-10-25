@@ -38,6 +38,8 @@ internal static class TreatmentModel
             b.HasKey(x => x.Id);
             b.HasIndex(x => new { x.DossierId, x.PlannedOrder });
             b.Property(x => x.ServiceName).HasMaxLength(160);
+            b.Property(x => x.Material).HasMaxLength(160);
+            b.Property(x => x.DecisionPlanVersion).HasColumnType("integer");
             b.Property(x => x.Region).HasMaxLength(80);
             b.Property(x => x.Unit).HasMaxLength(40);
             b.Property(x => x.Quantity).HasPrecision(12, 3);
@@ -68,6 +70,16 @@ internal static class TreatmentModel
             b.Property(x => x.Fingerprint).HasMaxLength(64);
             b.Property(x => x.ResultJson).HasColumnType("jsonb");
             b.HasOne<TreatmentDossier>().WithMany().HasForeignKey(x => x.DossierId).OnDelete(DeleteBehavior.Restrict);
+        });
+        model.Entity<TreatmentRevisionDraft>(b =>
+        {
+            b.ToTable("TREATMENT_REVISION_DRAFT");
+            b.HasKey(x => x.Id);
+            b.HasIndex(x => new { x.DossierId, x.ItemId, x.ActorId }).IsUnique();
+            b.Property(x => x.PayloadJson).HasColumnType("jsonb");
+            b.Property(x => x.Version).IsConcurrencyToken();
+            b.HasOne<TreatmentDossier>().WithMany().HasForeignKey(x => x.DossierId).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<TreatmentItem>().WithMany().HasForeignKey(x => x.ItemId).OnDelete(DeleteBehavior.Restrict);
         });
         model.Entity<TreatmentTemplate>(b =>
         {

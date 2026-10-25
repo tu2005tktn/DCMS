@@ -23,6 +23,7 @@ import CustomerAppointmentsPage from '../features/customer-appointments/Customer
 import CustomerAppointmentDetailPage from '../features/customer-appointments/CustomerAppointmentDetailPage';
 import DossierPage from '../features/treatment/DossierPage';
 import PlanPage from '../features/treatment/PlanPage';
+import RevisionPage from '../features/treatment/RevisionPage';
 import TemplatePage from '../features/treatment/TemplatePage';
 
 export default function App() {
@@ -55,6 +56,7 @@ export default function App() {
       <Route path="patients/:id" element={<Protected permission="patients.read"><PatientProfilePage /></Protected>} />
       <Route path="patients/:id/dossiers/:dossierId" element={<Protected permission="patients.read"><DossierPage /></Protected>} />
       <Route path="patients/:id/dossiers/:dossierId/plan" element={<Protected permission="patients.read"><PlanPage /></Protected>} />
+      <Route path="patients/:id/dossiers/:dossierId/plan/revise/:itemId" element={<Protected permission="patients.read"><RevisionPage /></Protected>} />
       <Route path="treatment-templates" element={<Protected><TemplatePage /></Protected>} />
       <Route path="appointments" element={<Protected><AppointmentCalendarPage /></Protected>} />
       <Route path="appointments/:id" element={<Protected><AppointmentDetailPage /></Protected>} />

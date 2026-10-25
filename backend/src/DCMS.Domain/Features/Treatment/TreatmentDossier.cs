@@ -36,6 +36,7 @@ public sealed class TreatmentItem
     public int? SourceDiagnosisId { get; set; }
     public int ServiceId { get; set; }
     public string ServiceName { get; set; } = "";
+    public string? Material { get; set; }
     public string? Region { get; set; }
     public string Unit { get; set; } = "";
     public decimal Quantity { get; set; }
@@ -51,6 +52,7 @@ public sealed class TreatmentItem
     public string? RepresentativeBasis { get; set; }
     public DateTimeOffset? DecidedAt { get; set; }
     public int? DecidedBy { get; set; }
+    public int? DecisionPlanVersion { get; set; }
     public Guid? ConsentDocumentId { get; set; }
     public int? ConsentPlanVersion { get; set; }
     public string? WarrantyPolicy { get; set; }
@@ -81,4 +83,16 @@ public sealed class TreatmentReceipt
     public string Fingerprint { get; set; } = "";
     public Guid DossierId { get; set; }
     public string ResultJson { get; set; } = "{}";
+}
+
+public sealed class TreatmentRevisionDraft
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid DossierId { get; set; }
+    public Guid ItemId { get; set; }
+    public int ActorId { get; set; }
+    public int BasePlanVersion { get; set; }
+    public int Version { get; set; } = 1;
+    public string PayloadJson { get; set; } = "{}";
+    public DateTimeOffset UpdatedAt { get; set; }
 }

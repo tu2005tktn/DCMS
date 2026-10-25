@@ -20,6 +20,12 @@
 .treatment-muted { color: #667085; font-size: 12px; }
 .treatment-order-actions { display: inline-flex; gap: 4px; }
 .treatment-order-actions .ant-btn { min-width: 28px; }
+.treatment-revision-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 20px 0; }
+.treatment-revision-form label { display: grid; align-content: start; gap: 6px; font-weight: 600; }
+.treatment-revision-form .ant-input-number, .treatment-revision-form .ant-select { width: 100%; }
+.treatment-revision-wide { grid-column: 1 / -1; }
+.treatment-revision .ant-alert { margin: 12px 0; }
+.treatment-revision .ant-steps { margin: 8px 0 12px; }
 .treatment-list { display: grid; gap: 16px; }
 .treatment-timeline .ant-timeline { margin-top: 12px; }
 @media (max-width: 767px) {
@@ -29,5 +35,9 @@
   .treatment-item-row { flex-wrap: wrap; }
   .treatment-plan-actions .ant-btn { min-height: 44px; }
   .treatment-scope-grid { grid-template-columns: 1fr; gap: 0; }
+  .treatment-revision-form { grid-template-columns: 1fr; }
   .treatment-estimate { align-items: flex-start; flex-direction: column; }
+}
+.treatment-selected-item, .ant-table-tbody > tr.treatment-selected-item > td {
+  background: #eaf2ff;
 }

@@ -91,7 +91,8 @@ public sealed class TreatmentDossierService(DcmsDbContext db, UserManager<Applic
         x.ServiceName, x.Region, x.Unit, x.Quantity, x.PlannedOrder, x.EstimatedMinutes, x.EstimatedStart,
         x.EstimatedEnd, x.AgreedUnitPriceVnd, x.Decision, x.Progress, x.Counseling, x.DecisionMaker,
         x.RepresentativeBasis, x.DecidedAt, x.ConsentDocumentId, x.ConsentPlanVersion,
-        x.WarrantyPolicy, x.WarrantyPolicyVersion, x.WarrantyScope, x.WarrantyConfirmedAt, x.WarrantyEndsOn);
+        x.WarrantyPolicy, x.WarrantyPolicyVersion, x.WarrantyScope, x.WarrantyConfirmedAt, x.WarrantyEndsOn,
+        x.Material, x.DecisionPlanVersion);
 
     public async Task<DossierPage> ListAsync(int actorId, int patientId, int? branchId, int page, int pageSize,
         CancellationToken ct)
@@ -256,6 +257,8 @@ public sealed class TreatmentDossierService(DcmsDbContext db, UserManager<Applic
         if (dossier.Items.Any(x => x.ConsentDocumentId.HasValue)) throw Error("MSG240");
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
         dossier.PlanVersion++;
+        foreach (var item in dossier.Items.Where(x => x.Decision != "Proposed"))
+            item.DecisionPlanVersion = dossier.PlanVersion;
         dossier.PlanState = "Committed";
         dossier.Version++;
         dossier.UpdatedAt = clock.GetUtcNow();
@@ -272,7 +275,8 @@ public sealed class TreatmentDossierService(DcmsDbContext db, UserManager<Applic
     public async Task<IReadOnlyList<TreatmentHistoryItem>> HistoryAsync(int actorId, Guid dossierId, CancellationToken ct)
     {
         await DossierAsync(actorId, dossierId, ct);
-        var versions = await db.TreatmentEvents.AsNoTracking().Where(x => x.DossierId == dossierId && x.Kind == "PlanCommitted")
+        var versions = await db.TreatmentEvents.AsNoTracking().Where(x => x.DossierId == dossierId &&
+                (x.Kind == "PlanCommitted" || x.Kind == "PlanRevised"))
             .OrderByDescending(x => x.OccurredAt).ToListAsync(ct);
         return versions.Select(x =>
         {
@@ -292,7 +296,9 @@ public sealed class TreatmentDossierService(DcmsDbContext db, UserManager<Applic
             throw Error("MSG04");
         var reason = Clean(request.Reason);
         if (reason?.Length > 1000 || (request.Outcome != "CompletedAsAgreed" && reason == null)) throw Error("MSG04");
-        if (request.Outcome == "CompletedRevisedScope") throw Error("MSG233"); // S62 revision is not available.
+        if (request.Outcome == "CompletedRevisedScope" &&
+            !await db.TreatmentEvents.AnyAsync(x => x.DossierId == dossierId && x.Kind == "PlanRevised", ct))
+            throw Error("MSG233", 409);
         if (request.Outcome == "CompletedAsAgreed" && dossier.PlanState != "Committed") throw Error("MSG243", 409);
         var unresolved = dossier.Items.Where(x => x.Decision == "Agreed" && x.Progress != "Completed").ToArray();
         if (request.Dispositions == null || request.Dispositions.Select(x => x.ItemId).Distinct().Count()

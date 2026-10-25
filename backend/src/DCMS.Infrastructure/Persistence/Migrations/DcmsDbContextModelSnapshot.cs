@@ -2504,6 +2504,26 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     .HasDatabaseName("IX_FOLLOW_UP_INSTRUCTION_ActiveItemOnly")
                     .HasFilter("\"DossierId\" IS NOT NULL AND \"ItemId\" IS NOT NULL AND \"StepId\" IS NULL AND \"Status\" IN ('NeedsBooking','Booked')");
             });
+            modelBuilder.Entity<DCMS.Domain.Features.Treatment.TreatmentItem>(b =>
+            {
+                b.Property(x => x.Material).HasMaxLength(160);
+                b.Property(x => x.DecisionPlanVersion).HasColumnType("integer");
+            });
+            modelBuilder.Entity<DCMS.Domain.Features.Treatment.TreatmentRevisionDraft>(b =>
+            {
+                b.ToTable("TREATMENT_REVISION_DRAFT");
+                b.HasKey(x => x.Id);
+                b.HasIndex(x => new { x.DossierId, x.ItemId, x.ActorId }).IsUnique();
+                b.HasIndex(x => x.ItemId);
+                b.Property(x => x.BasePlanVersion).HasColumnType("integer");
+                b.Property(x => x.UpdatedAt).HasColumnType("timestamp with time zone");
+                b.Property(x => x.PayloadJson).IsRequired().HasColumnType("jsonb");
+                b.Property(x => x.Version).IsConcurrencyToken();
+                b.HasOne<DCMS.Domain.Features.Treatment.TreatmentDossier>().WithMany()
+                    .HasForeignKey(x => x.DossierId).OnDelete(Microsoft.EntityFrameworkCore.DeleteBehavior.Restrict);
+                b.HasOne<DCMS.Domain.Features.Treatment.TreatmentItem>().WithMany()
+                    .HasForeignKey(x => x.ItemId).OnDelete(Microsoft.EntityFrameworkCore.DeleteBehavior.Restrict);
+            });
 #pragma warning restore 612, 618
         }
     }

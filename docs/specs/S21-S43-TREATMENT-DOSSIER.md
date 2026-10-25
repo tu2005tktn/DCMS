@@ -1,6 +1,6 @@
 # S21/S43 — Hồ sơ và kế hoạch điều trị (UC-13/39)
 
-Nguồn hồ sơ gốc: DCMS_Screen_Specifications_v2.2.docx và DCMS_Use_Cases_Business_Rules_Messages_v2.2.docx, 19/10/2026. Phần bước/mẫu/chỉ định áp dụng v2.3 ngày 24/10/2026 và bổ sung ngày 25/10/2026 theo [TREATMENT-PROGRESSION.vi.md](TREATMENT-PROGRESSION.vi.md). Phạm vi triển khai của Nguyễn Thành Vinh: staff Web S43/S21, API dossier/plan và projection chính thức cho S41; không triển khai UI patient app, actual S22, revision S62, file S20 hoặc ledger S38/S39 trong task này.
+Nguồn hồ sơ gốc: DCMS_Screen_Specifications_v2.2.docx và DCMS_Use_Cases_Business_Rules_Messages_v2.2.docx, 19/10/2026. Phần bước/mẫu/chỉ định áp dụng v2.3 ngày 24/10/2026 và bổ sung ngày 25/10/2026 theo [TREATMENT-PROGRESSION.vi.md](TREATMENT-PROGRESSION.vi.md). Điều chỉnh plan đã chốt dùng [S62](S62-TREATMENT-PLAN-REVISION.md), không mở editor thứ hai ở S21/S43. Phạm vi S21/S43 không bao gồm UI patient app, actual S22, file S20 hoặc ledger S38/S39.
 
 Phần mở rộng S58/S21 và backend S24 theo [TREATMENT-PROGRESSION.vi.md](TREATMENT-PROGRESSION.vi.md): template version được copy vào Draft riêng của Patient, tab Steps có outcome/readiness tách biệt, completion dựa trên actual và chỉ định quay lại không tự tạo Appointment hoặc charge. UI S24 do DCMS-106 thực hiện.
 

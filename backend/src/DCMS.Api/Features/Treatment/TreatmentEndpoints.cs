@@ -35,6 +35,32 @@ public static class TreatmentEndpoints
             Results.Ok(await service.CommitAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, request, ct)));
         dossier.MapGet("/plan/history", async (HttpContext context, Guid dossierId, ITreatmentDossierService service, CancellationToken ct) =>
             Results.Ok(await service.HistoryAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, ct)));
+        dossier.MapGet("/plan/revisions/context", async (HttpContext context, Guid dossierId, Guid itemId,
+            ITreatmentRevisionService service, CancellationToken ct) =>
+            Results.Ok(await service.ContextAsync(AuthenticationEndpoints.AccountId(context.User), dossierId,
+                itemId, ct)));
+        dossier.MapGet("/plan/revision-drafts/{itemId:guid}", async (HttpContext context, Guid dossierId,
+            Guid itemId, ITreatmentRevisionService service, CancellationToken ct) =>
+            Results.Ok(await service.DraftAsync(AuthenticationEndpoints.AccountId(context.User), dossierId,
+                itemId, ct)));
+        dossier.MapPut("/plan/revision-drafts/{itemId:guid}", async (HttpContext context, Guid dossierId,
+            Guid itemId, SaveRevisionDraftRequest request, ITreatmentRevisionService service, CancellationToken ct) =>
+            Results.Ok(await service.SaveDraftAsync(AuthenticationEndpoints.AccountId(context.User), dossierId,
+                itemId, request, ct)));
+        dossier.MapDelete("/plan/revision-drafts/{itemId:guid}", async (HttpContext context, Guid dossierId,
+            Guid itemId, ITreatmentRevisionService service, CancellationToken ct) =>
+        {
+            await service.DeleteDraftAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, itemId, ct);
+            return Results.NoContent();
+        });
+        dossier.MapPost("/plan/revisions/preview", async (HttpContext context, Guid dossierId,
+            PreviewRevisionRequest request, ITreatmentRevisionService service, CancellationToken ct) =>
+            Results.Ok(await service.PreviewAsync(AuthenticationEndpoints.AccountId(context.User), dossierId,
+                request, ct)));
+        dossier.MapPost("/plan/revisions", async (HttpContext context, Guid dossierId,
+            CommitRevisionRequest request, ITreatmentRevisionService service, CancellationToken ct) =>
+            Results.Ok(await service.CommitAsync(AuthenticationEndpoints.AccountId(context.User), dossierId,
+                request, ct)));
         dossier.MapPost("/close", async (HttpContext context, Guid dossierId, CloseDossierRequest request,
             ITreatmentDossierService service, CancellationToken ct) =>
             Results.Ok(await service.CloseAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, request, ct)));

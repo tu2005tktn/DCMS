@@ -1,6 +1,6 @@
 import { Alert, AutoComplete, Button, Card, Collapse, Drawer, Empty, Form, Input, InputNumber, Modal, Result, Select, Skeleton, Space, Table, Tabs, Tag, Typography } from 'antd';
 import { useEffect, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { api, type ApiError } from '../../services/api';
 import type { AppointmentOptions, PaymentTerm, TreatmentChange, TreatmentDossier, TreatmentItem } from './types';
 import { decisionLabel, money } from './types';
@@ -31,6 +31,10 @@ const quantityOptions = [...Array.from({ length: 10 }, (_, index) => ({ label: S
 
 export default function PlanPage() {
   const { id, dossierId } = useParams();
+  const [search] = useSearchParams();
+  const location = useLocation();
+  const selectedItemId = search.get('item');
+  const revisionNotice = (location.state as { revisionNotice?: string } | null)?.revisionNotice;
   const [dossier, setDossier] = useState<TreatmentDossier | null>(null);
   const [options, setOptions] = useState<AppointmentOptions | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
@@ -81,6 +85,12 @@ export default function PlanPage() {
       .then(result => { if (active) setHistory(result); }).catch(() => { if (active) setHistory([]); });
     return () => { active = false; };
   }, [tab, dossierId, dossier?.planVersion]);
+  useEffect(() => {
+    if (!dossier || !selectedItemId) return;
+    const frame = requestAnimationFrame(() => document.querySelector('.treatment-selected-item')
+      ?.scrollIntoView({ block: 'center' }));
+    return () => cancelAnimationFrame(frame);
+  }, [dossier, selectedItemId]);
 
   if (error && !dossier) return <Result status={error.status === 403 ? '403' : error.status === 404 ? '404' : 'error'}
     title={error.message} extra={<Space><Button onClick={() => setRevision(x => x + 1)}>Thử lại</Button>
@@ -157,7 +167,8 @@ export default function PlanPage() {
     <div className="treatment-page-heading"><div><Typography.Title level={2}>Kế hoạch điều trị</Typography.Title>
       <Typography.Paragraph>{dossier.diagnosis}</Typography.Paragraph></div>
       <Tag>{dossier.planState === 'Committed' ? `Đã chốt · phiên bản ${dossier.planVersion}` : dossier.planState === 'Draft' ? 'Bản nháp' : 'Chưa có kế hoạch'}</Tag></div>
-    {notice && <Alert type="success" showIcon className="form-alert" message={notice} />}
+    {(notice || revisionNotice) && <Alert type="success" showIcon className="form-alert"
+      message={notice || revisionNotice} />}
     {saveError && <Alert type="error" showIcon className="form-alert" message={saveError.message}
       description={saveError.code === 'MSG111' ? 'Bản nháp của bạn vẫn ở đây. Đối chiếu phiên bản mới trước khi lưu lại.' : undefined}
       />}
@@ -171,6 +182,7 @@ export default function PlanPage() {
         extra={editable && <Button type="primary" onClick={() => openScope(items.length)}>Thêm hạng mục</Button>}>
         {items.length === 0 ? <Empty description="Chưa có hạng mục. Hãy chọn dịch vụ và vùng điều trị." />
           : <Table rowKey={(item: ItemDraft, index: number | undefined) => item.id || String(index)} pagination={false}
+              rowClassName={item => item.id === selectedItemId ? 'treatment-selected-item' : ''}
               scroll={{ x: 750 }} dataSource={items} columns={[
                 { title: 'Thứ tự dự kiến', width: 112, render: (_: unknown, item: ItemDraft, index: number) =>
                   <Space size={4}><strong>{item.plannedOrder}</strong>{editable && <span className="treatment-order-actions">
@@ -193,7 +205,8 @@ export default function PlanPage() {
                 { title: 'Thao tác', render: (_: unknown, _item: ItemDraft, index: number) => editable
                   ? <Space wrap><Button onClick={() => openScope(index)}>Sửa hạng mục</Button>
                     <Button onClick={() => openDecision(index)}>Ghi quyết định</Button></Space>
-                  : <Typography.Text type="secondary">Sửa scope qua S62</Typography.Text> },
+                  : <Link to={`/patients/${id}/dossiers/${dossier.id}/plan/revise/${_item.id}?from=plan`}>
+                    <Button>Điều chỉnh kế hoạch</Button></Link> },
               ]} />}
         {dossier.planState === 'Committed' && <Alert type="info" showIcon className="treatment-section-note"
           message="Thay đổi hạng mục đã chốt cần phiên bản mới ở S62. Ghi điều trị thực tế tại S22." />}
