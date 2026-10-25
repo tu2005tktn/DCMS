@@ -1,6 +1,6 @@
 # DCMS-111 S17 S18 Tiếp nhận check-in và hàng chờ khám
 
-Ngày cập nhật: **25/10/2026**. Trạng thái: **hợp đồng tài liệu trước triển khai**. Nguồn: yêu cầu người dùng trong phiên này; [DCMS-111](https://capstone-fpt-fa26.atlassian.net/browse/DCMS-111), [luồng DCMS-110](CLINIC-FLOW-DCMS-110.vi.md), [UC/GBR/MSG v2.4](DCMS_Use_Cases_Business_Rules_Messages_v2.4.docx) UC-07 và [Screen Specifications v2.4](DCMS_Screen_Specifications_v2.4.docx) S17/S18.
+Ngày chốt contract: **25/10/2026**. Trạng thái ngày **26/10/2026**: đã triển khai phần tiếp nhận DCMS-111 và đọc Visit bàn giao; xem [bằng chứng và giới hạn](../implementation/DCMS-111-RECEPTION.md). Nguồn: yêu cầu người dùng trong phiên này; [DCMS-111](https://capstone-fpt-fa26.atlassian.net/browse/DCMS-111), [luồng DCMS-110](CLINIC-FLOW-DCMS-110.vi.md), [UC/GBR/MSG v2.4](DCMS_Use_Cases_Business_Rules_Messages_v2.4.docx) UC-07 và [Screen Specifications v2.4](DCMS_Screen_Specifications_v2.4.docx) S17/S18.
 
 ## Quyết định triển khai ngày 25/10/2026
 
@@ -53,7 +53,7 @@ Sau thành công, đọc lại hàng chờ và hiển thị nút mở lượt ma
 
 ## Khách chưa có lịch và tài nguyên
 
-S17/S18 mở S11 với Patient/ngữ cảnh đã chọn. Booking và availability của DCMS-83/84/85 kiểm lịch làm việc, ghế và toàn bộ nhân sự được phân công, cả nha sĩ và trợ lý khi có. Phòng khám có ba ghế vật lý, không phải ba nha sĩ hoặc ba slot mặc định. Preview không giữ chỗ; commit booking kiểm lại nguồn lực/version. Không tự giải phóng reservation trong lúc chờ thuốc/chuẩn bị.
+S17 mở S11 với ngày/chi nhánh/bác sĩ đang chọn, loại WalkIn và nguồn InPerson; nhân viên chọn hồ sơ có nhãn trong form S11 chung. S18 có lịch không hợp lệ hướng về S17 để xếp lịch hợp lệ. Booking và availability của DCMS-83/84/85 kiểm lịch làm việc, ghế và toàn bộ nhân sự được phân công, cả nha sĩ và trợ lý khi có. Phòng khám có ba ghế vật lý, không phải ba nha sĩ hoặc ba slot mặc định. Preview không giữ chỗ; commit booking kiểm lại nguồn lực/version. Không tự giải phóng reservation trong lúc chờ thuốc/chuẩn bị.
 
 Chỉ khi booking trả về Appointment hợp lệ mới quay lại S18 để check-in. Xung đột tài nguyên giữ nguyên form và không tạo Visit. Hủy form sau khi đã đặt lịch không tự hủy Appointment. Giờ thực tế đến có thể sớm hơn lúc xếp được lịch; lưu theo quyền hồi cứu và lý do, không chế tạo lịch quá khứ. Tiếp nhận không tạo lại hoặc nới reservation; nếu cần đổi khoảng đặt, dùng command booking/change chung.
 
@@ -77,9 +77,9 @@ Dùng transaction/locking, concurrency token, receipt và ràng buộc DB phù h
 
 Rollback khi command thất bại không để Visit/dòng chờ mồ côi hoặc Appointment đổi trạng thái một phần. Patient/lịch đã được tạo hợp lệ bằng command riêng trước đó vẫn giữ nguyên. Audit lưu người thao tác, giờ ghi nhận, giờ đến, xác nhận danh tính, lý do hồi cứu nếu có và nguồn đợt cũ; không ghi token/thông tin xác thực.
 
-## Contract API đề xuất
+## Contract API DCMS-111
 
-Các endpoint và route trong phần này là **đề xuất để chốt cùng DCMS-112, chưa tồn tại trên `main`**. Kiểu ID theo nền hiện tại: Patient/chi nhánh/nhân sự là số nguyên; Appointment là UUID. Visit đề xuất dùng UUID do server tạo.
+Các endpoint và route trong phần này đã có trên nhánh `feat/dcms-111-reception`, chưa merge vào `main`. DCMS-112 dùng chung `GET /api/visits/{visitId}` và mô hình Visit; command khám thuộc task đó. Kiểu ID theo nền hiện tại: Patient/chi nhánh/nhân sự là số nguyên; Appointment và Visit là UUID do server tạo.
 
 | Endpoint | Mục đích và đầu ra |
 | --- | --- |
@@ -135,11 +135,11 @@ Ví dụ response lần tạo đầu; dữ liệu giả dành cho tài liệu:
 
 Khi có nguồn, `source` trả liên kết đợt/item/step/hoạt động gốc và phiên bản **đã được server xác minh** theo contract chung; không bắt các thành phần tùy chọn phải đủ. Không mang tên/ID nguồn của Patient khác. `openVisitPath` là route staff đề xuất cùng DCMS-112; truy cập trực tiếp vẫn kiểm quyền. Nếu màn khám chưa được tích hợp, hiển thị trạng thái chưa khả dụng; không báo đã nghiệm thu đường mở màn khám chỉ bằng một trang giả.
 
-Command đề xuất trả HTTP 200 với Visit có thẩm quyền cho cả lần tạo và đọc lại, dùng `replayed` phân biệt. Lỗi theo envelope `SystemMessage` chung (`code`, `message`, `field` khi cần). Dùng danh mục v2.4: MSG42/MSG47 cho lịch không đủ điều kiện, MSG43 cho sai người khám, MSG44 cho nghi trùng, MSG111 cho stale/key-payload xung đột, MSG114 cho lượt đã check-in và MSG144 cho lỗi lưu. Thiếu nguồn tùy chọn là cảnh báo MSG237, không phải lỗi chặn. Các mã chưa có trong `SystemMessages` phải được bổ sung khi triển khai; không coi là API hiện đã hỗ trợ. 409 nghiệp vụ không đồng nghĩa mọi trường hợp đều cần reload do stale.
+Command trả HTTP 200 với Visit có thẩm quyền cho cả lần tạo và đọc lại, dùng `replayed` phân biệt. Lỗi theo envelope `SystemMessage` chung (`code`, `message`, `field` khi cần). Danh mục đã bổ sung MSG42/MSG47 cho lịch không đủ điều kiện, MSG43 cho sai người khám, MSG44 cho nghi trùng, MSG111 cho stale/key-payload xung đột, MSG114 cho lượt đã check-in và MSG144 cho lỗi lưu. UI biểu đạt cảnh báo nguồn tùy chọn qua `requiresClinicalSourceReview`, và kết quả có sẵn qua `replayed`; các nhánh thành công này không trả lỗi chặn. 409 nghiệp vụ không đồng nghĩa mọi trường hợp đều cần reload do stale.
 
 ## Ma trận nghiệm thu cần chạy
 
-Tất cả dòng dưới đây là **chưa chạy theo contract này**. Không dùng kết quả của nhánh S17/S18 đã hoàn tác để đánh dấu pass trên `main`.
+Ma trận dưới đây là tiêu chí và bằng chứng cần có. Các ca API/UI DCMS-111 đã chạy lại trên nhánh mới được ghi tại [runbook](../implementation/DCMS-111-RECEPTION.md); toàn bộ bước bắt đầu/lưu khám của DCMS-112 vẫn chưa nghiệm thu. Không dùng kết quả của nhánh S17/S18 đã hoàn tác để đánh dấu pass trên `main`.
 
 | Ca | Bằng chứng phải có |
 | --- | --- |
@@ -162,4 +162,4 @@ Bằng chứng bàn giao gồm PR, commit, contract đã thống nhất với DC
 
 Kiểm trên `main` tại `7da445f`: đã có Appointment/booking/availability, Patient master và các pattern transaction/receipt/concurrency. Các đầu mối là `backend/src/DCMS.Application/Features/Appointments/Contracts.cs`, `backend/src/DCMS.Infrastructure/Features/Appointments/AppointmentService.cs`, `backend/src/DCMS.Infrastructure/Persistence/DcmsDbContext.cs` và `web/src/app/App.tsx`.
 
-Sau hoàn tác S17/S18, checkout hiện tại chưa có Visit domain/DbSet, Reception endpoints hoặc route tiếp nhận/khám trong staff app. Tài liệu này không khôi phục code từ nhánh cũ, không áp migration và không khẳng định các task nền đã được kiểm tích hợp lại. Phần còn thiếu phải bổ sung vào cùng mô hình/API khi người dùng yêu cầu triển khai.
+Baseline sau hoàn tác chưa có Visit domain/DbSet, Reception endpoints hoặc route tiếp nhận. Nhánh DCMS-111 đã bổ sung các phần này vào cùng codebase/context, cùng migration nâng cấp dữ liệu legacy. Không cherry-pick toàn bộ engine nguồn và chức năng xếp ưu tiên của nhánh cũ. Trang Visit hiện đọc dữ liệu bàn giao thật; phần bắt đầu/lưu khám và nguồn điều trị còn chờ module tương ứng.

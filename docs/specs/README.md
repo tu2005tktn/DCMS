@@ -9,7 +9,7 @@ Bộ đặc tả hiện hành là hai tài liệu Word v2.4, sửa ngày **25/10
 
 ## Cách sử dụng
 
-Hợp đồng luồng được làm rõ theo yêu cầu ngày 25/10/2026 tại [DCMS-110](CLINIC-FLOW-DCMS-110.vi.md); phần tiếp nhận/check-in và bàn giao Visit cho màn khám tại [DCMS-111 S17/S18](S17-S18-RECEPTION.md). Các API mới trong hợp đồng tiếp nhận là đề xuất trước triển khai.
+Hợp đồng luồng được làm rõ theo yêu cầu ngày 25/10/2026 tại [DCMS-110](CLINIC-FLOW-DCMS-110.vi.md); phần tiếp nhận/check-in và bàn giao Visit cho màn khám tại [DCMS-111 S17/S18](S17-S18-RECEPTION.md). Phần DCMS-111 đã triển khai trên nhánh tính năng, có [bằng chứng riêng](../implementation/DCMS-111-RECEPTION.md); các task khám/điều trị tiếp tục tích hợp trên cùng Visit.
 
 Đọc cả hai tài liệu khi thay đổi chức năng. Tài liệu UC/GBR/MSG xác định hành vi nghiệp vụ; tài liệu màn hình xác định trường, thao tác và điều hướng tương ứng. Dùng mã UC, S, GBR và MSG để tra cứu; số mục của các bản cũ có thể đã thay đổi.
 
@@ -34,6 +34,6 @@ Các tài liệu Markdown theo tính năng và báo cáo trong `../implementatio
 
 ## Ranh giới với code hiện tại
 
-Lần cập nhật này chỉ nhập và tổ chức tài liệu, không thay đổi API, giao diện, migration hoặc dữ liệu. Việc v2.4 có S17/S18 không đưa phần triển khai tiếp nhận đã hoàn tác trở lại code.
+Lần nhập cặp Word v2.4 chỉ tổ chức lại tài liệu. Sau đó người dùng yêu cầu triển khai riêng DCMS-111; phạm vi code, migration và kết quả hiện tại được ghi trong [runbook DCMS-111](../implementation/DCMS-111-RECEPTION.md). Các chức năng khác trong Word chưa mặc nhiên được triển khai theo lần nhập tài liệu.
 
 Các tài liệu [recovery email](S03-PUBLIC-EMAIL-RECOVERY.md), [booking theo cấu hình](CLINIC-SLOTS-AND-SERVICE-DURATIONS.vi.md) và [điều trị nhiều buổi](TREATMENT-PROGRESSION.vi.md) ghi lại các quyết định hoặc phạm vi khác thời điểm. Đặc biệt, hợp đồng recovery email đã có trong repo cần được đối chiếu với phạm vi không có Email Service của v2.4 trước một thay đổi chức năng liên quan; lần nhập nguồn này không tự gỡ chức năng đó.
