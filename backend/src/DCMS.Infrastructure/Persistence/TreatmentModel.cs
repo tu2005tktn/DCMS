@@ -32,6 +32,7 @@ internal static class TreatmentModel
                 .OnDelete(DeleteBehavior.Restrict);
             b.HasMany(x => x.Items).WithOne().HasForeignKey(x => x.DossierId).OnDelete(DeleteBehavior.Restrict);
         });
+        ClinicalWorkModel.Configure(model);
         model.Entity<TreatmentItem>(b =>
         {
             b.ToTable("TREATMENT_PLAN_ITEM");

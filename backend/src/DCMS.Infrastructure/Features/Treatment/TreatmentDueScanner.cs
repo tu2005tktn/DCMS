@@ -94,6 +94,7 @@ public sealed class TreatmentDueScanWorker(IServiceScopeFactory scopes, ILogger<
             {
                 using var scope = scopes.CreateScope();
                 await scope.ServiceProvider.GetRequiredService<TreatmentDueScanner>().ScanAsync(stoppingToken);
+                await scope.ServiceProvider.GetRequiredService<CareTaskIngestionService>().IngestAsync(stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
             catch (Exception error) { logger.LogError(error, "Treatment due scan failed; the next scan will retry"); }

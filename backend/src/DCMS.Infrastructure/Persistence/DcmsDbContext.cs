@@ -49,6 +49,13 @@ public sealed class DcmsDbContext(DbContextOptions<DcmsDbContext> options)
     public DbSet<FollowUpInstruction> FollowUpInstructions => Set<FollowUpInstruction>();
     public DbSet<TreatmentProgressionReceipt> TreatmentProgressionReceipts => Set<TreatmentProgressionReceipt>();
     public DbSet<TreatmentProgressionEvent> TreatmentProgressionEvents => Set<TreatmentProgressionEvent>();
+    public DbSet<ClinicalActivity> ClinicalActivities => Set<ClinicalActivity>();
+    public DbSet<ClinicalReview> ClinicalReviews => Set<ClinicalReview>();
+    public DbSet<ClinicalCareNote> ClinicalCareNotes => Set<ClinicalCareNote>();
+    public DbSet<ClinicalCommandReceipt> ClinicalCommandReceipts => Set<ClinicalCommandReceipt>();
+    public DbSet<CareTask> CareTasks => Set<CareTask>();
+    public DbSet<CareContactAttempt> CareContactAttempts => Set<CareContactAttempt>();
+    public DbSet<CareEscalation> CareEscalations => Set<CareEscalation>();
 
     protected override void OnModelCreating(ModelBuilder model)
     {

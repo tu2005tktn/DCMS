@@ -20,6 +20,10 @@ Nguồn nghiệp vụ hiện hành: DCMS_Screen_Specifications_v2.3 và DCMS_Use
 - Hoàn thành step tạo tối đa một instruction cho mỗi successor logical step và source completion event; nhiều successor độc lập có thể tạo nhiều instruction. Booking, care task và blocker events có khóa ổn định để retry không nhân đôi.
 - Nguồn chỉ định phải chọn đúng một nhánh: `{dossierId,itemId,stepId?}` hoặc `{visitId,activityId}`; không trộn ID hai nhánh. Nguồn Visit/activity hiện chưa có adapter xác thực Patient/branch nên API từ chối 503 thay vì nhận ID chưa kiểm chứng. Chỉ định từ agreed dossier/item là đường hoạt động trước; nguồn actual/lab từ các module khác phải được nối trước nghiệm thu end-to-end tương ứng.
 
+### Tích hợp S22/S63 và care backend
+
+[S22/S63/care contract](S22-S63-ACTUAL-REVIEW-CARE.md) bổ sung bảng activity/review/care và cổng evidence đọc activity `Posted` đúng Patient/dossier/step. `ITreatmentActualEvidencePort` không còn mặc định trả false; tuy nhiên S22 production vẫn chặn Post khi cổng Visit InProgress và consent đúng version chưa được nối, và bước yêu cầu Labo vẫn chặn khi chưa xác minh Accepted. Đánh giá S63, activity S22 và contact care là các commit riêng. Điều này không biến một activity thành completed step, Appointment hoặc charge nếu chưa có command và bằng chứng tương ứng.
+
 ## API và DTO chung
 
 API dùng JSON camelCase, `requestKey` UUID cho command, `expectedVersion` cho cập nhật; cùng key + cùng payload trả cùng ID/kết quả, khác payload trả 409. Server kiểm Staff/Dentist, branch, Patient, source, version, quyền xem; client không gửi actor hoặc tự quyết status. Response command đọc lại ID/version/status sau commit.

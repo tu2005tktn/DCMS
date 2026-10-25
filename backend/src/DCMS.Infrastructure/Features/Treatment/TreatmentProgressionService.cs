@@ -52,7 +52,10 @@ public sealed class TreatmentProgressionService(DcmsDbContext db, UserManager<Ap
         Func<Task<T>> mutate, CancellationToken ct)
     {
         if (key == Guid.Empty) throw Error("MSG04");
-        await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
+        // S22 can post an activity and confirm its step within its owning transaction.
+        var ownsTransaction = db.Database.CurrentTransaction == null;
+        await using var tx = ownsTransaction
+            ? await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct) : null;
         // The shared lock also serializes Appointment's follow-up transitions with step commands.
         await db.Database.ExecuteSqlRawAsync($"SELECT pg_advisory_xact_lock({DCMS.Infrastructure.Features.Scheduling.WorkingScheduleService.TransactionLock})", ct);
         var hash = Fingerprint(payload);
@@ -72,7 +75,7 @@ public sealed class TreatmentProgressionService(DcmsDbContext db, UserManager<Ap
             ResultJson = Serialize(result!)
         });
         await db.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
+        if (tx != null) await tx.CommitAsync(ct);
         return result;
     }
 

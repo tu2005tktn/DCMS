@@ -154,6 +154,7 @@ app.MapAccountEndpoints();
 app.MapPatientLinkEndpoints();
 app.MapPatientEndpoints();
 app.MapTreatmentEndpoints();
+app.MapClinicalWorkEndpoints();
 app.MapSchedulingEndpoints();
 app.MapAppointmentEndpoints();
 app.MapAppointmentQueryEndpoints();

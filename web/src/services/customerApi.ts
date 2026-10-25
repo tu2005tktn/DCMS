@@ -5,6 +5,8 @@ const connectionMessage = 'Không thể hoàn tất thao tác. Vui lòng kiểm 
 
 // Customer requests carry their own token. Never use the staff client's module-level token.
 export async function customerApi<T>(path: string, init: RequestInit = {}, token?: string): Promise<T> {
+  if (import.meta.env.DEV && globalThis.location?.pathname.startsWith('/__preview/clinical'))
+    throw new ApiError(404, 'MSG113', 'Chế độ xem thử không kết nối API khách hàng.');
   const headers = new Headers(init.headers);
   headers.set('Accept', 'application/json');
   if (init.body) headers.set('Content-Type', 'application/json');

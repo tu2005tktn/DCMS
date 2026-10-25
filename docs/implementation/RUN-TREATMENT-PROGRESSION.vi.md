@@ -24,5 +24,5 @@ Integration test HTTP/PostgreSQL ở `TreatmentProgressionApiTests` dùng `ApiFi
 
 ## Điểm tích hợp còn phụ thuộc
 
-- Production `ITreatmentActualEvidencePort` trả false và `ITreatmentLabReadinessPort` trả unavailable cho tới khi DCMS-99/100 cung cấp adapter xác minh nguồn. API complete step/instruction không đánh dấu hoàn tất khi thiếu actual; lab-required step là Blocked. Nguồn Visit/activity của S24 bị từ chối 503 cho tới khi có cổng xác thực Patient/branch.
+- S22 bổ sung nguồn evidence từ activity `Posted` đúng Patient/dossier/step cho `ITreatmentActualEvidencePort`; khi chưa có activity hợp lệ, complete step/instruction vẫn bị chặn. `ITreatmentLabReadinessPort` còn unavailable nên lab-required step vẫn Blocked. S22 Post production cần Visit InProgress và consent adapter thật; `IClinicalVisitPort`/`IClinicalConsentPort` hiện trả unavailable/false nên không báo thành công giả. Nguồn Visit/activity của S24 vẫn bị từ chối cho tới khi có cổng xác thực Patient/branch.
 - `TreatmentDueScanner` ghi event outbox với stable key; dispatcher/care-task consumer thuộc DCMS-99. S24 UI dùng hợp đồng trên do Tuấn thực hiện. Khi nối adapter thật cần test theo Patient/branch, plan version, lab specification và lặp scan/cạnh tranh transaction trước khi xác nhận nghiệm thu end-to-end.

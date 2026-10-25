@@ -25,9 +25,17 @@ import DossierPage from '../features/treatment/DossierPage';
 import PlanPage from '../features/treatment/PlanPage';
 import RevisionPage from '../features/treatment/RevisionPage';
 import TemplatePage from '../features/treatment/TemplatePage';
+import { ActualTreatmentPage, PostoperativeReviewPage } from '../features/treatment/ClinicalWorkPages';
+import ClinicalPreviewPage from '../features/treatment/ClinicalPreviewPage';
+import { clinicalPreviewTreatment } from '../features/treatment/clinicalPreview';
 
 export default function App() {
   return <Routes>
+    {import.meta.env.DEV && <Route path="/__preview/clinical" element={<ClinicalPreviewPage />}>
+      <Route index element={<Navigate to={clinicalPreviewTreatment} replace />} />
+      <Route path=":id/:visitId/treatment" element={<ActualTreatmentPage />} />
+      <Route path=":id/:visitId/review" element={<PostoperativeReviewPage />} />
+    </Route>}
     <Route path="/sign-in" element={<SignInPage />} />
     <Route path="/access" element={<AccessPage />} />
     <Route path="/customer/sign-in" element={<CustomerSignInPage />} />
@@ -57,6 +65,8 @@ export default function App() {
       <Route path="patients/:id/dossiers/:dossierId" element={<Protected permission="patients.read"><DossierPage /></Protected>} />
       <Route path="patients/:id/dossiers/:dossierId/plan" element={<Protected permission="patients.read"><PlanPage /></Protected>} />
       <Route path="patients/:id/dossiers/:dossierId/plan/revise/:itemId" element={<Protected permission="patients.read"><RevisionPage /></Protected>} />
+      <Route path="patients/:id/visits/:visitId/treatment" element={<Protected permission="patients.read"><ActualTreatmentPage /></Protected>} />
+      <Route path="patients/:id/visits/:visitId/review" element={<Protected permission="patients.read"><PostoperativeReviewPage /></Protected>} />
       <Route path="treatment-templates" element={<Protected><TemplatePage /></Protected>} />
       <Route path="appointments" element={<Protected><AppointmentCalendarPage /></Protected>} />
       <Route path="appointments/:id" element={<Protected><AppointmentDetailPage /></Protected>} />

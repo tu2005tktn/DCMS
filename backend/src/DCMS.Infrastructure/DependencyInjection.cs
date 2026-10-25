@@ -68,11 +68,17 @@ public static class DependencyInjection
         services.AddScoped<ITreatmentRevisionActualPort, UnavailableRevisionActualPort>();
         services.AddScoped<ITreatmentRevisionFinancePort, UnavailableRevisionFinancePort>();
         services.AddScoped<ITreatmentProgressionService, TreatmentProgressionService>();
-        services.AddScoped<ITreatmentActualEvidencePort, UnavailableTreatmentActualEvidencePort>();
+        services.AddScoped<ITreatmentActualEvidencePort, ClinicalActualEvidencePort>();
+        services.AddScoped<IClinicalWorkService, ClinicalWorkService>();
+        services.AddScoped<IClinicalVisitPort, UnavailableClinicalVisitPort>();
+        services.AddScoped<IClinicalConsentPort, UnavailableClinicalConsentPort>();
+        services.AddScoped<IClinicalChargePort, UnavailableClinicalChargePort>();
+        services.AddScoped<ICareTaskService, CareTaskService>();
         services.AddScoped<ITreatmentLabReadinessPort, UnavailableTreatmentLabReadinessPort>();
         services.AddScoped<ITreatmentVisitActivitySourcePort, UnavailableTreatmentVisitActivitySourcePort>();
         services.AddScoped<ITreatmentDentistCapabilityPort, UnavailableTreatmentDentistCapabilityPort>();
         services.AddScoped<TreatmentDueScanner>();
+        services.AddScoped<CareTaskIngestionService>();
         services.AddHostedService<TreatmentDueScanWorker>();
         services.AddSingleton(TimeProvider.System);
         services.AddScoped<Features.Scheduling.WorkingScheduleService>();
