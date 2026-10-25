@@ -132,6 +132,19 @@ public sealed partial class WorkingScheduleService(DcmsDbContext db, TimeProvide
     }
     private async Task Lock(CancellationToken ct) => await db.Database.ExecuteSqlRawAsync("SELECT pg_advisory_xact_lock(90403)", ct);
 
+    public async Task ValidateReceptionAsync(Guid reservationId, int patientId, CancellationToken ct)
+    {
+        if (db.Database.CurrentTransaction == null) throw new InvalidOperationException("Reception requires a transaction.");
+        await Lock(ct);
+        var reservation = await db.Set<ResourceReservation>().AsNoTracking().SingleAsync(x => x.Id == reservationId, ct);
+        var query = new AvailabilityQuery(reservation.BranchId, reservation.DentistId, reservation.ServiceId,
+            DateOnly.FromDateTime(reservation.Start.ToOffset(TimeSpan.FromHours(7)).DateTime),
+            (int)(reservation.End - reservation.Start).TotalMinutes, reservation.AssistantId);
+        await ValidateQuery(query, false, ct);
+        Evaluate(query, false, reservation.Start.ToOffset(TimeSpan.FromHours(7)), reservation.ChairId,
+            $"patient:{patientId}", reservation.Id, await Load(query, null, ct), true);
+    }
+
     public async Task<AvailabilityResult> QueryAsync(AvailabilityQuery query, int? staffActorId, CancellationToken ct)
     {
         if (staffActorId.HasValue) await Authorize(staffActorId.Value, query.BranchId, null, ct);

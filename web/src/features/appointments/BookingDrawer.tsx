@@ -7,7 +7,7 @@ import {
   type AppointmentOptions, type AppointmentResult, type AvailabilitySlot,
 } from './types';
 
-export type BookingPrefill = { branchId: number; dentistId?: number; date: string; minute?: number };
+export type BookingPrefill = { branchId: number; dentistId?: number; date: string; minute?: number; kind?: 'Standard' | 'WalkIn'; source?: string; patientId?: number };
 type Values = {
   kind: 'Standard' | 'WalkIn'; source: string; bookerName: string; bookerContact: string; patientId?: number;
   attendeeName?: string; attendeeBirthDate?: string; relation: 'Self' | 'Relative'; serviceId?: number; reason?: string;
@@ -40,7 +40,8 @@ export default function BookingDrawer({ open, prefill, options, onClose, onBooke
   useEffect(() => {
     if (!open || !prefill) return;
     form.resetFields();
-    form.setFieldsValue({ kind: 'Standard', source: 'Phone', relation: 'Self', branchId: prefill.branchId, dentistId: prefill.dentistId,
+    form.setFieldsValue({ kind: prefill.kind ?? 'Standard', source: prefill.source ?? 'Phone', patientId: prefill.patientId,
+      relation: 'Self', branchId: prefill.branchId, dentistId: prefill.dentistId,
       date: prefill.date, duration: 30 });
     wantedMinute.current = prefill.minute;
     setSlots(null); setSlot(null); setReviewing(false); setError(null); setSlotsError(null); requestKey.current = null;

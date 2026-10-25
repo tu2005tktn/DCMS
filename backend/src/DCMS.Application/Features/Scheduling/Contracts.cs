@@ -49,6 +49,8 @@ public interface IWorkingScheduleService
 }
 public interface IAvailabilityService
 {
+    // Reception reuses resource validation for the existing reservation; never books or releases resources.
+    Task ValidateReceptionAsync(Guid reservationId, int patientId, CancellationToken ct);
     Task<AvailabilityResult> QueryAsync(AvailabilityQuery query, int? staffActorId, CancellationToken ct);
     // Caller must authorize the existing appointment and supply its immutable resource requirements.
     Task<AvailabilityResult> QueryForReservationAsync(AvailabilityQuery query, Guid reservationId, string? attendeeKey, CancellationToken ct);

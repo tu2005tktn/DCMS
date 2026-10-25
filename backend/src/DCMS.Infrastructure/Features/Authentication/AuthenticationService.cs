@@ -186,6 +186,9 @@ public sealed class AuthenticationService(DcmsDbContext db, UserManager<Applicat
         else if (user.AccountType != "Public" || roles.Any(x => x != AccountRoles.Guest && x != AccountRoles.Patient)) return null;
         var effective = AccountRoles.Effective(roles);
         string[] permissions = [
+            .. effective.Contains(AccountRoles.ClinicAssistant) || effective.Contains(AccountRoles.Dentist) ? ["reception.read"] : Array.Empty<string>(),
+            .. effective.Contains(AccountRoles.ClinicAssistant) ? ["reception.check-in", "reception.reorder"] : Array.Empty<string>(),
+            .. effective.Contains(AccountRoles.Dentist) ? ["reception.priority"] : Array.Empty<string>(),
             .. effective.Contains(AccountRoles.Admin) ? ["accounts.manage"] : Array.Empty<string>(),
             .. effective.Contains(AccountRoles.ClinicAssistant) ? ["patient-links.verify"] : Array.Empty<string>(),
             .. effective.Contains(AccountRoles.ClinicAssistant) || effective.Contains(AccountRoles.Dentist) ? ["patients.read"] : Array.Empty<string>(),

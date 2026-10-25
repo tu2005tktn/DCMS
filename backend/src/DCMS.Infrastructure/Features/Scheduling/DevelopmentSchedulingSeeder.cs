@@ -14,13 +14,18 @@ public sealed class DevelopmentSchedulingSeeder(DcmsDbContext db)
         if (branch == null)
         {
             branch = new() { Name = "S09 - Chi nhánh thử nghiệm" }; db.Add(branch); await db.SaveChangesAsync(ct);
-            db.AddRange(new SchedulingChair { BranchId = branch.Id, Name = "Ghế thử nghiệm 1" }, new SchedulingChair { BranchId = branch.Id, Name = "Ghế thử nghiệm 2" });
+            db.AddRange(new SchedulingChair { BranchId = branch.Id, Name = "Ghế thử nghiệm 1" }, new SchedulingChair { BranchId = branch.Id, Name = "Ghế thử nghiệm 2" },
+                new SchedulingChair { BranchId = branch.Id, Name = "Ghế thử nghiệm 3" });
             db.AddRange(new SchedulingService { BranchId = branch.Id, Name = "Khám", PublicDurationMinutes = 30, IsInitialExamination = true },
                 new SchedulingService { BranchId = branch.Id, Name = "Điều trị thử nghiệm", PublicDurationMinutes = 60, PublicBookable = false });
         }
         var employees = await (from employee in db.Employees join user in db.Users on employee.AccountId equals user.Id
             where user.UserName == "dentist.demo" || user.UserName == "owner.demo" || user.UserName == "assistant.demo" || user.UserName == "dual.demo"
             select new { Employee = employee, user.UserName }).ToArrayAsync(ct);
+        // Upgrade only the original demo clinic fixture. Never create three chairs per branch.
+        if (!db.Set<SchedulingChair>().Local.Any(x => x.BranchId == branch.Id && x.Name == "Ghế thử nghiệm 3")
+            && !await db.Set<SchedulingChair>().AnyAsync(x => x.BranchId == branch.Id && x.Name == "Ghế thử nghiệm 3", ct))
+            db.Add(new SchedulingChair { BranchId = branch.Id, Name = "Ghế thử nghiệm 3" });
         foreach (var item in employees)
         {
             if (!await db.Set<SchedulingMember>().AnyAsync(x => x.BranchId == branch.Id && x.EmployeeId == item.Employee.Id, ct))

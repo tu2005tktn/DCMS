@@ -15,6 +15,9 @@ import AppointmentCalendarPage from '../features/appointments/AppointmentCalenda
 import AppointmentDetailPage from '../features/appointments/AppointmentDetailPage';
 import { roleLabels } from '../features/accounts/types';
 import HealthStatus from '../features/HealthStatus';
+import ReceptionPage from '../features/reception/ReceptionPage';
+import CheckInPage from '../features/reception/CheckInPage';
+import VisitPage from '../features/reception/VisitPage';
 import { AccessPage, CustomerGuard, CustomerHomePage, CustomerRegisterPage, CustomerShell, CustomerSignInPage } from '../features/customer-auth/CustomerPages';
 import { useCustomerAuth } from '../features/customer-auth/CustomerAuthContext';
 import CustomerBookingPage from '../features/customer-booking/CustomerBookingPage';
@@ -51,6 +54,9 @@ export default function App() {
       <Route path="patients" element={<Protected permission="patients.read"><PatientSearchPage /></Protected>} />
       <Route path="patients/:id" element={<Protected permission="patients.read"><PatientProfilePage /></Protected>} />
       <Route path="appointments" element={<Protected><AppointmentCalendarPage /></Protected>} />
+      <Route path="reception" element={<Protected permission="reception.read"><ReceptionPage /></Protected>} />
+      <Route path="reception/check-in/:appointment" element={<Protected permission="reception.check-in"><CheckInPage /></Protected>} />
+      <Route path="reception/visits/:id" element={<Protected permission="reception.read"><VisitPage /></Protected>} />
       <Route path="appointments/:id" element={<Protected><AppointmentDetailPage /></Protected>} />
       <Route path="link-verification" element={<Protected permission="patient-links.verify"><LinkVerificationPage /></Protected>} />
       <Route path="support-inbox" element={<Protected permission="appointments.support.handle"><SupportInboxPage /></Protected>} />
@@ -98,6 +104,7 @@ function Workspace() {
       { key: '/', label: <Link to="/">Tài khoản của tôi</Link> },
       ...(auth.user?.permissions.includes('accounts.manage') ? [{ key: '/accounts', label: <Link to="/accounts">Quản lý tài khoản</Link> }] : []),
       ...(auth.user?.permissions.includes('patients.read') ? [{ key: '/patients', label: <Link to="/patients">Bệnh nhân</Link> }] : []),
+      ...(auth.user?.permissions.includes('reception.read') ? [{ key: '/reception', label: <Link to="/reception">Tiếp nhận và hàng chờ</Link> }] : []),
       ...(auth.user?.permissions.includes('patient-links.verify') ? [{ key: '/link-verification', label: <Link to="/link-verification">Xác minh liên kết hồ sơ</Link> }] : []),
     ]} />
     <Layout.Content className="workspace-content">{error && <Alert className="form-alert" type="error" message={error} showIcon />}<Outlet /></Layout.Content>

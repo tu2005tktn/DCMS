@@ -11,6 +11,11 @@ public static class SystemMessages
 {
     public static SystemMessage Get(string code, string field = "Thông tin", int maxLength = 0, string? value = null) => new(code, code switch
     {
+        "MSG42" => "Không thể tiếp nhận người đến khám cho lịch hẹn này. Vui lòng kiểm tra trạng thái và sắp xếp một ca hợp lệ.",
+        "MSG43" => "Thông tin người đến khám không khớp lịch hẹn. Vui lòng xác minh và cập nhật trước khi check-in.",
+        "MSG47" => "Lịch hẹn này đã được ghi nhận Không đến. Vui lòng kiểm tra khả năng tiếp nhận và đặt một ca hợp lệ.",
+        "MSG114" => "Lịch hẹn đã được tiếp nhận. Vui lòng sử dụng lượt khám hiện có.",
+        "MSG237" => "Vui lòng chọn mục đích lần đến và đối chiếu hồ sơ, hạng mục hoặc thủ thuật nguồn.",
         "MSG22" => "Không tìm thấy khung giờ phù hợp. Vui lòng đổi ngày, bác sĩ hoặc dịch vụ.",
         "MSG23" => "Vui lòng nhập thông tin người khám thực tế.",
         "MSG24" => "Lịch đặt công khai phải bắt đầu sau ít nhất 60 phút. Vui lòng chọn giờ khác.",

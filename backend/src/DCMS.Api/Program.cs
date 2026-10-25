@@ -153,6 +153,7 @@ app.MapPatientLinkEndpoints();
 app.MapPatientEndpoints();
 app.MapSchedulingEndpoints();
 app.MapAppointmentEndpoints();
+DCMS.Api.Features.Reception.ReceptionEndpoints.MapReceptionEndpoints(app);
 app.MapAppointmentQueryEndpoints();
 app.MapSupportRequestEndpoints();
 app.MapNotificationEndpoints();
