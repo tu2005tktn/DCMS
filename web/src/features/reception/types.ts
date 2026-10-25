@@ -1,4 +1,5 @@
 import { ApiError } from '../../services/api';
+import { receptionErrorPrefix } from './errors';
 import type { AppointmentOptions } from '../appointments/types';
 
 export const purposeLabels: Record<string, string> = { InitialExamination: 'Khám lần đầu', TreatmentContinuation: 'Tiếp tục điều trị',
@@ -24,7 +25,6 @@ export const clinicInput = (date = new Date()) => new Date(date.getTime() + 7 * 
 export const fromClinicInput = (value: string) => new Date(`${value}:00+07:00`).toISOString();
 export function failureText(error: unknown) {
   if (!(error instanceof ApiError)) return (error as Error).message;
-  const prefix = error.status === 0 ? 'Mất kết nối' : error.status === 401 ? 'Phiên đăng nhập đã hết hạn' : error.status === 403 ? 'Thiếu quyền'
-    : error.status === 409 ? 'Dữ liệu đã thay đổi' : error.status >= 500 ? 'Chưa thể lưu' : 'Kiểm tra thông tin';
+  const prefix = receptionErrorPrefix(error.status, error.code);
   return `${prefix} · ${error.code}: ${error.message}`;
 }

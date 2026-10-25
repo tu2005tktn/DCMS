@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api, ApiError } from '../../services/api';
 import PatientFormDrawer from '../patients/PatientFormDrawer';
 import type { PatientDetail, PatientListItem, PatientPage } from '../patients/types';
+import { checkInBlocker } from './eligibility';
 import { clinicInput, clinicTime, emptySource, failureText, fromClinicInput, purposeLabels,
   type ReceptionDetail, type SourceOption, type Visit, type VisitSource } from './types';
 
@@ -37,6 +38,13 @@ export default function CheckInPage() {
   const inheritedArrival = arrivalParam && Number.isFinite(Date.parse(arrivalParam)) ? arrivalParam : null;
   const pending = useRef<{ payload: string; key: string } | null>(null);
   const selection = useRef(0);
+  const feedback = useRef<HTMLDivElement>(null);
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 30_000); return () => clearInterval(timer); }, []);
+  useEffect(() => {
+    if (error) { feedback.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); feedback.current?.focus({ preventScroll: true }); }
+  }, [error]);
 
   async function reload() {
     setLoading(true); setError(undefined);
@@ -73,6 +81,8 @@ export default function CheckInPage() {
 
   async function submit(values: Values) {
     if (!patient || !detail || !verified || busy || conflict) return;
+    const blocker = checkInBlocker(detail.appointment);
+    if (blocker) { setNow(Date.now()); setError(blocker); return; }
     const body = { appointment: detail.appointment.appointmentId, branchId: detail.appointment.branchId, patientId: patient.id,
       identityVerified: verified, identityNote: values.identityNote, purpose: values.purpose, source: values.source ?? emptySource,
       reviewReason: values.purpose === 'PostoperativeOrWarrantyReview' ? values.reviewReason ?? null : null,
@@ -87,15 +97,16 @@ export default function CheckInPage() {
       const result = await api<Visit>('/api/reception/check-ins', { method: 'POST', body: JSON.stringify({ ...body, requestKey: pending.current.key }) });
       // Use the persisted ID then read back the committed visit on its own route.
       navigate(`/reception/visits/${result.visitId}`);
-    } catch (e) { setError(failureText(e)); if (e instanceof ApiError && e.status === 409) setConflict(true); }
+    } catch (e) { setError(failureText(e)); if (e instanceof ApiError && e.status === 409 && e.code === 'MSG111') setConflict(true); }
     finally { setBusy(false); }
   }
 
   if (loading && !detail) return <Spin aria-label="Đang tải lịch tiếp nhận" />;
   const a = detail?.appointment;
+  const blocker = a ? checkInBlocker(a, now) : null;
   return <Space direction="vertical" size="large" style={{ width: '100%' }}>
     <Space><Link to="/reception">← Tiếp nhận và hàng chờ</Link><Typography.Title level={2}>Đối chiếu và check-in · S18</Typography.Title></Space>
-    {error && <Alert type="error" showIcon message={error} action={<Button onClick={() => void reload()} loading={loading}>Đọc lại lịch hiện tại</Button>} />}
+    <div ref={feedback} tabIndex={-1}>{error && <Alert type="error" showIcon message={error} action={<Button onClick={() => void reload()} loading={loading}>Đọc lại lịch hiện tại</Button>} />}</div>
     {conflict && <Alert type="warning" message="Thông tin nhập được giữ lại. Đọc lại lịch hiện tại và đối chiếu trước khi gửi lại." />}
     {a && <Card title={`Lịch ${a.code}`}><Descriptions column={2} bordered items={[
       { key: 'booker', label: 'Người đặt', children: a.bookerName }, { key: 'contact', label: 'Liên hệ người đặt', children: [a.bookerPhone, a.bookerEmail].filter(Boolean).join(' · ') || 'Chưa rõ' },
@@ -104,7 +115,12 @@ export default function CheckInPage() {
       { key: 'time', label: 'Giờ hẹn', children: clinicTime(a.startAt) }, { key: 'status', label: 'Trạng thái lịch', children: a.status },
     ]} /></Card>}
     {detail?.visit ? <Card title="Lịch đã tiếp nhận"><Typography.Paragraph>{detail.visit.patientName} · {detail.visit.visitCode}</Typography.Paragraph>
-      <Link to={`/reception/visits/${detail.visit.visitId}`}>Mở lượt khám hiện có</Link></Card> : a && <>
+      <Link to={`/reception/visits/${detail.visit.visitId}`}>Mở lượt khám hiện có</Link></Card> : a && blocker ?
+      <Alert type="warning" showIcon message="Chưa thể check-in lịch hẹn này" description={<Space direction="vertical">
+        <Typography.Text>{blocker}</Typography.Text>
+        <Typography.Text>Chọn lịch hợp lệ trong ngày tiếp nhận. Khách đến trực tiếp cần đặt một ca qua S11 trước khi check-in.</Typography.Text>
+        <Space wrap><Link to="/reception">Về tiếp nhận hôm nay</Link><Link to={`/appointments/${a.appointmentId}`}>Mở chi tiết lịch hẹn</Link></Space>
+      </Space>} /> : a && <>
       <Card title="1. Chọn đúng người thực tế đến khám">
         <Alert type="info" showIcon message="Đối chiếu tên, mã, ngày sinh khi có và liên hệ. Số điện thoại dùng chung không xác nhận danh tính." />
         <Space wrap style={{ margin: '16px 0' }}>

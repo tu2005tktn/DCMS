@@ -5,6 +5,7 @@ import { api } from '../../services/api';
 import BookingDrawer, { type BookingPrefill } from '../appointments/BookingDrawer';
 import { clinicToday, statusLabels, type AppointmentStatus } from '../appointments/types';
 import { clinicTime, failureText, purposeLabels, visitLabels, type ReceptionAppointment, type ReceptionOptions, type ReceptionView, type Visit } from './types';
+import { checkInBlocker } from './eligibility';
 
 export default function ReceptionPage() {
   const navigate = useNavigate();
@@ -69,7 +70,8 @@ export default function ReceptionPage() {
         { title: 'Người khám dự kiến', render: (_, a) => <>{a.attendeeName}<br />{a.patientCode ?? 'Chưa gắn Patient'}</> },
         { title: 'Người đặt', dataIndex: 'bookerName' }, { title: 'Bác sĩ', dataIndex: 'dentistName' },
         { title: 'Trạng thái lịch', render: (_, a) => <>{statusLabels[a.status as AppointmentStatus] ?? a.status}{a.noShowEligible && <Tag color="orange">Cần kiểm tra đến muộn</Tag>}</> },
-        { title: 'Thao tác', render: (_, a) => options?.canCheckIn && a.status === 'Confirmed' ? <Link to={`/reception/check-in/${a.appointmentId}`}>Đối chiếu và check-in</Link> : <Link to={`/appointments/${a.appointmentId}`}>Chi tiết lịch</Link> },
+        { title: 'Thao tác', render: (_, a) => options?.canCheckIn && a.status === 'Confirmed' ? <Link to={`/reception/check-in/${a.appointmentId}`}>
+          {checkInBlocker(a, view?.serverNow ?? Date.now()) ? 'Xem điều kiện tiếp nhận' : 'Đối chiếu và check-in'}</Link> : <Link to={`/appointments/${a.appointmentId}`}>Chi tiết lịch</Link> },
       ]} />
     </Card>
     <Card title="Hàng chờ và lượt khám">
