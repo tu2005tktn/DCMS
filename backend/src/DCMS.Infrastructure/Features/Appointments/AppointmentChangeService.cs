@@ -77,6 +77,60 @@ public sealed class AppointmentChangeService(DcmsDbContext db, IAvailabilityServ
     public Task<AppointmentChangeResult> CancelAsync(int actorId, string code, CancelAppointmentRequest request, CancellationToken ct) =>
         ChangeAsync(actorId, code, request.ExpectedVersion, request.RequestKey, request.Reason, request.RequesterVerification, null, ct);
 
+    public async Task<AppointmentChangeResult> MarkNoShowAsync(int actorId, string code,
+        NoShowAppointmentRequest request, CancellationToken ct)
+    {
+        if (request.RequestKey == Guid.Empty || request.ExpectedVersion <= 0 ||
+            string.IsNullOrWhiteSpace(code) || code.Length > 40) throw Error("MSG04", 400);
+        var reason = RequiredText(request.Reason, "Lý do");
+        var fingerprint = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
+            JsonSerializer.Serialize(new { action = "NO_SHOW", code, request.ExpectedVersion, reason }))));
+        await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
+        await db.Database.ExecuteSqlRawAsync($"SELECT pg_advisory_xact_lock({WorkingScheduleService.TransactionLock})", ct);
+        var (appointment, staff) = await AuthorizeAsync(actorId, code, ct);
+        if (!staff) throw Error("MSG06", 403);
+        var receipt = await db.AppointmentChangeReceipts.AsNoTracking().SingleOrDefaultAsync(x =>
+            x.ActorAccountId == actorId && x.RequestKey == request.RequestKey, ct);
+        if (receipt != null)
+        {
+            if (receipt.Fingerprint != fingerprint) throw Error("MSG111");
+            return JsonSerializer.Deserialize<AppointmentChangeResult>(receipt.ResultJson)!;
+        }
+        var now = clock.GetUtcNow();
+        if (appointment.Version != request.ExpectedVersion) throw Error("MSG111");
+        if (appointment.Status != "Confirmed" || appointment.StartAt > now) throw Error("MSG31");
+        var reservation = await db.Set<ResourceReservation>().SingleAsync(x => x.Id == appointment.ReservationId, ct);
+        if (reservation.Status != "Confirmed") throw Error("MSG111");
+        if (appointment.FollowUpId.HasValue)
+            await followUps.MarkNeedsBookingAsync(appointment.FollowUpId.Value, appointment.Id, ct);
+        appointment.Status = reservation.Status = "NoShow";
+        appointment.Version++;
+        db.AppointmentChanges.Add(new AppointmentChange
+        {
+            AppointmentId = appointment.Id, ActorAccountId = actorId, ActorKind = "STAFF",
+            Action = "NO_SHOW", OldStart = appointment.StartAt, OldEnd = appointment.EndAt,
+            OldChairId = appointment.ChairId, OldDentistId = appointment.DentistId,
+            Reason = reason, RequestKey = request.RequestKey, OccurredAt = now
+        });
+        db.AppointmentOutboxEvents.Add(new AppointmentOutboxEvent
+        {
+            AggregateId = appointment.Id, EventType = "appointment.no_show", OccurredAt = now,
+            PayloadJson = JsonSerializer.Serialize(new { appointmentId = appointment.Id,
+                appointment.Code, appointment.Version, appointment.FollowUpId })
+        });
+        await db.SaveChangesAsync(ct);
+        var result = new AppointmentChangeResult(await queries.ChangeDetailAsync(actorId, code, ct),
+            SystemMessages.Get("MSG222", "trạng thái vắng mặt", value: code));
+        db.AppointmentChangeReceipts.Add(new AppointmentChangeReceipt
+        {
+            ActorAccountId = actorId, RequestKey = request.RequestKey, AppointmentId = appointment.Id,
+            Fingerprint = fingerprint, ResultJson = JsonSerializer.Serialize(result)
+        });
+        await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
+        return result;
+    }
+
     private static string RequiredText(string? value, string field)
     {
         var text = Clean(value);
@@ -134,6 +188,9 @@ public sealed class AppointmentChangeService(DcmsDbContext db, IAvailabilityServ
             if (!AppointmentRules.PublicLeadTimeValid(now, move.NewStart)) throw Error("MSG34");
             if (move.NewStart == appointment.StartAt && move.ChairId == appointment.ChairId
                 && selectedDentistId == appointment.DentistId) throw Error("MSG34");
+            if (appointment.FollowUpId.HasValue)
+                await followUps.ValidateRescheduleAsync(appointment.FollowUpId.Value, appointment.Id,
+                    selectedDentistId, move.NewStart, ct);
             AvailabilitySlot slot;
             try
             {
@@ -180,6 +237,9 @@ public sealed class AppointmentChangeService(DcmsDbContext db, IAvailabilityServ
 
 public sealed class UnavailableFollowUpAppointmentChangePort : IFollowUpAppointmentChangePort
 {
+    public Task ValidateRescheduleAsync(Guid followUpId, Guid appointmentId, int dentistId,
+        DateTimeOffset startAt, CancellationToken ct) =>
+        throw new BusinessException(503, SystemMessages.Get("MSG144"));
     public Task MarkNeedsBookingAsync(Guid followUpId, Guid appointmentId, CancellationToken ct) =>
         throw new BusinessException(503, SystemMessages.Get("MSG144"));
 }

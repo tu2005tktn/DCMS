@@ -17,6 +17,8 @@ using DCMS.Infrastructure.Features.Appointments;
 using Microsoft.Extensions.Hosting;
 using DCMS.Infrastructure.Features.Notifications;
 using DCMS.Application.Features.SupportRequests;
+using DCMS.Application.Features.Treatment;
+using DCMS.Infrastructure.Features.Treatment;
 
 namespace DCMS.Infrastructure;
 
@@ -61,6 +63,25 @@ public static class DependencyInjection
         services.AddScoped<IPatientLinkReviewService, PatientLinkReviewService>();
         services.AddScoped<DevelopmentPatientLinkSeeder>();
         services.AddScoped<IPatientService, PatientService>();
+        services.AddScoped<ITreatmentDossierService, TreatmentDossierService>();
+        services.AddScoped<IServicePriceService, ServicePriceService>();
+        services.AddScoped<ITreatmentFinancialSummaryPort, UnavailableTreatmentFinancialSummaryPort>();
+        services.AddScoped<ITreatmentRevisionService, TreatmentRevisionService>();
+        services.AddScoped<ITreatmentRevisionActualPort, UnavailableRevisionActualPort>();
+        services.AddScoped<ITreatmentRevisionFinancePort, UnavailableRevisionFinancePort>();
+        services.AddScoped<ITreatmentProgressionService, TreatmentProgressionService>();
+        services.AddScoped<ITreatmentActualEvidencePort, ClinicalActualEvidencePort>();
+        services.AddScoped<IClinicalWorkService, ClinicalWorkService>();
+        services.AddScoped<IClinicalVisitPort, UnavailableClinicalVisitPort>();
+        services.AddScoped<IClinicalConsentPort, UnavailableClinicalConsentPort>();
+        services.AddScoped<IClinicalChargePort, UnavailableClinicalChargePort>();
+        services.AddScoped<ICareTaskService, CareTaskService>();
+        services.AddScoped<ITreatmentLabReadinessPort, UnavailableTreatmentLabReadinessPort>();
+        services.AddScoped<ITreatmentVisitActivitySourcePort, UnavailableTreatmentVisitActivitySourcePort>();
+        services.AddScoped<ITreatmentDentistCapabilityPort, UnavailableTreatmentDentistCapabilityPort>();
+        services.AddScoped<TreatmentDueScanner>();
+        services.AddScoped<CareTaskIngestionService>();
+        services.AddHostedService<TreatmentDueScanWorker>();
         services.AddSingleton(TimeProvider.System);
         services.AddScoped<Features.Scheduling.WorkingScheduleService>();
         services.AddScoped<DCMS.Application.Features.Scheduling.IBookingSettingsService, Features.Scheduling.BookingSettingsService>();
@@ -73,9 +94,10 @@ public static class DependencyInjection
         services.AddScoped<IAppointmentQueryService, AppointmentQueryService>();
         services.AddScoped<IAppointmentChangeService, AppointmentChangeService>();
         services.AddScoped<ISupportRequestService, SupportRequestService>();
-        services.AddScoped<IFollowUpAppointmentChangePort, UnavailableFollowUpAppointmentChangePort>();
+        services.AddScoped<FollowUpAppointmentPort>();
+        services.AddScoped<IFollowUpAppointmentChangePort>(sp => sp.GetRequiredService<FollowUpAppointmentPort>());
         services.AddScoped<DevelopmentAppointmentSeeder>();
-        services.AddScoped<IFollowUpBookingPort, UnavailableFollowUpBookingPort>();
+        services.AddScoped<IFollowUpBookingPort>(sp => sp.GetRequiredService<FollowUpAppointmentPort>());
         services.AddScoped<IAppointmentNotificationDispatcher, AppointmentNotificationDispatcher>();
         services.AddScoped<IExternalNotificationAdapter, UnavailableExternalNotificationAdapter>();
         // S03 recovery delivery: a configured SMTP server sends real email in any environment; otherwise

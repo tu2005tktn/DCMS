@@ -300,7 +300,7 @@ public sealed class AppointmentChangeApiTests(AppointmentChangeFixture fixture) 
     }
 
     [Fact]
-    public async Task ValidationAndUnavailableFollowUpLeaveNoPartialWrites()
+    public async Task ValidationAndUnknownFollowUpLeaveNoPartialWrites()
     {
         var s = await Prepare(); var (client, _) = await Public(); var slots = await Slots(client, s); var a = await Book(client, s, slots[36]);
         await Message(await client.PostAsJsonAsync(Path(a, "cancel"), Cancel(a, "  ")), HttpStatusCode.BadRequest, "MSG02");
@@ -308,15 +308,15 @@ public sealed class AppointmentChangeApiTests(AppointmentChangeFixture fixture) 
         await Message(await client.PostAsJsonAsync(Path(a, "cancel"), Cancel(a) with { RequestKey = Guid.Empty }), HttpStatusCode.BadRequest, "MSG04");
         await Message(await client.PostAsJsonAsync(Path(a, "cancel"), Cancel(a) with { ExpectedVersion = 0 }), HttpStatusCode.BadRequest, "MSG04");
         await SetState(a, followUp: Guid.NewGuid());
-        var moved = await client.PostAsJsonAsync(Path(a, "reschedule"), Move(a, slots[40]));
-        Assert.Equal(HttpStatusCode.OK, moved.StatusCode);
-        Assert.NotNull((await moved.Content.ReadFromJsonAsync<AppointmentChangeResult>())!.Appointment.FollowUp);
-        await Message(await client.PostAsJsonAsync(Path(a, "cancel"), Cancel(a) with { ExpectedVersion = 2 }), HttpStatusCode.ServiceUnavailable, "MSG144");
+        await Message(await client.PostAsJsonAsync(Path(a, "reschedule"), Move(a, slots[40])),
+            HttpStatusCode.NotFound, "MSG113");
+        await Message(await client.PostAsJsonAsync(Path(a, "cancel"), Cancel(a)),
+            HttpStatusCode.NotFound, "MSG113");
         using var scope = fixture.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
         var saved = await db.Appointments.FindAsync(a.AppointmentId);
-        Assert.Equal("Confirmed", saved!.Status); Assert.Equal(2, saved.Version); Assert.Null(saved.CancelledAt);
-        Assert.Single(await db.AppointmentChanges.Where(x => x.AppointmentId == a.AppointmentId).ToListAsync());
-        Assert.Equal(2, await db.AppointmentOutboxEvents.CountAsync(x => x.AggregateId == a.AppointmentId));
+        Assert.Equal("Confirmed", saved!.Status); Assert.Equal(1, saved.Version); Assert.Null(saved.CancelledAt);
+        Assert.Empty(await db.AppointmentChanges.Where(x => x.AppointmentId == a.AppointmentId).ToListAsync());
+        Assert.Single(await db.AppointmentOutboxEvents.Where(x => x.AggregateId == a.AppointmentId).ToListAsync());
     }
 
     [Fact]

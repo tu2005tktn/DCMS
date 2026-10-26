@@ -7,6 +7,7 @@ using DCMS.Domain.Features.Authentication;
 using DCMS.Domain.Features.PatientLinks;
 using DCMS.Domain.Features.Patients;
 using DCMS.Domain.Features.Appointments;
+using DCMS.Domain.Features.Treatment;
 
 namespace DCMS.Infrastructure.Persistence;
 
@@ -38,12 +39,31 @@ public sealed class DcmsDbContext(DbContextOptions<DcmsDbContext> options)
     public DbSet<EmailVerificationToken> EmailVerificationTokens => Set<EmailVerificationToken>();
     public DbSet<RecoveryAudit> RecoveryAudits => Set<RecoveryAudit>();
     public DbSet<RecoveryOutbox> RecoveryOutbox => Set<RecoveryOutbox>();
+    public DbSet<TreatmentDossier> TreatmentDossiers => Set<TreatmentDossier>();
+    public DbSet<TreatmentItem> TreatmentItems => Set<TreatmentItem>();
+    public DbSet<TreatmentEvent> TreatmentEvents => Set<TreatmentEvent>();
+    public DbSet<TreatmentReceipt> TreatmentReceipts => Set<TreatmentReceipt>();
+    public DbSet<TreatmentRevisionDraft> TreatmentRevisionDrafts => Set<TreatmentRevisionDraft>();
+    public DbSet<TreatmentTemplate> TreatmentTemplates => Set<TreatmentTemplate>();
+    public DbSet<TreatmentTemplateVersion> TreatmentTemplateVersions => Set<TreatmentTemplateVersion>();
+    public DbSet<TreatmentStep> TreatmentSteps => Set<TreatmentStep>();
+    public DbSet<FollowUpInstruction> FollowUpInstructions => Set<FollowUpInstruction>();
+    public DbSet<TreatmentProgressionReceipt> TreatmentProgressionReceipts => Set<TreatmentProgressionReceipt>();
+    public DbSet<TreatmentProgressionEvent> TreatmentProgressionEvents => Set<TreatmentProgressionEvent>();
+    public DbSet<ClinicalActivity> ClinicalActivities => Set<ClinicalActivity>();
+    public DbSet<ClinicalReview> ClinicalReviews => Set<ClinicalReview>();
+    public DbSet<ClinicalCareNote> ClinicalCareNotes => Set<ClinicalCareNote>();
+    public DbSet<ClinicalCommandReceipt> ClinicalCommandReceipts => Set<ClinicalCommandReceipt>();
+    public DbSet<CareTask> CareTasks => Set<CareTask>();
+    public DbSet<CareContactAttempt> CareContactAttempts => Set<CareContactAttempt>();
+    public DbSet<CareEscalation> CareEscalations => Set<CareEscalation>();
 
     protected override void OnModelCreating(ModelBuilder model)
     {
         base.OnModelCreating(model);
         SchedulingModel.Configure(model);
         AppointmentModel.Configure(model);
+        TreatmentModel.Configure(model);
         VisitModel.Configure(model);
         model.Entity<ApplicationUser>(b =>
         {

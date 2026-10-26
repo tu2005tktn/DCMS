@@ -22,6 +22,10 @@ public static class AppointmentEndpoints
             CancelAppointmentRequest request, IAppointmentChangeService service, CancellationToken ct) =>
             Results.Ok(await service.CancelAsync(ChangeActor(context), code, request, ct)))
             .AllowAnonymous().WithTags("UC-06 S12/S16 Appointment changes");
+        endpoints.MapPost("/api/appointments/{code}/no-show", async (HttpContext context, string code,
+            NoShowAppointmentRequest request, IAppointmentChangeService service, CancellationToken ct) =>
+            Results.Ok(await service.MarkNoShowAsync(ChangeActor(context), code, request, ct)))
+            .RequireAuthorization().WithTags("UC-06 Staff NoShow follow-up transition");
         endpoints.MapPost("/api/appointments/{code}/support-requests", async (HttpContext context, string code,
             CustomerSupportRequestCommand command, ISupportRequestService service, CancellationToken ct) =>
             Results.Json(await service.CreateCustomerRequestAsync(ChangeActor(context), code, command, ct),
