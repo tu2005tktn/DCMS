@@ -32,7 +32,7 @@ public sealed class ReceptionClock : TimeProvider
     public DateTimeOffset Now { get; } = DateTimeOffset.FromUnixTimeSeconds(DateTimeOffset.UtcNow.AddMinutes(-30).ToUnixTimeSeconds());
     public override DateTimeOffset GetUtcNow() => Now;
 }
-public sealed class ReceptionFixture : ApiFixture
+public class ReceptionFixture : ApiFixture
 {
     public ReceptionClock Clock { get; } = new();
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -45,9 +45,9 @@ public sealed class ReceptionFixture : ApiFixture
 
 public sealed class ReceptionApiTests(ReceptionFixture fixture) : IClassFixture<ReceptionFixture>
 {
-    private sealed record Setup(int BranchId, int DentistId, int AssistantId, int ChairId, int ServiceId, int PatientId, Guid AppointmentId);
+    internal sealed record Setup(int BranchId, int DentistId, int AssistantId, int ChairId, int ServiceId, int PatientId, Guid AppointmentId);
     private DateOnly Today => DateOnly.FromDateTime(fixture.Clock.Now.ToOffset(TimeSpan.FromHours(7)).DateTime);
-    private async Task<HttpClient> Login(string name = "assistant.demo", ApiFixture? targetFixture = null)
+    internal async Task<HttpClient> Login(string name = "assistant.demo", ApiFixture? targetFixture = null)
     {
         var activeFixture = targetFixture ?? fixture;
         var client = activeFixture.CreateClient();
@@ -56,7 +56,7 @@ public sealed class ReceptionApiTests(ReceptionFixture fixture) : IClassFixture<
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", (await response.Content.ReadFromJsonAsync<SignInResponse>())!.AccessToken);
         return client;
     }
-    private async Task<Setup> Prepare(bool linked = true, int dayOffset = 0, ReceptionFixture? targetFixture = null)
+    internal async Task<Setup> Prepare(bool linked = true, int dayOffset = 0, ReceptionFixture? targetFixture = null)
     {
         var activeFixture = targetFixture ?? fixture;
         using var scope = activeFixture.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
@@ -91,7 +91,7 @@ public sealed class ReceptionApiTests(ReceptionFixture fixture) : IClassFixture<
     }
     private static CheckInRequest Command(Setup s) => new(s.PatientId, 1, Guid.NewGuid(), true, null, null, "InitialExamination", null, null);
     private static string Path(Setup s) => $"/api/reception/appointments/{s.AppointmentId}/check-in";
-    private async Task<VisitResult> Check(HttpClient client, Setup s, CheckInRequest? request = null)
+    internal async Task<VisitResult> Check(HttpClient client, Setup s, CheckInRequest? request = null)
     {
         var response = await client.PostAsJsonAsync(Path(s), request ?? Command(s));
         Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
@@ -169,7 +169,7 @@ public sealed class ReceptionApiTests(ReceptionFixture fixture) : IClassFixture<
     {
         var s = await Prepare(); using var client = await Login(); var command = Command(s) with { Purpose = "TreatmentContinuation" };
         var courses = await client.GetFromJsonAsync<ReceptionCourse[]>($"/api/reception/appointments/{s.AppointmentId}/courses?patientId={s.PatientId}"); Assert.Empty(courses!);
-        await Error(await client.PostAsJsonAsync(Path(s), command with { PriorCourseId = Guid.NewGuid() }), HttpStatusCode.ServiceUnavailable, "MSG144");
+        await Error(await client.PostAsJsonAsync(Path(s), command with { PriorCourseId = Guid.NewGuid() }), HttpStatusCode.NotFound, "MSG113");
         var v = await Check(client, s, command); Assert.True(v.RequiresClinicalSourceReview); Assert.Null(v.Source);
     }
     [Fact] public async Task AppointmentFollowUpSourceIsCarriedByServer()

@@ -64,6 +64,7 @@ public sealed class DcmsDbContext(DbContextOptions<DcmsDbContext> options)
         SchedulingModel.Configure(model);
         AppointmentModel.Configure(model);
         VisitModel.Configure(model);
+        ExaminationModel.Configure(model);
         TreatmentModel.Configure(model);
         model.Entity<ApplicationUser>(b =>
         {

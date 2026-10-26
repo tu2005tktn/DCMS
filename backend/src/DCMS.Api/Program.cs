@@ -159,6 +159,7 @@ app.MapClinicalWorkEndpoints();
 app.MapSchedulingEndpoints();
 app.MapAppointmentEndpoints();
 app.MapReceptionEndpoints();
+DCMS.Api.Features.Examinations.ExaminationEndpoints.MapExaminationEndpoints(app);
 app.MapAppointmentQueryEndpoints();
 app.MapSupportRequestEndpoints();
 app.MapNotificationEndpoints();

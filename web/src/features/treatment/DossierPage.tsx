@@ -19,6 +19,7 @@ const displayTime = (value: string) => new Intl.DateTimeFormat('vi-VN', {
 export default function DossierPage() {
   const { id, dossierId } = useParams();
   const [search] = useSearchParams();
+  const currentVisitId = search.get('visitId');
   const location = useLocation();
   const selectedItemId = search.get('item');
   const revisionNotice = (location.state as { revisionNotice?: string } | null)?.revisionNotice;
@@ -96,6 +97,8 @@ export default function DossierPage() {
   }
 
   return <main className="treatment-page">
+    {currentVisitId && <Space><Link to={`/visits/${currentVisitId}`}>Về lượt khám hiện tại</Link>
+      <Link to={`/patients/${id}/visits/${currentVisitId}/treatment?dossierId=${dossier.id}`}>Điều trị trong lượt này</Link></Space>}
     <Typography.Paragraph><Link to={`/patients/${id}`}>← Hồ sơ bệnh nhân</Link></Typography.Paragraph>
     <div className="treatment-page-heading"><div>
       <Typography.Title level={2}>Đợt điều trị {dossier.code}</Typography.Title>

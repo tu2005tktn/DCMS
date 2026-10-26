@@ -8,7 +8,7 @@ import { stateLabel } from './types';
 
 type Values = { branchId: number; dentistId: number; diagnosis: string; note?: string };
 
-export default function DossierList({ patientId }: { patientId: number }) {
+export default function DossierList({ patientId, visitId, diagnosis, branchId: contextBranchId, dentistId }: { patientId: number; visitId?: string; diagnosis?: string | null; branchId?: number; dentistId?: number }) {
   const auth = useAuth();
   const navigate = useNavigate();
   const [page, setPage] = useState<DossierPage | null>(null);
@@ -42,7 +42,7 @@ export default function DossierList({ patientId }: { patientId: number }) {
         method: 'POST', body: JSON.stringify({ ...values, requestKey: createKey.current }),
       });
       setOpen(false); form.resetFields(); createKey.current = crypto.randomUUID();
-      navigate(`/patients/${patientId}/dossiers/${result.dossier.id}`);
+      navigate(`/patients/${patientId}/dossiers/${result.dossier.id}${visitId ? `?visitId=${visitId}` : ''}`);
     } catch (failure) { setSaveError((failure as Error).message); }
     finally { setBusy(false); }
   }
@@ -52,7 +52,7 @@ export default function DossierList({ patientId }: { patientId: number }) {
     <div className="treatment-section-heading"><div>
       <Typography.Title level={4}>Các đợt điều trị</Typography.Title>
       <Typography.Paragraph type="secondary">Mỗi đợt có kế hoạch, lượt khám và tiến độ riêng.</Typography.Paragraph>
-    </div><Button type="primary" onClick={() => { setSaveError(null); createKey.current = crypto.randomUUID(); setOpen(true); }}>Tạo đợt điều trị</Button></div>
+    </div><Button type="primary" onClick={() => { setSaveError(null); createKey.current = crypto.randomUUID(); form.setFieldsValue({ diagnosis: diagnosis ?? undefined, branchId: contextBranchId, dentistId }); setOpen(true); }}>Tạo đợt điều trị</Button></div>
     {error ? <Alert type="error" showIcon message={error.message}
       action={<Button onClick={() => setRevision(value => value + 1)}>Thử lại</Button>} />
       : !page ? <Skeleton active /> : page.items.length === 0
@@ -60,7 +60,7 @@ export default function DossierList({ patientId }: { patientId: number }) {
         : <div className="treatment-list-cards">{page.items.map(item => <Card key={item.id} size="small">
           <div className="treatment-list-row"><div><Typography.Text strong>{item.code}</Typography.Text>
             <div>{item.diagnosis}</div><Typography.Text type="secondary">Kế hoạch phiên bản {item.planVersion || 'chưa có'}</Typography.Text></div>
-            <Space><Tag>{stateLabel[item.state]}</Tag><Link to={`/patients/${patientId}/dossiers/${item.id}`}>Mở hồ sơ</Link></Space></div>
+            <Space><Tag>{stateLabel[item.state]}</Tag><Link to={`/patients/${patientId}/dossiers/${item.id}${visitId ? `?visitId=${visitId}` : ''}`}>Mở hồ sơ</Link></Space></div>
         </Card>)}</div>}
     <Modal open={open} title="Tạo đợt điều trị" okText="Tạo hồ sơ" okButtonProps={{ loading: busy }}
       onOk={() => form.submit()} onCancel={() => { if (!busy) { setOpen(false); createKey.current = crypto.randomUUID(); } }}>

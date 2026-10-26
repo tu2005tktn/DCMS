@@ -1,5 +1,7 @@
 # Documentation
 
+- [DCMS-112 S19/S20](specs/S19-S20-DCMS-112.md): khám theo Visit, lịch sử, sơ đồ răng và file private; [contract, vận hành và bằng chứng](implementation/DCMS-112-EXAMINATION.md).
+
 - [Shared password policy](specs/SHARED-PASSWORD-POLICY.md): decision 18 October 2026, 8–256 characters without character-class requirements for patient and staff accounts; [implementation and validation](implementation/SHARED-PASSWORD-POLICY.md). This decision supersedes the older password baseline in the Word references below.
 
 - [S04 / UC-31](specs/S04-UC31.md): đặc tả quản lý tài khoản Web; [DCMS-75](implementation/S04-DCMS-75.md): phối hợp và bằng chứng nghiệm thu.
