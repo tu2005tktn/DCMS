@@ -1593,6 +1593,10 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(160)
                         .HasColumnType("character varying(160)");
 
+                    b.Property<long?>("ReferenceUnitPriceVnd").HasColumnType("bigint");
+
+                    b.Property<int>("PriceVersion").HasColumnType("integer").IsConcurrencyToken().HasDefaultValue(1);
+
                     b.Property<bool>("PublicBookable")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
@@ -1610,6 +1614,7 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.ToTable("SCHEDULING_SERVICE", null, t =>
                         {
                             t.HasCheckConstraint("CK_SERVICE_DURATION", "\"PublicDurationMinutes\" BETWEEN 1 AND 480");
+                            t.HasCheckConstraint("CK_SERVICE_REFERENCE_PRICE", "\"ReferenceUnitPriceVnd\" IS NULL OR \"ReferenceUnitPriceVnd\" >= 0");
                         });
                 });
 
@@ -2683,6 +2688,195 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                 {
                     b.Navigation("Periods");
                 });
+
+            // Frozen mapping for 20261019120000_TreatmentDossiers. Keep this snapshot
+            // independent from the live TreatmentModel when later migrations evolve it.
+            TreatmentMigrationSnapshot.Configure(modelBuilder);
+            TreatmentProgressionMigrationSnapshot.Configure(modelBuilder);
+            modelBuilder.Entity<DCMS.Domain.Features.Treatment.TreatmentStep>(b =>
+            {
+                b.Property(x => x.EstimatedMinMinutes).HasColumnType("integer");
+                b.Property(x => x.EstimatedMaxMinutes).HasColumnType("integer");
+                b.Property(x => x.ShortReservationAcknowledgedBy).HasColumnType("integer");
+                b.Property(x => x.ShortReservationAcknowledgedAt).HasColumnType("timestamp with time zone");
+                b.ToTable(t => t.HasCheckConstraint("CK_STEP_ESTIMATE_RANGE", "(\"EstimatedMinMinutes\" IS NULL AND \"EstimatedMaxMinutes\" IS NULL) OR (\"EstimatedMinMinutes\" IS NOT NULL AND \"EstimatedMaxMinutes\" IS NOT NULL AND \"EstimatedMinMinutes\" > 0 AND \"EstimatedMinMinutes\" <= \"EstimatedMinutes\" AND \"EstimatedMinutes\" <= \"EstimatedMaxMinutes\" AND \"EstimatedMaxMinutes\" <= 480)"));
+            });
+            modelBuilder.Entity<DCMS.Domain.Features.Treatment.FollowUpInstruction>(b =>
+            {
+                b.HasIndex(x => x.StepId).IsUnique()
+                    .HasDatabaseName("IX_FOLLOW_UP_INSTRUCTION_ActiveStep")
+                    .HasFilter("\"StepId\" IS NOT NULL AND \"Status\" IN ('NeedsBooking','Booked')");
+                b.HasIndex(x => new { x.DossierId, x.ItemId }).IsUnique()
+                    .HasDatabaseName("IX_FOLLOW_UP_INSTRUCTION_ActiveItemOnly")
+                    .HasFilter("\"DossierId\" IS NOT NULL AND \"ItemId\" IS NOT NULL AND \"StepId\" IS NULL AND \"Status\" IN ('NeedsBooking','Booked')");
+            });
+            modelBuilder.Entity<DCMS.Domain.Features.Treatment.TreatmentItem>(b =>
+            {
+                b.Property(x => x.Material).HasMaxLength(160);
+                b.Property(x => x.DecisionPlanVersion).HasColumnType("integer");
+                b.Property(x => x.EstimatedMinMinutes).HasColumnType("integer");
+                b.Property(x => x.EstimatedMaxMinutes).HasColumnType("integer");
+                b.Property(x => x.ReservedMinutes).HasColumnType("integer");
+                b.Property(x => x.ShortReservationAcknowledgedBy).HasColumnType("integer");
+                b.Property(x => x.ShortReservationAcknowledgedAt).HasColumnType("timestamp with time zone");
+                b.Property(x => x.EstimatedSessions).HasColumnType("integer");
+                b.Property(x => x.ReturnEarliestOn).HasColumnType("date");
+                b.Property(x => x.ReturnTargetOn).HasColumnType("date");
+                b.Property(x => x.ReturnLatestOn).HasColumnType("date");
+                b.Property(x => x.ReferenceUnitPriceVnd).HasColumnType("bigint");
+                b.Property(x => x.ReferencePriceVersion).HasColumnType("integer");
+                b.Property(x => x.DiscountType).HasMaxLength(16);
+                b.Property(x => x.DiscountValue).HasPrecision(18, 3);
+                b.Property(x => x.DiscountReason).HasMaxLength(1000);
+                b.Property(x => x.DiscountQualifyingItemId).HasColumnType("uuid");
+                b.Property(x => x.DiscountStatus).HasMaxLength(16);
+                b.Property(x => x.DiscountBasisHash).HasMaxLength(64);
+                b.Property(x => x.DiscountDecidedBy).HasColumnType("integer");
+                b.Property(x => x.DiscountDecidedAt).HasColumnType("timestamp with time zone");
+                b.Property(x => x.WarrantyComponent).HasMaxLength(500);
+                b.Property(x => x.WarrantyExclusions).HasMaxLength(1000);
+                b.Property(x => x.WarrantyActivatedOn).HasColumnType("date");
+                b.Property(x => x.WarrantyExplanation).HasMaxLength(2000);
+                b.Property(x => x.ExpectedServiceLifeMonths).HasColumnType("integer");
+                b.ToTable(t => t.HasCheckConstraint("CK_TREATMENT_ITEM_DURATION_V23", "(\"EstimatedMinMinutes\" IS NULL AND \"EstimatedMaxMinutes\" IS NULL OR \"EstimatedMinMinutes\" > 0 AND \"EstimatedMinMinutes\" <= \"EstimatedMinutes\" AND \"EstimatedMinutes\" <= \"EstimatedMaxMinutes\" AND \"EstimatedMaxMinutes\" <= 480) AND (\"ReservedMinutes\" IS NULL OR \"ReservedMinutes\" BETWEEN 15 AND 480 AND \"ReservedMinutes\" % 15 = 0 AND \"ReservedMinutes\" >= \"EstimatedMinutes\")"));
+            });
+            modelBuilder.Entity<DCMS.Domain.Features.Treatment.TreatmentDossier>(b =>
+            {
+                b.Property(x => x.DepositExceptionReason).HasMaxLength(1000);
+                b.Property(x => x.DepositExceptionBy).HasColumnType("integer");
+                b.Property(x => x.DepositExceptionAt).HasColumnType("timestamp with time zone");
+            });
+            modelBuilder.Entity<DCMS.Domain.Features.Treatment.TreatmentRevisionDraft>(b =>
+            {
+                b.ToTable("TREATMENT_REVISION_DRAFT");
+                b.HasKey(x => x.Id);
+                b.HasIndex(x => new { x.DossierId, x.ItemId, x.ActorId }).IsUnique();
+                b.HasIndex(x => x.ItemId);
+                b.Property(x => x.BasePlanVersion).HasColumnType("integer");
+                b.Property(x => x.UpdatedAt).HasColumnType("timestamp with time zone");
+                b.Property(x => x.PayloadJson).IsRequired().HasColumnType("jsonb");
+                b.Property(x => x.Version).IsConcurrencyToken();
+                b.HasOne<DCMS.Domain.Features.Treatment.TreatmentDossier>().WithMany()
+                    .HasForeignKey(x => x.DossierId).OnDelete(Microsoft.EntityFrameworkCore.DeleteBehavior.Restrict);
+                b.HasOne<DCMS.Domain.Features.Treatment.TreatmentItem>().WithMany()
+                    .HasForeignKey(x => x.ItemId).OnDelete(Microsoft.EntityFrameworkCore.DeleteBehavior.Restrict);
+            });
+            ClinicalWorkModel.Configure(modelBuilder);
+            modelBuilder.Entity<DCMS.Domain.Features.Treatment.ClinicalActivity>(b =>
+            {
+                b.Property<Guid>("Id").HasColumnType("uuid");
+                b.Property<Guid>("VisitId").HasColumnType("uuid");
+                b.Property<int>("PatientId").HasColumnType("integer");
+                b.Property<int>("BranchId").HasColumnType("integer");
+                b.Property<Guid?>("DossierId").HasColumnType("uuid");
+                b.Property<Guid?>("ItemId").HasColumnType("uuid");
+                b.Property<Guid?>("StepId").HasColumnType("uuid");
+                b.Property<int?>("PlanVersion").HasColumnType("integer");
+                b.Property<int>("ServiceId").HasColumnType("integer");
+                b.Property<string>("Region").HasColumnType("character varying(80)");
+                b.Property<string>("Unit").HasColumnType("character varying(40)").IsRequired();
+                b.Property<decimal>("Quantity").HasColumnType("numeric(12,3)");
+                b.Property<DateTimeOffset>("PerformedAt").HasColumnType("timestamp with time zone");
+                b.Property<int?>("ElapsedMinutes").HasColumnType("integer");
+                b.Property<int>("PerformerId").HasColumnType("integer");
+                b.Property<string>("Outcome").HasColumnType("character varying(4000)").IsRequired();
+                b.Property<string>("NextSteps").HasColumnType("character varying(2000)");
+                b.Property<string>("ChargingBasis").HasColumnType("character varying(16)").IsRequired();
+                b.Property<string>("ChargingBasisEvidence").HasColumnType("character varying(1000)");
+                b.Property<decimal>("PriceSnapshotVnd").HasColumnType("numeric(18,0)");
+                b.Property<Guid?>("ReviewId").HasColumnType("uuid");
+                b.Property<string>("State").HasColumnType("character varying(16)").IsRequired();
+                b.Property<int>("Version").HasColumnType("integer");
+                b.Property<DateTimeOffset>("CreatedAt").HasColumnType("timestamp with time zone");
+                b.Property<DateTimeOffset?>("PostedAt").HasColumnType("timestamp with time zone");
+            });
+            modelBuilder.Entity<DCMS.Domain.Features.Treatment.ClinicalReview>(b =>
+            {
+                b.Property<Guid>("Id").HasColumnType("uuid");
+                b.Property<Guid>("VisitId").HasColumnType("uuid");
+                b.Property<int>("PatientId").HasColumnType("integer");
+                b.Property<int>("BranchId").HasColumnType("integer");
+                b.Property<Guid?>("SourceActivityId").HasColumnType("uuid");
+                b.Property<Guid?>("SourceItemId").HasColumnType("uuid");
+                b.Property<string>("Complaint").HasColumnType("character varying(4000)").IsRequired();
+                b.Property<string>("Findings").HasColumnType("character varying(4000)").IsRequired();
+                b.Property<string>("Coverage").HasColumnType("character varying(24)").IsRequired();
+                b.Property<string>("Outcome").HasColumnType("character varying(32)").IsRequired();
+                b.Property<string>("CoveredComponent").HasColumnType("character varying(500)");
+                b.Property<string>("Exclusions").HasColumnType("character varying(1000)");
+                b.Property<string>("Policy").HasColumnType("character varying(160)");
+                b.Property<string>("PolicyVersion").HasColumnType("character varying(40)");
+                b.Property<string>("Basis").HasColumnType("character varying(1000)");
+                b.Property<string>("NextAction").HasColumnType("character varying(2000)");
+                b.Property<int>("DentistAccountId").HasColumnType("integer");
+                b.Property<DateTimeOffset>("RecordedAt").HasColumnType("timestamp with time zone");
+                b.Property<int>("Version").HasColumnType("integer");
+            });
+            modelBuilder.Entity<DCMS.Domain.Features.Treatment.ClinicalCareNote>(b =>
+            {
+                b.Property<Guid>("Id").HasColumnType("uuid");
+                b.Property<Guid>("VisitId").HasColumnType("uuid");
+                b.Property<int>("PatientId").HasColumnType("integer");
+                b.Property<int>("BranchId").HasColumnType("integer");
+                b.Property<Guid?>("SourceActivityId").HasColumnType("uuid");
+                b.Property<Guid?>("ReviewId").HasColumnType("uuid");
+                b.Property<string>("Content").HasColumnType("character varying(4000)").IsRequired();
+                b.Property<string>("Response").HasColumnType("character varying(4000)");
+                b.Property<int>("ActorId").HasColumnType("integer");
+                b.Property<DateTimeOffset>("RecordedAt").HasColumnType("timestamp with time zone");
+            });
+            modelBuilder.Entity<DCMS.Domain.Features.Treatment.ClinicalCommandReceipt>(b =>
+            {
+                b.Property<Guid>("RequestKey").HasColumnType("uuid");
+                b.Property<int>("ActorId").HasColumnType("integer");
+                b.Property<string>("Command").HasColumnType("character varying(40)").IsRequired();
+                b.Property<string>("Fingerprint").HasColumnType("character varying(64)").IsRequired();
+                b.Property<Guid>("ResultId").HasColumnType("uuid");
+            });
+            modelBuilder.Entity<DCMS.Domain.Features.Treatment.CareTask>(b =>
+            {
+                b.Property<Guid>("Id").HasColumnType("uuid");
+                b.Property<int>("PatientId").HasColumnType("integer");
+                b.Property<int>("BranchId").HasColumnType("integer");
+                b.Property<Guid?>("InstructionId").HasColumnType("uuid");
+                b.Property<Guid?>("AppointmentId").HasColumnType("uuid");
+                b.Property<Guid?>("ReviewId").HasColumnType("uuid");
+                b.Property<string>("EpisodeKey").HasColumnType("character varying(200)");
+                b.Property<string>("Type").HasColumnType("character varying(40)").IsRequired();
+                b.Property<string>("Content").HasColumnType("character varying(4000)").IsRequired();
+                b.Property<int?>("OwnerAccountId").HasColumnType("integer");
+                b.Property<DateTimeOffset>("DueAt").HasColumnType("timestamp with time zone");
+                b.Property<string>("Status").HasColumnType("character varying(16)").IsRequired();
+                b.Property<int>("Version").HasColumnType("integer");
+                b.Property<int>("CreatedBy").HasColumnType("integer");
+                b.Property<DateTimeOffset>("CreatedAt").HasColumnType("timestamp with time zone");
+                b.Property<DateTimeOffset>("UpdatedAt").HasColumnType("timestamp with time zone");
+            });
+            modelBuilder.Entity<DCMS.Domain.Features.Treatment.CareContactAttempt>(b =>
+            {
+                b.Property<Guid>("Id").HasColumnType("uuid");
+                b.Property<Guid>("TaskId").HasColumnType("uuid");
+                b.Property<string>("Channel").HasColumnType("character varying(32)").IsRequired();
+                b.Property<string>("Result").HasColumnType("character varying(40)").IsRequired();
+                b.Property<string>("NextAction").HasColumnType("character varying(1000)");
+                b.Property<Guid?>("RebookedAppointmentId").HasColumnType("uuid");
+                b.Property<int>("ActorId").HasColumnType("integer");
+                b.Property<DateTimeOffset>("OccurredAt").HasColumnType("timestamp with time zone");
+            });
+            modelBuilder.Entity<DCMS.Domain.Features.Treatment.CareEscalation>(b =>
+            {
+                b.Property<Guid>("Id").HasColumnType("uuid");
+                b.Property<Guid>("TaskId").HasColumnType("uuid");
+                b.Property<int>("TargetClinicianAccountId").HasColumnType("integer");
+                b.Property<string>("Reason").HasColumnType("character varying(1000)").IsRequired();
+                b.Property<string>("Resolution").HasColumnType("character varying(4000)");
+                b.Property<string>("Status").HasColumnType("character varying(16)").IsRequired();
+                b.Property<int>("CreatedBy").HasColumnType("integer");
+                b.Property<DateTimeOffset>("CreatedAt").HasColumnType("timestamp with time zone");
+                b.Property<int>("Version").HasColumnType("integer");
+                b.Property<DateTimeOffset?>("AcknowledgedAt").HasColumnType("timestamp with time zone");
+                b.Property<DateTimeOffset?>("ResolvedAt").HasColumnType("timestamp with time zone");
+            });
 #pragma warning restore 612, 618
         }
     }

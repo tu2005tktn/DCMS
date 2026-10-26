@@ -24,15 +24,28 @@ import CustomerBookingPage from '../features/customer-booking/CustomerBookingPag
 import CustomerPatientLinkPage from '../features/customer-patient-link/CustomerPatientLinkPage';
 import CustomerAppointmentsPage from '../features/customer-appointments/CustomerAppointmentsPage';
 import CustomerAppointmentDetailPage from '../features/customer-appointments/CustomerAppointmentDetailPage';
+import DossierPage from '../features/treatment/DossierPage';
+import PlanPage from '../features/treatment/PlanPage';
+import RevisionPage from '../features/treatment/RevisionPage';
+import TemplatePage from '../features/treatment/TemplatePage';
+import CommercialTreatmentPage from '../features/treatment/CommercialTreatmentPage';
+import { ActualTreatmentPage, PostoperativeReviewPage } from '../features/treatment/ClinicalWorkPages';
+import ClinicalPreviewPage from '../features/treatment/ClinicalPreviewPage';
+import { clinicalPreviewTreatment } from '../features/treatment/clinicalPreview';
 
 export default function App() {
   return <Routes>
+    {import.meta.env.DEV && <Route path="/__preview/clinical" element={<ClinicalPreviewPage />}>
+      <Route index element={<Navigate to={clinicalPreviewTreatment} replace />} />
+      <Route path=":id/:visitId/treatment" element={<ActualTreatmentPage />} />
+      <Route path=":id/:visitId/review" element={<PostoperativeReviewPage />} />
+    </Route>}
     <Route path="/sign-in" element={<SignInPage />} />
     <Route path="/access" element={<AccessPage />} />
     <Route path="/customer/sign-in" element={<CustomerSignInPage />} />
     <Route path="/customer/register" element={<CustomerRegisterPage />} />
     <Route path="/customer/recover" element={<RecoverAccountPage customer />} />
-    <Route path="/customer/book" element={<CustomerBookingPage />} />
+    <Route path="/customer/book" element={<CustomerGuard><CustomerBookingPage /></CustomerGuard>} />
     <Route path="/customer" element={<CustomerGuard><CustomerShell /></CustomerGuard>}>
       <Route index element={<Navigate to="/customer/home" replace />} />
       <Route path="home" element={<CustomerHomePage />} />
@@ -53,6 +66,13 @@ export default function App() {
       <Route path="accounts" element={<Protected permission="accounts.manage"><AccountsPage /></Protected>} />
       <Route path="patients" element={<Protected permission="patients.read"><PatientSearchPage /></Protected>} />
       <Route path="patients/:id" element={<Protected permission="patients.read"><PatientProfilePage /></Protected>} />
+      <Route path="patients/:id/dossiers/:dossierId" element={<Protected permission="patients.read"><DossierPage /></Protected>} />
+      <Route path="patients/:id/dossiers/:dossierId/plan" element={<Protected permission="patients.read"><PlanPage /></Protected>} />
+      <Route path="patients/:id/dossiers/:dossierId/plan/revise/:itemId" element={<Protected permission="patients.read"><RevisionPage /></Protected>} />
+      <Route path="patients/:id/visits/:visitId/treatment" element={<Protected permission="patients.read"><ActualTreatmentPage /></Protected>} />
+      <Route path="patients/:id/visits/:visitId/review" element={<Protected permission="patients.read"><PostoperativeReviewPage /></Protected>} />
+      <Route path="treatment-templates" element={<Protected><TemplatePage /></Protected>} />
+      <Route path="commercial/treatment" element={<Protected><CommercialTreatmentPage /></Protected>} />
       <Route path="appointments" element={<Protected><AppointmentCalendarPage /></Protected>} />
       <Route path="reception" element={<Protected permission="reception.read"><ReceptionPage /></Protected>} />
       <Route path="reception/appointments/:appointmentId" element={<Protected permission="reception.read"><CheckInPage /></Protected>} />
@@ -105,6 +125,9 @@ function Workspace() {
       ...(auth.user?.permissions.includes('reception.read') ? [{ key: '/reception', label: <Link to="/reception">Tiếp nhận và hàng chờ</Link> }] : []),
       ...(auth.user?.permissions.includes('accounts.manage') ? [{ key: '/accounts', label: <Link to="/accounts">Quản lý tài khoản</Link> }] : []),
       ...(auth.user?.permissions.includes('patients.read') ? [{ key: '/patients', label: <Link to="/patients">Bệnh nhân</Link> }] : []),
+      ...(auth.user?.effectiveRoles.includes('Dentist') ? [{ key: '/treatment-templates', label: <Link to="/treatment-templates">Mẫu điều trị</Link> }] : []),
+      ...(auth.user?.effectiveRoles.some(r => ['Admin', 'ClinicOwner', 'Dentist'].includes(r)) ? [{ key: '/commercial/treatment',
+        label: <Link to="/commercial/treatment">Giá và duyệt điều trị</Link> }] : []),
       ...(auth.user?.permissions.includes('patient-links.verify') ? [{ key: '/link-verification', label: <Link to="/link-verification">Xác minh liên kết hồ sơ</Link> }] : []),
     ]} />
     <Layout.Content className="workspace-content">{error && <Alert className="form-alert" type="error" message={error} showIcon />}<Outlet /></Layout.Content>

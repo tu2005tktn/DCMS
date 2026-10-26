@@ -7,6 +7,8 @@ import { formatDate, formatTime } from '../patient-links/types';
 import PatientFormDrawer from './PatientFormDrawer';
 import PatientAppointmentsTab from './PatientAppointmentsTab';
 import { auditActionLabels, genderLabels, type PatientAuditEntry, type PatientChange, type PatientDetail } from './types';
+import DossierList from '../treatment/DossierList';
+import '../treatment/treatment.css';
 
 const unknown = <Typography.Text type="secondary">Chưa rõ</Typography.Text>;
 const empty = <Typography.Text type="secondary">—</Typography.Text>;
@@ -123,7 +125,7 @@ export default function PatientProfilePage() {
             {' '}<Typography.Text type="secondary">Liên kết chỉ được xác minh hoặc thu hồi tại màn Xác minh liên kết hồ sơ (S08).</Typography.Text></Typography.Paragraph>
           <Typography.Paragraph type="secondary">Tạo lúc {formatTime(patient.createdAt)} · Cập nhật lúc {formatTime(patient.updatedAt)} · Phiên bản {patient.version}</Typography.Paragraph>
         </> },
-        { key: 'treatment', label: 'Điều trị & Thanh toán', children: <Pending feature="hồ sơ điều trị và thanh toán (S43)" /> },
+        { key: 'treatment', label: 'Điều trị & Thanh toán', children: <DossierList patientId={patient.id} /> },
         { key: 'files', label: 'Hình ảnh & Tệp', children: <Pending feature="hình ảnh và tài liệu (S20)" /> },
         { key: 'appointments', label: 'Lịch hẹn', children: <PatientAppointmentsTab key={patient.id} patientId={patient.id} active={tab === 'appointments'} revision={revision} /> },
         { key: 'prescriptions', label: 'Đơn thuốc', children: <Pending feature="đơn thuốc (S23)" /> },

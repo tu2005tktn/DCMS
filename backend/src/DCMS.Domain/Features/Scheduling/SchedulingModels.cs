@@ -34,6 +34,8 @@ public sealed class SchedulingService
     public string Name { get; set; } = "";
     public int PublicDurationMinutes { get; set; } = 30;
     public bool Active { get; set; } = true;
+    public long? ReferenceUnitPriceVnd { get; set; }
+    public int PriceVersion { get; set; } = 1;
 }
 public sealed class WorkingWeek
 {

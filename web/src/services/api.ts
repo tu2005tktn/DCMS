@@ -12,6 +12,8 @@
  * KHÔNG log body request/response vì có thể chứa token.
  */
 
+import { clinicalPreviewRequest } from '../features/treatment/clinicalPreview';
+
 export type SystemMessage = { code: string; message: string; field?: string };
 
 export class ApiError extends Error {
@@ -54,6 +56,8 @@ export const setAccessToken = (token: string | null) => {
 export const onSessionLost = (handler: typeof sessionLost) => { sessionLost = handler; };
 
 export async function api<T>(path: string, init: RequestInit = {}, authenticated = true): Promise<T> {
+  if (import.meta.env.DEV && globalThis.location?.pathname.startsWith('/__preview/clinical'))
+    return clinicalPreviewRequest<T>(path, init);
   const headers = new Headers(init.headers);
   if (init.body) headers.set('Content-Type', 'application/json');
   if (authenticated && accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
