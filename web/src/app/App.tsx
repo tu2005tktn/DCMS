@@ -15,6 +15,9 @@ import AppointmentCalendarPage from '../features/appointments/AppointmentCalenda
 import AppointmentDetailPage from '../features/appointments/AppointmentDetailPage';
 import { roleLabels } from '../features/accounts/types';
 import HealthStatus from '../features/HealthStatus';
+import ReceptionPage from '../features/reception/ReceptionPage';
+import CheckInPage from '../features/reception/CheckInPage';
+import VisitPage from '../features/reception/VisitPage';
 import { AccessPage, CustomerGuard, CustomerHomePage, CustomerRegisterPage, CustomerShell, CustomerSignInPage } from '../features/customer-auth/CustomerPages';
 import { useCustomerAuth } from '../features/customer-auth/CustomerAuthContext';
 import CustomerBookingPage from '../features/customer-booking/CustomerBookingPage';
@@ -71,6 +74,9 @@ export default function App() {
       <Route path="treatment-templates" element={<Protected><TemplatePage /></Protected>} />
       <Route path="commercial/treatment" element={<Protected><CommercialTreatmentPage /></Protected>} />
       <Route path="appointments" element={<Protected><AppointmentCalendarPage /></Protected>} />
+      <Route path="reception" element={<Protected permission="reception.read"><ReceptionPage /></Protected>} />
+      <Route path="reception/appointments/:appointmentId" element={<Protected permission="reception.read"><CheckInPage /></Protected>} />
+      <Route path="visits/:visitId" element={<Protected permission="reception.read"><VisitPage /></Protected>} />
       <Route path="appointments/:id" element={<Protected><AppointmentDetailPage /></Protected>} />
       <Route path="link-verification" element={<Protected permission="patient-links.verify"><LinkVerificationPage /></Protected>} />
       <Route path="support-inbox" element={<Protected permission="appointments.support.handle"><SupportInboxPage /></Protected>} />
@@ -116,6 +122,7 @@ function Workspace() {
       ...(auth.user?.effectiveRoles.some(r => ['ClinicAssistant', 'Dentist', 'ClinicOwner'].includes(r)) ? [{ key: '/appointments', label: <Link to="/appointments">Lịch hẹn</Link> }] : []),
       ...(auth.user?.permissions.includes('appointments.support.handle') ? [{ key: '/support-inbox', label: <Link to="/support-inbox">Hộp thư hỗ trợ</Link> }] : []),
       { key: '/', label: <Link to="/">Tài khoản của tôi</Link> },
+      ...(auth.user?.permissions.includes('reception.read') ? [{ key: '/reception', label: <Link to="/reception">Tiếp nhận và hàng chờ</Link> }] : []),
       ...(auth.user?.permissions.includes('accounts.manage') ? [{ key: '/accounts', label: <Link to="/accounts">Quản lý tài khoản</Link> }] : []),
       ...(auth.user?.permissions.includes('patients.read') ? [{ key: '/patients', label: <Link to="/patients">Bệnh nhân</Link> }] : []),
       ...(auth.user?.effectiveRoles.includes('Dentist') ? [{ key: '/treatment-templates', label: <Link to="/treatment-templates">Mẫu điều trị</Link> }] : []),

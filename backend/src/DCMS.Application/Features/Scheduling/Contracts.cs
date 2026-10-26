@@ -54,4 +54,6 @@ public interface IAvailabilityService
     Task<AvailabilityResult> QueryForReservationAsync(AvailabilityQuery query, Guid reservationId, string? attendeeKey, CancellationToken ct);
     // TV2: caller MUST begin a transaction on the same scoped DbContext and persist reservations before commit.
     Task<AvailabilitySlot> CheckInTransactionAsync(ResourceCheck request, CancellationToken ct);
+    // Reception rechecks the existing reservation without replacing or releasing it.
+    Task ValidateReceptionAsync(Guid reservationId, int patientId, CancellationToken ct);
 }

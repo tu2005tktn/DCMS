@@ -42,7 +42,7 @@ Trong mỗi feature, dùng `screens` cho màn hình, `components` cho UI riêng,
 
 ## Quy trình cho team
 
-1. Đọc [đặc tả màn hình](../docs/specs/DCMS_Screen_Specifications_English%20%281%29.docx) và [phạm vi bộ khung](../docs/specs/MOBILE-SCAFFOLD.md).
+1. Đọc [đặc tả màn hình](../docs/specs/DCMS_Screen_Specifications_v2.4.docx) và [phạm vi bộ khung](../docs/specs/MOBILE-SCAFFOLD.md).
 2. Tạo branch riêng cho task, ví dụ `mobile/s01-sign-in`. Cập nhật tài liệu trong `docs/` trước khi triển khai theo `AGENTS.md`.
 3. Viết code trong feature phụ trách; thống nhất thay đổi shared components, session và API với team.
 4. Chạy các lệnh kiểm tra ở trên, kiểm tra trên thiết bị khi có UI/logic, rồi tạo pull request ghi rõ phần đã làm và phần chưa làm.

@@ -76,7 +76,9 @@ Phần dưới được giữ để truy vết thiết kế ban đầu. Khi nộ
 
 # Điều trị nhiều buổi và đặt lịch buổi tiếp theo trong DCMS
 
-Ngày quyết định: 16/10/2026. Người dùng đã chọn áp dụng hướng phân tích vào **đặc tả và tài liệu trước**. Tài liệu này làm rõ UC-03/04/06/07/10/13/14/17/19/20/24/25/34/39/40/47/48/50/51/53, các màn hình liên quan và GBR-129–136 trong [bộ đặc tả v2](odental-v2/README.vi.md). Đây là hợp đồng để triển khai, không phải báo cáo chức năng đã chạy.
+> Cập nhật nguồn 25/10/2026: [bộ đặc tả v2.4](README.md) là nguồn hiện hành. Nội dung và bằng chứng dưới đây giữ mốc triển khai ban đầu; chưa được nghiệm thu lại theo v2.4.
+
+Ngày quyết định: 16/10/2026. Người dùng đã chọn áp dụng hướng phân tích vào **đặc tả và tài liệu trước**. Tài liệu này làm rõ UC-03/04/06/07/10/13/14/17/19/20/24/25/34/39/40/47/48/50/51/53, các màn hình liên quan và GBR-129–136 trong [bộ đặc tả v2](README.md). Đây là hợp đồng để triển khai, không phải báo cáo chức năng đã chạy.
 
 DCMS quản lý các bước điều trị xuyên nhiều lượt khám bằng kế hoạch có phiên bản, điều kiện sẵn sàng và chỉ định buổi tiếp theo. Nha sĩ quyết định nội dung chuyên môn cho từng bệnh nhân. Hệ thống hỗ trợ ghi nhận, kiểm tra và điều phối; mẫu dùng chung không tự quyết định điều trị hay tự xác nhận chuỗi lịch hẹn.
 
@@ -217,7 +219,7 @@ Tất cả màn hình có tải/rỗng/lỗi/quyền/xung đột rõ ràng. Lỗ
 
 ## 10 Hợp đồng API và dữ liệu
 
-Các đường dẫn là **hợp đồng dự kiến**, chưa khẳng định đã triển khai. Hợp đồng đầy đủ đồng bộ trong [nguồn UC v2](odental-v2/USE-CASES-RULES-MESSAGES.md).
+Các đường dẫn là **hợp đồng dự kiến** tại thời điểm viết, chưa khẳng định đã triển khai. Đối chiếu lại với [nguồn UC v2.4](DCMS_Use_Cases_Business_Rules_Messages_v2.4.docx) trước khi triển khai; việc đổi liên kết nguồn không xác nhận các API dự kiến dưới đây đã đồng bộ v2.4.
 
 | Thao tác | Hợp đồng chính |
 | --- | --- |

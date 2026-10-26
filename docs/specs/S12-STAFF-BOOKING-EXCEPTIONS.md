@@ -1,7 +1,9 @@
 # S12 — Staff Booking Exceptions and Resolution
 
-Nguồn chuẩn: `DCMS_Screen_Specifications_v2.0.docx` và
-`DCMS_Use_Cases_Business_Rules_Messages_v2.0.docx`, bản ngày 15/10/2026.
+> Cập nhật nguồn 25/10/2026: [bộ đặc tả v2.4](README.md) là nguồn hiện hành. Nội dung và bằng chứng dưới đây giữ mốc triển khai ban đầu; chưa được nghiệm thu lại theo v2.4.
+
+Nguồn hiện hành: [Screen Specifications v2.4](DCMS_Screen_Specifications_v2.4.docx) và
+[Use Cases / Business Rules / Messages v2.4](DCMS_Use_Cases_Business_Rules_Messages_v2.4.docx), ngày 25/10/2026. Hợp đồng bên dưới được viết theo v2.0 ngày 15/10/2026.
 Tài liệu này chốt phạm vi TV5 cho S12 và hợp đồng tích hợp với API booking/change
 do TV4 sở hữu.
 
