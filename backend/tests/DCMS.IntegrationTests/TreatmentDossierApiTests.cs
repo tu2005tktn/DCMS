@@ -55,6 +55,90 @@ public sealed class TreatmentDossierApiTests(ApiFixture fixture) : IClassFixture
     }
 
     [Fact]
+    public async Task EmptyDossierCanBeDeletedButClinicalPlanCannot()
+    {
+        var setup = await Prepare();
+        using var dentist = await Login("dentist.demo");
+        var createdResponse = await dentist.PostAsJsonAsync($"/api/patients/{setup.PatientId}/dossiers",
+            new CreateDossierRequest(setup.BranchId, setup.DentistId, "SYNTHETIC delete", null,
+                null, Guid.NewGuid()));
+        Assert.Equal(HttpStatusCode.Created, createdResponse.StatusCode);
+        var created = (await createdResponse.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
+        var url = $"/api/dossiers/{created.Id}";
+        var key = Guid.NewGuid();
+        async Task<HttpResponseMessage> Delete(DeleteDossierRequest request)
+        {
+            using var message = new HttpRequestMessage(HttpMethod.Delete, url)
+                { Content = JsonContent.Create(request) };
+            return await dentist.SendAsync(message);
+        }
+        var request = new DeleteDossierRequest(created.Version, key);
+        var deletedResponse = await Delete(request);
+        Assert.Equal(HttpStatusCode.OK, deletedResponse.StatusCode);
+        Assert.Equal("Deleted", (await deletedResponse.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier.State);
+        Assert.Equal(HttpStatusCode.OK, (await Delete(request)).StatusCode);
+        await AssertMessage(await Delete(new DeleteDossierRequest(created.Version + 1, key)),
+            HttpStatusCode.Conflict, "MSG111");
+        await AssertMessage(await dentist.GetAsync(url), HttpStatusCode.NotFound, "MSG113");
+        var page = await dentist.GetFromJsonAsync<DossierPage>(
+            $"/api/patients/{setup.PatientId}/dossiers?page=1&pageSize=20");
+        Assert.DoesNotContain(page!.Items, x => x.Id == created.Id);
+
+        var secondResponse = await dentist.PostAsJsonAsync($"/api/patients/{setup.PatientId}/dossiers",
+            new CreateDossierRequest(setup.BranchId, setup.DentistId, "SYNTHETIC plan", null,
+                null, Guid.NewGuid()));
+        var second = (await secondResponse.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
+        var draftResponse = await dentist.PostAsJsonAsync($"/api/dossiers/{second.Id}/plan/draft",
+            new SavePlanDraftRequest(second.Version, "SYNTHETIC goal", [
+                new TreatmentItemInput(null, null, setup.ServiceId, "25", "răng", 1, 1,
+                    30, null, null, 100000, "Proposed", null, null, null, null)], [], Guid.NewGuid()));
+        Assert.Equal(HttpStatusCode.OK, draftResponse.StatusCode);
+        var draft = (await draftResponse.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
+        using var blocked = new HttpRequestMessage(HttpMethod.Delete, $"/api/dossiers/{second.Id}")
+            { Content = JsonContent.Create(new DeleteDossierRequest(draft.Version, Guid.NewGuid())) };
+        await AssertMessage(await dentist.SendAsync(blocked), HttpStatusCode.Conflict, "MSG233");
+    }
+
+    [Fact]
+    public async Task DisplayFlagIsIndependentFromClinicalCompletion()
+    {
+        var setup = await Prepare();
+        using var dentist = await Login("dentist.demo");
+        var createdResponse = await dentist.PostAsJsonAsync($"/api/patients/{setup.PatientId}/dossiers",
+            new CreateDossierRequest(setup.BranchId, setup.DentistId, "SYNTHETIC status", null,
+                null, Guid.NewGuid()));
+        var created = (await createdResponse.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
+        var draftResponse = await dentist.PostAsJsonAsync($"/api/dossiers/{created.Id}/plan/draft",
+            new SavePlanDraftRequest(created.Version, "SYNTHETIC plan", [
+                new TreatmentItemInput(null, null, setup.ServiceId, "25", "răng", 1, 1,
+                    30, null, null, 100000, "Agreed", "Đã tư vấn", "Bệnh nhân", null, null)], [], Guid.NewGuid()));
+        var draft = (await draftResponse.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
+        var commitResponse = await dentist.PostAsJsonAsync($"/api/dossiers/{created.Id}/plan/commit",
+            new CommitPlanRequest(draft.Version, Guid.NewGuid()));
+        var committed = (await commitResponse.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
+        var flagKey = Guid.NewGuid();
+        var flagRequest = new SetDossierDisplayStatusRequest(committed.Version, true, flagKey);
+        var flagResponse = await dentist.PostAsJsonAsync($"/api/dossiers/{created.Id}/display-status", flagRequest);
+        Assert.Equal(HttpStatusCode.OK, flagResponse.StatusCode);
+        var flagged = (await flagResponse.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
+        Assert.True(flagged.DisplayCompleted);
+        Assert.Equal("Open", flagged.State);
+        Assert.Equal("NotStarted", Assert.Single(flagged.Items).Progress);
+        var replayResponse = await dentist.PostAsJsonAsync($"/api/dossiers/{created.Id}/display-status", flagRequest);
+        Assert.Equal(HttpStatusCode.OK, replayResponse.StatusCode);
+        Assert.Equal(flagged.Version, (await replayResponse.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier.Version);
+        await AssertMessage(await dentist.PostAsJsonAsync($"/api/dossiers/{created.Id}/display-status",
+            flagRequest with { Completed = false }), HttpStatusCode.Conflict, "MSG111");
+        await AssertMessage(await dentist.PostAsJsonAsync($"/api/dossiers/{created.Id}/close",
+            new CloseDossierRequest(flagged.Version, "CompletedAsAgreed", null, [], Guid.NewGuid())),
+            HttpStatusCode.Conflict, "MSG243");
+        var unflagResponse = await dentist.PostAsJsonAsync($"/api/dossiers/{created.Id}/display-status",
+            new SetDossierDisplayStatusRequest(flagged.Version, false, Guid.NewGuid()));
+        Assert.Equal(HttpStatusCode.OK, unflagResponse.StatusCode);
+        Assert.False((await unflagResponse.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier.DisplayCompleted);
+    }
+
+    [Fact]
     public async Task WarrantyIsItemSpecificAndPrognosisDoesNotExtendCoverage()
     {
         var setup = await Prepare();

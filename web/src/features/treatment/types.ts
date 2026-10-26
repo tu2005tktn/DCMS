@@ -46,9 +46,10 @@ export type TreatmentDossier = {
     sourceVersion: string | null };
   depositExceptionReason?: string | null; depositExceptionBy?: number | null;
   depositExceptionAt?: string | null;
+  displayCompleted: boolean;
 };
 export type DossierListItem = Pick<TreatmentDossier, 'id' | 'code' | 'patientId' | 'branchId' |
-  'dentistId' | 'diagnosis' | 'state' | 'closureOutcome' | 'version' | 'planVersion' | 'updatedAt'>;
+  'dentistId' | 'diagnosis' | 'state' | 'closureOutcome' | 'version' | 'planVersion' | 'updatedAt' | 'displayCompleted'>;
 export type DossierPage = { items: DossierListItem[]; total: number; page: number; pageSize: number };
 export type TreatmentChange = { dossier: TreatmentDossier; notification: SystemMessage };
 export type AppointmentOptions = { branches: { id: number; name: string }[];

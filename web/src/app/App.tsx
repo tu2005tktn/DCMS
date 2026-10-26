@@ -17,7 +17,6 @@ import { roleLabels } from '../features/accounts/types';
 import HealthStatus from '../features/HealthStatus';
 import ReceptionPage from '../features/reception/ReceptionPage';
 import CheckInPage from '../features/reception/CheckInPage';
-import VisitPage from '../features/examinations/ExaminationPage';
 import PatientDocumentsPage from '../features/clinical-documents/PatientDocumentsPage';
 import VisitPage from '../features/reception/VisitPage';
 import { AccessPage, CustomerGuard, CustomerHomePage, CustomerRegisterPage, CustomerShell, CustomerSignInPage } from '../features/customer-auth/CustomerPages';

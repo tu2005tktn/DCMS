@@ -58,7 +58,7 @@ const dossier: TreatmentDossier = {
   id: clinicalPreview.dossierId, code: 'HS-MOCK-001', patientId: clinicalPreview.patientId,
   branchId: clinicalPreview.branchId, dentistId: 9, startedOn: '2026-10-25',
   diagnosis: 'Tình huống thử: trám răng 25 và chữa tủy răng 46', note: null,
-  state: 'Open', closureOutcome: null, closureReason: null, version: 1,
+  state: 'Open', displayCompleted: false, closureOutcome: null, closureReason: null, version: 1,
   planId: '77777777-7777-4777-8777-777777777777', planVersion: 1,
   planState: 'Committed', goals: 'Theo dõi tiến độ từng hạng mục',
   items: [item(clinicalPreview.fillingItemId, 3, 'Trám răng', '25', 300000, 1),

@@ -1,4 +1,5 @@
 using DCMS.Application.Common;
+using System.Text.Json;
 
 namespace DCMS.Application.Features.Treatment;
 
@@ -24,6 +25,13 @@ public sealed record ItemDisposition(Guid ItemId, string Outcome, string Reason)
 public sealed record CloseDossierRequest(int ExpectedVersion, string Outcome, string? Reason,
     ItemDisposition[] Dispositions, Guid RequestKey);
 public sealed record ReopenDossierRequest(int ExpectedVersion, string? Reason, Guid RequestKey);
+public sealed record DeleteDossierRequest(int ExpectedVersion, Guid RequestKey);
+public sealed record SetDossierDisplayStatusRequest(int ExpectedVersion, bool Completed, Guid RequestKey);
+public sealed record UpdateDossierNoteRequest(int ExpectedVersion, string? Note, Guid RequestKey);
+public sealed record SaveSheetDraftRequest(string Kind, Guid? VisitId, JsonElement Row,
+    int ExpectedVersion, Guid RequestKey);
+public sealed record SheetDraftDto(Guid Id, string Kind, Guid? VisitId, JsonElement Row,
+    int Version, DateTimeOffset UpdatedAt);
 public sealed record ConfirmWarrantyRequest(int ExpectedVersion, string? Policy, string? PolicyVersion,
     string? Scope, DateOnly? EndsOn, Guid RequestKey, string? Component = null,
     string? Exclusions = null, DateOnly? ActivationOn = null, string? Explanation = null,
@@ -73,9 +81,11 @@ public sealed record TreatmentDossierDto(Guid Id, string Code, int PatientId, in
     IReadOnlyList<TreatmentEventDto> Timeline, bool FinancialSummaryAvailable,
     DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt,
     TreatmentFinancialSummary? FinancialSummary = null, string? DepositExceptionReason = null,
-    int? DepositExceptionBy = null, DateTimeOffset? DepositExceptionAt = null);
+    int? DepositExceptionBy = null, DateTimeOffset? DepositExceptionAt = null,
+    bool DisplayCompleted = false);
 public sealed record DossierListItem(Guid Id, string Code, int PatientId, int BranchId, int DentistId,
-    string Diagnosis, string State, string? ClosureOutcome, int Version, int PlanVersion, DateTimeOffset UpdatedAt);
+    string Diagnosis, string State, string? ClosureOutcome, int Version, int PlanVersion, DateTimeOffset UpdatedAt,
+    bool DisplayCompleted);
 public sealed record DossierPage(IReadOnlyList<DossierListItem> Items, int Total, int Page, int PageSize);
 public sealed record TreatmentChange(TreatmentDossierDto Dossier, SystemMessage Notification);
 public sealed record TreatmentHistoryItem(int Version, DateTimeOffset CommittedAt, int ActorId, string SnapshotJson);
@@ -92,6 +102,15 @@ public interface ITreatmentDossierService
     Task<IReadOnlyList<TreatmentHistoryItem>> HistoryAsync(int actorId, Guid dossierId, CancellationToken ct);
     Task<TreatmentChange> CloseAsync(int actorId, Guid dossierId, CloseDossierRequest request, CancellationToken ct);
     Task<TreatmentChange> ReopenAsync(int actorId, Guid dossierId, ReopenDossierRequest request, CancellationToken ct);
+    Task<TreatmentChange> DeleteAsync(int actorId, Guid dossierId, DeleteDossierRequest request, CancellationToken ct);
+    Task<TreatmentChange> SetDisplayStatusAsync(int actorId, Guid dossierId,
+        SetDossierDisplayStatusRequest request, CancellationToken ct);
+    Task<TreatmentChange> UpdateNoteAsync(int actorId, Guid dossierId,
+        UpdateDossierNoteRequest request, CancellationToken ct);
+    Task<IReadOnlyList<SheetDraftDto>> SheetDraftsAsync(int actorId, Guid dossierId, CancellationToken ct);
+    Task<SheetDraftDto> SaveSheetDraftAsync(int actorId, Guid dossierId, Guid rowId,
+        SaveSheetDraftRequest request, CancellationToken ct);
+    Task DeleteSheetDraftAsync(int actorId, Guid dossierId, Guid rowId, int expectedVersion, CancellationToken ct);
     Task<TreatmentChange> ConfirmWarrantyAsync(int actorId, Guid dossierId, Guid itemId, ConfirmWarrantyRequest request, CancellationToken ct);
     Task<TreatmentChange> DecideDiscountAsync(int actorId, Guid dossierId, Guid itemId, DecideDiscountRequest request, CancellationToken ct);
     Task<TreatmentChange> SetDepositExceptionAsync(int actorId, Guid dossierId, DepositExceptionRequest request, CancellationToken ct);

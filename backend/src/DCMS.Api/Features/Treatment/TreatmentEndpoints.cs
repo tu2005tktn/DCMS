@@ -1,6 +1,7 @@
 using DCMS.Api.Features.Authentication;
 using DCMS.Application.Features.Treatment;
 using DCMS.Api.Features.PatientLinks;
+using Microsoft.AspNetCore.Mvc;
 
 namespace DCMS.Api.Features.Treatment;
 
@@ -35,6 +36,31 @@ public static class TreatmentEndpoints
             .RequireAuthorization(DentistPolicy).WithTags("UC-13/39 S21/S43 Treatment");
         dossier.MapGet("/", async (HttpContext context, Guid dossierId, ITreatmentDossierService service, CancellationToken ct) =>
             Results.Ok(await service.GetAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, ct)));
+        dossier.MapDelete("/", async (HttpContext context, Guid dossierId, [FromBody] DeleteDossierRequest request,
+            ITreatmentDossierService service, CancellationToken ct) => Results.Ok(await service.DeleteAsync(
+                AuthenticationEndpoints.AccountId(context.User), dossierId, request, ct)));
+        dossier.MapPost("/display-status", async (HttpContext context, Guid dossierId,
+            SetDossierDisplayStatusRequest request, ITreatmentDossierService service, CancellationToken ct) =>
+            Results.Ok(await service.SetDisplayStatusAsync(AuthenticationEndpoints.AccountId(context.User),
+                dossierId, request, ct)));
+        dossier.MapPatch("/note", async (HttpContext context, Guid dossierId,
+            UpdateDossierNoteRequest request, ITreatmentDossierService service, CancellationToken ct) =>
+            Results.Ok(await service.UpdateNoteAsync(AuthenticationEndpoints.AccountId(context.User),
+                dossierId, request, ct)));
+        dossier.MapGet("/sheet-drafts", async (HttpContext context, Guid dossierId,
+            ITreatmentDossierService service, CancellationToken ct) => Results.Ok(await service.SheetDraftsAsync(
+                AuthenticationEndpoints.AccountId(context.User), dossierId, ct)));
+        dossier.MapPut("/sheet-drafts/{rowId:guid}", async (HttpContext context, Guid dossierId, Guid rowId,
+            SaveSheetDraftRequest request, ITreatmentDossierService service, CancellationToken ct) =>
+            Results.Ok(await service.SaveSheetDraftAsync(AuthenticationEndpoints.AccountId(context.User),
+                dossierId, rowId, request, ct)));
+        dossier.MapDelete("/sheet-drafts/{rowId:guid}", async (HttpContext context, Guid dossierId, Guid rowId,
+            int expectedVersion, ITreatmentDossierService service, CancellationToken ct) =>
+        {
+            await service.DeleteSheetDraftAsync(AuthenticationEndpoints.AccountId(context.User),
+                dossierId, rowId, expectedVersion, ct);
+            return Results.NoContent();
+        });
         dossier.MapPost("/plan/draft", async (HttpContext context, Guid dossierId, SavePlanDraftRequest request,
             ITreatmentDossierService service, CancellationToken ct) =>
             Results.Ok(await service.SaveDraftAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, request, ct)));

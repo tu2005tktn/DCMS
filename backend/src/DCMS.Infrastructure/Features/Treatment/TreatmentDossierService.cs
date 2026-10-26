@@ -92,6 +92,7 @@ public sealed class TreatmentDossierService(DcmsDbContext db, UserManager<Applic
         var dossier = await db.TreatmentDossiers.Include(x => x.Items).SingleOrDefaultAsync(x => x.Id == id, ct)
             ?? throw Error("MSG113", 404);
         await DentistAsync(actorId, dossier.BranchId, ct);
+        if (dossier.State == "Deleted") throw Error("MSG113", 404);
         return dossier;
     }
 
@@ -140,7 +141,7 @@ public sealed class TreatmentDossierService(DcmsDbContext db, UserManager<Applic
             events.Select(x => new TreatmentEventDto(x.Id, x.Kind, x.DossierVersion, x.ActorId,
                 x.OccurredAt, x.PayloadJson)).ToArray(), finance.Available, dossier.CreatedAt, dossier.UpdatedAt,
             finance, dossier.DepositExceptionReason, dossier.DepositExceptionBy,
-            dossier.DepositExceptionAt);
+            dossier.DepositExceptionAt, dossier.DisplayCompleted);
     }
 
     private static TreatmentItemDto ItemDto(TreatmentItem x) => new(x.Id, x.SourceDiagnosisId, x.ServiceId,
@@ -176,18 +177,193 @@ public sealed class TreatmentDossierService(DcmsDbContext db, UserManager<Applic
         }
         var allowed = db.Set<SchedulingMember>().AsNoTracking().Where(x =>
             x.EmployeeId == employee.Id && x.Active && x.CanDentist).Select(x => x.BranchId);
-        var query = db.TreatmentDossiers.AsNoTracking().Where(x => x.PatientId == patientId && allowed.Contains(x.BranchId));
+        var query = db.TreatmentDossiers.AsNoTracking().Where(x => x.PatientId == patientId
+            && x.State != "Deleted" && allowed.Contains(x.BranchId));
         if (branchId.HasValue) query = query.Where(x => x.BranchId == branchId.Value);
         var total = await query.CountAsync(ct);
         var rows = await query.OrderByDescending(x => x.UpdatedAt).ThenBy(x => x.Id)
             .Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(ct);
         return new(rows.Select(x => new DossierListItem(x.Id, x.Code, x.PatientId, x.BranchId,
-            x.DentistId, x.Diagnosis, x.State, x.ClosureOutcome, x.Version, x.PlanVersion, x.UpdatedAt))
+            x.DentistId, x.Diagnosis, x.State, x.ClosureOutcome, x.Version, x.PlanVersion, x.UpdatedAt,
+            x.DisplayCompleted))
             .ToArray(), total, page, pageSize);
     }
 
     public async Task<TreatmentDossierDto> GetAsync(int actorId, Guid dossierId, CancellationToken ct) =>
         await DetailAsync(await DossierAsync(actorId, dossierId, ct), ct);
+
+    public async Task<TreatmentChange> SetDisplayStatusAsync(int actorId, Guid dossierId,
+        SetDossierDisplayStatusRequest request, CancellationToken ct)
+    {
+        var replay = await ReplayAsync(actorId, request.RequestKey, "DisplayStatus",
+            new { dossierId, request }, ct);
+        if (replay != null) return replay;
+        await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+        var dossier = await DossierAsync(actorId, dossierId, ct);
+        if (dossier.Version != request.ExpectedVersion) throw Error("MSG111", 409);
+        if (dossier.DisplayCompleted != request.Completed)
+        {
+            dossier.DisplayCompleted = request.Completed;
+            dossier.Version++;
+            dossier.UpdatedAt = clock.GetUtcNow();
+            Event(dossier, actorId, "DossierDisplayStatusChanged", new { request.Completed });
+            await db.SaveChangesAsync(ct);
+        }
+        var result = new TreatmentChange(await DetailAsync(dossier, ct),
+            SystemMessages.Get("MSG222", "nhãn phiếu điều trị", value: dossier.Code));
+        StoreReceipt(actorId, request.RequestKey, "DisplayStatus", new { dossierId, request }, result);
+        await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
+        return result;
+    }
+
+    public async Task<TreatmentChange> UpdateNoteAsync(int actorId, Guid dossierId,
+        UpdateDossierNoteRequest request, CancellationToken ct)
+    {
+        var note = Clean(request.Note);
+        if (note?.Length > 4000) throw Error("MSG04");
+        var fingerprint = new { dossierId, request };
+        var replay = await ReplayAsync(actorId, request.RequestKey, "DossierNote", fingerprint, ct);
+        if (replay != null) return replay;
+        await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+        var dossier = await DossierAsync(actorId, dossierId, ct);
+        if (dossier.Version != request.ExpectedVersion) throw Error("MSG111", 409);
+        if (dossier.Note != note)
+        {
+            dossier.Note = note;
+            dossier.Version++;
+            dossier.UpdatedAt = clock.GetUtcNow();
+            Event(dossier, actorId, "DossierNoteUpdated", new { HasNote = note != null });
+            await db.SaveChangesAsync(ct);
+        }
+        var result = new TreatmentChange(await DetailAsync(dossier, ct),
+            SystemMessages.Get("MSG222", "ghi chú phiếu điều trị", value: dossier.Code));
+        StoreReceipt(actorId, request.RequestKey, "DossierNote", fingerprint, result);
+        await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
+        return result;
+    }
+
+    private static SheetDraftDto SheetDraftDto(TreatmentSheetDraft row) => new(row.Id, row.Kind,
+        row.VisitId, JsonSerializer.Deserialize<JsonElement>(row.PayloadJson), row.Version, row.UpdatedAt);
+
+    public async Task<IReadOnlyList<SheetDraftDto>> SheetDraftsAsync(int actorId, Guid dossierId,
+        CancellationToken ct)
+    {
+        await DossierAsync(actorId, dossierId, ct);
+        var rows = await db.TreatmentSheetDrafts.AsNoTracking().Where(x => x.DossierId == dossierId
+            && x.ActorId == actorId)
+            .OrderBy(x => x.UpdatedAt).ToListAsync(ct);
+        return rows.Select(SheetDraftDto).ToArray();
+    }
+
+    public async Task<SheetDraftDto> SaveSheetDraftAsync(int actorId, Guid dossierId, Guid rowId,
+        SaveSheetDraftRequest request, CancellationToken ct)
+    {
+        if (rowId == Guid.Empty || request.RequestKey == Guid.Empty || request.Kind is not ("Plan" or "Actual")
+            || request.Row.ValueKind != JsonValueKind.Object) throw Error("MSG04");
+        var row = request.Row;
+        bool Number(string name, decimal min) => row.TryGetProperty(name, out var value)
+            && value.ValueKind == JsonValueKind.Number && value.TryGetDecimal(out var number) && number >= min;
+        bool Text(string name, int max) => row.TryGetProperty(name, out var value)
+            && value.ValueKind == JsonValueKind.String && value.GetString() is { Length: > 0 } text
+            && text.Length <= max;
+        if (!Text("date", 10) || !DateOnly.TryParse(row.GetProperty("date").GetString(), out _)
+            || !Number("serviceId", 1) || !Number("dentistId", 1) || !Number("quantity", 1)
+            || !Number("costVnd", 0) || !row.TryGetProperty("regions", out var regions)
+            || regions.ValueKind != JsonValueKind.Array || regions.GetArrayLength() is < 1 or > 32
+            || regions.EnumerateArray().Any(x => x.ValueKind != JsonValueKind.String
+                || !int.TryParse(x.GetString(), out var tooth) || tooth is < 1 or > 99))
+            throw Error("MSG04");
+        if (request.Kind == "Actual" && (!request.VisitId.HasValue || !Text("note", 1000)))
+            throw Error("MSG04");
+        if (request.Kind == "Plan" && request.VisitId.HasValue) throw Error("MSG04");
+        var dossier = await DossierAsync(actorId, dossierId, ct);
+        if (dossier.State != "Open") throw Error("MSG240", 409);
+        var serviceId = row.GetProperty("serviceId").GetInt32();
+        var dentistId = row.GetProperty("dentistId").GetInt32();
+        if (!await db.Set<SchedulingService>().AsNoTracking().AnyAsync(x => x.Id == serviceId
+            && x.BranchId == dossier.BranchId && x.Active, ct)
+            || !await db.Set<SchedulingMember>().AsNoTracking().AnyAsync(x => x.EmployeeId == dentistId
+                && x.BranchId == dossier.BranchId && x.Active && x.CanDentist, ct)) throw Error("MSG04");
+        if (request.VisitId.HasValue && !await db.Visits.AsNoTracking().AnyAsync(x =>
+            x.Id == request.VisitId.Value && x.PatientId == dossier.PatientId
+            && x.BranchId == dossier.BranchId, ct)) throw Error("MSG113", 404);
+        var fingerprint = Hash(new { dossierId, rowId, request });
+        var existing = await db.TreatmentSheetDrafts.SingleOrDefaultAsync(x => x.Id == rowId, ct);
+        if (existing is not null && existing.LastRequestKey == request.RequestKey)
+        {
+            if (existing.LastFingerprint != fingerprint) throw Error("MSG111", 409);
+            return SheetDraftDto(existing);
+        }
+        if (existing is null)
+        {
+            if (request.ExpectedVersion != 0) throw Error("MSG111", 409);
+            existing = new TreatmentSheetDraft { Id = rowId, DossierId = dossierId,
+                ActorId = actorId, Kind = request.Kind, VisitId = request.VisitId };
+            db.TreatmentSheetDrafts.Add(existing);
+        }
+        else
+        {
+            if (existing.DossierId != dossierId || existing.ActorId != actorId
+                || existing.Kind != request.Kind || existing.Version != request.ExpectedVersion)
+                throw Error("MSG111", 409);
+            existing.Version++;
+            existing.VisitId = request.VisitId;
+        }
+        existing.PayloadJson = row.GetRawText();
+        existing.LastRequestKey = request.RequestKey;
+        existing.LastFingerprint = fingerprint;
+        existing.UpdatedAt = clock.GetUtcNow();
+        await db.SaveChangesAsync(ct);
+        return SheetDraftDto(existing);
+    }
+
+    public async Task DeleteSheetDraftAsync(int actorId, Guid dossierId, Guid rowId,
+        int expectedVersion, CancellationToken ct)
+    {
+        await DossierAsync(actorId, dossierId, ct);
+        var row = await db.TreatmentSheetDrafts.SingleOrDefaultAsync(x => x.Id == rowId
+            && x.DossierId == dossierId, ct) ?? throw Error("MSG113", 404);
+        if (row.ActorId != actorId) throw Error("MSG06", 403);
+        if (row.Version != expectedVersion) throw Error("MSG111", 409);
+        db.TreatmentSheetDrafts.Remove(row);
+        await db.SaveChangesAsync(ct);
+    }
+
+    public async Task<TreatmentChange> DeleteAsync(int actorId, Guid dossierId, DeleteDossierRequest request,
+        CancellationToken ct)
+    {
+        if (request.RequestKey == Guid.Empty) throw Error("MSG04");
+        var fingerprint = new { dossierId, request };
+        var replay = await ReplayAsync(actorId, request.RequestKey, "Delete", fingerprint, ct);
+        if (replay != null) return replay;
+        await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+        var dossier = await DossierAsync(actorId, dossierId, ct);
+        if (dossier.Version != request.ExpectedVersion) throw Error("MSG111", 409);
+        if (dossier.State != "Open" || dossier.PlanState != "None" || dossier.PlanVersion != 0
+            || dossier.Items.Count != 0 || dossier.Goals != null || dossier.PaymentTermsJson != "[]"
+            || dossier.DepositExceptionReason != null
+            || await db.TreatmentEvents.AnyAsync(x => x.DossierId == dossierId && x.Kind != "DossierCreated", ct)
+            || await db.TreatmentSteps.AnyAsync(x => x.DossierId == dossierId, ct)
+            || await db.FollowUpInstructions.AnyAsync(x => x.DossierId == dossierId, ct)
+            || await db.ClinicalActivities.AnyAsync(x => x.DossierId == dossierId, ct)
+            || await db.TreatmentRevisionDrafts.AnyAsync(x => x.DossierId == dossierId, ct)
+            || await db.TreatmentSheetDrafts.AnyAsync(x => x.DossierId == dossierId, ct)
+            || await db.Set<DCMS.Domain.Features.Examinations.ClinicalDocument>()
+                .AnyAsync(x => x.DossierId == dossierId, ct)) throw Error("MSG233", 409);
+        dossier.State = "Deleted";
+        dossier.Version++;
+        dossier.UpdatedAt = clock.GetUtcNow();
+        Event(dossier, actorId, "DossierDeleted", new { dossier.Code });
+        await db.SaveChangesAsync(ct);
+        var result = new TreatmentChange(await DetailAsync(dossier, ct),
+            SystemMessages.Get("MSG222", "xóa phiếu điều trị", value: dossier.Code));
+        StoreReceipt(actorId, request.RequestKey, "Delete", fingerprint, result);
+        await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
+        return result;
+    }
 
     public async Task<TreatmentChange> CreateAsync(int actorId, int patientId, CreateDossierRequest request,
         CancellationToken ct)
@@ -675,7 +851,7 @@ public sealed class TreatmentDossierService(DcmsDbContext db, UserManager<Applic
         var patientIds = db.PatientAccountLinks.AsNoTracking().Where(x => x.AccountId == accountId
             && x.Status == PatientLinkStatus.Verified).Select(x => x.PatientId);
         var dossiers = await db.TreatmentDossiers.AsNoTracking().Include(x => x.Items)
-            .Where(x => patientIds.Contains(x.PatientId) && x.PlanState == "Committed")
+            .Where(x => patientIds.Contains(x.PatientId) && x.PlanState == "Committed" && x.State != "Deleted")
             .OrderByDescending(x => x.StartedOn).ToListAsync(ct);
         return dossiers.Select(x => new OwnTreatmentSummaryItem(x.Id, x.Code, x.State, x.StartedOn,
             x.Diagnosis, x.PlanVersion, x.Items.Where(item => item.Decision == "Agreed")

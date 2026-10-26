@@ -1,0 +1,203 @@
+/* The patient file is a focused clinical workspace. Keep the surrounding staff shell intact elsewhere. */
+body:has(.patient-treatment-shell) .workspace { background: #fff; }
+body:has(.patient-treatment-shell) .workspace-header,
+body:has(.patient-treatment-shell) .workspace > .ant-menu { display: none; }
+body:has(.patient-treatment-shell) .workspace-content { width: 100%; max-width: none; padding: 0; }
+
+.patient-treatment-shell {
+  --sheet-green: #28a745;
+  --sheet-blue: #1688d7;
+  --sheet-line: #e9e9e9;
+  min-width: 0;
+  min-height: 100vh;
+  background: #fff;
+  color: #16202d;
+  font-size: 13px;
+}
+.patient-treatment-shell :is(button, a):focus-visible { outline: 3px solid #1688d7; outline-offset: 2px; }
+.patient-treatment-shell .patient-treatment-tabs > .ant-tabs-nav {
+  min-height: 55px;
+  margin: 0;
+  padding: 0 12px 0 5px;
+  box-shadow: 0 1px 3px #00000012;
+  border-bottom: 1px solid #ededed;
+}
+.patient-treatment-shell .patient-treatment-tabs > .ant-tabs-nav::before { display: none; }
+.patient-treatment-shell .patient-treatment-tabs .ant-tabs-nav-wrap { justify-content: center; }
+.patient-treatment-shell .patient-treatment-tabs .ant-tabs-tab { min-height: 54px; margin: 0 14px; padding: 13px 0 7px; font-size: 15px; font-weight: 400; color: #9b9b9b; }
+.patient-treatment-shell .patient-treatment-tabs .ant-tabs-tab-active .ant-tabs-tab-btn { color: #262c31; font-weight: 400; }
+.patient-treatment-shell .patient-treatment-tabs .ant-tabs-ink-bar { height: 2px; background: var(--sheet-blue); }
+.patient-treatment-shell .patient-treatment-tabs .ant-tabs-content-holder { padding: 24px 30px 56px; }
+.patient-treatment-toolbar { display: flex; align-items: center; gap: 4px; white-space: nowrap; min-width: 290px; }
+.patient-treatment-toolbar .ant-btn { border: 0; box-shadow: none; width: 31px; height: 44px; font-size: 27px; color: #071322; padding: 0; }
+.patient-treatment-toolbar .ant-typography { margin: 0; font-size: 18px; font-weight: 400; }
+.patient-treatment-close { display: grid; place-items: center; width: 40px; height: 44px; font-size: 31px; font-weight: 200; color: var(--sheet-blue); text-decoration: none; }
+.patient-treatment-close:hover { color: #076cbe; }
+.patient-treatment-shell .patient-banner { margin-bottom: 16px; }
+.patient-treatment-shell .patient-basic-card { border: 1px solid var(--sheet-line); }
+.patient-audit-panel { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--sheet-line); }
+
+.patient-treatment-shell .treatment-list { gap: 14px; min-width: 0; }
+.treatment-sheets-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; padding: 0 8px; }
+.treatment-sheets-heading .ant-typography { margin: 0; }
+.treatment-sheets-heading h4.ant-typography { font-size: 12px; line-height: 1.3; font-weight: 700; }
+.treatment-sheets-heading p.ant-typography { color: #667085; margin-top: 3px; font-size: 13px; }
+.treatment-sheets-summary { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 5px 20px; padding-top: 2px; font-size: 12px; }
+.treatment-sheets-summary strong { color: #101828; }
+.treatment-sheets-summary span { color: #667085; }
+.treatment-list-cards { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; gap: 13px; }
+.treatment-sheet-card { min-width: 0; background: #fff; border: 1px solid #eee; box-shadow: 0 1px 6px #0000000c; }
+.treatment-sheet-card-top { position: relative; min-height: 61px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 20px; align-items: center; padding: 10px 13px; }
+.treatment-sheet-created { white-space: nowrap; font-size: 12px; }
+.treatment-sheet-created strong, .treatment-sheet-diagnosis strong { margin-right: 5px; }
+.treatment-sheet-card-actions { display: flex; align-items: center; gap: 5px; padding-top: 14px; padding-right: 22px; }
+.treatment-sheet-card-actions .ant-btn { min-width: 28px; height: 22px; padding: 0 5px; border-color: #e1e5e9; border-radius: 1px; line-height: 1; }
+.treatment-sheet-state { display: inline-flex; align-items: center; gap: 5px; min-height: 26px; padding: 2px 9px; border: 1px solid transparent; border-radius: 13px; font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer; }
+.treatment-sheet-state.is-pending { color: #8a4b04; background: #fff2d8; }
+.treatment-sheet-state.is-complete { color: #146c31; background: #e1f5e8; }
+.treatment-sheet-toggle { position: absolute; top: 0; right: 0; border: 0; background: #f9f9f9; width: 28px; height: 19px; font-size: 19px; font-weight: 600; line-height: 1; cursor: pointer; }
+.treatment-sheet-toggle:hover { background: #ecf5fc; }
+.treatment-sheet-body { min-width: 0; padding: 0 13px 4px; }
+.treatment-sheet-print-title { display: none; }
+.treatment-sheet-body section { margin: 6px 0 25px; }
+.treatment-sheet-band { min-height: 23px; padding: 3px 5px; background: #ececec; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.treatment-sheet-band h3 { margin: 0; font-size: 11px; font-weight: 700; }
+.treatment-sheet-band > div { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 14px; }
+.treatment-sheet-band :is(span, strong) { font-size: 11px; font-weight: 400; white-space: nowrap; }
+.treatment-sheet-band strong { font-weight: 600; }
+.treatment-sheet-scroll-hint { display: none; }
+.treatment-sheet-table-scroll { max-width: 100%; overflow-x: auto; }
+.treatment-sheet-table { width: 100%; min-width: 1050px; border-collapse: collapse; table-layout: fixed; font-size: 11px; }
+.treatment-sheet-table th { color: #0e1726; font-weight: 700; background: #fbfbfb; }
+.treatment-sheet-table th, .treatment-sheet-table td { border: 1px solid #f0f0f0; padding: 1px 4px; height: 23px; text-align: left; vertical-align: middle; }
+.treatment-sheet-table :is(th:nth-child(1), td:nth-child(1)) { width: 70px; }
+.treatment-sheet-table :is(th:nth-child(2), td:nth-child(2)) { width: 75px; }
+.treatment-sheet-table :is(th:nth-child(3), td:nth-child(3)) { width: 35px; text-align: center; }
+.treatment-sheet-table :is(th:last-child, td:last-child) { width: 31px; text-align: center; }
+.treatment-sheet-plan-table :is(th:nth-child(4), td:nth-child(4)),
+.treatment-sheet-plan-table :is(th:nth-child(5), td:nth-child(5)) { width: 35%; }
+.treatment-sheet-plan-table :is(th:nth-child(6), td:nth-child(6)) { width: 20%; }
+.treatment-sheet-plan-table :is(th:nth-child(7), td:nth-child(7)),
+.treatment-sheet-plan-table :is(th:nth-child(8), td:nth-child(8)) { width: 5%; }
+.treatment-sheet-actual-table :is(th:nth-child(4), td:nth-child(4)),
+.treatment-sheet-actual-table :is(th:nth-child(5), td:nth-child(5)) { width: 29%; }
+.treatment-sheet-actual-table :is(th:nth-child(6), td:nth-child(6)),
+.treatment-sheet-actual-table :is(th:nth-child(7), td:nth-child(7)) { width: 16%; }
+.treatment-sheet-actual-table :is(th:nth-child(8), td:nth-child(8)) { width: 6%; }
+.treatment-sheet-actual-table :is(th:nth-child(9), td:nth-child(9)) { width: 4%; }
+.treatment-sheet-plan-table:has(.treatment-sheet-edit-row) { min-width: 1800px; }
+.treatment-sheet-plan-table:has(.treatment-sheet-edit-row) :is(th:nth-child(4), td:nth-child(4)),
+.treatment-sheet-plan-table:has(.treatment-sheet-edit-row) :is(th:nth-child(5), td:nth-child(5)) { width: 32%; }
+.treatment-sheet-plan-table:has(.treatment-sheet-edit-row) :is(th:nth-child(6), td:nth-child(6)) { width: 19%; }
+.treatment-sheet-plan-table:has(.treatment-sheet-edit-row) :is(th:nth-child(7), td:nth-child(7)) { width: 8%; }
+.treatment-sheet-plan-table:has(.treatment-sheet-edit-row) :is(th:nth-child(8), td:nth-child(8)) { width: 9%; }
+.treatment-sheet-actual-table:has(.treatment-sheet-edit-row) { min-width: 1950px; }
+.treatment-sheet-actual-table:has(.treatment-sheet-edit-row) :is(th:nth-child(4), td:nth-child(4)),
+.treatment-sheet-actual-table:has(.treatment-sheet-edit-row) :is(th:nth-child(5), td:nth-child(5)) { width: 25%; }
+.treatment-sheet-actual-table:has(.treatment-sheet-edit-row) :is(th:nth-child(6), td:nth-child(6)),
+.treatment-sheet-actual-table:has(.treatment-sheet-edit-row) :is(th:nth-child(7), td:nth-child(7)) { width: 16%; }
+.treatment-sheet-actual-table:has(.treatment-sheet-edit-row) :is(th:nth-child(8), td:nth-child(8)) { width: 8%; }
+.treatment-sheet-actual-table:has(.treatment-sheet-edit-row) :is(th:nth-child(9), td:nth-child(9)) { width: 10%; }
+.treatment-sheet-table td strong { font-weight: 500; }
+.treatment-sheet-table td small { display: block; color: #667085; font-size: 10px; }
+.treatment-sheet-table a { color: #065fa6; }
+.treatment-sheet-table .treatment-sheet-money { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.treatment-sheet-table .treatment-sheet-empty { text-align: left; color: #667085; padding: 11px 6px; }
+.treatment-sheet-table tfoot td { background: #fff; }
+.treatment-sheet-table .treatment-sheet-preview-row td { background: #fff9e8; }
+.treatment-sheet-table .treatment-sheet-preview-row small { color: #8a5700; font-weight: 600; }
+.treatment-sheet-table .treatment-sheet-edit-row td { background: #f9fefb; padding: 3px 2px; }
+.treatment-sheet-edit-row .ant-form-item { margin: 0; }
+.treatment-sheet-edit-row .ant-form-item-explain-error { font-size: 10px; line-height: 1.25; }
+.treatment-sheet-edit-row :is(.ant-select, .ant-input-number) { width: 100%; }
+.treatment-sheet-edit-row .ant-input-number-handler-wrap { display: none; }
+.treatment-sheet-edit-row :is(.ant-input, .ant-select-selector, .ant-input-number) { border-radius: 1px; font-size: 11px; }
+.treatment-sheet-edit-row textarea.ant-input { min-height: 51px; resize: vertical; }
+.treatment-sheet-staff-fields, .treatment-sheet-edit-actions { display: grid; gap: 2px; }
+.treatment-sheet-discount-fields { display: grid; grid-template-columns: minmax(45px, 1fr) 49px; gap: 2px; }
+.treatment-sheet-discount-fields > .ant-form-item:last-child { grid-column: 1 / -1; }
+.treatment-sheet-discount-fields .ant-select-selector { padding-inline: 4px !important; }
+.treatment-sheet-discount-fields .ant-select-selection-item { padding-inline-end: 9px !important; }
+.treatment-sheet-discount-fields .ant-select-arrow { inset-inline-end: 4px; }
+.treatment-sheet-edit-actions .ant-btn { min-width: 23px; height: 22px; padding: 0; border-radius: 1px; line-height: 1; }
+.treatment-sheet-edit-actions .ant-btn-primary { background: var(--sheet-green); border-color: var(--sheet-green); }
+.treatment-sheet-edit-actions .ant-btn:not(.ant-btn-primary) { background: #f5a623; border-color: #f5a623; color: #fff; }
+.treatment-sheet-plus { display: inline-flex; align-items: center; justify-content: center; width: 25px; height: 22px; background: var(--sheet-green); border: 0; color: #fff !important; font-size: 19px; font-weight: 400; line-height: 1; text-decoration: none; }
+.treatment-sheet-plus:hover, .treatment-sheet-create:hover { background: #1d8f38; color: #fff; }
+.treatment-sheet-row-action { border: 1px solid #dbdee2; display: inline-flex; justify-content: center; min-width: 21px; height: 18px; font-size: 14px; line-height: 16px; text-decoration: none; }
+.treatment-sheet-action-menu .ant-dropdown-menu { min-width: 122px; padding: 2px 0; border-radius: 0; }
+.treatment-sheet-action-menu .ant-dropdown-menu-item { min-height: 34px; padding: 5px 9px; font-size: 12px; }
+.treatment-sheet-action-menu .ant-dropdown-menu-item a { color: inherit; }
+.treatment-sheet-menu-symbol { display: inline-block; width: 17px; font-size: 14px; }
+.treatment-sheet-menu-symbol.is-green { color: #28a745; }
+.treatment-sheet-menu-symbol.is-blue { color: #1688d7; }
+.treatment-sheet-menu-symbol.is-red { color: #c83d4b; }
+.treatment-sheet-actual-actions { display: grid; justify-content: center; gap: 1px; }
+.treatment-sheet-actual-actions .ant-btn { min-width: 22px; width: 22px; height: 19px; padding: 0; border-radius: 0; line-height: 1; }
+.treatment-sheet-actual-plus { width: 45px; }
+.treatment-sheet-footer-label { display: flex; align-items: center; justify-content: space-between; }
+.treatment-sheet-footer-label strong { font-size: 11px; margin-right: 3px; }
+.treatment-sheet-table .ant-btn:disabled { width: 25px; height: 23px; padding: 0; }
+.treatment-sheet-payment { display: grid; justify-content: end; justify-items: end; gap: 3px; margin: 2px 0 0; }
+.treatment-sheet-payment > div { display: flex; align-items: center; gap: 10px; min-height: 25px; font-size: 12px; }
+.treatment-sheet-payment strong { min-width: 46px; text-align: right; }
+.treatment-sheet-payment span { color: #667085; min-width: 110px; text-align: right; }
+.treatment-sheet-payment .ant-btn { min-width: 88px; height: 27px; padding: 2px 7px; font-size: 10px; border-radius: 0; }
+.treatment-sheet-payment .ant-btn[aria-label^="TRẢ TIỀN"]:disabled { background: #28a745; border-color: #28a745; color: #fff; opacity: .58; }
+.treatment-sheet-minor-heading { margin: 0 0 12px; padding: 4px 5px; border-bottom: 1px solid #f0f0f0; font-size: 11px; font-weight: 700; }
+.treatment-sheet-minor-heading::first-letter { background: #ececec; }
+.treatment-sheet-image-tile { width: 174px; height: 110px; margin: 10px 0 14px 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; border: 1px dashed #d4dce4; color: #3dbb63; text-decoration: none; }
+.treatment-sheet-image-tile svg { width: 62px; height: 62px; }
+.treatment-sheet-visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.treatment-sheet-notes { min-height: 40px; }
+.treatment-sheet-notes > div { padding-left: 1px; font-size: 12px; }
+.treatment-sheet-notes p { margin: 4px 0; color: #667085; }
+.treatment-sheet-note-hint { color: #98a2b3; font-size: 11px; }
+.treatment-sheet-create-row { display: flex; justify-content: center; padding: 13px 0 30px; }
+.treatment-sheet-create.ant-btn { min-width: 146px; min-height: 35px; padding: 5px 14px; color: #fff; background: var(--sheet-green); border-color: var(--sheet-green); border-radius: 1px; font-size: 12px; font-weight: 600; }
+.treatment-sheet-draft-notice { margin-bottom: 18px; }
+.treatment-sheet-body .treatment-sheet-images { margin-top: -44px; }
+.treatment-sheet-body .treatment-sheet-notes { margin-bottom: 0; }
+
+@media (max-width: 950px) {
+  .patient-treatment-shell .patient-treatment-tabs > .ant-tabs-nav { display: grid; grid-template-columns: 1fr auto; padding: 2px 12px 0; }
+  .patient-treatment-shell .patient-treatment-tabs .ant-tabs-extra-content:first-child { grid-column: 1; grid-row: 1; }
+  .patient-treatment-shell .patient-treatment-tabs .ant-tabs-extra-content:last-child { grid-column: 2; grid-row: 1; }
+  .patient-treatment-shell .patient-treatment-tabs .ant-tabs-nav-wrap { grid-column: 1 / -1; grid-row: 2; justify-content: flex-start; }
+  .patient-treatment-shell .patient-treatment-tabs .ant-tabs-tab { margin: 0 12px 0 0; }
+  .patient-treatment-shell .patient-treatment-tabs .ant-tabs-content-holder { padding: 18px 16px 40px; }
+  .treatment-sheets-heading { flex-direction: column; gap: 8px; }
+  .treatment-sheets-summary { justify-content: flex-start; }
+  .treatment-sheet-card-top { grid-template-columns: 1fr auto; gap: 7px; }
+  .treatment-sheet-card-actions { grid-column: 2; }
+  .treatment-sheet-scroll-hint { display: block; margin: 5px 0 2px; color: #667085; font-size: 11px; }
+}
+@media (max-width: 500px) {
+  .patient-treatment-toolbar { min-width: 0; }
+  .patient-treatment-toolbar .ant-typography { font-size: 15px; }
+  .patient-treatment-shell .patient-treatment-tabs .ant-tabs-content-holder { padding: 14px 9px 35px; }
+  .treatment-sheets-heading { padding: 0 3px; }
+  .treatment-sheets-summary { display: grid; grid-template-columns: 1fr; gap: 2px; }
+  .treatment-sheet-card-top { padding: 8px; }
+  .treatment-sheet-card-actions .ant-btn { min-width: 26px; }
+  .treatment-sheet-body { padding: 0 7px 15px; }
+  .treatment-sheet-band { align-items: flex-start; flex-direction: column; }
+  .treatment-sheet-band > div { justify-content: flex-start; }
+  .treatment-sheet-payment span { min-width: 96px; }
+  .treatment-sheet-body .treatment-sheet-images { margin-top: 10px; }
+}
+@media print {
+  body:has(.patient-treatment-shell) .workspace-content { padding: 0; }
+  .patient-treatment-shell .patient-treatment-tabs > .ant-tabs-nav,
+  .treatment-sheet-card-top, .treatment-sheet-create-row, .treatment-sheet-scroll-hint,
+  .treatment-sheet-table a, .treatment-sheet-table button, .treatment-sheet-preview-row,
+  .treatment-sheet-edit-row,
+  .treatment-sheet-payment .ant-btn,
+  .treatment-sheet-image-tile { display: none !important; }
+  .patient-treatment-shell .patient-treatment-tabs .ant-tabs-content-holder { padding: 0; }
+  .treatment-sheet-card:not(.is-open) { display: none; }
+  .treatment-sheet-card { border: 0; box-shadow: none; }
+  .treatment-sheet-print-title { display: block; font-size: 16px; }
+  .treatment-sheet-table { min-width: 0; font-size: 9px; }
+  .treatment-sheet-table-scroll { overflow: visible; }
+}

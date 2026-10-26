@@ -43,6 +43,7 @@ public sealed class DcmsDbContext(DbContextOptions<DcmsDbContext> options)
     public DbSet<TreatmentItem> TreatmentItems => Set<TreatmentItem>();
     public DbSet<TreatmentEvent> TreatmentEvents => Set<TreatmentEvent>();
     public DbSet<TreatmentReceipt> TreatmentReceipts => Set<TreatmentReceipt>();
+    public DbSet<TreatmentSheetDraft> TreatmentSheetDrafts => Set<TreatmentSheetDraft>();
     public DbSet<TreatmentRevisionDraft> TreatmentRevisionDrafts => Set<TreatmentRevisionDraft>();
     public DbSet<TreatmentTemplate> TreatmentTemplates => Set<TreatmentTemplate>();
     public DbSet<TreatmentTemplateVersion> TreatmentTemplateVersions => Set<TreatmentTemplateVersion>();

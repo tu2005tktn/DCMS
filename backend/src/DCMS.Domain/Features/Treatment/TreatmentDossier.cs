@@ -12,6 +12,7 @@ public sealed class TreatmentDossier
     public string Diagnosis { get; set; } = "";
     public string? Note { get; set; }
     public string State { get; set; } = "Open";
+    public bool DisplayCompleted { get; set; }
     public string? ClosureOutcome { get; set; }
     public string? ClosureReason { get; set; }
     public DateTimeOffset? ClosedAt { get; set; }
@@ -110,6 +111,21 @@ public sealed class TreatmentReceipt
     public string Fingerprint { get; set; } = "";
     public Guid DossierId { get; set; }
     public string ResultJson { get; set; } = "{}";
+}
+
+// Editable sheet rows are saved independently of agreed plan items and posted clinical activities.
+public sealed class TreatmentSheetDraft
+{
+    public Guid Id { get; set; }
+    public Guid DossierId { get; set; }
+    public Guid? VisitId { get; set; }
+    public int ActorId { get; set; }
+    public string Kind { get; set; } = "";
+    public int Version { get; set; } = 1;
+    public string PayloadJson { get; set; } = "{}";
+    public Guid LastRequestKey { get; set; }
+    public string LastFingerprint { get; set; } = "";
+    public DateTimeOffset UpdatedAt { get; set; }
 }
 
 public sealed class TreatmentRevisionDraft

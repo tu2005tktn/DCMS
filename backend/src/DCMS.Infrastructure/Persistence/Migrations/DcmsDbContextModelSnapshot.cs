@@ -2540,6 +2540,11 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)");
 
+                    b.Property<bool>("DisplayCompleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
                     b.Property<string>("Goals")
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)");
@@ -2974,6 +2979,25 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("TREATMENT_REVISION_DRAFT", (string)null);
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Treatment.TreatmentSheetDraft", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+                    b.Property<int>("ActorId").HasColumnType("integer");
+                    b.Property<Guid>("DossierId").HasColumnType("uuid");
+                    b.Property<string>("Kind").IsRequired().HasMaxLength(12).HasColumnType("character varying(12)");
+                    b.Property<string>("LastFingerprint").IsRequired().HasMaxLength(64).HasColumnType("character varying(64)");
+                    b.Property<Guid>("LastRequestKey").HasColumnType("uuid");
+                    b.Property<string>("PayloadJson").IsRequired().HasColumnType("jsonb");
+                    b.Property<DateTimeOffset>("UpdatedAt").HasColumnType("timestamp with time zone");
+                    b.Property<int>("Version").IsConcurrencyToken().HasColumnType("integer");
+                    b.Property<Guid?>("VisitId").HasColumnType("uuid");
+                    b.HasKey("Id");
+                    b.HasIndex("DossierId", "Kind", "UpdatedAt");
+                    b.ToTable("TREATMENT_SHEET_DRAFT", (string)null);
                 });
 
             modelBuilder.Entity("DCMS.Domain.Features.Treatment.TreatmentStep", b =>
@@ -4285,6 +4309,15 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasOne("DCMS.Domain.Features.Treatment.TreatmentItem", null)
                         .WithMany()
                         .HasForeignKey("ItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Treatment.TreatmentSheetDraft", b =>
+                {
+                    b.HasOne("DCMS.Domain.Features.Treatment.TreatmentDossier", null)
+                        .WithMany()
+                        .HasForeignKey("DossierId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
