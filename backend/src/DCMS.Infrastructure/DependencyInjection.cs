@@ -72,7 +72,7 @@ public static class DependencyInjection
         services.AddScoped<ITreatmentProgressionService, TreatmentProgressionService>();
         services.AddScoped<ITreatmentActualEvidencePort, ClinicalActualEvidencePort>();
         services.AddScoped<IClinicalWorkService, ClinicalWorkService>();
-        services.AddScoped<IClinicalVisitPort, UnavailableClinicalVisitPort>();
+        services.AddScoped<IClinicalVisitPort, Features.Examinations.ClinicalVisitPort>();
         services.AddScoped<IClinicalConsentPort, UnavailableClinicalConsentPort>();
         services.AddScoped<IClinicalChargePort, UnavailableClinicalChargePort>();
         services.AddScoped<ICareTaskService, CareTaskService>();
@@ -90,6 +90,12 @@ public static class DependencyInjection
         services.AddScoped<Features.Scheduling.DevelopmentSchedulingSeeder>();
         services.AddScoped<IAppointmentService, AppointmentService>();
         services.AddScoped<DCMS.Application.Features.Reception.IReceptionService, Features.Reception.ReceptionService>();
+        services.AddScoped<DCMS.Application.Features.Reception.IReceptionSourceReader, Features.Examinations.ReceptionTreatmentSourceReader>();
+        services.AddScoped<Features.Examinations.ClinicalAccess>();
+        services.AddScoped<DCMS.Application.Features.Examinations.IExaminationService, Features.Examinations.ExaminationService>();
+        services.AddScoped<DCMS.Application.Features.Examinations.IClinicalDocumentService, Features.Examinations.ClinicalDocumentService>();
+        services.AddSingleton<DCMS.Application.Features.Examinations.IClinicalFileScanner, Features.Examinations.ClamAvClinicalFileScanner>();
+        services.AddHostedService<Features.Examinations.ClinicalScanWorker>();
         services.AddScoped<DCMS.Application.Features.Reception.IReceptionSourceReader, Features.Reception.UnavailableReceptionSourceReader>();
         services.AddScoped<IAppointmentQueryService, AppointmentQueryService>();
         services.AddScoped<IAppointmentChangeService, AppointmentChangeService>();

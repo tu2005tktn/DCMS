@@ -126,7 +126,7 @@ export default function PatientProfilePage() {
           <Typography.Paragraph type="secondary">Tạo lúc {formatTime(patient.createdAt)} · Cập nhật lúc {formatTime(patient.updatedAt)} · Phiên bản {patient.version}</Typography.Paragraph>
         </> },
         { key: 'treatment', label: 'Điều trị & Thanh toán', children: <DossierList patientId={patient.id} /> },
-        { key: 'files', label: 'Hình ảnh & Tệp', children: <Pending feature="hình ảnh và tài liệu (S20)" /> },
+        { key: 'files', label: 'Hình ảnh & Tệp', children: <Link to={`/patients/${patient.id}/documents`}>Mở hình ảnh và tài liệu của bệnh nhân</Link> },
         { key: 'appointments', label: 'Lịch hẹn', children: <PatientAppointmentsTab key={patient.id} patientId={patient.id} active={tab === 'appointments'} revision={revision} /> },
         { key: 'prescriptions', label: 'Đơn thuốc', children: <Pending feature="đơn thuốc (S23)" /> },
         { key: 'audit', label: 'Lịch sử thay đổi', children: auditError

@@ -85,6 +85,8 @@ public sealed class ClinicalWorkService(DcmsDbContext db, UserManager<Applicatio
         var visit = await visits.GetAsync(id, ct);
         if (!visit.Available) throw Error("MSG144", 503);
         await DentistAsync(actorId, visit.BranchId, ct);
+        if (await db.Visits.AnyAsync(x => x.Id == id, ct))
+            await new DCMS.Infrastructure.Features.Examinations.ClinicalAccess(db, users, clock).VisitAsync(actorId, id, true, ct);
         if (!visit.InProgress) throw Error("MSG230", 409);
         if (expectedVersion > 0 && visit.Version != expectedVersion) throw Error("MSG111", 409);
         return visit;

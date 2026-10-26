@@ -17,6 +17,8 @@ import { roleLabels } from '../features/accounts/types';
 import HealthStatus from '../features/HealthStatus';
 import ReceptionPage from '../features/reception/ReceptionPage';
 import CheckInPage from '../features/reception/CheckInPage';
+import VisitPage from '../features/examinations/ExaminationPage';
+import PatientDocumentsPage from '../features/clinical-documents/PatientDocumentsPage';
 import VisitPage from '../features/reception/VisitPage';
 import { AccessPage, CustomerGuard, CustomerHomePage, CustomerRegisterPage, CustomerShell, CustomerSignInPage } from '../features/customer-auth/CustomerPages';
 import { useCustomerAuth } from '../features/customer-auth/CustomerAuthContext';
@@ -66,6 +68,7 @@ export default function App() {
       <Route path="accounts" element={<Protected permission="accounts.manage"><AccountsPage /></Protected>} />
       <Route path="patients" element={<Protected permission="patients.read"><PatientSearchPage /></Protected>} />
       <Route path="patients/:id" element={<Protected permission="patients.read"><PatientProfilePage /></Protected>} />
+      <Route path="patients/:id/documents" element={<Protected permission="patients.read"><PatientDocumentsPage /></Protected>} />
       <Route path="patients/:id/dossiers/:dossierId" element={<Protected permission="patients.read"><DossierPage /></Protected>} />
       <Route path="patients/:id/dossiers/:dossierId/plan" element={<Protected permission="patients.read"><PlanPage /></Protected>} />
       <Route path="patients/:id/dossiers/:dossierId/plan/revise/:itemId" element={<Protected permission="patients.read"><RevisionPage /></Protected>} />

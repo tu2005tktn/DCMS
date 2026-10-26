@@ -1,5 +1,6 @@
 # UC-06 — API đổi và hủy lịch hẹn
 
+> Cập nhật nguồn 25/10/2026: [bộ đặc tả v2.4](README.md) là nguồn hiện hành. Nội dung và bằng chứng dưới đây giữ mốc triển khai ban đầu; chưa được nghiệm thu lại theo v2.4.
 Theo hợp đồng S58/S21/S24 v2.3 ngày 24/10/2026, Appointment gắn `followUpId` chỉ chuyển instruction từ `NeedsBooking` sang `Booked` sau khi lịch và reservation commit. Reschedule giữ ID, kiểm lại cửa sổ, readiness, dentist, duration và toàn bộ nhân sự/ghế trong khoảng mới. Cancel/NoShow đưa instruction chưa hoàn tất về `NeedsBooking` trong cùng transaction; lỗi port làm rollback lịch. Không có slot không hủy instruction. Ba ghế là cấu hình chi nhánh thực tế, không là số hardcode trong engine; ghế và staff được giữ liên tục trong cả duration.
 > Cập nhật nguồn 25/10/2026: [bộ đặc tả v2.4](README.md) là nguồn hiện hành. Nội dung và bằng chứng dưới đây giữ mốc triển khai ban đầu; chưa được nghiệm thu lại theo v2.4.
 
