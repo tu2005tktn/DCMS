@@ -1,6 +1,6 @@
 # DCMS-112 — Contract và bàn giao khám theo Visit
 
-Ngày kiểm chứng: 26/10/2026. [Đặc tả](../specs/S19-S20-DCMS-112.md). Branch: `feat/dcms-112-examination`.
+Ngày kiểm chứng: 26/10/2026. [Đặc tả](../specs/S19-S20-DCMS-112.md). Branch: `feat/dcms-112-examination`. [Draft PR #27](https://github.com/tu2005tktn/DCMS/pull/27).
 
 Tái sử dụng treatment foundation `origin/vinh@fc942b6` qua merge `d162045`; giữ tiếp nhận DCMS-111 `caa01ef`. UI S20 lấy từ `origin/TriNM@1b4d72c` (list/upload/detail/viewer/types), nối API thật và bỏ preview khỏi đường chạy. Không thay backend kế hoạch/actual bằng engine thứ hai. Migration `20261026035110_VisitExaminationsAndClinicalDocuments` bổ sung khám/file/audit/receipt/review vào DbContext chung.
 
