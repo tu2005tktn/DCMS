@@ -232,6 +232,21 @@ public sealed partial class WorkingScheduleService(DcmsDbContext db, TimeProvide
         catch (BusinessException) { return null; }
         return Evaluate(q, isPublic, start, chairId, attendeeKey, exclude, await Load(q, draft, ct));
     }
+    public async Task ValidateReceptionAsync(Guid reservationId, int patientId, CancellationToken ct)
+    {
+        if (db.Database.CurrentTransaction == null) throw new InvalidOperationException("Reception requires the reservation transaction.");
+        await Lock(ct);
+        var r = await db.Set<ResourceReservation>().AsNoTracking().SingleOrDefaultAsync(x => x.Id == reservationId, ct)
+            ?? throw Error("MSG47", 409);
+        if (r.Status != "Confirmed") throw Error("MSG47", 409);
+        var start = r.Start.ToOffset(TimeSpan.FromHours(7));
+        var q = new AvailabilityQuery(r.BranchId, r.DentistId, r.ServiceId, DateOnly.FromDateTime(start.DateTime),
+            (int)(r.End - r.Start).TotalMinutes, r.AssistantId);
+        await ValidateQuery(q, false, ct);
+        var data = await Load(q, null, ct);
+        _ = Evaluate(q, false, start, r.ChairId, $"patient:{patientId}", r.Id, data, true);
+    }
+
     public async Task<AvailabilitySlot> CheckInTransactionAsync(ResourceCheck request, CancellationToken ct)
     {
         if (db.Database.CurrentTransaction == null) throw new InvalidOperationException("Resource checks require the caller's reservation transaction.");

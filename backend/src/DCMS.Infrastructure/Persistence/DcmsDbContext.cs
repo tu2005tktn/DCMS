@@ -22,6 +22,7 @@ public sealed class DcmsDbContext(DbContextOptions<DcmsDbContext> options)
     public DbSet<PatientAccountLink> PatientAccountLinks => Set<PatientAccountLink>();
     public DbSet<PatientLinkAudit> PatientLinkAudits => Set<PatientLinkAudit>();
     public DbSet<Appointment> Appointments => Set<Appointment>();
+    public DbSet<DCMS.Domain.Features.Visits.Visit> Visits => Set<DCMS.Domain.Features.Visits.Visit>();
     public DbSet<AppointmentChange> AppointmentChanges => Set<AppointmentChange>();
     public DbSet<AppointmentChangeReceipt> AppointmentChangeReceipts => Set<AppointmentChangeReceipt>();
     public DbSet<AppointmentReceipt> AppointmentReceipts => Set<AppointmentReceipt>();
@@ -43,6 +44,7 @@ public sealed class DcmsDbContext(DbContextOptions<DcmsDbContext> options)
         base.OnModelCreating(model);
         SchedulingModel.Configure(model);
         AppointmentModel.Configure(model);
+        VisitModel.Configure(model);
         model.Entity<ApplicationUser>(b =>
         {
             b.ToTable("USER_ACCOUNT");

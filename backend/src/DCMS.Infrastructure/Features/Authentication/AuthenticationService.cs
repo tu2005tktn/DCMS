@@ -190,6 +190,8 @@ public sealed class AuthenticationService(DcmsDbContext db, UserManager<Applicat
             .. effective.Contains(AccountRoles.ClinicAssistant) ? ["patient-links.verify"] : Array.Empty<string>(),
             .. effective.Contains(AccountRoles.ClinicAssistant) || effective.Contains(AccountRoles.Dentist) ? ["patients.read"] : Array.Empty<string>(),
             .. effective.Contains(AccountRoles.ClinicAssistant) ? ["patients.manage"] : Array.Empty<string>(),
+            .. effective.Contains(AccountRoles.ClinicAssistant) || effective.Contains(AccountRoles.Dentist) ? ["reception.read"] : Array.Empty<string>(),
+            .. effective.Contains(AccountRoles.ClinicAssistant) ? ["reception.check-in"] : Array.Empty<string>(),
             // S26 — Staff Support Inbox (UC-34 booking portion): clinic ops xử lý yêu cầu đổi/huỷ/xác nhận.
             .. effective.Contains(AccountRoles.ClinicAssistant) || effective.Contains(AccountRoles.Dentist) || effective.Contains(AccountRoles.Admin)
                 ? ["appointments.support.handle"] : Array.Empty<string>()

@@ -7,8 +7,8 @@
 - [Mobile scaffold](specs/MOBILE-SCAFFOLD.md): route mapping, folder responsibilities, and implementation scope; [team guide](../mobile/README.md).
 - [UC-33 and S02 Mobile registration](specs/UC33-S02-MOBILE.md): 12 October 2026 decision, workflow, validation, API contract, and account boundary.
 
-- [Screen specifications (English)](specs/DCMS_Screen_Specifications_English%20%281%29.docx): supplied screen design reference.
-- [Screen Specification v2.0](specs/DCMS_Screen_Specifications_v2.0.docx) and [Use Case/Business Rule/Message v2.0](specs/DCMS_Use_Cases_Business_Rules_Messages_v2.0.docx) (15 October 2026): current baseline; replaces conflicting values in the earlier pair.
+- [Bộ đặc tả DCMS v2.4](specs/README.md): nguồn hiện hành, ngày 25/10/2026; thay thế các bản Word cũ và bản trùng trong `odental-v2/`. Gồm [Screen Specifications](specs/DCMS_Screen_Specifications_v2.4.docx) và [Use Cases / Business Rules / Messages](specs/DCMS_Use_Cases_Business_Rules_Messages_v2.4.docx). Trang hướng dẫn nêu các thay đổi chính, quyết định riêng còn hiệu lực và ranh giới giữa đặc tả với bằng chứng triển khai cũ.
+- [Luồng phòng khám DCMS-110](specs/CLINIC-FLOW-DCMS-110.vi.md): các bước, dữ liệu bàn giao, phạm vi và điểm tính phí gói còn cần quyết định; [DCMS-111 S17/S18](specs/S17-S18-RECEPTION.md): xác minh người đến, check-in một lần, hàng chờ và contract Visit; [bằng chứng triển khai DCMS-111](implementation/DCMS-111-RECEPTION.md). Bắt đầu/lưu khám ở DCMS-112 chưa thuộc phần nghiệm thu của DCMS-111.
 
 - [Hướng dẫn cài đặt và chạy dự án cho team (Windows/PowerShell)](SETUP.vi.md): công cụ cần cài, cấu hình local, chạy API/web/PostgreSQL, kiểm tra và xử lý lỗi.
 - [Đối chiếu triển khai UC-01/UC-31](implementation/UC01-UC31.md): quy tắc, thông báo, API, màn hình, kiểm thử và phần hoãn.
