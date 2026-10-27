@@ -2,8 +2,10 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using DCMS.Application.Common;
 using DCMS.Application.Features.Patients;
+using DCMS.Application.Features.SystemSettings;
 using DCMS.Domain.Features.PatientLinks;
 using DCMS.Domain.Features.Patients;
+using DCMS.Infrastructure.Features.SystemSettings;
 using DCMS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -54,15 +56,23 @@ public sealed partial class PatientService(DcmsDbContext db) : IPatientService
     {
         var input = Validate(request.FullName, request.BirthDate, request.Gender, request.Phone, request.Address,
             request.GuardianName, request.GuardianRelationship, request.GuardianPhone, request.Note);
-        var manualCode = Optional(request.PatientCode, "Mã bệnh nhân", 40)?.ToUpperInvariant();
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        var policy = await PolicyAsync(request.PolicyVersion, ct);
+        RequirePolicy(policy, input);
+        var (extra, names) = await ValidateExtraAsync(request.ProfileDate, request.SourceId, request.CustomerGroupId, request.OccupationId,
+            request.IntakeHistoryIds, request.IntakeHistoryOther, null, ct);
+        RequireExtraPolicy(policy, extra);
+        // S58 code mode (GBR-177): AutoOnly ignores client input, ManualOnly requires it.
+        var manualCode = policy.PatientCode.Mode == PatientCodeModes.AutoOnly ? null
+            : Optional(request.PatientCode, "Mã bệnh nhân", 40)?.ToUpperInvariant();
+        if (manualCode == null && policy.PatientCode.Mode == PatientCodeModes.ManualOnly) RequiredField("Mã bệnh nhân", "patientCode");
         if (manualCode != null && !CodePattern().IsMatch(manualCode)) Invalid("Mã bệnh nhân");
         await RequireReviewAsync(input, null, request.DuplicatesReviewed, ct);
         if (manualCode != null && await db.Patients.AnyAsync(x => x.PatientCode == manualCode, ct)) throw DuplicateCode();
 
         var now = DateTimeOffset.UtcNow;
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        var patient = new PatientProfile { PatientCode = manualCode ?? await NextCodeAsync(ct), CreatedAt = now, UpdatedAt = now };
-        var changes = Apply(patient, input);
+        var patient = new PatientProfile { PatientCode = manualCode ?? await NextCodeAsync(policy.PatientCode.Prefix, ct), CreatedAt = now, UpdatedAt = now };
+        var changes = Apply(patient, input).Concat(ApplyExtra(patient, extra, names, actorId, now)).ToList();
         await SaveAsync(() =>
         {
             db.Patients.Add(patient);
@@ -81,13 +91,18 @@ public sealed partial class PatientService(DcmsDbContext db) : IPatientService
         if (patient.Version != request.Version) throw Stale();
         var input = Validate(request.FullName, request.BirthDate, request.Gender, request.Phone, request.Address,
             request.GuardianName, request.GuardianRelationship, request.GuardianPhone, request.Note);
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        var policy = await PolicyAsync(request.PolicyVersion, ct);
+        RequirePolicy(policy, input);
+        var (extra, names) = await ValidateExtraAsync(request.ProfileDate, request.SourceId, request.CustomerGroupId, request.OccupationId,
+            request.IntakeHistoryIds, request.IntakeHistoryOther, patient, ct);
+        RequireExtraPolicy(policy, extra);
         await RequireReviewAsync(input, id, request.DuplicatesReviewed, ct);
-        var changes = Apply(patient, input);
-        if (changes.Count == 0) return new(await DetailAsync(patient, ct), SystemMessages.Get("MSG116"));
         var now = DateTimeOffset.UtcNow;
+        var changes = Apply(patient, input).Concat(ApplyExtra(patient, extra, names, actorId, now)).ToList();
+        if (changes.Count == 0) return new(await DetailAsync(patient, ct), SystemMessages.Get("MSG116"));
         patient.UpdatedAt = now;
         patient.Version++;
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
         await SaveAsync(() => Task.CompletedTask, ct);
         await AuditAsync(patient.Id, actorId, PatientAuditActions.Update, null, changes, now, ct);
         await transaction.CommitAsync(ct);
@@ -134,13 +149,15 @@ public sealed partial class PatientService(DcmsDbContext db) : IPatientService
         // The administrative note is internal to the clinic: kept as is, never shown or edited by the patient.
         var input = Validate(request.FullName, request.BirthDate, request.Gender, request.Phone, request.Address,
             request.GuardianName, request.GuardianRelationship, request.GuardianPhone, patient.Note);
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        // Catalog-backed fields are not on the patient's own form: kept as is and not enforced here (S58 đợt 3).
+        RequirePolicy(await PolicyAsync(null, ct), input);
         var changes = Apply(patient, input);
         if (changes.Count > 0)
         {
             var now = DateTimeOffset.UtcNow;
             patient.UpdatedAt = now;
             patient.Version++;
-            await using var transaction = await db.Database.BeginTransactionAsync(ct);
             await SaveAsync(() => Task.CompletedTask, ct);
             await AuditAsync(patient.Id, accountId, PatientAuditActions.Update, "Bệnh nhân tự cập nhật qua ứng dụng", changes, now, ct);
             await transaction.CommitAsync(ct);
@@ -272,12 +289,102 @@ public sealed partial class PatientService(DcmsDbContext db) : IPatientService
         }).ToArray();
     }
 
-    private async Task<string> NextCodeAsync(CancellationToken ct)
+    public Task<PatientFormPolicy> FormPolicyAsync(CancellationToken ct) => ClinicSettingsStore.PolicyAsync(db, ct);
+
+    // Called inside the save transaction: the shared lock waits for an in-flight S58 write, so the policy cannot change before commit.
+    private async Task<PatientFormPolicy> PolicyAsync(int? expectedVersion, CancellationToken ct)
+    {
+        await db.Database.ExecuteSqlRawAsync(ClinicSettingsStore.SharedLock, ct);
+        var policy = await ClinicSettingsStore.PolicyAsync(db, ct);
+        if (expectedVersion is { } version && version != policy.Version)
+            throw new BusinessException(409, SystemMessages.Get("MSG111") with { Field = "policyVersion" });
+        return policy;
+    }
+
+    // S58 required fields (GBR-176) apply to the next administrative save only; old records stay readable and are never backfilled.
+    private static void RequirePolicy(PatientFormPolicy policy, Input input)
+    {
+        var required = policy.RequiredFields;
+        if (required.BirthDate && input.BirthDate == null) RequiredField("Ngày sinh", "birthDate");
+        if (required.Gender && input.Gender == null) RequiredField("Giới tính", "gender");
+        if (required.Phone && input.Phone == null) RequiredField("Số điện thoại", "phone");
+        if (required.Address && input.Address == null) RequiredField("Địa chỉ", "address");
+    }
+
+    private sealed record Extra(DateOnly? ProfileDate, Guid? SourceId, Guid? CustomerGroupId, Guid? OccupationId, Guid[] IntakeIds, string? IntakeOther);
+
+    // A new choice must be an active entry of the right kind; a value already on the record stays valid after deactivation (SET-01).
+    private async Task<(Extra Extra, IReadOnlyDictionary<Guid, string> Names)> ValidateExtraAsync(DateOnly? profileDate, Guid? sourceId,
+        Guid? customerGroupId, Guid? occupationId, IReadOnlyList<Guid>? intake, string? other, PatientProfile? current, CancellationToken ct)
+    {
+        if (profileDate > ClinicToday() || profileDate?.Year < 1900) InvalidField("Ngày lập hồ sơ", "profileDate");
+        var intakeIds = (intake ?? []).Distinct().ToArray();
+        if (intakeIds.Length != (intake?.Count ?? 0)) InvalidField("Tiền sử", "intakeHistoryIds");
+        var wanted = new List<(Guid Id, string Kind, string Label, string Field, bool Kept)>();
+        void Want(Guid? id, bool kept, string kind, string label, string field) { if (id is { } value) wanted.Add((value, kind, label, field, kept)); }
+        Want(sourceId, sourceId == current?.SourceId, ReferenceKinds.PatientSources, "Nguồn", "sourceId");
+        Want(customerGroupId, customerGroupId == current?.CustomerGroupId, ReferenceKinds.CustomerGroups, "Phân nhóm khách hàng", "customerGroupId");
+        Want(occupationId, occupationId == current?.OccupationId, ReferenceKinds.Occupations, "Nghề nghiệp", "occupationId");
+        foreach (var id in intakeIds) Want(id, current?.IntakeHistoryIds.Contains(id) == true, ReferenceKinds.IntakeHistory, "Tiền sử", "intakeHistoryIds");
+        var ids = wanted.Select(x => x.Id).Distinct().ToArray();
+        var entries = await db.ReferenceEntries.AsNoTracking().Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id, ct);
+        foreach (var item in wanted)
+            if (!entries.TryGetValue(item.Id, out var entry) || entry.Kind != item.Kind || (!entry.IsActive && !item.Kept)) InvalidField(item.Label, item.Field);
+        // Names of values being replaced, for the audit trail.
+        Guid?[] previous = [current?.SourceId, current?.CustomerGroupId, current?.OccupationId];
+        var old = previous.OfType<Guid>().Concat(current?.IntakeHistoryIds ?? []).Where(x => !entries.ContainsKey(x)).Distinct().ToArray();
+        var names = entries.ToDictionary(x => x.Key, x => x.Value.Name);
+        foreach (var row in await db.ReferenceEntries.AsNoTracking().Where(x => old.Contains(x.Id)).Select(x => new { x.Id, x.Name }).ToListAsync(ct))
+            names[row.Id] = row.Name;
+        return (new(profileDate, sourceId, customerGroupId, occupationId, intakeIds, Optional(other, "Tiền sử khác", 1000)), names);
+    }
+
+    private static void RequireExtraPolicy(PatientFormPolicy policy, Extra extra)
+    {
+        var required = policy.RequiredFields;
+        if (required.ProfileDate && extra.ProfileDate == null) RequiredField("Ngày lập hồ sơ", "profileDate");
+        if (required.Source && extra.SourceId == null) RequiredField("Nguồn", "sourceId");
+        if (required.CustomerGroup && extra.CustomerGroupId == null) RequiredField("Phân nhóm khách hàng", "customerGroupId");
+    }
+
+    private static List<PatientFieldChange> ApplyExtra(PatientProfile patient, Extra extra, IReadOnlyDictionary<Guid, string> names, int actorId, DateTimeOffset now)
+    {
+        var changes = new List<PatientFieldChange>();
+        string? Name(Guid? id) => id is { } value ? names.GetValueOrDefault(value, value.ToString()) : null;
+        void Set(string field, string? before, string? after, Action assign)
+        {
+            changes.Add(new(field, before, after));
+            assign();
+        }
+        if (patient.ProfileDate != extra.ProfileDate)
+            Set("Ngày lập hồ sơ", patient.ProfileDate?.ToString("yyyy-MM-dd"), extra.ProfileDate?.ToString("yyyy-MM-dd"), () => patient.ProfileDate = extra.ProfileDate);
+        if (patient.SourceId != extra.SourceId) Set("Nguồn", Name(patient.SourceId), Name(extra.SourceId), () => patient.SourceId = extra.SourceId);
+        if (patient.CustomerGroupId != extra.CustomerGroupId)
+            Set("Phân nhóm khách hàng", Name(patient.CustomerGroupId), Name(extra.CustomerGroupId), () => patient.CustomerGroupId = extra.CustomerGroupId);
+        if (patient.OccupationId != extra.OccupationId)
+            Set("Nghề nghiệp", Name(patient.OccupationId), Name(extra.OccupationId), () => patient.OccupationId = extra.OccupationId);
+        if (!patient.IntakeHistoryIds.Order().SequenceEqual(extra.IntakeIds.Order()))
+            Set("Tiền sử", Empty(string.Join(", ", patient.IntakeHistoryIds.Select(x => Name(x)))), Empty(string.Join(", ", extra.IntakeIds.Select(x => Name(x)))),
+                () => patient.IntakeHistoryIds = extra.IntakeIds);
+        if (patient.IntakeHistoryOther != extra.IntakeOther)
+            Set("Tiền sử khác", patient.IntakeHistoryOther, extra.IntakeOther, () => patient.IntakeHistoryOther = extra.IntakeOther);
+        // Intake answers are patient-reported: keep who recorded the latest change and when.
+        if (changes.Any(x => x.Field.StartsWith("Tiền sử"))) { patient.IntakeRecordedAt = now; patient.IntakeRecordedBy = actorId; }
+        return changes;
+    }
+
+    private static void InvalidField(string label, string field) =>
+        throw new BusinessException(400, SystemMessages.Get("MSG04", label) with { Field = field });
+
+    private static void RequiredField(string label, string field) =>
+        throw new BusinessException(400, SystemMessages.Get("MSG02", label) with { Field = field });
+
+    private async Task<string> NextCodeAsync(string prefix, CancellationToken ct)
     {
         while (true)
         {
             var next = await db.Database.SqlQuery<long>($"SELECT nextval('patient_code_seq') AS \"Value\"").SingleAsync(ct);
-            var code = $"BN{next:000000}";
+            var code = $"{prefix}{next:000000}";
             if (!await db.Patients.AnyAsync(x => x.PatientCode == code, ct)) return code;
         }
     }
@@ -310,9 +417,18 @@ public sealed partial class PatientService(DcmsDbContext db) : IPatientService
                               join user in db.Users.AsNoTracking() on link.AccountId equals user.Id
                               where link.PatientId == x.Id && link.Status == PatientLinkStatus.Verified
                               select new { user.UserName, link.ReviewedAt }).FirstOrDefaultAsync(ct);
+        Guid?[] single = [x.SourceId, x.CustomerGroupId, x.OccupationId];
+        var ids = single.OfType<Guid>().Concat(x.IntakeHistoryIds).Distinct().ToArray();
+        var entries = await db.ReferenceEntries.AsNoTracking().Where(e => ids.Contains(e.Id))
+            .ToDictionaryAsync(e => e.Id, e => new PatientReference(e.Id, e.Name, e.IsActive), ct);
+        PatientReference? Ref(Guid? id) => id is { } value ? entries.GetValueOrDefault(value) : null;
+        var recorder = x.IntakeRecordedBy is { } by
+            ? await db.Users.AsNoTracking().Where(u => u.Id == by).Select(u => u.FullName).SingleOrDefaultAsync(ct) : null;
         return new(x.Id, x.PatientCode, x.FullName, x.BirthDate, x.Gender, x.Phone, x.Address, x.GuardianName,
             x.GuardianRelationship, x.GuardianPhone, x.Note, x.IsArchived, x.ArchivedAt, x.ArchiveReason, x.CreatedAt, x.UpdatedAt,
-            x.Version, new(verified?.UserName, verified?.ReviewedAt));
+            x.Version, new(verified?.UserName, verified?.ReviewedAt), x.ProfileDate, Ref(x.SourceId), Ref(x.CustomerGroupId), Ref(x.OccupationId),
+            x.IntakeHistoryIds.Select(id => entries.GetValueOrDefault(id)).OfType<PatientReference>().ToArray(), x.IntakeHistoryOther,
+            x.IntakeRecordedAt, recorder);
     }
 
     // Last visit stays null until UC-07 check-in/VISIT exists; the UI shows "no data", never a fabricated date.

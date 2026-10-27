@@ -6,7 +6,7 @@ Danh mục dùng chung toàn hệ thống. Staff active có role hiệu lực De
 
 ## UI
 
-Menu Thiết lập hệ thống /system-settings chỉ Dentist hiệu lực, URL trực tiếp chặn 403. Hai tab Dụng cụ / Vật liệu và Danh mục. Bảng mục: STT/Tên/Thuộc danh mục/Thao tác, tìm tên + lọc nhóm, phân trang 20/50/100. Bảng nhóm: STT/Tên danh mục/Số mục/Thao tác, tìm tên, phân trang. Modal thêm/sửa: name bắt buộc tối đa160, categoryId bắt buộc với mục; dropdown có tìm kiếm, tải nhóm phân trang từ API (không cắt ở 20). Nhóm trống hướng dẫn chuyển tab tạo nhóm. Chỉ nút Lưu gửi command; đang gửi chặn lặp, validation/mạng/stale giữ form. Đọc lại phiên bản giữ tên/người dùng đang nhập. Xóa có Đồng ý/Không đồng ý. Loading/empty/error/retry/401/403 và responsive theo Ant Design hiện có.
+Menu Thiết lập hệ thống /system-settings hiện khi có ít nhất một nhóm được phép theo `GET /api/settings/capabilities` (cập nhật 27/10/2026, xem [S58 Thiết lập chung](S58-GENERAL-SETTINGS.md)); hai tab Dụng cụ / Vật liệu và Danh mục chỉ Dentist hiệu lực, API của chúng chặn 403. Hai tab Dụng cụ / Vật liệu và Danh mục. Bảng mục: STT/Tên/Thuộc danh mục/Thao tác, tìm tên + lọc nhóm, phân trang 20/50/100. Bảng nhóm: STT/Tên danh mục/Số mục/Thao tác, tìm tên, phân trang. Modal thêm/sửa: name bắt buộc tối đa160, categoryId bắt buộc với mục; dropdown có tìm kiếm, tải nhóm phân trang từ API (không cắt ở 20). Nhóm trống hướng dẫn chuyển tab tạo nhóm. Chỉ nút Lưu gửi command; đang gửi chặn lặp, validation/mạng/stale giữ form. Đọc lại phiên bản giữ tên/người dùng đang nhập. Xóa có Đồng ý/Không đồng ý. Loading/empty/error/retry/401/403 và responsive theo Ant Design hiện có.
 
 ## API
 

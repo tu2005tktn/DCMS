@@ -17,6 +17,11 @@ public sealed class DcmsDbContext(DbContextOptions<DcmsDbContext> options)
     public DbSet<DCMS.Domain.Features.SystemSettings.MaterialCategory> MaterialCategories => Set<DCMS.Domain.Features.SystemSettings.MaterialCategory>();
     public DbSet<DCMS.Domain.Features.SystemSettings.MaterialCatalogItem> MaterialCatalogItems => Set<DCMS.Domain.Features.SystemSettings.MaterialCatalogItem>();
     public DbSet<DCMS.Domain.Features.SystemSettings.SystemCatalogChange> SystemCatalogChanges => Set<DCMS.Domain.Features.SystemSettings.SystemCatalogChange>();
+    public DbSet<DCMS.Domain.Features.SystemSettings.ClinicSettingsVersion> ClinicSettingsVersions => Set<DCMS.Domain.Features.SystemSettings.ClinicSettingsVersion>();
+    public DbSet<DCMS.Domain.Features.SystemSettings.ReferenceEntry> ReferenceEntries => Set<DCMS.Domain.Features.SystemSettings.ReferenceEntry>();
+    public DbSet<DCMS.Domain.Features.SystemSettings.CatalogProvider> CatalogProviders => Set<DCMS.Domain.Features.SystemSettings.CatalogProvider>();
+    public DbSet<DCMS.Domain.Features.SystemSettings.LabWorkType> LabWorkTypes => Set<DCMS.Domain.Features.SystemSettings.LabWorkType>();
+    public DbSet<DCMS.Domain.Features.SystemSettings.CatalogMedicine> CatalogMedicines => Set<DCMS.Domain.Features.SystemSettings.CatalogMedicine>();
     public DbSet<EmployeeProfile> Employees => Set<EmployeeProfile>();
     public DbSet<AuthSession> AuthSessions => Set<AuthSession>();
     public DbSet<AuthRefreshToken> AuthRefreshTokens => Set<AuthRefreshToken>();
@@ -143,6 +148,10 @@ public sealed class DcmsDbContext(DbContextOptions<DcmsDbContext> options)
             b.Property(x => x.Note).HasMaxLength(1000);
             b.Property(x => x.ArchiveReason).HasMaxLength(500);
             b.Property(x => x.Version).IsConcurrencyToken();
+            b.Property(x => x.IntakeHistoryOther).HasMaxLength(1000);
+            b.HasOne<DCMS.Domain.Features.SystemSettings.ReferenceEntry>().WithMany().HasForeignKey(x => x.SourceId).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<DCMS.Domain.Features.SystemSettings.ReferenceEntry>().WithMany().HasForeignKey(x => x.CustomerGroupId).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<DCMS.Domain.Features.SystemSettings.ReferenceEntry>().WithMany().HasForeignKey(x => x.OccupationId).OnDelete(DeleteBehavior.Restrict);
         });
         // UC-38: automatic patient codes BN000001... [PROPOSED format].
         model.HasSequence<long>("patient_code_seq");

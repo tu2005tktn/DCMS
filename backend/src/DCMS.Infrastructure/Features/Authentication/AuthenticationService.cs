@@ -192,6 +192,8 @@ public sealed class AuthenticationService(DcmsDbContext db, UserManager<Applicat
             .. effective.Contains(AccountRoles.ClinicAssistant) ? ["patients.manage"] : Array.Empty<string>(),
             .. effective.Contains(AccountRoles.ClinicAssistant) || effective.Contains(AccountRoles.Dentist) ? ["reception.read"] : Array.Empty<string>(),
             .. effective.Contains(AccountRoles.ClinicAssistant) ? ["reception.check-in"] : Array.Empty<string>(),
+            // S58 Thiết lập chung: assigned ClinicOwner only; not inferred from the effective Dentist role.
+            .. roles.Contains(AccountRoles.ClinicOwner) ? ["settings.general.manage"] : Array.Empty<string>(),
             // S26 — Staff Support Inbox (UC-34 booking portion): clinic ops xử lý yêu cầu đổi/huỷ/xác nhận.
             .. effective.Contains(AccountRoles.ClinicAssistant) || effective.Contains(AccountRoles.Dentist) || effective.Contains(AccountRoles.Admin)
                 ? ["appointments.support.handle"] : Array.Empty<string>()

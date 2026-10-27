@@ -61,6 +61,101 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasKey("RequestKey"); b.HasIndex("ResourceId", "OccurredAt");
                     b.ToTable("SYSTEM_CATALOG_CHANGE");
                 });
+            modelBuilder.Entity("DCMS.Domain.Features.SystemSettings.ClinicSettingsVersion", b => {
+                    b.Property<int>("Version").HasColumnType("integer");
+                    b.Property<DateTimeOffset>("EffectiveAt").HasColumnType("timestamp with time zone");
+                    b.Property<int>("ActorId").HasColumnType("integer");
+                    b.Property<string>("Reason").IsRequired().HasMaxLength(500).HasColumnType("character varying(500)");
+                    b.Property<int?>("RestoredFromVersion").HasColumnType("integer");
+                    b.Property<string>("ContentJson").IsRequired().HasColumnType("jsonb");
+                    b.HasKey("Version");
+                    b.ToTable("CLINIC_SETTINGS_VERSION");
+                });
+            modelBuilder.Entity("DCMS.Domain.Features.SystemSettings.ReferenceEntry", b => {
+                    b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uuid");
+                    b.Property<string>("Kind").IsRequired().HasMaxLength(32).HasColumnType("character varying(32)");
+                    b.Property<string>("Code").HasMaxLength(40).HasColumnType("character varying(40)");
+                    b.Property<string>("Name").IsRequired().HasMaxLength(160).HasColumnType("character varying(160)");
+                    b.Property<string>("NormalizedName").IsRequired().HasMaxLength(160).HasColumnType("character varying(160)");
+                    b.Property<string>("Description").HasMaxLength(1000).HasColumnType("character varying(1000)");
+                    b.Property<bool>("IsReserved").HasColumnType("boolean");
+                    b.Property<bool>("IsActive").HasColumnType("boolean");
+                    b.Property<int>("Version").IsConcurrencyToken().HasColumnType("integer");
+                    b.Property<DateTimeOffset>("CreatedAt").HasColumnType("timestamp with time zone");
+                    b.Property<int?>("CreatedBy").HasColumnType("integer");
+                    b.Property<DateTimeOffset>("UpdatedAt").HasColumnType("timestamp with time zone");
+                    b.Property<int?>("UpdatedBy").HasColumnType("integer");
+                    b.HasKey("Id");
+                    b.HasIndex("Kind", "NormalizedName").IsUnique();
+                    b.HasIndex("Kind", "Code").IsUnique().HasFilter("\"Code\" IS NOT NULL");
+                    b.ToTable("REFERENCE_ENTRY");
+                });
+            modelBuilder.Entity("DCMS.Domain.Features.SystemSettings.CatalogProvider", b => {
+                    b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uuid");
+                    b.Property<string>("Code").IsRequired().HasMaxLength(40).HasColumnType("character varying(40)");
+                    b.Property<string>("Name").IsRequired().HasMaxLength(160).HasColumnType("character varying(160)");
+                    b.Property<string>("NormalizedName").IsRequired().HasMaxLength(160).HasColumnType("character varying(160)");
+                    b.Property<bool>("IsActive").HasColumnType("boolean");
+                    b.Property<int>("Version").IsConcurrencyToken().HasColumnType("integer");
+                    b.Property<DateTimeOffset>("CreatedAt").HasColumnType("timestamp with time zone");
+                    b.Property<int>("CreatedBy").HasColumnType("integer");
+                    b.Property<DateTimeOffset>("UpdatedAt").HasColumnType("timestamp with time zone");
+                    b.Property<int>("UpdatedBy").HasColumnType("integer");
+                    b.Property<string>("Type").IsRequired().HasMaxLength(16).HasColumnType("character varying(16)");
+                    b.Property<string>("Address").HasMaxLength(1000).HasColumnType("character varying(1000)");
+                    b.Property<string>("Phone").HasMaxLength(20).HasColumnType("character varying(20)");
+                    b.Property<string>("Email").HasMaxLength(254).HasColumnType("character varying(254)");
+                    b.HasKey("Id");
+                    b.HasIndex("Code").IsUnique();
+                    b.HasIndex("NormalizedName").IsUnique();
+                    b.ToTable("CATALOG_PROVIDER");
+                });
+            modelBuilder.Entity("DCMS.Domain.Features.SystemSettings.LabWorkType", b => {
+                    b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uuid");
+                    b.Property<string>("Code").IsRequired().HasMaxLength(40).HasColumnType("character varying(40)");
+                    b.Property<string>("Name").IsRequired().HasMaxLength(160).HasColumnType("character varying(160)");
+                    b.Property<string>("NormalizedName").IsRequired().HasMaxLength(160).HasColumnType("character varying(160)");
+                    b.Property<bool>("IsActive").HasColumnType("boolean");
+                    b.Property<int>("Version").IsConcurrencyToken().HasColumnType("integer");
+                    b.Property<DateTimeOffset>("CreatedAt").HasColumnType("timestamp with time zone");
+                    b.Property<int>("CreatedBy").HasColumnType("integer");
+                    b.Property<DateTimeOffset>("UpdatedAt").HasColumnType("timestamp with time zone");
+                    b.Property<int>("UpdatedBy").HasColumnType("integer");
+                    b.Property<Guid?>("ProviderId").HasColumnType("uuid");
+                    b.Property<string>("Unit").IsRequired().HasMaxLength(16).HasColumnType("character varying(16)");
+                    b.Property<long?>("ReferencePrice").HasColumnType("bigint");
+                    b.Property<string>("Warranty").HasMaxLength(1000).HasColumnType("character varying(1000)");
+                    b.HasIndex("ProviderId");
+                    b.HasKey("Id");
+                    b.HasIndex("Code").IsUnique();
+                    b.HasIndex("NormalizedName").IsUnique();
+                    b.ToTable("LAB_WORK_TYPE");
+                });
+            modelBuilder.Entity("DCMS.Domain.Features.SystemSettings.CatalogMedicine", b => {
+                    b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uuid");
+                    b.Property<string>("Code").IsRequired().HasMaxLength(40).HasColumnType("character varying(40)");
+                    b.Property<string>("Name").IsRequired().HasMaxLength(200).HasColumnType("character varying(200)");
+                    b.Property<string>("NormalizedName").IsRequired().HasMaxLength(200).HasColumnType("character varying(200)");
+                    b.Property<bool>("IsActive").HasColumnType("boolean");
+                    b.Property<int>("Version").IsConcurrencyToken().HasColumnType("integer");
+                    b.Property<DateTimeOffset>("CreatedAt").HasColumnType("timestamp with time zone");
+                    b.Property<int>("CreatedBy").HasColumnType("integer");
+                    b.Property<DateTimeOffset>("UpdatedAt").HasColumnType("timestamp with time zone");
+                    b.Property<int>("UpdatedBy").HasColumnType("integer");
+                    b.Property<string>("ActiveIngredient").HasMaxLength(200).HasColumnType("character varying(200)");
+                    b.Property<string>("Strength").HasMaxLength(200).HasColumnType("character varying(200)");
+                    b.Property<string>("DosageForm").HasMaxLength(200).HasColumnType("character varying(200)");
+                    b.Property<string>("BaseUnit").IsRequired().HasMaxLength(40).HasColumnType("character varying(40)");
+                    b.Property<string>("Packaging").HasMaxLength(160).HasColumnType("character varying(160)");
+                    b.Property<string>("Instructions").HasMaxLength(1000).HasColumnType("character varying(1000)");
+                    b.Property<long?>("ReferencePrice").HasColumnType("bigint");
+                    b.Property<bool>("PrescriptionEligible").HasColumnType("boolean");
+                    b.Property<bool>("InternalStockTracked").HasColumnType("boolean");
+                    b.HasKey("Id");
+                    b.HasIndex("Code").IsUnique();
+                    b.HasIndex("NormalizedName").IsUnique();
+                    b.ToTable("CATALOG_MEDICINE");
+                });
             modelBuilder.Entity("DCMS.Domain.Features.Accounts.AccountAudit", b =>
                 {
                     b.Property<long>("Id")
@@ -1528,6 +1623,18 @@ namespace DCMS.Infrastructure.Persistence.Migrations
 
                     b.Property<DateOnly?>("BirthDate")
                         .HasColumnType("date");
+
+                    b.Property<Guid?>("CustomerGroupId").HasColumnType("uuid");
+                    b.Property<Guid[]>("IntakeHistoryIds").IsRequired().HasColumnType("uuid[]");
+                    b.Property<string>("IntakeHistoryOther").HasMaxLength(1000).HasColumnType("character varying(1000)");
+                    b.Property<DateTimeOffset?>("IntakeRecordedAt").HasColumnType("timestamp with time zone");
+                    b.Property<int?>("IntakeRecordedBy").HasColumnType("integer");
+                    b.Property<Guid?>("OccupationId").HasColumnType("uuid");
+                    b.Property<DateOnly?>("ProfileDate").HasColumnType("date");
+                    b.Property<Guid?>("SourceId").HasColumnType("uuid");
+                    b.HasIndex("CustomerGroupId");
+                    b.HasIndex("OccupationId");
+                    b.HasIndex("SourceId");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -4561,6 +4668,14 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                 {
                     b.Navigation("Versions");
                 });
+            modelBuilder.Entity("DCMS.Domain.Features.Patients.PatientProfile", b => {
+                b.HasOne("DCMS.Domain.Features.SystemSettings.ReferenceEntry", null).WithMany().HasForeignKey("CustomerGroupId").OnDelete(DeleteBehavior.Restrict);
+                b.HasOne("DCMS.Domain.Features.SystemSettings.ReferenceEntry", null).WithMany().HasForeignKey("OccupationId").OnDelete(DeleteBehavior.Restrict);
+                b.HasOne("DCMS.Domain.Features.SystemSettings.ReferenceEntry", null).WithMany().HasForeignKey("SourceId").OnDelete(DeleteBehavior.Restrict);
+            });
+            modelBuilder.Entity("DCMS.Domain.Features.SystemSettings.LabWorkType", b => {
+                b.HasOne("DCMS.Domain.Features.SystemSettings.CatalogProvider", null).WithMany().HasForeignKey("ProviderId").OnDelete(DeleteBehavior.Restrict);
+            });
             modelBuilder.Entity("DCMS.Domain.Features.SystemSettings.MaterialCatalogItem", b => {
                 b.HasOne("DCMS.Domain.Features.SystemSettings.MaterialCategory", "Category").WithMany().HasForeignKey("CategoryId").OnDelete(DeleteBehavior.Restrict).IsRequired();
                 b.Navigation("Category");

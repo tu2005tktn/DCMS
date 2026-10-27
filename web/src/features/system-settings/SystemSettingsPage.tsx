@@ -1,8 +1,12 @@
 import { Alert, Button, Card, Empty, Form, Input, Modal, Result, Select, Space, Table, Tabs, Typography } from 'antd';
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { api, ApiError } from '../../services/api';
 import { useAuth } from '../authentication/AuthContext';
+import GeneralSettingsPanel from './GeneralSettingsPanel';
+import ReferenceCatalogPanel from './ReferenceCatalogPanel';
+import SupplyCatalogPanel from './SupplyCatalogPanel';
+import type { SettingsCapabilities } from './generalSettings';
 import './systemSettings.css';
 
 type Kind = 'materials' | 'material-categories';
@@ -19,7 +23,41 @@ async function allCategories() {
     if (!batch.items.length || result.length >= batch.total) return result;
   }
 }
+// S58 shell: one tab per section the server allows (GET /api/settings/capabilities); each API rechecks access.
 export default function SystemSettingsPage() {
+  const [modal, modalContext] = Modal.useModal();
+  const [search, setSearch] = useSearchParams();
+  const [capabilities, setCapabilities] = useState<SettingsCapabilities | null>(null), [error, setError] = useState<string>(), [revision, setRevision] = useState(0);
+  const dirty = useRef(false);
+  useEffect(() => {
+    let live = true; setError(undefined);
+    void api<SettingsCapabilities>('/api/settings/capabilities').then(v => { if (live) setCapabilities(v); })
+      .catch(e => { if (live) setError((e as Error).message); });
+    return () => { live = false; };
+  }, [revision]);
+  if (error) return <Alert type="error" showIcon message={error} action={<Button onClick={() => setRevision(v => v + 1)}>Thử lại</Button>} />;
+  if (!capabilities) return <Card loading />;
+  const tabs = [
+    ...(capabilities.sections.some(x => x.key === 'general') ? [{ key: 'general', label: 'Thiết lập chung', children: <GeneralSettingsPanel onDirtyChange={v => { dirty.current = v; }} /> }] : []),
+    ...(capabilities.sections.some(x => x.key === 'catalogs') ? [{ key: 'catalogs', label: 'Danh mục hồ sơ/nghiệp vụ', children: <ReferenceCatalogPanel /> }] : []),
+    ...(capabilities.sections.some(x => x.key === 'supplies') ? [{ key: 'supplies', label: 'Vật tư, labo & thuốc', children: <SupplyCatalogPanel /> }] : []),
+    ...(capabilities.sections.some(x => x.key === 'materials') ? [{ key: 'materials', label: 'Dụng cụ / Vật liệu', children: <MaterialCatalog /> }] : []),
+  ];
+  if (!tabs.length) return <Result status="403" title="Bạn không có quyền thực hiện thao tác này." extra={<Link to="/">Về trang chủ</Link>} />;
+  const active = tabs.some(x => x.key === search.get('tab')) ? search.get('tab')! : tabs[0].key;
+  function change(key: string) {
+    const go = () => { dirty.current = false; setSearch({ tab: key }, { replace: true }); };
+    if (!dirty.current) { go(); return; }
+    modal.confirm({ title: 'Bỏ thay đổi chưa lưu?', content: 'Thiết lập vừa sửa sẽ không được lưu.', okText: 'Bỏ thay đổi', cancelText: 'Tiếp tục sửa', onOk: go });
+  }
+  return <div className="system-settings-page">
+    {modalContext}
+    <Typography.Title level={2}>Thiết lập hệ thống</Typography.Title>
+    <Tabs activeKey={active} onChange={change} destroyInactiveTabPane items={tabs} />
+  </div>;
+}
+
+function MaterialCatalog() {
   const { user } = useAuth();
   const allowed = user?.accountType === 'Staff' && user.effectiveRoles.includes('Dentist');
   const [kind, setKind] = useState<Kind>('materials'), [query, setQuery] = useState(''), [search, setSearch] = useState('');
@@ -94,8 +132,7 @@ export default function SystemSettingsPage() {
   if (!allowed) return <Result status="403" title="Bạn không có quyền thực hiện thao tác này." extra={<Link to="/">Về trang chủ</Link>} />;
   const options = categories?.map(c => ({value:c.id,label:c.name})) ?? [];
   const itemMode = kind === 'materials';
-  return <div className="system-settings-page">
-    <Typography.Title level={2}>Thiết lập hệ thống</Typography.Title>
+  return <div>
     <Typography.Paragraph type="secondary">Danh mục dụng cụ và vật liệu dùng chung cho các chi nhánh.</Typography.Paragraph>
     <Card><Tabs activeKey={kind} onChange={tab} items={[{key:'materials',label:'Dụng cụ / Vật liệu'},{key:'material-categories',label:'Danh mục'}]} />
       <div className="system-settings-toolbar">

@@ -129,7 +129,8 @@ function Workspace() {
       ...(auth.user?.permissions.includes('reception.read') ? [{ key: '/reception', label: <Link to="/reception">Tiếp nhận và hàng chờ</Link> }] : []),
       ...(auth.user?.permissions.includes('accounts.manage') ? [{ key: '/accounts', label: <Link to="/accounts">Quản lý tài khoản</Link> }] : []),
       ...(auth.user?.permissions.includes('patients.read') ? [{ key: '/patients', label: <Link to="/patients">Bệnh nhân</Link> }] : []),
-      ...(auth.user?.effectiveRoles.includes('Dentist') ? [{ key: '/system-settings', label: <Link to="/system-settings">Thiết lập hệ thống</Link> }] : []),
+      ...(auth.user?.effectiveRoles.includes('Dentist') || auth.user?.permissions.includes('settings.general.manage')
+        ? [{ key: '/system-settings', label: <Link to="/system-settings">Thiết lập hệ thống</Link> }] : []),
       ...(auth.user?.effectiveRoles.includes('Dentist') ? [{ key: '/treatment-templates', label: <Link to="/treatment-templates">Mẫu điều trị</Link> }] : []),
       ...(auth.user?.effectiveRoles.some(r => ['Admin', 'ClinicOwner', 'Dentist'].includes(r)) ? [{ key: '/commercial/treatment',
         label: <Link to="/commercial/treatment">Giá và duyệt điều trị</Link> }] : []),
