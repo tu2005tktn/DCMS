@@ -46,6 +46,7 @@ internal static class SchedulingModel
         });
         model.Entity<SchedulingService>(b =>
         {
+            b.Property(x => x.Unit).HasMaxLength(40).HasDefaultValue("lần");
             b.HasIndex(x => x.BranchId).IsUnique().HasFilter("\"IsInitialExamination\" = TRUE");
             b.Property(x => x.PublicBookable).HasDefaultValue(true);
             b.ToTable("SCHEDULING_SERVICE", t => t.HasCheckConstraint("CK_SERVICE_DURATION", "\"PublicDurationMinutes\" BETWEEN 1 AND 480"));

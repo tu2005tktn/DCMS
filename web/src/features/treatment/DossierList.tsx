@@ -6,15 +6,18 @@ import { useAuth } from '../authentication/AuthContext';
 import type { AppointmentOptions, DossierListItem, DossierPage, TreatmentChange, TreatmentDossier } from './types';
 import { money } from './types';
 import TreatmentSheet from './TreatmentSheet';
+import DossierClosureModal from './DossierClosureModal';
+import type { DossierTotals } from './sheetTypes';
+import FinancialPatientDossiers from './FinancialPatientDossiers';
 
 type Values = { branchId: number; dentistId: number; diagnosis: string; note?: string };
 const displayTime = (value: string) => new Intl.DateTimeFormat('vi-VN', {
   dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Ho_Chi_Minh',
 }).format(new Date(value));
 
-export default function DossierList({ patientId, visitId, diagnosis, branchId: contextBranchId, dentistId,
+export default function DossierList({ patientId, visitId, sourceVisitVersion, diagnosis, branchId: contextBranchId, dentistId,
   patientName, patientCode, patientAge }: { patientId: number; visitId?: string; diagnosis?: string | null;
-  branchId?: number; dentistId?: number; patientName?: string; patientCode?: string; patientAge?: number | null }) {
+  branchId?: number; dentistId?: number; sourceVisitVersion?: number; patientName?: string; patientCode?: string; patientAge?: number | null }) {
   const auth = useAuth();
   const navigate = useNavigate();
   const [page, setPage] = useState<DossierPage | null>(null);
@@ -25,7 +28,6 @@ export default function DossierList({ patientId, visitId, diagnosis, branchId: c
   const [pageNumber, setPageNumber] = useState(1);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [selected, setSelected] = useState<TreatmentDossier | null>(null);
-  const [visiblePlanTotal, setVisiblePlanTotal] = useState<{ dossierId: string; amount: number } | null>(null);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -35,15 +37,16 @@ export default function DossierList({ patientId, visitId, diagnosis, branchId: c
   const deleteKey = useRef(crypto.randomUUID());
   const [statusError, setStatusError] = useState<{ id: string; message: string } | null>(null);
   const [statusBusyId, setStatusBusyId] = useState<string | null>(null);
-  const statusRequest = useRef<{ id: string; completed: boolean; key: string } | null>(null);
+  const [clinicalTarget, setClinicalTarget] = useState<{ dossier: TreatmentDossier; completed: boolean } | null>(null);
+  const [totals, setTotals] = useState<DossierTotals | null>(null);
+  const [totalsError, setTotalsError] = useState<string | null>(null);
   const [form] = Form.useForm<Values>();
   const createKey = useRef(crypto.randomUUID());
   const branchId = Form.useWatch('branchId', form);
   const canUse = auth.user?.effectiveRoles.includes('Dentist') ?? false;
-  const onPlanTotalChange = useCallback((dossierId: string, amount: number) => {
-    setVisiblePlanTotal(current => current?.dossierId === dossierId && current.amount === amount
-      ? current : { dossierId, amount });
-  }, []);
+  const onPlanTotalChange = useCallback(() => {
+    void api<DossierTotals>(`/api/patients/${patientId}/dossiers/summary`).then(setTotals).catch(f => setTotalsError((f as Error).message));
+  }, [patientId]);
 
   useEffect(() => {
     if (!canUse) return;
@@ -53,6 +56,8 @@ export default function DossierList({ patientId, visitId, diagnosis, branchId: c
     api<DossierPage>(`/api/patients/${patientId}/dossiers?page=${pageNumber}&pageSize=20`)
       .then(result => { if (active) { setPage(result); setActiveId(result.items[0]?.id ?? null); } })
       .catch(failure => { if (active) setError(failure as ApiError); });
+    api<DossierTotals>(`/api/patients/${patientId}/dossiers/summary`).then(v => { if (active) { setTotals(v); setTotalsError(null); } })
+      .catch(f => { if (active) setTotalsError((f as Error).message); });
     return () => { active = false; };
   }, [patientId, pageNumber, revision, canUse]);
   useEffect(() => {
@@ -70,7 +75,8 @@ export default function DossierList({ patientId, visitId, diagnosis, branchId: c
     setBusy(true); setSaveError(null);
     try {
       const result = await api<TreatmentChange>(`/api/patients/${patientId}/dossiers`, {
-        method: 'POST', body: JSON.stringify({ ...values, requestKey: createKey.current }),
+        method: 'POST', body: JSON.stringify({ ...values, requestKey: createKey.current,
+          ...(visitId && sourceVisitVersion ? { sourceVisitId: visitId, expectedSourceVisitVersion: sourceVisitVersion } : {}) }),
       });
       setOpen(false); form.resetFields(); createKey.current = crypto.randomUUID();
       navigate(`/patients/${patientId}/dossiers/${result.dossier.id}${visitId ? `?visitId=${visitId}` : ''}`);
@@ -93,41 +99,27 @@ export default function DossierList({ patientId, visitId, diagnosis, branchId: c
   }
 
   async function changeStatus(item: DossierListItem, completed: boolean) {
-    if (item.displayCompleted === completed || statusBusyId) return;
-    if (statusRequest.current?.id !== item.id || statusRequest.current.completed !== completed)
-      statusRequest.current = { id: item.id, completed, key: crypto.randomUUID() };
+    if ((item.state === 'Open' && !completed) || statusBusyId) return;
     setStatusBusyId(item.id); setStatusError(null);
-    try {
-      const result = await api<TreatmentChange>(`/api/dossiers/${item.id}/display-status`, {
-        method: 'POST', body: JSON.stringify({ expectedVersion: item.version, completed,
-          requestKey: statusRequest.current.key }),
-      });
-      setPage(current => current && ({ ...current, items: current.items.map(row => row.id === item.id
-        ? { ...row, displayCompleted: result.dossier.displayCompleted, version: result.dossier.version }
-        : row) }));
-      setSelected(current => current?.id === item.id ? result.dossier : current);
-      statusRequest.current = null;
-    } catch (failure) { setStatusError({ id: item.id, message: (failure as Error).message }); }
+    try { const value = await api<TreatmentDossier>(`/api/dossiers/${item.id}`); setClinicalTarget({ dossier: value, completed }); }
+    catch (failure) { setStatusError({ id: item.id, message: (failure as Error).message }); }
     finally { setStatusBusyId(null); }
   }
 
-  if (!canUse) return <Alert type="info" showIcon message="Hồ sơ điều trị chỉ dành cho bác sĩ được phân quyền." />;
-  const planned = selected && visiblePlanTotal?.dossierId === selected.id ? visiblePlanTotal.amount
-    : selected?.financialSummary?.plannedVnd ?? selected?.items.filter(item => item.decision === 'Agreed')
-    .reduce((sum, item) => sum + Math.round(item.quantity * item.agreedUnitPriceVnd)
-      - (item.discount?.status === 'Approved' ? item.discount.amountVnd : 0), 0);
+  if (!canUse) return <FinancialPatientDossiers patientId={patientId} />;
   return <section className="treatment-list treatment-sheets" aria-label="Các phiếu điều trị">
     <div className="treatment-sheets-heading"><div>
       <Typography.Title level={4}>DS PHIẾU ĐIỀU TRỊ/DỊCH VỤ</Typography.Title>
       <Typography.Paragraph>{patientName || 'Bệnh nhân'} (MSKH: {patientCode || `#${patientId}`},
         {' '}{patientAge !== null && patientAge !== undefined ? `${patientAge} tuổi` : 'chưa rõ tuổi'})</Typography.Paragraph>
     </div>
-    <div className="treatment-sheets-summary" aria-label="Tóm tắt phiếu đang mở">
-      <div><strong>Tổng cộng{selected ? ' (dự kiến)' : ''}:</strong> <span>{planned === undefined ? '—' : money(planned)}</span></div>
-      <div><strong>Đã trả:</strong> <span>{selected?.financialSummary?.available && selected.financialSummary.receivedVnd !== null
-        && selected.financialSummary.receivedVnd !== undefined ? money(selected.financialSummary.receivedVnd) : 'Chưa có dữ liệu đối soát'}</span></div>
-      <div><strong>Còn lại:</strong> <span>{selected?.financialSummary?.available && selected.financialSummary.outstandingVnd !== null
-        && selected.financialSummary.outstandingVnd !== undefined ? money(selected.financialSummary.outstandingVnd) : 'Chưa có dữ liệu đối soát'}</span></div>
+    <div className="treatment-sheets-summary" aria-label="Tóm tắt các phiếu được phép xem">
+      {totalsError ? <Alert type="error" message={totalsError} /> : <>
+        <div><strong>Tổng cộng (dự kiến):</strong> <span>{totals ? money(totals.plannedNetVnd) : 'Đang tải…'}</span></div>
+        <div><strong>Đã trả:</strong> <span>{totals?.financialAvailable && totals.confirmedAllocatedVnd != null ? money(totals.confirmedAllocatedVnd) : 'Chưa có dữ liệu đối soát'}</span></div>
+        <div><strong>Còn nợ:</strong> <span>{totals?.financialAvailable && totals.outstandingVnd != null ? money(totals.outstandingVnd) : 'Chưa có dữ liệu đối soát'}</span></div>
+        {(totals?.pendingFeeCount ?? 0) > 0 && <div>{totals?.pendingFeeCount} hoạt động đang chờ ghi phí</div>}
+      </>}
     </div></div>
     {error ? <Alert type="error" showIcon message={error.message}
       action={<Button onClick={() => setRevision(value => value + 1)}>Thử lại</Button>} />
@@ -143,11 +135,11 @@ export default function DossierList({ patientId, visitId, diagnosis, branchId: c
                 { key: 'pending', label: 'Chưa xong', onClick: () => void changeStatus(item, false) },
                 { key: 'complete', label: 'Hoàn tất', onClick: () => void changeStatus(item, true) },
               ] }}><button type="button"
-                className={`treatment-sheet-state ${item.displayCompleted ? 'is-complete' : 'is-pending'}`}
-                aria-label={`Trạng thái phiếu: ${item.displayCompleted ? 'Hoàn tất' : 'Chưa xong'}`}
+                className={`treatment-sheet-state ${item.state === 'Completed' ? 'is-complete' : 'is-pending'}`}
+                aria-label={`Trạng thái phiếu: ${item.state === 'Completed' ? 'Hoàn tất' : item.state === 'Stopped' ? 'Đã ngừng' : 'Chưa xong'}`}
                 aria-busy={statusBusyId === item.id} disabled={statusBusyId === item.id}
                 title="Chọn trạng thái phiếu">
-                {item.displayCompleted ? 'Hoàn tất' : 'Chưa xong'} <span aria-hidden="true">⌄</span>
+                {item.state === 'Completed' ? 'Hoàn tất' : item.state === 'Stopped' ? 'Đã ngừng' : 'Chưa xong'} <span aria-hidden="true">⌄</span>
               </button></Dropdown>
               <Button aria-label={`Xóa phiếu ${item.code}`} onClick={() => {
                 setDeleteTarget(item); setDeleteError(null); deleteKey.current = crypto.randomUUID();
@@ -176,6 +168,8 @@ export default function DossierList({ patientId, visitId, diagnosis, branchId: c
         {page.total > page.page * page.pageSize && <Button onClick={() => setPageNumber(value => value + 1)}>Xem thêm phiếu</Button>}
         {page.page > 1 && <Button onClick={() => setPageNumber(value => value - 1)}>Trang trước</Button>}</>}
     <div className="treatment-sheet-create-row"><Button className="treatment-sheet-create" onClick={() => { setSaveError(null); createKey.current = crypto.randomUUID(); form.setFieldsValue({ diagnosis: diagnosis ?? undefined, branchId: contextBranchId, dentistId }); setOpen(true); }}>+ TẠO PHIẾU MỚI</Button></div>
+    {clinicalTarget && <DossierClosureModal dossier={clinicalTarget.dossier} completed={clinicalTarget.completed}
+      onClose={() => setClinicalTarget(null)} onSaved={() => { setClinicalTarget(null); setRevision(v => v + 1); }} />}
     <Modal open={!!deleteTarget} title={`Xóa phiếu ${deleteTarget?.code ?? ''}?`}
       okText="Xóa phiếu" okButtonProps={{ danger: true, loading: deleteBusy }}
       onOk={() => void deleteDossier()} onCancel={() => { if (!deleteBusy) setDeleteTarget(null); }}>

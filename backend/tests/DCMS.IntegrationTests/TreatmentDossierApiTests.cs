@@ -100,7 +100,7 @@ public sealed class TreatmentDossierApiTests(ApiFixture fixture) : IClassFixture
     }
 
     [Fact]
-    public async Task DisplayFlagIsIndependentFromClinicalCompletion()
+    public async Task LegacyDisplayFlagCannotBypassClinicalClosure()
     {
         var setup = await Prepare();
         using var dentist = await Login("dentist.demo");
@@ -119,23 +119,13 @@ public sealed class TreatmentDossierApiTests(ApiFixture fixture) : IClassFixture
         var flagKey = Guid.NewGuid();
         var flagRequest = new SetDossierDisplayStatusRequest(committed.Version, true, flagKey);
         var flagResponse = await dentist.PostAsJsonAsync($"/api/dossiers/{created.Id}/display-status", flagRequest);
-        Assert.Equal(HttpStatusCode.OK, flagResponse.StatusCode);
-        var flagged = (await flagResponse.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
-        Assert.True(flagged.DisplayCompleted);
-        Assert.Equal("Open", flagged.State);
-        Assert.Equal("NotStarted", Assert.Single(flagged.Items).Progress);
-        var replayResponse = await dentist.PostAsJsonAsync($"/api/dossiers/{created.Id}/display-status", flagRequest);
-        Assert.Equal(HttpStatusCode.OK, replayResponse.StatusCode);
-        Assert.Equal(flagged.Version, (await replayResponse.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier.Version);
-        await AssertMessage(await dentist.PostAsJsonAsync($"/api/dossiers/{created.Id}/display-status",
-            flagRequest with { Completed = false }), HttpStatusCode.Conflict, "MSG111");
+        await AssertMessage(flagResponse, HttpStatusCode.Conflict, "MSG243");
+        var read = (await dentist.GetFromJsonAsync<TreatmentDossierDto>($"/api/dossiers/{created.Id}"))!;
+        Assert.Equal("Open", read.State);
+        Assert.False(read.DisplayCompleted);
+        Assert.Equal("NotStarted", Assert.Single(read.Items).Progress);
         await AssertMessage(await dentist.PostAsJsonAsync($"/api/dossiers/{created.Id}/close",
-            new CloseDossierRequest(flagged.Version, "CompletedAsAgreed", null, [], Guid.NewGuid())),
-            HttpStatusCode.Conflict, "MSG243");
-        var unflagResponse = await dentist.PostAsJsonAsync($"/api/dossiers/{created.Id}/display-status",
-            new SetDossierDisplayStatusRequest(flagged.Version, false, Guid.NewGuid()));
-        Assert.Equal(HttpStatusCode.OK, unflagResponse.StatusCode);
-        Assert.False((await unflagResponse.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier.DisplayCompleted);
+            new CloseDossierRequest(read.Version, "CompletedAsAgreed", null, [], Guid.NewGuid())), HttpStatusCode.Conflict, "MSG243");
     }
 
     [Fact]

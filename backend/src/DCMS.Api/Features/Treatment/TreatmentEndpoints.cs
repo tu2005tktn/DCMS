@@ -11,6 +11,9 @@ public static class TreatmentEndpoints
 
     public static void MapTreatmentEndpoints(this IEndpointRouteBuilder endpoints)
     {
+        endpoints.MapGet("/api/patients/{patientId:int}/dossiers/financial-context", async (HttpContext context,
+            int patientId, ITreatmentFinancialWorkspace service, CancellationToken ct) => Results.Ok(await service.ListAsync(
+                AuthenticationEndpoints.AccountId(context.User), patientId, ct))).RequireAuthorization();
         var prices = endpoints.MapGroup("/api/service-prices").RequireAuthorization().WithTags("S21 reference prices");
         prices.MapGet("/", async (HttpContext context, IServicePriceService service, CancellationToken ct) =>
             Results.Ok(await service.ListAsync(AuthenticationEndpoints.AccountId(context.User), ct)));
@@ -31,11 +34,43 @@ public static class TreatmentEndpoints
             var result = await service.CreateAsync(AuthenticationEndpoints.AccountId(context.User), patientId, request, ct);
             return Results.Created($"/api/dossiers/{result.Dossier.Id}", result);
         });
+        patient.MapGet("/summary", async (HttpContext context, int patientId, int? branchId,
+            ITreatmentDossierService service, CancellationToken ct) => Results.Ok(await service.SummaryAsync(
+                AuthenticationEndpoints.AccountId(context.User), patientId, branchId, ct)));
 
         var dossier = endpoints.MapGroup("/api/dossiers/{dossierId:guid}")
             .RequireAuthorization(DentistPolicy).WithTags("UC-13/39 S21/S43 Treatment");
         dossier.MapGet("/", async (HttpContext context, Guid dossierId, ITreatmentDossierService service, CancellationToken ct) =>
             Results.Ok(await service.GetAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, ct)));
+        dossier.MapGet("/sheet-context", async (HttpContext context, Guid dossierId, ITreatmentDossierService service, CancellationToken ct) =>
+            Results.Ok(await service.SheetContextAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, ct)));
+        dossier.MapGet("/activities", async (HttpContext context, Guid dossierId, Guid? visitId, DateOnly? from, DateOnly? to,
+            int? page, int? pageSize, ITreatmentDossierService service, CancellationToken ct) => Results.Ok(await service.ActivitiesAsync(
+                AuthenticationEndpoints.AccountId(context.User), dossierId, visitId, from, to, page ?? 1, pageSize ?? 20, ct)));
+        dossier.MapPost("/sheet-drafts/{rowId:guid}/confirm-plan", async (HttpContext context, Guid dossierId, Guid rowId,
+            ConfirmSheetPlanRequest request, ITreatmentDossierService service, CancellationToken ct) => Results.Ok(await service.ConfirmSheetPlanAsync(
+                AuthenticationEndpoints.AccountId(context.User), dossierId, rowId, request, ct)));
+        dossier.MapPost("/sheet-drafts/{rowId:guid}/confirm-actual", async (HttpContext context, Guid dossierId, Guid rowId,
+            ConfirmSheetActualRequest request, ITreatmentDossierService service, CancellationToken ct) => Results.Ok(await service.ConfirmSheetActualAsync(
+                AuthenticationEndpoints.AccountId(context.User), dossierId, rowId, request, ct)));
+        dossier.MapPut("/sheet-activities/{activityId:guid}", async (HttpContext context, Guid dossierId, Guid activityId, EditSheetActivityRequest request,
+            ITreatmentDossierService service, CancellationToken ct) => Results.Ok(await service.EditSheetActivityAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, activityId, request, ct)));
+        dossier.MapDelete("/sheet-activities/{activityId:guid}", async (HttpContext context, Guid dossierId, Guid activityId, [FromBody] SheetActivityActionRequest request,
+            ITreatmentDossierService service, CancellationToken ct) => Results.Ok(await service.DeleteSheetActivityAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, activityId, request, ct)));
+        dossier.MapPut("/sheet-items/{itemId:guid}", async (HttpContext context, Guid dossierId, Guid itemId, EditSheetItemRequest request,
+            ITreatmentDossierService service, CancellationToken ct) => Results.Ok(await service.EditSheetItemAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, itemId, request, ct)));
+        dossier.MapPost("/sheet-items/{itemId:guid}/perform", async (HttpContext context, Guid dossierId, Guid itemId, PerformSheetItemRequest request,
+            ITreatmentDossierService service, CancellationToken ct) => Results.Ok(await service.PerformSheetItemAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, itemId, request, ct)));
+        dossier.MapPatch("/sheet-items/{itemId:guid}/display-completion", async (HttpContext context, Guid dossierId, Guid itemId, MarkSheetItemRequest request,
+            ITreatmentDossierService service, CancellationToken ct) => Results.Ok(await service.MarkSheetItemAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, itemId, request, ct)));
+        dossier.MapDelete("/sheet-items/{itemId:guid}", async (HttpContext context, Guid dossierId, Guid itemId, [FromBody] SheetItemActionRequest request,
+            ITreatmentDossierService service, CancellationToken ct) => Results.Ok(await service.DeleteSheetItemAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, itemId, request, ct)));
+        dossier.MapPatch("/plan/items/{itemId:guid}/schedule-note", async (HttpContext context, Guid dossierId, Guid itemId,
+            ScheduleNoteRequest request, ITreatmentDossierService service, CancellationToken ct) => Results.Ok(await service.ScheduleNoteAsync(
+                AuthenticationEndpoints.AccountId(context.User), dossierId, itemId, request, ct)));
+        dossier.MapPost("/plan/items/{itemId:guid}/decision", async (HttpContext context, Guid dossierId, Guid itemId,
+            DecideSheetItemRequest request, ITreatmentDossierService service, CancellationToken ct) => Results.Ok(await service.DecideSheetItemAsync(
+                AuthenticationEndpoints.AccountId(context.User), dossierId, itemId, request, ct)));
         dossier.MapDelete("/", async (HttpContext context, Guid dossierId, [FromBody] DeleteDossierRequest request,
             ITreatmentDossierService service, CancellationToken ct) => Results.Ok(await service.DeleteAsync(
                 AuthenticationEndpoints.AccountId(context.User), dossierId, request, ct)));

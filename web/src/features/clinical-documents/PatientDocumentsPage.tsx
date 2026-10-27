@@ -31,6 +31,7 @@ export default function PatientDocumentsPage() {
   const filters: DocumentFilters = useMemo(() => ({
     type: (search.get('type') as DocumentType) || undefined, from: search.get('from') || undefined,
     to: search.get('to') || undefined, visitId: search.get('visitId') || undefined,
+    dossierId: search.get('dossierId') || undefined, planId: search.get('planId') || undefined,
   }), [search]);
   const uploadContext = { visitId: search.get('visitId') || undefined, dossierId: search.get('dossierId') || undefined,
     planId: search.get('planId') || undefined, investigationId: search.get('investigationId') || undefined,

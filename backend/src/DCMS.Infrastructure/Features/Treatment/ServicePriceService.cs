@@ -56,7 +56,7 @@ public sealed class ServicePriceService(DcmsDbContext db, UserManager<Applicatio
         }
         return await query.OrderBy(x => x.BranchId).ThenBy(x => x.Name)
             .Select(x => new ServicePriceDto(x.Id, x.BranchId, x.Name,
-                x.ReferenceUnitPriceVnd, x.PriceVersion)).ToArrayAsync(ct);
+                x.ReferenceUnitPriceVnd, x.PriceVersion, x.Unit)).ToArrayAsync(ct);
     }
 
     public async Task<ServicePriceDto> GetAsync(int actorId, int serviceId, CancellationToken ct)
@@ -64,7 +64,7 @@ public sealed class ServicePriceService(DcmsDbContext db, UserManager<Applicatio
         var service = await db.Set<SchedulingService>().AsNoTracking().SingleOrDefaultAsync(x => x.Id == serviceId, ct)
             ?? throw Error("MSG113", 404);
         await AuthorizeAsync(actorId, service.BranchId, false, ct);
-        return new(service.Id, service.BranchId, service.Name, service.ReferenceUnitPriceVnd, service.PriceVersion);
+        return new(service.Id, service.BranchId, service.Name, service.ReferenceUnitPriceVnd, service.PriceVersion, service.Unit);
     }
 
     public async Task<ServicePriceDto> SaveAsync(int actorId, int serviceId, SaveServicePriceRequest request,
@@ -86,11 +86,13 @@ public sealed class ServicePriceService(DcmsDbContext db, UserManager<Applicatio
             return JsonSerializer.Deserialize<ServicePriceDto>(receipt.ResultJson)!;
         }
         if (service.PriceVersion != request.ExpectedVersion) throw Error("MSG111", 409);
+        if (request.Unit != null && request.Unit is not ("lần" or "răng" or "hàm" or "gói" or "g" or "ml")) throw Error("MSG04", 400);
         service.ReferenceUnitPriceVnd = request.ReferenceUnitPriceVnd;
+        if (request.Unit != null) service.Unit = request.Unit;
         service.PriceVersion++;
         await db.SaveChangesAsync(ct);
         var result = new ServicePriceDto(service.Id, service.BranchId, service.Name,
-            service.ReferenceUnitPriceVnd, service.PriceVersion);
+            service.ReferenceUnitPriceVnd, service.PriceVersion, service.Unit);
         db.Add(new ScheduleReceipt { ActorId = actorId, RequestKey = request.RequestKey,
             Fingerprint = fingerprint, ResultJson = JsonSerializer.Serialize(result) });
         await db.SaveChangesAsync(ct);

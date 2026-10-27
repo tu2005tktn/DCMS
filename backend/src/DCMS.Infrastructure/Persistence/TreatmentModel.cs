@@ -41,7 +41,9 @@ internal static class TreatmentModel
             b.HasKey(x => x.Id);
             b.HasIndex(x => new { x.DossierId, x.PlannedOrder });
             b.Property(x => x.ServiceName).HasMaxLength(160);
+            b.Property(x => x.EntrySource).HasMaxLength(24);
             b.Property(x => x.Material).HasMaxLength(160);
+            b.Property(x => x.Note).HasMaxLength(1000);
             b.Property(x => x.DecisionPlanVersion).HasColumnType("integer");
             b.Property(x => x.Region).HasMaxLength(80);
             b.Property(x => x.Unit).HasMaxLength(40);

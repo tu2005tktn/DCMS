@@ -155,6 +155,7 @@ app.MapAccountEndpoints();
 app.MapPatientLinkEndpoints();
 app.MapPatientEndpoints();
 app.MapTreatmentEndpoints();
+DCMS.Api.Features.SystemSettings.SystemSettingsEndpoints.MapSystemSettingsEndpoints(app);
 app.MapClinicalWorkEndpoints();
 app.MapSchedulingEndpoints();
 app.MapAppointmentEndpoints();

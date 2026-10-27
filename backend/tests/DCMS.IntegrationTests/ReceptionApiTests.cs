@@ -33,7 +33,6 @@ public sealed class ReceptionClock : TimeProvider
     public override DateTimeOffset GetUtcNow() => Now;
 }
 public class ReceptionFixture : ApiFixture
-public sealed class ReceptionFixture : ApiFixture
 {
     public ReceptionClock Clock { get; } = new();
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -49,9 +48,6 @@ public sealed class ReceptionApiTests(ReceptionFixture fixture) : IClassFixture<
     internal sealed record Setup(int BranchId, int DentistId, int AssistantId, int ChairId, int ServiceId, int PatientId, Guid AppointmentId);
     private DateOnly Today => DateOnly.FromDateTime(fixture.Clock.Now.ToOffset(TimeSpan.FromHours(7)).DateTime);
     internal async Task<HttpClient> Login(string name = "assistant.demo", ApiFixture? targetFixture = null)
-    private sealed record Setup(int BranchId, int DentistId, int AssistantId, int ChairId, int ServiceId, int PatientId, Guid AppointmentId);
-    private DateOnly Today => DateOnly.FromDateTime(fixture.Clock.Now.ToOffset(TimeSpan.FromHours(7)).DateTime);
-    private async Task<HttpClient> Login(string name = "assistant.demo", ApiFixture? targetFixture = null)
     {
         var activeFixture = targetFixture ?? fixture;
         var client = activeFixture.CreateClient();
@@ -61,7 +57,6 @@ public sealed class ReceptionApiTests(ReceptionFixture fixture) : IClassFixture<
         return client;
     }
     internal async Task<Setup> Prepare(bool linked = true, int dayOffset = 0, ReceptionFixture? targetFixture = null)
-    private async Task<Setup> Prepare(bool linked = true, int dayOffset = 0, ReceptionFixture? targetFixture = null)
     {
         var activeFixture = targetFixture ?? fixture;
         using var scope = activeFixture.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
@@ -97,7 +92,6 @@ public sealed class ReceptionApiTests(ReceptionFixture fixture) : IClassFixture<
     private static CheckInRequest Command(Setup s) => new(s.PatientId, 1, Guid.NewGuid(), true, null, null, "InitialExamination", null, null);
     private static string Path(Setup s) => $"/api/reception/appointments/{s.AppointmentId}/check-in";
     internal async Task<VisitResult> Check(HttpClient client, Setup s, CheckInRequest? request = null)
-    private async Task<VisitResult> Check(HttpClient client, Setup s, CheckInRequest? request = null)
     {
         var response = await client.PostAsJsonAsync(Path(s), request ?? Command(s));
         Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());

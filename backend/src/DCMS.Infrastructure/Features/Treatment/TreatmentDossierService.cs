@@ -15,8 +15,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace DCMS.Infrastructure.Features.Treatment;
 
-public sealed class TreatmentDossierService(DcmsDbContext db, UserManager<ApplicationUser> users,
-    TimeProvider clock, ITreatmentFinancialSummaryPort financialPort) : ITreatmentDossierService
+public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManager<ApplicationUser> users,
+    TimeProvider clock, ITreatmentFinancialSummaryPort financialPort, IClinicalWorkService clinicalWork) : ITreatmentDossierService
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     private static BusinessException Error(string code, int status = 400) =>
@@ -44,12 +44,12 @@ public sealed class TreatmentDossierService(DcmsDbContext db, UserManager<Applic
 
     private static PlanPricePreviewDto PricePreview(TreatmentDossier dossier)
     {
-        var lines = dossier.Items.OrderBy(x => x.PlannedOrder).Select(x =>
+        var lines = dossier.Items.Where(x => !x.SheetDeleted && !x.HiddenFromSheet).OrderBy(x => x.PlannedOrder).Select(x =>
         {
             var gross = Gross(x);
             var discount = DiscountAmount(x);
             return new PlanPricePreviewItem(x.Id, gross, discount, gross - discount,
-                x.ReferenceUnitPriceVnd, x.Decision, x.Decision == "Agreed");
+                x.ReferenceUnitPriceVnd, x.Decision, x.Decision == "Agreed" || x.EntrySource == "ClinicianEntry");
         }).ToArray();
         return new(dossier.Id, dossier.Version, dossier.PlanVersion, lines,
             checked(lines.Where(x => x.IncludedInTotal).Sum(x => x.GrossVnd)),
@@ -128,20 +128,23 @@ public sealed class TreatmentDossierService(DcmsDbContext db, UserManager<Applic
     {
         var events = await db.TreatmentEvents.AsNoTracking().Where(x => x.DossierId == dossier.Id)
             .OrderBy(x => x.OccurredAt).ThenBy(x => x.Id).ToListAsync(ct);
+        var actorIds = events.Select(x => x.ActorId).Distinct().ToArray();
+        var actorNames = await db.Users.AsNoTracking().Where(x => actorIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.FullName, ct);
         var terms = JsonSerializer.Deserialize<PaymentTermDto[]>(dossier.PaymentTermsJson, Json) ?? [];
         var finance = await financialPort.ReadAsync(dossier.PatientId, dossier.BranchId, dossier.Id, ct);
+        var pendingFeeCount = await db.ClinicalActivities.CountAsync(x => x.DossierId == dossier.Id && x.State == "Posted" && x.FeeStatus == "Pending", ct);
         var planned = PricePreview(dossier).NetBeforeTaxVnd;
         finance = finance is { Available: true }
-            ? finance with { PlannedVnd = planned }
-            : new TreatmentFinancialSummary(false, planned, null, null, null, null, null);
+            ? finance with { PlannedVnd = planned, PendingFeeCount = pendingFeeCount }
+            : new TreatmentFinancialSummary(false, planned, null, null, null, null, null, PendingFeeCount: pendingFeeCount);
         return new(dossier.Id, dossier.Code, dossier.PatientId, dossier.BranchId, dossier.DentistId,
             dossier.StartedOn, dossier.Diagnosis, dossier.Note, dossier.State, dossier.ClosureOutcome,
             dossier.ClosureReason, dossier.Version, dossier.PlanId, dossier.PlanVersion, dossier.PlanState,
             dossier.Goals, dossier.Items.OrderBy(x => x.PlannedOrder).Select(ItemDto).ToArray(), terms,
             events.Select(x => new TreatmentEventDto(x.Id, x.Kind, x.DossierVersion, x.ActorId,
-                x.OccurredAt, x.PayloadJson)).ToArray(), finance.Available, dossier.CreatedAt, dossier.UpdatedAt,
+                x.OccurredAt, x.PayloadJson, actorNames.GetValueOrDefault(x.ActorId))).ToArray(), finance.Available, dossier.CreatedAt, dossier.UpdatedAt,
             finance, dossier.DepositExceptionReason, dossier.DepositExceptionBy,
-            dossier.DepositExceptionAt, dossier.DisplayCompleted);
+            dossier.DepositExceptionAt, dossier.State == "Completed", dossier.SourceExaminationId, dossier.SourceExaminationVersion);
     }
 
     private static TreatmentItemDto ItemDto(TreatmentItem x) => new(x.Id, x.SourceDiagnosisId, x.ServiceId,
@@ -158,7 +161,7 @@ public sealed class TreatmentDossierService(DcmsDbContext db, UserManager<Applic
                 x.DiscountQualifyingItemId, x.DiscountStatus, x.DiscountDecidedBy,
                 x.DiscountDecidedAt, DiscountAmount(x)),
         x.WarrantyComponent, x.WarrantyExclusions, x.WarrantyActivatedOn, x.WarrantyExplanation,
-        x.ExpectedServiceLifeMonths);
+        x.ExpectedServiceLifeMonths, x.Note, x.ResponsibleDentistId, x.AssistantId, x.EntrySource, x.DisplayCompleted, x.SheetDeleted, x.HiddenFromSheet);
 
     public async Task<DossierPage> ListAsync(int actorId, int patientId, int? branchId, int page, int pageSize,
         CancellationToken ct)
@@ -185,7 +188,7 @@ public sealed class TreatmentDossierService(DcmsDbContext db, UserManager<Applic
             .Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(ct);
         return new(rows.Select(x => new DossierListItem(x.Id, x.Code, x.PatientId, x.BranchId,
             x.DentistId, x.Diagnosis, x.State, x.ClosureOutcome, x.Version, x.PlanVersion, x.UpdatedAt,
-            x.DisplayCompleted))
+            x.State == "Completed"))
             .ToArray(), total, page, pageSize);
     }
 
@@ -195,26 +198,11 @@ public sealed class TreatmentDossierService(DcmsDbContext db, UserManager<Applic
     public async Task<TreatmentChange> SetDisplayStatusAsync(int actorId, Guid dossierId,
         SetDossierDisplayStatusRequest request, CancellationToken ct)
     {
-        var replay = await ReplayAsync(actorId, request.RequestKey, "DisplayStatus",
-            new { dossierId, request }, ct);
-        if (replay != null) return replay;
-        await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
         var dossier = await DossierAsync(actorId, dossierId, ct);
         if (dossier.Version != request.ExpectedVersion) throw Error("MSG111", 409);
-        if (dossier.DisplayCompleted != request.Completed)
-        {
-            dossier.DisplayCompleted = request.Completed;
-            dossier.Version++;
-            dossier.UpdatedAt = clock.GetUtcNow();
-            Event(dossier, actorId, "DossierDisplayStatusChanged", new { request.Completed });
-            await db.SaveChangesAsync(ct);
-        }
-        var result = new TreatmentChange(await DetailAsync(dossier, ct),
-            SystemMessages.Get("MSG222", "nhãn phiếu điều trị", value: dossier.Code));
-        StoreReceipt(actorId, request.RequestKey, "DisplayStatus", new { dossierId, request }, result);
-        await db.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
-        return result;
+        // Compatibility endpoint: a display flag cannot close or reopen a clinical course.
+        if (request.Completed != (dossier.State == "Completed")) throw Error("MSG243", 409);
+        return new(await DetailAsync(dossier, ct), SystemMessages.Get("MSG222", "trạng thái hồ sơ", value: dossier.Code));
     }
 
     public async Task<TreatmentChange> UpdateNoteAsync(int actorId, Guid dossierId,
@@ -230,10 +218,11 @@ public sealed class TreatmentDossierService(DcmsDbContext db, UserManager<Applic
         if (dossier.Version != request.ExpectedVersion) throw Error("MSG111", 409);
         if (dossier.Note != note)
         {
+            var before = dossier.Note;
             dossier.Note = note;
             dossier.Version++;
             dossier.UpdatedAt = clock.GetUtcNow();
-            Event(dossier, actorId, "DossierNoteUpdated", new { HasNote = note != null });
+            Event(dossier, actorId, "DossierNoteUpdated", new { Before = before, After = note });
             await db.SaveChangesAsync(ct);
         }
         var result = new TreatmentChange(await DetailAsync(dossier, ct),
@@ -263,25 +252,17 @@ public sealed class TreatmentDossierService(DcmsDbContext db, UserManager<Applic
         if (rowId == Guid.Empty || request.RequestKey == Guid.Empty || request.Kind is not ("Plan" or "Actual")
             || request.Row.ValueKind != JsonValueKind.Object) throw Error("MSG04");
         var row = request.Row;
-        bool Number(string name, decimal min) => row.TryGetProperty(name, out var value)
-            && value.ValueKind == JsonValueKind.Number && value.TryGetDecimal(out var number) && number >= min;
-        bool Text(string name, int max) => row.TryGetProperty(name, out var value)
-            && value.ValueKind == JsonValueKind.String && value.GetString() is { Length: > 0 } text
-            && text.Length <= max;
-        if (!Text("date", 10) || !DateOnly.TryParse(row.GetProperty("date").GetString(), out _)
-            || !Number("serviceId", 1) || !Number("dentistId", 1) || !Number("quantity", 1)
-            || !Number("costVnd", 0) || !row.TryGetProperty("regions", out var regions)
-            || regions.ValueKind != JsonValueKind.Array || regions.GetArrayLength() is < 1 or > 32
-            || regions.EnumerateArray().Any(x => x.ValueKind != JsonValueKind.String
-                || !int.TryParse(x.GetString(), out var tooth) || tooth is < 1 or > 99))
-            throw Error("MSG04");
-        if (request.Kind == "Actual" && (!request.VisitId.HasValue || !Text("note", 1000)))
-            throw Error("MSG04");
+        var typed = ReadRow(row);
         if (request.Kind == "Plan" && request.VisitId.HasValue) throw Error("MSG04");
+        await using var gate = await ClinicalRequestLock.AcquireAsync(db, request.RequestKey, ct);
+        await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
+        await db.Database.ExecuteSqlRawAsync($"SELECT pg_advisory_xact_lock({DCMS.Infrastructure.Features.Scheduling.WorkingScheduleService.TransactionLock})", ct);
         var dossier = await DossierAsync(actorId, dossierId, ct);
+        if (await db.ClinicalActivities.AnyAsync(x => x.Id == rowId, ct)
+            || request.Kind == "Plan" && await db.TreatmentItems.AnyAsync(x => x.Id == rowId, ct)) throw Error("MSG111", 409);
         if (dossier.State != "Open") throw Error("MSG240", 409);
-        var serviceId = row.GetProperty("serviceId").GetInt32();
-        var dentistId = row.GetProperty("dentistId").GetInt32();
+        var serviceId = typed.ServiceId;
+        var dentistId = typed.DentistId;
         if (!await db.Set<SchedulingService>().AsNoTracking().AnyAsync(x => x.Id == serviceId
             && x.BranchId == dossier.BranchId && x.Active, ct)
             || !await db.Set<SchedulingMember>().AsNoTracking().AnyAsync(x => x.EmployeeId == dentistId
@@ -316,6 +297,7 @@ public sealed class TreatmentDossierService(DcmsDbContext db, UserManager<Applic
         existing.LastFingerprint = fingerprint;
         existing.UpdatedAt = clock.GetUtcNow();
         await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
         return SheetDraftDto(existing);
     }
 
@@ -388,6 +370,18 @@ public sealed class TreatmentDossierService(DcmsDbContext db, UserManager<Applic
         };
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
         db.TreatmentDossiers.Add(dossier);
+        if (request.SourceVisitId.HasValue)
+        {
+            var source = await db.Visits.AsNoTracking().SingleOrDefaultAsync(x => x.Id == request.SourceVisitId
+                && x.PatientId == patientId && x.BranchId == request.BranchId, ct) ?? throw Error("MSG113", 404);
+            if (source.Version != request.ExpectedSourceVisitVersion) throw Error("MSG111", 409);
+            var examination = await db.Set<DCMS.Domain.Features.Examinations.VisitExamination>().AsNoTracking()
+                .SingleOrDefaultAsync(x => x.VisitId == source.Id && x.Confirmed, ct) ?? throw Error("MSG240", 409);
+            dossier.SourceExaminationId = source.Id; dossier.SourceExaminationVersion = source.Version;
+            Event(dossier, actorId, "ExaminationSourceCaptured", new { SourceVisitId = source.Id,
+                SourceVisitVersion = source.Version, Content = JsonSerializer.Deserialize<JsonElement>(examination.ContentJson) });
+        }
+        else if (request.ExpectedSourceVisitVersion.HasValue) throw Error("MSG04");
         Event(dossier, actorId, "DossierCreated", new { dossier.Code, dossier.Diagnosis });
         await db.SaveChangesAsync(ct);
         var result = new TreatmentChange(await DetailAsync(dossier, ct), SystemMessages.Get("MSG222", "hồ sơ điều trị", value: dossier.Code));
@@ -578,12 +572,16 @@ public sealed class TreatmentDossierService(DcmsDbContext db, UserManager<Applic
         if (dossier.Items.Any(x => x.DiscountStatus == "Approved" && x.DiscountQualifyingItemId.HasValue
             && dossier.Items.All(q => q.Id != x.DiscountQualifyingItemId || q.Decision != "Agreed")))
             throw Error("MSG240");
-        // S20 is not present yet. Do not claim an unverified document as consent evidence.
-        if (dossier.Items.Any(x => x.ConsentDocumentId.HasValue)) throw Error("MSG240");
+        foreach (var item in dossier.Items.Where(x => x.ConsentDocumentId.HasValue))
+            if (!await db.Set<DCMS.Domain.Features.Examinations.ClinicalDocument>().AnyAsync(x => x.Id == item.ConsentDocumentId
+                && x.PatientId == dossier.PatientId && x.DossierId == dossier.Id && x.PlanId == dossier.PlanId && x.FileState == "Ready", ct)) throw Error("MSG240");
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
         dossier.PlanVersion++;
         foreach (var item in dossier.Items.Where(x => x.Decision != "Proposed"))
+        {
             item.DecisionPlanVersion = dossier.PlanVersion;
+            item.ConsentPlanVersion = item.ConsentDocumentId.HasValue ? dossier.PlanVersion : null;
+        }
         dossier.PlanState = "Committed";
         dossier.Version++;
         dossier.UpdatedAt = clock.GetUtcNow();

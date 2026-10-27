@@ -70,34 +70,25 @@ body:has(.patient-treatment-shell) .workspace-content { width: 100%; max-width: 
 .treatment-sheet-table { width: 100%; min-width: 1050px; border-collapse: collapse; table-layout: fixed; font-size: 11px; }
 .treatment-sheet-table th { color: #0e1726; font-weight: 700; background: #fbfbfb; }
 .treatment-sheet-table th, .treatment-sheet-table td { border: 1px solid #f0f0f0; padding: 1px 4px; height: 23px; text-align: left; vertical-align: middle; }
-.treatment-sheet-table :is(th:nth-child(1), td:nth-child(1)) { width: 70px; }
-.treatment-sheet-table :is(th:nth-child(2), td:nth-child(2)) { width: 75px; }
-.treatment-sheet-table :is(th:nth-child(3), td:nth-child(3)) { width: 35px; text-align: center; }
-.treatment-sheet-table :is(th:last-child, td:last-child) { width: 31px; text-align: center; }
-.treatment-sheet-plan-table :is(th:nth-child(4), td:nth-child(4)),
-.treatment-sheet-plan-table :is(th:nth-child(5), td:nth-child(5)) { width: 35%; }
-.treatment-sheet-plan-table :is(th:nth-child(6), td:nth-child(6)) { width: 20%; }
-.treatment-sheet-plan-table :is(th:nth-child(7), td:nth-child(7)),
-.treatment-sheet-plan-table :is(th:nth-child(8), td:nth-child(8)) { width: 5%; }
-.treatment-sheet-actual-table :is(th:nth-child(4), td:nth-child(4)),
-.treatment-sheet-actual-table :is(th:nth-child(5), td:nth-child(5)) { width: 29%; }
-.treatment-sheet-actual-table :is(th:nth-child(6), td:nth-child(6)),
-.treatment-sheet-actual-table :is(th:nth-child(7), td:nth-child(7)) { width: 16%; }
-.treatment-sheet-actual-table :is(th:nth-child(8), td:nth-child(8)) { width: 6%; }
-.treatment-sheet-actual-table :is(th:nth-child(9), td:nth-child(9)) { width: 4%; }
-.treatment-sheet-plan-table:has(.treatment-sheet-edit-row) { min-width: 1800px; }
-.treatment-sheet-plan-table:has(.treatment-sheet-edit-row) :is(th:nth-child(4), td:nth-child(4)),
-.treatment-sheet-plan-table:has(.treatment-sheet-edit-row) :is(th:nth-child(5), td:nth-child(5)) { width: 32%; }
-.treatment-sheet-plan-table:has(.treatment-sheet-edit-row) :is(th:nth-child(6), td:nth-child(6)) { width: 19%; }
-.treatment-sheet-plan-table:has(.treatment-sheet-edit-row) :is(th:nth-child(7), td:nth-child(7)) { width: 8%; }
-.treatment-sheet-plan-table:has(.treatment-sheet-edit-row) :is(th:nth-child(8), td:nth-child(8)) { width: 9%; }
-.treatment-sheet-actual-table:has(.treatment-sheet-edit-row) { min-width: 1950px; }
-.treatment-sheet-actual-table:has(.treatment-sheet-edit-row) :is(th:nth-child(4), td:nth-child(4)),
-.treatment-sheet-actual-table:has(.treatment-sheet-edit-row) :is(th:nth-child(5), td:nth-child(5)) { width: 25%; }
-.treatment-sheet-actual-table:has(.treatment-sheet-edit-row) :is(th:nth-child(6), td:nth-child(6)),
-.treatment-sheet-actual-table:has(.treatment-sheet-edit-row) :is(th:nth-child(7), td:nth-child(7)) { width: 16%; }
-.treatment-sheet-actual-table:has(.treatment-sheet-edit-row) :is(th:nth-child(8), td:nth-child(8)) { width: 8%; }
-.treatment-sheet-actual-table:has(.treatment-sheet-edit-row) :is(th:nth-child(9), td:nth-child(9)) { width: 10%; }
+/* The two compact sheets have independent columns; quantity is not displayed. */
+.treatment-sheet-plan-table { min-width: 1250px; }
+.treatment-sheet-actual-table { min-width: 1280px; }
+.treatment-sheet-table :is(th:nth-child(1),td:nth-child(1)) { width: 105px; }
+.treatment-sheet-table :is(th:nth-child(2),td:nth-child(2)) { width: 85px; }
+.treatment-sheet-table :is(th:last-child,td:last-child) { width: 32px; text-align: center; }
+.treatment-sheet-plan-table :is(th:nth-child(3),td:nth-child(3)) { width: 19%; }
+.treatment-sheet-plan-table :is(th:nth-child(4),td:nth-child(4)) { width: 100px; }
+.treatment-sheet-plan-table :is(th:nth-child(5),td:nth-child(5)) { width: 22%; }
+.treatment-sheet-plan-table :is(th:nth-child(6),td:nth-child(6)) { width: 16%; }
+.treatment-sheet-plan-table :is(th:nth-child(7),td:nth-child(7)) { width: 100px; }
+.treatment-sheet-plan-table :is(th:nth-child(8),td:nth-child(8)) { width: 110px; }
+.treatment-sheet-actual-table :is(th:nth-child(3),td:nth-child(3)) { width: 17%; }
+.treatment-sheet-actual-table :is(th:nth-child(4),td:nth-child(4)) { width: 20%; }
+.treatment-sheet-actual-table :is(th:nth-child(5),td:nth-child(5)) { width: 15%; }
+.treatment-sheet-actual-table :is(th:nth-child(6),td:nth-child(6)) { width: 12%; }
+.treatment-sheet-actual-table :is(th:nth-child(7),td:nth-child(7)),
+.treatment-sheet-actual-table :is(th:nth-child(8),td:nth-child(8)) { width: 100px; }
+.treatment-sheet-actual-table :is(th:nth-child(9),td:nth-child(9)) { width: 105px; }
 .treatment-sheet-table td strong { font-weight: 500; }
 .treatment-sheet-table td small { display: block; color: #667085; font-size: 10px; }
 .treatment-sheet-table a { color: #065fa6; }
@@ -201,3 +192,34 @@ body:has(.patient-treatment-shell) .workspace-content { width: 100%; max-width: 
   .treatment-sheet-table { min-width: 0; font-size: 9px; }
   .treatment-sheet-table-scroll { overflow: visible; }
 }
+
+/* S21/S22 v2.5: contextual actions retain the compact sheet. */
+.patient-treatment-shell .treatment-sheet-tools, .patient-treatment-shell .treatment-sheet-filters { display:flex; flex-wrap:wrap; gap:8px; margin:8px 0; align-items:center; }
+.sheet-column-picker { display:flex; flex-direction:column; gap:8px; padding:16px; background:#fff; box-shadow:0 3px 16px #0002; }
+[data-hidden-columns~="quantity"] [data-col="quantity"], [data-hidden-columns~="note"] [data-col="note"], [data-hidden-columns~="lab"] [data-col="lab"], [data-hidden-columns~="discount"] [data-col="discount"], [data-hidden-columns~="paid"] [data-col="paid"] { display:none; }
+.treatment-sheet-table td small { display:block; color:#596579; line-height:1.5; }
+.treatment-sheet-table button:focus-visible, .treatment-sheet-table a:focus-visible { outline:2px solid #175cd3; outline-offset:2px; }
+@media (max-width:768px) { .treatment-sheet-filters { gap:12px; } .treatment-sheet-table-scroll { max-width:100%; overflow-x:auto; } .treatment-sheet-row-action { min-width:36px; min-height:36px; } }
+@media print { .treatment-sheet-tools,.treatment-sheet-filters,.treatment-sheet-edit-row { display:none!important; } }
+
+.patient-treatment-shell .treatment-sheet-payment p { margin:3px 0; line-height:1.6; }
+.patient-treatment-shell .treatment-sheet-payment .ant-space-item { display:inline-flex; }
+.patient-treatment-shell .treatment-sheet-payment .ant-btn span { min-width:0; }
+.patient-treatment-shell .treatment-sheet-payment .treatment-sheet-create span { color:#fff; }
+.patient-treatment-shell .treatment-sheet-actual-table { min-width:1200px; }
+.patient-treatment-shell .treatment-sheet-actual-table :is(th:nth-child(4),td:nth-child(4)), .patient-treatment-shell .treatment-sheet-actual-table :is(th:nth-child(5),td:nth-child(5)) { width:18%; }
+.patient-treatment-shell .treatment-sheet-actual-table :is(th:nth-child(6),td:nth-child(6)) { width:12%; }
+.patient-treatment-shell .treatment-sheet-actual-table :is(th:nth-child(7),td:nth-child(7)) { width:8%; }
+.patient-treatment-shell .treatment-sheet-actual-table :is(th:nth-child(8),td:nth-child(8)), .patient-treatment-shell .treatment-sheet-actual-table :is(th:nth-child(10),td:nth-child(10)) { width:10%; }
+.patient-treatment-shell .treatment-sheet-actual-table :is(th:nth-child(9),td:nth-child(9)) { width:6%; }
+@media print { .treatment-sheet-preview-row { display:none!important; } }
+
+@media (max-width:900px) {
+  .patient-treatment-shell .patient-treatment-tabs > .ant-tabs-nav .ant-tabs-nav-wrap { width:100%; min-width:0; overflow-x:auto; }
+  .patient-treatment-shell .patient-treatment-tabs > .ant-tabs-nav .ant-tabs-nav-list { transform:none!important; flex:none; }
+  .patient-treatment-shell .patient-treatment-tabs > .ant-tabs-nav .ant-tabs-nav-operations { display:none; }
+}
+
+.treatment-sheet-row-completed > td:not(:last-child),
+.treatment-sheet-row-completed > td:not(:last-child) small { text-decoration: line-through; }
+.treatment-sheet-payment > p { margin: 0; min-height: 23px; font-size: 12px; }

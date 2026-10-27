@@ -1,5 +1,11 @@
 # Hồ sơ khách hàng — Điều trị & Thanh toán (Web)
 
+## Baseline v2.5 — 27/10/2026
+
+Điều chỉnh mới nhất: bỏ tự lưu hàng và ghi chú. Nút ✓ trên hàng chỉ mở bước xem lại; chỉ xác nhận cuối cùng mới ghi máy chủ. Ghi chú có nút Lưu ghi chú. Quy định này thay thế các mô tả tự lưu còn giữ bên dưới để tham khảo lịch sử UI.
+
+Phần triển khai mới tuân theo [hợp đồng v2.5](TREATMENT-PAYMENT-V25.md). Hợp đồng này thay thế các mô tả bên dưới về màn hình chỉ xem/điều hướng, cờ hoàn tất tự do, hàng nhập chỉ dùng để xem trước và giới hạn quá trình vào một Visit. Giữ bố cục bảng hiện có, không hiển thị dải chẩn đoán hoặc checkbox VAT theo quyết định người dùng. S21/S22/S43 dùng nguồn thật; S38/S39 chờ ledger DCMS-101, mock chỉ dùng trong preview/test.
+
 ## Mục đích và nguồn dữ liệu
 
 Màn hình nhân viên trong hồ sơ bệnh nhân hiển thị mỗi **phiếu điều trị** bằng một treatment dossier hiện có. Phiếu có thể kéo dài nhiều lượt khám. Giao diện này là nơi xem nhanh và điều hướng; S21 vẫn là nơi sửa kế hoạch, S22 là nơi ghi việc đã làm, S43 là chi tiết dossier. Không tạo một thực thể phiếu mới.
@@ -56,3 +62,15 @@ Kiểm bằng Playwright với API giả lập cho nhiều phiếu, mở/thu, t�
 
 
 
+
+
+## Điều chỉnh thao tác theo mẫu oDental — 27/10/2026
+
+Hàng nhập mở ngay trong bảng kế hoạch/quá trình. Nút xanh ✓ có tên “Đồng ý” kiểm tra và lưu trực tiếp; không mở drawer xem lại hoặc hỏi xác nhận thêm. Không tự lưu khi gõ. Quyết định lâm sàng và dữ liệu bắt buộc được nhập trên cùng hàng: lưu đề xuất không đồng nghĩa bệnh nhân đã đồng ý; chọn Agreed phải có tư vấn và người quyết định. Khi ghi actual, chọn Visit hợp lệ, bước khi áp dụng, kết quả và cơ sở tính phí ngay trên hàng. Không tự tạo bằng chứng đồng ý, Visit, kết quả hay căn cứ miễn phí. Các trường tùy chọn/điều kiện không thêm một bước xác nhận riêng. Quy trình quyết định riêng của item đã lưu vẫn có thể mở từ menu.
+
+Một lần bấm gửi lưu nháp và command chuyển nguồn hiện có, có loading và khóa gửi lặp. Retry cùng payload giữ requestKey và version của nháp đã lưu; lỗi giữ hàng đang nhập và cho tải lại phiên bản nguồn mà không xóa form. Ghi chú cuối phiếu vẫn lưu bằng nút riêng. Chỉ hiển thị thành công sau phản hồi server. Không đổi hợp đồng API, backend hay database.
+
+
+## Luồng nhập trực tiếp mới — 27/10/2026 (thay các hướng dẫn nhập cũ)
+
+Theo yêu cầu đã chốt, form nhập chỉ còn Răng, bỏ Vùng/SL; kế hoạch thêm số phút dự kiến nullable 1–480. Ghi chú chỉ text, không chọn quyết định/tư vấn. ✓ lưu trực tiếp, không tự lưu. Nguồn ClinicianEntry không phải Agreed/consent. Thực hiện trong menu lưu ngay actual Dossier không Visit và gạch ngang nguồn; Hoàn tất/Bỏ hoàn tất chỉ đổi DisplayCompleted item; Sửa mở inline; Xóa hiện Đồng ý/Không đồng ý rồi soft-delete, không cascade dữ liệu đã làm/tiền. Không có filter Visit/ngày ở quá trình. Thêm việc đã làm cho nhập trực tiếp từ catalog không cần item/Visit trước. Đã trả là số ConfirmedAllocated từ ledger, không có dữ liệu hiện Chưa có dữ liệu. Snapshot giá/tên dịch vụ/răng/note actual giữ độc lập khỏi sửa kế hoạch. Chi tiết API/schema/test xem TREATMENT-PAYMENT-V25.md, mục Luồng nhập trực tiếp.
