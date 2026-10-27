@@ -31,14 +31,14 @@ export type AppointmentDetail = AppointmentCard & {
 // Same shape as Tư's GET /api/availability (S09).
 export type AvailabilitySlot = {
   start: string; end: string; chairId: number; dentistId: number; assistantId: number | null;
-  scheduleVersion: number; assistantScheduleVersion: number | null;
+  scheduleVersion: number; assistantScheduleVersion: number | null; bookingSettingsVersion?: number;
 };
 export type RescheduleDentist = { id: number; branchId: number; name: string };
 
 export type AppointmentQuery = { scope: AppointmentScope; status: AppointmentStatus | 'ALL'; from: string | null; to: string | null; page: number; pageSize: number };
 export type RescheduleCommand = {
   expectedVersion: number; requestKey: string; dentistId: number; newStart: string; chairId: number; scheduleVersion: number;
-  assistantScheduleVersion: number | null; reason: string;
+  assistantScheduleVersion: number | null; reason: string; bookingSettingsVersion?: number;
 };
 export type CancelCommand = { expectedVersion: number; requestKey: string; reason: string };
 export type SupportCommand = {

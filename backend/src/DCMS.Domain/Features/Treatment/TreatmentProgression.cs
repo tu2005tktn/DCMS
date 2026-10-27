@@ -34,7 +34,11 @@ public sealed class TreatmentStep
     public string Name { get; set; } = "";
     public string? Region { get; set; }
     public int EstimatedMinutes { get; set; }
+    public int? EstimatedMinMinutes { get; set; }
+    public int? EstimatedMaxMinutes { get; set; }
     public int ReservedMinutes { get; set; }
+    public int? ShortReservationAcknowledgedBy { get; set; }
+    public DateTimeOffset? ShortReservationAcknowledgedAt { get; set; }
     public string PredecessorsJson { get; set; } = "[]";
     public string? Capability { get; set; }
     public string? LabRequirement { get; set; }

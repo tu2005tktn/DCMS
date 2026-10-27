@@ -1,0 +1,14 @@
+.system-settings-page { min-width: 0; }
+.system-settings-page .ant-card, .system-settings-page .ant-card-body { min-width: 0; }
+.system-settings-toolbar { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
+.system-settings-toolbar .ant-input-search { width: min(100%, 320px); }
+.system-settings-toolbar .ant-select { width: min(100%, 240px); }
+.system-settings-page .ant-alert { margin-bottom: 16px; }
+@media (max-width: 600px) {
+  .system-settings-toolbar .ant-input-search, .system-settings-toolbar .ant-select { width: 100%; }
+  .system-settings-page .ant-card-body { padding: 16px 12px; }
+}
+
+/* Contain the measured, hidden horizontal-menu items on this page only. */
+.workspace:has(.system-settings-page) > .ant-menu-horizontal { min-width: 0; overflow: hidden; }
+.system-settings-page .ant-table-wrapper { min-width: 0; }

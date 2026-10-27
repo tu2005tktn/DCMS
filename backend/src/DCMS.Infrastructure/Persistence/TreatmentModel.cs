@@ -19,11 +19,13 @@ internal static class TreatmentModel
             b.Property(x => x.Diagnosis).HasMaxLength(4000);
             b.Property(x => x.Note).HasMaxLength(4000);
             b.Property(x => x.State).HasMaxLength(16);
+            b.Property(x => x.DisplayCompleted).HasDefaultValue(false);
             b.Property(x => x.ClosureOutcome).HasMaxLength(32);
             b.Property(x => x.ClosureReason).HasMaxLength(1000);
             b.Property(x => x.PlanState).HasMaxLength(16);
             b.Property(x => x.Goals).HasMaxLength(4000);
             b.Property(x => x.PaymentTermsJson).HasColumnType("jsonb");
+            b.Property(x => x.DepositExceptionReason).HasMaxLength(1000);
             b.HasIndex(x => x.SourceTemplateId);
             b.Property(x => x.Version).IsConcurrencyToken();
             b.HasOne<PatientProfile>().WithMany().HasForeignKey(x => x.PatientId).OnDelete(DeleteBehavior.Restrict);
@@ -32,12 +34,17 @@ internal static class TreatmentModel
                 .OnDelete(DeleteBehavior.Restrict);
             b.HasMany(x => x.Items).WithOne().HasForeignKey(x => x.DossierId).OnDelete(DeleteBehavior.Restrict);
         });
+        ClinicalWorkModel.Configure(model);
         model.Entity<TreatmentItem>(b =>
         {
             b.ToTable("TREATMENT_PLAN_ITEM");
             b.HasKey(x => x.Id);
             b.HasIndex(x => new { x.DossierId, x.PlannedOrder });
             b.Property(x => x.ServiceName).HasMaxLength(160);
+            b.Property(x => x.EntrySource).HasMaxLength(24);
+            b.Property(x => x.Material).HasMaxLength(160);
+            b.Property(x => x.Note).HasMaxLength(1000);
+            b.Property(x => x.DecisionPlanVersion).HasColumnType("integer");
             b.Property(x => x.Region).HasMaxLength(80);
             b.Property(x => x.Unit).HasMaxLength(40);
             b.Property(x => x.Quantity).HasPrecision(12, 3);
@@ -46,10 +53,19 @@ internal static class TreatmentModel
             b.Property(x => x.Counseling).HasMaxLength(4000);
             b.Property(x => x.DecisionMaker).HasMaxLength(160);
             b.Property(x => x.RepresentativeBasis).HasMaxLength(1000);
+            b.Property(x => x.DiscountType).HasMaxLength(16);
+            b.Property(x => x.DiscountReason).HasMaxLength(1000);
+            b.Property(x => x.DiscountStatus).HasMaxLength(16);
+            b.Property(x => x.DiscountBasisHash).HasMaxLength(64);
+            b.Property(x => x.DiscountValue).HasPrecision(18, 3);
             b.Property(x => x.WarrantyPolicy).HasMaxLength(160);
             b.Property(x => x.WarrantyPolicyVersion).HasMaxLength(40);
             b.Property(x => x.WarrantyScope).HasMaxLength(1000);
+            b.Property(x => x.WarrantyComponent).HasMaxLength(500);
+            b.Property(x => x.WarrantyExclusions).HasMaxLength(1000);
+            b.Property(x => x.WarrantyExplanation).HasMaxLength(2000);
             b.ToTable(t => t.HasCheckConstraint("CK_TREATMENT_ITEM_VALUES", "\"Quantity\" > 0 AND \"AgreedUnitPriceVnd\" >= 0"));
+            b.ToTable(t => t.HasCheckConstraint("CK_TREATMENT_ITEM_DURATION_V23", "(\"EstimatedMinMinutes\" IS NULL AND \"EstimatedMaxMinutes\" IS NULL OR \"EstimatedMinMinutes\" > 0 AND \"EstimatedMinMinutes\" <= \"EstimatedMinutes\" AND \"EstimatedMinutes\" <= \"EstimatedMaxMinutes\" AND \"EstimatedMaxMinutes\" <= 480) AND (\"ReservedMinutes\" IS NULL OR \"ReservedMinutes\" BETWEEN 15 AND 480 AND \"ReservedMinutes\" % 15 = 0 AND \"ReservedMinutes\" >= \"EstimatedMinutes\")"));
         });
         model.Entity<TreatmentEvent>(b =>
         {
@@ -68,6 +84,27 @@ internal static class TreatmentModel
             b.Property(x => x.Fingerprint).HasMaxLength(64);
             b.Property(x => x.ResultJson).HasColumnType("jsonb");
             b.HasOne<TreatmentDossier>().WithMany().HasForeignKey(x => x.DossierId).OnDelete(DeleteBehavior.Restrict);
+        });
+        model.Entity<TreatmentSheetDraft>(b =>
+        {
+            b.ToTable("TREATMENT_SHEET_DRAFT");
+            b.HasKey(x => x.Id);
+            b.HasIndex(x => new { x.DossierId, x.Kind, x.UpdatedAt });
+            b.Property(x => x.Kind).HasMaxLength(12);
+            b.Property(x => x.PayloadJson).HasColumnType("jsonb");
+            b.Property(x => x.LastFingerprint).HasMaxLength(64);
+            b.Property(x => x.Version).IsConcurrencyToken();
+            b.HasOne<TreatmentDossier>().WithMany().HasForeignKey(x => x.DossierId).OnDelete(DeleteBehavior.Restrict);
+        });
+        model.Entity<TreatmentRevisionDraft>(b =>
+        {
+            b.ToTable("TREATMENT_REVISION_DRAFT");
+            b.HasKey(x => x.Id);
+            b.HasIndex(x => new { x.DossierId, x.ItemId, x.ActorId }).IsUnique();
+            b.Property(x => x.PayloadJson).HasColumnType("jsonb");
+            b.Property(x => x.Version).IsConcurrencyToken();
+            b.HasOne<TreatmentDossier>().WithMany().HasForeignKey(x => x.DossierId).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<TreatmentItem>().WithMany().HasForeignKey(x => x.ItemId).OnDelete(DeleteBehavior.Restrict);
         });
         model.Entity<TreatmentTemplate>(b =>
         {
@@ -103,12 +140,21 @@ internal static class TreatmentModel
             b.Property(x => x.Version).IsConcurrencyToken();
             b.HasOne<TreatmentDossier>().WithMany().HasForeignKey(x => x.DossierId).OnDelete(DeleteBehavior.Restrict);
             b.HasOne<TreatmentItem>().WithMany().HasForeignKey(x => x.ItemId).OnDelete(DeleteBehavior.Restrict);
-            b.ToTable(t => t.HasCheckConstraint("CK_STEP_DURATION", "\"EstimatedMinutes\" > 0 AND \"ReservedMinutes\" BETWEEN 15 AND 480 AND \"ReservedMinutes\" % 15 = 0 AND \"ReservedMinutes\" >= \"EstimatedMinutes\""));
+            b.ToTable(t =>
+            {
+                t.HasCheckConstraint("CK_STEP_DURATION", "\"EstimatedMinutes\" > 0 AND \"ReservedMinutes\" BETWEEN 15 AND 480 AND \"ReservedMinutes\" % 15 = 0 AND \"ReservedMinutes\" >= \"EstimatedMinutes\"");
+                t.HasCheckConstraint("CK_STEP_ESTIMATE_RANGE", "(\"EstimatedMinMinutes\" IS NULL AND \"EstimatedMaxMinutes\" IS NULL) OR (\"EstimatedMinMinutes\" IS NOT NULL AND \"EstimatedMaxMinutes\" IS NOT NULL AND \"EstimatedMinMinutes\" > 0 AND \"EstimatedMinMinutes\" <= \"EstimatedMinutes\" AND \"EstimatedMinutes\" <= \"EstimatedMaxMinutes\" AND \"EstimatedMaxMinutes\" <= 480)");
+            });
         });
         model.Entity<FollowUpInstruction>(b =>
         {
             b.ToTable("FOLLOW_UP_INSTRUCTION"); b.HasKey(x => x.Id);
             b.HasIndex(x => new { x.PatientId, x.Status });
+            b.HasIndex(x => x.StepId).IsUnique().HasDatabaseName("IX_FOLLOW_UP_INSTRUCTION_ActiveStep")
+                .HasFilter("\"StepId\" IS NOT NULL AND \"Status\" IN ('NeedsBooking','Booked')");
+            b.HasIndex(x => new { x.DossierId, x.ItemId }).IsUnique()
+                .HasDatabaseName("IX_FOLLOW_UP_INSTRUCTION_ActiveItemOnly")
+                .HasFilter("\"DossierId\" IS NOT NULL AND \"ItemId\" IS NOT NULL AND \"StepId\" IS NULL AND \"Status\" IN ('NeedsBooking','Booked')");
             b.HasIndex(x => new { x.StepId, x.SourceCompletionEventId }).IsUnique()
                 .HasDatabaseName("IX_FOLLOW_UP_INSTRUCTION_Step_Completion")
                 .HasFilter("\"StepId\" IS NOT NULL AND \"SourceCompletionEventId\" IS NOT NULL");

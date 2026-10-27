@@ -22,7 +22,8 @@ public sealed class TreatmentDueScanner(DcmsDbContext db, ITreatmentLabReadiness
         var inserted = 0;
         foreach (var instruction in due)
         {
-            var stable = $"followup-due:{instruction.Id}:{instruction.Version}";
+            // A version can change without changing the clinical return window (for example booking/cancel).
+            var stable = $"followup-due:{instruction.Id}:{instruction.EarliestOn:yyyyMMdd}:{instruction.TargetOn:yyyyMMdd}:{instruction.LatestOn:yyyyMMdd}";
             if (await db.TreatmentProgressionEvents.AnyAsync(x => x.StableKey == stable, ct)) continue;
             db.TreatmentProgressionEvents.Add(new TreatmentProgressionEvent
             {
@@ -93,6 +94,7 @@ public sealed class TreatmentDueScanWorker(IServiceScopeFactory scopes, ILogger<
             {
                 using var scope = scopes.CreateScope();
                 await scope.ServiceProvider.GetRequiredService<TreatmentDueScanner>().ScanAsync(stoppingToken);
+                await scope.ServiceProvider.GetRequiredService<CareTaskIngestionService>().IngestAsync(stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
             catch (Exception error) { logger.LogError(error, "Treatment due scan failed; the next scan will retry"); }

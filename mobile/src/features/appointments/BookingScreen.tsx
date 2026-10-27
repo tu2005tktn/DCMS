@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { uuid } from 'expo-modules-core';
@@ -33,7 +33,6 @@ export default function BookingScreen() {
   const [step, setStep] = useState(0);
   const [relation, setRelation] = useState<Relation>('Self');
   const [branchId, setBranchId] = useState<number | null>(null);
-  const [serviceId, setServiceId] = useState<number | null>(null);
   const [dentistId, setDentistId] = useState<number | null>(null);
   const [date, setDate] = useState(nextDate());
   const [reason, setReason] = useState('');
@@ -44,10 +43,22 @@ export default function BookingScreen() {
   const [contact, setContact] = useState('');
   const [attendeeName, setAttendeeName] = useState(state.status === 'authenticated' ? state.user.fullName : '');
   const [result, setResult] = useState<BookingResult | null>(null);
+  const prefilledAccount = useRef<number | null>(null);
+  const account = state.status === 'authenticated' ? state.user : null;
+  useEffect(() => {
+    if (!account || prefilledAccount.current === account.id) return;
+    const changedAccount = prefilledAccount.current !== null;
+    prefilledAccount.current = account.id;
+    const accountContact = account.phoneNumber || account.email || '';
+    setBookerName(value => changedAccount ? account.fullName : value || account.fullName);
+    setContact(value => changedAccount ? accountContact : value || accountContact);
+    setAttendeeName(value => relation === 'Self' ? changedAccount ? account.fullName : value || account.fullName : changedAccount ? '' : value);
+  }, [account?.id, account?.fullName, account?.phoneNumber, account?.email, relation]);
 
   const services = useMemo(() => options?.services.filter(x => x.branchId === branchId) ?? [], [options, branchId]);
   const dentists = useMemo(() => options?.employees.filter(x => x.branchId === branchId && x.canDentist) ?? [], [options, branchId]);
-  const service = services.find(x => x.id === serviceId);
+  const service = services[0];
+  const serviceId = service?.id ?? null;
   const dentist = dentists.find(x => x.id === dentistId);
   const branch = options?.branches.find(x => x.id === branchId);
 
@@ -101,7 +112,7 @@ export default function BookingScreen() {
         reason: reason.trim() || null, dentistId, assistantId: null, chairId: null,
         startAt: slot.start, durationMinutes: service.publicDurationMinutes, followUpId: null,
         exceptionReason: null, requestKey: key, scheduleVersion: slot.scheduleVersion,
-        assistantScheduleVersion: null,
+        assistantScheduleVersion: null, bookingSettingsVersion: slot.bookingSettingsVersion,
       }, token);
       setResult(value); setStep(3);
       // S26+ — fix bug "đặt lịch xong list trống" + "thông báo biến mất":
@@ -173,16 +184,15 @@ export default function BookingScreen() {
         <Text style={styles.section}>1. Chọn lịch</Text>
         <Text>Người khám</Text>
         <View style={styles.choices}>
-          <Choice label="Bản thân" selected={relation === 'Self'} onPress={() => setRelation('Self')} />
-          <Choice label="Người thân" selected={relation === 'Relative'} onPress={() => setRelation('Relative')} />
+          <Choice label="Bản thân" selected={relation === 'Self'} onPress={() => { if (relation !== 'Self') { setRelation('Self'); if (account) setAttendeeName(account.fullName); } }} />
+          <Choice label="Người thân" selected={relation === 'Relative'} onPress={() => { if (relation !== 'Relative') { setRelation('Relative'); setAttendeeName(''); } }} />
         </View>
         <Text>Chi nhánh</Text>
         <View style={styles.choices}>{options?.branches.map(x => <Choice key={x.id} label={x.name} selected={branchId === x.id}
-          onPress={() => { setBranchId(x.id); setServiceId(null); setDentistId(null); }} />)}</View>
+          onPress={() => { setBranchId(x.id); setDentistId(null); }} />)}</View>
         {!options?.branches.length && <Text>Chưa có chi nhánh nhận đặt lịch.</Text>}
         <Text>Dịch vụ</Text>
-        <View style={styles.choices}>{services.map(x => <Choice key={x.id} label={`${x.name} · ${x.publicDurationMinutes} phút`}
-          selected={serviceId === x.id} onPress={() => setServiceId(x.id)} />)}</View>
+        <Text>{service ? `Khám · ${service.publicDurationMinutes} phút` : 'Chi nhánh chưa có dịch vụ Khám khả dụng.'}</Text>
         <Field label="Lý do khám (không bắt buộc)" value={reason} onChangeText={setReason} multiline />
         <Text>Bác sĩ</Text>
         <View style={styles.choices}>{dentists.map(x => <Choice key={x.id} label={x.name} selected={dentistId === x.id}

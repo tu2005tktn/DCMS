@@ -40,8 +40,8 @@ public sealed class RecurringSchedulingTests(ApiFixture fixture) : IClassFixture
         var branch = new SchedulingBranch { Name = "Recurring A " + suffix };
         var other = new SchedulingBranch { Name = "Recurring B " + suffix }; db.AddRange(branch, other); await db.SaveChangesAsync();
         db.AddRange(new SchedulingMember { BranchId = branch.Id, EmployeeId = employee.Id, CanDentist = true }, new SchedulingMember { BranchId = other.Id, EmployeeId = employee.Id, CanDentist = true });
-        var service = new SchedulingService { BranchId = branch.Id, Name = "30", PublicDurationMinutes = 30 };
-        var otherService = new SchedulingService { BranchId = other.Id, Name = "30", PublicDurationMinutes = 30 };
+        var service = new SchedulingService { BranchId = branch.Id, Name = "30", PublicDurationMinutes = 30, IsInitialExamination = true };
+        var otherService = new SchedulingService { BranchId = other.Id, Name = "30", PublicDurationMinutes = 30, IsInitialExamination = true };
         var chair = new SchedulingChair { BranchId = branch.Id, Name = "Chair A" };
         db.AddRange(service, otherService, chair, new SchedulingChair { BranchId = other.Id, Name = "Chair B" });
         await db.SaveChangesAsync();

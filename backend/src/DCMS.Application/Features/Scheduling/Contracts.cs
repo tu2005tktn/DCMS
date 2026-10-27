@@ -17,12 +17,12 @@ public sealed record ServiceOption(int Id, int BranchId, string Name, int Public
 public sealed record ScheduleOptions(BranchOption[] Branches, EmployeeOption[] Employees, ChairOption[] Chairs, ServiceOption[] Services);
 public sealed record AvailabilityQuery(int BranchId, int DentistId, int? ServiceId, DateOnly Date, int DurationMinutes, int? AssistantId = null);
 public sealed record AvailabilitySlot(DateTimeOffset Start, DateTimeOffset End, int ChairId, int DentistId, int? AssistantId,
-    int ScheduleVersion, int? AssistantScheduleVersion);
+    int ScheduleVersion, int? AssistantScheduleVersion, int BookingSettingsVersion = 1);
 public sealed record AvailabilityResult(string TimeZone, DateOnly Date, AvailabilitySlot[] Slots);
 public sealed record PreviewAvailabilityRequest(ScheduleCommand Schedule, AvailabilityQuery Query);
 public sealed record ResourceCheck(int BranchId, int DentistId, int? ServiceId, DateTimeOffset Start, int DurationMinutes,
     int? ChairId, int? AssistantId, string? AttendeeKey, int ExpectedScheduleVersion,
-    int? ExpectedAssistantScheduleVersion = null, Guid? ExcludeReservationId = null, bool Public = false);
+    int? ExpectedAssistantScheduleVersion = null, Guid? ExcludeReservationId = null, bool Public = false, int? BookingSettingsVersion = null);
 public sealed record BranchPeriod(int BranchId, int Day, int StartMinute, int EndMinute, string Kind, string Reason = "");
 public sealed record RecurringCommand(int DentistId, DateOnly Date, string Kind, int ExpectedVersion,
     BranchPeriod[] Intervals, Guid RequestKey, string Reason = "");
@@ -54,4 +54,6 @@ public interface IAvailabilityService
     Task<AvailabilityResult> QueryForReservationAsync(AvailabilityQuery query, Guid reservationId, string? attendeeKey, CancellationToken ct);
     // TV2: caller MUST begin a transaction on the same scoped DbContext and persist reservations before commit.
     Task<AvailabilitySlot> CheckInTransactionAsync(ResourceCheck request, CancellationToken ct);
+    // Reception rechecks the existing reservation without replacing or releasing it.
+    Task ValidateReceptionAsync(Guid reservationId, int patientId, CancellationToken ct);
 }

@@ -7,14 +7,15 @@ const sample: Period[] = [
   { day: 0, startMinute: 720, endMinute: 780, kind: 'Break', reason: 'Nghỉ trưa' },
   { day: 0, startMinute: 900, endMinute: 930, kind: 'Block', reason: 'Họp nội bộ' },
 ];
-test('staff duration rejects 70, blank and invalid bounds; accepts 75 and boundary values', () => {
-  expect(validateAvailabilityDuration(70, false)).toContain('60 hoặc 75');
+test('staff duration accepts flexible integer minutes and rejects invalid bounds', () => {
+  expect(validateAvailabilityDuration(70, false)).toBeNull();
   for (const value of [null, 0, -15, 495, 30.5, NaN, Infinity]) expect(validateAvailabilityDuration(value, false)).not.toBeNull();
   for (const value of [15, 30, 60, 75, 120, 480]) expect(validateAvailabilityDuration(value, false)).toBeNull();
 });
-test('public duration must equal the 30/60 minute service catalog value', () => {
+test('public duration must equal the configurable service catalog value', () => {
   expect(validateAvailabilityDuration(30, true, 30)).toBeNull();
   expect(validateAvailabilityDuration(60, true, 60)).toBeNull();
+  expect(validateAvailabilityDuration(35, true, 35)).toBeNull();
   for (const value of [15, 70, 75, 120]) expect(validateAvailabilityDuration(value, true, 30)).not.toBeNull();
   expect(validateAvailabilityDuration(60, true, 30)).not.toBeNull();
 });

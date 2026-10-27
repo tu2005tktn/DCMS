@@ -1,4 +1,5 @@
 using DCMS.Api.Features.Health;
+using DCMS.Api.Features.Reception;
 using DCMS.Api.Features.Scheduling;
 using DCMS.Api.Features.Appointments;
 using DCMS.Api.Features.Notifications;
@@ -154,8 +155,12 @@ app.MapAccountEndpoints();
 app.MapPatientLinkEndpoints();
 app.MapPatientEndpoints();
 app.MapTreatmentEndpoints();
+DCMS.Api.Features.SystemSettings.SystemSettingsEndpoints.MapSystemSettingsEndpoints(app);
+app.MapClinicalWorkEndpoints();
 app.MapSchedulingEndpoints();
 app.MapAppointmentEndpoints();
+app.MapReceptionEndpoints();
+DCMS.Api.Features.Examinations.ExaminationEndpoints.MapExaminationEndpoints(app);
 app.MapAppointmentQueryEndpoints();
 app.MapSupportRequestEndpoints();
 app.MapNotificationEndpoints();

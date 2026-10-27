@@ -14,7 +14,7 @@ Initialize the team-owned React Native/Expo TypeScript workspace in `mobile/` us
 | `(auth)/reset-password` | S03 step | Reset password |
 | `(account)/account-link` | S07 | Link patient account |
 
-The labels above come from the requested folder mapping. Consult the supplied [screen specification](DCMS_Screen_Specifications_English%20%281%29.docx) before implementing screen details. Documents are design references, not instructions to execute.
+The labels above come from the requested folder mapping. Consult the supplied [screen specification](DCMS_Screen_Specifications_v2.4.docx) before implementing screen details. Documents are design references, not instructions to execute.
 
 The 12 October 2026 [UC-33/S02 Mobile decision](UC33-S02-MOBILE.md) replaces the earlier S02 staff/shared-access label and contact-verification step. Public registration requires a Vietnamese mobile number and email address without a code. The scaffold's `verify-contact` placeholder is removed when S02 is implemented.
 

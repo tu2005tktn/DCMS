@@ -15,7 +15,9 @@ using Microsoft.EntityFrameworkCore;
 namespace DCMS.Infrastructure.Features.Treatment;
 
 public sealed class TreatmentProgressionService(DcmsDbContext db, UserManager<ApplicationUser> users,
-    ITreatmentActualEvidencePort actual, ITreatmentLabReadinessPort lab, TimeProvider clock)
+    ITreatmentActualEvidencePort actual, ITreatmentLabReadinessPort lab,
+    ITreatmentVisitActivitySourcePort visitActivity, ITreatmentDentistCapabilityPort capabilities,
+    TimeProvider clock)
     : ITreatmentProgressionService
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
@@ -50,7 +52,10 @@ public sealed class TreatmentProgressionService(DcmsDbContext db, UserManager<Ap
         Func<Task<T>> mutate, CancellationToken ct)
     {
         if (key == Guid.Empty) throw Error("MSG04");
-        await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
+        // S22 can post an activity and confirm its step within its owning transaction.
+        var ownsTransaction = db.Database.CurrentTransaction == null;
+        await using var tx = ownsTransaction
+            ? await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct) : null;
         // The shared lock also serializes Appointment's follow-up transitions with step commands.
         await db.Database.ExecuteSqlRawAsync($"SELECT pg_advisory_xact_lock({DCMS.Infrastructure.Features.Scheduling.WorkingScheduleService.TransactionLock})", ct);
         var hash = Fingerprint(payload);
@@ -70,7 +75,7 @@ public sealed class TreatmentProgressionService(DcmsDbContext db, UserManager<Ap
             ResultJson = Serialize(result!)
         });
         await db.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
+        if (tx != null) await tx.CommitAsync(ct);
         return result;
     }
 
@@ -93,6 +98,10 @@ public sealed class TreatmentProgressionService(DcmsDbContext db, UserManager<Ap
                 || step.ItemId == Guid.Empty || Clean(step.Region)?.Length > 80
                 || step.EstimatedMinutes is < 1 or > 480 || step.ReservedMinutes is < 15 or > 480
                 || step.ReservedMinutes % 15 != 0 || step.ReservedMinutes < step.EstimatedMinutes
+                || step.EstimatedMinMinutes.HasValue != step.EstimatedMaxMinutes.HasValue
+                || (step.EstimatedMinMinutes.HasValue &&
+                    (step.EstimatedMinMinutes < 1 || step.EstimatedMinMinutes > step.EstimatedMinutes
+                    || step.EstimatedMaxMinutes < step.EstimatedMinutes || step.EstimatedMaxMinutes > 480))
                 || Clean(step.Capability)?.Length > 160 || Clean(step.LabRequirement)?.Length > 160
                 || step.ChargingCoverage is not ("IncludedInItem" or "FinancialReview")
                 || step.PredecessorIds == null || step.PredecessorIds.Distinct().Count() != step.PredecessorIds.Length
@@ -250,13 +259,18 @@ public sealed class TreatmentProgressionService(DcmsDbContext db, UserManager<Ap
                 if (!readiness.Available) blockers.Add("Chưa kết nối nguồn Labo");
                 else if (!readiness.IsAccepted) blockers.Add("Chưa có Labo Accepted phù hợp");
             }
+            if (row.Capability != null && !await capabilities.HasCapabilityAsync(dossier.BranchId,
+                dossier.DentistId, row.Capability, ct))
+                blockers.Add("Chưa xác minh năng lực bác sĩ phù hợp");
             if (dossier.Items.SingleOrDefault(x => x.Id == row.ItemId)?.Decision != "Agreed")
                 blockers.Add("Hạng mục chưa được đồng ý");
             result.Add(new StepDto(row.Id, row.ItemId, row.Name, row.Region, row.PlanVersion,
                 row.EstimatedMinutes, row.ReservedMinutes, Parse<Guid>(row.PredecessorsJson), row.Capability,
                 row.LabRequirement, row.EarliestOffsetDays, row.TargetOffsetDays, row.LatestOffsetDays,
                 row.ChargingCoverage, row.Outcome, blockers.Count == 0 ? "Ready" : "Blocked",
-                blockers.Distinct().ToArray(), row.HoldReason, row.ReviewCondition, row.Version));
+                blockers.Distinct().ToArray(), row.HoldReason, row.ReviewCondition, row.Version,
+                row.EstimatedMinMinutes, row.EstimatedMaxMinutes,
+                row.ShortReservationAcknowledgedBy, row.ShortReservationAcknowledgedAt));
         }
         return result.ToArray();
     }
@@ -268,6 +282,8 @@ public sealed class TreatmentProgressionService(DcmsDbContext db, UserManager<Ap
         ApplyTemplateRequest request, CancellationToken ct)
     {
         ValidateSteps(request.Steps, true);
+        if (request.Steps.Any(x => x.EstimatedMaxMinutes > x.ReservedMinutes) &&
+            !request.AcknowledgeShortReservation) throw Error("MSG229");
         return await CommandAsync(actorId, request.RequestKey, "ApplyTemplate", new { dossierId, request }, async () =>
         {
             var dossier = await DossierAsync(actorId, dossierId, ct);
@@ -293,6 +309,11 @@ public sealed class TreatmentProgressionService(DcmsDbContext db, UserManager<Ap
                     PlanVersion = dossier.PlanVersion + 1, ItemId = definition.ItemId!.Value,
                     Name = Clean(definition.Name)!, Region = Clean(definition.Region),
                     EstimatedMinutes = definition.EstimatedMinutes, ReservedMinutes = definition.ReservedMinutes,
+                    EstimatedMinMinutes = definition.EstimatedMinMinutes,
+                    EstimatedMaxMinutes = definition.EstimatedMaxMinutes,
+                    ShortReservationAcknowledgedBy = definition.EstimatedMaxMinutes > definition.ReservedMinutes ? actorId : null,
+                    ShortReservationAcknowledgedAt = definition.EstimatedMaxMinutes > definition.ReservedMinutes
+                        ? clock.GetUtcNow() : null,
                     PredecessorsJson = Serialize(definition.PredecessorIds.Select(x => patientIds[x]).ToArray()),
                     Capability = Clean(definition.Capability),
                     LabRequirement = Clean(definition.LabRequirement),
@@ -307,6 +328,58 @@ public sealed class TreatmentProgressionService(DcmsDbContext db, UserManager<Ap
                 snapshot = source, patientSteps = request.Steps, patientIds });
             await db.SaveChangesAsync(ct);
             return new StepChange(await StepDtosAsync(dossier, ct), [], SystemMessages.Get("MSG222", "mẫu điều trị", value: owner.Name));
+        }, ct);
+    }
+
+    public async Task<StepChange> AddPatientStepAsync(int actorId, Guid dossierId,
+        AddPatientStepRequest request, CancellationToken ct)
+    {
+        if (Clean(request.Reason) is not { Length: <= 1000 }) throw Error("MSG04");
+        var definition = new StepDefinition(Guid.NewGuid(), request.ItemId, request.Name, request.Region,
+            request.EstimatedMinutes, request.ReservedMinutes, [], request.Capability,
+            request.LabRequirement, request.EarliestOffsetDays, request.TargetOffsetDays,
+            request.LatestOffsetDays, request.ChargingCoverage, request.EstimatedMinMinutes,
+            request.EstimatedMaxMinutes);
+        ValidateSteps([definition], true);
+        if (request.EstimatedMaxMinutes > request.ReservedMinutes && !request.AcknowledgeShortReservation)
+            throw Error("MSG229");
+        if (request.PredecessorIds == null || request.PredecessorIds.Length != request.PredecessorIds.Distinct().Count()
+            || request.PredecessorIds.Contains(Guid.Empty)) throw Error("MSG229");
+        return await CommandAsync(actorId, request.RequestKey, "AddPatientStep",
+            new { dossierId, request }, async () =>
+        {
+            var dossier = await DossierAsync(actorId, dossierId, ct);
+            if (dossier.Version != request.ExpectedVersion) throw Error("MSG111", 409);
+            if (dossier.State != "Open" || dossier.PlanState != "Committed"
+                || dossier.Items.All(x => x.Id != request.ItemId || x.Decision != "Agreed"))
+                throw Error("MSG240", 409);
+            var existing = await db.TreatmentSteps.Where(x => x.DossierId == dossierId &&
+                x.PlanVersion == dossier.PlanVersion).ToListAsync(ct);
+            if (request.PredecessorIds.Any(id => existing.All(x => x.Id != id))) throw Error("MSG229");
+            var now = clock.GetUtcNow();
+            var step = new TreatmentStep
+            {
+                DossierId = dossierId, PlanId = dossier.PlanId, PlanVersion = dossier.PlanVersion,
+                ItemId = request.ItemId, Name = Clean(request.Name)!, Region = Clean(request.Region),
+                EstimatedMinutes = request.EstimatedMinutes, ReservedMinutes = request.ReservedMinutes,
+                EstimatedMinMinutes = request.EstimatedMinMinutes,
+                EstimatedMaxMinutes = request.EstimatedMaxMinutes,
+                ShortReservationAcknowledgedBy = request.EstimatedMaxMinutes > request.ReservedMinutes ? actorId : null,
+                ShortReservationAcknowledgedAt = request.EstimatedMaxMinutes > request.ReservedMinutes ? now : null,
+                PredecessorsJson = Serialize(request.PredecessorIds), Capability = Clean(request.Capability),
+                LabRequirement = Clean(request.LabRequirement),
+                EarliestOffsetDays = request.EarliestOffsetDays,
+                TargetOffsetDays = request.TargetOffsetDays, LatestOffsetDays = request.LatestOffsetDays,
+                ChargingCoverage = request.ChargingCoverage
+            };
+            db.TreatmentSteps.Add(step);
+            dossier.Version++; dossier.UpdatedAt = now;
+            Event(dossierId, actorId, "step.added", new { step.Id, step.ItemId, request.Reason,
+                step.PlanVersion, step.EstimatedMinMinutes, step.EstimatedMaxMinutes,
+                step.EstimatedMinutes, step.ReservedMinutes, request.PredecessorIds });
+            await db.SaveChangesAsync(ct);
+            return new StepChange(await StepDtosAsync(dossier, ct), [],
+                SystemMessages.Get("MSG222", "bước", value: step.Name));
         }, ct);
     }
 
@@ -334,7 +407,8 @@ public sealed class TreatmentProgressionService(DcmsDbContext db, UserManager<Ap
             var (dossier, step) = await ActiveStepAsync(actorId, dossierId, stepId,
                 request.ExpectedVersion, request.ExpectedStepVersion, ct);
             if (step.Outcome == "Completed") throw Error("MSG230", 409);
-            step.Outcome = request.Outcome is "Partial" or "Repeat" ? "Partial" : "NotStarted";
+            // Deferring or requesting another visit is an assessment, not a reversal of work already recorded.
+            if (request.Outcome is "Partial" or "Repeat") step.Outcome = "Partial";
             step.Version++; dossier.Version++; dossier.UpdatedAt = clock.GetUtcNow();
             Event(dossierId, actorId, "step.progress", new { stepId, request.Outcome, request.Reason });
             await db.SaveChangesAsync(ct);
@@ -493,7 +567,7 @@ public sealed class TreatmentProgressionService(DcmsDbContext db, UserManager<Ap
             request.Purpose is not ("TreatmentContinuation" or "PostoperativeReview" or "WarrantyReview"
                 or "PeriodicRecall" or "NewProblem")) throw Error("MSG04");
         var hasDossierSource = request.Source.DossierId.HasValue && request.Source.ItemId.HasValue
-            && request.Source.StepId.HasValue && !request.Source.VisitId.HasValue
+            && !request.Source.VisitId.HasValue
             && !request.Source.ActivityId.HasValue;
         var hasVisitSource = !request.Source.DossierId.HasValue && !request.Source.ItemId.HasValue
             && !request.Source.StepId.HasValue && request.Source.VisitId.HasValue
@@ -518,14 +592,23 @@ public sealed class TreatmentProgressionService(DcmsDbContext db, UserManager<Ap
                         ?? throw Error("MSG113", 404);
                     if (step.PlanVersion != dossier.PlanVersion ||
                         await db.FollowUpInstructions.AnyAsync(x => x.StepId == step.Id &&
-                            x.Status != "Cancelled" && x.Status != "Superseded", ct)) throw Error("MSG233", 409);
+                            (x.Status == "NeedsBooking" || x.Status == "Booked" ||
+                             x.ActiveAppointmentId.HasValue && db.Appointments.Any(a =>
+                                 a.Id == x.ActiveAppointmentId &&
+                                 (a.Status == "Confirmed" || a.Status == "CheckedIn" || a.Status == "InProgress"))), ct))
+                        throw Error("MSG233", 409);
                 }
+                else if (await db.FollowUpInstructions.AnyAsync(x => x.DossierId == dossier.Id &&
+                    x.ItemId == itemId && x.StepId == null &&
+                    (x.Status == "NeedsBooking" || x.Status == "Booked"), ct))
+                    throw Error("MSG233", 409);
             }
             else
             {
-                // UC-17's Visit/activity path is reserved for the owner of the actual module.
-                // It cannot be accepted until source Patient/branch verification is available.
-                throw Error("MSG144", 503);
+                var verified = await visitActivity.VerifyAsync(request.PatientId, request.BranchId,
+                    source.VisitId!.Value, source.ActivityId!.Value, ct);
+                if (!verified.Available) throw Error("MSG144", 503);
+                if (!verified.Matches) throw Error("MSG06", 403);
             }
             if (request.DentistId.HasValue && !await db.Set<SchedulingMember>().AsNoTracking().AnyAsync(x =>
                     x.BranchId == request.BranchId && x.EmployeeId == request.DentistId && x.Active && x.CanDentist, ct))
@@ -618,4 +701,16 @@ public sealed class UnavailableTreatmentLabReadinessPort : ITreatmentLabReadines
 {
     public Task<LabReadinessResult> CheckAsync(int patientId, Guid stepId, string specification,
         int planVersion, CancellationToken ct) => Task.FromResult(new LabReadinessResult(false, false, null));
+}
+
+public sealed class UnavailableTreatmentVisitActivitySourcePort : ITreatmentVisitActivitySourcePort
+{
+    public Task<VisitActivitySourceResult> VerifyAsync(int patientId, int branchId, Guid visitId,
+        Guid activityId, CancellationToken ct) => Task.FromResult(new VisitActivitySourceResult(false, false));
+}
+
+public sealed class UnavailableTreatmentDentistCapabilityPort : ITreatmentDentistCapabilityPort
+{
+    public Task<bool> HasCapabilityAsync(int branchId, int dentistId, string capability,
+        CancellationToken ct) => Task.FromResult(false);
 }

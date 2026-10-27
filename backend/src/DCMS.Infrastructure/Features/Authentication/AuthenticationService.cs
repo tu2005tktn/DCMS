@@ -190,6 +190,8 @@ public sealed class AuthenticationService(DcmsDbContext db, UserManager<Applicat
             .. effective.Contains(AccountRoles.ClinicAssistant) ? ["patient-links.verify"] : Array.Empty<string>(),
             .. effective.Contains(AccountRoles.ClinicAssistant) || effective.Contains(AccountRoles.Dentist) ? ["patients.read"] : Array.Empty<string>(),
             .. effective.Contains(AccountRoles.ClinicAssistant) ? ["patients.manage"] : Array.Empty<string>(),
+            .. effective.Contains(AccountRoles.ClinicAssistant) || effective.Contains(AccountRoles.Dentist) ? ["reception.read"] : Array.Empty<string>(),
+            .. effective.Contains(AccountRoles.ClinicAssistant) ? ["reception.check-in"] : Array.Empty<string>(),
             // S26 — Staff Support Inbox (UC-34 booking portion): clinic ops xử lý yêu cầu đổi/huỷ/xác nhận.
             .. effective.Contains(AccountRoles.ClinicAssistant) || effective.Contains(AccountRoles.Dentist) || effective.Contains(AccountRoles.Admin)
                 ? ["appointments.support.handle"] : Array.Empty<string>()
@@ -197,7 +199,7 @@ public sealed class AuthenticationService(DcmsDbContext db, UserManager<Applicat
         // UC-36: only a current VERIFIED self link counts; never inferred from a role or contact. Re-read on every request.
         var verifiedLink = user.AccountType == "Public" && await db.PatientAccountLinks.AsNoTracking()
             .AnyAsync(x => x.AccountId == user.Id && x.Status == PatientLinkStatus.Verified, ct);
-        return new(user.Id, user.UserName!, user.FullName, user.AccountType, roles, effective, permissions, verifiedLink);
+        return new(user.Id, user.UserName!, user.FullName, user.AccountType, roles, effective, permissions, verifiedLink, user.PhoneNumber, user.Email);
     }
 
     private string IssueAccessToken(int accountId, Guid sessionId, DateTimeOffset now, DateTimeOffset expires)

@@ -64,17 +64,40 @@ public static class DependencyInjection
         services.AddScoped<DevelopmentPatientLinkSeeder>();
         services.AddScoped<IPatientService, PatientService>();
         services.AddScoped<ITreatmentDossierService, TreatmentDossierService>();
+        services.AddScoped<IServicePriceService, ServicePriceService>();
+        services.AddScoped<ITreatmentFinancialSummaryPort, UnavailableTreatmentFinancialSummaryPort>();
+        services.AddScoped<ITreatmentFinancialWorkspace, TreatmentFinancialWorkspace>();
+        services.AddScoped<ITreatmentRevisionService, TreatmentRevisionService>();
+        services.AddScoped<ITreatmentRevisionActualPort, UnavailableRevisionActualPort>();
+        services.AddScoped<ITreatmentRevisionFinancePort, UnavailableRevisionFinancePort>();
         services.AddScoped<ITreatmentProgressionService, TreatmentProgressionService>();
-        services.AddScoped<ITreatmentActualEvidencePort, UnavailableTreatmentActualEvidencePort>();
+        services.AddScoped<ITreatmentActualEvidencePort, ClinicalActualEvidencePort>();
+        services.AddScoped<IClinicalWorkService, ClinicalWorkService>();
+        services.AddScoped<IClinicalVisitPort, Features.Examinations.ClinicalVisitPort>();
+        services.AddScoped<IClinicalConsentPort, ClinicalConsentPort>();
+        services.AddScoped<IClinicalChargePort, OutboxClinicalChargePort>();
+        services.AddScoped<ICareTaskService, CareTaskService>();
         services.AddScoped<ITreatmentLabReadinessPort, UnavailableTreatmentLabReadinessPort>();
+        services.AddScoped<ITreatmentVisitActivitySourcePort, UnavailableTreatmentVisitActivitySourcePort>();
+        services.AddScoped<ITreatmentDentistCapabilityPort, UnavailableTreatmentDentistCapabilityPort>();
         services.AddScoped<TreatmentDueScanner>();
+        services.AddScoped<CareTaskIngestionService>();
         services.AddHostedService<TreatmentDueScanWorker>();
         services.AddSingleton(TimeProvider.System);
         services.AddScoped<Features.Scheduling.WorkingScheduleService>();
+        services.AddScoped<DCMS.Application.Features.Scheduling.IBookingSettingsService, Features.Scheduling.BookingSettingsService>();
         services.AddScoped<DCMS.Application.Features.Scheduling.IWorkingScheduleService>(sp => sp.GetRequiredService<Features.Scheduling.WorkingScheduleService>());
         services.AddScoped<DCMS.Application.Features.Scheduling.IAvailabilityService>(sp => sp.GetRequiredService<Features.Scheduling.WorkingScheduleService>());
         services.AddScoped<Features.Scheduling.DevelopmentSchedulingSeeder>();
         services.AddScoped<IAppointmentService, AppointmentService>();
+        services.AddScoped<DCMS.Application.Features.Reception.IReceptionService, Features.Reception.ReceptionService>();
+        services.AddScoped<DCMS.Application.Features.Reception.IReceptionSourceReader, Features.Examinations.ReceptionTreatmentSourceReader>();
+        services.AddScoped<Features.Examinations.ClinicalAccess>();
+        services.AddScoped<DCMS.Application.Features.Examinations.IExaminationService, Features.Examinations.ExaminationService>();
+        services.AddScoped<DCMS.Application.Features.Examinations.IClinicalDocumentService, Features.Examinations.ClinicalDocumentService>();
+        services.AddSingleton<DCMS.Application.Features.Examinations.IClinicalFileScanner, Features.Examinations.ClamAvClinicalFileScanner>();
+        services.AddHostedService<Features.Examinations.ClinicalScanWorker>();
+        services.AddScoped<DCMS.Application.Features.Reception.IReceptionSourceReader, Features.Reception.UnavailableReceptionSourceReader>();
         services.AddScoped<IAppointmentQueryService, AppointmentQueryService>();
         services.AddScoped<IAppointmentChangeService, AppointmentChangeService>();
         services.AddScoped<ISupportRequestService, SupportRequestService>();
@@ -104,6 +127,7 @@ public static class DependencyInjection
             services.AddScoped<IEmailVerificationDelivery>(sp => sp.GetRequiredService<SmtpContactDeliveryAdapter>());
         }
         else services.AddScoped<IEmailVerificationDelivery, UnavailableEmailVerificationDelivery>();
+        services.AddScoped<DCMS.Application.Features.SystemSettings.ISystemCatalogService, Features.SystemSettings.SystemCatalogService>();
         return services;
     }
 }

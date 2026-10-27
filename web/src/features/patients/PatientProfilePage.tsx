@@ -1,18 +1,20 @@
 import { Alert, Button, Card, Descriptions, Empty, Form, Input, message, Modal, Result, Skeleton, Space, Tabs, Tag, Timeline, Typography } from 'antd';
 import { useEffect, useRef, useState } from 'react';
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { api, ApiError } from '../../services/api';
 import { useAuth } from '../authentication/AuthContext';
 import { formatDate, formatTime } from '../patient-links/types';
 import PatientFormDrawer from './PatientFormDrawer';
+import PatientAppointmentsTab from './PatientAppointmentsTab';
 import { auditActionLabels, genderLabels, type PatientAuditEntry, type PatientChange, type PatientDetail } from './types';
 import DossierList from '../treatment/DossierList';
 import '../treatment/treatment.css';
+import './patientTreatment.css';
 
 const unknown = <Typography.Text type="secondary">Chưa rõ</Typography.Text>;
 const empty = <Typography.Text type="secondary">—</Typography.Text>;
 
-// Tabs whose source features (S43/S20/S11/S23) are not built yet: say so instead of showing zero or an empty list.
+// Tabs whose source features are not built yet.
 function Pending({ feature }: { feature: string }) {
   return <Alert type="info" showIcon message="Chức năng chưa triển khai"
     description={`Dữ liệu ${feature} sẽ hiển thị tại đây khi chức năng tương ứng được triển khai. Hiện chưa có dữ liệu để hiển thị.`} />;
@@ -24,6 +26,7 @@ export default function PatientProfilePage() {
   const auth = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [search] = useSearchParams();
   const canManage = auth.user?.permissions.includes('patients.manage') ?? false;
   const [toast, toastContext] = message.useMessage();
   const [patient, setPatient] = useState<PatientDetail | null>(null);
@@ -34,6 +37,8 @@ export default function PatientProfilePage() {
   const [audit, setAudit] = useState<PatientAuditEntry[] | null>(null);
   const [auditError, setAuditError] = useState<string | null>(null);
   const [tab, setTab] = useState('basic');
+  const [auditOpen, setAuditOpen] = useState(false);
+  const visitId = search.get('visitId') ?? undefined;
 
   const noticeShown = useRef(false);
   useEffect(() => {
@@ -54,14 +59,14 @@ export default function PatientProfilePage() {
   }, [id, revision]);
 
   useEffect(() => {
-    if (tab !== 'audit') return;
+    if (!auditOpen) return;
     let active = true;
     setAudit(null); setAuditError(null);
     api<PatientAuditEntry[]>(`/api/patients/${id}/audit`)
       .then(result => { if (active) setAudit(result); })
       .catch(error => { if (active) setAuditError((error as Error).message); });
     return () => { active = false; };
-  }, [tab, id, revision]);
+  }, [auditOpen, id, revision]);
 
   function saved(change: PatientChange) {
     setPatient(change.patient);
@@ -74,15 +79,25 @@ export default function PatientProfilePage() {
     extra={<Space><Button onClick={() => setRevision(value => value + 1)}>Thử lại</Button><Link to="/patients">Về danh sách bệnh nhân</Link></Space>} /></>;
   if (!patient) return <>{toastContext}<Card><Skeleton active /></Card></>;
 
-  return <>
-    {toastContext}
-    <Typography.Paragraph><Link to="/patients">← Danh sách bệnh nhân</Link></Typography.Paragraph>
-    <Card className="patient-banner">
+  const age = patient.birthDate ? (() => {
+    const born = new Date(`${patient.birthDate.slice(0, 10)}T00:00:00Z`);
+    if (Number.isNaN(born.getTime())) return null;
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
+    const year = Number(parts.find(part => part.type === 'year')?.value);
+    const month = Number(parts.find(part => part.type === 'month')?.value);
+    const day = Number(parts.find(part => part.type === 'day')?.value);
+    const years = year - born.getUTCFullYear() - (month < born.getUTCMonth() + 1 ||
+      (month === born.getUTCMonth() + 1 && day < born.getUTCDate()) ? 1 : 0);
+    return years >= 0 && years < 150 ? years : null;
+  })() : null;
+
+  const patientBanner = <Card className="patient-banner">
       <div className="patient-banner-row">
         <div>
           <Typography.Title level={3} className="patient-name">{patient.fullName}</Typography.Title>
           <Space wrap size={[16, 4]}>
             <Typography.Text strong>{patient.patientCode}</Typography.Text>
+            <span>{age === null ? 'Chưa rõ tuổi' : `${age} tuổi`}</span>
             <span>Ngày sinh: {patient.birthDate ? formatDate(patient.birthDate) : unknown}</span>
             <span>Giới tính: {patient.gender ? genderLabels[patient.gender] : unknown}</span>
             <span>SĐT: {patient.phone ?? empty}</span>
@@ -94,10 +109,21 @@ export default function PatientProfilePage() {
       {failure && <Alert className="patient-section" type="error" showIcon message={failure.message} />}
       {patient.isArchived && <Alert className="patient-section" type="warning" showIcon message="Hồ sơ đã ngừng sử dụng"
         description={`${formatTime(patient.archivedAt)} · Lý do: ${patient.archiveReason ?? '—'}. Khôi phục để chỉnh sửa.`} />}
-    </Card>
-    <Card>
-      <Tabs activeKey={tab} onChange={setTab} items={[
+    </Card>;
+
+  return <main className="patient-treatment-shell">
+    {toastContext}
+    <Tabs className="patient-treatment-tabs" activeKey={tab} onChange={setTab}
+      tabBarExtraContent={{
+        left: <div className="patient-treatment-toolbar">
+          <Button type="text" onClick={() => navigate(-1)} aria-label="Quay lại">←</Button>
+          <Typography.Title level={3}>HỒ SƠ KHÁCH HÀNG</Typography.Title>
+        </div>,
+        right: <Link to="/patients" aria-label="Đóng hồ sơ khách hàng" className="patient-treatment-close">×</Link>,
+      }} items={[
         { key: 'basic', label: 'Thông tin cơ bản', children: <>
+          {patientBanner}
+          <Card className="patient-basic-card">
           {canManage && <Space className="patient-actions">
             <Button type="primary" disabled={patient.isArchived} onClick={() => setEditing(true)}>Sửa thông tin</Button>
             <Button danger={!patient.isArchived} onClick={() => setArchiving(true)}>{patient.isArchived ? 'Khôi phục hồ sơ' : 'Ngừng sử dụng'}</Button>
@@ -123,26 +149,30 @@ export default function PatientProfilePage() {
             : 'Chưa có tài khoản nào được xác minh liên kết với hồ sơ này.'}
             {' '}<Typography.Text type="secondary">Liên kết chỉ được xác minh hoặc thu hồi tại màn Xác minh liên kết hồ sơ (S08).</Typography.Text></Typography.Paragraph>
           <Typography.Paragraph type="secondary">Tạo lúc {formatTime(patient.createdAt)} · Cập nhật lúc {formatTime(patient.updatedAt)} · Phiên bản {patient.version}</Typography.Paragraph>
+          <Button onClick={() => setAuditOpen(value => !value)} aria-expanded={auditOpen}>
+            {auditOpen ? 'Ẩn lịch sử thay đổi' : 'Xem lịch sử thay đổi'}
+          </Button>
+          {auditOpen && <section className="patient-audit-panel" aria-label="Lịch sử thay đổi">
+            {auditError ? <Alert type="error" showIcon message={auditError} action={<Button size="small" onClick={() => setRevision(value => value + 1)}>Thử lại</Button>} />
+              : !audit ? <Skeleton active /> : audit.length === 0 ? <Empty description="Chưa có lịch sử thay đổi." />
+              : <Timeline items={audit.map(entry => ({ key: entry.id, children: <div className="audit-entry">
+                <Typography.Text strong>{auditActionLabels[entry.action] ?? entry.action}</Typography.Text>
+                {' · '}{entry.actorName}{' · '}<Typography.Text type="secondary">{formatTime(entry.occurredAt)}</Typography.Text>
+                {entry.reason && <div>Lý do: {entry.reason}</div>}
+                {entry.changes.length > 0 && <ul className="patient-changes">{entry.changes.map(change =>
+                  <li key={change.field}>{change.field}: <Typography.Text delete type="secondary">{change.before ?? 'trống'}</Typography.Text> → {change.after ?? 'trống'}</li>)}</ul>}
+              </div> }))} />}
+          </section>}
+          </Card>
         </> },
-        { key: 'treatment', label: 'Điều trị & Thanh toán', children: <DossierList patientId={patient.id} /> },
-        { key: 'files', label: 'Hình ảnh & Tệp', children: <Pending feature="hình ảnh và tài liệu (S20)" /> },
-        { key: 'appointments', label: 'Lịch hẹn', children: <Pending feature="lịch hẹn (S11/S12)" /> },
+        { key: 'treatment', label: 'Điều trị & Thanh toán', children: <DossierList patientId={patient.id} visitId={visitId} patientName={patient.fullName} patientCode={patient.patientCode} patientAge={age} /> },
+        { key: 'files', label: 'Hình ảnh', children: <Link to={`/patients/${patient.id}/documents`}>Mở hình ảnh và tài liệu của bệnh nhân</Link> },
+        { key: 'appointments', label: 'Lịch hẹn', children: <PatientAppointmentsTab key={patient.id} patientId={patient.id} active={tab === 'appointments'} revision={revision} /> },
         { key: 'prescriptions', label: 'Đơn thuốc', children: <Pending feature="đơn thuốc (S23)" /> },
-        { key: 'audit', label: 'Lịch sử thay đổi', children: auditError
-          ? <Alert type="error" showIcon message={auditError} action={<Button size="small" onClick={() => setRevision(value => value + 1)}>Thử lại</Button>} />
-          : !audit ? <Skeleton active /> : audit.length === 0 ? <Empty description="Chưa có lịch sử thay đổi." />
-          : <Timeline items={audit.map(entry => ({ key: entry.id, children: <div className="audit-entry">
-            <Typography.Text strong>{auditActionLabels[entry.action] ?? entry.action}</Typography.Text>
-            {' · '}{entry.actorName}{' · '}<Typography.Text type="secondary">{formatTime(entry.occurredAt)}</Typography.Text>
-            {entry.reason && <div>Lý do: {entry.reason}</div>}
-            {entry.changes.length > 0 && <ul className="patient-changes">{entry.changes.map(change =>
-              <li key={change.field}>{change.field}: <Typography.Text delete type="secondary">{change.before ?? 'trống'}</Typography.Text> → {change.after ?? 'trống'}</li>)}</ul>}
-          </div> }))} /> },
       ]} />
-    </Card>
     <PatientFormDrawer open={editing} patient={patient} onClose={() => setEditing(false)} onSaved={change => { setEditing(false); saved(change); }} />
     <ArchiveModal patient={patient} open={archiving} onClose={() => setArchiving(false)} onSaved={change => { setArchiving(false); saved(change); }} />
-  </>;
+  </main>;
 }
 
 function ArchiveModal({ patient, open, onClose, onSaved }: {

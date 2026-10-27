@@ -3,16 +3,23 @@ import { useState, type ReactNode } from 'react';
 import { Link, Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuth } from '../features/authentication/AuthContext';
 import SignInPage from '../features/authentication/SignInPage';
+import SystemSettingsPage from '../features/system-settings/SystemSettingsPage';
 import AccountsPage from '../features/accounts/AccountsPage';
 import WorkingSchedulesPage from '../features/working-schedules/WorkingSchedulesPage';
+import BookingSettingsPage from '../features/working-schedules/BookingSettingsPage';
 import LinkVerificationPage from '../features/patient-links/LinkVerificationPage';
 import PatientSearchPage from '../features/patients/PatientSearchPage';
 import PatientProfilePage from '../features/patients/PatientProfilePage';
 import SupportInboxPage from '../features/support-inbox/SupportInboxPage';
 import RecoverAccountPage from '../features/recovery/RecoverAccountPage';
 import AppointmentCalendarPage from '../features/appointments/AppointmentCalendarPage';
+import AppointmentDetailPage from '../features/appointments/AppointmentDetailPage';
 import { roleLabels } from '../features/accounts/types';
 import HealthStatus from '../features/HealthStatus';
+import ReceptionPage from '../features/reception/ReceptionPage';
+import CheckInPage from '../features/reception/CheckInPage';
+import PatientDocumentsPage from '../features/clinical-documents/PatientDocumentsPage';
+import VisitPage from '../features/reception/VisitPage';
 import { AccessPage, CustomerGuard, CustomerHomePage, CustomerRegisterPage, CustomerShell, CustomerSignInPage } from '../features/customer-auth/CustomerPages';
 import { useCustomerAuth } from '../features/customer-auth/CustomerAuthContext';
 import CustomerBookingPage from '../features/customer-booking/CustomerBookingPage';
@@ -21,16 +28,26 @@ import CustomerAppointmentsPage from '../features/customer-appointments/Customer
 import CustomerAppointmentDetailPage from '../features/customer-appointments/CustomerAppointmentDetailPage';
 import DossierPage from '../features/treatment/DossierPage';
 import PlanPage from '../features/treatment/PlanPage';
+import RevisionPage from '../features/treatment/RevisionPage';
 import TemplatePage from '../features/treatment/TemplatePage';
+import CommercialTreatmentPage from '../features/treatment/CommercialTreatmentPage';
+import { ActualTreatmentPage, PostoperativeReviewPage } from '../features/treatment/ClinicalWorkPages';
+import ClinicalPreviewPage from '../features/treatment/ClinicalPreviewPage';
+import { clinicalPreviewTreatment } from '../features/treatment/clinicalPreview';
 
 export default function App() {
   return <Routes>
+    {import.meta.env.DEV && <Route path="/__preview/clinical" element={<ClinicalPreviewPage />}>
+      <Route index element={<Navigate to={clinicalPreviewTreatment} replace />} />
+      <Route path=":id/:visitId/treatment" element={<ActualTreatmentPage />} />
+      <Route path=":id/:visitId/review" element={<PostoperativeReviewPage />} />
+    </Route>}
     <Route path="/sign-in" element={<SignInPage />} />
     <Route path="/access" element={<AccessPage />} />
     <Route path="/customer/sign-in" element={<CustomerSignInPage />} />
     <Route path="/customer/register" element={<CustomerRegisterPage />} />
     <Route path="/customer/recover" element={<RecoverAccountPage customer />} />
-    <Route path="/customer/book" element={<CustomerBookingPage />} />
+    <Route path="/customer/book" element={<CustomerGuard><CustomerBookingPage /></CustomerGuard>} />
     <Route path="/customer" element={<CustomerGuard><CustomerShell /></CustomerGuard>}>
       <Route index element={<Navigate to="/customer/home" replace />} />
       <Route path="home" element={<CustomerHomePage />} />
@@ -46,14 +63,25 @@ export default function App() {
       <Route index element={<Home />} />
     </Route>
     <Route element={<Protected><Workspace /></Protected>}>
+      <Route path="system-settings" element={<Protected><SystemSettingsPage /></Protected>} />
       <Route path="working-schedules" element={<WorkingSchedulesPage />} />
+      <Route path="booking-settings" element={<BookingSettingsPage />} />
       <Route path="accounts" element={<Protected permission="accounts.manage"><AccountsPage /></Protected>} />
       <Route path="patients" element={<Protected permission="patients.read"><PatientSearchPage /></Protected>} />
       <Route path="patients/:id" element={<Protected permission="patients.read"><PatientProfilePage /></Protected>} />
+      <Route path="patients/:id/documents" element={<Protected permission="patients.read"><PatientDocumentsPage /></Protected>} />
       <Route path="patients/:id/dossiers/:dossierId" element={<Protected permission="patients.read"><DossierPage /></Protected>} />
       <Route path="patients/:id/dossiers/:dossierId/plan" element={<Protected permission="patients.read"><PlanPage /></Protected>} />
+      <Route path="patients/:id/dossiers/:dossierId/plan/revise/:itemId" element={<Protected permission="patients.read"><RevisionPage /></Protected>} />
+      <Route path="patients/:id/visits/:visitId/treatment" element={<Protected permission="patients.read"><ActualTreatmentPage /></Protected>} />
+      <Route path="patients/:id/visits/:visitId/review" element={<Protected permission="patients.read"><PostoperativeReviewPage /></Protected>} />
       <Route path="treatment-templates" element={<Protected><TemplatePage /></Protected>} />
+      <Route path="commercial/treatment" element={<Protected><CommercialTreatmentPage /></Protected>} />
       <Route path="appointments" element={<Protected><AppointmentCalendarPage /></Protected>} />
+      <Route path="reception" element={<Protected permission="reception.read"><ReceptionPage /></Protected>} />
+      <Route path="reception/appointments/:appointmentId" element={<Protected permission="reception.read"><CheckInPage /></Protected>} />
+      <Route path="visits/:visitId" element={<Protected permission="reception.read"><VisitPage /></Protected>} />
+      <Route path="appointments/:id" element={<Protected><AppointmentDetailPage /></Protected>} />
       <Route path="link-verification" element={<Protected permission="patient-links.verify"><LinkVerificationPage /></Protected>} />
       <Route path="support-inbox" element={<Protected permission="appointments.support.handle"><SupportInboxPage /></Protected>} />
       <Route path="*" element={<Result status="404" title="Không tìm thấy trang" extra={<Link to="/">Về trang chủ</Link>} />} />
@@ -64,6 +92,7 @@ export default function App() {
 function Entry() {
   const staff = useAuth();
   const customer = useCustomerAuth();
+  if (staff.initializing) return <main className="page">Đang kiểm tra phiên…</main>;
   if (staff.user) return <Workspace />;
   if (customer.state.status === 'initializing') return <main className="page"><Typography.Text>Đang kiểm tra phiên…</Typography.Text></main>;
   if (customer.state.status === 'authenticated') return <Navigate to="/customer/home" replace />;
@@ -71,7 +100,8 @@ function Entry() {
 }
 
 function Protected({ children, permission }: { children: ReactNode; permission?: string }) {
-  const { user } = useAuth();
+  const { user, initializing } = useAuth();
+  if (initializing) return <main className="page">Đang kiểm tra phiên…</main>;
   if (!user) return <Navigate to="/sign-in" replace />;
   if (permission && !user.permissions.includes(permission)) return <Result status="403" title="Bạn không có quyền thực hiện thao tác này." extra={<Link to="/">Về trang chủ</Link>} />;
   return children;
@@ -92,12 +122,17 @@ function Workspace() {
       <Space><Typography.Text>{auth.user?.fullName}</Typography.Text><Button loading={busy} onClick={() => void signOut()}>Đăng xuất</Button></Space></Layout.Header>
     <Menu mode="horizontal" selectedKeys={[location.pathname.startsWith('/patients') ? '/patients' : location.pathname]} items={[
       ...(auth.user?.accountType === 'Staff' ? [{ key: '/working-schedules', label: <Link to="/working-schedules">Lịch làm việc</Link> }] : []),
+      ...(auth.user?.accountType === 'Staff' ? [{ key: '/booking-settings', label: <Link to="/booking-settings">Cài đặt đặt lịch</Link> }] : []),
       ...(auth.user?.effectiveRoles.some(r => ['ClinicAssistant', 'Dentist', 'ClinicOwner'].includes(r)) ? [{ key: '/appointments', label: <Link to="/appointments">Lịch hẹn</Link> }] : []),
       ...(auth.user?.permissions.includes('appointments.support.handle') ? [{ key: '/support-inbox', label: <Link to="/support-inbox">Hộp thư hỗ trợ</Link> }] : []),
       { key: '/', label: <Link to="/">Tài khoản của tôi</Link> },
+      ...(auth.user?.permissions.includes('reception.read') ? [{ key: '/reception', label: <Link to="/reception">Tiếp nhận và hàng chờ</Link> }] : []),
       ...(auth.user?.permissions.includes('accounts.manage') ? [{ key: '/accounts', label: <Link to="/accounts">Quản lý tài khoản</Link> }] : []),
       ...(auth.user?.permissions.includes('patients.read') ? [{ key: '/patients', label: <Link to="/patients">Bệnh nhân</Link> }] : []),
+      ...(auth.user?.effectiveRoles.includes('Dentist') ? [{ key: '/system-settings', label: <Link to="/system-settings">Thiết lập hệ thống</Link> }] : []),
       ...(auth.user?.effectiveRoles.includes('Dentist') ? [{ key: '/treatment-templates', label: <Link to="/treatment-templates">Mẫu điều trị</Link> }] : []),
+      ...(auth.user?.effectiveRoles.some(r => ['Admin', 'ClinicOwner', 'Dentist'].includes(r)) ? [{ key: '/commercial/treatment',
+        label: <Link to="/commercial/treatment">Giá và duyệt điều trị</Link> }] : []),
       ...(auth.user?.permissions.includes('patient-links.verify') ? [{ key: '/link-verification', label: <Link to="/link-verification">Xác minh liên kết hồ sơ</Link> }] : []),
     ]} />
     <Layout.Content className="workspace-content">{error && <Alert className="form-alert" type="error" message={error} showIcon />}<Outlet /></Layout.Content>

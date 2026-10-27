@@ -8,7 +8,8 @@ import {
   type AppointmentOptions, type AppointmentResult, type AvailabilitySlot,
 } from './types';
 
-export type BookingPrefill = { branchId: number; dentistId?: number; date: string; minute?: number };
+export type BookingPrefill = { branchId: number; dentistId?: number; date: string; minute?: number;
+  kind?: 'Standard' | 'WalkIn'; source?: string };
 type Values = {
   kind: 'Standard' | 'WalkIn' | 'FollowUp'; source: string; bookerName: string; bookerContact: string; patientId?: number;
   attendeeName?: string; attendeeBirthDate?: string; relation: 'Self' | 'Relative'; serviceId?: number; reason?: string;
@@ -49,8 +50,8 @@ export default function BookingDrawer({ open, prefill, options, followUp, onClos
         dentistId: followUp.dentistId ?? undefined, date: prefill.date, duration: followUp.durationMinutes,
         patientId: followUp.patientId, bookerName: auth.user?.fullName ?? '' });
     } else {
-      form.setFieldsValue({ kind: 'Standard', source: 'Phone', relation: 'Self', branchId: prefill.branchId, dentistId: prefill.dentistId,
-        date: prefill.date, duration: 30 });
+      form.setFieldsValue({ kind: prefill.kind ?? 'Standard', source: prefill.source ?? 'Phone', relation: 'Self',
+        branchId: prefill.branchId, dentistId: prefill.dentistId, date: prefill.date, duration: 30 });
     }
     wantedMinute.current = prefill.minute;
     setSlots(null); setSlot(null); setReviewing(false); setError(null); setSlotsError(null); requestKey.current = null;
@@ -64,7 +65,9 @@ export default function BookingDrawer({ open, prefill, options, followUp, onClos
   // nên giá trị hiệu lực lấy từ bối cảnh chỉ định thay vì form watch.
   const effectiveKind = followUp ? 'FollowUp' as const : values?.kind;
   const effectiveDuration = followUp ? followUp.durationMinutes : values?.duration;
-  const durationValid = !!effectiveDuration && effectiveDuration >= 15 && effectiveDuration <= 480 && effectiveDuration % 15 === 0;
+  // main (CLINIC-SLOTS-AND-SERVICE-DURATIONS.vi.md §27/§33) thay quy tắc 15–480 bội 15 bằng số phút nguyên 1–480;
+  // server dùng chung ScheduleRules.ValidDuration nên client không được lệch về phía chặt hơn.
+  const durationValid = !!effectiveDuration && Number.isInteger(effectiveDuration) && effectiveDuration >= 1 && effectiveDuration <= 480;
   const windowExpired = !!followUp && followUp.latestOn < clinicToday();
   const outsideWindow = !!followUp && !!values?.date && (values.date < followUp.earliestOn || values.date > followUp.latestOn);
   const canQuery = !!values?.branchId && !!values.dentistId && !!values.serviceId && !!values.date && durationValid
@@ -78,7 +81,7 @@ export default function BookingDrawer({ open, prefill, options, followUp, onClos
     setLoadingSlots(true); setSlotsError(null); setSlot(null); setReviewing(false);
     try {
       const query = new URLSearchParams({ branchId: String(values.branchId), dentistId: String(values.dentistId),
-        serviceId: String(values.serviceId), date: values.date, durationMinutes: String(values.duration) });
+        serviceId: String(values.serviceId), date: values.date, durationMinutes: String(effectiveDuration) });
       const result = await api<{ slots: AvailabilitySlot[] }>(`/api/availability?${query}`);
       setSlots(result.slots);
       const wanted = wantedMinute.current;
@@ -91,7 +94,7 @@ export default function BookingDrawer({ open, prefill, options, followUp, onClos
   }
 
   useEffect(() => { if (open && canQuery) void loadSlots(); else { setSlots(null); setSlot(null); } },
-    [open, values?.branchId, values?.dentistId, values?.serviceId, values?.date, values?.duration]);
+    [open, values?.branchId, values?.dentistId, values?.serviceId, values?.date, effectiveDuration]);
 
   async function searchPatients(keyword: string) {
     if (!canSearchPatients || keyword.trim().length < 2) return;
@@ -127,7 +130,7 @@ export default function BookingDrawer({ open, prefill, options, followUp, onClos
         source: values.source, serviceId: values.serviceId ?? null,
         reason: values.reason?.trim() || null, dentistId: values.dentistId, assistantId: null, chairId: slot.chairId,
         startAt: slot.start, durationMinutes: effectiveDuration,
-        followUpId: followUp?.instructionId ?? null,
+        followUpId: followUp?.instructionId ?? null, bookingSettingsVersion: slot.bookingSettingsVersion,
         exceptionReason: needsException ? values.exceptionReason?.trim() : null,
         requestKey: requestKey.current, scheduleVersion: slot.scheduleVersion, assistantScheduleVersion: slot.assistantScheduleVersion,
       }) });
@@ -196,8 +199,10 @@ export default function BookingDrawer({ open, prefill, options, followUp, onClos
       <Typography.Title level={5}>Dịch vụ và tài nguyên</Typography.Title>
       <div className="patient-form-grid">
         <Form.Item name="serviceId" label="Dịch vụ" rules={[{ required: true, message: 'Vui lòng nhập Dịch vụ.' }]}>
-          <Select options={branchServices.map(s => ({ value: s.id, label: s.name }))} /></Form.Item>
-        <Form.Item name="reason" label="Lý do khám (tùy chọn)" rules={[{ max: 1000, message: 'Lý do không được vượt quá 1000 ký tự.' }]}><Input maxLength={1000} /></Form.Item>        <Form.Item name="branchId" label="Chi nhánh" rules={[{ required: true, message: 'Vui lòng nhập Chi nhánh.' }]}>
+          <Select options={branchServices.map(s => ({ value: s.id, label: `${s.name} · ${s.publicDurationMinutes} phút` }))}
+            onChange={id => { if (!followUp) form.setFieldValue('duration', branchServices.find(s => s.id === id)?.publicDurationMinutes); }} /></Form.Item>
+        <Form.Item name="reason" label="Lý do khám (tùy chọn)" rules={[{ max: 1000, message: 'Lý do không được vượt quá 1000 ký tự.' }]}><Input maxLength={1000} /></Form.Item>
+        <Form.Item name="branchId" label="Chi nhánh" rules={[{ required: true, message: 'Vui lòng nhập Chi nhánh.' }]}>
           <Select disabled={!!followUp} options={options?.branches.map(b => ({ value: b.id, label: b.name }))}
             onChange={() => form.setFieldsValue({ dentistId: undefined, chairId: undefined, serviceId: undefined })} />
         </Form.Item>
@@ -214,9 +219,9 @@ export default function BookingDrawer({ open, prefill, options, followUp, onClos
         </Form.Item>
         {followUp ? <div><Typography.Text type="secondary">Thời lượng</Typography.Text>
           <div>{followUp.durationMinutes} phút (khóa theo chỉ định)</div></div>
-          : <Form.Item name="duration" label="Thời lượng (phút)" extra="15–480 phút, bội số của 15." rules={[{ required: true, message: 'Vui lòng nhập Thời lượng.' },
-            { validator: (_, v?: number) => !v || (v >= 15 && v <= 480 && v % 15 === 0) ? Promise.resolve() : Promise.reject(new Error('Thời lượng không đúng định dạng.')) }]}>
-            <InputNumber min={15} max={480} step={15} style={{ width: '100%' }} />
+          : <Form.Item name="duration" label="Thời lượng (phút)" extra="1–480 phút. Mặc định theo dịch vụ; có thể điều chỉnh cho ca này." rules={[{ required: true, message: 'Vui lòng nhập Thời lượng.' },
+            { validator: (_, v?: number) => !v || (Number.isInteger(v) && v >= 1 && v <= 480) ? Promise.resolve() : Promise.reject(new Error('Thời lượng không đúng định dạng.')) }]}>
+            <InputNumber min={1} max={480} precision={0} step={1} style={{ width: '100%' }} />
           </Form.Item>}
       </div>
       <Typography.Title level={5}>Khung giờ hợp lệ</Typography.Title>

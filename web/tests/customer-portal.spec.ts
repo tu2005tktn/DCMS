@@ -16,10 +16,24 @@ test('entry offers separate customer and unchanged staff login', async ({ page }
   await page.goto('/');
   await expect(page).toHaveURL(/\/access$/);
   await expect(page.getByRole('link', { name: 'Khách hàng', exact: true })).toHaveAttribute('href', '/customer/sign-in');
+  await expect(page.getByText('đặt lịch không cần đăng nhập')).toHaveCount(0);
   await page.getByRole('link', { name: 'Nhân viên', exact: true }).click();
   await expect(page).toHaveURL(/\/sign-in$/);
   await expect(page.getByLabel('Tên đăng nhập', { exact: true })).toBeVisible();
   await expect(page.getByLabel('Mật khẩu', { exact: true })).toBeVisible();
+});
+
+test('customer booking requires a Public session before loading booking options', async ({ page }) => {
+  let optionsCalls = 0;
+  await page.route('**/api/availability/options', route => {
+    optionsCalls += 1;
+    return route.fulfill(json({ branches: [], employees: [], services: [] }));
+  });
+  await page.goto('/customer/book');
+  await expect(page).toHaveURL(/\/customer\/sign-in$/);
+  await expect(page.getByRole('heading', { name: 'Đăng nhập' })).toBeVisible();
+  await expect(page.getByText('Đặt lịch không cần tài khoản')).toHaveCount(0);
+  expect(optionsCalls).toBe(0);
 });
 
 test('staff sign-in and sign-out still use existing routes', async ({ page }) => {
@@ -106,8 +120,9 @@ test('Google credential signs a Public customer in through the customer session'
   expect(await page.evaluate(() => sessionStorage.getItem('dcms.customer.accessToken'))).toBe('google-token');
 });
 
-test('guest booking retains form after a slot conflict and confirms another slot', async ({ page }) => {
+test('signed-in customer booking retains form after a slot conflict and confirms another slot', async ({ page }) => {
   await mockCommon(page);
+  await page.addInitScript(() => sessionStorage.setItem('dcms.customer.accessToken', 'public-token'));
   const start = new Date(Date.now() + 3 * 86_400_000).toISOString();
   const second = new Date(Date.now() + 3 * 86_400_000 + 3_600_000).toISOString();
   await page.route('**/api/availability/options', route => route.fulfill(json({
@@ -132,9 +147,8 @@ test('guest booking retains form after a slot conflict and confirms another slot
   await expect(page.locator('.customer-booking-progress')).toContainText('Bước 2/5');
   await page.locator('.ant-select').nth(0).click();
   await page.getByText('Chi nhánh A').last().click();
+  await expect(page.getByLabel('Dịch vụ', { exact: true })).toHaveValue('Khám · 30 phút');
   await page.locator('.ant-select').nth(1).click();
-  await page.getByText(/Khám tổng quát/).last().click();
-  await page.locator('.ant-select').nth(2).click();
   await page.getByText('Bác sĩ B').last().click();
   await page.locator('.customer-slots button').first().click();
   await expect(page.getByRole('complementary', { name: 'Lịch đã chọn' })).toContainText('Giờ khám');

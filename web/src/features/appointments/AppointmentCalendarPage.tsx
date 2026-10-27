@@ -1,7 +1,7 @@
 import { Alert, Button, Card, Empty, Radio, Select, Space, Spin, Tag, Typography, message } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../services/api';
-import AppointmentDetailDrawer from './AppointmentDetailDrawer';
+import { useNavigate } from 'react-router-dom';
 import BookingDrawer, { type BookingPrefill } from './BookingDrawer';
 import {
   addDays, clinicToday, clock, formatDate, localDate, localMinute, mondayOf, sourceLabels, statusColors, statusLabels, weekday,
@@ -20,6 +20,7 @@ function cellKind(periods: CalendarPeriod[], minute: number) {
 
 // S10 Appointment calendar (UC-05). Scope is decided by the server; filters only narrow what the server allows.
 export default function AppointmentCalendarPage() {
+  const navigate = useNavigate();
   const [toast, toastContext] = message.useMessage();
   const [options, setOptions] = useState<AppointmentOptions | null>(null);
   const [optionsError, setOptionsError] = useState<string | null>(null);
@@ -33,7 +34,6 @@ export default function AppointmentCalendarPage() {
   const [error, setError] = useState<string | null>(null);
   const [revision, setRevision] = useState(0);
   const [booking, setBooking] = useState<BookingPrefill | null>(null);
-  const [selected, setSelected] = useState<string | null>(null);
 
   useEffect(() => {
     api<AppointmentOptions>('/api/appointments/options')
@@ -136,7 +136,7 @@ export default function AppointmentCalendarPage() {
                   {items.map(a => {
                     const top = (localMinute(a.startAt) - startMinute) / SLOT * ROW;
                     return <button type="button" key={a.id} className={`calendar-event status-${a.status}`} style={{ top, height: Math.max(ROW, a.durationMinutes / SLOT * ROW) - 2 }}
-                      onClick={() => setSelected(a.id)} aria-label={`Lịch ${a.code}`}>
+                      onClick={() => navigate(`/appointments/${a.id}`)} aria-label={`Lịch ${a.code}`}>
                       <strong>{clock(localMinute(a.startAt))}–{clock(localMinute(a.endAt))}</strong> {a.attendeeName}
                       <span>{a.code}{a.source ? ` · ${sourceLabels[a.source] ?? a.source}` : ''}{a.serviceName ? ` · ${a.serviceName}` : ''}{a.chairName ? ` · ${a.chairName}` : ''}</span>
                       <Tag color={statusColors[a.status]}>{statusLabels[a.status]}</Tag>
@@ -153,6 +153,5 @@ export default function AppointmentCalendarPage() {
       void toast.success(`${result.notification.message} Mã lịch: ${result.code}`);
       setRevision(v => v + 1); // authoritative refresh from the server
     }} />
-    <AppointmentDetailDrawer id={selected} onClose={() => setSelected(null)} />
   </>;
 }

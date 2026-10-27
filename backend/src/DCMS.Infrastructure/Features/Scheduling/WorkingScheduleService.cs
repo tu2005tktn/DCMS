@@ -65,7 +65,7 @@ public sealed partial class WorkingScheduleService(DcmsDbContext db, TimeProvide
         var employees = await db.Employees.AsNoTracking().ToDictionaryAsync(x => x.Id, ct);
         return new(await db.Set<SchedulingBranch>().Where(x => branches.Contains(x.Id)).Select(x => new BranchOption(x.Id, x.Name)).ToArrayAsync(ct),
             members.Select(x => new EmployeeOption(x.EmployeeId, x.BranchId, employees[x.EmployeeId].FullName, true, false, false)).ToArray(), [],
-            await db.Set<SchedulingService>().Where(x => branches.Contains(x.BranchId) && x.Active).Select(x => new ServiceOption(x.Id, x.BranchId, x.Name, x.PublicDurationMinutes)).ToArrayAsync(ct));
+            await db.Set<SchedulingService>().Where(x => branches.Contains(x.BranchId) && x.Active && x.PublicBookable && x.IsInitialExamination).Select(x => new ServiceOption(x.Id, x.BranchId, "Khám", x.PublicDurationMinutes)).ToArrayAsync(ct));
     }
     public async Task<ScheduleDto> GetAsync(int actorId, int branchId, int dentistId, DateOnly weekStart, CancellationToken ct)
     {
@@ -142,7 +142,7 @@ public sealed partial class WorkingScheduleService(DcmsDbContext db, TimeProvide
         await ValidateQuery(query, false, ct);
         var data = await Load(query, null, ct);
         var slots = new List<AvailabilitySlot>();
-        for (var minute = 0; minute + query.DurationMinutes <= 1440; minute += 15)
+        foreach (var minute in CandidateMinutes(query, data))
         {
             var slot = Evaluate(query, true, Local(query.Date, minute), null, attendeeKey, reservationId, data);
             if (slot != null) slots.Add(slot);
@@ -165,7 +165,7 @@ public sealed partial class WorkingScheduleService(DcmsDbContext db, TimeProvide
         var service = q.ServiceId.HasValue
             ? await db.Set<SchedulingService>().AsNoTracking().SingleOrDefaultAsync(x => x.Id == q.ServiceId && x.BranchId == q.BranchId && x.Active, ct)
             : null;
-        if ((q.ServiceId.HasValue && service == null) || (isPublic && (service == null || service.PublicDurationMinutes != q.DurationMinutes))) throw Error("MSG110");
+        if ((q.ServiceId.HasValue && service == null) || (isPublic && (service == null || !service.IsInitialExamination || !service.PublicBookable || service.PublicDurationMinutes != q.DurationMinutes))) throw Error("MSG110");
     }
     private async Task<AvailabilityResult> Query(AvailabilityQuery q, bool isPublic, ScheduleCommand? draft, CancellationToken ct, RecurringCommand? recurringDraft = null)
     {
@@ -173,21 +173,31 @@ public sealed partial class WorkingScheduleService(DcmsDbContext db, TimeProvide
         var slots = new List<AvailabilitySlot>();
         // Load resources once per query; candidate starts all share the same resource snapshot.
         var data = await Load(q, draft, ct, recurringDraft);
-        for (var minute = 0; minute + q.DurationMinutes <= 1440; minute += 15)
+        foreach (var minute in CandidateMinutes(q, data))
         {
             var slot = Evaluate(q, isPublic, Local(q.Date, minute), null, null, null, data);
             if (slot != null) slots.Add(slot);
         }
         return new("Asia/Ho_Chi_Minh", q.Date, slots.ToArray());
     }
-    private sealed record Resources(WorkingWeek? Main, WorkingWeek? Assistant, SchedulePeriod[] MainPeriods,
+    private static IEnumerable<int> CandidateMinutes(AvailabilityQuery query, Resources data)
+    {
+        var day = query.Date.DayNumber - Monday(query.Date).DayNumber;
+        return data.MainPeriods.Where(p => p.Day == day && p.Kind == "Work")
+            .SelectMany(p => Enumerable.Range(0, (p.EndMinute - p.StartMinute - 1) / data.Branch.SlotIntervalMinutes + 1)
+                .Select(index => p.StartMinute + index * data.Branch.SlotIntervalMinutes))
+            .Where(minute => minute + query.DurationMinutes <= 1440).Distinct().Order();
+    }
+    private sealed record Resources(SchedulingBranch Branch, WorkingWeek? Main, WorkingWeek? Assistant, SchedulePeriod[] MainPeriods,
         SchedulePeriod[] AssistantPeriods, SchedulingChair[] Chairs, ResourceReservation[] Occupied);
     private async Task<Resources> Load(AvailabilityQuery q, ScheduleCommand? draft, CancellationToken ct, RecurringCommand? recurringDraft = null)
     {
         var main = await Resolve(q.BranchId, q.DentistId, q.Date, recurringDraft, ct);
         var assistant = q.AssistantId.HasValue ? await Resolve(q.BranchId, q.AssistantId.Value, q.Date, recurringDraft, ct) : null;
         var from = Local(q.Date).ToUniversalTime(); var to = from.AddDays(1);
-        return new(main, assistant,
+        var branch = await db.Set<SchedulingBranch>().AsNoTracking().SingleOrDefaultAsync(x => x.Id == q.BranchId && x.Active, ct)
+            ?? throw Error("MSG110");
+        return new(branch, main, assistant,
             draft != null && draft.DentistId == q.DentistId ? draft.Intervals : Periods(main),
             draft != null && draft.DentistId == q.AssistantId ? draft.Intervals : Periods(assistant),
             await db.Set<SchedulingChair>().AsNoTracking().Where(x => x.BranchId == q.BranchId && x.Active).OrderBy(x => x.Id).ToArrayAsync(ct),
@@ -202,7 +212,9 @@ public sealed partial class WorkingScheduleService(DcmsDbContext db, TimeProvide
             throw Error(code, 409);
         }
         var end = start.AddMinutes(q.DurationMinutes); var minute = start.Hour * 60 + start.Minute; var day = q.Date.DayNumber - Monday(q.Date).DayNumber;
-        if (start.Second != 0 || start.Ticks % TimeSpan.TicksPerSecond != 0 || minute % 15 != 0 || minute + q.DurationMinutes > 1440
+        if (start.Second != 0 || start.Ticks % TimeSpan.TicksPerSecond != 0 || minute + q.DurationMinutes > 1440
+            || !data.MainPeriods.Any(p => p.Day == day && p.Kind == "Work" && p.StartMinute <= minute && minute < p.EndMinute
+                && (minute - p.StartMinute) % data.Branch.SlotIntervalMinutes == 0)
             ) return Fail("MSG110");
         if (isPublic && start < clock.GetUtcNow().AddMinutes(60)) return Fail("MSG24");
         if (!ScheduleRules.Covers(data.MainPeriods, day, minute, minute + q.DurationMinutes)
@@ -212,7 +224,7 @@ public sealed partial class WorkingScheduleService(DcmsDbContext db, TimeProvide
         if (overlaps.Any(r => staff.Contains(r.DentistId) || (r.AssistantId.HasValue && staff.Contains(r.AssistantId.Value))
             || (!string.IsNullOrWhiteSpace(attendeeKey) && r.AttendeeKey == attendeeKey))) return Fail("MSG27");
         var chair = data.Chairs.FirstOrDefault(c => (!chairId.HasValue || c.Id == chairId) && c.OpenMinute <= minute && c.CloseMinute >= minute + q.DurationMinutes && !overlaps.Any(r => r.ChairId == c.Id));
-        return chair == null ? Fail("MSG28") : new(start, end, chair.Id, q.DentistId, q.AssistantId, data.Main?.Version ?? 0, data.Assistant?.Version);
+        return chair == null ? Fail("MSG28") : new(start, end, chair.Id, q.DentistId, q.AssistantId, data.Main?.Version ?? 0, data.Assistant?.Version, data.Branch.BookingSettingsVersion);
     }
     private async Task<AvailabilitySlot?> Find(AvailabilityQuery q, bool isPublic, DateTimeOffset start, int? chairId, string? attendeeKey, Guid? exclude, ScheduleCommand? draft, CancellationToken ct)
     {
@@ -220,6 +232,21 @@ public sealed partial class WorkingScheduleService(DcmsDbContext db, TimeProvide
         catch (BusinessException) { return null; }
         return Evaluate(q, isPublic, start, chairId, attendeeKey, exclude, await Load(q, draft, ct));
     }
+    public async Task ValidateReceptionAsync(Guid reservationId, int patientId, CancellationToken ct)
+    {
+        if (db.Database.CurrentTransaction == null) throw new InvalidOperationException("Reception requires the reservation transaction.");
+        await Lock(ct);
+        var r = await db.Set<ResourceReservation>().AsNoTracking().SingleOrDefaultAsync(x => x.Id == reservationId, ct)
+            ?? throw Error("MSG47", 409);
+        if (r.Status != "Confirmed") throw Error("MSG47", 409);
+        var start = r.Start.ToOffset(TimeSpan.FromHours(7));
+        var q = new AvailabilityQuery(r.BranchId, r.DentistId, r.ServiceId, DateOnly.FromDateTime(start.DateTime),
+            (int)(r.End - r.Start).TotalMinutes, r.AssistantId);
+        await ValidateQuery(q, false, ct);
+        var data = await Load(q, null, ct);
+        _ = Evaluate(q, false, start, r.ChairId, $"patient:{patientId}", r.Id, data, true);
+    }
+
     public async Task<AvailabilitySlot> CheckInTransactionAsync(ResourceCheck request, CancellationToken ct)
     {
         if (db.Database.CurrentTransaction == null) throw new InvalidOperationException("Resource checks require the caller's reservation transaction.");
@@ -228,8 +255,11 @@ public sealed partial class WorkingScheduleService(DcmsDbContext db, TimeProvide
         await Lock(ct);
         var start = request.Start.ToOffset(TimeSpan.FromHours(7));
         var q = new AvailabilityQuery(request.BranchId, request.DentistId, request.ServiceId, DateOnly.FromDateTime(start.DateTime), request.DurationMinutes, request.AssistantId);
+        if (request.BookingSettingsVersion.HasValue && request.BookingSettingsVersion != await db.Set<SchedulingBranch>()
+            .Where(x => x.Id == q.BranchId).Select(x => x.BookingSettingsVersion).SingleOrDefaultAsync(ct)) throw Error("MSG111", 409);
         await ValidateQuery(q, request.Public, ct);
         var data = await Load(q, null, ct);
+        if (request.BookingSettingsVersion.HasValue && request.BookingSettingsVersion != data.Branch.BookingSettingsVersion) throw Error("MSG111", 409);
         if ((data.Main?.Version ?? 0) != request.ExpectedScheduleVersion || (q.AssistantId.HasValue && data.Assistant?.Version != request.ExpectedAssistantScheduleVersion)) throw Error("MSG111", 409);
         return Evaluate(q, request.Public, start, request.ChairId, request.AttendeeKey, request.ExcludeReservationId, data, true)!;
     }

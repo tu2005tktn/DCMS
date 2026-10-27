@@ -1,7 +1,9 @@
 # S12 — Staff Booking Exceptions and Resolution
 
-Nguồn chuẩn: `DCMS_Screen_Specifications_v2.0.docx` và
-`DCMS_Use_Cases_Business_Rules_Messages_v2.0.docx`, bản ngày 15/10/2026.
+> Cập nhật nguồn 25/10/2026: [bộ đặc tả v2.4](README.md) là nguồn hiện hành. Nội dung và bằng chứng dưới đây giữ mốc triển khai ban đầu; chưa được nghiệm thu lại theo v2.4.
+
+Nguồn hiện hành: [Screen Specifications v2.4](DCMS_Screen_Specifications_v2.4.docx) và
+[Use Cases / Business Rules / Messages v2.4](DCMS_Use_Cases_Business_Rules_Messages_v2.4.docx), ngày 25/10/2026. Hợp đồng bên dưới được viết theo v2.0 ngày 15/10/2026.
 Tài liệu này chốt phạm vi TV5 cho S12 và hợp đồng tích hợp với API booking/change
 do TV4 sở hữu.
 
@@ -87,6 +89,13 @@ là bản đọc lại sau save với `expectedVersion` mới và
 - Thay đổi `ConfirmedToAttend` không tạo Visit và không đổi Appointment status.
 - Khi giảm giờ làm, staff thấy danh sách lịch bị ảnh hưởng; schedule publish vẫn do
   luồng S09 chặn cho tới khi dữ liệu hợp lệ.
+
+## Calendar detail entry (19 October 2026)
+
+- Clicking an S10 appointment opens `/appointments/{id}` directly, with the authorized staff detail for that exact appointment. A refresh preserves this route while the staff session is restored.
+- The detail page shows appointment information and, for `appointments.support.handle`, its own support requests with pagination. Opening a request reuses the existing S12 command drawer on the same page; changes refresh both appointment information and request list.
+- `GET /api/support-requests` accepts optional GUID `appointmentId`, applied before count/pagination alongside existing status and staff branch restrictions. No unrelated request is returned. An appointment with no matching requests shows an empty state; failed reads have a retry state.
+- Other appointment readers see the appointment detail without support commands. Check-in remains outside the implemented support workflow. Navigating or viewing does not create a request or change appointment lifecycle.
 
 ## Traceability
 
