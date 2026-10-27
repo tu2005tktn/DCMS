@@ -1,6 +1,84 @@
+# S58/S21/S24 — Mẫu, tiến trình điều trị và chỉ định quay lại
+
+Nguồn nghiệp vụ hiện hành: DCMS_Screen_Specifications_v2.3 và DCMS_Use_Cases_Business_Rules_Messages_v2.3, 24/10/2026; bổ sung phân công 25/10/2026; UC-13/14/17/24/51/53, GBR-129–132/135/153/154/156/162, AT30/31/32/37/42/45/46/47/52. Vinh sở hữu S58, phần Steps của S21 và backend chỉ định; UI S24 thuộc DCMS-106. Quyết định không quản lý thuốc theo lô vẫn có hiệu lực.
+
+## Bổ sung hợp đồng v2.3
+
+- Step template và step của Patient có cặp `estimatedMinMinutes?`/`estimatedMaxMinutes?` tùy chọn, `estimatedMinutes` bác sĩ chọn và `reservedMinutes` giữ ghế. Cặp khoảng hoặc cùng rỗng, hoặc thỏa `0 < min <= estimated <= max <= 480`. `reservedMinutes` là bội 15 trong 15–480 và >= estimate. Khi reserved < max, bác sĩ phải xác nhận cảnh báo; lưu actor và thời điểm xác nhận trong bản sao Patient. Step cũ có khoảng rỗng tiếp tục hợp lệ.
+- Mẫu là gợi ý, không áp số buổi hay khoảng chờ cố định cho Implant tại phòng khám hoặc niềng răng. Bác sĩ có thể thêm bước vào item đã Agreed, ghi Partial/Repeat/Deferred và tạo thêm chỉ định quay lại cho cùng bước sau đánh giá, kèm lý do/cửa sổ; các lệnh này không tăng quantity hoặc giá, không tự tạo actual/Appointment/charge. Thay đổi phạm vi đã thỏa thuận đi qua S62.
+- `POST /api/dossiers/{id}/steps` thêm bước Patient-specific trong phạm vi item Agreed, nhận `{expectedVersion, itemId, name, region?, estimatedMinMinutes?, estimatedMaxMinutes?, estimatedMinutes, reservedMinutes, predecessorIds[], capability?, labRequirement?, earliestOffsetDays?, targetOffsetDays?, latestOffsetDays?, chargingCoverage, reason, acknowledgeShortReservation, requestKey}`. Response `StepChange` trả ID/version/readiness đã lưu. `POST .../plan/from-template` cũng nhận `acknowledgeShortReservation`; `GET .../steps` trả khoảng và dấu xác nhận. Bác sĩ tạo instruction qua `POST /api/follow-up-instructions` với source step hiện có; `AddVisit` trong progress chỉ ghi quyết định, không tự đặt lịch.
+- Instruction đầu tiên có thể tham chiếu `{dossierId,itemId,stepId:null}` của item Agreed khi chưa có Visit hay bước đã lập; cửa sổ và duration do Dentist nhập. Mỗi step, hoặc mỗi nguồn item-only, có tối đa một instruction `NeedsBooking`/`Booked`. Đổi/hủy/NoShow giữ lịch sử và cập nhật instruction trong transaction đặt lịch. Due event dùng khóa instruction + cửa sổ, blocker event dùng khóa episode; consumer care task thuộc DCMS-99. Nguồn actual, Labo và Visit/activity thiếu adapter thật phải từ chối an toàn, không báo hoàn tất.
+- Availability sử dụng danh sách ghế cấu hình cho chi nhánh và kiểm chiếm dụng liên tục suốt thời gian đặt cùng mọi staff được phân công. Phòng khám xác nhận có ba ghế; không hardcode con số này vào engine hay tự tạo ghế trong dữ liệu vận hành. Recall do bác sĩ chọn, không tự sinh sáu hoặc mười hai tháng. Kênh SMS/Zalo chỉ được báo đã gửi khi adapter thật xác nhận.
+
+## Ranh giới nguồn
+
+- Template có các phiên bản Draft/Active/Retired. Chỉ Dentist có quyền ở chi nhánh được activate/retire. Bản patient copy giữ `templateId/templateVersion` và snapshot; chỉnh/retire template không đổi kế hoạch đã copy.
+- Dossier/plan/item hiện có là nguồn lâm sàng của Patient. Step có stable logical ID qua các phiên bản kế hoạch, gắn item Agreed, outcome `NotStarted/Partial/Completed/Skipped/Stopped/Cancelled` riêng với readiness `Ready/Blocked` và blocker cụ thể. Plan/item/step không đại diện cho actual, Appointment hoặc charge.
+- Mỗi step có `estimatedMinutes`, `reservedMinutes` bội 15 trong 15–480 và không nhỏ hơn estimate; predecessor IDs tạo đồ thị không chu trình. Return offsets là ngày lịch theo Asia/Ho_Chi_Minh, `0 <= earliest <= target <= latest`; nếu không có offsets, Dentist chọn cửa sổ trực tiếp. Coverage chỉ là dữ liệu hoạch định gắn item thỏa thuận, không tự tạo charge hoặc miễn phí.
+- `Completed` đòi actual/evidence đã post và xác nhận Dentist. Không có nguồn actual thật thì từ chối an toàn; Lab requirement chưa được xác nhận Accepted đúng Patient/step/spec version thì readiness Blocked. Hold/release lưu lý do 1–1000, thời điểm/điều kiện review, không tự đổi/hủy lịch hay thu tiền.
+- Follow-up instruction độc lập với Appointment: purpose `TreatmentContinuation/PostoperativeReview/WarrantyReview/PeriodicRecall/NewProblem`, nguồn Visit/activity hoặc agreed dossier/item/step (prospective first instruction không cần Visit), reason 1–2000, guidance 0–4000, window, duration và dentist/capability. Status `NeedsBooking/Booked/Completed/Cancelled/Superseded`; overdue là cờ tính toán. No slot vẫn NeedsBooking. Appointment success mới chuyển Booked; cancel/NoShow quay NeedsBooking nếu instruction chưa hoàn tất; reschedule giữ link. Chỉ Dentist xác nhận Completed lâm sàng.
+- Hoàn thành step tạo tối đa một instruction cho mỗi successor logical step và source completion event; nhiều successor độc lập có thể tạo nhiều instruction. Booking, care task và blocker events có khóa ổn định để retry không nhân đôi.
+- Nguồn chỉ định phải chọn đúng một nhánh: `{dossierId,itemId,stepId?}` hoặc `{visitId,activityId}`; không trộn ID hai nhánh. Nguồn Visit/activity hiện chưa có adapter xác thực Patient/branch nên API từ chối 503 thay vì nhận ID chưa kiểm chứng. Chỉ định từ agreed dossier/item là đường hoạt động trước; nguồn actual/lab từ các module khác phải được nối trước nghiệm thu end-to-end tương ứng.
+
+### Tích hợp S22/S63 và care backend
+
+[S22/S63/care contract](S22-S63-ACTUAL-REVIEW-CARE.md) bổ sung bảng activity/review/care và cổng evidence đọc activity `Posted` đúng Patient/dossier/step. `ITreatmentActualEvidencePort` không còn mặc định trả false; tuy nhiên S22 production vẫn chặn Post khi cổng Visit InProgress và consent đúng version chưa được nối, và bước yêu cầu Labo vẫn chặn khi chưa xác minh Accepted. Đánh giá S63, activity S22 và contact care là các commit riêng. Điều này không biến một activity thành completed step, Appointment hoặc charge nếu chưa có command và bằng chứng tương ứng.
+
+## API và DTO chung
+
+API dùng JSON camelCase, `requestKey` UUID cho command, `expectedVersion` cho cập nhật; cùng key + cùng payload trả cùng ID/kết quả, khác payload trả 409. Server kiểm Staff/Dentist, branch, Patient, source, version, quyền xem; client không gửi actor hoặc tự quyết status. Response command đọc lại ID/version/status sau commit.
+
+| Route | Chức năng |
+| --- | --- |
+| `GET/POST /api/treatment-templates` | Lọc branch, đọc/tạo Draft |
+| `GET /api/treatment-templates/{id}`, `POST /api/treatment-templates/{id}/versions` | Đọc lịch sử, tạo Draft version mới |
+| `POST /api/treatment-templates/{id}/versions/{version}/draft` | Lưu bước của Draft với expectedVersion/requestKey |
+| `POST /api/treatment-templates/{id}/versions/{version}/activate`, `/retire` | Chuyển trạng thái version với expectedVersion/requestKey |
+| `POST /api/dossiers/{id}/plan/from-template` | Copy Active version vào Draft của Patient; giữ provenance và snapshot |
+| `GET /api/dossiers/{id}/steps`, `GET /api/dossiers/{id}/steps/{stepId}/readiness` | Step và blocker theo plan version |
+| `POST /api/dossiers/{id}/steps/{stepId}/progress`, `/hold`, `/release-hold`, `/complete` | Cập nhật outcome, hold hoặc dentist-confirmed completion |
+| `GET/POST /api/follow-up-instructions`, `GET /api/follow-up-instructions/{id}` | Danh sách/đọc/tạo chỉ định trong phạm vi quyền |
+| `POST /api/follow-up-instructions/{id}/revise-window`, `/complete`, `/cancel`, `/supersede` | Command theo version, ghi history |
+
+`templateStep` và `planStep` có `logicalStepId`, `itemId` (plan), `name`, `region`, `estimatedMinutes`, `reservedMinutes`, `predecessorIds`, `capability`, `labRequirement`, `returnOffsets`, `chargingCoverage`, `outcome`, `readiness`, `blockers`, `version`. `instruction` có `id`, `patientId`, `source`, `purpose`, `reason`, `guidance`, `earliestOn/targetOn/latestOn`, `durationMinutes`, `dentistId?/capability?`, `status`, `overdue`, `activeAppointmentId?`, `version`, `allowedActions`. Ví dụ prospective: source `{dossierId,itemId,stepId}` của item Agreed, không có `visitId`, window do Dentist chọn; kết quả `NeedsBooking` và MSG231, không tạo Visit/Appointment.
+
+`GET /api/treatment-templates?branchId=...` trả `[]` khi chi nhánh chưa có mẫu, và danh sách theo tên khi đã có mẫu; mỗi dòng gồm `activeVersion` nếu có. Lỗi truy vấn ở server không được biến thành trạng thái danh sách rỗng của UI.
+
+Ví dụ request cho UI S24 của Tuấn (IDs lấy từ GET dossier/steps, Dentist đang đăng nhập):
+
+```json
+{
+  "patientId": 123,
+  "branchId": 1,
+  "source": { "dossierId": "11111111-1111-4111-8111-111111111111", "itemId": "22222222-2222-4222-8222-222222222222", "stepId": "33333333-3333-4333-8333-333333333333", "visitId": null, "activityId": null },
+  "purpose": "TreatmentContinuation",
+  "reason": "Quay lại thực hiện bước điều trị đầu tiên",
+  "guidance": "Bác sĩ xem lại trước khi làm",
+  "earliestOn": "2026-11-01", "targetOn": "2026-11-03", "latestOn": "2026-11-05",
+  "durationMinutes": 30, "dentistId": 2, "capability": null,
+  "requestKey": "550e8400-e29b-41d4-a716-446655440000"
+}
+```
+
+`POST /api/follow-up-instructions` trả HTTP 201 với `{ "instruction": { "id": "...", "status": "NeedsBooking", "version": 1, "activeAppointmentId": null, "allowedActions": ["reviseWindow", "cancel", "supersede", "findSlots"], "overdue": false, ... }, "notification": { "code": "MSG231", "message": "Đã lưu chỉ định quay lại. Chưa có lịch hẹn được đặt." } }`. UI dùng `instruction.id` làm `followUpId` trong `POST /api/appointments` khi bệnh nhân tự thân đã xác minh hoặc staff đặt; `Find slots` chỉ đọc availability, không chuyển trạng thái. `expectedVersion` lấy từ response gần nhất khi sửa chỉ định. UI S24 không được suy ra Patient từ số điện thoại hay quyền xem hồ sơ người thân.
+
+Booking port phải dùng cùng scoped DbContext/transaction: `ValidateAsync` kiểm Patient, window, duration, dentist, readiness và một active appointment; `MarkBookedAsync` ghi link; `MarkNeedsBookingAsync` kiểm đúng appointment ID và giữ lịch sử. Reschedule kiểm lại instruction trước đổi slot. Outbox ghi trong cùng transaction; dispatcher và UI S24 thuộc task khác. `GET /api/availability` vẫn là nguồn slot, không mở calendar engine mới.
+
+## Trạng thái, lỗi và nghiệm thu
+
+- MSG229: graph/duration/window/coverage sai; MSG230: prerequisite/lab/hold chặn; MSG231: đã lưu instruction, chưa đặt lịch; MSG233: thay đổi ảnh hưởng booking; MSG235: không có slot; MSG236: template không còn Active/version thay đổi; MSG241: đã lưu hold; MSG111: stale; MSG144: lỗi nguồn. Lỗi giữ draft; loading/empty/validation/401/403/409/network phân biệt.
+- AT30/31/32/37: snapshot template bất biến; bước Partial/Blocked không mở successor; retry completion giữ instruction IDs; prospective instruction không tạo Visit giả; booking → reschedule → cancel/NoShow giữ provenance; hai booking cạnh tranh chỉ một active; scan lặp không nhân care task; hold/release không tạo actual/charge/payment.
+- Test PostgreSQL dùng schema cách ly và fixture cho actual/lab/care đến khi adapter thật sẵn sàng. Không chạy migration hoặc seed lên database dự án đang dùng chỉ để thử nghiệm. Không tuyên bố nghiệm thu end-to-end actual/lab/care khi chưa nối nguồn thật.
+
+## Phụ lục — phân tích nghiệp vụ ngày 16/10/2026 từ main
+
+Phần dưới được giữ để truy vết thiết kế ban đầu. Khi nội dung về API đã triển khai hoặc thời lượng giữ lịch khác với hợp đồng S58/S21/S24 ở trên và cặp đặc tả v2.3 ngày 24/10/2026, áp dụng hợp đồng và đặc tả mới hơn. Cụ thể, thời lượng đặt lịch staff theo đơn vị 15 phút; mô tả 1–480 phút không làm tròn bên dưới là đề xuất lịch sử.
+
 # Điều trị nhiều buổi và đặt lịch buổi tiếp theo trong DCMS
 
-Ngày quyết định: 16/10/2026. Người dùng đã chọn áp dụng hướng phân tích vào **đặc tả và tài liệu trước**. Tài liệu này làm rõ UC-03/04/06/07/10/13/14/17/19/20/24/25/34/39/40/47/48/50/51/53, các màn hình liên quan và GBR-129–136 trong [bộ đặc tả v2](odental-v2/README.vi.md). Đây là hợp đồng để triển khai, không phải báo cáo chức năng đã chạy.
+> Cập nhật nguồn 25/10/2026: [bộ đặc tả v2.4](README.md) là nguồn hiện hành. Nội dung và bằng chứng dưới đây giữ mốc triển khai ban đầu; chưa được nghiệm thu lại theo v2.4.
+
+Ngày quyết định: 16/10/2026. Người dùng đã chọn áp dụng hướng phân tích vào **đặc tả và tài liệu trước**. Tài liệu này làm rõ UC-03/04/06/07/10/13/14/17/19/20/24/25/34/39/40/47/48/50/51/53, các màn hình liên quan và GBR-129–136 trong [bộ đặc tả v2](README.md). Đây là hợp đồng để triển khai, không phải báo cáo chức năng đã chạy.
 
 DCMS quản lý các bước điều trị xuyên nhiều lượt khám bằng kế hoạch có phiên bản, điều kiện sẵn sàng và chỉ định buổi tiếp theo. Nha sĩ quyết định nội dung chuyên môn cho từng bệnh nhân. Hệ thống hỗ trợ ghi nhận, kiểm tra và điều phối; mẫu dùng chung không tự quyết định điều trị hay tự xác nhận chuỗi lịch hẹn.
 
@@ -141,7 +219,7 @@ Tất cả màn hình có tải/rỗng/lỗi/quyền/xung đột rõ ràng. Lỗ
 
 ## 10 Hợp đồng API và dữ liệu
 
-Các đường dẫn là **hợp đồng dự kiến**, chưa khẳng định đã triển khai. Hợp đồng đầy đủ đồng bộ trong [nguồn UC v2](odental-v2/USE-CASES-RULES-MESSAGES.md).
+Các đường dẫn là **hợp đồng dự kiến** tại thời điểm viết, chưa khẳng định đã triển khai. Đối chiếu lại với [nguồn UC v2.4](DCMS_Use_Cases_Business_Rules_Messages_v2.4.docx) trước khi triển khai; việc đổi liên kết nguồn không xác nhận các API dự kiến dưới đây đã đồng bộ v2.4.
 
 | Thao tác | Hợp đồng chính |
 | --- | --- |

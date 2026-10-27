@@ -9,7 +9,7 @@ import {
   type DocumentItem, type DocumentPage, type DocumentType, type PatientDocumentContexts,
 } from './types';
 
-export type DocumentFilters = { type?: DocumentType; from?: string; to?: string; visitId?: string };
+export type DocumentFilters = { type?: DocumentType; from?: string; to?: string; visitId?: string; dossierId?: string; planId?: string };
 const POLL_MS = 5000;
 const POLL_LIMIT = 24; // about two minutes of waiting for scans
 
@@ -18,9 +18,10 @@ const loadMessage = (e: ApiError) => e.status === 401 ? 'Phiên đăng nhập đ
   : e.status === 404 ? 'Chưa kết nối được API tài liệu (DCMS-95) hoặc không tìm thấy bệnh nhân.' : e.message;
 
 // S20 list, reused by the patient profile tab and the S20 page (and later the S19 workspace) so there is one list/viewer.
-export default function DocumentList({ patientId, contexts, filters, onFiltersChange, uploadContext }: {
+export default function DocumentList({ patientId, contexts, filters, onFiltersChange, uploadContext, review, lockedVisitId }: {
   patientId: number; contexts: PatientDocumentContexts | null; filters: DocumentFilters;
   onFiltersChange: (next: DocumentFilters) => void; uploadContext: UploadContext;
+  review?: (document: DocumentItem) => Promise<void>; lockedVisitId?: string;
 }) {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
@@ -57,7 +58,7 @@ export default function DocumentList({ patientId, contexts, filters, onFiltersCh
       <Select allowClear placeholder="Tất cả loại" value={filters.type} style={{ width: 190 }}
         options={(Object.keys(documentTypeLabels) as DocumentType[]).map(v => ({ value: v, label: documentTypeLabels[v] }))}
         onChange={type => { setPage(1); onFiltersChange({ ...filters, type }); }} />
-      <Select allowClear placeholder="Mọi lượt khám" value={filters.visitId} style={{ width: 220 }}
+      <Select disabled={!!lockedVisitId} allowClear placeholder="Mọi lượt khám" value={filters.visitId} style={{ width: 220 }}
         options={contexts?.visits.map(v => ({ value: v.id, label: v.label }))}
         onChange={visitId => { setPage(1); onFiltersChange({ ...filters, visitId }); }} />
       <Input type="date" aria-label="Từ ngày" value={filters.from ?? ''} max={filters.to} style={{ width: 160 }}
@@ -86,9 +87,12 @@ export default function DocumentList({ patientId, contexts, filters, onFiltersCh
           { title: 'Trạng thái', render: (_, d) => d.fileState === 'Rejected' && d.rejectReason
             ? <Tooltip title={d.rejectReason}><Tag color={fileStateColors.Rejected}>{fileStateLabels.Rejected}</Tag></Tooltip>
             : <Tag color={fileStateColors[d.fileState]}>{fileStateLabels[d.fileState]}</Tag> },
+          { title: 'Bác sĩ xem kết quả', render: (_, d) => d.reviews?.some(r => r.visitId === lockedVisitId)
+            ? <Tag color="green">Đã review trong lượt này</Tag> : <Space><Tag>Chưa review</Tag>{review && <Button size="small" disabled={d.fileState !== 'Ready'}
+              onClick={e => { e.stopPropagation(); void review(d).then(reload).catch(() => {}); }}>Xác nhận đã xem</Button>}</Space> },
         ]} />}
     <DocumentDetailDrawer documentId={selected} onClose={() => setSelected(null)} />
     <UploadDrawer open={uploading} patientId={patientId} contexts={contexts} initialContext={{ ...uploadContext, visitId: uploadContext.visitId ?? filters.visitId }}
-      constraints={data?.constraints ?? defaultConstraints} onClose={() => { setUploading(false); reload(); }} onUploaded={reload} />
+      lockedVisitId={lockedVisitId} constraints={data?.constraints ?? defaultConstraints} onClose={() => { setUploading(false); reload(); }} onUploaded={reload} />
   </>;
 }

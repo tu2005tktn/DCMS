@@ -2,7 +2,6 @@ import { Alert, Card, Descriptions, Skeleton, Typography } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { ApiError } from '../../services/api';
-import { PreviewBanner } from '../ui-preview/preview';
 import DocumentList, { type DocumentFilters } from './DocumentList';
 import { documentsApi } from './documents.api';
 import { formatDay, type DocumentType, type PatientDocumentContexts } from './types';
@@ -12,6 +11,7 @@ export function usePatientDocumentContexts(patientId: number) {
   const [contexts, setContexts] = useState<PatientDocumentContexts | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
   useEffect(() => {
+    if (patientId <= 0) return;
     let active = true;
     setContexts(null); setError(null);
     documentsApi.contexts(patientId).then(c => { if (active) setContexts(c); }).catch(e => { if (active) setError(e as ApiError); });
@@ -31,6 +31,7 @@ export default function PatientDocumentsPage() {
   const filters: DocumentFilters = useMemo(() => ({
     type: (search.get('type') as DocumentType) || undefined, from: search.get('from') || undefined,
     to: search.get('to') || undefined, visitId: search.get('visitId') || undefined,
+    dossierId: search.get('dossierId') || undefined, planId: search.get('planId') || undefined,
   }), [search]);
   const uploadContext = { visitId: search.get('visitId') || undefined, dossierId: search.get('dossierId') || undefined,
     planId: search.get('planId') || undefined, investigationId: search.get('investigationId') || undefined,
@@ -51,7 +52,6 @@ export default function PatientDocumentsPage() {
   return <>
     <Typography.Paragraph><Link to={`/patients/${patientId}`}>← Hồ sơ bệnh nhân</Link></Typography.Paragraph>
     <Typography.Title level={2}>Hình ảnh và tài liệu</Typography.Title>
-    <PreviewBanner />
     <Card className="patient-banner">
       {error ? <Alert type="error" showIcon message={error.status === 403 ? 'Bạn không có quyền xem tài liệu của bệnh nhân này.'
         : error.status === 404 ? 'Chưa kết nối được API tài liệu (DCMS-95) hoặc không tìm thấy bệnh nhân.' : error.message} />

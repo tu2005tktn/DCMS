@@ -42,6 +42,7 @@ for (const width of [320, 390, 768, 1440]) {
       }
     }
 
+    await page.addInitScript(() => sessionStorage.setItem('dcms.customer.accessToken', 'ui-test-token'));
     await page.goto('/customer/book');
     await page.getByRole('button', { name: 'Tiếp tục' }).click();
     await page.locator('.ant-select').nth(0).click();
@@ -57,7 +58,6 @@ for (const width of [320, 390, 768, 1440]) {
     await expectNoHorizontalOverflow(page);
     await page.screenshot({ path: test.info().outputPath(`booking-${width}.png`), fullPage: true });
 
-    await page.addInitScript(() => sessionStorage.setItem('dcms.customer.accessToken', 'ui-test-token'));
     for (const path of ['/customer/home', '/customer/appointments', '/customer/patient-link']) {
       await page.goto(path);
       if (path === '/customer/patient-link') await expect(page.getByText('Chưa liên kết', { exact: true })).toBeVisible();

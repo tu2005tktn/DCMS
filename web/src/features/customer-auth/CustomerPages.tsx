@@ -29,7 +29,7 @@ function CustomerAuthFrame({ title, description, children, footer }: {
           <span className="customer-kicker">Phòng khám nha khoa</span>
           <h2>Chủ động chăm sóc nụ cười của bạn</h2>
           <p>Đặt lịch khám, theo dõi lịch hẹn và quản lý yêu cầu liên kết hồ sơ tại một nơi.</p>
-          <div className="customer-auth-note">Bạn cũng có thể đặt lịch cho người thân mà không cần tạo tài khoản.</div>
+          <div className="customer-auth-note">Sau khi đăng nhập, bạn có thể đặt lịch cho bản thân hoặc người thân.</div>
         </div>
       </aside>
       <section className="customer-auth-panel">
@@ -61,7 +61,7 @@ export function AccessPage() {
           <span className="customer-option-arrow" aria-hidden="true">→</span>
         </Link>
       </div>
-      <p className="customer-access-help">Chưa có tài khoản? <Link to="/customer/register">Tạo tài khoản khách hàng</Link> hoặc <Link to="/customer/book">đặt lịch không cần đăng nhập</Link>.</p>
+      <p className="customer-access-help">Chưa có tài khoản? <Link to="/customer/register">Tạo tài khoản khách hàng</Link>.</p>
     </div>
   </main>;
 }
@@ -134,7 +134,7 @@ export function CustomerSignInPage() {
         <div className="customer-auth-help-row"><Link to="/customer/recover">Quên mật khẩu?</Link></div>
         <Button type="primary" htmlType="submit" block loading={busy}>Đăng nhập</Button>
       </Form>
-      <div className="customer-links"><Link to="/customer/register">Tạo tài khoản</Link><Link to="/customer/book">Đặt lịch không cần tài khoản</Link></div>
+      <div className="customer-links"><Link to="/customer/register">Tạo tài khoản</Link></div>
       <Typography.Paragraph className="customer-or">Hoặc đăng nhập bằng Google</Typography.Paragraph>
       <CustomerGoogleButton onCredential={google} />
   </CustomerAuthFrame>;

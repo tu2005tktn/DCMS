@@ -112,7 +112,7 @@ export default function CustomerBookingPage() {
   }
 
   async function confirm() {
-    if (!slot || !service || !branchId || !dentistId || submittingRef.current || authExpired || !validateContact()) return;
+    if (!token || !slot || !service || !branchId || !dentistId || submittingRef.current || authExpired || !validateContact()) return;
     submittingRef.current = true; setSubmitting(true); setError(null);
     const cleanContact = contact.trim();
     const payload = {
@@ -274,8 +274,8 @@ export default function CustomerBookingPage() {
         <div className="customer-confirmation-details"><p>Trạng thái: <strong>{result.status === 'Confirmed' ? 'Đã xác nhận' : result.status}</strong></p>
           <p>Thời gian: <strong>{formatTime(result.startAt)} – {formatTime(result.endAt)}</strong></p></div>
         <div className="customer-confirmation-next">
-          {token && <Link className="customer-link-button customer-link-button-primary" to={`/customer/appointments/${encodeURIComponent(result.code)}`}>Xem và quản lý lịch hẹn</Link>}
-          <Link to={token ? '/customer/home' : '/customer/sign-in'}>{token ? 'Về trang chủ' : 'Đăng nhập để quản lý lịch hẹn'}</Link>
+          <Link className="customer-link-button customer-link-button-primary" to={`/customer/appointments/${encodeURIComponent(result.code)}`}>Xem và quản lý lịch hẹn</Link>
+          <Link to="/customer/home">Về trang chủ</Link>
         </div>
       </div>}
     </Card>}

@@ -6,7 +6,7 @@ if (-not (Test-Path -LiteralPath $environmentFile)) {
 }
 $settings = @{}
 foreach ($line in Get-Content -LiteralPath $environmentFile) {
-    if ($line -match '^\s*(POSTGRES_DB|POSTGRES_USER|POSTGRES_PASSWORD|POSTGRES_PORT|JWT_SIGNING_KEY|DEV_SEED_PASSWORD|GOOGLE_WEB_CLIENT_ID|SMTP_HOST|SMTP_PORT|SMTP_ENABLE_SSL|SMTP_USERNAME|SMTP_PASSWORD|SMTP_FROM_ADDRESS|SMTP_FROM_NAME)=(.*)$') {
+    if ($line -match '^\s*(POSTGRES_DB|POSTGRES_USER|POSTGRES_PASSWORD|POSTGRES_PORT|JWT_SIGNING_KEY|DEV_SEED_PASSWORD|GOOGLE_WEB_CLIENT_ID|SMTP_HOST|SMTP_PORT|SMTP_ENABLE_SSL|SMTP_USERNAME|SMTP_PASSWORD|SMTP_FROM_ADDRESS|SMTP_FROM_NAME|CLINICAL_DOCUMENTS_STORAGE_PATH|CLAMAV_HOST|CLAMAV_PORT)=(.*)$') {
         $settings[$Matches[1]] = $Matches[2].Trim()
     }
 }
@@ -20,6 +20,9 @@ $connection['Database'] = $settings['POSTGRES_DB']
 $connection['Username'] = $settings['POSTGRES_USER']
 $connection['Password'] = $settings['POSTGRES_PASSWORD']
 $env:ConnectionStrings__DefaultConnection = $connection.ConnectionString
+$env:ClinicalDocuments__StoragePath = if ($settings['CLINICAL_DOCUMENTS_STORAGE_PATH']) { $settings['CLINICAL_DOCUMENTS_STORAGE_PATH'] } else { Join-Path $env:LOCALAPPDATA 'DCMS\clinical-documents' }
+if ($settings['CLAMAV_HOST']) { $env:ClinicalDocuments__ClamAvHost = $settings['CLAMAV_HOST'] }
+if ($settings['CLAMAV_PORT']) { $env:ClinicalDocuments__ClamAvPort = $settings['CLAMAV_PORT'] }
 if ($settings['JWT_SIGNING_KEY']) { $env:Jwt__SigningKey = $settings['JWT_SIGNING_KEY'] }
 if ($settings['DEV_SEED_PASSWORD']) { $env:DevSeed__Password = $settings['DEV_SEED_PASSWORD'] }
 if ($settings['GOOGLE_WEB_CLIENT_ID']) { $env:Google__WebClientId = $settings['GOOGLE_WEB_CLIENT_ID'] }

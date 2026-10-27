@@ -14,9 +14,15 @@ public sealed class DevelopmentSchedulingSeeder(DcmsDbContext db)
         if (branch == null)
         {
             branch = new() { Name = "S09 - Chi nhánh thử nghiệm" }; db.Add(branch); await db.SaveChangesAsync(ct);
-            db.AddRange(new SchedulingChair { BranchId = branch.Id, Name = "Ghế thử nghiệm 1" }, new SchedulingChair { BranchId = branch.Id, Name = "Ghế thử nghiệm 2" });
             db.AddRange(new SchedulingService { BranchId = branch.Id, Name = "Khám", PublicDurationMinutes = 30, IsInitialExamination = true },
                 new SchedulingService { BranchId = branch.Id, Name = "Điều trị thử nghiệm", PublicDurationMinutes = 60, PublicBookable = false });
+        }
+        // Seed only the named demo branch; never overwrite a clinic's configured chairs.
+        for (var number = 1; number <= 3; number++)
+        {
+            var name = $"Ghế thử nghiệm {number}";
+            if (!await db.Set<SchedulingChair>().AnyAsync(x => x.BranchId == branch.Id && x.Name == name, ct))
+                db.Add(new SchedulingChair { BranchId = branch.Id, Name = name });
         }
         var employees = await (from employee in db.Employees join user in db.Users on employee.AccountId equals user.Id
             where user.UserName == "dentist.demo" || user.UserName == "owner.demo" || user.UserName == "assistant.demo" || user.UserName == "dual.demo"

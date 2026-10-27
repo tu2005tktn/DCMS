@@ -41,7 +41,7 @@ test('assistant creates, searches, edits, archives, restores and reads audit usi
   await form.getByRole('button', { name: 'Ngừng sử dụng', exact: true }).click();
   await expect(page.getByText('Hồ sơ đã ngừng sử dụng', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Sửa thông tin', exact: true })).toBeDisabled();
-  await page.getByRole('link', { name: '← Danh sách bệnh nhân', exact: true }).click();
+  await page.getByRole('link', { name: 'Đóng hồ sơ khách hàng', exact: true }).click();
   await page.getByPlaceholder('Mã bệnh nhân, họ tên (có hoặc không dấu), SĐT').fill(`dang anh ${suffix}`);
   await page.getByRole('button', { name: 'Tìm kiếm', exact: true }).click();
   await expect(page.getByText('Không tìm thấy hồ sơ bệnh nhân phù hợp.', { exact: true })).toBeVisible();
@@ -55,12 +55,12 @@ test('assistant creates, searches, edits, archives, restores and reads audit usi
   await form.getByRole('button', { name: 'Khôi phục', exact: true }).click();
   await expect(form).not.toBeVisible();
   await expect(page.getByRole('button', { name: 'Sửa thông tin', exact: true })).toBeEnabled();
-  await page.getByRole('tab', { name: 'Lịch sử thay đổi', exact: true }).click();
+  await page.getByRole('button', { name: 'Xem lịch sử thay đổi', exact: true }).click();
   for (const action of ['Tạo hồ sơ', 'Cập nhật hành chính', 'Ngừng sử dụng', 'Khôi phục'])
     await expect(page.locator('.audit-entry strong').filter({ hasText: new RegExp(`^${action}$`) })).toBeVisible();
   await page.screenshot({ path: '../.artifacts/test-results/trinm/patient-audit.png', fullPage: true });
   await page.getByRole('tab', { name: 'Điều trị & Thanh toán', exact: true }).click();
-  await expect(page.getByText('Chức năng chưa triển khai', { exact: true })).toBeVisible();
+  await expect(page.getByText('Hồ sơ điều trị chỉ dành cho bác sĩ được phân quyền.', { exact: true })).toBeVisible();
   expect(patient.id).toBeGreaterThan(0);
   expect(errors).toEqual([]);
 });

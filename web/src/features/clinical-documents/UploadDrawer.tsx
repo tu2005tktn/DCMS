@@ -28,9 +28,10 @@ function clientError(file: File, c: DocumentConstraints) {
 
 // S20 upload form. Every file is its own request with its own requestKey, progress and result, so one failure never
 // marks the others as failed and a retry after a lost connection cannot create a duplicate.
-export default function UploadDrawer({ open, patientId, contexts, initialContext, constraints, onClose, onUploaded }: {
+export default function UploadDrawer({ open, patientId, contexts, initialContext, constraints, onClose, onUploaded, lockedVisitId }: {
   open: boolean; patientId: number; contexts: PatientDocumentContexts | null; initialContext: UploadContext;
   constraints: DocumentConstraints; onClose: () => void; onUploaded: () => void;
+  lockedVisitId?: string;
 }) {
   const [form] = Form.useForm<Values>();
   const [modal, modalContext] = Modal.useModal();
@@ -71,7 +72,7 @@ export default function UploadDrawer({ open, patientId, contexts, initialContext
     update(row.key, { status: 'uploading', progress: 0, error: undefined });
     try {
       const result = await documentsApi.upload({
-        patientId, visitId: values.visitId ?? null, dossierId: values.dossierId ?? null, planId: values.planId ?? null,
+        patientId, visitId: lockedVisitId ?? values.visitId ?? null, dossierId: values.dossierId ?? null, planId: values.planId ?? null,
         investigationId: initialContext.investigationId ?? null, consentVersion: initialContext.consentVersion ?? null,
         documentType: values.documentType, source: values.source, sourceDate: values.sourceDate, description: values.description?.trim() ?? '',
         requestKey: row.requestKey,
@@ -117,7 +118,7 @@ export default function UploadDrawer({ open, patientId, contexts, initialContext
           <Select options={(Object.keys(sourceLabels) as DocumentSource[]).map(v => ({ value: v, label: sourceLabels[v] }))} /></Form.Item>
         <Form.Item name="sourceDate" label="Ngày nguồn" rules={[{ required: true, message: 'Vui lòng nhập Ngày nguồn.' }]}>
           <Input type="date" max={today()} /></Form.Item>
-        <Form.Item name="visitId" label="Lượt khám"><Select allowClear placeholder="Không gắn lượt khám"
+        <Form.Item name="visitId" label="Lượt khám" rules={[{ required: true, message: 'Chọn lượt khám.' }]}><Select disabled={!!lockedVisitId} placeholder="Chọn lượt khám"
           options={contexts?.visits.map(v => ({ value: v.id, label: v.label }))} /></Form.Item>
         <Form.Item name="dossierId" label="Hồ sơ điều trị"><Select allowClear placeholder="Không gắn hồ sơ"
           options={contexts?.dossiers.map(d => ({ value: d.id, label: d.label }))} /></Form.Item>

@@ -13,7 +13,7 @@
  */
 
 import { Link, type Href } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSessionState } from '@/features/auth/session/useSession';
 import { colors } from '@/theme/colors';
 import { spacing } from '@/theme/spacing';
@@ -131,11 +131,10 @@ export default function HomeMenuScreen() {
             <Text style={styles.groupTitle}>{group.title}</Text>
             {visibleItems.map((item) => (
               <Link key={`${item.href.toString()}-${item.label}`} href={item.href} asChild>
-                {/* Link asChild needs a pressable child on native; a plain View swallows taps (web renders <a>). */}
-                <Pressable style={({ pressed }) => [styles.card, pressed && styles.cardPressed]} accessibilityRole="button">
+                <View style={styles.card} accessibilityRole="button">
                   <Text style={styles.cardLabel}>{item.label}</Text>
                   <Text style={styles.cardDescription}>{item.description}</Text>
-                </Pressable>
+                </View>
               </Link>
             ))}
           </View>
@@ -170,7 +169,6 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
-  cardPressed: { opacity: 0.85 },
   card: {
     backgroundColor: colors.surface,
     borderRadius: 10,

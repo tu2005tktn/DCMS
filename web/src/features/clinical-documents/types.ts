@@ -22,6 +22,7 @@ export type DocumentItem = {
   documentType: DocumentType; source: DocumentSource; sourceDate: string; description?: string | null;
   context: DocumentContextRef; uploaderName: string; uploadedAt: string; fileState: FileState; rejectReason?: string | null;
   allowedActions: DocumentAction[];
+  reviews?: { visitId: string; reviewedBy: number; reviewedAt: string }[];
 };
 export type DocumentConstraints = { maxFiles: number; maxBytes: number; contentTypes: string[]; descriptionMax: number };
 export type DocumentPage = {

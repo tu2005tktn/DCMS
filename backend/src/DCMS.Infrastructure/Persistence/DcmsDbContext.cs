@@ -7,12 +7,16 @@ using DCMS.Domain.Features.Authentication;
 using DCMS.Domain.Features.PatientLinks;
 using DCMS.Domain.Features.Patients;
 using DCMS.Domain.Features.Appointments;
+using DCMS.Domain.Features.Treatment;
 
 namespace DCMS.Infrastructure.Persistence;
 
 public sealed class DcmsDbContext(DbContextOptions<DcmsDbContext> options)
 : IdentityDbContext<ApplicationUser, IdentityRole<int>, int>(options)
 {
+    public DbSet<DCMS.Domain.Features.SystemSettings.MaterialCategory> MaterialCategories => Set<DCMS.Domain.Features.SystemSettings.MaterialCategory>();
+    public DbSet<DCMS.Domain.Features.SystemSettings.MaterialCatalogItem> MaterialCatalogItems => Set<DCMS.Domain.Features.SystemSettings.MaterialCatalogItem>();
+    public DbSet<DCMS.Domain.Features.SystemSettings.SystemCatalogChange> SystemCatalogChanges => Set<DCMS.Domain.Features.SystemSettings.SystemCatalogChange>();
     public DbSet<EmployeeProfile> Employees => Set<EmployeeProfile>();
     public DbSet<AuthSession> AuthSessions => Set<AuthSession>();
     public DbSet<AuthRefreshToken> AuthRefreshTokens => Set<AuthRefreshToken>();
@@ -22,6 +26,7 @@ public sealed class DcmsDbContext(DbContextOptions<DcmsDbContext> options)
     public DbSet<PatientAccountLink> PatientAccountLinks => Set<PatientAccountLink>();
     public DbSet<PatientLinkAudit> PatientLinkAudits => Set<PatientLinkAudit>();
     public DbSet<Appointment> Appointments => Set<Appointment>();
+    public DbSet<DCMS.Domain.Features.Visits.Visit> Visits => Set<DCMS.Domain.Features.Visits.Visit>();
     public DbSet<AppointmentChange> AppointmentChanges => Set<AppointmentChange>();
     public DbSet<AppointmentChangeReceipt> AppointmentChangeReceipts => Set<AppointmentChangeReceipt>();
     public DbSet<AppointmentReceipt> AppointmentReceipts => Set<AppointmentReceipt>();
@@ -37,12 +42,36 @@ public sealed class DcmsDbContext(DbContextOptions<DcmsDbContext> options)
     public DbSet<EmailVerificationToken> EmailVerificationTokens => Set<EmailVerificationToken>();
     public DbSet<RecoveryAudit> RecoveryAudits => Set<RecoveryAudit>();
     public DbSet<RecoveryOutbox> RecoveryOutbox => Set<RecoveryOutbox>();
+    public DbSet<TreatmentDossier> TreatmentDossiers => Set<TreatmentDossier>();
+    public DbSet<TreatmentItem> TreatmentItems => Set<TreatmentItem>();
+    public DbSet<TreatmentEvent> TreatmentEvents => Set<TreatmentEvent>();
+    public DbSet<TreatmentReceipt> TreatmentReceipts => Set<TreatmentReceipt>();
+    public DbSet<TreatmentSheetDraft> TreatmentSheetDrafts => Set<TreatmentSheetDraft>();
+    public DbSet<TreatmentRevisionDraft> TreatmentRevisionDrafts => Set<TreatmentRevisionDraft>();
+    public DbSet<TreatmentTemplate> TreatmentTemplates => Set<TreatmentTemplate>();
+    public DbSet<TreatmentTemplateVersion> TreatmentTemplateVersions => Set<TreatmentTemplateVersion>();
+    public DbSet<TreatmentStep> TreatmentSteps => Set<TreatmentStep>();
+    public DbSet<FollowUpInstruction> FollowUpInstructions => Set<FollowUpInstruction>();
+    public DbSet<TreatmentProgressionReceipt> TreatmentProgressionReceipts => Set<TreatmentProgressionReceipt>();
+    public DbSet<TreatmentProgressionEvent> TreatmentProgressionEvents => Set<TreatmentProgressionEvent>();
+    public DbSet<ClinicalActivity> ClinicalActivities => Set<ClinicalActivity>();
+    public DbSet<ClinicalReview> ClinicalReviews => Set<ClinicalReview>();
+    public DbSet<ClinicalCareNote> ClinicalCareNotes => Set<ClinicalCareNote>();
+    public DbSet<ClinicalCommandReceipt> ClinicalCommandReceipts => Set<ClinicalCommandReceipt>();
+    public DbSet<CareTask> CareTasks => Set<CareTask>();
+    public DbSet<CareContactAttempt> CareContactAttempts => Set<CareContactAttempt>();
+    public DbSet<CareEscalation> CareEscalations => Set<CareEscalation>();
 
     protected override void OnModelCreating(ModelBuilder model)
     {
         base.OnModelCreating(model);
         SchedulingModel.Configure(model);
         AppointmentModel.Configure(model);
+        VisitModel.Configure(model);
+        ExaminationModel.Configure(model);
+        TreatmentModel.Configure(model);
+        SystemSettingsModel.Configure(model);
+        VisitModel.Configure(model);
         model.Entity<ApplicationUser>(b =>
         {
             b.ToTable("USER_ACCOUNT");

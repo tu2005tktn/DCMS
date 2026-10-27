@@ -1,0 +1,12 @@
+.clinical-fact { margin-bottom: 12px; }
+.tooth-chart { overflow-x: auto; padding: 8px 0 16px; }
+.tooth-row { display: flex; gap: 4px; justify-content: center; min-width: 760px; margin: 4px 0; }
+.tooth-row button { min-width: 40px; padding: 4px; }
+.finding-row { display: flex; margin: 12px 0; width: 100%; }
+.finding-row > .ant-space-item:nth-child(2) { flex: 1; }
+.document-filters { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.document-viewer img, .document-viewer iframe { width: 100%; max-height: 65vh; object-fit: contain; }
+.document-viewer iframe { height: 65vh; border: 0; }
+.clinical-confirmed .ant-input[disabled], .clinical-confirmed .ant-select-disabled .ant-select-selection-item,
+.clinical-confirmed .ant-checkbox-wrapper-disabled span { color: #344054; -webkit-text-fill-color: #344054; }
+.clinical-confirmed .ant-btn-primary:disabled { background: #dbeafe; color: #1d4ed8; border-color: #93c5fd; }

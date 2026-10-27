@@ -21,6 +21,7 @@ public interface IAppointmentService
 // TV4 can replace this port when the follow-up module arrives.
 public interface IFollowUpBookingPort
 {
-    Task ValidateAsync(Guid followUpId, int patientId, int dentistId, int durationMinutes, CancellationToken ct);
+    Task ValidateAsync(Guid followUpId, int patientId, int branchId, int dentistId, int durationMinutes,
+        DateTimeOffset startAt, CancellationToken ct);
     Task MarkBookedAsync(Guid followUpId, Guid appointmentId, CancellationToken ct);
 }

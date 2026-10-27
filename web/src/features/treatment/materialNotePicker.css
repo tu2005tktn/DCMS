@@ -1,0 +1,20 @@
+.material-note-columns, .material-note-line { display: grid; grid-template-columns: minmax(0,1fr) 130px 36px; gap: 10px; align-items: start; }
+.material-note-columns { font-weight: 600; margin: 18px 0 8px; }
+.material-note-line { margin-bottom: 12px; }
+.material-note-select { min-width: 0; }
+.material-note-select .ant-select, .material-note-line > .ant-input-number { width: 100%; }
+.material-note-line-error { grid-column: 1 / -1; color: #b42318; }
+.material-note-help { color: #667085; margin-top: 16px; margin-bottom: 0; }
+.material-note-select .ant-alert { margin-top: 8px; }
+.material-note-select-footer { text-align: center; padding: 4px; }
+.material-note-modal .ant-modal-body > .ant-alert { margin-bottom: 12px; }
+.treatment-sheet-note-input { display: flex; gap: 3px; align-items: flex-start; }
+.treatment-sheet-note-input > .ant-form-item { min-width: 0; flex: 1; }
+.treatment-sheet-note-input .material-note-trigger.ant-btn { flex: 0 0 28px; min-width: 28px; height: 28px; padding: 3px; }
+@media(max-width:600px) {
+  .material-note-columns, .material-note-line { grid-template-columns: minmax(0,1fr) 90px 32px; gap: 6px; }
+  .material-note-columns { font-size: 12px; }
+}
+
+.material-note-select-popup .ant-select-item-option-content { white-space: normal; overflow-wrap: anywhere; }
+.treatment-sheet-actual-table td:nth-child(4) { white-space: pre-wrap; overflow-wrap: anywhere; }

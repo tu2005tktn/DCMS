@@ -1,5 +1,9 @@
 # UC-06 — API đổi và hủy lịch hẹn
 
+> Cập nhật nguồn 25/10/2026: [bộ đặc tả v2.4](README.md) là nguồn hiện hành. Nội dung và bằng chứng dưới đây giữ mốc triển khai ban đầu; chưa được nghiệm thu lại theo v2.4.
+Theo hợp đồng S58/S21/S24 v2.3 ngày 24/10/2026, Appointment gắn `followUpId` chỉ chuyển instruction từ `NeedsBooking` sang `Booked` sau khi lịch và reservation commit. Reschedule giữ ID, kiểm lại cửa sổ, readiness, dentist, duration và toàn bộ nhân sự/ghế trong khoảng mới. Cancel/NoShow đưa instruction chưa hoàn tất về `NeedsBooking` trong cùng transaction; lỗi port làm rollback lịch. Không có slot không hủy instruction. Ba ghế là cấu hình chi nhánh thực tế, không là số hardcode trong engine; ghế và staff được giữ liên tục trong cả duration.
+> Cập nhật nguồn 25/10/2026: [bộ đặc tả v2.4](README.md) là nguồn hiện hành. Nội dung và bằng chứng dưới đây giữ mốc triển khai ban đầu; chưa được nghiệm thu lại theo v2.4.
+
 Ngày: 18/10/2026. Nguồn: UC-06/S12/S16 và GBR-012/013/014/015/025/031/075/076/081 trong bộ đặc tả v2.0; hợp đồng mobile tại `docs/implementation/UC05-06-S14-S16.md`.
 
 ## Hợp đồng và quyền
@@ -28,7 +32,9 @@ Một transaction ReadCommitted dùng cùng advisory lock S09 (90403) với đ�
 - Mỗi thành công ghi một `APPOINTMENT_CHANGE` có actor SELF/STAFF, old/new interval và chair, reason, requesterVerification, requestKey, thời gian; tăng version một lần. Bảng dùng FK giữ lịch sử.
 - Receipt dùng khóa ghép `(ActorAccountId, RequestKey)`; fingerprint gồm action, code và toàn bộ command chuẩn hóa. Cùng actor/key/nội dung trả nguyên kết quả đã lưu, không tăng version, ghi history hoặc event lần nữa. Key bị dùng lại với nội dung/action khác trả HTTP 409 MSG111. Quyền được kiểm tra lại trước replay, kể cả khi liên kết đã bị thu hồi.
 - Cùng transaction ghi một `APPOINTMENT_OUTBOX` event `appointment.rescheduled` hoặc `appointment.cancelled`, gồm mã/ID, version, trạng thái, chi nhánh, giờ cũ/mới; không đưa lý do tự do, contact hoặc chẩn đoán vào payload. Dispatcher/reminder do TV5 cung cấp; commit không phụ thuộc gửi thông báo.
-- Follow-up: đổi lịch giữ nguyên ID; hủy phải gọi port transactional `IFollowUpAppointmentChangePort.MarkNeedsBookingAsync` trước commit. Module follow-up chưa có trong checkout: adapter mặc định trả HTTP 503 MSG144 cho hủy lịch có FollowUpId, rollback toàn bộ; không giả vờ chuyển chỉ định sang NeedsBooking. Adapter tương lai phải dùng cùng DbContext/transaction, không gọi mạng ngoài. Chi tiết của lịch đã hủy thể hiện NeedsBooking khi adapter hoàn thành.
+- Follow-up: đổi lịch giữ nguyên ID và kiểm lại cửa sổ/readiness; hủy/NoShow gọi port transactional `IFollowUpAppointmentChangePort.MarkNeedsBookingAsync` trước commit. Port dùng cùng DbContext/transaction, không gọi mạng ngoài. ID follow-up không tồn tại hoặc thay đổi bất nhất làm rollback Appointment; không giả vờ chuyển chỉ định sang NeedsBooking.
+
+Tích hợp S24 theo [TREATMENT-PROGRESSION.vi.md](TREATMENT-PROGRESSION.vi.md) sẽ thay adapter mặc định bằng cổng dùng chung DbContext/transaction. Đổi lịch follow-up phải kiểm cửa sổ và readiness mới, vẫn giữ FollowUpId; hủy/NoShow đưa instruction chưa hoàn tất về NeedsBooking và giữ history. Nếu cổng lỗi thì toàn bộ thay đổi Appointment rollback, không báo thành công.
 - Lỗi lưu DB rollback mọi thay đổi; không trả thành công. EF concurrency failure trả MSG111; lỗi persistence bất ngờ trả MSG144 qua error middleware.
 
 ## Phạm vi tích hợp

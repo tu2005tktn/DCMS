@@ -1,6 +1,4 @@
 import { api, ApiError, readAccessToken, type SystemMessage } from '../../services/api';
-import { uiPreview } from '../ui-preview/preview';
-import { previewDocumentsApi } from './preview';
 import type {
   DocumentHistoryEntry, DocumentItem, DocumentPage, DocumentQuery, PatientDocumentContexts, UploadMetadata,
 } from './types';
@@ -46,7 +44,7 @@ const httpDocumentsApi: DocumentsApi = {
     xhr.onload = () => {
       let body: unknown = null;
       try { body = JSON.parse(xhr.responseText); } catch { /* empty or non-JSON body */ }
-      if (xhr.status >= 200 && xhr.status < 300) { resolve((body as { document: DocumentItem }).document); return; }
+      if (xhr.status >= 200 && xhr.status < 300 && (body as { document?: DocumentItem })?.document) { resolve((body as { document: DocumentItem }).document); return; }
       const error = body as Partial<SystemMessage> | null;
       reject(new ApiError(xhr.status, error?.code ?? 'MSG144', error?.message ?? 'Không thể tải tệp lên. Vui lòng thử lại.', error?.field));
     };
@@ -68,4 +66,4 @@ const httpDocumentsApi: DocumentsApi = {
   },
 };
 
-export const documentsApi: DocumentsApi = uiPreview ? previewDocumentsApi : httpDocumentsApi;
+export const documentsApi: DocumentsApi = httpDocumentsApi;

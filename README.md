@@ -1,5 +1,7 @@
 # DCMS
 
+**Đặc tả hiện hành:** [DCMS v2.4 ngày 25/10/2026](docs/specs/README.md), gồm tài liệu màn hình và UC/GBR/MSG. Các báo cáo triển khai bên dưới giữ mốc kiểm chứng ban đầu.
+
 **S04 / DCMS-75:** [Đặc tả quản lý tài khoản Web](docs/specs/S04-UC31.md) và [hướng dẫn chạy, migration, bằng chứng nghiệm thu](docs/implementation/S04-DCMS-75.md). Đăng nhập Admin dùng API/phiên chung S01; recovery S03 vẫn hoãn.
 
 **Team setup (Tiếng Việt): [Hướng dẫn cài đặt và chạy dự án](docs/SETUP.vi.md).** Includes required tools, first-run commands, daily startup, verification, and troubleshooting for Windows/PowerShell.

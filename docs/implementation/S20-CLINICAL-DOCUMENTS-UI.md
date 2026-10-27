@@ -1,5 +1,7 @@
 # S20 — Danh sách và tải lên tài liệu lâm sàng (UI web)
 
+> Cập nhật 26/10/2026: UI DCMS-104 được tái sử dụng trong S19 và `/patients/:id/documents`; backend hiện thuộc DCMS-112. Xem [contract và bằng chứng hiện hành](DCMS-112-EXAMINATION.md). `documents.api.ts` luôn gọi HTTP thật; preview đã bỏ. Các ghi chú DCMS-94/95, PROPOSED và preview bên dưới là lịch sử tại mốc UI cũ.
+
 Task UI của Ngô Minh Trí (Epic DCMS-92). Backend lưu trữ private, scan, giới hạn và phân quyền thuộc **DCMS-95 (Tư)**; workspace S19 thuộc **DCMS-94 (Tư)**. Truy vết: S20, tab Images and Results của S19; UC-11/12; AT28, AT38.
 
 > Trạng thái (19/10/2026): **chỉ có UI**. Backend DCMS-95 chưa có trên `main`; hợp đồng dưới đây là **[PROPOSED]** để Tư xác nhận và chỉnh, sau đó UI chỉ đổi trong `web/src/features/clinical-documents/documents.api.ts`. Đặc tả v2.2 (19/10/2026) chưa có trong repo; thông báo MSG cụ thể dùng theo server trả về.
