@@ -6,7 +6,7 @@ import { useAuth } from '../authentication/AuthContext';
 import { formatDate, formatTime } from '../patient-links/types';
 import PatientFormDrawer from './PatientFormDrawer';
 import PatientAppointmentsTab from './PatientAppointmentsTab';
-import { auditActionLabels, genderLabels, type PatientAuditEntry, type PatientChange, type PatientDetail } from './types';
+import { auditActionLabels, genderLabels, type PatientAuditEntry, type PatientChange, type PatientDetail, type PatientReference } from './types';
 import DossierList from '../treatment/DossierList';
 import '../treatment/treatment.css';
 import './patientTreatment.css';
@@ -15,6 +15,8 @@ const unknown = <Typography.Text type="secondary">Chưa rõ</Typography.Text>;
 const empty = <Typography.Text type="secondary">—</Typography.Text>;
 
 // Tabs whose source features are not built yet.
+const reference = (value: PatientReference | null) => value ? `${value.name}${value.active ? '' : ' (ngừng dùng)'}` : '—';
+
 function Pending({ feature }: { feature: string }) {
   return <Alert type="info" showIcon message="Chức năng chưa triển khai"
     description={`Dữ liệu ${feature} sẽ hiển thị tại đây khi chức năng tương ứng được triển khai. Hiện chưa có dữ liệu để hiển thị.`} />;
@@ -135,6 +137,15 @@ export default function PatientProfilePage() {
             { label: 'Giới tính', children: patient.gender ? genderLabels[patient.gender] : unknown },
             { label: 'Số điện thoại', children: patient.phone ?? empty },
             { label: 'Địa chỉ', children: patient.address ?? empty },
+            { label: 'Ngày lập hồ sơ', children: patient.profileDate ? formatDate(patient.profileDate) : empty },
+            { label: 'Nguồn', children: reference(patient.source) },
+            { label: 'Phân nhóm khách hàng', children: reference(patient.customerGroup) },
+            { label: 'Nghề nghiệp', children: reference(patient.occupation) },
+            { label: 'Tiền sử (bệnh nhân khai)', span: 2, children: patient.intakeHistory.length || patient.intakeHistoryOther ? <>
+              {patient.intakeHistory.map(x => <Tag key={x.id}>{x.name}{x.active ? '' : ' (ngừng dùng)'}</Tag>)}
+              {patient.intakeHistoryOther && <div>{patient.intakeHistoryOther}</div>}
+              {patient.intakeRecordedAt && <Typography.Text type="secondary">Ghi nhận bởi {patient.intakeRecordedByName ?? '—'} lúc {formatTime(patient.intakeRecordedAt)}</Typography.Text>}
+            </> : empty },
             { label: 'Ghi chú hành chính', span: 2, children: patient.note ?? empty },
           ]} />
           <Typography.Title level={5} className="patient-section">Người giám hộ</Typography.Title>

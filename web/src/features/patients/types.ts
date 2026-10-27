@@ -15,7 +15,11 @@ export type PatientDetail = {
   note: string | null; isArchived: boolean; archivedAt: string | null; archiveReason: string | null;
   createdAt: string; updatedAt: string; version: number;
   link: { verifiedAccountUserName: string | null; verifiedAt: string | null };
+  // S58 đợt 3: catalog-backed administrative fields; active=false marks a value deactivated after it was chosen.
+  profileDate: string | null; source: PatientReference | null; customerGroup: PatientReference | null; occupation: PatientReference | null;
+  intakeHistory: PatientReference[]; intakeHistoryOther: string | null; intakeRecordedAt: string | null; intakeRecordedByName: string | null;
 };
+export type PatientReference = { id: string; name: string; active: boolean };
 export type PatientChange = { patient: PatientDetail; notification: SystemMessage };
 export type DuplicateCandidate = { patient: PatientListItem; reasons: string[] };
 export type PatientAuditEntry = {

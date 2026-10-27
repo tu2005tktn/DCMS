@@ -16,6 +16,16 @@ public sealed class PatientProfile
     public string? GuardianRelationship { get; set; }
     public string? GuardianPhone { get; set; }
     public string? Note { get; set; }
+    // S58 đợt 3: administrative fields backed by REFERENCE_ENTRY catalogs (docs/specs/S58-PATIENT-CATALOG-FIELDS.md).
+    public DateOnly? ProfileDate { get; set; }
+    public Guid? SourceId { get; set; }
+    public Guid? CustomerGroupId { get; set; }
+    public Guid? OccupationId { get; set; }
+    // Patient-reported intake history; it never replaces dentist-reviewed findings in S19.
+    public Guid[] IntakeHistoryIds { get; set; } = [];
+    public string? IntakeHistoryOther { get; set; }
+    public DateTimeOffset? IntakeRecordedAt { get; set; }
+    public int? IntakeRecordedBy { get; set; }
     public bool IsArchived { get; set; }
     public DateTimeOffset? ArchivedAt { get; set; }
     public string? ArchiveReason { get; set; }

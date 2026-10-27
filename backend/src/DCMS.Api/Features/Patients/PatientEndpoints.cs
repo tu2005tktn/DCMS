@@ -27,6 +27,8 @@ public static class PatientEndpoints
             Results.Ok(await service.SearchAsync(keyword, birthDate, includeArchived ?? false, page ?? 1, pageSize ?? 20, ct)));
         group.MapPost("/duplicates", async (DuplicateCheckRequest request, IPatientService service, CancellationToken ct) =>
             Results.Ok(await service.DuplicatesAsync(request, ct)));
+        // S58: required administrative fields and patient-code mode for the S05/S06 form.
+        group.MapGet("/form-policy", async (IPatientService service, CancellationToken ct) => Results.Ok(await service.FormPolicyAsync(ct)));
         group.MapGet("/{id:int}", async (int id, IPatientService service, CancellationToken ct) =>
             Results.Ok(await service.GetAsync(id, ct)));
         group.MapGet("/{id:int}/audit", async (int id, IPatientService service, CancellationToken ct) =>

@@ -1,13 +1,25 @@
 import { Alert, Button, Checkbox, Drawer, Form, Input, Modal, Select, Space, Table, Tag, Typography } from 'antd';
+import type { PatientReference } from './types';
 import { useEffect, useState } from 'react';
-import { api } from '../../services/api';
+import { api, ApiError } from '../../services/api';
+import { codeExample, type PatientFormPolicy } from '../system-settings/generalSettings';
 import { formatDate } from '../patient-links/types';
 import { genderLabels, type DuplicateCandidate, type Gender, type PatientChange, type PatientDetail } from './types';
 
 type Values = {
   patientCode?: string; fullName: string; birthDate?: string; gender?: Gender; phone?: string; address?: string;
   guardianName?: string; guardianRelationship?: string; guardianPhone?: string; note?: string;
+  profileDate?: string; sourceId?: string; customerGroupId?: string; occupationId?: string; intakeHistoryIds?: string[]; intakeHistoryOther?: string;
 };
+type Option = { id: string; code: string | null; name: string };
+type CatalogKind = 'patient-sources' | 'customer-groups' | 'occupations' | 'intake-history';
+
+// Active choices from the S58 catalog, plus a value already on the record even if it was deactivated later (SET-01).
+const choices = (options: Option[] | undefined, kept: (PatientReference | null | undefined)[]) => [
+  ...(options ?? []).map(x => ({ value: x.id, label: x.name })),
+  ...kept.filter((x): x is PatientReference => !!x && !(options ?? []).some(o => o.id === x.id))
+    .map(x => ({ value: x.id, label: `${x.name}${x.active ? '' : ' (ngừng dùng)'}` })),
+];
 
 const blank = (value?: string | null) => value?.trim() ? value.trim() : null;
 const today = () => new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10);
@@ -22,7 +34,29 @@ export default function PatientFormDrawer({ open, patient, onClose, onSaved }: {
   const [error, setError] = useState<string | null>(null);
   const [duplicates, setDuplicates] = useState<DuplicateCandidate[] | null>(null);
   const [reviewed, setReviewed] = useState(false);
+  const [policy, setPolicy] = useState<PatientFormPolicy | null>(null);
+  const [policyError, setPolicyError] = useState<string | null>(null);
+  const [catalogs, setCatalogs] = useState<Partial<Record<CatalogKind, Option[]>>>({});
+  const [catalogError, setCatalogError] = useState<string | null>(null);
   const editing = patient !== null;
+  const required = policy?.requiredFields;
+  const mode = policy?.patientCode.mode;
+
+  async function loadCatalogs() {
+    setCatalogError(null);
+    try {
+      const kinds: CatalogKind[] = ['patient-sources', 'customer-groups', 'occupations', 'intake-history'];
+      const loaded = await Promise.all(kinds.map(kind => api<Option[]>(`/api/reference-options?kind=${kind}`)));
+      setCatalogs(Object.fromEntries(kinds.map((kind, i) => [kind, loaded[i]])));
+    } catch (failure) { setCatalogError((failure as Error).message); }
+  }
+
+  // S58: required fields and code mode come from the clinic policy; the server rechecks the same version at save.
+  async function loadPolicy() {
+    setPolicyError(null);
+    try { setPolicy(await api<PatientFormPolicy>('/api/patients/form-policy')); }
+    catch (failure) { setPolicy(null); setPolicyError((failure as Error).message); }
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -31,9 +65,12 @@ export default function PatientFormDrawer({ open, patient, onClose, onSaved }: {
       fullName: patient.fullName, birthDate: patient.birthDate ?? undefined, gender: patient.gender ?? undefined,
       phone: patient.phone ?? undefined, address: patient.address ?? undefined, guardianName: patient.guardianName ?? undefined,
       guardianRelationship: patient.guardianRelationship ?? undefined, guardianPhone: patient.guardianPhone ?? undefined,
-      note: patient.note ?? undefined,
-    } : {});
+      note: patient.note ?? undefined, profileDate: patient.profileDate ?? undefined, sourceId: patient.source?.id,
+      customerGroupId: patient.customerGroup?.id, occupationId: patient.occupation?.id, intakeHistoryIds: patient.intakeHistory.map(x => x.id),
+      intakeHistoryOther: patient.intakeHistoryOther ?? undefined,
+    } : { profileDate: today() });
     setError(null); setDuplicates(null); setReviewed(false);
+    void loadPolicy(); void loadCatalogs();
   }, [open, patient]);
 
   function close() {
@@ -48,6 +85,8 @@ export default function PatientFormDrawer({ open, patient, onClose, onSaved }: {
         fullName: values.fullName, birthDate: values.birthDate || null, gender: values.gender ?? null, phone: blank(values.phone),
         address: blank(values.address), guardianName: blank(values.guardianName), guardianRelationship: blank(values.guardianRelationship),
         guardianPhone: blank(values.guardianPhone), note: blank(values.note),
+        profileDate: values.profileDate || null, sourceId: values.sourceId ?? null, customerGroupId: values.customerGroupId ?? null,
+        occupationId: values.occupationId ?? null, intakeHistoryIds: values.intakeHistoryIds ?? [], intakeHistoryOther: blank(values.intakeHistoryOther),
       };
       // Show suspected duplicates first; the server rechecks and refuses an unreviewed save.
       if (!reviewed) {
@@ -56,19 +95,36 @@ export default function PatientFormDrawer({ open, patient, onClose, onSaved }: {
         });
         if (found.length > 0) { setDuplicates(found); return; }
       }
+      const policyVersion = policy?.version ?? null;
       const change = editing
-        ? await api<PatientChange>(`/api/patients/${patient.id}`, { method: 'PUT', body: JSON.stringify({ ...body, version: patient.version, duplicatesReviewed: true }) })
-        : await api<PatientChange>('/api/patients', { method: 'POST', body: JSON.stringify({ ...body, patientCode: blank(values.patientCode), duplicatesReviewed: true }) });
+        ? await api<PatientChange>(`/api/patients/${patient.id}`, { method: 'PUT', body: JSON.stringify({ ...body, version: patient.version, duplicatesReviewed: true, policyVersion }) })
+        : await api<PatientChange>('/api/patients', { method: 'POST', body: JSON.stringify({
+          ...body, patientCode: mode === 'AutoOnly' ? null : blank(values.patientCode), duplicatesReviewed: true, policyVersion }) });
       onSaved(change);
-    } catch (failure) { setError((failure as Error).message); }
+    } catch (failure) {
+      const apiError = failure as ApiError;
+      if (apiError.field === 'policyVersion') {
+        // Keep the draft; reload the policy so the new required fields show before the next save (SET-AT-06).
+        await loadPolicy();
+        setError('Thiết lập hồ sơ vừa thay đổi. Vui lòng kiểm tra lại các trường bắt buộc.');
+        void form.validateFields().catch(() => undefined);
+      } else {
+        setError(apiError.message);
+        if (apiError.field) form.setFields([{ name: apiError.field as keyof Values, errors: [apiError.message] }]);
+      }
+    }
     finally { setBusy(false); }
   }
 
   return <Drawer open={open} width={720} onClose={close} destroyOnClose title={editing ? `Sửa thông tin hành chính · ${patient.patientCode}` : 'Thêm hồ sơ bệnh nhân'}
     extra={<Space><Button onClick={close}>Hủy</Button>
-      <Button type="primary" loading={busy} disabled={duplicates !== null && duplicates.length > 0 && !reviewed} onClick={() => form.submit()}>Lưu</Button></Space>}>
+      <Button type="primary" loading={busy} disabled={!policy || (duplicates !== null && duplicates.length > 0 && !reviewed)} onClick={() => form.submit()}>Lưu</Button></Space>}>
     {modalContext}
+    {policyError && <Alert className="form-alert" type="error" showIcon message={`Không tải được thiết lập hồ sơ: ${policyError}`}
+      action={<Button size="small" onClick={() => void loadPolicy()}>Thử lại</Button>} />}
     {error && <Alert className="form-alert" type="error" message={error} showIcon />}
+    {catalogError && <Alert className="form-alert" type="warning" showIcon message={`Không tải được danh mục: ${catalogError}`}
+      action={<Button size="small" onClick={() => void loadCatalogs()}>Thử lại</Button>} />}
     {duplicates && duplicates.length > 0 && <Alert className="form-alert" type="warning" showIcon message="Có hồ sơ nghi trùng"
       description={<>
         <Typography.Paragraph>Hệ thống chỉ gợi ý, không tự kết luận là cùng một người. Hãy đối chiếu trước khi lưu. Nếu đúng là người đã có hồ sơ, hủy và mở hồ sơ đó.</Typography.Paragraph>
@@ -88,22 +144,51 @@ export default function PatientFormDrawer({ open, patient, onClose, onSaved }: {
       <div className="patient-form-grid">
         {editing
           ? <Form.Item label="Mã bệnh nhân"><Input value={patient.patientCode} disabled /></Form.Item>
-          : <Form.Item name="patientCode" label="Mã bệnh nhân" extra="Để trống để hệ thống tự cấp mã (BN000001...)."
-            rules={[{ max: 40, message: 'Mã bệnh nhân không được vượt quá 40 ký tự.' },
+          : <Form.Item name="patientCode" label="Mã bệnh nhân"
+            extra={mode === 'ManualOnly' ? 'Phòng khám yêu cầu nhập mã thủ công.'
+              : mode === 'AutoOnly' ? `Hệ thống tự cấp mã (${codeExample(policy?.patientCode.prefix ?? '')}...).`
+              : `Để trống để hệ thống tự cấp mã (${codeExample(policy?.patientCode.prefix ?? 'BN')}...).`}
+            rules={[{ required: mode === 'ManualOnly', whitespace: true, message: 'Vui lòng nhập Mã bệnh nhân.' },
+              { max: 40, message: 'Mã bệnh nhân không được vượt quá 40 ký tự.' },
               { pattern: /^[A-Za-z0-9][A-Za-z0-9._-]*$/, message: 'Mã bệnh nhân không đúng định dạng.' }]}>
-            <Input maxLength={40} placeholder="Tự động" /></Form.Item>}
+            <Input maxLength={40} disabled={mode === 'AutoOnly'} placeholder={mode === 'ManualOnly' ? undefined : 'Tự động'} /></Form.Item>}
         <Form.Item name="fullName" label="Họ tên" rules={[{ required: true, whitespace: true, message: 'Vui lòng nhập Họ tên.' },
           { max: 100, message: 'Họ tên không được vượt quá 100 ký tự.' }]}><Input maxLength={100} /></Form.Item>
-        <Form.Item name="birthDate" label="Ngày sinh" extra="Để trống nếu chưa rõ."
-          rules={[{ validator: (_, value?: string) => !value || value <= today() ? Promise.resolve() : Promise.reject(new Error('Ngày sinh không đúng định dạng.')) }]}>
+        <Form.Item name="birthDate" label="Ngày sinh" extra={required?.birthDate ? undefined : 'Để trống nếu chưa rõ.'}
+          rules={[{ required: required?.birthDate, message: 'Vui lòng nhập Ngày sinh.' }, { validator: (_, value?: string) => !value || value <= today() ? Promise.resolve() : Promise.reject(new Error('Ngày sinh không đúng định dạng.')) }]}>
           <Input type="date" max={today()} /></Form.Item>
-        <Form.Item name="gender" label="Giới tính"><Select allowClear placeholder="Chưa rõ"
+        <Form.Item name="gender" label="Giới tính" rules={[{ required: required?.gender, message: 'Vui lòng nhập Giới tính.' }]}><Select allowClear placeholder="Chưa rõ"
           options={(Object.keys(genderLabels) as Gender[]).map(value => ({ value, label: genderLabels[value] }))} /></Form.Item>
         <Form.Item name="phone" label="Số điện thoại" extra="Có thể dùng chung với người khác; không dùng để gộp hồ sơ."
-          rules={[{ max: 20, message: 'Số điện thoại không được vượt quá 20 ký tự.' },
+          rules={[{ required: required?.phone, whitespace: true, message: 'Vui lòng nhập Số điện thoại.' },
+            { max: 20, message: 'Số điện thoại không được vượt quá 20 ký tự.' },
             { pattern: /^\+?[0-9 ().-]+$/, message: 'Số điện thoại không đúng định dạng.' }]}><Input maxLength={20} /></Form.Item>
-        <Form.Item name="address" label="Địa chỉ" rules={[{ max: 255, message: 'Địa chỉ không được vượt quá 255 ký tự.' }]}><Input maxLength={255} /></Form.Item>
+        <Form.Item name="address" label="Địa chỉ" rules={[{ required: required?.address, whitespace: true, message: 'Vui lòng nhập Địa chỉ.' }, { max: 255, message: 'Địa chỉ không được vượt quá 255 ký tự.' }]}><Input maxLength={255} /></Form.Item>
       </div>
+      <Typography.Title level={5}>Thông tin bổ sung</Typography.Title>
+      <div className="patient-form-grid">
+        <Form.Item label="Ngày lập hồ sơ" required={required?.profileDate}>
+          <Space.Compact block>
+            <Form.Item name="profileDate" noStyle rules={[{ required: required?.profileDate, message: 'Vui lòng nhập Ngày lập hồ sơ.' },
+              { validator: (_, value?: string) => !value || value <= today() ? Promise.resolve() : Promise.reject(new Error('Ngày lập hồ sơ không được ở tương lai.')) }]}>
+              <Input type="date" max={today()} /></Form.Item>
+            <Button onClick={() => form.setFieldValue('profileDate', today())}>Hôm nay</Button>
+          </Space.Compact>
+        </Form.Item>
+        <Form.Item name="sourceId" label="Nguồn" rules={[{ required: required?.source, message: 'Vui lòng chọn Nguồn.' }]}>
+          <Select allowClear showSearch optionFilterProp="label" placeholder="Chưa chọn" loading={!catalogs['patient-sources'] && !catalogError}
+            options={choices(catalogs['patient-sources'], [patient?.source])} /></Form.Item>
+        <Form.Item name="customerGroupId" label="Phân nhóm khách hàng" rules={[{ required: required?.customerGroup, message: 'Vui lòng chọn Phân nhóm khách hàng.' }]}>
+          <Select allowClear showSearch optionFilterProp="label" placeholder="Chưa chọn" loading={!catalogs['customer-groups'] && !catalogError}
+            options={choices(catalogs['customer-groups'], [patient?.customerGroup])} /></Form.Item>
+        <Form.Item name="occupationId" label="Nghề nghiệp">
+          <Select allowClear showSearch optionFilterProp="label" placeholder="Chưa chọn" loading={!catalogs.occupations && !catalogError}
+            options={choices(catalogs.occupations, [patient?.occupation])} /></Form.Item>
+      </div>
+      <Form.Item name="intakeHistoryIds" label="Tiền sử (bệnh nhân tự khai)" extra="Thông tin tham khảo; nha sĩ vẫn ghi nhận tình trạng sức khỏe khi khám.">
+        <Checkbox.Group options={choices(catalogs['intake-history'], patient?.intakeHistory ?? [])} /></Form.Item>
+      <Form.Item name="intakeHistoryOther" label="Tiền sử khác" rules={[{ max: 1000, message: 'Tiền sử khác không được vượt quá 1000 ký tự.' }]}>
+        <Input.TextArea rows={2} maxLength={1000} showCount /></Form.Item>
       <Typography.Title level={5}>Người giám hộ</Typography.Title>
       <Typography.Paragraph type="secondary">Nhập khi bệnh nhân cần người đại diện. Thông tin này không cấp quyền xem hồ sơ qua ứng dụng.</Typography.Paragraph>
       <div className="patient-form-grid">

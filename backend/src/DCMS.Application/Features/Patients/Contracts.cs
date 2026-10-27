@@ -1,4 +1,5 @@
 using DCMS.Application.Common;
+using DCMS.Application.Features.SystemSettings;
 
 namespace DCMS.Application.Features.Patients;
 
@@ -8,17 +9,23 @@ public sealed record PatientListItem(int Id, string PatientCode, string FullName
 public sealed record PatientPage(IReadOnlyList<PatientListItem> Items, int Total, int Page, int PageSize);
 
 public sealed record PatientLinkInfo(string? VerifiedAccountUserName, DateTimeOffset? VerifiedAt);
+// S58 catalog value as attached to the record; Active=false keeps showing a value that was deactivated after it was chosen.
+public sealed record PatientReference(Guid Id, string Name, bool Active);
 public sealed record PatientDetail(int Id, string PatientCode, string FullName, DateOnly? BirthDate, string? Gender,
     string? Phone, string? Address, string? GuardianName, string? GuardianRelationship, string? GuardianPhone, string? Note,
     bool IsArchived, DateTimeOffset? ArchivedAt, string? ArchiveReason, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt,
-    int Version, PatientLinkInfo Link);
+    int Version, PatientLinkInfo Link, DateOnly? ProfileDate = null, PatientReference? Source = null, PatientReference? CustomerGroup = null,
+    PatientReference? Occupation = null, IReadOnlyList<PatientReference>? IntakeHistory = null, string? IntakeHistoryOther = null,
+    DateTimeOffset? IntakeRecordedAt = null, string? IntakeRecordedByName = null);
 
 public sealed record CreatePatientRequest(string? PatientCode, string? FullName, DateOnly? BirthDate, string? Gender,
     string? Phone, string? Address, string? GuardianName, string? GuardianRelationship, string? GuardianPhone, string? Note,
-    bool DuplicatesReviewed);
+    bool DuplicatesReviewed, int? PolicyVersion = null, DateOnly? ProfileDate = null, Guid? SourceId = null, Guid? CustomerGroupId = null,
+    Guid? OccupationId = null, IReadOnlyList<Guid>? IntakeHistoryIds = null, string? IntakeHistoryOther = null);
 public sealed record UpdatePatientRequest(int Version, string? FullName, DateOnly? BirthDate, string? Gender, string? Phone,
     string? Address, string? GuardianName, string? GuardianRelationship, string? GuardianPhone, string? Note,
-    bool DuplicatesReviewed);
+    bool DuplicatesReviewed, int? PolicyVersion = null, DateOnly? ProfileDate = null, Guid? SourceId = null, Guid? CustomerGroupId = null,
+    Guid? OccupationId = null, IReadOnlyList<Guid>? IntakeHistoryIds = null, string? IntakeHistoryOther = null);
 public sealed record ArchivePatientRequest(int Version, string? Reason);
 public sealed record PatientChange(PatientDetail Patient, SystemMessage Notification);
 
@@ -48,4 +55,5 @@ public interface IPatientService
     Task<PatientChange> UpdateAsync(int actorId, int id, UpdatePatientRequest request, CancellationToken ct);
     Task<PatientChange> ArchiveAsync(int actorId, int id, ArchivePatientRequest request, bool archive, CancellationToken ct);
     Task<IReadOnlyList<PatientAuditEntry>> AuditAsync(int id, CancellationToken ct);
+    Task<PatientFormPolicy> FormPolicyAsync(CancellationToken ct);
 }
