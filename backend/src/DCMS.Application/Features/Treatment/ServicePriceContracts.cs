@@ -1,9 +1,9 @@
 namespace DCMS.Application.Features.Treatment;
 
 public sealed record ServicePriceDto(int ServiceId, int BranchId, string Name,
-    long? ReferenceUnitPriceVnd, int PriceVersion);
+    long? ReferenceUnitPriceVnd, int PriceVersion, string Unit = "lần");
 public sealed record SaveServicePriceRequest(int ExpectedVersion, long? ReferenceUnitPriceVnd,
-    Guid RequestKey);
+    Guid RequestKey, string? Unit = null);
 
 public interface IServicePriceService
 {

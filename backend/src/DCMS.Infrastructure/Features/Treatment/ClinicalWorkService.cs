@@ -26,12 +26,6 @@ public sealed class UnavailableClinicalConsentPort : IClinicalConsentPort
         int serviceId, CancellationToken ct) => Task.FromResult(false);
 }
 
-public sealed class UnavailableClinicalChargePort : IClinicalChargePort
-{
-    public Task<bool> PostInTransactionAsync(int patientId, int branchId, Guid activityId,
-        decimal quantity, decimal priceSnapshotVnd, CancellationToken ct) => Task.FromResult(false);
-}
-
 public sealed class ClinicalActualEvidencePort(DcmsDbContext db) : ITreatmentActualEvidencePort
 {
     public async Task<bool> HasDentistConfirmedActualAsync(int patientId, Guid dossierId, Guid stepId,
@@ -116,7 +110,7 @@ public sealed class ClinicalWorkService(DcmsDbContext db, UserManager<Applicatio
         x.Unit, x.Quantity, x.PerformedAt, x.ElapsedMinutes, x.PerformerId, x.Outcome,
         x.NextSteps, x.ChargingBasis, x.ChargingBasisEvidence, x.PriceSnapshotVnd,
         x.ReviewId, x.State, x.Version,
-        x.CreatedAt, x.PostedAt);
+        x.CreatedAt, x.PostedAt, x.FeeStatus, x.DiscountSnapshotVnd, x.AssistantId, x.RecordedBy, x.SourceKind, x.ServiceNameSnapshot, x.LabWorkSnapshot);
     private static ReviewDto Map(ClinicalReview x) => new(x.Id, x.VisitId, x.PatientId,
         x.BranchId, x.SourceActivityId, x.SourceItemId, x.Complaint, x.Findings, x.Coverage,
         x.Outcome, x.CoveredComponent, x.Exclusions, x.Policy, x.PolicyVersion, x.Basis,
@@ -150,7 +144,8 @@ public sealed class ClinicalWorkService(DcmsDbContext db, UserManager<Applicatio
     private async Task ValidateSourceAsync(ClinicalVisitState visit, ActivityInput x,
         CancellationToken ct)
     {
-        if (x.ChargingBasis == "Free" && !x.ReviewId.HasValue) throw Error("MSG244", 409);
+        if (x.ChargingBasis == "Free" && !x.ReviewId.HasValue &&
+            (!x.ItemId.HasValue || x.PriceSnapshotVnd != 0 || Clean(x.ChargingBasisEvidence) == null)) throw Error("MSG244", 409);
         if (!await db.Set<SchedulingService>().AsNoTracking().AnyAsync(s =>
             s.Id == x.ServiceId && s.BranchId == visit.BranchId && s.Active, ct))
             throw Error("MSG04");
@@ -171,12 +166,16 @@ public sealed class ClinicalWorkService(DcmsDbContext db, UserManager<Applicatio
             if (dossier.State != "Open" || dossier.PlanState != "Committed" ||
                 dossier.PlanVersion != x.PlanVersion) throw Error("MSG111", 409);
             var item = dossier.Items.SingleOrDefault(i => i.Id == x.ItemId);
-            if (item == null || item.Decision != "Agreed" || item.ServiceId != x.ServiceId)
+            if (item == null || item.Decision != "Agreed" || item.ServiceId != x.ServiceId || item.Progress is "Completed" or "Stopped" or "Cancelled"
+                || item.Unit != x.Unit || item.AgreedUnitPriceVnd != x.PriceSnapshotVnd || !TreatmentSheetRules.RegionWithinScope(item.Region, x.Region))
                 throw Error("MSG230", 409);
-            if (item.Unit == x.Unit && item.Unit != "gói")
+            if (!TreatmentSheetRules.ValidQuantity(x.Quantity, item.Unit)) throw Error("MSG04");
+            if (!x.StepId.HasValue && await db.TreatmentSteps.AnyAsync(s => s.DossierId == dossier.Id && s.ItemId == item.Id, ct))
+                throw Error("MSG230", 409);
+            if (x.ChargingBasis == "Separate" && item.Unit != "gói")
             {
                 var performed = await db.ClinicalActivities.AsNoTracking().Where(a =>
-                    a.ItemId == item.Id && a.State == "Posted" && a.Unit == x.Unit)
+                    a.ItemId == item.Id && a.State == "Posted" && a.Unit == x.Unit && a.ChargingBasis == "Separate")
                     .SumAsync(a => a.Quantity, ct);
                 if (performed + x.Quantity > item.Quantity) throw Error("MSG230", 409);
             }
@@ -247,7 +246,7 @@ public sealed class ClinicalWorkService(DcmsDbContext db, UserManager<Applicatio
         Validate(request.Activity);
         var row = await db.ClinicalActivities.SingleOrDefaultAsync(x => x.Id == id, ct)
             ?? throw Error("MSG113", 404);
-        var visit = await VisitAsync(actorId, row.VisitId, request.ExpectedVisitVersion, ct);
+        var visit = await VisitAsync(actorId, row.VisitId ?? throw Error("MSG230", 409), request.ExpectedVisitVersion, ct);
         if (row.PatientId != visit.PatientId || row.State != "Draft" ||
             row.Version != request.ExpectedVersion || request.Activity.VisitId != row.VisitId)
             throw Error("MSG111", 409);
@@ -269,25 +268,75 @@ public sealed class ClinicalWorkService(DcmsDbContext db, UserManager<Applicatio
     {
         if (request.RequestKey == Guid.Empty) throw Error("MSG04");
         await using var gate = await ClinicalRequestLock.AcquireAsync(db, request.RequestKey, ct);
+        await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
+        var result = await PostWithinTransactionAsync(actorId, id, request, ct);
+        await tx.CommitAsync(ct);
+        return result;
+    }
+
+    // Only the outer command owns its transaction; sheet promotion and actual posting are atomic.
+    public Task<ActivityDto> PostWithinTransactionAsync(int actorId, Guid id, PostActivityRequest request, CancellationToken ct, ClinicalFeeRequest? feeSnapshot = null)
+    {
+        if (db.Database.CurrentTransaction == null) throw new InvalidOperationException("An owning transaction is required.");
+        return PostCoreAsync(actorId, id, request, ct, feeSnapshot);
+    }
+
+    private async Task<ActivityDto> PostCoreAsync(int actorId, Guid id, PostActivityRequest request, CancellationToken ct, ClinicalFeeRequest? feeSnapshot = null)
+    {
         var replay = await ReplayAsync(actorId, request.RequestKey, "ActivityPost", new { id, request }, ct);
         if (replay.HasValue) return Map(await db.ClinicalActivities.AsNoTracking().SingleAsync(x => x.Id == replay, ct));
-        await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
         await db.Database.ExecuteSqlRawAsync($"SELECT pg_advisory_xact_lock({DCMS.Infrastructure.Features.Scheduling.WorkingScheduleService.TransactionLock})", ct);
         var row = await db.ClinicalActivities.SingleOrDefaultAsync(x => x.Id == id, ct)
             ?? throw Error("MSG113", 404);
-        var visit = await VisitAsync(actorId, row.VisitId, request.ExpectedVisitVersion, ct);
+        if (row.SourceKind == "Dossier")
+        {
+            var dossierSource = await db.TreatmentDossiers.Include(x => x.Items).SingleOrDefaultAsync(x => x.Id == row.DossierId, ct)
+                ?? throw Error("MSG113", 404);
+            var employee = await DentistAsync(actorId, dossierSource.BranchId, ct);
+            var source = dossierSource.Items.SingleOrDefault(x => x.Id == row.ItemId) ?? throw Error("MSG113", 404);
+            if (row.VisitId.HasValue || row.RecordedBy != actorId || employee != dossierSource.DentistId || row.PerformerId != employee
+                || row.PatientId != dossierSource.PatientId || row.BranchId != dossierSource.BranchId
+                || dossierSource.State != "Open" || source.SheetDeleted
+                || row.PlanVersion != dossierSource.PlanVersion || row.State != "Draft" || row.Version != request.ExpectedVersion)
+                throw Error("MSG111", 409);
+        }
+        else
+        {
+        var visit = await VisitAsync(actorId, row.VisitId ?? throw Error("MSG230", 409), request.ExpectedVisitVersion, ct);
         if (row.State != "Draft" || row.Version != request.ExpectedVersion ||
             row.PatientId != visit.PatientId || row.BranchId != visit.BranchId)
             throw Error("MSG111", 409);
-        await ValidateSourceAsync(visit, new ActivityInput(row.VisitId, row.DossierId, row.ItemId,
+        await ValidateSourceAsync(visit, new ActivityInput(row.VisitId ?? throw Error("MSG230", 409), row.DossierId, row.ItemId,
             row.StepId, row.PlanVersion, row.ServiceId, row.Region, row.Unit, row.Quantity,
             row.PerformedAt, row.ElapsedMinutes, row.Outcome, row.NextSteps, row.ChargingBasis,
             row.ChargingBasisEvidence,
             row.PriceSnapshotVnd, row.ReviewId), ct);
-        if (row.ChargingBasis == "Separate" &&
-            !await charges.PostInTransactionAsync(row.PatientId, row.BranchId, row.Id,
-                row.Quantity, row.PriceSnapshotVnd, ct))
-            throw Error("MSG144", 503);
+        }
+        if (row.SourceKind == "Dossier" && row.PriceSnapshotVnd == 0) row.FeeStatus = "NotRequested";
+        else if (row.SourceKind == "Dossier" && row.Unit == "gói") row.FeeStatus = "NeedsRule";
+        else if (row.ChargingBasis == "Separate")
+        {
+            if (row.PriceSnapshotVnd == 0) throw Error("MSG244", 409);
+            var item = row.ItemId.HasValue ? await db.TreatmentItems.SingleAsync(x => x.Id == row.ItemId, ct) : null;
+            if (row.Unit == "gói") throw new BusinessException(409, SystemMessages.Get("MSG255", "Quy tắc ghi phí gói"));
+            var gross = TreatmentPlanRules.Gross(row.Quantity, checked((long)row.PriceSnapshotVnd));
+            var approved = item is { DiscountStatus: "Approved", DiscountValue: not null }
+                ? TreatmentPlanRules.Discount(TreatmentPlanRules.Gross(item.Quantity, item.AgreedUnitPriceVnd), item.DiscountType!, item.DiscountValue.Value) : 0;
+            var used = item == null ? 0 : await db.ClinicalActivities.Where(x => x.ItemId == item.Id && x.State == "Posted" && x.ChargingBasis == "Separate").SumAsync(x => x.DiscountSnapshotVnd, ct);
+            var share = item == null ? 0 : checked((long)decimal.Round(approved * row.Quantity / item.Quantity, 0, MidpointRounding.AwayFromZero));
+            var priorQuantity = item == null ? 0 : await db.ClinicalActivities.Where(x => x.ItemId == item.Id && x.State == "Posted" && x.ChargingBasis == "Separate").SumAsync(x => x.Quantity, ct);
+            if (item != null && priorQuantity + row.Quantity == item.Quantity) share = approved - used;
+            row.DiscountSnapshotVnd = feeSnapshot?.ApprovedDiscountVnd ?? Math.Min(gross, Math.Max(0, Math.Min(approved - used, share)));
+            var fee = await charges.PostInTransactionAsync(feeSnapshot ?? new ClinicalFeeRequest($"clinical-fee:{row.Id}", row.Id, row.Version + 1,
+                row.PatientId, row.BranchId, row.DossierId, row.ItemId, row.PlanVersion, row.ChargingBasis,
+                row.Quantity, row.Unit, checked((long)row.PriceSnapshotVnd), gross, row.DiscountSnapshotVnd,
+                item?.DiscountType, item?.DiscountValue, item?.DiscountReason, item?.DiscountQualifyingItemId,
+                item?.DiscountDecidedBy, item?.DiscountDecidedAt, actorId), ct);
+            if (fee.Status is not ("Pending" or "Posted")) throw Error("MSG144", 503);
+            row.FeeStatus = fee.Status;
+        }
+        else row.FeeStatus = row.ChargingBasis;
+        row.RecordedBy ??= actorId;
         row.State = "Posted"; row.PostedAt = clock.GetUtcNow(); row.Version++;
         await db.SaveChangesAsync(ct);
         if (row.StepId.HasValue)
@@ -318,7 +367,6 @@ public sealed class ClinicalWorkService(DcmsDbContext db, UserManager<Applicatio
         });
         Receipt(actorId, request.RequestKey, "ActivityPost", new { id, request }, id);
         await db.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
         return Map(row);
     }
 

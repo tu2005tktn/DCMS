@@ -46,6 +46,10 @@ public sealed class BusinessErrorMiddleware(RequestDelegate next, ILogger<Busine
                 _ when (context.Request.Path.StartsWithSegments("/api/accounts")
                         || context.Request.Path.StartsWithSegments("/api/auth/google"))
                     && postgres?.SqlState is PostgresErrorCodes.SerializationFailure or PostgresErrorCodes.DeadlockDetected => (409, SystemMessages.Get("MSG111")),
+                _ when context.Request.Path.StartsWithSegments("/api/system-settings") && postgres?.SqlState == PostgresErrorCodes.UniqueViolation
+                    => (409, DCMS.Application.Features.SystemSettings.CatalogMessages.Duplicate),
+                _ when context.Request.Path.StartsWithSegments("/api/system-settings") && postgres?.SqlState is PostgresErrorCodes.SerializationFailure or PostgresErrorCodes.DeadlockDetected
+                    => (409, SystemMessages.Get("MSG111")),
                 _ => (503, SystemMessages.Get("MSG144"))
             };
             if (status == 503) logger.LogError(ex, "Operation failed ({ExceptionType}); trace {TraceId}", ex.GetType().Name, context.TraceIdentifier);

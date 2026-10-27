@@ -3,6 +3,7 @@ import { useState, type ReactNode } from 'react';
 import { Link, Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuth } from '../features/authentication/AuthContext';
 import SignInPage from '../features/authentication/SignInPage';
+import SystemSettingsPage from '../features/system-settings/SystemSettingsPage';
 import AccountsPage from '../features/accounts/AccountsPage';
 import WorkingSchedulesPage from '../features/working-schedules/WorkingSchedulesPage';
 import BookingSettingsPage from '../features/working-schedules/BookingSettingsPage';
@@ -17,7 +18,6 @@ import { roleLabels } from '../features/accounts/types';
 import HealthStatus from '../features/HealthStatus';
 import ReceptionPage from '../features/reception/ReceptionPage';
 import CheckInPage from '../features/reception/CheckInPage';
-import VisitPage from '../features/examinations/ExaminationPage';
 import PatientDocumentsPage from '../features/clinical-documents/PatientDocumentsPage';
 import VisitPage from '../features/reception/VisitPage';
 import { AccessPage, CustomerGuard, CustomerHomePage, CustomerRegisterPage, CustomerShell, CustomerSignInPage } from '../features/customer-auth/CustomerPages';
@@ -63,6 +63,7 @@ export default function App() {
       <Route index element={<Home />} />
     </Route>
     <Route element={<Protected><Workspace /></Protected>}>
+      <Route path="system-settings" element={<Protected><SystemSettingsPage /></Protected>} />
       <Route path="working-schedules" element={<WorkingSchedulesPage />} />
       <Route path="booking-settings" element={<BookingSettingsPage />} />
       <Route path="accounts" element={<Protected permission="accounts.manage"><AccountsPage /></Protected>} />
@@ -128,6 +129,7 @@ function Workspace() {
       ...(auth.user?.permissions.includes('reception.read') ? [{ key: '/reception', label: <Link to="/reception">Tiếp nhận và hàng chờ</Link> }] : []),
       ...(auth.user?.permissions.includes('accounts.manage') ? [{ key: '/accounts', label: <Link to="/accounts">Quản lý tài khoản</Link> }] : []),
       ...(auth.user?.permissions.includes('patients.read') ? [{ key: '/patients', label: <Link to="/patients">Bệnh nhân</Link> }] : []),
+      ...(auth.user?.effectiveRoles.includes('Dentist') ? [{ key: '/system-settings', label: <Link to="/system-settings">Thiết lập hệ thống</Link> }] : []),
       ...(auth.user?.effectiveRoles.includes('Dentist') ? [{ key: '/treatment-templates', label: <Link to="/treatment-templates">Mẫu điều trị</Link> }] : []),
       ...(auth.user?.effectiveRoles.some(r => ['Admin', 'ClinicOwner', 'Dentist'].includes(r)) ? [{ key: '/commercial/treatment',
         label: <Link to="/commercial/treatment">Giá và duyệt điều trị</Link> }] : []),

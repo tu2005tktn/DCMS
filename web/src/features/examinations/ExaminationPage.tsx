@@ -114,7 +114,7 @@ export default function ExaminationPage() {
         <Tag>{h.examination.confirmed ? 'Đã xác nhận' : 'Nháp'}</Tag><Typography.Paragraph>{h.examination.content.diagnosis ?? 'Chưa chẩn đoán'}</Typography.Paragraph>
         {h.examination.content.findings.map((f,i) => <p key={i}>{f.tooth ? `Răng ${f.tooth}` : f.region}: {f.condition}</p>)}
       </Card>) : <Alert type="info" message="Chưa có kết quả khám trước trong chi nhánh." /> },
-      { key: 'counseling', label: 'Tư vấn', disabled: !handoff, children: <><Alert type="info" message={`Kết quả khám: ${content.diagnosis ?? ''}`} /><DossierList patientId={v.patientId} visitId={visitId} diagnosis={content.diagnosis} branchId={v.branchId} dentistId={v.dentistId} /></> },
+      { key: 'counseling', label: 'Tư vấn', disabled: !handoff, children: <><Alert type="info" message={`Kết quả khám: ${content.diagnosis ?? ''}`} /><DossierList patientId={v.patientId} visitId={visitId} sourceVisitVersion={w.visit.visitVersion} diagnosis={content.diagnosis} branchId={v.branchId} dentistId={v.dentistId} /></> },
       { key: 'treatment', label: 'Điều trị cũ', disabled: !handoff, children: <Card title="Tiếp tục hồ sơ đã có">
         {dossiers?.items.length ? dossiers.items.map(d => <p key={d.id}><strong>{d.code}</strong> · {d.diagnosis} · <Link to={`/patients/${v.patientId}/dossiers/${d.id}?visitId=${visitId}`}>Mở hồ sơ</Link>{' · '}
           <Link to={`/patients/${v.patientId}/visits/${visitId}/treatment?dossierId=${d.id}`}>Điều trị trong lượt này</Link></p>) : <Alert type="info" message="Chưa có hồ sơ điều trị cũ tại chi nhánh." />}

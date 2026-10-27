@@ -1,5 +1,7 @@
 # S22 actual treatment, S63 review and S25/S60 care backend
 
+S22 tích hợp S43 hiện áp dụng [TREATMENT-PAYMENT-V25.md](TREATMENT-PAYMENT-V25.md): Visit/consent dùng nguồn thật; Separate actual ghi outbox `clinical.fee.requested` cùng transaction với feeStatus Pending khi chưa có ledger. Không còn trả 503 chỉ vì thiếu dispatcher tài chính. Lab vẫn fail-closed khi chưa có xác nhận authoritative. Hoạt động Free/Included không sinh yêu cầu phí mới; Separate giá 0 yêu cầu chọn lại căn cứ Free rõ ràng (MSG244).
+
 Source: DCMS Screen Specifications v2.3 and DCMS Use Cases Business Rules Messages v2.3, revised 24 October 2026, with the Vinh assignment updated 25 October 2026. Screens S22/S63 belong to the staff Web. Trí owns the S25/S60 UI; this module owns its backend. Relevant workflows: UC-10/14/17/18/25/39/40/43/53, GBR-154/155/159, AT43/44/45/50 and MSG230/237/240/242/244/246.
 
 ## Record boundaries

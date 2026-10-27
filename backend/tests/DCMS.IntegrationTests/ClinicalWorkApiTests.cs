@@ -98,14 +98,14 @@ public sealed class ClinicalWorkApiTests(ClinicalWorkFixture fixture) : IClassFi
             draftRequest)).Content.ReadFromJsonAsync<ActivityDto>())!;
         Assert.Equal(draft.Id, retry.Id);
         Assert.Equal("Draft", draft.State);
-        Assert.Equal(HttpStatusCode.ServiceUnavailable, (await dentist.PostAsJsonAsync(
+        Assert.Equal(HttpStatusCode.OK, (await dentist.PostAsJsonAsync(
             $"/api/activities/{draft.Id}/post", new PostActivityRequest(draft.Version, 1,
                 null, null, Guid.NewGuid()))).StatusCode);
 
         using (var scope = fixture.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
-            Assert.Equal("Draft", (await db.ClinicalActivities.SingleAsync(x => x.Id == draft.Id)).State);
+            Assert.Equal("Posted", (await db.ClinicalActivities.SingleAsync(x => x.Id == draft.Id)).State);
             // A prior, already-posted activity is a valid source for a review in the current visit.
             var source = await db.ClinicalActivities.SingleAsync(x => x.Id == draft.Id);
             source.State = "Posted"; source.Version = 2; source.PostedAt = DateTimeOffset.UtcNow;

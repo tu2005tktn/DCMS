@@ -66,6 +66,7 @@ public static class DependencyInjection
         services.AddScoped<ITreatmentDossierService, TreatmentDossierService>();
         services.AddScoped<IServicePriceService, ServicePriceService>();
         services.AddScoped<ITreatmentFinancialSummaryPort, UnavailableTreatmentFinancialSummaryPort>();
+        services.AddScoped<ITreatmentFinancialWorkspace, TreatmentFinancialWorkspace>();
         services.AddScoped<ITreatmentRevisionService, TreatmentRevisionService>();
         services.AddScoped<ITreatmentRevisionActualPort, UnavailableRevisionActualPort>();
         services.AddScoped<ITreatmentRevisionFinancePort, UnavailableRevisionFinancePort>();
@@ -73,8 +74,8 @@ public static class DependencyInjection
         services.AddScoped<ITreatmentActualEvidencePort, ClinicalActualEvidencePort>();
         services.AddScoped<IClinicalWorkService, ClinicalWorkService>();
         services.AddScoped<IClinicalVisitPort, Features.Examinations.ClinicalVisitPort>();
-        services.AddScoped<IClinicalConsentPort, UnavailableClinicalConsentPort>();
-        services.AddScoped<IClinicalChargePort, UnavailableClinicalChargePort>();
+        services.AddScoped<IClinicalConsentPort, ClinicalConsentPort>();
+        services.AddScoped<IClinicalChargePort, OutboxClinicalChargePort>();
         services.AddScoped<ICareTaskService, CareTaskService>();
         services.AddScoped<ITreatmentLabReadinessPort, UnavailableTreatmentLabReadinessPort>();
         services.AddScoped<ITreatmentVisitActivitySourcePort, UnavailableTreatmentVisitActivitySourcePort>();
@@ -126,6 +127,7 @@ public static class DependencyInjection
             services.AddScoped<IEmailVerificationDelivery>(sp => sp.GetRequiredService<SmtpContactDeliveryAdapter>());
         }
         else services.AddScoped<IEmailVerificationDelivery, UnavailableEmailVerificationDelivery>();
+        services.AddScoped<DCMS.Application.Features.SystemSettings.ISystemCatalogService, Features.SystemSettings.SystemCatalogService>();
         return services;
     }
 }

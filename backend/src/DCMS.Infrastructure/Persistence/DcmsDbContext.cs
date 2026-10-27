@@ -14,6 +14,9 @@ namespace DCMS.Infrastructure.Persistence;
 public sealed class DcmsDbContext(DbContextOptions<DcmsDbContext> options)
 : IdentityDbContext<ApplicationUser, IdentityRole<int>, int>(options)
 {
+    public DbSet<DCMS.Domain.Features.SystemSettings.MaterialCategory> MaterialCategories => Set<DCMS.Domain.Features.SystemSettings.MaterialCategory>();
+    public DbSet<DCMS.Domain.Features.SystemSettings.MaterialCatalogItem> MaterialCatalogItems => Set<DCMS.Domain.Features.SystemSettings.MaterialCatalogItem>();
+    public DbSet<DCMS.Domain.Features.SystemSettings.SystemCatalogChange> SystemCatalogChanges => Set<DCMS.Domain.Features.SystemSettings.SystemCatalogChange>();
     public DbSet<EmployeeProfile> Employees => Set<EmployeeProfile>();
     public DbSet<AuthSession> AuthSessions => Set<AuthSession>();
     public DbSet<AuthRefreshToken> AuthRefreshTokens => Set<AuthRefreshToken>();
@@ -43,6 +46,7 @@ public sealed class DcmsDbContext(DbContextOptions<DcmsDbContext> options)
     public DbSet<TreatmentItem> TreatmentItems => Set<TreatmentItem>();
     public DbSet<TreatmentEvent> TreatmentEvents => Set<TreatmentEvent>();
     public DbSet<TreatmentReceipt> TreatmentReceipts => Set<TreatmentReceipt>();
+    public DbSet<TreatmentSheetDraft> TreatmentSheetDrafts => Set<TreatmentSheetDraft>();
     public DbSet<TreatmentRevisionDraft> TreatmentRevisionDrafts => Set<TreatmentRevisionDraft>();
     public DbSet<TreatmentTemplate> TreatmentTemplates => Set<TreatmentTemplate>();
     public DbSet<TreatmentTemplateVersion> TreatmentTemplateVersions => Set<TreatmentTemplateVersion>();
@@ -66,6 +70,7 @@ public sealed class DcmsDbContext(DbContextOptions<DcmsDbContext> options)
         VisitModel.Configure(model);
         ExaminationModel.Configure(model);
         TreatmentModel.Configure(model);
+        SystemSettingsModel.Configure(model);
         VisitModel.Configure(model);
         model.Entity<ApplicationUser>(b =>
         {

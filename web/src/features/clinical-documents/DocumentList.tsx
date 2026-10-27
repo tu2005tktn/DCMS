@@ -9,7 +9,7 @@ import {
   type DocumentItem, type DocumentPage, type DocumentType, type PatientDocumentContexts,
 } from './types';
 
-export type DocumentFilters = { type?: DocumentType; from?: string; to?: string; visitId?: string };
+export type DocumentFilters = { type?: DocumentType; from?: string; to?: string; visitId?: string; dossierId?: string; planId?: string };
 const POLL_MS = 5000;
 const POLL_LIMIT = 24; // about two minutes of waiting for scans
 

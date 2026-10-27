@@ -12,6 +12,7 @@ public sealed class TreatmentDossier
     public string Diagnosis { get; set; } = "";
     public string? Note { get; set; }
     public string State { get; set; } = "Open";
+    public bool DisplayCompleted { get; set; }
     public string? ClosureOutcome { get; set; }
     public string? ClosureReason { get; set; }
     public DateTimeOffset? ClosedAt { get; set; }
@@ -21,6 +22,8 @@ public sealed class TreatmentDossier
     public int PlanVersion { get; set; }
     public string PlanState { get; set; } = "None";
     public string? Goals { get; set; }
+    public Guid? SourceExaminationId { get; set; }
+    public int? SourceExaminationVersion { get; set; }
     public Guid? SourceTemplateId { get; set; }
     public int? SourceTemplateVersion { get; set; }
     public string PaymentTermsJson { get; set; } = "[]";
@@ -34,12 +37,21 @@ public sealed class TreatmentDossier
 
 public sealed class TreatmentItem
 {
+    public string? EntrySource { get; set; }
+    public int? EntryRecordedBy { get; set; }
+    public DateTimeOffset? EntryRecordedAt { get; set; }
+    public bool DisplayCompleted { get; set; }
+    public bool SheetDeleted { get; set; }
+    public bool HiddenFromSheet { get; set; }
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid DossierId { get; set; }
     public int? SourceDiagnosisId { get; set; }
     public int ServiceId { get; set; }
     public string ServiceName { get; set; } = "";
     public string? Material { get; set; }
+    public string? Note { get; set; }
+    public int? ResponsibleDentistId { get; set; }
+    public int? AssistantId { get; set; }
     public string? Region { get; set; }
     public string Unit { get; set; } = "";
     public decimal Quantity { get; set; }
@@ -110,6 +122,21 @@ public sealed class TreatmentReceipt
     public string Fingerprint { get; set; } = "";
     public Guid DossierId { get; set; }
     public string ResultJson { get; set; } = "{}";
+}
+
+// Editable sheet rows are saved independently of agreed plan items and posted clinical activities.
+public sealed class TreatmentSheetDraft
+{
+    public Guid Id { get; set; }
+    public Guid DossierId { get; set; }
+    public Guid? VisitId { get; set; }
+    public int ActorId { get; set; }
+    public string Kind { get; set; } = "";
+    public int Version { get; set; } = 1;
+    public string PayloadJson { get; set; } = "{}";
+    public Guid LastRequestKey { get; set; }
+    public string LastFingerprint { get; set; } = "";
+    public DateTimeOffset UpdatedAt { get; set; }
 }
 
 public sealed class TreatmentRevisionDraft

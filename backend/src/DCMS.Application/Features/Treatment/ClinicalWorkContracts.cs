@@ -15,8 +15,7 @@ public interface IClinicalConsentPort
 
 public interface IClinicalChargePort
 {
-    Task<bool> PostInTransactionAsync(int patientId, int branchId, Guid activityId,
-        decimal quantity, decimal priceSnapshotVnd, CancellationToken ct);
+    Task<ClinicalFeeResult> PostInTransactionAsync(ClinicalFeeRequest request, CancellationToken ct);
 }
 
 public sealed record ActivityInput(Guid VisitId, Guid? DossierId, Guid? ItemId, Guid? StepId,
@@ -29,13 +28,15 @@ public sealed record UpdateActivityDraftRequest(ActivityInput Activity, int Expe
     int ExpectedVisitVersion, Guid RequestKey);
 public sealed record PostActivityRequest(int ExpectedVersion, int ExpectedVisitVersion,
     int? ExpectedStepVersion, string? StepOutcome, Guid RequestKey);
-public sealed record ActivityDto(Guid Id, Guid VisitId, int PatientId, int BranchId, Guid? DossierId,
+public sealed record ActivityDto(Guid Id, Guid? VisitId, int PatientId, int BranchId, Guid? DossierId,
     Guid? ItemId, Guid? StepId, int? PlanVersion, int ServiceId, string? Region, string Unit,
     decimal Quantity, DateTimeOffset PerformedAt, int? ElapsedMinutes, int PerformerId,
     string Outcome, string? NextSteps, string ChargingBasis, string? ChargingBasisEvidence,
     decimal PriceSnapshotVnd,
     Guid? ReviewId, string State, int Version, DateTimeOffset CreatedAt,
-    DateTimeOffset? PostedAt);
+    DateTimeOffset? PostedAt, string FeeStatus = "Unavailable", long DiscountSnapshotVnd = 0,
+    int? AssistantId = null, int? RecordedBy = null, string SourceKind = "Visit", string? ServiceNameSnapshot = null, string? LabWorkSnapshot = null, int SheetVersion = 0, bool SheetDeleted = false,
+    string? SheetDiscountType = null, decimal? SheetDiscountValue = null, string? SheetDiscountReason = null);
 public sealed record TreatmentContextDto(ClinicalVisitState Visit,
     IReadOnlyList<StepDto> Steps, IReadOnlyList<ActivityDto> Activities);
 public sealed record ClinicalServiceOption(int Id, string Name);
@@ -59,6 +60,7 @@ public sealed record CareNoteDto(Guid Id, Guid VisitId, int PatientId, int Branc
 
 public interface IClinicalWorkService
 {
+    Task<ActivityDto> PostWithinTransactionAsync(int actorId, Guid id, PostActivityRequest request, CancellationToken ct, ClinicalFeeRequest? feeSnapshot = null);
     Task<IReadOnlyList<ClinicalServiceOption>> ServicesAsync(int actorId, int branchId, CancellationToken ct);
     Task<TreatmentContextDto> ContextAsync(int actorId, Guid visitId, CancellationToken ct);
     Task<ActivityDto> CreateDraftAsync(int actorId, CreateActivityDraftRequest request, CancellationToken ct);

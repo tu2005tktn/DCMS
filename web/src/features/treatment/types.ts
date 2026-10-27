@@ -3,6 +3,7 @@ import type { SystemMessage } from '../../services/api';
 export type TreatmentItem = {
   id: string; sourceDiagnosisId: number | null; serviceId: number; serviceName: string; region: string | null;
   material: string | null;
+  note?: string | null; responsibleDentistId?: number; assistantId?: number;
   unit: string; quantity: number; plannedOrder: number; estimatedMinutes: number | null;
   estimatedStart: string | null; estimatedEnd: string | null; agreedUnitPriceVnd: number;
   decision: 'Proposed' | 'Agreed' | 'Refused' | 'Deferred'; progress: string;
@@ -19,13 +20,14 @@ export type TreatmentItem = {
   discount: TreatmentDiscount | null; warrantyComponent: string | null; warrantyExclusions: string | null;
   warrantyActivatedOn: string | null; warrantyExplanation: string | null;
   expectedServiceLifeMonths: number | null;
+  entrySource?: string; displayCompleted?: boolean; sheetDeleted?: boolean; hiddenFromSheet?: boolean;
 };
 export type TreatmentDiscount = { type: 'Fixed' | 'Percent'; value: number; reason: string;
   qualifyingItemId: string | null; status: 'Proposed' | 'Approved' | 'Rejected';
   decidedBy: number | null; decidedAt: string | null; amountVnd: number };
 export type PaymentTerm = { purpose: string; amountVnd: number; dueOn: string; evidence: string | null;
   milestone: string | null; planVersion: number | null };
-export type ServicePrice = { serviceId: number; branchId: number; name: string;
+export type ServicePrice = { unit?: string; serviceId: number; branchId: number; name: string;
   referenceUnitPriceVnd: number | null; priceVersion: number };
 export type PricePreview = { dossierId: string; dossierVersion: number; planVersion: number;
   items: { itemId: string; grossVnd: number; approvedDiscountVnd: number; netVnd: number;
@@ -33,8 +35,9 @@ export type PricePreview = { dossierId: string; dossierVersion: number; planVers
     includedInTotal: boolean }[]; grossVnd: number; approvedDiscountVnd: number;
   netBeforeTaxVnd: number };
 export type TreatmentEvent = { id: string; kind: string; dossierVersion: number; actorId: number;
-  occurredAt: string; payloadJson: string };
+  occurredAt: string; payloadJson: string; actorName?: string };
 export type TreatmentDossier = {
+  sourceExaminationId?: string | null; sourceExaminationVersion?: number | null;
   id: string; code: string; patientId: number; branchId: number; dentistId: number;
   startedOn: string; diagnosis: string; note: string | null; state: 'Open' | 'Completed' | 'Stopped';
   closureOutcome: string | null; closureReason: string | null; version: number;
@@ -43,12 +46,14 @@ export type TreatmentDossier = {
   financialSummaryAvailable: boolean; createdAt: string; updatedAt: string;
   financialSummary?: { available: boolean; plannedVnd: number; postedChargeVnd: number | null;
     receivedVnd: number | null; allocatedVnd: number | null; outstandingVnd: number | null;
-    sourceVersion: string | null };
+    sourceVersion: string | null; unusedAdvanceVnd?: number | null; asOf?: string; pendingFeeCount?: number;
+    lines?: { activityId: string; chargeId: string; netVnd: number; confirmedAllocatedVnd: number; outstandingVnd: number; includedCoverage: boolean }[] };
   depositExceptionReason?: string | null; depositExceptionBy?: number | null;
   depositExceptionAt?: string | null;
+  displayCompleted: boolean;
 };
 export type DossierListItem = Pick<TreatmentDossier, 'id' | 'code' | 'patientId' | 'branchId' |
-  'dentistId' | 'diagnosis' | 'state' | 'closureOutcome' | 'version' | 'planVersion' | 'updatedAt'>;
+  'dentistId' | 'diagnosis' | 'state' | 'closureOutcome' | 'version' | 'planVersion' | 'updatedAt' | 'displayCompleted'>;
 export type DossierPage = { items: DossierListItem[]; total: number; page: number; pageSize: number };
 export type TreatmentChange = { dossier: TreatmentDossier; notification: SystemMessage };
 export type AppointmentOptions = { branches: { id: number; name: string }[];

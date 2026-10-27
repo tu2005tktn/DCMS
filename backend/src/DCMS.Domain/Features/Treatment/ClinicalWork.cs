@@ -2,8 +2,12 @@ namespace DCMS.Domain.Features.Treatment;
 
 public sealed class ClinicalActivity
 {
+    public string SourceKind { get; set; } = "Visit";
+    public string? ServiceNameSnapshot { get; set; }
+    public string? LabWorkSnapshot { get; set; }
+    public bool IsPlanTransfer { get; set; }
     public Guid Id { get; set; } = Guid.NewGuid();
-    public Guid VisitId { get; set; }
+    public Guid? VisitId { get; set; }
     public int PatientId { get; set; }
     public int BranchId { get; set; }
     public Guid? DossierId { get; set; }
@@ -17,6 +21,10 @@ public sealed class ClinicalActivity
     public DateTimeOffset PerformedAt { get; set; }
     public int? ElapsedMinutes { get; set; }
     public int PerformerId { get; set; }
+    public int? AssistantId { get; set; }
+    public int? RecordedBy { get; set; }
+    public string FeeStatus { get; set; } = "Unavailable";
+    public long DiscountSnapshotVnd { get; set; }
     public string Outcome { get; set; } = "";
     public string? NextSteps { get; set; }
     public string ChargingBasis { get; set; } = "Included";

@@ -27,6 +27,7 @@ public sealed class SchedulingChair
 }
 public sealed class SchedulingService
 {
+    public string Unit { get; set; } = "lần";
     public bool IsInitialExamination { get; set; }
     public bool PublicBookable { get; set; } = true;
     public int Id { get; set; }

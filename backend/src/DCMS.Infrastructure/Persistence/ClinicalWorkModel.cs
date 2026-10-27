@@ -10,6 +10,10 @@ internal static class ClinicalWorkModel
         model.Entity<ClinicalActivity>(b =>
         {
             b.ToTable("CLINICAL_ACTIVITY"); b.HasKey(x => x.Id);
+            b.Property(x => x.SourceKind).HasMaxLength(16).HasDefaultValue("Visit");
+            b.Property(x => x.ServiceNameSnapshot).HasMaxLength(160);
+            b.Property(x => x.LabWorkSnapshot).HasMaxLength(1000);
+            b.HasIndex(x => new { x.ItemId, x.PlanVersion }).IsUnique().HasFilter("\"IsPlanTransfer\" = TRUE");
             b.HasIndex(x => new { x.VisitId, x.State });
             b.HasIndex(x => new { x.PatientId, x.DossierId, x.StepId });
             b.Property(x => x.Unit).HasMaxLength(40);
@@ -21,6 +25,7 @@ internal static class ClinicalWorkModel
             b.Property(x => x.ChargingBasis).HasMaxLength(16);
             b.Property(x => x.ChargingBasisEvidence).HasMaxLength(1000);
             b.Property(x => x.State).HasMaxLength(16);
+            b.Property(x => x.FeeStatus).HasMaxLength(24).HasDefaultValue("Unavailable");
             b.Property(x => x.Version).IsConcurrencyToken();
             b.ToTable(t => t.HasCheckConstraint("CK_CLINICAL_ACTIVITY_VALUES",
                 "\"Quantity\" > 0 AND \"PriceSnapshotVnd\" >= 0"));

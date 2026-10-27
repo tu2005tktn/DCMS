@@ -1,9 +1,10 @@
 using DCMS.Application.Common;
+using System.Text.Json;
 
 namespace DCMS.Application.Features.Treatment;
 
 public sealed record CreateDossierRequest(int BranchId, int DentistId, string? Diagnosis, string? Note,
-    DateOnly? StartedOn, Guid RequestKey);
+    DateOnly? StartedOn, Guid RequestKey, Guid? SourceVisitId = null, int? ExpectedSourceVisitVersion = null);
 public sealed record PaymentTermInput(string Purpose, long AmountVnd, DateOnly DueOn, string? Evidence,
     string? Milestone = null);
 public sealed record TreatmentDiscountInput(string Type, decimal Value, string Reason, Guid? QualifyingItemId);
@@ -24,6 +25,13 @@ public sealed record ItemDisposition(Guid ItemId, string Outcome, string Reason)
 public sealed record CloseDossierRequest(int ExpectedVersion, string Outcome, string? Reason,
     ItemDisposition[] Dispositions, Guid RequestKey);
 public sealed record ReopenDossierRequest(int ExpectedVersion, string? Reason, Guid RequestKey);
+public sealed record DeleteDossierRequest(int ExpectedVersion, Guid RequestKey);
+public sealed record SetDossierDisplayStatusRequest(int ExpectedVersion, bool Completed, Guid RequestKey);
+public sealed record UpdateDossierNoteRequest(int ExpectedVersion, string? Note, Guid RequestKey);
+public sealed record SaveSheetDraftRequest(string Kind, Guid? VisitId, JsonElement Row,
+    int ExpectedVersion, Guid RequestKey);
+public sealed record SheetDraftDto(Guid Id, string Kind, Guid? VisitId, JsonElement Row,
+    int Version, DateTimeOffset UpdatedAt);
 public sealed record ConfirmWarrantyRequest(int ExpectedVersion, string? Policy, string? PolicyVersion,
     string? Scope, DateOnly? EndsOn, Guid RequestKey, string? Component = null,
     string? Exclusions = null, DateOnly? ActivationOn = null, string? Explanation = null,
@@ -40,7 +48,12 @@ public sealed record CommercialPlanDto(Guid DossierId, string Code, int BranchId
 public sealed record CommercialDossierListItem(Guid DossierId, string Code, int BranchId,
     int Version, int PendingDiscounts);
 public sealed record TreatmentFinancialSummary(bool Available, long PlannedVnd, long? PostedChargeVnd,
-    long? ReceivedVnd, long? AllocatedVnd, long? OutstandingVnd, string? SourceVersion);
+    long? ReceivedVnd, long? AllocatedVnd, long? OutstandingVnd, string? SourceVersion,
+    long? GrossVnd = null, long? DiscountVnd = null, long? TaxVnd = null,
+    long? UnusedAdvanceVnd = null, DateTimeOffset? AsOf = null, int PendingFeeCount = 0,
+    IReadOnlyList<TreatmentChargeAllocation>? Lines = null);
+public sealed record TreatmentChargeAllocation(Guid ActivityId, Guid ChargeId, long NetVnd,
+    long ConfirmedAllocatedVnd, long OutstandingVnd, bool IncludedCoverage);
 public interface ITreatmentFinancialSummaryPort
 {
     Task<TreatmentFinancialSummary?> ReadAsync(int patientId, int branchId, Guid dossierId,
@@ -61,11 +74,13 @@ public sealed record TreatmentItemDto(Guid Id, int? SourceDiagnosisId, int Servi
     long? ReferenceUnitPriceVnd = null, int? ReferencePriceVersion = null,
     TreatmentDiscountDto? Discount = null, string? WarrantyComponent = null,
     string? WarrantyExclusions = null, DateOnly? WarrantyActivatedOn = null,
-    string? WarrantyExplanation = null, int? ExpectedServiceLifeMonths = null);
+    string? WarrantyExplanation = null, int? ExpectedServiceLifeMonths = null,
+    string? Note = null, int? ResponsibleDentistId = null, int? AssistantId = null,
+    string? EntrySource = null, bool DisplayCompleted = false, bool SheetDeleted = false, bool HiddenFromSheet = false);
 public sealed record PaymentTermDto(string Purpose, long AmountVnd, DateOnly DueOn, string? Evidence,
     string? Milestone = null, int? PlanVersion = null);
 public sealed record TreatmentEventDto(Guid Id, string Kind, int DossierVersion, int ActorId,
-    DateTimeOffset OccurredAt, string PayloadJson);
+    DateTimeOffset OccurredAt, string PayloadJson, string? ActorName = null);
 public sealed record TreatmentDossierDto(Guid Id, string Code, int PatientId, int BranchId, int DentistId,
     DateOnly StartedOn, string Diagnosis, string? Note, string State, string? ClosureOutcome,
     string? ClosureReason, int Version, Guid PlanId, int PlanVersion, string PlanState, string? Goals,
@@ -73,9 +88,11 @@ public sealed record TreatmentDossierDto(Guid Id, string Code, int PatientId, in
     IReadOnlyList<TreatmentEventDto> Timeline, bool FinancialSummaryAvailable,
     DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt,
     TreatmentFinancialSummary? FinancialSummary = null, string? DepositExceptionReason = null,
-    int? DepositExceptionBy = null, DateTimeOffset? DepositExceptionAt = null);
+    int? DepositExceptionBy = null, DateTimeOffset? DepositExceptionAt = null,
+    bool DisplayCompleted = false, Guid? SourceExaminationId = null, int? SourceExaminationVersion = null);
 public sealed record DossierListItem(Guid Id, string Code, int PatientId, int BranchId, int DentistId,
-    string Diagnosis, string State, string? ClosureOutcome, int Version, int PlanVersion, DateTimeOffset UpdatedAt);
+    string Diagnosis, string State, string? ClosureOutcome, int Version, int PlanVersion, DateTimeOffset UpdatedAt,
+    bool DisplayCompleted);
 public sealed record DossierPage(IReadOnlyList<DossierListItem> Items, int Total, int Page, int PageSize);
 public sealed record TreatmentChange(TreatmentDossierDto Dossier, SystemMessage Notification);
 public sealed record TreatmentHistoryItem(int Version, DateTimeOffset CommittedAt, int ActorId, string SnapshotJson);
@@ -84,6 +101,19 @@ public sealed record OwnTreatmentSummaryItem(Guid DossierId, string Code, string
 
 public interface ITreatmentDossierService
 {
+    Task<ConfirmSheetActualResult> EditSheetActivityAsync(int actorId, Guid dossierId, Guid activityId, EditSheetActivityRequest request, CancellationToken ct);
+    Task<ConfirmSheetActualResult> DeleteSheetActivityAsync(int actorId, Guid dossierId, Guid activityId, SheetActivityActionRequest request, CancellationToken ct);
+    Task<TreatmentChange> EditSheetItemAsync(int actorId, Guid dossierId, Guid itemId, EditSheetItemRequest request, CancellationToken ct);
+    Task<TreatmentChange> MarkSheetItemAsync(int actorId, Guid dossierId, Guid itemId, MarkSheetItemRequest request, CancellationToken ct);
+    Task<TreatmentChange> DeleteSheetItemAsync(int actorId, Guid dossierId, Guid itemId, SheetItemActionRequest request, CancellationToken ct);
+    Task<ConfirmSheetActualResult> PerformSheetItemAsync(int actorId, Guid dossierId, Guid itemId, PerformSheetItemRequest request, CancellationToken ct);
+    Task<TreatmentSheetContext> SheetContextAsync(int actorId, Guid dossierId, CancellationToken ct);
+    Task<TreatmentActivityPage> ActivitiesAsync(int actorId, Guid dossierId, Guid? visitId, DateOnly? from, DateOnly? to, int page, int pageSize, CancellationToken ct);
+    Task<TreatmentChange> ConfirmSheetPlanAsync(int actorId, Guid dossierId, Guid rowId, ConfirmSheetPlanRequest request, CancellationToken ct);
+    Task<ConfirmSheetActualResult> ConfirmSheetActualAsync(int actorId, Guid dossierId, Guid rowId, ConfirmSheetActualRequest request, CancellationToken ct);
+    Task<TreatmentChange> ScheduleNoteAsync(int actorId, Guid dossierId, Guid itemId, ScheduleNoteRequest request, CancellationToken ct);
+    Task<TreatmentChange> DecideSheetItemAsync(int actorId, Guid dossierId, Guid itemId, DecideSheetItemRequest request, CancellationToken ct);
+    Task<DossierTotals> SummaryAsync(int actorId, int patientId, int? branchId, CancellationToken ct);
     Task<DossierPage> ListAsync(int actorId, int patientId, int? branchId, int page, int pageSize, CancellationToken ct);
     Task<TreatmentDossierDto> GetAsync(int actorId, Guid dossierId, CancellationToken ct);
     Task<TreatmentChange> CreateAsync(int actorId, int patientId, CreateDossierRequest request, CancellationToken ct);
@@ -92,6 +122,15 @@ public interface ITreatmentDossierService
     Task<IReadOnlyList<TreatmentHistoryItem>> HistoryAsync(int actorId, Guid dossierId, CancellationToken ct);
     Task<TreatmentChange> CloseAsync(int actorId, Guid dossierId, CloseDossierRequest request, CancellationToken ct);
     Task<TreatmentChange> ReopenAsync(int actorId, Guid dossierId, ReopenDossierRequest request, CancellationToken ct);
+    Task<TreatmentChange> DeleteAsync(int actorId, Guid dossierId, DeleteDossierRequest request, CancellationToken ct);
+    Task<TreatmentChange> SetDisplayStatusAsync(int actorId, Guid dossierId,
+        SetDossierDisplayStatusRequest request, CancellationToken ct);
+    Task<TreatmentChange> UpdateNoteAsync(int actorId, Guid dossierId,
+        UpdateDossierNoteRequest request, CancellationToken ct);
+    Task<IReadOnlyList<SheetDraftDto>> SheetDraftsAsync(int actorId, Guid dossierId, CancellationToken ct);
+    Task<SheetDraftDto> SaveSheetDraftAsync(int actorId, Guid dossierId, Guid rowId,
+        SaveSheetDraftRequest request, CancellationToken ct);
+    Task DeleteSheetDraftAsync(int actorId, Guid dossierId, Guid rowId, int expectedVersion, CancellationToken ct);
     Task<TreatmentChange> ConfirmWarrantyAsync(int actorId, Guid dossierId, Guid itemId, ConfirmWarrantyRequest request, CancellationToken ct);
     Task<TreatmentChange> DecideDiscountAsync(int actorId, Guid dossierId, Guid itemId, DecideDiscountRequest request, CancellationToken ct);
     Task<TreatmentChange> SetDepositExceptionAsync(int actorId, Guid dossierId, DepositExceptionRequest request, CancellationToken ct);

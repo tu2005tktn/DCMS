@@ -19,6 +19,7 @@ internal static class TreatmentModel
             b.Property(x => x.Diagnosis).HasMaxLength(4000);
             b.Property(x => x.Note).HasMaxLength(4000);
             b.Property(x => x.State).HasMaxLength(16);
+            b.Property(x => x.DisplayCompleted).HasDefaultValue(false);
             b.Property(x => x.ClosureOutcome).HasMaxLength(32);
             b.Property(x => x.ClosureReason).HasMaxLength(1000);
             b.Property(x => x.PlanState).HasMaxLength(16);
@@ -40,7 +41,9 @@ internal static class TreatmentModel
             b.HasKey(x => x.Id);
             b.HasIndex(x => new { x.DossierId, x.PlannedOrder });
             b.Property(x => x.ServiceName).HasMaxLength(160);
+            b.Property(x => x.EntrySource).HasMaxLength(24);
             b.Property(x => x.Material).HasMaxLength(160);
+            b.Property(x => x.Note).HasMaxLength(1000);
             b.Property(x => x.DecisionPlanVersion).HasColumnType("integer");
             b.Property(x => x.Region).HasMaxLength(80);
             b.Property(x => x.Unit).HasMaxLength(40);
@@ -80,6 +83,17 @@ internal static class TreatmentModel
             b.Property(x => x.Command).HasMaxLength(40);
             b.Property(x => x.Fingerprint).HasMaxLength(64);
             b.Property(x => x.ResultJson).HasColumnType("jsonb");
+            b.HasOne<TreatmentDossier>().WithMany().HasForeignKey(x => x.DossierId).OnDelete(DeleteBehavior.Restrict);
+        });
+        model.Entity<TreatmentSheetDraft>(b =>
+        {
+            b.ToTable("TREATMENT_SHEET_DRAFT");
+            b.HasKey(x => x.Id);
+            b.HasIndex(x => new { x.DossierId, x.Kind, x.UpdatedAt });
+            b.Property(x => x.Kind).HasMaxLength(12);
+            b.Property(x => x.PayloadJson).HasColumnType("jsonb");
+            b.Property(x => x.LastFingerprint).HasMaxLength(64);
+            b.Property(x => x.Version).IsConcurrencyToken();
             b.HasOne<TreatmentDossier>().WithMany().HasForeignKey(x => x.DossierId).OnDelete(DeleteBehavior.Restrict);
         });
         model.Entity<TreatmentRevisionDraft>(b =>
