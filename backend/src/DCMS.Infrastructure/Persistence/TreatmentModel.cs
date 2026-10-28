@@ -12,6 +12,8 @@ internal static class TreatmentModel
         model.Entity<TreatmentDossier>(b =>
         {
             b.ToTable("TREATMENT_DOSSIER");
+            b.Property(x=>x.SourceExaminationJson).HasColumnType("jsonb");
+            b.HasOne<DCMS.Domain.Features.Visits.Visit>().WithMany().HasForeignKey(x=>x.SourceExaminationVisitId).OnDelete(DeleteBehavior.Restrict);
             b.HasKey(x => x.Id);
             b.HasIndex(x => x.Code).IsUnique();
             b.HasIndex(x => new { x.PatientId, x.BranchId, x.UpdatedAt });

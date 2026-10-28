@@ -18,7 +18,7 @@ using Microsoft.IdentityModel.Tokens;
 namespace DCMS.Infrastructure.Features.Authentication;
 
 public sealed class AuthenticationService(DcmsDbContext db, UserManager<ApplicationUser> users,
-    IOptions<JwtSettings> settings) : IAuthenticationService
+    IOptions<JwtSettings> settings, DCMS.Application.Features.Settings.ISettingsAccess settingsAccess) : IAuthenticationService
 {
     public async Task<SignInResponse> SignInAsync(SignInRequest request, CancellationToken ct)
     {
@@ -185,19 +185,9 @@ public sealed class AuthenticationService(DcmsDbContext db, UserManager<Applicat
         }
         else if (user.AccountType != "Public" || roles.Any(x => x != AccountRoles.Guest && x != AccountRoles.Patient)) return null;
         var effective = AccountRoles.Effective(roles);
-        string[] permissions = [
-            .. effective.Contains(AccountRoles.Admin) ? ["accounts.manage"] : Array.Empty<string>(),
-            .. effective.Contains(AccountRoles.ClinicAssistant) ? ["patient-links.verify"] : Array.Empty<string>(),
-            .. effective.Contains(AccountRoles.ClinicAssistant) || effective.Contains(AccountRoles.Dentist) ? ["patients.read"] : Array.Empty<string>(),
-            .. effective.Contains(AccountRoles.ClinicAssistant) ? ["patients.manage"] : Array.Empty<string>(),
-            .. effective.Contains(AccountRoles.ClinicAssistant) || effective.Contains(AccountRoles.Dentist) ? ["reception.read"] : Array.Empty<string>(),
-            .. effective.Contains(AccountRoles.ClinicAssistant) ? ["reception.check-in"] : Array.Empty<string>(),
-            // S58 Thiết lập chung: assigned ClinicOwner only; not inferred from the effective Dentist role.
-            .. roles.Contains(AccountRoles.ClinicOwner) ? ["settings.general.manage"] : Array.Empty<string>(),
-            // S26 — Staff Support Inbox (UC-34 booking portion): clinic ops xử lý yêu cầu đổi/huỷ/xác nhận.
-            .. effective.Contains(AccountRoles.ClinicAssistant) || effective.Contains(AccountRoles.Dentist) || effective.Contains(AccountRoles.Admin)
-                ? ["appointments.support.handle"] : Array.Empty<string>()
-        ];
+        var permissions = user.AccountType == "Staff" ? (await settingsAccess.ResolveAsync(user.Id,ct)).Permissions : Array.Empty<string>();
+        if (user.AccountType == "Staff" && roles.Contains(AccountRoles.ClinicOwner))
+            permissions = permissions.Append("settings.general.manage").Distinct().ToArray();
         // UC-36: only a current VERIFIED self link counts; never inferred from a role or contact. Re-read on every request.
         var verifiedLink = user.AccountType == "Public" && await db.PatientAccountLinks.AsNoTracking()
             .AnyAsync(x => x.AccountId == user.Id && x.Status == PatientLinkStatus.Verified, ct);

@@ -1,5 +1,7 @@
 # Documentation
 
+- [Thiết lập hệ thống S58/UC-51](specs/S58-SYSTEM-SETTINGS.vi.md): đặc tả 11 nhóm theo oDental, trường/form, phân quyền, API, audit và dữ liệu lịch sử; đã đưa nội dung vào Word màn hình/use case v2.5; [khảo sát trực tiếp 27/10/2026](research/ODENTAL-SYSTEM-SETTINGS-20261027.vi.md); [32 tiêu chí nghiệm thu](implementation/S58-SYSTEM-SETTINGS-PLAN.vi.md); [14 việc Jira đã phân công](implementation/S58-JIRA-HANDOFF.vi.md). Chưa triển khai code.
+
 - [DCMS-112 S19/S20](specs/S19-S20-DCMS-112.md): khám theo Visit, lịch sử, sơ đồ răng và file private; [contract, vận hành và bằng chứng](implementation/DCMS-112-EXAMINATION.md).
 
 - [Shared password policy](specs/SHARED-PASSWORD-POLICY.md): decision 18 October 2026, 8–256 characters without character-class requirements for patient and staff accounts; [implementation and validation](implementation/SHARED-PASSWORD-POLICY.md). This decision supersedes the older password baseline in the Word references below.
@@ -9,7 +11,7 @@
 - [Mobile scaffold](specs/MOBILE-SCAFFOLD.md): route mapping, folder responsibilities, and implementation scope; [team guide](../mobile/README.md).
 - [UC-33 and S02 Mobile registration](specs/UC33-S02-MOBILE.md): 12 October 2026 decision, workflow, validation, API contract, and account boundary.
 
-- [Bộ đặc tả DCMS v2.4](specs/README.md): nguồn hiện hành, ngày 25/10/2026; thay thế các bản Word cũ và bản trùng trong `odental-v2/`. Gồm [Screen Specifications](specs/DCMS_Screen_Specifications_v2.4.docx) và [Use Cases / Business Rules / Messages](specs/DCMS_Use_Cases_Business_Rules_Messages_v2.4.docx). Trang hướng dẫn nêu các thay đổi chính, quyết định riêng còn hiệu lực và ranh giới giữa đặc tả với bằng chứng triển khai cũ.
+- [Bộ đặc tả DCMS v2.5](specs/README.md): nguồn hiện hành, ngày 26/10/2026; thay thế các bản Word cũ và bản trùng trong `odental-v2/`. Gồm [Screen Specifications](specs/DCMS_Screen_Specifications_v2.5.docx) và [Use Cases / Business Rules / Messages](specs/DCMS_Use_Cases_Business_Rules_Messages_v2.5.docx). Trang hướng dẫn nêu các thay đổi chính, quyết định riêng còn hiệu lực và ranh giới giữa đặc tả với bằng chứng triển khai cũ.
 - [Luồng phòng khám DCMS-110](specs/CLINIC-FLOW-DCMS-110.vi.md): các bước, dữ liệu bàn giao, phạm vi và điểm tính phí gói còn cần quyết định; [DCMS-111 S17/S18](specs/S17-S18-RECEPTION.md): xác minh người đến, check-in một lần, hàng chờ và contract Visit; [bằng chứng triển khai DCMS-111](implementation/DCMS-111-RECEPTION.md). Bắt đầu/lưu khám ở DCMS-112 chưa thuộc phần nghiệm thu của DCMS-111.
 
 - [Hướng dẫn cài đặt và chạy dự án cho team (Windows/PowerShell)](SETUP.vi.md): công cụ cần cài, cấu hình local, chạy API/web/PostgreSQL, kiểm tra và xử lý lỗi.
@@ -26,3 +28,11 @@
 Architecture: `Domain` contains business rules, `Application` defines use cases and contracts, `Infrastructure` supplies PostgreSQL/EF Core implementations, and `Api` configures HTTP endpoints and dependency injection. Add feature folders within each layer when implementing business features.
 
 The supplied [37-table logical ERD](architecture/DCMS_Logical_ERD_37_Tables.mmd) is the database design reference. Only account, employee, session, account-audit, patient master with administrative audit (UC-08/09/38) and patient account link (UC-36) entities are implemented and migrated; the other business features remain pending.
+
+
+[Cận lâm sàng và thanh toán](specs/INVESTIGATION-BILLING.vi.md) — [triển khai và dùng thử](implementation/INVESTIGATION-BILLING.vi.md).
+
+
+[Tách khám và điều trị nhiều buổi](implementation/EXAMINATION-TREATMENT-SEPARATION.vi.md): sửa điều kiện kết thúc khám, nguồn khám bất biến và lifecycle từng buổi điều trị.
+
+[Phí khám và thu ngân sau khám](specs/EXAMINATION-BILLING.vi.md) — [triển khai, kiểm chứng và cách thử](implementation/EXAMINATION-BILLING.vi.md).

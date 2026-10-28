@@ -11,7 +11,7 @@ public static class SystemSettingsEndpoints
             Results.Ok(await s.ListAsync(AuthenticationEndpoints.AccountId(c.User), q, status, type, page ?? 1, pageSize ?? 20, ct)));
         g.MapGet("/{id:guid}", async (HttpContext c, Guid id, ISupplyCatalog<TInput, TDto> s, CancellationToken ct) => Results.Ok(await s.GetAsync(AuthenticationEndpoints.AccountId(c.User), id, ct)));
         g.MapPost("/", async (HttpContext c, CreateSupplyRequest<TInput> r, ISupplyCatalog<TInput, TDto> s, CancellationToken ct) =>
-            Results.Created($"/api/settings/catalogs/{resource}", await s.CreateAsync(AuthenticationEndpoints.AccountId(c.User), r, ct)));
+            Results.Created($"/api/system-settings/settings/catalogs/{resource}", await s.CreateAsync(AuthenticationEndpoints.AccountId(c.User), r, ct)));
         g.MapPut("/{id:guid}", async (HttpContext c, Guid id, UpdateSupplyRequest<TInput> r, ISupplyCatalog<TInput, TDto> s, CancellationToken ct) => Results.Ok(await s.UpdateAsync(AuthenticationEndpoints.AccountId(c.User), id, r, ct)));
         g.MapPost("/{id:guid}/state-preview", async (HttpContext c, Guid id, ReferenceStatePreviewRequest r, ISupplyCatalog<TInput, TDto> s, CancellationToken ct) => Results.Ok(await s.StatePreviewAsync(AuthenticationEndpoints.AccountId(c.User), id, r, ct)));
         g.MapPost("/{id:guid}/state", async (HttpContext c, Guid id, ReferenceStateRequest r, ISupplyCatalog<TInput, TDto> s, CancellationToken ct) => Results.Ok(await s.SetStateAsync(AuthenticationEndpoints.AccountId(c.User), id, r, ct)));
@@ -34,7 +34,7 @@ public static class SystemSettingsEndpoints
         items.MapPut("/{id:guid}", async (HttpContext c, Guid id, UpdateMaterialRequest r, ISystemCatalogService s, CancellationToken ct) => Results.Ok(await s.UpdateMaterialAsync(AuthenticationEndpoints.AccountId(c.User), id, r, ct)));
         items.MapDelete("/{id:guid}", async (HttpContext c, Guid id, [FromBody] DeleteCatalogRequest r, ISystemCatalogService s, CancellationToken ct) => Results.Ok(await s.DeleteMaterialAsync(AuthenticationEndpoints.AccountId(c.User), id, r, ct)));
         // S58 Thiết lập chung (docs/specs/S58-GENERAL-SETTINGS.md); the service checks the ClinicOwner role on every request.
-        var settings = app.MapGroup("/api/settings").RequireAuthorization().WithTags("S58 Settings");
+        var settings = app.MapGroup("/api/system-settings/settings").RequireAuthorization().WithTags("S58 Settings");
         settings.MapGet("/capabilities", async (HttpContext c, IGeneralSettingsService s, CancellationToken ct) => Results.Ok(await s.CapabilitiesAsync(AuthenticationEndpoints.AccountId(c.User), ct)));
         settings.MapGet("/general", async (HttpContext c, IGeneralSettingsService s, CancellationToken ct) => Results.Ok(await s.GetAsync(AuthenticationEndpoints.AccountId(c.User), ct)));
         settings.MapPost("/general/preview", async (HttpContext c, PreviewGeneralRequest r, IGeneralSettingsService s, CancellationToken ct) => Results.Ok(await s.PreviewAsync(AuthenticationEndpoints.AccountId(c.User), r, ct)));
@@ -55,12 +55,12 @@ public static class SystemSettingsEndpoints
             Results.Ok(await s.ListAsync(AuthenticationEndpoints.AccountId(c.User), kind, q, status, page ?? 1, pageSize ?? 20, ct)));
         catalogs.MapGet("/{id:guid}", async (HttpContext c, string kind, Guid id, IReferenceCatalogService s, CancellationToken ct) => Results.Ok(await s.GetAsync(AuthenticationEndpoints.AccountId(c.User), kind, id, ct)));
         catalogs.MapPost("/", async (HttpContext c, string kind, CreateReferenceRequest r, IReferenceCatalogService s, CancellationToken ct) =>
-        { var result = await s.CreateAsync(AuthenticationEndpoints.AccountId(c.User), kind, r, ct); return Results.Created($"/api/settings/catalogs/{kind}/{result.Id}", result); });
+        { var result = await s.CreateAsync(AuthenticationEndpoints.AccountId(c.User), kind, r, ct); return Results.Created($"/api/system-settings/settings/catalogs/{kind}/{result.Id}", result); });
         catalogs.MapPut("/{id:guid}", async (HttpContext c, string kind, Guid id, UpdateReferenceRequest r, IReferenceCatalogService s, CancellationToken ct) => Results.Ok(await s.UpdateAsync(AuthenticationEndpoints.AccountId(c.User), kind, id, r, ct)));
         catalogs.MapPost("/{id:guid}/state-preview", async (HttpContext c, string kind, Guid id, ReferenceStatePreviewRequest r, IReferenceCatalogService s, CancellationToken ct) => Results.Ok(await s.StatePreviewAsync(AuthenticationEndpoints.AccountId(c.User), kind, id, r, ct)));
         catalogs.MapPost("/{id:guid}/state", async (HttpContext c, string kind, Guid id, ReferenceStateRequest r, IReferenceCatalogService s, CancellationToken ct) => Results.Ok(await s.SetStateAsync(AuthenticationEndpoints.AccountId(c.User), kind, id, r, ct)));
         catalogs.MapGet("/{id:guid}/history", async (HttpContext c, string kind, Guid id, IReferenceCatalogService s, CancellationToken ct) => Results.Ok(await s.HistoryAsync(AuthenticationEndpoints.AccountId(c.User), kind, id, ct)));
-        app.MapGet("/api/reference-options", async (HttpContext c, string? kind, string? search, IReferenceCatalogService s, CancellationToken ct) =>
+        app.MapGet("/api/system-settings/reference-options", async (HttpContext c, string? kind, string? search, IReferenceCatalogService s, CancellationToken ct) =>
             Results.Ok(await s.OptionsAsync(AuthenticationEndpoints.AccountId(c.User), kind, search, ct))).RequireAuthorization().WithTags("S58 Settings");
     }
 }

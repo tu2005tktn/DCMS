@@ -55,7 +55,7 @@ public sealed class ClinicalDocumentService(DcmsDbContext db, ClinicalAccess acc
             .Select(x => new DocumentReviewDto(x.VisitId, x.ReviewedBy, x.ReviewedAt)).ToArrayAsync(ct);
         return new(d.Id, d.Version, d.FileName, d.ContentType, d.SizeBytes, d.DocumentType, d.Source, d.SourceDate,
             d.Description, new(d.VisitId, $"Lượt {d.VisitId.ToString()[..8]}", d.DossierId, dossier?.Code, d.PlanId,
-                d.PlanId.HasValue ? "Kế hoạch điều trị" : null), uploader, d.UploadedAt, d.FileState, d.RejectReason,
+                d.PlanId.HasValue ? "Kế hoạch điều trị" : null, d.InvestigationId, d.InvestigationId.HasValue ? await db.Set<InvestigationOrder>().Where(x => x.Id == d.InvestigationId).Select(x => x.Name).SingleAsync(ct) : null), uploader, d.UploadedAt, d.FileState, d.RejectReason,
             d.FileState == "Ready" ? ["view", "download"] : [], reviews);
     }
     public async Task<object> ContextsAsync(int actorId, int patientId, CancellationToken ct)
@@ -110,10 +110,16 @@ public sealed class ClinicalDocumentService(DcmsDbContext db, ClinicalAccess acc
     public async Task<UploadBatchResult> UploadAsync(int actorId, DocumentMetadata m, IReadOnlyList<DocumentUpload> files, CancellationToken ct)
     {
         if (m.RequestKey == Guid.Empty || files.Count is < 1 or > 10 || !Types.Contains(m.DocumentType) || !new[] {"Clinic","External"}.Contains(m.Source)
-            || m.Description?.Length > 1000 || m.InvestigationId.HasValue || m.ConsentVersion != null || m.SourceDate.Year < 1900
+            || m.Description?.Length > 1000 || m.ConsentVersion != null || m.SourceDate.Year < 1900
             || m.SourceDate > DateOnly.FromDateTime(clock.GetUtcNow().ToOffset(TimeSpan.FromHours(7)).DateTime)) throw Error("MSG04");
         await using var tx = await db.Database.BeginTransactionAsync(ct); await LockAsync(ct);
         var visit = await ContextAsync(actorId, m.PatientId, m.VisitId, m.DossierId, m.PlanId, ct);
+        InvestigationOrder? investigation = null;
+        if (m.InvestigationId.HasValue) {
+            investigation = await db.Set<InvestigationOrder>().SingleOrDefaultAsync(x => x.Id == m.InvestigationId && x.VisitId == m.VisitId,ct) ?? throw Error("MSG113",404);
+            var dentist = await access.BranchAsync(actorId,visit.BranchId,false,ct);
+            if (dentist && !await db.Employees.AnyAsync(x => x.Id == visit.DentistId && x.AccountId == actorId,ct)) throw Error("MSG06",403);
+        }
         var hash = ExaminationService.Hash(new { m, files = files.Select(x => new { x.FileName, x.ContentType, Hash = Convert.ToHexString(SHA256.HashData(x.Content)) }) });
         var receipt = await db.Set<DocumentReceipt>().SingleOrDefaultAsync(x => x.ActorId == actorId && x.RequestKey == m.RequestKey, ct);
         if (receipt != null) {
@@ -123,11 +129,12 @@ public sealed class ClinicalDocumentService(DcmsDbContext db, ClinicalAccess acc
             await tx.CommitAsync(ct); return new(replay.Count == 1 ? replay[0].Document : null, replay);
         }
         if (visit.Status is not (VisitStatuses.Queued or VisitStatuses.InProgress)) throw Error("MSG42", 409);
+        if (investigation != null && investigation.State != "Ordered") throw Error("MSG42",409);
         var results = new List<DocumentUploadResult>(); var ids = new List<BatchEntry>(); var written = new List<string>();
         try {
             foreach (var f in files) {
                 var error = FileError(f); if (error != null) { results.Add(new(null, error)); ids.Add(new(null, error)); continue; }
-                var d = new ClinicalDocument { PatientId = m.PatientId, VisitId = m.VisitId, DossierId = m.DossierId, PlanId = m.PlanId,
+                var d = new ClinicalDocument { PatientId = m.PatientId, VisitId = m.VisitId, DossierId = m.DossierId, PlanId = m.PlanId, InvestigationId = m.InvestigationId,
                     FileName = f.FileName, ContentType = f.ContentType, SizeBytes = f.Content.LongLength, Sha256 = Convert.ToHexString(SHA256.HashData(f.Content)),
                     DocumentType = m.DocumentType, Source = m.Source, SourceDate = m.SourceDate, Description = m.Description,
                     UploaderId = actorId, UploadedAt = clock.GetUtcNow() };
@@ -139,6 +146,12 @@ public sealed class ClinicalDocumentService(DcmsDbContext db, ClinicalAccess acc
                 db.Add(d); Audit(d.Id, actorId, "Uploaded");
                 if (d.FileState != "PendingScan") Audit(d.Id, null, d.FileState == "Ready" ? "ScanPassed" : "ScanRejected");
                 ids.Add(new(d.Id, null)); results.Add(new(await DtoAsync(d, ct), null));
+            }
+            if (investigation != null && ids.Any(x => x.Id.HasValue)) {
+                var before = JsonSerializer.Serialize(new { investigation.Version, VisitVersion = visit.Version });
+                investigation.Version++; visit.Version++;
+                db.Add(new VisitAudit { VisitId = visit.Id, ActorAccountId = actorId, Action = "InvestigationDocumentUploaded", OccurredAt = clock.GetUtcNow(), BeforeJson = before,
+                    AfterJson = JsonSerializer.Serialize(new { investigation.Id, investigation.Version, VisitVersion = visit.Version, DocumentIds = ids.Where(x => x.Id.HasValue).Select(x => x.Id) }) });
             }
             db.Add(new DocumentReceipt { ActorId = actorId, RequestKey = m.RequestKey, Fingerprint = hash, ResultJson = JsonSerializer.Serialize(ids) });
             await db.SaveChangesAsync(ct); await tx.CommitAsync(ct);

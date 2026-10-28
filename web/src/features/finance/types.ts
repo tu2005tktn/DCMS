@@ -1,0 +1,13 @@
+export type Capabilities={permissions:string[];branches:{id:number;name:string}[]};
+export type Service={id:number;branchId:number;name:string;kind:string;unit:string;priceVnd:number|null;version:number;active:boolean};
+export type Provider={id:string;code:string;name:string;version:number};
+export type Billing={investigationId:string;visitId:string;visitVersion:number;orderVersion:number;mode:string|null;serviceId:number|null;serviceName:string|null;unit:string|null;quantity:number;unitPriceVnd:number|null;amountVnd:number|null;evidence:string|null;performedAt:string|null;chargeId:string|null;providerId:string|null;providerName:string|null;providerCostVnd:number|null;allowedActions:string[]};
+export type Allocation={chargeId:string;amountVnd:number};
+export type Payment={id:string;number:string|null;method:string;state:string;amountVnd:number;payer:string;note:string|null;bankReference:string|null;version:number;createdBy:number;createdAt:string;confirmedBy:number|null;confirmedAt:string|null;allocations:Allocation[];createdByName:string;confirmedByName:string|null;declaredReference:string|null;confirmationNote:string|null;cancellationReason:string|null};
+export type Charge={id:string;visitId:string;sourceKind:string;sourceId:string;name:string;unit:string;quantity:number;unitPriceVnd:number;amountVnd:number;paidVnd:number;remainingVnd:number;postedAt:string};
+export type BillInvestigation={id:string;name:string;kind:string;state:string;billingMode:string|null;performedAt:string|null};
+export type Bill={visitId:string;patientId:number;patientName:string;branchId:number;branchName:string;accountVersion:number;totalVnd:number;paidVnd:number;remainingVnd:number;charges:Charge[];payments:Payment[];providerPayables:{id:string;chargeId:string;providerName:string;amountVnd:number}[]|null;suggestedPayer:string|null;allowedActions:string[];investigations:BillInvestigation[]};
+export type QueueBill={visitId:string;patientId:number;patientName:string;branchId:number;totalVnd:number;remainingVnd:number;pendingPayments:number;pendingServices:number;pendingExaminationFees:number};
+export const money=(n:number|null|undefined)=>n==null?'Chưa có giá':`${n.toLocaleString('vi-VN')} ₫`;
+export const kinds:Record<string,string>={XRay:'Chụp phim răng hàm mặt',Imaging:'Chẩn đoán hình ảnh khác',Lab:'Xét nghiệm',Pathology:'Giải phẫu bệnh / tế bào học',Other:'Khác'};
+export const modes:Record<string,string>={Clinic:'Thực hiện tại phòng khám',OutsourcedClinic:'Thu tại phòng khám, thuê ngoài thực hiện',ExternalSelfPay:'Gửi ngoài, bệnh nhân tự trả',ExistingResult:'Sử dụng kết quả đã có'};

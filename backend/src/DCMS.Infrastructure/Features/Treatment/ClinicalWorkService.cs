@@ -50,7 +50,7 @@ public sealed class ClinicalActualEvidencePort(DcmsDbContext db) : ITreatmentAct
 
 public sealed class ClinicalWorkService(DcmsDbContext db, UserManager<ApplicationUser> users,
     IClinicalVisitPort visits, IClinicalConsentPort consent, IClinicalChargePort charges,
-    ITreatmentProgressionService progression, TimeProvider clock) : IClinicalWorkService
+    ITreatmentProgressionService progression, TimeProvider clock, DCMS.Application.Features.Settings.ISettingsAccess settingsAccess) : IClinicalWorkService
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     private static BusinessException Error(string code, int status = 400) =>
@@ -80,7 +80,7 @@ public sealed class ClinicalWorkService(DcmsDbContext db, UserManager<Applicatio
         if (!visit.Available) throw Error("MSG144", 503);
         await DentistAsync(actorId, visit.BranchId, ct);
         if (await db.Visits.AnyAsync(x => x.Id == id, ct))
-            await new DCMS.Infrastructure.Features.Examinations.ClinicalAccess(db, users, clock).VisitAsync(actorId, id, true, ct);
+            await new DCMS.Infrastructure.Features.Examinations.ClinicalAccess(db, users, clock, settingsAccess).VisitAsync(actorId, id, true, ct);
         if (!visit.InProgress) throw Error("MSG230", 409);
         if (expectedVersion > 0 && visit.Version != expectedVersion) throw Error("MSG111", 409);
         return visit;
@@ -214,6 +214,8 @@ public sealed class ClinicalWorkService(DcmsDbContext db, UserManager<Applicatio
         await using var gate = await ClinicalRequestLock.AcquireAsync(db, request.RequestKey, ct);
         var replay = await ReplayAsync(actorId, request.RequestKey, "ActivityDraft", request, ct);
         if (replay.HasValue) return Map(await db.ClinicalActivities.AsNoTracking().SingleAsync(x => x.Id == replay, ct));
+        await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
+        await db.Database.ExecuteSqlRawAsync($"SELECT pg_advisory_xact_lock({DCMS.Infrastructure.Features.Scheduling.WorkingScheduleService.TransactionLock})", ct);
         Validate(request.Activity);
         var visit = await VisitAsync(actorId, request.Activity.VisitId, request.ExpectedVisitVersion, ct);
         var performer = await DentistAsync(actorId, visit.BranchId, ct);
@@ -233,6 +235,7 @@ public sealed class ClinicalWorkService(DcmsDbContext db, UserManager<Applicatio
         db.ClinicalActivities.Add(row);
         Receipt(actorId, request.RequestKey, "ActivityDraft", request, row.Id);
         await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
         return Map(row);
     }
 

@@ -76,7 +76,7 @@ Phần dưới được giữ để truy vết thiết kế ban đầu. Khi nộ
 
 # Điều trị nhiều buổi và đặt lịch buổi tiếp theo trong DCMS
 
-> Cập nhật nguồn 25/10/2026: [bộ đặc tả v2.4](README.md) là nguồn hiện hành. Nội dung và bằng chứng dưới đây giữ mốc triển khai ban đầu; chưa được nghiệm thu lại theo v2.4.
+> Cập nhật nguồn 26/10/2026: [bộ đặc tả v2.5](README.md) là nguồn hiện hành. Nội dung và bằng chứng dưới đây giữ mốc triển khai ban đầu; chưa được nghiệm thu lại theo v2.5.
 
 Ngày quyết định: 16/10/2026. Người dùng đã chọn áp dụng hướng phân tích vào **đặc tả và tài liệu trước**. Tài liệu này làm rõ UC-03/04/06/07/10/13/14/17/19/20/24/25/34/39/40/47/48/50/51/53, các màn hình liên quan và GBR-129–136 trong [bộ đặc tả v2](README.md). Đây là hợp đồng để triển khai, không phải báo cáo chức năng đã chạy.
 
@@ -219,7 +219,7 @@ Tất cả màn hình có tải/rỗng/lỗi/quyền/xung đột rõ ràng. Lỗ
 
 ## 10 Hợp đồng API và dữ liệu
 
-Các đường dẫn là **hợp đồng dự kiến** tại thời điểm viết, chưa khẳng định đã triển khai. Đối chiếu lại với [nguồn UC v2.4](DCMS_Use_Cases_Business_Rules_Messages_v2.4.docx) trước khi triển khai; việc đổi liên kết nguồn không xác nhận các API dự kiến dưới đây đã đồng bộ v2.4.
+Các đường dẫn là **hợp đồng dự kiến** tại thời điểm viết, chưa khẳng định đã triển khai. Đối chiếu lại với [nguồn UC v2.5](DCMS_Use_Cases_Business_Rules_Messages_v2.5.docx) trước khi triển khai; việc đổi liên kết nguồn không xác nhận các API dự kiến dưới đây đã đồng bộ v2.5.
 
 | Thao tác | Hợp đồng chính |
 | --- | --- |
@@ -264,3 +264,6 @@ Các quyết định trong tài liệu là thiết kế DCMS được người d
 - [NHS về điều trị tủy](https://www.nhs.uk/tests-and-treatments/root-canal-treatment/): ví dụ điều trị có thể cần nhiều lần hẹn, không dùng làm protocol cố định cho DCMS.
 
 Các nhận định về tỷ trọng phòng khám nhỏ, doanh thu, hiệu suất hai ghế, tỷ lệ khách đến qua Zalo và các thời lượng lâm sàng trong đề xuất gốc chưa được chứng minh bằng khảo sát phòng khám mục tiêu. Không dùng chúng làm định mức bắt buộc. Việc tối ưu lịch cần số liệu thời lượng thực tế, chờ, quá giờ, NoShow và số buổi chưa được đặt trước khi quyết định thuật toán.
+
+
+Chốt 27/10/2026: [tách lượt khám và các buổi điều trị](S19-S20-DCMS-112.md). Một hồ sơ/plan có nhiều Visit điều trị thật; khám chỉ là nguồn snapshot. Kết thúc khám hoặc một buổi điều trị không hoàn tất toàn bộ kế hoạch. UI không gán Visit khám nguồn vào actual điều trị.

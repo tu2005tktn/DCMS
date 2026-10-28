@@ -1,0 +1,8 @@
+.finance-page { display: block; min-width: 0; }
+.finance-page > .ant-space:first-child { display: flex; margin-bottom: 20px; }
+.finance-page > .ant-space:first-child h2 { margin: 0; }
+.finance-page > .ant-alert { margin: 16px 0; }
+.finance-page > .ant-card { margin: 24px 0; }
+.finance-page .ant-table-wrapper { margin: 16px 0; overflow-x: auto; }
+.finance-page > .ant-space > .ant-space-item > .ant-card { min-width: 180px; }
+@media (max-width: 680px) { .finance-page > .ant-space > .ant-space-item > .ant-card { min-width: 140px; } }

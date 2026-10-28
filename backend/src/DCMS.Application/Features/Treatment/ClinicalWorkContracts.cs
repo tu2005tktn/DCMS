@@ -16,6 +16,7 @@ public interface IClinicalConsentPort
 public interface IClinicalChargePort
 {
     Task<ClinicalFeeResult> PostInTransactionAsync(ClinicalFeeRequest request, CancellationToken ct);
+    Task<bool> PostInTransactionAsync(int patientId,int branchId,Guid activityId,decimal quantity,decimal priceSnapshotVnd,int postingActor,CancellationToken ct) => Task.FromResult(false);
 }
 
 public sealed record ActivityInput(Guid VisitId, Guid? DossierId, Guid? ItemId, Guid? StepId,

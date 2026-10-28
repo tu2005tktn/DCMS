@@ -23,7 +23,7 @@ async function allCategories() {
     if (!batch.items.length || result.length >= batch.total) return result;
   }
 }
-// S58 shell: one tab per section the server allows (GET /api/settings/capabilities); each API rechecks access.
+// S58 shell: one tab per section the server allows (GET /api/system-settings/settings/capabilities); each API rechecks access.
 export default function SystemSettingsPage() {
   const [modal, modalContext] = Modal.useModal();
   const [search, setSearch] = useSearchParams();
@@ -31,7 +31,7 @@ export default function SystemSettingsPage() {
   const dirty = useRef(false);
   useEffect(() => {
     let live = true; setError(undefined);
-    void api<SettingsCapabilities>('/api/settings/capabilities').then(v => { if (live) setCapabilities(v); })
+    void api<SettingsCapabilities>('/api/system-settings/settings/capabilities').then(v => { if (live) setCapabilities(v); })
       .catch(e => { if (live) setError((e as Error).message); });
     return () => { live = false; };
   }, [revision]);

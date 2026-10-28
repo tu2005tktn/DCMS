@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { api, ApiError, onSessionLost, readAccessToken, setAccessToken } from '../../services/api';
+import { api, ApiError, onSessionLost, readAccessToken, setAccessToken, setSessionTokens } from '../../services/api';
 
 export type CurrentUser = {
   id: number; userName: string; fullName: string; accountType: string; roles: string[];
@@ -50,9 +50,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user?.id]);
 
   async function signIn(userName: string, password: string) {
-    const response = await api<{ accessToken: string; user: CurrentUser }>('/api/auth/sign-in',
+    const response = await api<{ accessToken: string; refreshToken: string; user: CurrentUser }>('/api/auth/sign-in',
       { method: 'POST', body: JSON.stringify({ userName, password }) }, false);
-    setAccessToken(response.accessToken); setUser(response.user); setSessionMessage(null);
+    setSessionTokens(response); setUser(response.user); setSessionMessage(null);
   }
   async function signOut() {
     try { await api<void>('/api/auth/sign-out', { method: 'POST' }); }

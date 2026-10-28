@@ -27,7 +27,7 @@ public sealed class UnavailableReceptionSourceReader : IReceptionSourceReader
 
 public sealed class ReceptionService(DcmsDbContext db, UserManager<ApplicationUser> users,
     IAppointmentQueryService appointments, IAvailabilityService availability, IReceptionSourceReader sources,
-    TimeProvider clock) : IReceptionService
+    TimeProvider clock, DCMS.Application.Features.Settings.ISettingsAccess settingsAccess) : IReceptionService
 {
     private static readonly string[] AppointmentStatuses = ["Confirmed", "CheckedIn", "InProgress", "Completed", "Cancelled", "NoShow"];
     private static readonly TimeSpan ClinicOffset = TimeSpan.FromHours(7);
@@ -52,6 +52,7 @@ public sealed class ReceptionService(DcmsDbContext db, UserManager<ApplicationUs
 
     private async Task<Actor> ScopeAsync(int actorId, int branchId, bool write, CancellationToken ct)
     {
+        await settingsAccess.OperationalAsync(actorId,write ? "reception.check-in" : "reception.read",branchId,ct);
         var actor = await ActorAsync(actorId, ct);
         if (write && !actor.Assistant) throw Error("MSG06", 403);
         if (!await (from m in db.Set<SchedulingMember>() join b in db.Set<SchedulingBranch>() on m.BranchId equals b.Id
@@ -66,10 +67,12 @@ public sealed class ReceptionService(DcmsDbContext db, UserManager<ApplicationUs
 
     public async Task<ReceptionOptions> OptionsAsync(int actorId, CancellationToken ct)
     {
+        var permissionState = await settingsAccess.RequireAsync(actorId,"reception.read",ct);
         var actor = await ActorAsync(actorId, ct);
         var options = await appointments.OptionsAsync(actorId, ct);
         var branchIds = await (from m in db.Set<SchedulingMember>() join b in db.Set<SchedulingBranch>() on m.BranchId equals b.Id
             where m.EmployeeId == actor.EmployeeId && m.Active && b.Active && (actor.Assistant || m.CanDentist) select m.BranchId).ToArrayAsync(ct);
+        branchIds = branchIds.Intersect(permissionState.BranchIds).ToArray();
         return new(options with
         {
             Branches = options.Branches.Where(x => branchIds.Contains(x.Id)).ToArray(),

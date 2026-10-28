@@ -1,3 +1,5 @@
+import PatientExaminationsTab from '../examinations/PatientExaminationsTab';
+import ExaminationTreatmentHandoff from '../examinations/ExaminationTreatmentHandoff';
 import { Alert, Button, Card, Descriptions, Empty, Form, Input, message, Modal, Result, Skeleton, Space, Tabs, Tag, Timeline, Typography } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
@@ -38,7 +40,9 @@ export default function PatientProfilePage() {
   const [archiving, setArchiving] = useState(false);
   const [audit, setAudit] = useState<PatientAuditEntry[] | null>(null);
   const [auditError, setAuditError] = useState<string | null>(null);
-  const [tab, setTab] = useState('basic');
+  const [tab, setTab] = useState(search.get('tab') ?? 'basic');
+  useEffect(()=>{setTab(search.get('tab')??'basic');},[id,location.search]);
+  const sourceExaminationVisitId=search.get('sourceExaminationVisitId');
   const [auditOpen, setAuditOpen] = useState(false);
   const visitId = search.get('visitId') ?? undefined;
 
@@ -176,7 +180,8 @@ export default function PatientProfilePage() {
           </section>}
           </Card>
         </> },
-        { key: 'treatment', label: 'Điều trị & Thanh toán', children: <DossierList patientId={patient.id} visitId={visitId} patientName={patient.fullName} patientCode={patient.patientCode} patientAge={age} /> },
+        { key:'examinations',label:'Khám',children:<PatientExaminationsTab key={patient.id} patientId={patient.id} active={tab==='examinations'}/> },
+        { key: 'treatment', label: 'Điều trị & Thanh toán', children: sourceExaminationVisitId ? <ExaminationTreatmentHandoff patientId={patient.id} visitId={sourceExaminationVisitId} version={search.get('examinationVersion')}/> : <DossierList patientId={patient.id} visitId={visitId} patientName={patient.fullName} patientCode={patient.patientCode} patientAge={age} /> },
         { key: 'files', label: 'Hình ảnh', children: <Link to={`/patients/${patient.id}/documents`}>Mở hình ảnh và tài liệu của bệnh nhân</Link> },
         { key: 'appointments', label: 'Lịch hẹn', children: <PatientAppointmentsTab key={patient.id} patientId={patient.id} active={tab === 'appointments'} revision={revision} /> },
         { key: 'prescriptions', label: 'Đơn thuốc', children: <Pending feature="đơn thuốc (S23)" /> },

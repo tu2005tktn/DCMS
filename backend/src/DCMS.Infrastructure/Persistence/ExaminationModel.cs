@@ -21,6 +21,20 @@ internal static class ExaminationModel
             b.Property(x => x.Fingerprint).HasMaxLength(64);
             b.HasOne<Visit>().WithMany().HasForeignKey(x => x.VisitId).OnDelete(DeleteBehavior.Restrict);
         });
+        model.Entity<InvestigationOrder>(b => {
+            b.ToTable("INVESTIGATION_ORDER", t => t.HasCheckConstraint("CK_INVESTIGATION_ORDER_STATE", "\"State\" IN ('Ordered','ResultAvailable','Reviewed','Cancelled')"));
+            b.Property(x => x.Kind).HasMaxLength(16); b.Property(x => x.Name).HasMaxLength(160);
+            b.Property(x => x.Region).HasMaxLength(200); b.Property(x => x.Reason).HasMaxLength(1000);
+            b.Property(x => x.State).HasMaxLength(24); b.Property(x => x.ResultText).HasMaxLength(4000);
+            b.Property(x => x.Interpretation).HasMaxLength(4000); b.Property(x => x.CancellationReason).HasMaxLength(1000);
+            b.Property(x => x.ResultDocumentIdsJson).HasColumnType("jsonb"); b.Property(x => x.Version).IsConcurrencyToken();
+            b.HasIndex(x => new { x.VisitId, x.State }); b.HasIndex(x => new { x.CreatedBy, x.CreateRequestKey }).IsUnique();
+            b.HasOne<Visit>().WithMany().HasForeignKey(x => x.VisitId).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.CreatedBy).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.ResultBy).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.ReviewedBy).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.CancelledBy).OnDelete(DeleteBehavior.Restrict);
+        });
         model.Entity<ClinicalDocument>(b => {
             b.ToTable("CLINICAL_DOCUMENT", t => t.HasCheckConstraint("CK_CLINICAL_DOCUMENT_State", "\"FileState\" IN ('PendingScan','Ready','Rejected')"));
             b.Property(x => x.FileName).HasMaxLength(255); b.Property(x => x.ContentType).HasMaxLength(64);
@@ -29,6 +43,7 @@ internal static class ExaminationModel
             b.Property(x => x.Description).HasMaxLength(1000); b.Property(x => x.RejectReason).HasMaxLength(500);
             b.Property(x => x.Version).IsConcurrencyToken(); b.HasIndex(x => new { x.PatientId, x.VisitId });
             b.HasOne<Visit>().WithMany().HasForeignKey(x => x.VisitId).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<InvestigationOrder>().WithMany().HasForeignKey(x => x.InvestigationId).OnDelete(DeleteBehavior.Restrict);
             b.HasOne<TreatmentDossier>().WithMany().HasForeignKey(x => x.DossierId).OnDelete(DeleteBehavior.Restrict);
             b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.UploaderId).OnDelete(DeleteBehavior.Restrict);
         });

@@ -79,3 +79,5 @@ Tab **Danh mục** trong `/system-settings` (Owner). Bên trái chọn loại da
 ## Nghiệm thu
 
 SET-AT-01 (Owner/403), 02 (tạo/sửa có dấu, tìm/lọc/phân trang), 03/04 (stale, retry cùng/khác payload), 32 (seed không trùng, reserved), reference-options chỉ trả active và đúng vai trò. Integration test trên schema tạm; web build.
+
+Tích hợp workspace 53d3e2e: các API `/api/settings/*` của module trong tài liệu này dùng tiền tố `/api/system-settings/settings/*`; API options dùng `/api/system-settings/reference-options`. Các API `/api/settings/*` hiện hữu tiếp tục dành cho module phân quyền/danh mục vận hành riêng. Xem [ghi chú tích hợp](../implementation/MAIN-INTEGRATION-20261027-53d3e2e.vi.md).

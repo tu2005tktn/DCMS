@@ -9,11 +9,12 @@ using Microsoft.EntityFrameworkCore;
 
 namespace DCMS.Infrastructure.Features.Examinations;
 
-public sealed class ClinicalAccess(DcmsDbContext db, UserManager<ApplicationUser> users, TimeProvider clock)
+public sealed class ClinicalAccess(DcmsDbContext db, UserManager<ApplicationUser> users, TimeProvider clock, DCMS.Application.Features.Settings.ISettingsAccess settingsAccess)
 {
     public static BusinessException Error(string code, int status = 400) => new(status, SystemMessages.Get(code));
     public async Task<bool> BranchAsync(int actorId, int branchId, bool dentistOnly, CancellationToken ct)
     {
+        await settingsAccess.OperationalAsync(actorId,dentistOnly ? "examinations.manage" : "examinations.read",branchId,ct);
         var u = await users.FindByIdAsync(actorId.ToString());
         if (u == null || !u.IsActive || u.LockoutEnabled && u.LockoutEnd > clock.GetUtcNow()) throw Error("MSG07", 401);
         var roles = AccountRoles.Effective(await users.GetRolesAsync(u));

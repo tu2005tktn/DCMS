@@ -41,3 +41,5 @@ Form S05/S06 thêm nhóm "Thông tin bổ sung": Ngày lập hồ sơ (mặc đ�
 ## Nghiệm thu
 
 Tạo/sửa có đủ trường; chọn mục ngừng dùng bị chặn nhưng giữ được mục đã gắn; bật bắt buộc nguồn/nhóm/ngày lập hồ sơ thì lưu thiếu bị MSG02, bệnh nhân tự sửa không bị chặn; ngày lập ở tương lai bị MSG04; preview đếm hồ sơ thiếu. Integration test trên schema tạm; web build.
+
+Tích hợp workspace 53d3e2e: các API `/api/settings/*` của module trong tài liệu này dùng tiền tố `/api/system-settings/settings/*`; API options dùng `/api/system-settings/reference-options`. Các API `/api/settings/*` hiện hữu tiếp tục dành cho module phân quyền/danh mục vận hành riêng. Xem [ghi chú tích hợp](../implementation/MAIN-INTEGRATION-20261027-53d3e2e.vi.md).

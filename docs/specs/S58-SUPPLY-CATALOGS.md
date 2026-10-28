@@ -62,3 +62,5 @@ Tab **Vật tư, labo & thuốc** trong `/system-settings` (Owner) với 4 mục
 ## Nghiệm thu
 
 SET-AT-15 (công ty Both một ID ở hai tab; đổi về Supplier khi còn loại công việc labo bị chặn), 17 (loại công việc không có công ty mặc định vẫn lưu), 18 (thuốc kê mua ngoài không cần theo dõi tồn), 30 (export đúng lọc, ô công thức an toàn), 12 phần giá âm/NULL/0, quyền Owner. Integration test trên schema tạm; web build.
+
+Tích hợp workspace 53d3e2e: các API `/api/settings/*` của module trong tài liệu này dùng tiền tố `/api/system-settings/settings/*`; API options dùng `/api/system-settings/reference-options`. Các API `/api/settings/*` hiện hữu tiếp tục dành cho module phân quyền/danh mục vận hành riêng. Xem [ghi chú tích hợp](../implementation/MAIN-INTEGRATION-20261027-53d3e2e.vi.md).
