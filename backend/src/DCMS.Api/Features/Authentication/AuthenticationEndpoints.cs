@@ -30,9 +30,10 @@ public static class AuthenticationEndpoints
         group.MapGet("/session/idle", async (HttpContext context, IStaffIdleService service, CancellationToken ct) =>
             Results.Ok(await service.StatusAsync(AccountId(context.User),
                 Guid.Parse(context.User.FindFirstValue("sid")!), ct))).RequireAuthorization();
-        group.MapPost("/session/activity", async (HttpContext context, IStaffIdleService service, CancellationToken ct) =>
+        group.MapPost("/session/activity", async (HttpContext context, StaffIdleActivityRequest request,
+            IStaffIdleService service, CancellationToken ct) =>
             Results.Ok(await service.ActivityAsync(AccountId(context.User),
-                Guid.Parse(context.User.FindFirstValue("sid")!), ct))).RequireAuthorization();
+                Guid.Parse(context.User.FindFirstValue("sid")!), request, ct))).RequireAuthorization();
         endpoints.MapPost("/api/auth/session/idle-preview", async (StaffIdlePreviewRequest request, IStaffIdleService service, CancellationToken ct) =>
             Results.Ok(await service.PreviewAsync(request, ct)));
         group.MapPost("/sign-out", async (HttpContext context, IAuthenticationService service, CancellationToken ct) =>

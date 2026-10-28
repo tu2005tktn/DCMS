@@ -7,6 +7,7 @@ using DCMS.Domain.Features.Examinations;
 using DCMS.Domain.Features.Patients;
 using DCMS.Domain.Features.Scheduling;
 using DCMS.Domain.Features.Settings;
+using DCMS.Domain.Features.SystemSettings;
 using DCMS.Domain.Features.Visits;
 using DCMS.Infrastructure.Features.Examinations;
 using DCMS.Infrastructure.Features.Scheduling;
@@ -124,7 +125,7 @@ public sealed class FinanceService(DcmsDbContext db, ISettingsAccess access, Tim
     async Task<PaymentDto[]> MapPayments(PaymentReceipt[] rows,CancellationToken ct){var result=new List<PaymentDto>();foreach(var p in rows)result.Add(await Payment(p,ct));return result.ToArray();}
     public async Task<BillDto> BillAsync(int actor, Guid visitId, CancellationToken ct)
     {
-        var v = await Visit(actor, visitId, "finance.read", ct); var caps = await access.ResolveAsync(actor, ct); var charges = await Charges(visitId, ct); var payments = await db.Set<PaymentReceipt>().Include(x => x.Allocations).Where(x => x.VisitId == visitId).OrderByDescending(x => x.CreatedAt).ToArrayAsync(ct); var patient = await db.Set<PatientProfile>().SingleAsync(x => x.Id == v.PatientId, ct); var branch = await db.Set<SchedulingBranch>().SingleAsync(x => x.Id == v.BranchId, ct); var json = await db.Set<SettingsVersion>().OrderByDescending(x => x.Version).Select(x => x.ContentJson).FirstOrDefaultAsync(ct); var settings = json == null ? GeneralSettings.Default : JsonSerializer.Deserialize<GeneralSettings>(json, ExaminationService.Json)!;
+        var v = await Visit(actor, visitId, "finance.read", ct); var caps = await access.ResolveAsync(actor, ct); var charges = await Charges(visitId, ct); var payments = await db.Set<PaymentReceipt>().Include(x => x.Allocations).Where(x => x.VisitId == visitId).OrderByDescending(x => x.CreatedAt).ToArrayAsync(ct); var patient = await db.Set<PatientProfile>().SingleAsync(x => x.Id == v.PatientId, ct); var branch = await db.Set<SchedulingBranch>().SingleAsync(x => x.Id == v.BranchId, ct); var json = await db.Set<ClinicSettingsVersion>().OrderByDescending(x => x.Version).Select(x => x.ContentJson).FirstOrDefaultAsync(ct); var settings = json == null ? DCMS.Application.Features.SystemSettings.GeneralSettings.Default : JsonSerializer.Deserialize<DCMS.Application.Features.SystemSettings.GeneralSettings>(json, DCMS.Infrastructure.Features.SystemSettings.ClinicSettingsStore.Json)!;
         var ids = charges.Select(x => x.Id).ToArray(); var costs = caps.Permissions.Contains("finance.costs.read") ? await db.Set<ProviderPayable>().Where(x => ids.Contains(x.ChargeId)).Select(x => new PayableDto(x.Id, x.ChargeId, x.ProviderName, x.AmountVnd)).ToArrayAsync(ct) : null;
         return new(v.Id, v.PatientId, patient.FullName, v.BranchId, branch.Name, await Version(v.PatientId, v.BranchId, ct), charges.Sum(x => x.AmountVnd), charges.Sum(x => x.PaidVnd), charges.Sum(x => x.RemainingVnd), charges, (await MapPayments(payments,ct)), costs, settings.ReceiptPrint.DefaultPayerToPatient ? patient.FullName : null, caps.Permissions.Where(x => x.StartsWith("finance.payments.")).ToArray(), await db.Set<InvestigationOrder>().Where(x => x.VisitId == visitId).OrderBy(x => x.CreatedAt).Select(x => new BillInvestigation(x.Id, x.Name, x.Kind, x.State, x.BillingMode, x.PerformedAt)).ToArrayAsync(ct));
     }
@@ -166,4 +167,73 @@ public sealed class FinanceService(DcmsDbContext db, ISettingsAccess access, Tim
         }, ct);
     }
     public async Task<PaymentDto> CancelAsync(int actor, Guid id, CancelPayment c, CancellationToken ct) { var p = await db.Set<PaymentReceipt>().Include(x => x.Allocations).SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw Error("MSG113", 404); await access.OperationalAsync(actor, "finance.payments.create", p.BranchId, ct); return await Run(actor, c.RequestKey, "CancelPayment", id.ToString(), c, p.BranchId, p.VisitId, async () => { await access.OperationalAsync(actor, "finance.payments.create", p.BranchId, ct); await db.Entry(p).ReloadAsync(ct); if (p.Version != c.ExpectedVersion) throw Error("MSG111", 409); if (p.State != "Pending") throw Error("MSG42", 409); p.CancellationReason = Text(c.Reason, 1000); p.State = "Cancelled"; p.Version++; await Touch(p.PatientId, p.BranchId, ct); return await Payment(p,ct); }, ct); }
+
+    async Task<(int Version, DCMS.Application.Features.SystemSettings.ReceiptPrintSettings Settings)> PrintSettings(CancellationToken ct)
+    {
+        var row = await db.Set<ClinicSettingsVersion>().OrderByDescending(x => x.Version)
+            .Select(x => new { x.Version, x.ContentJson }).FirstOrDefaultAsync(ct);
+        var settings = row == null ? DCMS.Application.Features.SystemSettings.GeneralSettings.Default : JsonSerializer.Deserialize<DCMS.Application.Features.SystemSettings.GeneralSettings>(row.ContentJson, DCMS.Infrastructure.Features.SystemSettings.ClinicSettingsStore.Json)!;
+        return (row?.Version ?? 0, settings.ReceiptPrint);
+    }
+    async Task<ReceiptPrintDto> PrintDto(PaymentReceipt p, bool preview, CancellationToken ct)
+    {
+        var (settingsVersion, settings) = await PrintSettings(ct);
+        if (preview) return new(null, true, settings.ShowReceiptNumber ? "PT-MẪU-00000001" : null,
+            "NGUYỄN VĂN A (DỮ LIỆU MẪU)", p.BranchName, "Cash", 500_000, 200_000, 300_000,
+            "NGUYỄN VĂN A", "NHÂN VIÊN THU NGÂN", "Bản xem trước không phát hành phiếu", clock.GetUtcNow(), settingsVersion, settings);
+        if (p.State != "Posted" || p.ConfirmedAt == null || p.Number == null) throw Error("MSG42", 409);
+        var issuedAt = p.ConfirmedAt.Value;
+        var total = await db.Set<FinanceCharge>().Where(x => x.VisitId == p.VisitId && x.PostedAt <= issuedAt).SumAsync(x => x.AmountVnd, ct);
+        var paidBefore = await db.Set<PaymentReceipt>().Where(x => x.VisitId == p.VisitId && x.State == "Posted" && x.ConfirmedAt < issuedAt).SumAsync(x => x.AmountVnd, ct);
+        var collector = await db.Users.Where(x => x.Id == p.ConfirmedBy).Select(x => x.FullName).SingleAsync(ct);
+        return new(p.Id, false, settings.ShowReceiptNumber ? p.Number : null, p.PatientName, p.BranchName, p.Method,
+            p.AmountVnd, paidBefore, Math.Max(0, total - paidBefore - p.AmountVnd), p.Payer, collector, p.Note,
+            issuedAt, settingsVersion, settings);
+    }
+    public async Task<ReceiptPrintDto> PreviewReceiptAsync(int actor, int branchId, CancellationToken ct)
+    {
+        await access.OperationalAsync(actor, "finance.read", branchId, ct);
+        var branch = await db.Set<SchedulingBranch>().SingleOrDefaultAsync(x => x.Id == branchId, ct) ?? throw Error("MSG113", 404);
+        return await PrintDto(new PaymentReceipt { BranchName = branch.Name }, true, ct);
+    }
+    public async Task<ReceiptPrintDto> ReceiptPrintAsync(int actor, Guid id, CancellationToken ct)
+    {
+        var p = await db.Set<PaymentReceipt>().SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw Error("MSG113", 404);
+        await access.OperationalAsync(actor, "finance.read", p.BranchId, ct);
+        return await PrintDto(p, false, ct);
+    }
+    public async Task<ReceiptPrintDto> RecordPrintAsync(int actor, Guid id, RecordReceiptPrint c, CancellationToken ct)
+    {
+        var p = await db.Set<PaymentReceipt>().SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw Error("MSG113", 404);
+        await access.OperationalAsync(actor, "finance.read", p.BranchId, ct);
+        if (c.RequestKey == Guid.Empty) throw Error("MSG04");
+        var dto = await PrintDto(p, false, ct);
+        if (!await db.Set<ReceiptPrintEvent>().AnyAsync(x => x.ReceiptId == id && x.ActorId == actor && x.RequestKey == c.RequestKey, ct))
+        {
+            db.Add(new ReceiptPrintEvent { ReceiptId = id, ActorId = actor, RequestKey = c.RequestKey, SettingsVersion = dto.SettingsVersion, PrintedAt = clock.GetUtcNow() });
+            await db.SaveChangesAsync(ct);
+        }
+        return dto;
+    }
+    public async Task<ReceiptSequenceDto> ReceiptSequenceAsync(int actor, int branchId, CancellationToken ct)
+    {
+        await access.OperationalAsync(actor, "settings.general.manage", branchId, ct);
+        var row = await db.Set<BranchReceiptSequence>().SingleOrDefaultAsync(x => x.BranchId == branchId, ct);
+        return new(branchId, row?.NextNumber ?? 1, Math.Max(0, (row?.NextNumber ?? 1) - 1), row?.Version ?? 0);
+    }
+    public async Task<ReceiptSequenceDto> UpdateReceiptSequenceAsync(int actor, int branchId, UpdateReceiptSequence c, CancellationToken ct)
+    {
+        await access.OperationalAsync(actor, "settings.general.manage", branchId, ct);
+        if (c.NextNumber < 1 || string.IsNullOrWhiteSpace(c.Reason) || c.Reason.Length > 500) throw Error("MSG04");
+        return await Run(actor, c.RequestKey, "UpdateReceiptSequence", branchId.ToString(), c, branchId, null, async () =>
+        {
+            await access.OperationalAsync(actor, "settings.general.manage", branchId, ct);
+            var row = await db.Set<BranchReceiptSequence>().SingleOrDefaultAsync(x => x.BranchId == branchId, ct);
+            if (row == null) { if (c.ExpectedVersion != 0) throw Error("MSG111", 409); row = new() { BranchId = branchId, NextNumber = 1, Version = 0 }; db.Add(row); }
+            if (row.Version != c.ExpectedVersion) throw Error("MSG111", 409);
+            if (c.NextNumber <= row.NextNumber - 1 || c.NextNumber < row.NextNumber) throw Invalid("Mốc số mới phải lớn hơn mọi số phiếu đã cấp và không được giảm hoặc tái sử dụng.", 409);
+            row.NextNumber = c.NextNumber; row.Version++;
+            return new ReceiptSequenceDto(branchId, row.NextNumber, row.NextNumber - 1, row.Version);
+        }, ct);
+    }
 }

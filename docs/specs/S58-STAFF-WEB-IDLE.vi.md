@@ -34,9 +34,14 @@ là idle policy riêng, chờ nối vào general settings chung.
   `{expectedVersion,requestKey,reason,staffIdleTimeoutMinutes}`; commit
   policy/history/command receipt nguyên tử; retry cùng key/payload trả cùng
   kết quả, thay payload/stale trả 409 MSG111.
-- `GET /api/auth/session/idle`: staff web đọc deadline server và timeout.
-- `POST /api/auth/session/activity`: staff web, body rỗng; server chỉ lấy actor
-  và session từ bearer, trả deadline/giờ server. Patient/Public trả 403 MSG06.
+- `GET /api/auth/session/idle`: staff web đọc deadline server, timeout và
+  `activityVersion`.
+- `POST /api/auth/session/activity`: staff web gửi
+  `{expectedVersion,requestKey}` từ trạng thái server; server chỉ lấy actor
+  và session từ bearer, trả deadline/giờ server/version. Một touch được ghi
+  cùng command receipt trong transaction, retry cùng key/payload trả cùng
+  kết quả; stale/key khác payload trả 409 MSG111. Touch trong cửa sổ 30 giây
+  là no-op, không ghi. Patient/Public trả 403 MSG06.
 
 Không nhận timestamp/clientKind/actor/session ID từ body activity. Không chấp
 nhận timeout ngoài enum. Endpoint owner đòi role hiện tại; sẽ nối action grant

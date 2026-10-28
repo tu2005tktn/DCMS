@@ -83,6 +83,16 @@ public sealed class BranchReceiptSequence
 {
     public int BranchId { get; set; }
     public long NextNumber { get; set; } = 1;
+    public int Version { get; set; } = 1;
+}
+public sealed class ReceiptPrintEvent
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid ReceiptId { get; set; }
+    public int ActorId { get; set; }
+    public int SettingsVersion { get; set; }
+    public Guid RequestKey { get; set; }
+    public DateTimeOffset PrintedAt { get; set; }
 }
 public sealed class FinanceAudit
 {

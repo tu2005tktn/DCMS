@@ -38,7 +38,7 @@ test('S58 mock idle warning is shown without writing a clinical draft', async ({
     const now = new Date();
     await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({
       staffIdleTimeoutMinutes:5, lastInteractiveActivityAt:new Date(now.getTime()-270_000).toISOString(),
-      deadlineAt:new Date(now.getTime()+30_000).toISOString(), serverNow:now.toISOString(),
+      deadlineAt:new Date(now.getTime()+30_000).toISOString(), serverNow:now.toISOString(), activityVersion:1,
     })});
   });
   await page.reload();

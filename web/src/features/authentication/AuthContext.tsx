@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { api, ApiError, onSessionLost, readAccessToken, setAccessToken, setSessionTokens } from '../../services/api';
 
 export type CurrentUser = {
@@ -20,6 +20,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [sessionMessage, setSessionMessage] = useState<string | null>(null);
   const [idleDeadline, setIdleDeadline] = useState<number | null>(null);
   const [clockNow, setClockNow] = useState(Date.now());
+  const activityVersion = useRef<number | null>(null);
 
   // S26+ — đăng ký callback khi token hết hạn hoặc bị thu hồi.
   useEffect(() => {
@@ -55,23 +56,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (user?.accountType !== 'Staff') { setIdleDeadline(null); return; }
     let active = true;
-    type Idle = { deadlineAt:string; serverNow:string };
-    const update = (path:string, method?:string) => void api<Idle>(path, method ? {method} : {}).then(status => {
-      if (active) setIdleDeadline(Date.now() + new Date(status.deadlineAt).getTime() - new Date(status.serverNow).getTime());
-    }).catch(() => { /* centralized session handling */ });
+    type Idle = { deadlineAt:string; serverNow:string; activityVersion:number };
+    let lastActivitySent = Date.now();
+    let activityRequestKey: string | null = null;
+    const update = (path:string, method?:string) => {
+      if (method && activityVersion.current == null) return;
+      if (method && !activityRequestKey) activityRequestKey = crypto.randomUUID();
+      const init = method ? { method, body:JSON.stringify({expectedVersion:activityVersion.current,
+        requestKey:activityRequestKey}) } : {};
+      void api<Idle>(path, init).then(status => {
+        if (active) {
+          activityVersion.current = status.activityVersion;
+          if (method) activityRequestKey = null;
+          setIdleDeadline(Date.now() + new Date(status.deadlineAt).getTime()
+            - new Date(status.serverNow).getTime());
+        }
+      }).catch(error => { if (active && error instanceof ApiError && error.status === 409) {
+        lastActivitySent = 0; update('/api/auth/session/idle');
+      } });
+    };
     update('/api/auth/session/idle');
-    let lastSent = Date.now();
     const interact = (event:Event) => {
-      if (!event.isTrusted || Date.now() - lastSent < 30_000) return;
-      lastSent = Date.now(); update('/api/auth/session/activity', 'POST');
+      if (!event.isTrusted || Date.now() - lastActivitySent < 30_000) return;
+      lastActivitySent = Date.now(); update('/api/auth/session/activity', 'POST');
     };
     window.addEventListener('pointerdown', interact); window.addEventListener('keydown', interact);
     window.addEventListener('touchstart', interact);
-    const status = window.setInterval(() => update('/api/auth/session/idle'), 30_000);
-    const display = window.setInterval(() => setClockNow(Date.now()), 1_000);
-    return () => { active = false; window.removeEventListener('pointerdown', interact);
+    const statusTimer = window.setInterval(() => update('/api/auth/session/idle'), 30_000);
+    const displayTimer = window.setInterval(() => setClockNow(Date.now()), 1_000);
+    return () => { active = false; activityVersion.current = null; window.removeEventListener('pointerdown', interact);
       window.removeEventListener('keydown', interact); window.removeEventListener('touchstart', interact);
-      window.clearInterval(status); window.clearInterval(display); };
+      window.clearInterval(statusTimer); window.clearInterval(displayTimer); };
   }, [user?.id, user?.accountType]);
 
   async function signIn(userName: string, password: string) {

@@ -26,17 +26,20 @@ Content-Type: application/json
 Response: `{"version":2,"effectiveAt":"...","staffIdleTimeoutMinutes":5}`.
 `POST /api/settings/staff-idle/preview` nhận cùng timeout và trả
 `affectedActiveSessions`/`evaluatedAt`. `GET /api/auth/session/idle` và
-`POST /api/auth/session/activity` trả server time, mốc activity, deadline và
-timeout; không nhận timestamp client. Activity là telemetry throttled theo
-session, không có field nhân viên nhập hoặc command receipt riêng; các lệnh
-thay đổi policy có expectedVersion/requestKey/audit nguyên tử.
+`POST /api/auth/session/activity` nhận `{expectedVersion,requestKey}` và trả
+server time, mốc activity, deadline, timeout, `activityVersion`; không nhận
+timestamp client. Touch vượt throttle ghi command receipt cùng session trong
+transaction; request trong 30 giây chỉ ghi command receipt để retry giữ đúng
+kết quả, không đổi interactive timestamp. Lệnh đổi policy có
+expectedVersion/requestKey/audit nguyên tử riêng.
 
 27/10/2026:
 
-- Migration `S58StaffWebIdle` áp dụng PostgreSQL dev; backfill phiên cũ từ
-  CreatedAt. `/health` trả API/database healthy.
+- Migration `S58StaffWebIdle` và `S58StaffActivityCommands` áp dụng PostgreSQL
+  dev; backfill phiên cũ từ CreatedAt và activityVersion=1. `/health` trả
+  API/database healthy.
 - Schema PostgreSQL test cô lập: `StaffIdleApiTests` kiểm 5 phút, poll/refresh,
-  hai client cùng session, activity theo giờ server, policy giảm/tăng, không
+  hai client cùng session, activity theo giờ server, version/key/retry, policy giảm/tăng, không
   hồi sinh session revoked, Patient riêng và từ chối commit phiếu sau idle.
   Nhóm auth/billing regression: 42/42 pass; unit tests: 49/49 pass.
 - Browser thật/API/PostgreSQL dev: owner mở màn settings và preview không lưu
