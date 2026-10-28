@@ -11,7 +11,7 @@ public sealed class TreatmentPaymentV25 : Migration
     {
         m.AddColumn<string>("Unit", "SCHEDULING_SERVICE", type: "character varying(40)", maxLength: 40, nullable: false, defaultValue: "lần");
         m.AddColumn<Guid>("SourceExaminationId", "TREATMENT_DOSSIER", type: "uuid", nullable: true);
-        m.AddColumn<int>("SourceExaminationVersion", "TREATMENT_DOSSIER", type: "integer", nullable: true);
+        m.Sql("ALTER TABLE \"TREATMENT_DOSSIER\" ADD COLUMN IF NOT EXISTS \"SourceExaminationVersion\" integer;");
         m.AddColumn<string>("Note", "TREATMENT_PLAN_ITEM", type: "character varying(1000)", maxLength: 1000, nullable: true);
         m.AddColumn<int>("ResponsibleDentistId", "TREATMENT_PLAN_ITEM", type: "integer", nullable: true);
         m.AddColumn<int>("AssistantId", "TREATMENT_PLAN_ITEM", type: "integer", nullable: true);

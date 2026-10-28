@@ -22,7 +22,7 @@ const kinds: { key: Kind; label: string; codeLabel: string; help?: string }[] = 
   { key: 'customer-groups', label: 'Nhóm khách hàng', codeLabel: 'Mã', help: 'Chỉ phân nhóm; không tạo giá thẻ, điểm hay ưu đãi.' },
 ];
 const commandLabels: Record<string, string> = { ReferenceCreate: 'Tạo mới', ReferenceUpdate: 'Sửa', ReferenceState: 'Đổi trạng thái' };
-const base = '/api/settings/catalogs';
+const base = '/api/system-settings/settings/catalogs';
 const formatTime = (value: string) => new Date(value).toLocaleString('vi-VN');
 
 // Each save carries a requestKey that stays the same while the payload is unchanged, so a retry cannot write twice (SET-02).

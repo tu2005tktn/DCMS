@@ -38,3 +38,10 @@ weights/
 .vscode/
 dcms-mobile-qr.png
 .tools/
+.artifacts/
+
+# Public, attributed reference meshes used by the examination viewer (not AI weights or patient scans).
+!web/public/models/
+web/public/models/*
+!web/public/models/dental/
+!web/public/models/dental/**

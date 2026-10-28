@@ -87,3 +87,5 @@ Form bệnh nhân (S05/S06): tải `form-policy` khi mở; trường bắt buộ
 ## Nghiệm thu đợt này
 
 SET-AT-05, 06, 07, 08 (phần mode/prefix, GET không cấp số), 31 (restore tạo version mới), SET-02/03 retry/stale cho lệnh general, quyền Owner-only (AT90). Integration test trên schema PostgreSQL tạm; web build. Không tạo dữ liệu thử trong `dcms_dev`; migration vào `dcms_dev` cần người dùng duyệt riêng.
+
+Tích hợp workspace 53d3e2e: các API `/api/settings/*` của module trong tài liệu này dùng tiền tố `/api/system-settings/settings/*`; API options dùng `/api/system-settings/reference-options`. Các API `/api/settings/*` hiện hữu tiếp tục dành cho module phân quyền/danh mục vận hành riêng. Xem [ghi chú tích hợp](../implementation/MAIN-INTEGRATION-20261027-53d3e2e.vi.md).

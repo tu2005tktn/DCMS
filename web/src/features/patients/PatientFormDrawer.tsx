@@ -46,7 +46,7 @@ export default function PatientFormDrawer({ open, patient, onClose, onSaved }: {
     setCatalogError(null);
     try {
       const kinds: CatalogKind[] = ['patient-sources', 'customer-groups', 'occupations', 'intake-history'];
-      const loaded = await Promise.all(kinds.map(kind => api<Option[]>(`/api/reference-options?kind=${kind}`)));
+      const loaded = await Promise.all(kinds.map(kind => api<Option[]>(`/api/system-settings/reference-options?kind=${kind}`)));
       setCatalogs(Object.fromEntries(kinds.map((kind, i) => [kind, loaded[i]])));
     } catch (failure) { setCatalogError((failure as Error).message); }
   }

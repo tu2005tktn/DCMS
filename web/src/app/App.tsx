@@ -1,3 +1,6 @@
+import VisitPage from '../features/examinations/ExaminationPage';
+import PaymentsPage from '../features/finance/PaymentsPage';
+import ClinicalServicesPage from '../features/finance/ClinicalServicesPage';
 import { Alert, Button, Card, Layout, Menu, Result, Space, Tag, Typography } from 'antd';
 import { useState, type ReactNode } from 'react';
 import { Link, Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom';
@@ -19,7 +22,6 @@ import HealthStatus from '../features/HealthStatus';
 import ReceptionPage from '../features/reception/ReceptionPage';
 import CheckInPage from '../features/reception/CheckInPage';
 import PatientDocumentsPage from '../features/clinical-documents/PatientDocumentsPage';
-import VisitPage from '../features/reception/VisitPage';
 import { AccessPage, CustomerGuard, CustomerHomePage, CustomerRegisterPage, CustomerShell, CustomerSignInPage } from '../features/customer-auth/CustomerPages';
 import { useCustomerAuth } from '../features/customer-auth/CustomerAuthContext';
 import CustomerBookingPage from '../features/customer-booking/CustomerBookingPage';
@@ -31,17 +33,9 @@ import PlanPage from '../features/treatment/PlanPage';
 import RevisionPage from '../features/treatment/RevisionPage';
 import TemplatePage from '../features/treatment/TemplatePage';
 import CommercialTreatmentPage from '../features/treatment/CommercialTreatmentPage';
-import { ActualTreatmentPage, PostoperativeReviewPage } from '../features/treatment/ClinicalWorkPages';
-import ClinicalPreviewPage from '../features/treatment/ClinicalPreviewPage';
-import { clinicalPreviewTreatment } from '../features/treatment/clinicalPreview';
 
 export default function App() {
   return <Routes>
-    {import.meta.env.DEV && <Route path="/__preview/clinical" element={<ClinicalPreviewPage />}>
-      <Route index element={<Navigate to={clinicalPreviewTreatment} replace />} />
-      <Route path=":id/:visitId/treatment" element={<ActualTreatmentPage />} />
-      <Route path=":id/:visitId/review" element={<PostoperativeReviewPage />} />
-    </Route>}
     <Route path="/sign-in" element={<SignInPage />} />
     <Route path="/access" element={<AccessPage />} />
     <Route path="/customer/sign-in" element={<CustomerSignInPage />} />
@@ -64,6 +58,9 @@ export default function App() {
     </Route>
     <Route element={<Protected><Workspace /></Protected>}>
       <Route path="system-settings" element={<Protected><SystemSettingsPage /></Protected>} />
+      <Route path="payments" element={<Protected permission="finance.read"><PaymentsPage /></Protected>} />
+      <Route path="visits/:visitId/payments" element={<Protected permission="finance.read"><PaymentsPage /></Protected>} />
+      <Route path="clinical-services" element={<Protected permission="services.read"><ClinicalServicesPage /></Protected>} />
       <Route path="working-schedules" element={<WorkingSchedulesPage />} />
       <Route path="booking-settings" element={<BookingSettingsPage />} />
       <Route path="accounts" element={<Protected permission="accounts.manage"><AccountsPage /></Protected>} />
@@ -73,8 +70,6 @@ export default function App() {
       <Route path="patients/:id/dossiers/:dossierId" element={<Protected permission="patients.read"><DossierPage /></Protected>} />
       <Route path="patients/:id/dossiers/:dossierId/plan" element={<Protected permission="patients.read"><PlanPage /></Protected>} />
       <Route path="patients/:id/dossiers/:dossierId/plan/revise/:itemId" element={<Protected permission="patients.read"><RevisionPage /></Protected>} />
-      <Route path="patients/:id/visits/:visitId/treatment" element={<Protected permission="patients.read"><ActualTreatmentPage /></Protected>} />
-      <Route path="patients/:id/visits/:visitId/review" element={<Protected permission="patients.read"><PostoperativeReviewPage /></Protected>} />
       <Route path="treatment-templates" element={<Protected><TemplatePage /></Protected>} />
       <Route path="commercial/treatment" element={<Protected><CommercialTreatmentPage /></Protected>} />
       <Route path="appointments" element={<Protected><AppointmentCalendarPage /></Protected>} />
@@ -125,6 +120,8 @@ function Workspace() {
       ...(auth.user?.accountType === 'Staff' ? [{ key: '/booking-settings', label: <Link to="/booking-settings">Cài đặt đặt lịch</Link> }] : []),
       ...(auth.user?.effectiveRoles.some(r => ['ClinicAssistant', 'Dentist', 'ClinicOwner'].includes(r)) ? [{ key: '/appointments', label: <Link to="/appointments">Lịch hẹn</Link> }] : []),
       ...(auth.user?.permissions.includes('appointments.support.handle') ? [{ key: '/support-inbox', label: <Link to="/support-inbox">Hộp thư hỗ trợ</Link> }] : []),
+      ...(auth.user?.permissions.includes('finance.read') ? [{key:'/payments',label:<Link to="/payments">Thanh toán</Link>}] : []),
+      ...(auth.user?.permissions.includes('services.read') ? [{key:'/clinical-services',label:<Link to="/clinical-services">Dịch vụ cận lâm sàng</Link>}] : []),
       { key: '/', label: <Link to="/">Tài khoản của tôi</Link> },
       ...(auth.user?.permissions.includes('reception.read') ? [{ key: '/reception', label: <Link to="/reception">Tiếp nhận và hàng chờ</Link> }] : []),
       ...(auth.user?.permissions.includes('accounts.manage') ? [{ key: '/accounts', label: <Link to="/accounts">Quản lý tài khoản</Link> }] : []),

@@ -24,6 +24,7 @@ public sealed class ClinicalDocument
     public Guid VisitId { get; set; }
     public Guid? DossierId { get; set; }
     public Guid? PlanId { get; set; }
+    public Guid? InvestigationId { get; set; }
     public string FileName { get; set; } = "";
     public string ContentType { get; set; } = "";
     public long SizeBytes { get; set; }

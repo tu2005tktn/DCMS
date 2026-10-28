@@ -54,7 +54,7 @@ public sealed class TreatmentSheetV25Tests(ApiFixture fixture) : IClassFixture<A
                 AttendeeName = patient.FullName, StartAt = start, EndAt = start.AddHours(1), CreatedAt = start };
             db.Add(appointment);
             var visit = new Visit { AppointmentId = id, PatientId = patient.Id, BranchId = branch.Id, DentistId = staff.Id,
-                Status = "InProgress", ArrivalAt = start, RecordedAt = start, RecordedBy = staff.AccountId };
+                Status = "InProgress", Purpose = AttendancePurposes.TreatmentContinuation, ArrivalAt = start, RecordedAt = start, RecordedBy = staff.AccountId };
             db.Add(visit); visits.Add(visit.Id);
         }
         await db.SaveChangesAsync(); return new(patient.Id, branch.Id, staff.Id, service.Id, visits.ToArray());

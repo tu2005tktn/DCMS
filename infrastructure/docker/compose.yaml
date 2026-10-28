@@ -24,5 +24,15 @@ services:
     ports:
       - "127.0.0.1:1025:1025"
       - "127.0.0.1:8025:8025"
+  # Optional real antivirus for clinical uploads. Start with --profile clinical.
+  clamav:
+    image: clamav/clamav:stable
+    profiles: ["clinical"]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${CLAMAV_PORT:-3310}:3310"
+    volumes:
+      - dcms_clamav_data:/var/lib/clamav
 volumes:
   dcms_postgres_data:
+  dcms_clamav_data:

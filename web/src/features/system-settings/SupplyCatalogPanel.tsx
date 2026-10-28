@@ -80,7 +80,7 @@ const sections: Section[] = [
       <Form.Item name="internalStockTracked" valuePropName="checked"><Checkbox>Theo dõi tồn kho nội bộ</Checkbox></Form.Item>
     </> },
 ];
-const base = '/api/settings/catalogs';
+const base = '/api/system-settings/settings/catalogs';
 const commandLabels: Record<string, string> = { create: 'Tạo mới', update: 'Sửa', state: 'Đổi trạng thái' };
 
 export default function SupplyCatalogPanel() {
@@ -119,7 +119,7 @@ export default function SupplyCatalogPanel() {
   function open(row?: Row) {
     requestKey.current = null; setFormError(undefined); form.resetFields();
     form.setFieldsValue((row ? { ...row, reason: '' } : { ...section.defaults }) as Record<string, never>);
-    if (section.key === 'lab-work-types') void api<Option[]>('/api/reference-options?kind=lab-providers').then(setLabProviders).catch(() => setLabProviders([]));
+    if (section.key === 'lab-work-types') void api<Option[]>('/api/system-settings/reference-options?kind=lab-providers').then(setLabProviders).catch(() => setLabProviders([]));
     setEditing({ row });
   }
   async function save() {

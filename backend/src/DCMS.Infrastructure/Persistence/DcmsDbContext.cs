@@ -74,9 +74,10 @@ public sealed class DcmsDbContext(DbContextOptions<DcmsDbContext> options)
         AppointmentModel.Configure(model);
         VisitModel.Configure(model);
         ExaminationModel.Configure(model);
+        SettingsModel.Configure(model);
+        FinanceModel.Configure(model);
         TreatmentModel.Configure(model);
         SystemSettingsModel.Configure(model);
-        VisitModel.Configure(model);
         model.Entity<ApplicationUser>(b =>
         {
             b.ToTable("USER_ACCOUNT");

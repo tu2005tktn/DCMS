@@ -4,7 +4,7 @@ import { api, ApiError } from '../../services/api';
 import { codeExample, codeModes, idleChoices, receiptFields, requiredFieldOptions, type GeneralHistoryItem, type GeneralHistoryPage,
   type GeneralPreview, type GeneralSettings, type GeneralSettingsDto } from './generalSettings';
 
-const base = '/api/settings/general';
+const base = '/api/system-settings/settings/general';
 const formatTime = (value: string | null) => value ? new Date(value).toLocaleString('vi-VN') : '—';
 type Pending = { kind: 'save' | 'restore'; preview: GeneralPreview; body: Record<string, unknown>; sourceVersion?: number };
 

@@ -5,7 +5,8 @@ const visitId = '33333333-3333-4333-8333-333333333333';
 const secondVisit = '44444444-4444-4444-8444-444444444444';
 const patient = { id: 123, patientCode: 'SYNTHETIC-123', fullName: 'Bệnh nhân thử nghiệm', birthDate: null,
   gender: null, phone: null, address: null, guardianName: null, guardianRelationship: null, guardianPhone: null,
-  note: null, isArchived: false, version: 1, createdAt: '2026-10-27T01:00:00Z', updatedAt: '2026-10-27T01:00:00Z',
+  note: null, profileDate: null, source: null, customerGroup: null, occupation: null, intakeHistory: [],
+  isArchived: false, version: 1, createdAt: '2026-10-27T01:00:00Z', updatedAt: '2026-10-27T01:00:00Z',
   link: { verifiedAccountUserName: null, verifiedAt: null } };
 const item = { id: itemId, serviceId: 3, serviceName: 'Trám răng', region: '25, 26', unit: 'răng', quantity: 2,
   agreedUnitPriceVnd: 300000, decision: 'Agreed', progress: 'NotStarted', estimatedStart: null,
@@ -101,6 +102,7 @@ async function prepare(page: Page, withItem = true, withFinance = false) {
   await page.goto('/sign-in');
   await page.getByLabel('Tên đăng nhập', { exact: true }).fill('synthetic'); await page.getByLabel('Mật khẩu', { exact: true }).fill('synthetic');
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Đăng xuất', exact: true })).toBeVisible();
   await page.goto('/patients/123'); await page.getByRole('tab', { name: 'Điều trị & Thanh toán' }).click();
   await expect(page.getByRole('heading', { name: 'KẾ HOẠCH ĐIỀU TRỊ/DỊCH VỤ' })).toBeVisible();
   return state;

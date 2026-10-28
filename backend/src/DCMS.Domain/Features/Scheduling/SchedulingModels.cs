@@ -28,6 +28,9 @@ public sealed class SchedulingChair
 public sealed class SchedulingService
 {
     public string Unit { get; set; } = "lần";
+    public bool IsInvestigationService { get; set; }
+    public string? InvestigationKind { get; set; }
+    public string BillingUnit { get; set; } = "Lần";
     public bool IsInitialExamination { get; set; }
     public bool PublicBookable { get; set; } = true;
     public int Id { get; set; }

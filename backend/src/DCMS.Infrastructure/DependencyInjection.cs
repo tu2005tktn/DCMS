@@ -54,6 +54,8 @@ public static class DependencyInjection
         services.AddScoped<IEmailVerificationService, EmailVerificationService>();
         services.AddScoped<IAccountService, AccountService>();
         services.AddScoped<IAuthenticationService, AuthenticationService>();
+        services.AddScoped<DCMS.Application.Features.Settings.ISettingsAccess, Features.Settings.SettingsAccess>();
+        services.AddScoped<DCMS.Application.Features.Settings.ISettingsService, Features.Settings.SettingsService>();
         services.AddScoped<IRegistrationService, RegistrationService>();
         services.AddHttpClient();
         services.AddSingleton<IGoogleTokenVerifier, GoogleTokenVerifier>();
@@ -65,6 +67,9 @@ public static class DependencyInjection
         services.AddScoped<IPatientService, PatientService>();
         services.AddScoped<ITreatmentDossierService, TreatmentDossierService>();
         services.AddScoped<IServicePriceService, ServicePriceService>();
+        services.AddScoped<Features.Finance.FinanceService>();
+        services.AddScoped<DCMS.Application.Features.Finance.IExaminationFeeService,Features.Finance.ExaminationFeeService>();
+        services.AddScoped<DCMS.Application.Features.Finance.IFinanceService>(sp=>sp.GetRequiredService<Features.Finance.FinanceService>());
         services.AddScoped<ITreatmentFinancialSummaryPort, UnavailableTreatmentFinancialSummaryPort>();
         services.AddScoped<ITreatmentFinancialWorkspace, TreatmentFinancialWorkspace>();
         services.AddScoped<ITreatmentRevisionService, TreatmentRevisionService>();
@@ -75,7 +80,8 @@ public static class DependencyInjection
         services.AddScoped<IClinicalWorkService, ClinicalWorkService>();
         services.AddScoped<IClinicalVisitPort, Features.Examinations.ClinicalVisitPort>();
         services.AddScoped<IClinicalConsentPort, ClinicalConsentPort>();
-        services.AddScoped<IClinicalChargePort, OutboxClinicalChargePort>();
+        services.AddScoped<OutboxClinicalChargePort>();
+        services.AddScoped<IClinicalChargePort, Features.Finance.ClinicalChargePort>();
         services.AddScoped<ICareTaskService, CareTaskService>();
         services.AddScoped<ITreatmentLabReadinessPort, UnavailableTreatmentLabReadinessPort>();
         services.AddScoped<ITreatmentVisitActivitySourcePort, UnavailableTreatmentVisitActivitySourcePort>();
@@ -93,11 +99,11 @@ public static class DependencyInjection
         services.AddScoped<DCMS.Application.Features.Reception.IReceptionService, Features.Reception.ReceptionService>();
         services.AddScoped<DCMS.Application.Features.Reception.IReceptionSourceReader, Features.Examinations.ReceptionTreatmentSourceReader>();
         services.AddScoped<Features.Examinations.ClinicalAccess>();
+        services.AddScoped<DCMS.Application.Features.Examinations.IInvestigationService, Features.Examinations.InvestigationService>();
         services.AddScoped<DCMS.Application.Features.Examinations.IExaminationService, Features.Examinations.ExaminationService>();
         services.AddScoped<DCMS.Application.Features.Examinations.IClinicalDocumentService, Features.Examinations.ClinicalDocumentService>();
         services.AddSingleton<DCMS.Application.Features.Examinations.IClinicalFileScanner, Features.Examinations.ClamAvClinicalFileScanner>();
         services.AddHostedService<Features.Examinations.ClinicalScanWorker>();
-        services.AddScoped<DCMS.Application.Features.Reception.IReceptionSourceReader, Features.Reception.UnavailableReceptionSourceReader>();
         services.AddScoped<IAppointmentQueryService, AppointmentQueryService>();
         services.AddScoped<IAppointmentChangeService, AppointmentChangeService>();
         services.AddScoped<ISupportRequestService, SupportRequestService>();

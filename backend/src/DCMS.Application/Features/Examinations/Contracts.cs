@@ -3,18 +3,29 @@ using DCMS.Application.Features.Reception;
 namespace DCMS.Application.Features.Examinations;
 
 public sealed record MedicalFact(string State = "Unknown", string? Detail = null, bool Verified = false);
-public sealed record ToothFinding(int? Tooth, string? Region, string Condition);
+public sealed record ToothFinding(int? Tooth, string? Region, string Condition, IReadOnlyList<string>? Surfaces = null, IReadOnlyList<string>? Diagnoses = null);
 public sealed record ExaminationContent(string? Symptoms, MedicalFact MedicalHistory, MedicalFact Allergies,
-    MedicalFact Medications, IReadOnlyList<ToothFinding> Findings, string? Diagnosis, string? Notes);
+    MedicalFact Medications, IReadOnlyList<ToothFinding> Findings, string? Diagnosis, string? Notes,
+    string? Conclusion = null, string? Advice = null, string? Disposition = null,
+    string? ReturnNeed = null, string? ReferralDestination = null, IReadOnlyList<string>? Diagnoses = null, IReadOnlyList<string>? UnscopedDiagnoses = null, IReadOnlyList<DCMS.Application.Features.Settings.ReferenceSnapshot>? DiagnosisReferences = null);
 public sealed record StartExamination(int PatientId, int ExpectedVersion, Guid RequestKey);
 public sealed record SaveExamination(int PatientId, int ExpectedVersion, Guid RequestKey,
     ExaminationContent Content, bool Confirm);
-public sealed record ExaminationDto(ExaminationContent Content, bool Confirmed, int UpdatedBy, DateTimeOffset UpdatedAt);
+public sealed record ExaminationDto(ExaminationContent Content, bool Confirmed, int UpdatedBy, DateTimeOffset UpdatedAt,
+    Guid Id = default, int Version = 0);
+public sealed record AmendExamination(int PatientId, int ExpectedVersion, Guid RequestKey, ExaminationContent Content, string Reason);
+public sealed record CompleteExaminationVisit(int PatientId, int ExpectedVersion, Guid RequestKey, bool WorkReviewed, DCMS.Application.Features.Finance.ExaminationFeeChoice? ExaminationFee = null);
+public sealed record PatientExamination(Guid VisitId, string AppointmentCode, int BranchId, string BranchName,
+    string DentistName, DateTimeOffset ArrivalAt, string VisitStatus, ExaminationDto? Examination);
+public sealed record ExaminationVersion(int Version, ExaminationContent Content, bool Confirmed, int ActorId,
+    DateTimeOffset RecordedAt, string? Reason);
+public sealed record ExaminationPatient(int Id, string PatientCode, string FullName, DateOnly? BirthDate,
+    string? Gender, int? AgeYears);
 public sealed record ExaminationWorkspace(VisitResult Visit, ExaminationDto? Examination,
-    ExaminationContent InitialContent, IReadOnlyList<string> AllowedActions, bool Replayed = false);
+    ExaminationContent InitialContent, IReadOnlyList<string> AllowedActions, ExaminationPatient Patient, bool Replayed = false, IReadOnlyList<InvestigationDto>? Investigations = null);
 public sealed record ExaminationHistory(Guid VisitId, DateTimeOffset ArrivalAt, ExaminationDto Examination);
 public sealed record ClinicalHandoff(Guid VisitId, int PatientId, int BranchId, int Version, ExaminationContent Examination,
-    IReadOnlyList<int> Teeth, IReadOnlyList<DocumentDto> Documents, VisitSource? Source);
+    IReadOnlyList<int> Teeth, IReadOnlyList<DocumentDto> Documents, VisitSource? Source, int ExaminationVersion = 0, string VisitStatus = "InProgress");
 public interface IExaminationService
 {
     Task<ExaminationWorkspace> GetAsync(int actorId, Guid visitId, CancellationToken ct);
@@ -22,13 +33,17 @@ public interface IExaminationService
     Task<ExaminationWorkspace> SaveAsync(int actorId, Guid visitId, SaveExamination request, CancellationToken ct);
     Task<IReadOnlyList<ExaminationHistory>> HistoryAsync(int actorId, Guid visitId, CancellationToken ct);
     Task<ClinicalHandoff> HandoffAsync(int actorId, Guid visitId, CancellationToken ct);
+    Task<IReadOnlyList<PatientExamination>> ListAsync(int actorId, int patientId, CancellationToken ct);
+    Task<IReadOnlyList<ExaminationVersion>> VersionsAsync(int actorId, Guid visitId, CancellationToken ct);
+    Task<ExaminationWorkspace> AmendAsync(int actorId, Guid visitId, AmendExamination request, CancellationToken ct);
+    Task<ExaminationWorkspace> CompleteAsync(int actorId, Guid visitId, CompleteExaminationVisit request, CancellationToken ct);
 }
 
 public sealed record DocumentMetadata(int PatientId, Guid VisitId, Guid? DossierId, Guid? PlanId,
     Guid? InvestigationId, string? ConsentVersion, string DocumentType, string Source,
     DateOnly SourceDate, string? Description, Guid RequestKey);
 public sealed record DocumentContext(Guid VisitId, string VisitLabel, Guid? DossierId, string? DossierLabel,
-    Guid? PlanId, string? PlanLabel);
+    Guid? PlanId, string? PlanLabel, Guid? InvestigationId = null, string? InvestigationLabel = null);
 public sealed record DocumentReviewDto(Guid VisitId, int ReviewedBy, DateTimeOffset ReviewedAt);
 public sealed record DocumentDto(Guid DocumentId, int Version, string FileName, string ContentType, long SizeBytes,
     string DocumentType, string Source, DateOnly SourceDate, string? Description, DocumentContext Context,
