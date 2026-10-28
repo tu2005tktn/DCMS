@@ -27,6 +27,14 @@ public static class AuthenticationEndpoints
             return Results.Json(result, statusCode: StatusCodes.Status201Created);
         }).AllowAnonymous().WithTags("UC-33 Registration");
         group.MapGet("/me", (HttpContext context) => Results.Ok((CurrentUser)context.Items["CurrentUser"]!)).RequireAuthorization();
+        group.MapGet("/session/idle", async (HttpContext context, IStaffIdleService service, CancellationToken ct) =>
+            Results.Ok(await service.StatusAsync(AccountId(context.User),
+                Guid.Parse(context.User.FindFirstValue("sid")!), ct))).RequireAuthorization();
+        group.MapPost("/session/activity", async (HttpContext context, IStaffIdleService service, CancellationToken ct) =>
+            Results.Ok(await service.ActivityAsync(AccountId(context.User),
+                Guid.Parse(context.User.FindFirstValue("sid")!), ct))).RequireAuthorization();
+        endpoints.MapPost("/api/auth/session/idle-preview", async (StaffIdlePreviewRequest request, IStaffIdleService service, CancellationToken ct) =>
+            Results.Ok(await service.PreviewAsync(request, ct)));
         group.MapPost("/sign-out", async (HttpContext context, IAuthenticationService service, CancellationToken ct) =>
         {
             await service.SignOutAsync(AccountId(context.User), Guid.Parse(context.User.FindFirstValue("sid")!), ct);

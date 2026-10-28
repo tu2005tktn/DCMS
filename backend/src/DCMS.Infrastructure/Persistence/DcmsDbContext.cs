@@ -105,6 +105,7 @@ public sealed class DcmsDbContext(DbContextOptions<DcmsDbContext> options)
         {
             b.ToTable("AUTH_SESSION");
             b.Property(x => x.DeviceLabel).HasMaxLength(120);
+            b.Property(x => x.ClientKind).HasMaxLength(20);
             b.HasIndex(x => new { x.AccountId, x.RevokedAt });
             b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.AccountId).OnDelete(DeleteBehavior.Restrict);
         });

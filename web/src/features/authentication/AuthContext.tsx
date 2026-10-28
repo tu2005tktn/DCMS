@@ -8,6 +8,7 @@ export type CurrentUser = {
 type AuthState = {
   initializing: boolean;
   user: CurrentUser | null; sessionMessage: string | null;
+  idleSecondsLeft: number | null;
   signIn: (userName: string, password: string) => Promise<void>;
   signOut: () => Promise<void>; refresh: () => Promise<void>;
 };
@@ -17,10 +18,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [initializing, setInitializing] = useState(() => !!readAccessToken());
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [sessionMessage, setSessionMessage] = useState<string | null>(null);
+  const [idleDeadline, setIdleDeadline] = useState<number | null>(null);
+  const [clockNow, setClockNow] = useState(Date.now());
 
   // S26+ — đăng ký callback khi token hết hạn hoặc bị thu hồi.
   useEffect(() => {
-    onSessionLost(error => { setUser(null); setSessionMessage(error.message); });
+    onSessionLost(error => { setUser(null); setIdleDeadline(null); setSessionMessage(error.message); });
     return () => onSessionLost(undefined);
   }, []);
 
@@ -49,6 +52,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => { window.clearInterval(timer); window.removeEventListener('focus', update); };
   }, [user?.id]);
 
+  useEffect(() => {
+    if (user?.accountType !== 'Staff') { setIdleDeadline(null); return; }
+    let active = true;
+    type Idle = { deadlineAt:string; serverNow:string };
+    const update = (path:string, method?:string) => void api<Idle>(path, method ? {method} : {}).then(status => {
+      if (active) setIdleDeadline(Date.now() + new Date(status.deadlineAt).getTime() - new Date(status.serverNow).getTime());
+    }).catch(() => { /* centralized session handling */ });
+    update('/api/auth/session/idle');
+    let lastSent = Date.now();
+    const interact = (event:Event) => {
+      if (!event.isTrusted || Date.now() - lastSent < 30_000) return;
+      lastSent = Date.now(); update('/api/auth/session/activity', 'POST');
+    };
+    window.addEventListener('pointerdown', interact); window.addEventListener('keydown', interact);
+    window.addEventListener('touchstart', interact);
+    const status = window.setInterval(() => update('/api/auth/session/idle'), 30_000);
+    const display = window.setInterval(() => setClockNow(Date.now()), 1_000);
+    return () => { active = false; window.removeEventListener('pointerdown', interact);
+      window.removeEventListener('keydown', interact); window.removeEventListener('touchstart', interact);
+      window.clearInterval(status); window.clearInterval(display); };
+  }, [user?.id, user?.accountType]);
+
   async function signIn(userName: string, password: string) {
     const response = await api<{ accessToken: string; refreshToken: string; user: CurrentUser }>('/api/auth/sign-in',
       { method: 'POST', body: JSON.stringify({ userName, password }) }, false);
@@ -57,9 +82,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function signOut() {
     try { await api<void>('/api/auth/sign-out', { method: 'POST' }); }
     catch (error) { if (!(error instanceof ApiError && error.status === 401)) throw error; }
-    setAccessToken(null); setUser(null); setSessionMessage(null);
+    setAccessToken(null); setUser(null); setIdleDeadline(null); setSessionMessage(null);
   }
-  return <Context.Provider value={{ user, initializing, sessionMessage, signIn, signOut, refresh }}>{children}</Context.Provider>;
+  const idleSecondsLeft = idleDeadline == null ? null : Math.max(0, Math.ceil((idleDeadline - clockNow) / 1000));
+  return <Context.Provider value={{ user, initializing, sessionMessage, idleSecondsLeft, signIn, signOut, refresh }}>{children}</Context.Provider>;
 }
 export function useAuth() {
   const context = useContext(Context);

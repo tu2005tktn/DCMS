@@ -18,7 +18,8 @@ using Microsoft.IdentityModel.Tokens;
 namespace DCMS.Infrastructure.Features.Authentication;
 
 public sealed class AuthenticationService(DcmsDbContext db, UserManager<ApplicationUser> users,
-    IOptions<JwtSettings> settings, DCMS.Application.Features.Settings.ISettingsAccess settingsAccess) : IAuthenticationService
+    IOptions<JwtSettings> settings, DCMS.Application.Features.Settings.ISettingsAccess settingsAccess,
+    StaffIdleService staffIdle, TimeProvider clock) : IAuthenticationService
 {
     public async Task<SignInResponse> SignInAsync(SignInRequest request, CancellationToken ct)
     {
@@ -37,14 +38,16 @@ public sealed class AuthenticationService(DcmsDbContext db, UserManager<Applicat
         if (user == null || !user.IsActive || await users.IsLockedOutAsync(user)) DenySignIn();
         var current = await CurrentAsync(user!, ct);
         if (current == null) DenySignIn();
-        var now = DateTimeOffset.UtcNow;
+        var now = clock.GetUtcNow();
         var accessExpires = now.AddMinutes(settings.Value.AccessTokenMinutes);
         var refreshExpires = now.AddDays(settings.Value.RefreshTokenDays);
         var session = new AuthSession
         {
             Id = Guid.NewGuid(), AccountId = user!.Id,
             DeviceLabel = NormalizeDeviceLabel(deviceLabel),
-            CreatedAt = now, LastSeenAt = now, ExpiresAt = accessExpires
+            ClientKind = current!.AccountType == "Staff" ? "StaffWeb" : "Patient",
+            CreatedAt = now, LastSeenAt = now, LastInteractiveActivityAt = now,
+            ExpiresAt = current.AccountType == "Staff" ? refreshExpires : accessExpires
         };
         var (refresh, refreshPlaintext) = CreateRefreshToken(session.AccountId, session.Id, refreshExpires);
         db.AuthSessions.Add(session);
@@ -62,13 +65,24 @@ public sealed class AuthenticationService(DcmsDbContext db, UserManager<Applicat
 
     public async Task<CurrentUser?> ValidateSessionAsync(int accountId, Guid sessionId, CancellationToken ct)
     {
-        var now = DateTimeOffset.UtcNow;
+        var now = clock.GetUtcNow();
         var session = await db.AuthSessions.AsNoTracking()
             .SingleOrDefaultAsync(x => x.Id == sessionId && x.AccountId == accountId, ct);
         if (session == null || session.RevokedAt != null || session.ExpiresAt <= now) return null;
-        // Last-seen cập nhật best-effort, không chặn request khi lỗi.
-        await db.AuthSessions.Where(x => x.Id == sessionId)
-            .ExecuteUpdateAsync(s => s.SetProperty(x => x.LastSeenAt, now), ct).ConfigureAwait(false);
+        if (session.ClientKind == "StaffWeb")
+        {
+            await using var tx = await db.Database.BeginTransactionAsync(ct);
+            session = await db.AuthSessions.FromSqlInterpolated(
+                $"SELECT * FROM \"AUTH_SESSION\" WHERE \"Id\" = {sessionId} FOR UPDATE").SingleAsync(ct);
+            if (session.RevokedAt != null || session.ExpiresAt <= now) return null;
+            if (session.LastInteractiveActivityAt.AddMinutes(await staffIdle.MinutesAsync(ct)) <= now)
+            {
+                await staffIdle.ExpireAsync(session, now, ct); await tx.CommitAsync(ct); return null;
+            }
+            session.LastSeenAt = now; await db.SaveChangesAsync(ct); await tx.CommitAsync(ct);
+        }
+        else await db.AuthSessions.Where(x => x.Id == sessionId)
+            .ExecuteUpdateAsync(s => s.SetProperty(x => x.LastSeenAt, now), ct);
         var user = await db.Users.AsNoTracking().SingleOrDefaultAsync(x => x.Id == accountId, ct);
         if (user == null || !user.IsActive || await users.IsLockedOutAsync(user)) return null;
         return await CurrentAsync(user, ct);
@@ -77,7 +91,7 @@ public sealed class AuthenticationService(DcmsDbContext db, UserManager<Applicat
     public async Task SignOutAsync(int accountId, Guid sessionId, CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        var now = DateTimeOffset.UtcNow;
+        var now = clock.GetUtcNow();
         var changed = await db.AuthSessions.Where(x => x.Id == sessionId && x.AccountId == accountId && x.RevokedAt == null)
             .ExecuteUpdateAsync(s => s.SetProperty(x => x.RevokedAt, now), ct);
         if (changed > 0)
@@ -109,8 +123,16 @@ public sealed class AuthenticationService(DcmsDbContext db, UserManager<Applicat
             throw new BusinessException(401, SystemMessages.Get("MSG07"));
         }
         // Tài khoản và session còn hiệu lực?
-        var session = await db.AuthSessions.SingleOrDefaultAsync(x => x.Id == existing.SessionId, ct);
+        var session = await db.AuthSessions.FromSqlInterpolated(
+            $"SELECT * FROM \"AUTH_SESSION\" WHERE \"Id\" = {existing.SessionId} FOR UPDATE").SingleOrDefaultAsync(ct);
         var user = await db.Users.SingleOrDefaultAsync(x => x.Id == existing.AccountId, ct);
+        if (session?.ClientKind == "StaffWeb" && session.RevokedAt == null
+            && session.LastInteractiveActivityAt.AddMinutes(await staffIdle.MinutesAsync(ct)) <= now)
+        {
+            await staffIdle.ExpireAsync(session, now, ct); await transaction.CommitAsync(ct);
+            throw new BusinessException(401, SystemMessages.Get("MSG07"));
+        }
+        if (session?.RevokedAt != null) throw new BusinessException(401, SystemMessages.Get("MSG07"));
         if (session == null || session.RevokedAt != null || session.ExpiresAt <= now
             || user == null || !user.IsActive || await users.IsLockedOutAsync(user))
         {
@@ -133,7 +155,7 @@ public sealed class AuthenticationService(DcmsDbContext db, UserManager<Applicat
         existing.Status = "REPLACED";
         existing.ReplacedById = newRefresh.Id;
         session.LastSeenAt = now;
-        session.ExpiresAt = accessExpires;
+        session.ExpiresAt = session.ClientKind == "StaffWeb" ? refreshExpires : accessExpires;
         db.AccountAudits.Add(new AccountAudit
         {
             ActorId = existing.AccountId, TargetId = existing.AccountId, Action = "Refresh", Reason = "Refresh token rotation",

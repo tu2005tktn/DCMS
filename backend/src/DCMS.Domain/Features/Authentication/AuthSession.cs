@@ -8,5 +8,7 @@ public sealed class AuthSession
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset ExpiresAt { get; set; }
     public DateTimeOffset LastSeenAt { get; set; }
+    public string ClientKind { get; set; } = "Patient";
+    public DateTimeOffset LastInteractiveActivityAt { get; set; }
     public DateTimeOffset? RevokedAt { get; set; }
 }

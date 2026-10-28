@@ -133,7 +133,10 @@ function Workspace() {
         label: <Link to="/commercial/treatment">Giá và duyệt điều trị</Link> }] : []),
       ...(auth.user?.permissions.includes('patient-links.verify') ? [{ key: '/link-verification', label: <Link to="/link-verification">Xác minh liên kết hồ sơ</Link> }] : []),
     ]} />
-    <Layout.Content className="workspace-content">{error && <Alert className="form-alert" type="error" message={error} showIcon />}<Outlet /></Layout.Content>
+    <Layout.Content className="workspace-content">{error && <Alert className="form-alert" type="error" message={error} showIcon />}
+      {auth.idleSecondsLeft !== null && auth.idleSecondsLeft <= 60 && <Alert className="form-alert" type="warning" showIcon
+        message={auth.idleSecondsLeft > 0 ? `Phiên staff sẽ hết hạn sau ${auth.idleSecondsLeft} giây nếu không tương tác.` : 'Phiên đã hết hạn. Vui lòng đăng nhập lại.'} />}
+      <Outlet /></Layout.Content>
   </Layout>;
 }
 
