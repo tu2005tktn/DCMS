@@ -24,6 +24,11 @@ public static class FinanceEndpoints
         g.MapPost("/visits/{visitId:guid}/payments", async (HttpContext c, Guid visitId, CollectPayment command, IFinanceService s, CancellationToken ct) => Results.Ok(await s.CollectAsync(Actor(c), visitId, command, ct)));
         g.MapPost("/payments/{id:guid}/confirm", async (HttpContext c, Guid id, ConfirmPayment command, IFinanceService s, CancellationToken ct) => Results.Ok(await s.ConfirmAsync(Actor(c), id, command, ct)));
         g.MapPost("/payments/{id:guid}/cancel", async (HttpContext c, Guid id, CancelPayment command, IFinanceService s, CancellationToken ct) => Results.Ok(await s.CancelAsync(Actor(c), id, command, ct)));
+        g.MapGet("/receipt-preview", async (HttpContext c, int branchId, IFinanceService s, CancellationToken ct) => Results.Ok(await s.PreviewReceiptAsync(Actor(c), branchId, ct)));
+        g.MapGet("/payments/{id:guid}/print", async (HttpContext c, Guid id, IFinanceService s, CancellationToken ct) => Results.Ok(await s.ReceiptPrintAsync(Actor(c), id, ct)));
+        g.MapPost("/payments/{id:guid}/print", async (HttpContext c, Guid id, RecordReceiptPrint command, IFinanceService s, CancellationToken ct) => Results.Ok(await s.RecordPrintAsync(Actor(c), id, command, ct)));
+        g.MapGet("/branches/{branchId:int}/receipt-sequence", async (HttpContext c, int branchId, IFinanceService s, CancellationToken ct) => Results.Ok(await s.ReceiptSequenceAsync(Actor(c), branchId, ct)));
+        g.MapPut("/branches/{branchId:int}/receipt-sequence", async (HttpContext c, int branchId, UpdateReceiptSequence command, IFinanceService s, CancellationToken ct) => Results.Ok(await s.UpdateReceiptSequenceAsync(Actor(c), branchId, command, ct)));
         var orders = endpoints.MapGroup("/api/visits/{visitId:guid}/investigations/{id:guid}/billing").RequireAuthorization();
         orders.MapGet("", async (HttpContext c, Guid visitId, Guid id, IFinanceService s, CancellationToken ct) => Results.Ok(await s.BillingAsync(Actor(c), visitId, id, ct)));
         orders.MapPost("/quote", async (HttpContext c, Guid visitId, Guid id, QuoteInvestigation command, IFinanceService s, CancellationToken ct) => Results.Ok(await s.QuoteAsync(Actor(c), visitId, id, command, ct)));

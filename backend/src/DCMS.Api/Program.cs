@@ -155,6 +155,7 @@ app.MapEmailVerificationEndpoints();
 app.MapAccountEndpoints();
 DCMS.Api.Features.Settings.SettingsEndpoints.MapSettingsEndpoints(app);
 DCMS.Api.Features.Finance.FinanceEndpoints.MapFinanceEndpoints(app);
+DCMS.Api.Features.Prescriptions.PrescriptionEndpoints.MapPrescriptionEndpoints(app);
 app.MapPatientLinkEndpoints();
 app.MapPatientEndpoints();
 app.MapTreatmentEndpoints();

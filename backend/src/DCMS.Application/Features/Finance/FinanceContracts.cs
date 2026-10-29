@@ -37,6 +37,14 @@ public sealed record BillDto(Guid VisitId, int PatientId, string PatientName, in
     long TotalVnd, long PaidVnd, long RemainingVnd, IReadOnlyList<ChargeDto> Charges, IReadOnlyList<PaymentDto> Payments,
     IReadOnlyList<PayableDto>? ProviderPayables, string? SuggestedPayer, string[] AllowedActions, IReadOnlyList<BillInvestigation> Investigations);
 public sealed record QueueBill(Guid VisitId, int PatientId, string PatientName, int BranchId, long TotalVnd, long RemainingVnd, int PendingPayments, int PendingServices,int PendingExaminationFees=0);
+public sealed record ReceiptPrintDto(Guid? ReceiptId, bool Preview, string? Number, string PatientName, string BranchName,
+    string Method, long AmountVnd, long PreviouslyPaidVnd, long RemainingVnd, string Payer, string Collector,
+    string? Note, DateTimeOffset IssuedAt, int SettingsVersion, DCMS.Application.Features.SystemSettings.ReceiptPrintSettings Settings);
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record RecordReceiptPrint(Guid RequestKey);
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record UpdateReceiptSequence(int ExpectedVersion, Guid RequestKey, long NextNumber, string Reason);
+public sealed record ReceiptSequenceDto(int BranchId, long NextNumber, long HighestIssuedNumber, int Version);
 
 public interface IFinanceService
 {
@@ -53,4 +61,9 @@ public interface IFinanceService
     Task<PaymentDto> CollectAsync(int actor, Guid visitId, CollectPayment command, CancellationToken ct);
     Task<PaymentDto> ConfirmAsync(int actor, Guid id, ConfirmPayment command, CancellationToken ct);
     Task<PaymentDto> CancelAsync(int actor, Guid id, CancelPayment command, CancellationToken ct);
+    Task<ReceiptPrintDto> PreviewReceiptAsync(int actor, int branchId, CancellationToken ct);
+    Task<ReceiptPrintDto> ReceiptPrintAsync(int actor, Guid id, CancellationToken ct);
+    Task<ReceiptPrintDto> RecordPrintAsync(int actor, Guid id, RecordReceiptPrint command, CancellationToken ct);
+    Task<ReceiptSequenceDto> ReceiptSequenceAsync(int actor, int branchId, CancellationToken ct);
+    Task<ReceiptSequenceDto> UpdateReceiptSequenceAsync(int actor, int branchId, UpdateReceiptSequence command, CancellationToken ct);
 }

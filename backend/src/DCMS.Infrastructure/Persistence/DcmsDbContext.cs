@@ -25,6 +25,7 @@ public sealed class DcmsDbContext(DbContextOptions<DcmsDbContext> options)
     public DbSet<EmployeeProfile> Employees => Set<EmployeeProfile>();
     public DbSet<AuthSession> AuthSessions => Set<AuthSession>();
     public DbSet<AuthRefreshToken> AuthRefreshTokens => Set<AuthRefreshToken>();
+    public DbSet<StaffActivityCommandReceipt> StaffActivityCommandReceipts => Set<StaffActivityCommandReceipt>();
     public DbSet<AccountAudit> AccountAudits => Set<AccountAudit>();
     public DbSet<PatientProfile> Patients => Set<PatientProfile>();
     public DbSet<PatientAudit> PatientAudits => Set<PatientAudit>();
@@ -76,6 +77,7 @@ public sealed class DcmsDbContext(DbContextOptions<DcmsDbContext> options)
         ExaminationModel.Configure(model);
         SettingsModel.Configure(model);
         FinanceModel.Configure(model);
+        PrescriptionModel.Configure(model);
         TreatmentModel.Configure(model);
         SystemSettingsModel.Configure(model);
         model.Entity<ApplicationUser>(b =>
@@ -105,8 +107,16 @@ public sealed class DcmsDbContext(DbContextOptions<DcmsDbContext> options)
         {
             b.ToTable("AUTH_SESSION");
             b.Property(x => x.DeviceLabel).HasMaxLength(120);
+            b.Property(x => x.ClientKind).HasMaxLength(20);
             b.HasIndex(x => new { x.AccountId, x.RevokedAt });
             b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.AccountId).OnDelete(DeleteBehavior.Restrict);
+        });
+        model.Entity<StaffActivityCommandReceipt>(b =>
+        {
+            b.ToTable("STAFF_ACTIVITY_COMMAND_RECEIPT"); b.HasKey(x => x.Id);
+            b.HasIndex(x => new { x.SessionId, x.RequestKey }).IsUnique();
+            b.Property(x => x.ResultJson).HasColumnType("jsonb");
+            b.HasOne<AuthSession>().WithMany().HasForeignKey(x => x.SessionId).OnDelete(DeleteBehavior.Restrict);
         });
         model.Entity<AuthRefreshToken>(b =>
         {
