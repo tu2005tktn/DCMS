@@ -44,3 +44,15 @@ public interface IMedicineCatalog : ISupplyCatalog<MedicineInput, MedicineDto>
 {
     Task<byte[]> ExportAsync(int actorId, string? q, string? status, CancellationToken ct);
 }
+
+// Resource-specific authorization: medicines deliberately retain their existing Owner policy.
+public static class SupplyCatalogPermissions
+{
+    public static bool CanManage(string resource, IEnumerable<string> roles)
+    {
+        var values = roles.ToArray();
+        if (values.Contains(DCMS.Domain.Features.Accounts.AccountRoles.ClinicOwner)) return true;
+        return resource is "providers" or "lab-work-types" or "materials" or "material-categories" or "units"
+            && values.Contains(DCMS.Domain.Features.Accounts.AccountRoles.Dentist);
+    }
+}
