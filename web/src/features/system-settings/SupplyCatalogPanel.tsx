@@ -1,6 +1,7 @@
 import { Alert, Button, Checkbox, Drawer, Empty, Form, Input, InputNumber, Menu, Modal, Segmented, Select, Space, Table, Tag, Timeline, Typography, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useAuth } from '../authentication/AuthContext';
 import { api, ApiError, readAccessToken } from '../../services/api';
 
 // S58 đợt 4: companies, lab work types and medicines. Contract: docs/specs/S58-SUPPLY-CATALOGS.md.
@@ -84,6 +85,8 @@ const base = '/api/system-settings/settings/catalogs';
 const commandLabels: Record<string, string> = { create: 'Tạo mới', update: 'Sửa', state: 'Đổi trạng thái' };
 
 export default function SupplyCatalogPanel() {
+  const { user } = useAuth();
+  const visibleSections = sections.filter(s => s.key !== 'medicines' || user?.effectiveRoles.includes('ClinicOwner'));
   const [key, setKey] = useState<SectionKey>('suppliers'), [status, setStatus] = useState<Status>('Active');
   const [search, setSearch] = useState(''), [query, setQuery] = useState(''), [page, setPage] = useState(1), [size, setSize] = useState(20);
   const [data, setData] = useState<Page | null>(null), [loading, setLoading] = useState(false), [error, setError] = useState<string>(), [revision, setRevision] = useState(0);
@@ -182,7 +185,7 @@ export default function SupplyCatalogPanel() {
   }
 
   return <div className="reference-catalogs">
-    <Menu className="reference-catalogs-menu" mode="inline" selectedKeys={[key]} onClick={e => select(e.key as SectionKey)} items={sections.map(x => ({ key: x.key, label: x.title }))} />
+    <Menu className="reference-catalogs-menu" mode="inline" selectedKeys={[key]} onClick={e => select(e.key as SectionKey)} items={visibleSections.map(x => ({ key: x.key, label: x.title }))} />
     <div className="reference-catalogs-body">
       <Typography.Title level={4}>{section.title}</Typography.Title>
       {section.help && <Typography.Paragraph type="secondary">{section.help}</Typography.Paragraph>}

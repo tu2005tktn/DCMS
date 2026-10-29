@@ -43,9 +43,12 @@ public abstract partial class SupplyCatalog<TEntity, TInput, TDto>(DcmsDbContext
     protected async Task AuthorizeAsync(int actorId)
     {
         var user = await users.FindByIdAsync(actorId.ToString());
-        if (user is not { IsActive: true, AccountType: "Staff" } || !(await users.GetRolesAsync(user)).Contains(Domain.Features.Accounts.AccountRoles.ClinicOwner))
+        if (user is not { IsActive: true, AccountType: "Staff" } || !CanManage(Resource, await users.GetRolesAsync(user)))
             throw Error("MSG06", 403);
     }
+
+    private static bool CanManage(string resource, IList<string> roles) =>
+        SupplyCatalogPermissions.CanManage(resource, roles);
 
     protected IQueryable<TEntity> Search(string? q, string? status, string? type)
     {

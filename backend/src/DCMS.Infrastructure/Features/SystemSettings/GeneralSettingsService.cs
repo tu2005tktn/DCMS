@@ -84,8 +84,8 @@ public sealed partial class GeneralSettingsService(DcmsDbContext db, UserManager
     {
         var roles = await users.GetRolesAsync(await StaffAsync(actorId));
         var sections = new List<SettingsSection>();
-        if (roles.Contains(AccountRoles.ClinicOwner)) { sections.Add(new("general", true)); sections.Add(new("catalogs", true)); sections.Add(new("supplies", true)); }
-        if (AccountRoles.Effective(roles).Contains(AccountRoles.Dentist)) sections.Add(new("materials", true));
+        if (roles.Contains(AccountRoles.ClinicOwner)) { sections.Add(new("general", true)); sections.Add(new("catalogs", true)); }
+        if (AccountRoles.Effective(roles).Contains(AccountRoles.Dentist)) { sections.Add(new("materials", true)); sections.Add(new("supplies", true)); }
         return new(sections);
     }
 
