@@ -15,7 +15,7 @@ using Npgsql;
 namespace DCMS.Infrastructure.Features.SystemSettings;
 
 // S58 danh mục tham chiếu (docs/specs/S58-REFERENCE-CATALOGS.md).
-public sealed partial class ReferenceCatalogService(DcmsDbContext db, UserManager<ApplicationUser> users, TimeProvider clock) : IReferenceCatalogService
+public sealed partial class ReferenceCatalogService(DcmsDbContext db, UserManager<ApplicationUser> users, TimeProvider clock, DCMS.Application.Features.Settings.ISettingsAccess access) : IReferenceCatalogService
 {
     private static readonly int[] PageSizes = [20, 50, 100];
     private const string Impact = "Mục sẽ không còn được chọn cho giao dịch mới; dữ liệu đã ghi giữ nguyên.";
@@ -31,17 +31,20 @@ public sealed partial class ReferenceCatalogService(DcmsDbContext db, UserManage
         return [.. await users.GetRolesAsync(user)];
     }
 
-    // Managing catalogs needs an assigned ClinicOwner until an explicit grant store exists (same rule as Thiết lập chung).
-    private async Task AuthorizeAsync(int actorId)
+    // Catalog grants from access groups (catalog.{kind}.{action}); the owner holds them all. Customer groups have no grant
+    // yet and stay owner-only (docs/specs/S58-SETTINGS-MERGE.vi.md).
+    private async Task AuthorizeAsync(int actorId, string kind, string action, CancellationToken ct)
     {
-        if (!(await RolesAsync(actorId)).Contains(AccountRoles.ClinicOwner)) throw Error("MSG06", 403);
+        Kind(kind);
+        if (DCMS.Application.Features.Settings.SettingsGrants.CatalogKinds.Contains(kind)) await access.RequireAsync(actorId, $"catalog.{kind}.{action}", ct);
+        else if (!(await RolesAsync(actorId)).Contains(AccountRoles.ClinicOwner)) throw Error("MSG06", 403);
     }
 
     private static string Kind(string kind) => ReferenceKinds.All.Contains(kind) ? kind : throw Error("MSG04", label: "Loại danh mục", field: "kind");
 
     public async Task<CatalogPage<ReferenceEntryDto>> ListAsync(int actorId, string kind, string? q, string? status, int page, int pageSize, CancellationToken ct)
     {
-        await AuthorizeAsync(actorId); Kind(kind);
+        await AuthorizeAsync(actorId, kind, "read", ct);
         if (page < 1 || !PageSizes.Contains(pageSize) || page > int.MaxValue / pageSize) throw Error("MSG04", label: "Phân trang");
         if (q?.Length > 100) throw Error("MSG03", label: "Từ khóa", max: 100);
         var term = q?.Trim().Normalize(NormalizationForm.FormC).ToUpperInvariant() ?? "";
@@ -59,12 +62,12 @@ public sealed partial class ReferenceCatalogService(DcmsDbContext db, UserManage
 
     public async Task<ReferenceEntryDto> GetAsync(int actorId, string kind, Guid id, CancellationToken ct)
     {
-        await AuthorizeAsync(actorId);
+        await AuthorizeAsync(actorId, kind, "read", ct);
         return await DtoAsync(await RowAsync(Kind(kind), id, tracked: false, ct), ct);
     }
 
     public Task<ReferenceEntryDto> CreateAsync(int actorId, string kind, CreateReferenceRequest request, CancellationToken ct) =>
-        Command(actorId, request.RequestKey, "ReferenceCreate", new { kind, request }, async now =>
+        Command(actorId, kind, "create", request.RequestKey, "ReferenceCreate", new { kind, request }, async now =>
         {
             var (code, name, description) = Validate(Kind(kind), request.Entry);
             await UniqueAsync(kind, code, name, null, ct);
@@ -75,7 +78,7 @@ public sealed partial class ReferenceCatalogService(DcmsDbContext db, UserManage
         }, ct);
 
     public Task<ReferenceEntryDto> UpdateAsync(int actorId, string kind, Guid id, UpdateReferenceRequest request, CancellationToken ct) =>
-        Command(actorId, request.RequestKey, "ReferenceUpdate", new { kind, id, request }, async now =>
+        Command(actorId, kind, "update", request.RequestKey, "ReferenceUpdate", new { kind, id, request }, async now =>
         {
             var reason = Reason(request.Reason);
             var row = await RowAsync(Kind(kind), id, tracked: true, ct);
@@ -91,7 +94,7 @@ public sealed partial class ReferenceCatalogService(DcmsDbContext db, UserManage
 
     public async Task<ReferenceStatePreview> StatePreviewAsync(int actorId, string kind, Guid id, ReferenceStatePreviewRequest request, CancellationToken ct)
     {
-        await AuthorizeAsync(actorId);
+        await AuthorizeAsync(actorId, kind, "deactivate", ct);
         var row = await RowAsync(Kind(kind), id, tracked: false, ct);
         // Reserved expense categories are the only blocker (GBR-182); linked patients never block deactivation (SET-01).
         string[] blockers = !request.Active && row.IsReserved ? [ReferenceMessages.Reserved.Message] : [];
@@ -102,7 +105,7 @@ public sealed partial class ReferenceCatalogService(DcmsDbContext db, UserManage
     }
 
     public Task<ReferenceEntryDto> SetStateAsync(int actorId, string kind, Guid id, ReferenceStateRequest request, CancellationToken ct) =>
-        Command(actorId, request.RequestKey, "ReferenceState", new { kind, id, request }, async now =>
+        Command(actorId, kind, "deactivate", request.RequestKey, "ReferenceState", new { kind, id, request }, async now =>
         {
             var reason = Reason(request.Reason);
             var row = await RowAsync(Kind(kind), id, tracked: true, ct);
@@ -116,7 +119,7 @@ public sealed partial class ReferenceCatalogService(DcmsDbContext db, UserManage
 
     public async Task<IReadOnlyList<ReferenceHistoryItem>> HistoryAsync(int actorId, string kind, Guid id, CancellationToken ct)
     {
-        await AuthorizeAsync(actorId);
+        await AuthorizeAsync(actorId, kind, "read", ct);
         await RowAsync(Kind(kind), id, tracked: false, ct);
         var rows = await (from change in db.SystemCatalogChanges.AsNoTracking()
                           join user in db.Users.AsNoTracking() on change.ActorId equals user.Id
@@ -149,8 +152,8 @@ public sealed partial class ReferenceCatalogService(DcmsDbContext db, UserManage
         var term = search?.Trim().Normalize(NormalizationForm.FormC).ToUpperInvariant() ?? "";
         return await db.ReferenceEntries.AsNoTracking()
             .Where(x => x.Kind == kind && x.IsActive && (term == "" || x.NormalizedName.Contains(term) || (x.Code != null && x.Code.Contains(term))))
-            .OrderBy(x => x.NormalizedName).ThenBy(x => x.Id).Take(50)
-            .Select(x => new ReferenceOption(x.Id, x.Code, x.Name)).ToArrayAsync(ct);
+            .OrderBy(x => x.NormalizedName).ThenBy(x => x.Id).Take(kind == ReferenceKinds.Diagnoses ? 500 : 50)
+            .Select(x => new ReferenceOption(x.Id, x.Code, x.Name, x.Version)).ToArrayAsync(ct);
     }
 
     // S58 đợt 4 typed catalogs: same projection shape, never prices or contacts.
@@ -167,13 +170,13 @@ public sealed partial class ReferenceCatalogService(DcmsDbContext db, UserManage
             _ => db.CatalogMedicines.Where(x => x.PrescriptionEligible)
         };
         return await query.AsNoTracking().Where(x => x.IsActive && (term == "" || x.NormalizedName.Contains(term) || x.Code.Contains(term)))
-            .OrderBy(x => x.NormalizedName).ThenBy(x => x.Id).Take(50).Select(x => new ReferenceOption(x.Id, x.Code, x.Name)).ToArrayAsync(ct);
+            .OrderBy(x => x.NormalizedName).ThenBy(x => x.Id).Take(50).Select(x => new ReferenceOption(x.Id, x.Code, x.Name, x.Version)).ToArrayAsync(ct);
     }
 
-    private async Task<ReferenceEntryDto> Command(int actorId, Guid key, string command, object request,
+    private async Task<ReferenceEntryDto> Command(int actorId, string kind, string action, Guid key, string command, object request,
         Func<DateTimeOffset, Task<(ReferenceEntry Row, Change Change)>> apply, CancellationToken ct)
     {
-        await AuthorizeAsync(actorId);
+        await AuthorizeAsync(actorId, kind, action, ct);
         if (key == Guid.Empty) throw Error("MSG04", label: "Mã yêu cầu", field: "requestKey");
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         await db.Database.ExecuteSqlRawAsync("SELECT pg_advisory_xact_lock(6462362059)", ct);

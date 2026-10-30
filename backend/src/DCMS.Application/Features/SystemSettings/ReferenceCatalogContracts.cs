@@ -24,7 +24,8 @@ public sealed record ReferenceStatePreviewRequest(bool Active);
 public sealed record ReferenceStatePreview(ReferenceEntryDto Entry, bool Allowed, IReadOnlyList<string> Blockers, string Impact);
 public sealed record ReferenceStateRequest(int ExpectedVersion, Guid RequestKey, bool Active, string? Reason);
 public sealed record ReferenceHistoryItem(DateTimeOffset OccurredAt, string ActorName, string Command, string? Reason, ReferenceEntryDto? Before, ReferenceEntryDto After);
-public sealed record ReferenceOption(Guid Id, string? Code, string Name);
+// Version lets consumers snapshot the exact entry (examination diagnoses, docs/specs/S58-SETTINGS-MERGE.vi.md).
+public sealed record ReferenceOption(Guid Id, string? Code, string Name, int Version = 0);
 
 public static class ReferenceMessages
 {

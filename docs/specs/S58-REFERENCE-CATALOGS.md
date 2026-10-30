@@ -38,7 +38,7 @@ Seed (migration, chạy một lần, có ID cố định; chỉ các tên đã n
 
 Không có grant store tường minh, nên `catalog.{kind}.read/create/update/deactivate` chỉ thuộc Staff active có role gán ClinicOwner (cùng nguyên tắc đợt 1). `capabilities` trả thêm section `catalogs` cho Owner.
 
-`GET /api/reference-options` (UC-51 A5) không cần quyền settings; chỉ trả mục đang dùng `{id, code, name}` theo vai trò nghiệp vụ của consumer:
+`GET /api/reference-options` (UC-51 A5) không cần quyền settings; chỉ trả mục đang dùng `{id, code, name, version}` theo vai trò nghiệp vụ của consumer:
 
 - `diagnoses`: Dentist hiệu lực.
 - `patient-sources`, `occupations`, `intake-history`, `customer-groups`: ClinicAssistant hoặc Dentist hiệu lực (quyền đọc bệnh nhân).
@@ -56,7 +56,7 @@ Không có grant store tường minh, nên `catalog.{kind}.read/create/update/de
 | `POST /api/settings/catalogs/{kind}/{id}/state-preview` | `{ active }` → `{ entry, allowed, blockers: [string], impact: string }`; không ghi |
 | `POST /api/settings/catalogs/{kind}/{id}/state` | `{ expectedVersion, requestKey, active, reason }` → DTO |
 | `GET /api/settings/catalogs/{kind}/{id}/history` | Mới nhất trước: `[{ occurredAt, actorName, command, reason?, before?, after }]` |
-| `GET /api/reference-options?kind=&search=` | Tối đa 50 mục active, sort tên: `[{ id, code, name }]` |
+| `GET /api/reference-options?kind=&search=` | Tối đa 50 mục active (`diagnoses`: 500, vì màn khám tải cả danh sách một lần), sort tên: `[{ id, code, name, version }]`. Từ 30/10/2026 là nguồn chọn chẩn đoán khi khám ([gộp settings](S58-SETTINGS-MERGE.vi.md)) |
 
 `ReferenceEntryDto`: `{ id, kind, code, name, description, reserved, active, version, createdAt, createdByName, updatedAt, updatedByName, patientCount? }`.
 

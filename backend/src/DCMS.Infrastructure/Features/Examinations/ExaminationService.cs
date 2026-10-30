@@ -132,8 +132,8 @@ public sealed class ExaminationService(DcmsDbContext db, ClinicalAccess access, 
         foreach(var reference in references){
             if(!names.Contains(reference.Name,StringComparer.OrdinalIgnoreCase))throw Error("MSG04");
             if(previous?.DiagnosisReferences?.Contains(reference)==true)continue;
-            var entry=await db.Set<DCMS.Domain.Features.Settings.ReferenceEntry>().AsNoTracking().SingleOrDefaultAsync(x=>x.Id==reference.Id&&x.Kind=="diagnoses",ct)??throw Error("MSG113",404);
-            if(!entry.Active)throw Error("MSG202",409);
+            var entry=await db.ReferenceEntries.AsNoTracking().SingleOrDefaultAsync(x=>x.Id==reference.Id&&x.Kind=="diagnoses",ct)??throw Error("MSG113",404);
+            if(!entry.IsActive)throw Error("MSG202",409);
             if(entry.Version!=reference.Version||entry.Name!=reference.Name||entry.Code!=reference.Code)throw Error("MSG111",409);
         }
     }
