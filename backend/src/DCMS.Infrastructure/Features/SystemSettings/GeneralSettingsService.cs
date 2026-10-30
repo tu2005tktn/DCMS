@@ -180,6 +180,104 @@ public sealed partial class GeneralSettingsService(DcmsDbContext db, UserManager
         return result;
     }
 
+    // DCMS-122 patient code sequence (GBR-177, SET-AT-08). One PostgreSQL sequence serves every prefix clinic-wide.
+    private static readonly Guid SequenceResource = new("00000000-0000-4000-8000-000000000122");
+    private const long MaxSequence = 999_999_999_999_999;
+    private sealed class SequenceRow { public long LastValue { get; set; } public bool IsCalled { get; set; } }
+
+    // Reads pg state directly so a GET never issues a number (nextval is only called when a patient is created).
+    private async Task<(long Next, long? LastIssued)> SequenceStateAsync(CancellationToken ct)
+    {
+        var row = await db.Database.SqlQueryRaw<SequenceRow>(
+            "SELECT last_value AS \"LastValue\", is_called AS \"IsCalled\" FROM patient_code_seq").SingleAsync(ct);
+        return row.IsCalled ? (row.LastValue + 1, row.LastValue) : (row.LastValue, null);
+    }
+
+    private Task<long?> HighestExistingAsync(string prefix, CancellationToken ct) =>
+        db.Database.SqlQuery<long?>($"""
+            SELECT MAX(CAST(SUBSTRING("PatientCode" FROM {prefix.Length + 1}) AS bigint)) AS "Value" FROM "PATIENT_PROFILE"
+            WHERE "PatientCode" ~ {"^" + prefix + "[0-9]{1,15}$"}
+            """).SingleAsync(ct);
+
+    private Task<int> SkippedAsync(string prefix, long from, CancellationToken ct) =>
+        db.Database.SqlQuery<int>($"""
+            SELECT COUNT(*)::int AS "Value" FROM "PATIENT_PROFILE"
+            WHERE "PatientCode" ~ {"^" + prefix + "[0-9]{1,15}$"} AND CAST(SUBSTRING("PatientCode" FROM {prefix.Length + 1}) AS bigint) >= {from}
+            """).SingleAsync(ct);
+
+    private static string CodeFor(string prefix, long number) => $"{prefix}{number:000000}";
+
+    private async Task<PatientCodeSequenceDto> SequenceDtoAsync(CancellationToken ct)
+    {
+        var (_, settings, _) = await ClinicSettingsStore.CurrentAsync(db, ct);
+        var prefix = settings.PatientCode.Prefix;
+        var (next, last) = await SequenceStateAsync(ct);
+        return new(prefix, next, CodeFor(prefix, next), last, await HighestExistingAsync(prefix, ct));
+    }
+
+    private static IReadOnlyList<string> SequenceIssues(string prefix, long current, long proposed)
+    {
+        var issues = new List<string>();
+        if (proposed < 1 || proposed > MaxSequence) issues.Add($"Số tiếp theo phải từ 1 đến {MaxSequence}.");
+        else if (proposed < current) issues.Add($"Số tiếp theo chỉ được tăng (hiện tại {current}). Không lùi hoặc tái dùng số đã cấp.");
+        else if (CodeFor(prefix, proposed).Length > 40) issues.Add("Mã sinh ra vượt quá 40 ký tự.");
+        return issues;
+    }
+
+    public async Task<PatientCodeSequenceDto> SequenceAsync(int actorId, CancellationToken ct)
+    {
+        await AuthorizeAsync(actorId);
+        return await SequenceDtoAsync(ct);
+    }
+
+    public async Task<PatientCodeSequencePreview> SequencePreviewAsync(int actorId, PatientCodeSequencePreviewRequest request, CancellationToken ct)
+    {
+        await AuthorizeAsync(actorId);
+        var current = await SequenceDtoAsync(ct);
+        var issues = SequenceIssues(current.Prefix, current.NextNumber, request.NextNumber);
+        var valid = issues.Count == 0;
+        return new(current.NextNumber != request.ExpectedNextNumber, valid && request.NextNumber != current.NextNumber,
+            valid ? CodeFor(current.Prefix, request.NextNumber) : current.NextCode, issues,
+            valid ? await SkippedAsync(current.Prefix, request.NextNumber, ct) : 0);
+    }
+
+    public async Task<PatientCodeSequenceDto> UpdateSequenceAsync(int actorId, UpdatePatientCodeSequenceRequest request, CancellationToken ct)
+    {
+        await AuthorizeAsync(actorId);
+        if (request.RequestKey == Guid.Empty) throw Error("MSG04", label: "Mã yêu cầu", field: "requestKey");
+        var why = request.Reason?.Trim() ?? "";
+        if (why.Length == 0) throw Error("MSG02", label: "Lý do", field: "reason");
+        if (why.Length > 500) throw Error("MSG03", label: "Lý do", field: "reason", max: 500);
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        // Exclusive: patient creation holds the shared lock, so no number is issued while the sequence moves.
+        await db.Database.ExecuteSqlRawAsync(ClinicSettingsStore.ExclusiveLock, ct);
+        const string command = "PatientCodeSequence";
+        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(request, ClinicSettingsStore.Json))));
+        var prior = await db.SystemCatalogChanges.AsNoTracking().SingleOrDefaultAsync(x => x.RequestKey == request.RequestKey, ct);
+        if (prior != null)
+        {
+            if (prior.ActorId != actorId || prior.Command != command || prior.Fingerprint != hash) throw Error("MSG111", 409);
+            return JsonSerializer.Deserialize<PatientCodeSequenceDto>(prior.ResultJson, ClinicSettingsStore.Json) ?? throw Error("MSG144", 503);
+        }
+        var before = await SequenceDtoAsync(ct);
+        if (before.NextNumber != request.ExpectedNextNumber) throw Error("MSG111", 409);
+        if (request.NextNumber == before.NextNumber) throw new BusinessException(400, GeneralSettingsMessages.NoChange);
+        if (SequenceIssues(before.Prefix, before.NextNumber, request.NextNumber).Count > 0)
+            throw Error("MSG04", label: "Số tiếp theo", field: "nextNumber");
+        var result = before with { NextNumber = request.NextNumber, NextCode = CodeFor(before.Prefix, request.NextNumber) };
+        db.SystemCatalogChanges.Add(new SystemCatalogChange
+        {
+            RequestKey = request.RequestKey, ActorId = actorId, Command = command, ResourceId = SequenceResource, Fingerprint = hash,
+            BeforeJson = JsonSerializer.Serialize(new { before, reason = why }, ClinicSettingsStore.Json),
+            ResultJson = JsonSerializer.Serialize(result, ClinicSettingsStore.Json), OccurredAt = clock.GetUtcNow()
+        });
+        await db.SaveChangesAsync(ct);
+        // setval is not transactional; it runs last under the exclusive lock and only ever moves forward.
+        await db.Database.ExecuteSqlAsync($"SELECT setval('patient_code_seq', {request.NextNumber}, false)", ct);
+        await tx.CommitAsync(ct);
+        return result;
+    }
+
     private static GeneralSettings Normalize(GeneralSettings? settings)
     {
         if (settings == null) throw Error("MSG04", label: "Thiết lập", field: "settings");
@@ -225,8 +323,8 @@ public sealed partial class GeneralSettingsService(DcmsDbContext db, UserManager
         }
         if (before.PatientCode != after.PatientCode) warnings.Add("Chế độ và tiền tố mã chỉ áp dụng cho bệnh nhân tạo mới. Mã đã cấp không thay đổi.");
         if (before.StaffIdleTimeoutMinutes != after.StaffIdleTimeoutMinutes)
-            warnings.Add("Đã lưu cấu hình; tự đăng xuất theo phiên đăng nhập chưa được áp dụng trong bản này.");
-        if (before.ReceiptPrint != after.ReceiptPrint) warnings.Add("Đã lưu cấu hình; module phiếu thu chưa áp dụng mẫu in này.");
+            warnings.Add("Thời gian tự đăng xuất mới áp dụng cho phiên nhân viên ngay sau khi lưu; hoạt động đã ghi nhận không được đặt lại.");
+        if (before.ReceiptPrint != after.ReceiptPrint) warnings.Add("Mẫu in mới áp dụng cho lần in tiếp theo; phiếu thu đã phát hành giữ nguyên số tiền và số phiếu.");
         return new(version, version != expected, changes, warnings, missing);
     }
 

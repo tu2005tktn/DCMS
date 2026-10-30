@@ -11,6 +11,8 @@ export type GeneralHistoryItem = { version: number; effectiveAt: string; actorNa
 export type GeneralHistoryPage = { items: GeneralHistoryItem[]; total: number; page: number; pageSize: number };
 export type SettingsCapabilities = { sections: { key: string; canManage: boolean }[] };
 export type PatientFormPolicy = { version: number; requiredFields: RequiredFields; patientCode: PatientCodeSettings };
+export type PatientCodeSequence = { prefix: string; nextNumber: number; nextCode: string; lastIssued: number | null; highestExisting: number | null };
+export type PatientCodeSequencePreview = { stale: boolean; allowed: boolean; nextCode: string; issues: string[]; skippedCodes: number };
 
 export const idleChoices = [5, 10, 20, 30, 60, 90, 120];
 // [field, label, available on the patient master today] — all available since S58 đợt 3.

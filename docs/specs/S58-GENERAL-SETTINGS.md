@@ -8,9 +8,9 @@ Có: nhóm **Thiết lập chung** gồm bốn khối Tự đăng xuất, Hồ s
 
 Chưa có (ghi rõ trên UI, không giả lập):
 
-- Tự đăng xuất chỉ lưu giá trị. Kiểm idle theo phiên (`lastInteractiveActivityAt`, `POST /api/auth/session/activity`, thu hồi refresh) là hạng mục riêng vì đổi hợp đồng phiên đăng nhập.
-- Mẫu in chỉ lưu toggle. Chưa có module phiếu thu/in nên không có preview phiếu, print event hoặc bộ đếm số phiếu theo chi nhánh.
-- Sửa next sequence mã bệnh nhân (lệnh riêng, chỉ tiến lên) chưa làm; sequence `patient_code_seq` hiện có tiếp tục được dùng.
+- ~~Tự đăng xuất chỉ lưu giá trị~~ — DCMS-129 (Triển) đã áp dụng idle theo phiên từ giá trị này; xem [S58-STAFF-WEB-IDLE.vi.md](S58-STAFF-WEB-IDLE.vi.md).
+- ~~Mẫu in chỉ lưu toggle~~ — DCMS-130 (Triển) đọc mẫu in khi in phiếu thu; bộ đếm số phiếu theo chi nhánh thuộc module tài chính.
+- ~~Sửa next sequence mã bệnh nhân chưa làm~~ — có từ DCMS-122, xem mục "Sequence mã bệnh nhân" dưới đây.
 - ~~Ba trường bắt buộc `profileDate`, `customerGroup`, `source` chưa có trên hồ sơ bệnh nhân~~ — đã bật được từ [đợt 3](S58-PATIENT-CATALOG-FIELDS.md).
 - Các nhóm khác của S58 (dịch vụ, nhóm quyền, chi nhánh/ghế, export) và `GET /api/settings/audit` chung. Danh mục tham chiếu ở [đợt 2](S58-REFERENCE-CATALOGS.md).
 
@@ -72,6 +72,31 @@ Lệnh ghi (SET-02): requestKey bắt buộc; cùng actor + lệnh + payload tr�
 - Trường bắt buộc đang bật mà trống → 400 MSG02 với `field` là tên trường form (`birthDate`, `gender`, `address`, `phone`). Áp dụng cho tạo mới, sửa hành chính và "Hồ sơ của tôi"; không áp dụng cho đọc, ngừng/khôi phục hồ sơ, tiếp nhận hoặc khám. Không tự điền, không backfill.
 - Mã bệnh nhân khi tạo: `AutoWithManualOverride` — trống thì sinh, có thì kiểm định dạng/unique (MSG201); `AutoOnly` — bỏ qua mã client, luôn sinh; `ManualOnly` — thiếu trả MSG02 `field = patientCode`, trùng MSG201. Đổi chế độ/prefix không đổi mã cũ. Sequence tăng nguyên tử và bỏ qua giá trị đã có người dùng.
 
+## Sequence mã bệnh nhân (DCMS-122, GBR-177, SET-AT-08)
+
+Mã sinh tự động = prefix hiện hành + số lấy từ sequence PostgreSQL `patient_code_seq` (≥ 6 chữ số). Sequence dùng chung cho mọi prefix và toàn phòng khám; đổi prefix không đặt lại số.
+
+| Route | Hợp đồng |
+|---|---|
+| `GET /api/system-settings/settings/patient-code-sequence` | Owner. `{ prefix, nextNumber, nextCode, lastIssued?, highestExisting? }`. Chỉ đọc trạng thái sequence, **không cấp số** (không gọi `nextval`). `highestExisting` là số lớn nhất trong các mã hiện có dạng `prefix + chữ số`, gồm cả mã nhập tay. |
+| `POST /api/system-settings/settings/patient-code-sequence/preview` | Owner. `{ expectedNextNumber, nextNumber }` → `{ stale, allowed, nextCode, issues: [string], skippedCodes }`. Không ghi. `skippedCodes` là số mã đã tồn tại có số ≥ `nextNumber` với prefix hiện hành; khi sinh mã, server bỏ qua các mã này. |
+| `PUT /api/system-settings/settings/patient-code-sequence` | Owner. `{ expectedNextNumber, requestKey, reason, nextNumber }` → DTO như GET. |
+
+Quy tắc:
+- Chỉ tiến lên: `nextNumber` phải lớn hơn số tiếp theo hiện tại, nếu không trả 400 MSG04 `field = nextNumber`. Bằng số hiện tại trả `SETTINGS_NO_CHANGE`.
+- `nextNumber` là số nguyên dương; mã sinh ra (prefix + số) không dài quá 40 ký tự. Vi phạm trả MSG04.
+- `expectedNextNumber` khác số tiếp theo hiện tại → 409 MSG111 (đã có người tạo bệnh nhân hoặc sửa sequence).
+- Lệnh ghi giữ khóa độc quyền của Thiết lập chung, nên không chạy xen với lưu bệnh nhân (khóa dùng chung). Receipt/audit ghi vào `SYSTEM_CATALOG_CHANGE` (command `PatientCodeSequence`), cùng quy tắc retry như lệnh general.
+- Restore Thiết lập chung không đụng sequence (SET-06/AT-31). Không có lệnh lùi sequence hay tái dùng số.
+
+## Tạo bệnh nhân an toàn khi gửi lại (DCMS-122)
+
+`POST /api/patients` nhận thêm `requestKey?` (UUID); client cũ không gửi vẫn chạy như trước.
+- Cùng nhân viên + cùng `requestKey` + cùng nội dung: trả lại đúng bệnh nhân đã tạo, không sinh mã và không tạo hồ sơ thứ hai.
+- Cùng key nhưng nội dung khác: 409 MSG111 `field = requestKey`.
+- Biên nhận lưu trong bảng `PATIENT_CREATE_RECEIPT` (ActorId, RequestKey, Fingerprint, PatientId), cùng transaction với hồ sơ và audit.
+- Form web giữ key khi lỗi kết nối hoặc chưa rõ kết quả; đổi key sau khi server trả lỗi xác định.
+
 ## UI web
 
 `/system-settings` hiển thị tab theo `capabilities`: **Thiết lập chung** (Owner) và các tab Dụng cụ/Vật liệu hiện có (Dentist). Menu "Thiết lập hệ thống" hiện khi có ít nhất một nhóm. Deep link `/system-settings?tab=general`.
@@ -82,10 +107,12 @@ Luồng lưu: "Xem trước và lưu" → gọi preview → Modal liệt kê tha
 
 Lịch sử: bảng version/thời điểm/người lưu/lý do/khôi phục từ; nút "Khôi phục" → restore-preview → Modal lý do → restore.
 
-Form bệnh nhân (S05/S06): tải `form-policy` khi mở; trường bắt buộc có dấu và rule; ô mã theo chế độ (AutoOnly disable, ManualOnly bắt buộc, gợi ý theo prefix); gửi `policyVersion`; nhận 409 `policyVersion` thì tải lại chính sách, giữ dữ liệu, báo "Thiết lập hồ sơ vừa thay đổi. Vui lòng kiểm tra lại các trường bắt buộc."
+Form bệnh nhân (S05/S06): tải `form-policy` khi mở; trường bắt buộc có dấu và rule; ô mã theo chế độ (AutoOnly disable, ManualOnly bắt buộc, gợi ý theo prefix); gửi `policyVersion`; nhận 409 `policyVersion` thì tải lại chính sách, giữ dữ liệu, báo "Thiết lập hồ sơ vừa thay đổi. Vui lòng kiểm tra lại các trường bắt buộc." Khi tạo mới, form gửi `requestKey` và giữ key cho lần thử lại sau lỗi kết nối.
+
+Khối Mã bệnh nhân có thêm phần "Số tiếp theo": hiển thị mã sẽ được sinh tiếp (chỉ để xem, không giữ chỗ), số lớn nhất đã có; nút "Đổi số tiếp theo" mở Modal nhập số mới → xem trước (cảnh báo mã sẽ bị bỏ qua) → lý do → lưu. Số nhỏ hơn hoặc bằng hiện tại bị chặn ngay trên form và tại server.
 
 ## Nghiệm thu đợt này
 
-SET-AT-05, 06, 07, 08 (phần mode/prefix, GET không cấp số), 31 (restore tạo version mới), SET-02/03 retry/stale cho lệnh general, quyền Owner-only (AT90). Integration test trên schema PostgreSQL tạm; web build. Không tạo dữ liệu thử trong `dcms_dev`; migration vào `dcms_dev` cần người dùng duyệt riêng.
+SET-AT-05, 06, 07 (gồm tạo đồng thời ra mã duy nhất và gửi lại cùng `requestKey` không tạo hồ sơ thứ hai), 08 (mode/prefix, GET không cấp số, sequence lùi bị từ chối, mã cũ bất biến), 31 (restore tạo version mới), SET-02/03 retry/stale cho lệnh general, quyền Owner-only (AT90). Integration test trên schema PostgreSQL tạm; web build. Không tạo dữ liệu thử trong `dcms_dev`; migration vào `dcms_dev` cần người dùng duyệt riêng.
 
 Tích hợp workspace 53d3e2e: các API `/api/settings/*` của module trong tài liệu này dùng tiền tố `/api/system-settings/settings/*`; API options dùng `/api/system-settings/reference-options`. Các API `/api/settings/*` hiện hữu tiếp tục dành cho module phân quyền/danh mục vận hành riêng. Xem [ghi chú tích hợp](../implementation/MAIN-INTEGRATION-20261027-53d3e2e.vi.md).

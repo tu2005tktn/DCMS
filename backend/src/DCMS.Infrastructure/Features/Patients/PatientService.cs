@@ -57,6 +57,22 @@ public sealed partial class PatientService(DcmsDbContext db) : IPatientService
         var input = Validate(request.FullName, request.BirthDate, request.Gender, request.Phone, request.Address,
             request.GuardianName, request.GuardianRelationship, request.GuardianPhone, request.Note);
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        // DCMS-122: a retried create (same actor + key + payload) returns the first patient; nothing new is issued.
+        string? fingerprint = null;
+        if (request.RequestKey is { } key)
+        {
+            if (key == Guid.Empty) throw new BusinessException(400, SystemMessages.Get("MSG04", "Mã yêu cầu") with { Field = "requestKey" });
+            await db.Database.ExecuteSqlAsync($"SELECT pg_advisory_xact_lock(hashtextextended({$"patient-create:{actorId}:{key}"}, 0))", ct);
+            fingerprint = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(JsonSerializer.Serialize(request with { RequestKey = null }))));
+            var prior = await db.Set<PatientCreateReceipt>().AsNoTracking().SingleOrDefaultAsync(x => x.ActorId == actorId && x.RequestKey == key, ct);
+            if (prior != null)
+            {
+                if (prior.Fingerprint != fingerprint) throw new BusinessException(409, SystemMessages.Get("MSG111") with { Field = "requestKey" });
+                var existing = await db.Patients.AsNoTracking().SingleAsync(x => x.Id == prior.PatientId, ct);
+                return new(await DetailAsync(existing, ct), SystemMessages.Get("MSG222", "hồ sơ bệnh nhân", value: existing.PatientCode));
+            }
+        }
         var policy = await PolicyAsync(request.PolicyVersion, ct);
         RequirePolicy(policy, input);
         var (extra, names) = await ValidateExtraAsync(request.ProfileDate, request.SourceId, request.CustomerGroupId, request.OccupationId,
@@ -78,6 +94,8 @@ public sealed partial class PatientService(DcmsDbContext db) : IPatientService
             db.Patients.Add(patient);
             return Task.CompletedTask;
         }, ct);
+        if (request.RequestKey is { } receiptKey)
+            db.Add(new PatientCreateReceipt { ActorId = actorId, RequestKey = receiptKey, Fingerprint = fingerprint!, PatientId = patient.Id, CreatedAt = now });
         await AuditAsync(patient.Id, actorId, PatientAuditActions.Create, null,
             [new("Mã bệnh nhân", null, patient.PatientCode), .. changes], now, ct);
         await transaction.CommitAsync(ct);

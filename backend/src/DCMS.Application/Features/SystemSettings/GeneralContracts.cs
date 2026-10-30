@@ -37,6 +37,12 @@ public sealed record SettingsSection(string Key, bool CanManage);
 public sealed record SettingsCapabilities(IReadOnlyList<SettingsSection> Sections);
 public sealed record PatientFormPolicy(int Version, RequiredFieldsSettings RequiredFields, PatientCodeSettings PatientCode);
 
+// DCMS-122: the shared patient code sequence. Reads never call nextval; the only write moves it forward.
+public sealed record PatientCodeSequenceDto(string Prefix, long NextNumber, string NextCode, long? LastIssued, long? HighestExisting);
+public sealed record PatientCodeSequencePreviewRequest(long ExpectedNextNumber, long NextNumber);
+public sealed record PatientCodeSequencePreview(bool Stale, bool Allowed, string NextCode, IReadOnlyList<string> Issues, int SkippedCodes);
+public sealed record UpdatePatientCodeSequenceRequest(long ExpectedNextNumber, Guid RequestKey, string? Reason, long NextNumber);
+
 public static class GeneralSettingsMessages
 {
     public static SystemMessage FieldUnavailable(string field) =>
@@ -53,4 +59,7 @@ public interface IGeneralSettingsService
     Task<GeneralHistoryPage> HistoryAsync(int actorId, int page, int pageSize, CancellationToken ct);
     Task<GeneralPreview> RestorePreviewAsync(int actorId, RestorePreviewRequest request, CancellationToken ct);
     Task<GeneralSettingsDto> RestoreAsync(int actorId, RestoreGeneralRequest request, CancellationToken ct);
+    Task<PatientCodeSequenceDto> SequenceAsync(int actorId, CancellationToken ct);
+    Task<PatientCodeSequencePreview> SequencePreviewAsync(int actorId, PatientCodeSequencePreviewRequest request, CancellationToken ct);
+    Task<PatientCodeSequenceDto> UpdateSequenceAsync(int actorId, UpdatePatientCodeSequenceRequest request, CancellationToken ct);
 }

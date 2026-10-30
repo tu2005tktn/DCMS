@@ -42,6 +42,10 @@ public static class SystemSettingsEndpoints
         settings.MapGet("/general/history", async (HttpContext c, int? page, int? pageSize, IGeneralSettingsService s, CancellationToken ct) => Results.Ok(await s.HistoryAsync(AuthenticationEndpoints.AccountId(c.User), page ?? 1, pageSize ?? 20, ct)));
         settings.MapPost("/general/restore-preview", async (HttpContext c, RestorePreviewRequest r, IGeneralSettingsService s, CancellationToken ct) => Results.Ok(await s.RestorePreviewAsync(AuthenticationEndpoints.AccountId(c.User), r, ct)));
         settings.MapPost("/general/restore", async (HttpContext c, RestoreGeneralRequest r, IGeneralSettingsService s, CancellationToken ct) => Results.Ok(await s.RestoreAsync(AuthenticationEndpoints.AccountId(c.User), r, ct)));
+        // DCMS-122 patient code sequence: forward-only, separate from the general payload.
+        settings.MapGet("/patient-code-sequence", async (HttpContext c, IGeneralSettingsService s, CancellationToken ct) => Results.Ok(await s.SequenceAsync(AuthenticationEndpoints.AccountId(c.User), ct)));
+        settings.MapPost("/patient-code-sequence/preview", async (HttpContext c, PatientCodeSequencePreviewRequest r, IGeneralSettingsService s, CancellationToken ct) => Results.Ok(await s.SequencePreviewAsync(AuthenticationEndpoints.AccountId(c.User), r, ct)));
+        settings.MapPut("/patient-code-sequence", async (HttpContext c, UpdatePatientCodeSequenceRequest r, IGeneralSettingsService s, CancellationToken ct) => Results.Ok(await s.UpdateSequenceAsync(AuthenticationEndpoints.AccountId(c.User), r, ct)));
         // S58 đợt 4 typed catalogs (docs/specs/S58-SUPPLY-CATALOGS.md); literal segments win over {kind} below.
         MapSupply<ProviderInput, ProviderDto>(settings, "providers");
         MapSupply<LabWorkTypeInput, LabWorkTypeDto>(settings, "lab-work-types");

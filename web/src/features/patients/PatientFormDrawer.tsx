@@ -1,6 +1,6 @@
 import { Alert, Button, Checkbox, Drawer, Form, Input, Modal, Select, Space, Table, Tag, Typography } from 'antd';
 import type { PatientReference } from './types';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api, ApiError } from '../../services/api';
 import { codeExample, type PatientFormPolicy } from '../system-settings/generalSettings';
 import { formatDate } from '../patient-links/types';
@@ -31,6 +31,8 @@ export default function PatientFormDrawer({ open, patient, onClose, onSaved }: {
   const [form] = Form.useForm<Values>();
   const [modal, modalContext] = Modal.useModal();
   const [busy, setBusy] = useState(false);
+  // DCMS-122: one requestKey per create payload, kept across a lost response so the retry replays instead of issuing a second code.
+  const pendingCreate = useRef<{ payload: string; key: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [duplicates, setDuplicates] = useState<DuplicateCandidate[] | null>(null);
   const [reviewed, setReviewed] = useState(false);
@@ -78,6 +80,12 @@ export default function PatientFormDrawer({ open, patient, onClose, onSaved }: {
     modal.confirm({ title: 'Bỏ thay đổi chưa lưu?', content: 'Thông tin vừa nhập sẽ không được lưu.', okText: 'Bỏ thay đổi', cancelText: 'Tiếp tục sửa', onOk: onClose });
   }
 
+  function create(payload: object) {
+    const text = JSON.stringify(payload);
+    if (pendingCreate.current?.payload !== text) pendingCreate.current = { payload: text, key: crypto.randomUUID() };
+    return api<PatientChange>('/api/patients', { method: 'POST', body: JSON.stringify({ ...payload, requestKey: pendingCreate.current.key }) });
+  }
+
   async function submit(values: Values) {
     setBusy(true); setError(null);
     try {
@@ -98,11 +106,12 @@ export default function PatientFormDrawer({ open, patient, onClose, onSaved }: {
       const policyVersion = policy?.version ?? null;
       const change = editing
         ? await api<PatientChange>(`/api/patients/${patient.id}`, { method: 'PUT', body: JSON.stringify({ ...body, version: patient.version, duplicatesReviewed: true, policyVersion }) })
-        : await api<PatientChange>('/api/patients', { method: 'POST', body: JSON.stringify({
-          ...body, patientCode: mode === 'AutoOnly' ? null : blank(values.patientCode), duplicatesReviewed: true, policyVersion }) });
+        : await create({ ...body, patientCode: mode === 'AutoOnly' ? null : blank(values.patientCode), duplicatesReviewed: true, policyVersion });
+      pendingCreate.current = null;
       onSaved(change);
     } catch (failure) {
       const apiError = failure as ApiError;
+      if (!(apiError instanceof ApiError) || apiError.status !== 0) pendingCreate.current = null;
       if (apiError.field === 'policyVersion') {
         // Keep the draft; reload the policy so the new required fields show before the next save (SET-AT-06).
         await loadPolicy();

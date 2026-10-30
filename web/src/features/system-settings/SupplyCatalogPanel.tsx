@@ -85,6 +85,8 @@ const base = '/api/system-settings/settings/catalogs';
 const commandLabels: Record<string, string> = { create: 'Tạo mới', update: 'Sửa', state: 'Đổi trạng thái' };
 
 export default function SupplyCatalogPanel() {
+  // Static message does not render under React 19 + antd 5 (errors were silently lost); use the hook instance.
+  const [toast, toastContext] = message.useMessage();
   const { user } = useAuth();
   const visibleSections = sections.filter(s => s.key !== 'medicines' || user?.effectiveRoles.includes('ClinicOwner'));
   const [key, setKey] = useState<SectionKey>('suppliers'), [status, setStatus] = useState<Status>('Active');
@@ -142,7 +144,7 @@ export default function SupplyCatalogPanel() {
     });
     if (!saved) return;
     setEditing(null); requestKey.current = null; setRevision(v => v + 1);
-    void message.success(editing.row ? 'Đã cập nhật.' : 'Đã thêm mới.');
+    void toast.success(editing.row ? 'Đã cập nhật.' : 'Đã thêm mới.');
   }
   async function reloadEditing() {
     if (!editing?.row) return;
@@ -151,7 +153,7 @@ export default function SupplyCatalogPanel() {
   }
   async function previewState(row: Row) {
     const preview = await run(() => api<StatePreview>(`${base}/${section.resource}/${row.id}/state-preview`, { method: 'POST', body: JSON.stringify({ active: !row.active }) }),
-      failure => void message.error(failure.message));
+      failure => void toast.error(failure.message));
     if (preview) { setStateTarget(preview); setStateReason(''); setStateError(undefined); requestKey.current = null; }
   }
   async function changeState() {
@@ -164,7 +166,7 @@ export default function SupplyCatalogPanel() {
       failure => setStateError(failure.message));
     if (!saved) return;
     setStateTarget(null); setRevision(v => v + 1);
-    void message.success(saved.active ? 'Đã khôi phục.' : 'Đã ngừng dùng.');
+    void toast.success(saved.active ? 'Đã khôi phục.' : 'Đã ngừng dùng.');
   }
   async function openHistory(row: Row) {
     setHistory({ row, items: null });
@@ -181,10 +183,11 @@ export default function SupplyCatalogPanel() {
       const url = URL.createObjectURL(await response.blob());
       const link = Object.assign(document.createElement('a'), { href: url, download: `danh-muc-${section.resource}.xlsx` });
       link.click(); URL.revokeObjectURL(url);
-    }, failure => void message.error(failure.message));
+    }, failure => void toast.error(failure.message));
   }
 
   return <div className="reference-catalogs">
+    {toastContext}
     <Menu className="reference-catalogs-menu" mode="inline" selectedKeys={[key]} onClick={e => select(e.key as SectionKey)} items={visibleSections.map(x => ({ key: x.key, label: x.title }))} />
     <div className="reference-catalogs-body">
       <Typography.Title level={4}>{section.title}</Typography.Title>

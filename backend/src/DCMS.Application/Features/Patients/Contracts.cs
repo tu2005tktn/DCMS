@@ -21,7 +21,7 @@ public sealed record PatientDetail(int Id, string PatientCode, string FullName, 
 public sealed record CreatePatientRequest(string? PatientCode, string? FullName, DateOnly? BirthDate, string? Gender,
     string? Phone, string? Address, string? GuardianName, string? GuardianRelationship, string? GuardianPhone, string? Note,
     bool DuplicatesReviewed, int? PolicyVersion = null, DateOnly? ProfileDate = null, Guid? SourceId = null, Guid? CustomerGroupId = null,
-    Guid? OccupationId = null, IReadOnlyList<Guid>? IntakeHistoryIds = null, string? IntakeHistoryOther = null);
+    Guid? OccupationId = null, IReadOnlyList<Guid>? IntakeHistoryIds = null, string? IntakeHistoryOther = null, Guid? RequestKey = null);
 public sealed record UpdatePatientRequest(int Version, string? FullName, DateOnly? BirthDate, string? Gender, string? Phone,
     string? Address, string? GuardianName, string? GuardianRelationship, string? GuardianPhone, string? Note,
     bool DuplicatesReviewed, int? PolicyVersion = null, DateOnly? ProfileDate = null, Guid? SourceId = null, Guid? CustomerGroupId = null,
