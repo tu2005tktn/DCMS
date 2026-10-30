@@ -166,6 +166,14 @@ public sealed class DcmsDbContext(DbContextOptions<DcmsDbContext> options)
         });
         // UC-38: automatic patient codes BN000001... [PROPOSED format].
         model.HasSequence<long>("patient_code_seq");
+        model.Entity<PatientCreateReceipt>(b =>
+        {
+            b.ToTable("PATIENT_CREATE_RECEIPT");
+            b.HasKey(x => new { x.ActorId, x.RequestKey });
+            b.Property(x => x.Fingerprint).HasMaxLength(64);
+            b.HasOne<PatientProfile>().WithMany().HasForeignKey(x => x.PatientId).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.ActorId).OnDelete(DeleteBehavior.Restrict);
+        });
         model.Entity<PatientAudit>(b =>
         {
             b.ToTable("PATIENT_AUDIT");

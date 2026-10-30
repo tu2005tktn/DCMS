@@ -1,7 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using DCMS.Application.Features.Settings;
 using DCMS.Domain.Features.Accounts;
 using DCMS.Domain.Features.Scheduling;
@@ -19,94 +18,14 @@ public sealed class SettingsService(DcmsDbContext db, ISettingsAccess access, Us
 {
     public static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     static string Normalize(string value) => value.Trim().Normalize(NormalizationForm.FormC).ToUpperInvariant();
-    static void Kind(string kind) { if (!SettingsGrants.CatalogKinds.Contains(kind)) throw Error("MSG04"); }
     static void Paging(string? search, int page, int size) { if (search?.Length > 100 || page < 1 || page > 1000000 || size is not (20 or 50 or 100)) throw Error("MSG04"); }
     static void Reason(string? reason) { if (string.IsNullOrWhiteSpace(reason) || reason.Length > 1000) throw Error("MSG02",field:"lý do"); }
-    static ReferenceDto Dto(ReferenceEntry e) => new(e.Id,e.Kind,e.Name,e.Code,e.Description,e.Active,e.Reserved,e.Version,e.CreatedAt);
-    async Task<GeneralDto> Current(CancellationToken ct) {
-        var row = await db.Set<SettingsVersion>().AsNoTracking().OrderByDescending(x => x.Version).FirstOrDefaultAsync(ct);
-        return row == null ? new(0,null,GeneralSettings.Default) : new(row.Version,row.EffectiveAt,JsonSerializer.Deserialize<GeneralSettings>(row.ContentJson,Json)!);
-    }
     public async Task<SettingsCapabilities> CapabilitiesAsync(int actor, CancellationToken ct) {
         var state = await access.RequireAsync(actor,"settings.read",ct);
         var sections = SettingsGrants.CatalogKinds.Select((kind,i) => new SectionCapability(kind,SettingsGrants.CatalogLabels[i],$"/settings/{kind}",state.Permissions.Where(x => x.StartsWith($"catalog.{kind}.")).Select(x => x.Split('.').Last()).ToArray()))
             .Where(x => x.Actions.Contains("read")).ToList();
         if (state.Permissions.Contains("access-groups.read")) sections.Add(new("access-groups","Phân quyền truy cập","/settings/access-groups",state.Permissions.Where(x => x.StartsWith("access-groups.") || x == "staff.access.assign").ToArray()));
         return new("current-installation",sections.ToArray(),state.Permissions,state.BranchIds,state.Owner,await db.Set<SchedulingBranch>().Where(x=>state.BranchIds.Contains(x.Id)).Select(x=>new ScopeBranch(x.Id,x.Name)).ToArrayAsync(ct));
-    }
-    public async Task<GeneralDto> GeneralAsync(int actor, CancellationToken ct) { await access.RequireAsync(actor,"settings.general.read",ct); return await Current(ct); }
-    static void ValidateGeneral(GeneralSettings value) {
-        if (value == null || value.RequiredFields == null || value.PatientCode == null || value.ReceiptPrint == null
-            || !new[]{5,10,20,30,60,90,120}.Contains(value.StaffIdleTimeoutMinutes)
-            || !new[]{"AutoWithManualOverride","AutoOnly","ManualOnly"}.Contains(value.PatientCode.Mode)
-            || value.PatientCode.Prefix == null || !Regex.IsMatch(value.PatientCode.Prefix,"^[A-Za-z0-9-]{0,12}$")) throw Error("MSG04");
-    }
-    public async Task<object> GeneralPreviewAsync(int actor, GeneralCommand command, CancellationToken ct) {
-        await access.RequireAsync(actor,"settings.general.manage",ct); ValidateGeneral(command.Settings);
-        var before = await Current(ct); if (before.Version != command.ExpectedVersion) throw Error("MSG111",409);
-        return new {before,after=command.Settings,expectedVersion=before.Version,consumers="Policy contracts for W04/W11/W12; no counters or operational records are changed."};
-    }
-    async Task<GeneralDto> NewVersion(GeneralSettings value, int expected, CancellationToken ct) {
-        ValidateGeneral(value); var old = await Current(ct); if (old.Version != expected) throw Error("MSG111",409);
-        var next = new SettingsVersion { Version=old.Version+1,ContentJson=JsonSerializer.Serialize(value,Json),EffectiveAt=clock.GetUtcNow() };
-        db.Add(next); return new(next.Version,next.EffectiveAt,value);
-    }
-    public Task<GeneralDto> SaveGeneralAsync(int actor, GeneralCommand command, CancellationToken ct) => Run(actor,"settings.general.manage",command.RequestKey,"general.save","general",command,command.Reason,async _ => {
-        var before = await Current(ct); var next = await NewVersion(command.Settings,command.ExpectedVersion,ct);
-        var row = db.ChangeTracker.Entries<SettingsVersion>().Single(x => x.State == EntityState.Added).Entity; row.ActorId=actor;row.Reason=command.Reason.Trim();
-        return (next,next.Version,(object)before,(object)next);
-    },ct);
-    async Task<GeneralSettings> RestoreValue(int source, CancellationToken ct) {
-        var row = await db.Set<SettingsVersion>().AsNoTracking().SingleOrDefaultAsync(x => x.Version == source,ct) ?? throw Error("MSG113",404);
-        return JsonSerializer.Deserialize<GeneralSettings>(row.ContentJson,Json)!;
-    }
-    public async Task<object> RestorePreviewAsync(int actor, RestoreSettings command, CancellationToken ct) { await access.RequireAsync(actor,"settings.general.manage",ct); return await GeneralPreviewAsync(actor,new(command.ExpectedVersion,command.RequestKey,command.Reason,await RestoreValue(command.SourceVersion,ct)),ct); }
-    public Task<GeneralDto> RestoreAsync(int actor, RestoreSettings command, CancellationToken ct) => Run(actor,"settings.general.manage",command.RequestKey,"general.restore","general",command,command.Reason,async _ => {
-        var before=await Current(ct);var next=await NewVersion(await RestoreValue(command.SourceVersion,ct),command.ExpectedVersion,ct);
-        var row=db.ChangeTracker.Entries<SettingsVersion>().Single(x=>x.State==EntityState.Added).Entity;row.ActorId=actor;row.Reason=command.Reason.Trim();
-        return(next,next.Version,(object)before,(object)next);
-    },ct);
-    public async Task<Page<ReferenceDto>> CatalogAsync(int actor,string kind,string? search,string status,int page,int pageSize,CancellationToken ct) {
-        Kind(kind);await access.RequireAsync(actor,$"catalog.{kind}.read",ct);Paging(search,page,pageSize);
-        if (!new[]{"Active","Inactive","All"}.Contains(status)) throw Error("MSG04");
-        var rows=db.Set<ReferenceEntry>().AsNoTracking().Where(x=>x.Kind==kind);
-        if(status!="All") rows=rows.Where(x=>x.Active==(status=="Active"));
-        if(!string.IsNullOrWhiteSpace(search)){var term=Normalize(search);rows=rows.Where(x=>x.NormalizedName.Contains(term) || x.NormalizedCode!=null && x.NormalizedCode.Contains(term));}
-        var total=await rows.CountAsync(ct);var items=await rows.OrderBy(x=>x.NormalizedName).ThenBy(x=>x.Id).Skip((page-1)*pageSize).Take(pageSize).ToListAsync(ct);
-        return new(items.Select(Dto).ToArray(),total,page,pageSize);
-    }
-    public async Task<ReferenceDto> ReferenceAsync(int actor,string kind,Guid id,CancellationToken ct) { Kind(kind);await access.RequireAsync(actor,$"catalog.{kind}.read",ct);return Dto(await Entry(kind,id,ct)); }
-    public Task<ReferenceDto> SaveReferenceAsync(int actor,string kind,Guid? id,ReferenceCommand command,CancellationToken ct) {
-        Kind(kind);
-        return Run(actor,$"catalog.{kind}.{(id==null?"create":"update")}",command.RequestKey,"catalog.save",kind+":"+(id?.ToString()??"new"),command,id==null?"Tạo danh mục":command.Reason,async _=>{
-            var input=command.Entry;
-            if(input==null || string.IsNullOrWhiteSpace(input.Name)||input.Name.Trim().Length>160||input.Code?.Length>40||input.Description?.Length>1000 || kind!="diagnoses"&&string.IsNullOrWhiteSpace(input.Code)) throw Error("MSG04");
-            var code=string.IsNullOrWhiteSpace(input.Code)?null:input.Code.Trim();var name=input.Name.Trim().Normalize(NormalizationForm.FormC);var normName=Normalize(name);var normCode=code==null?null:Normalize(code);
-            if(await db.Set<ReferenceEntry>().AnyAsync(x=>x.Kind==kind&&x.Id!=id&&(x.NormalizedName==normName||normCode!=null&&x.NormalizedCode==normCode),ct))throw Error("MSG201",409,"code/name");
-            var entry=id==null?new ReferenceEntry {Kind=kind,CreatedBy=actor,CreatedAt=clock.GetUtcNow()}:await Entry(kind,id.Value,ct);
-            var before=id==null?null:Dto(entry);
-            if(id!=null){if(entry.Version!=command.ExpectedVersion)throw Error("MSG111",409);if(entry.Reserved)throw Error("MSG205",409);entry.Version++;}else db.Add(entry);
-            entry.Code=code;entry.NormalizedCode=normCode;entry.Name=name;entry.NormalizedName=normName;entry.Description=input.Description?.Trim();
-            var result=Dto(entry);return(result,entry.Version,(object?)before??new{},(object)result);
-        },ct);
-    }
-    async Task<ReferenceEntry> Entry(string kind,Guid id,CancellationToken ct)=>await db.Set<ReferenceEntry>().SingleOrDefaultAsync(x=>x.Id==id&&x.Kind==kind,ct)??throw Error("MSG113",404);
-    public async Task<object> ReferenceStatePreviewAsync(int actor,string kind,Guid id,StateCommand command,CancellationToken ct) {
-        Kind(kind);await access.RequireAsync(actor,$"catalog.{kind}.deactivate",ct);var row=await Entry(kind,id,ct);if(row.Version!=command.ExpectedVersion)throw Error("MSG111",409);
-        return new {id,name=row.Name,currentVersion=row.Version,command.Active,blocked=row.Reserved,historyPreserved=true};
-    }
-    public Task<ReferenceDto> ReferenceStateAsync(int actor,string kind,Guid id,StateCommand command,CancellationToken ct) {
-        Kind(kind);return Run(actor,$"catalog.{kind}.deactivate",command.RequestKey,"catalog.state",kind+":"+id,command,command.Reason,async _=>{
-            var row=await Entry(kind,id,ct);if(row.Version!=command.ExpectedVersion)throw Error("MSG111",409);if(row.Reserved)throw Error("MSG205",409);
-            var before=Dto(row);row.Active=command.Active;row.Version++;var result=Dto(row);return(result,row.Version,(object)before,(object)result);
-        },ct);
-    }
-    public async Task<ReferenceDto[]> OptionsAsync(int actor,string kind,string context,int branchId,string? search,CancellationToken ct) {
-        Kind(kind);Paging(search,1,100);var permission=context switch {"examination" when kind=="diagnoses"=>"examinations.read","patient" when new[]{"patient-sources","occupations","intake-history"}.Contains(kind)=>"patients.read",_=>throw Error("MSG04")};
-        await access.OperationalAsync(actor,permission,branchId,ct);
-        var rows=db.Set<ReferenceEntry>().AsNoTracking().Where(x=>x.Kind==kind&&x.Active);
-        if(!string.IsNullOrWhiteSpace(search)){var term=Normalize(search);rows=rows.Where(x=>x.NormalizedName.Contains(term)||x.NormalizedCode!=null&&x.NormalizedCode.Contains(term));}
-        return(await rows.OrderBy(x=>x.NormalizedName).ThenBy(x=>x.Id).ToListAsync(ct)).Select(Dto).ToArray();
     }
     async Task<GroupDto> GroupDto(AccessGroup row,PermissionState state,CancellationToken ct) {
         var assignments=await db.Set<StaffAccessAssignment>().AsNoTracking().Where(x=>x.GroupId==row.Id).Select(x=>x.BranchIds).ToListAsync(ct);

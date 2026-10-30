@@ -1,6 +1,7 @@
 import { Alert, Button, Card, Checkbox, Descriptions, Form, Input, List, Modal, Radio, Select, Skeleton, Space, Table, Tag, Typography, message } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { api, ApiError } from '../../services/api';
+import PatientCodeSequenceCard from './PatientCodeSequenceCard';
 import { codeExample, codeModes, idleChoices, receiptFields, requiredFieldOptions, type GeneralHistoryItem, type GeneralHistoryPage,
   type GeneralPreview, type GeneralSettings, type GeneralSettingsDto } from './generalSettings';
 
@@ -18,6 +19,9 @@ export default function GeneralSettingsPanel({ onDirtyChange }: { onDirtyChange:
   const [historyPage, setHistoryPage] = useState(1), [historySize, setHistorySize] = useState(20), [historyRevision, setHistoryRevision] = useState(0);
   const requestKey = useRef<{ fingerprint: string; key: string } | null>(null), guard = useRef(false);
   const prefix = Form.useWatch(['patientCode', 'prefix'], form) ?? '';
+  // Static Modal/message do not render under React 19 + antd 5; use the hook instances.
+  const [modal, modalContext] = Modal.useModal();
+  const [toast, toastContext] = message.useMessage();
 
   function markDirty(value: boolean) { setDirty(value); onDirtyChange(value); }
 
@@ -83,7 +87,7 @@ export default function GeneralSettingsPanel({ onDirtyChange }: { onDirtyChange:
       });
       setData(saved); form.setFieldsValue(saved.settings); markDirty(false); setPending(null); requestKey.current = null; setError(undefined);
       setHistoryPage(1); setHistoryRevision(v => v + 1);
-      void message.success(`Đã lưu Thiết lập chung, phiên bản ${saved.version}.`);
+      void toast.success(`Đã lưu Thiết lập chung, phiên bản ${saved.version}.`);
     } catch (e) {
       const failure = e as ApiError;
       if (failure.field === 'reason') setReasonError(failure.message);
@@ -96,6 +100,7 @@ export default function GeneralSettingsPanel({ onDirtyChange }: { onDirtyChange:
     action={<Button onClick={() => void load()}>Thử lại</Button>} />;
 
   return <div className="general-settings">
+    {modalContext}{toastContext}
     <Descriptions size="small" column={{ xs: 1, sm: 3 }} items={[
       { key: 'version', label: 'Phiên bản', children: data.version === 0 ? 'Mặc định (chưa lưu lần nào)' : data.version },
       { key: 'effective', label: 'Hiệu lực từ', children: formatTime(data.effectiveAt) },
@@ -108,7 +113,7 @@ export default function GeneralSettingsPanel({ onDirtyChange }: { onDirtyChange:
         <Form.Item name="staffIdleTimeoutMinutes" label="Tự đăng xuất khi không thao tác sau" extra="Chỉ áp dụng cho phiên nhân viên trên web; ứng dụng bệnh nhân có chính sách riêng.">
           <Select style={{ maxWidth: 240 }} options={idleChoices.map(value => ({ value, label: `${value} phút` }))} />
         </Form.Item>
-        <Alert type="info" showIcon message="Đã lưu cấu hình; tự đăng xuất theo phiên đăng nhập chưa được áp dụng trong bản này." />
+        <Alert type="info" showIcon message="Áp dụng cho phiên nhân viên ngay sau khi lưu (DCMS-129); hoạt động đã ghi nhận không bị đặt lại." />
       </Card>
       <Card size="small" title="Hồ sơ bắt buộc">
         <Typography.Paragraph type="secondary">Áp dụng từ lần lưu hồ sơ bệnh nhân tiếp theo. Hồ sơ cũ vẫn xem và khám bình thường, không bị tự điền.</Typography.Paragraph>
@@ -130,9 +135,10 @@ export default function GeneralSettingsPanel({ onDirtyChange }: { onDirtyChange:
           rules={[{ pattern: /^\s*[A-Za-z0-9-]{0,12}\s*$/, message: 'Tiền tố gồm tối đa 12 chữ cái không dấu, số hoặc dấu gạch nối.' }]}>
           <Input style={{ maxWidth: 240 }} maxLength={14} placeholder="Không có tiền tố" />
         </Form.Item>
+        <PatientCodeSequenceCard revision={data.version} />
       </Card>
       <Card size="small" title="Mẫu in phiếu thu">
-        <Alert type="info" showIcon message="Đã lưu cấu hình; module phiếu thu chưa áp dụng mẫu in này. Tùy chọn chỉ ẩn/hiện thông tin, không đổi số tiền đã ghi nhận." />
+        <Alert type="info" showIcon message="Áp dụng cho lần in phiếu thu tiếp theo (DCMS-130). Tùy chọn chỉ ẩn/hiện thông tin; số tiền, số phiếu và người nộp/thu của phiếu đã phát hành giữ nguyên." />
         <div className="general-settings-grid">
           {receiptFields.map(([field, label]) =>
             <Form.Item key={field} name={['receiptPrint', field]} valuePropName="checked"><Checkbox>{label}</Checkbox></Form.Item>)}
@@ -141,7 +147,7 @@ export default function GeneralSettingsPanel({ onDirtyChange }: { onDirtyChange:
     </Form>
     <Space className="general-settings-actions">
       <Button type="primary" loading={busy} disabled={!dirty} onClick={() => void previewSave()}>Xem trước và lưu</Button>
-      <Button disabled={!dirty || busy} onClick={() => Modal.confirm({ title: 'Bỏ thay đổi chưa lưu?', okText: 'Bỏ thay đổi', cancelText: 'Tiếp tục sửa',
+      <Button disabled={!dirty || busy} onClick={() => modal.confirm({ title: 'Bỏ thay đổi chưa lưu?', okText: 'Bỏ thay đổi', cancelText: 'Tiếp tục sửa',
         onOk: () => { form.setFieldsValue(data.settings); markDirty(false); setError(undefined); } })}>Hoàn tác</Button>
     </Space>
 

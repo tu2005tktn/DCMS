@@ -54,6 +54,16 @@ public sealed class PatientAudit
     public DateTimeOffset OccurredAt { get; set; }
 }
 
+// DCMS-122: a create retried with the same actor + requestKey returns this patient instead of issuing a second code.
+public sealed class PatientCreateReceipt
+{
+    public int ActorId { get; set; }
+    public Guid RequestKey { get; set; }
+    public string Fingerprint { get; set; } = "";
+    public int PatientId { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+}
+
 public static class PatientAuditActions
 {
     public const string Create = "CREATE";

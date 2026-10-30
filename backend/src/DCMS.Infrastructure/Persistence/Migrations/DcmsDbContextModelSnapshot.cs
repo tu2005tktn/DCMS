@@ -2176,6 +2176,32 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.ToTable("PATIENT_AUDIT", (string)null);
                 });
 
+            modelBuilder.Entity("DCMS.Domain.Features.Patients.PatientCreateReceipt", b =>
+                {
+                    b.Property<int>("ActorId")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("RequestKey")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Fingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<int>("PatientId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("ActorId", "RequestKey");
+
+                    b.HasIndex("PatientId");
+
+                    b.ToTable("PATIENT_CREATE_RECEIPT", (string)null);
+                });
+
             modelBuilder.Entity("DCMS.Domain.Features.Patients.PatientProfile", b =>
                 {
                     b.Property<int>("Id")
@@ -5868,6 +5894,21 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasOne("DCMS.Infrastructure.Features.Accounts.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("ActorAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DCMS.Domain.Features.Patients.PatientProfile", null)
+                        .WithMany()
+                        .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Patients.PatientCreateReceipt", b =>
+                {
+                    b.HasOne("DCMS.Infrastructure.Features.Accounts.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("ActorId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 

@@ -61,17 +61,6 @@ public interface ISettingsAccess
 public interface ISettingsService
 {
     Task<SettingsCapabilities> CapabilitiesAsync(int actor, CancellationToken ct);
-    Task<GeneralDto> GeneralAsync(int actor, CancellationToken ct);
-    Task<object> GeneralPreviewAsync(int actor, GeneralCommand command, CancellationToken ct);
-    Task<GeneralDto> SaveGeneralAsync(int actor, GeneralCommand command, CancellationToken ct);
-    Task<object> RestorePreviewAsync(int actor, RestoreSettings command, CancellationToken ct);
-    Task<GeneralDto> RestoreAsync(int actor, RestoreSettings command, CancellationToken ct);
-    Task<Page<ReferenceDto>> CatalogAsync(int actor, string kind, string? search, string status, int page, int pageSize, CancellationToken ct);
-    Task<ReferenceDto> ReferenceAsync(int actor, string kind, Guid id, CancellationToken ct);
-    Task<ReferenceDto> SaveReferenceAsync(int actor, string kind, Guid? id, ReferenceCommand command, CancellationToken ct);
-    Task<object> ReferenceStatePreviewAsync(int actor, string kind, Guid id, StateCommand command, CancellationToken ct);
-    Task<ReferenceDto> ReferenceStateAsync(int actor, string kind, Guid id, StateCommand command, CancellationToken ct);
-    Task<ReferenceDto[]> OptionsAsync(int actor, string kind, string context, int branchId, string? search, CancellationToken ct);
     Task<GroupDto[]> GroupsAsync(int actor, CancellationToken ct);
     Task<object> GroupPreviewAsync(int actor, Guid id, GroupCommand command, CancellationToken ct);
     Task<GroupDto> SaveGroupAsync(int actor, Guid? id, GroupCommand command, CancellationToken ct);

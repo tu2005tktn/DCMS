@@ -14,8 +14,9 @@ public static class ReferenceKinds
     public static readonly string[] All = [Diagnoses, PatientSources, Occupations, IntakeHistory, CareTypes, ExpenseCategories, CustomerGroups];
 }
 
+// PatientCount (DCMS-127): live count of non-archived patients pointing at the entry; null for kinds patients do not reference.
 public sealed record ReferenceEntryDto(Guid Id, string Kind, string? Code, string Name, string? Description, bool Reserved, bool Active, int Version,
-    DateTimeOffset CreatedAt, string CreatedByName, DateTimeOffset UpdatedAt, string UpdatedByName);
+    DateTimeOffset CreatedAt, string CreatedByName, DateTimeOffset UpdatedAt, string UpdatedByName, int? PatientCount = null);
 public sealed record ReferenceEntryInput(string? Code, string? Name, string? Description);
 public sealed record CreateReferenceRequest(Guid RequestKey, ReferenceEntryInput? Entry);
 public sealed record UpdateReferenceRequest(int ExpectedVersion, Guid RequestKey, string? Reason, ReferenceEntryInput? Entry);
@@ -23,7 +24,8 @@ public sealed record ReferenceStatePreviewRequest(bool Active);
 public sealed record ReferenceStatePreview(ReferenceEntryDto Entry, bool Allowed, IReadOnlyList<string> Blockers, string Impact);
 public sealed record ReferenceStateRequest(int ExpectedVersion, Guid RequestKey, bool Active, string? Reason);
 public sealed record ReferenceHistoryItem(DateTimeOffset OccurredAt, string ActorName, string Command, string? Reason, ReferenceEntryDto? Before, ReferenceEntryDto After);
-public sealed record ReferenceOption(Guid Id, string? Code, string Name);
+// Version lets consumers snapshot the exact entry (examination diagnoses, docs/specs/S58-SETTINGS-MERGE.vi.md).
+public sealed record ReferenceOption(Guid Id, string? Code, string Name, int Version = 0);
 
 public static class ReferenceMessages
 {

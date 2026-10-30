@@ -1,5 +1,7 @@
 # S58 / UC-51 — Thiết lập hệ thống
 
+Cập nhật 30/10/2026: hai module được gộp, `/api/system-settings` là nguồn duy nhất. Bảng đổi route và cách chuyển dữ liệu ở [S58-SETTINGS-MERGE.vi.md](S58-SETTINGS-MERGE.vi.md). Các route `/api/settings/*`, `/api/access-groups`, `/api/reference-options` bên dưới là tên trong bản thiết kế gốc.
+
 Ngày: **27/10/2026**. Trạng thái: **đặc tả để triển khai, chưa phải nghiệm thu phần mềm**. Phạm vi: staff web DCMS; cấu hình dùng chung được backend áp dụng cho các client liên quan. Bản soạn ban đầu chưa triển khai code. Cập nhật local: [kết quả DCMS-119/121/128 và phạm vi bàn giao](../implementation/S58-119-121-128.vi.md); các phần khác của Epic vẫn theo kế hoạch, không suy ra đã nghiệm thu toàn S58.
 
 ## 1. Nguồn, ký hiệu và phạm vi
