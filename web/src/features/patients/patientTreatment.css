@@ -1,6 +1,5 @@
 /* The patient file is a focused clinical workspace. Keep the surrounding staff shell intact elsewhere. */
 body:has(.patient-treatment-shell) .workspace { background: #fff; }
-body:has(.patient-treatment-shell) .workspace-header,
 body:has(.patient-treatment-shell) .workspace > .ant-menu { display: none; }
 body:has(.patient-treatment-shell) .workspace-content { width: 100%; max-width: none; padding: 0; }
 

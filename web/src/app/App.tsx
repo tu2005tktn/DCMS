@@ -1,11 +1,12 @@
+import Workspace from './StaffWorkspace';
 import VisitPage from '../features/examinations/ExaminationPage';
 import PaymentsPage from '../features/finance/PaymentsPage';
 import ReceiptPrintPage from '../features/finance/ReceiptPrintPage';
 import PrescriptionPage from '../features/prescriptions/PrescriptionPage';
 import ClinicalServicesPage from '../features/finance/ClinicalServicesPage';
-import { Alert, Button, Card, Layout, Menu, Result, Space, Tag, Typography } from 'antd';
+import { Alert, Button, Card, Result, Space, Tag, Typography } from 'antd';
 import { useState, type ReactNode } from 'react';
-import { Link, Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom';
+import { Link, Navigate, Route, Routes } from 'react-router-dom';
 import { useAuth } from '../features/authentication/AuthContext';
 import SignInPage from '../features/authentication/SignInPage';
 import SystemSettingsPage from '../features/system-settings/SystemSettingsPage';
@@ -106,43 +107,6 @@ function Protected({ children, permission }: { children: ReactNode; permission?:
   return children;
 }
 
-function Workspace() {
-  const auth = useAuth();
-  const location = useLocation();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  async function signOut() {
-    setBusy(true); setError(null);
-    try { await auth.signOut(); window.location.replace('/sign-in'); } catch (failure) { setError((failure as Error).message); }
-    finally { setBusy(false); }
-  }
-  return <Layout className="workspace">
-    <Layout.Header className="workspace-header"><Link to="/" className="brand">DCMS</Link>
-      <Space><Typography.Text>{auth.user?.fullName}</Typography.Text><Button loading={busy} onClick={() => void signOut()}>Đăng xuất</Button></Space></Layout.Header>
-    <Menu mode="horizontal" selectedKeys={[location.pathname.startsWith('/patients') ? '/patients' : location.pathname]} items={[
-      ...(auth.user?.accountType === 'Staff' ? [{ key: '/working-schedules', label: <Link to="/working-schedules">Lịch làm việc</Link> }] : []),
-      ...(auth.user?.accountType === 'Staff' ? [{ key: '/booking-settings', label: <Link to="/booking-settings">Cài đặt đặt lịch</Link> }] : []),
-      ...(auth.user?.effectiveRoles.some(r => ['ClinicAssistant', 'Dentist', 'ClinicOwner'].includes(r)) ? [{ key: '/appointments', label: <Link to="/appointments">Lịch hẹn</Link> }] : []),
-      ...(auth.user?.permissions.includes('appointments.support.handle') ? [{ key: '/support-inbox', label: <Link to="/support-inbox">Hộp thư hỗ trợ</Link> }] : []),
-      ...(auth.user?.permissions.includes('finance.read') ? [{key:'/payments',label:<Link to="/payments">Thanh toán</Link>}] : []),
-      ...(auth.user?.permissions.includes('services.read') ? [{key:'/clinical-services',label:<Link to="/clinical-services">Dịch vụ cận lâm sàng</Link>}] : []),
-      { key: '/', label: <Link to="/">Tài khoản của tôi</Link> },
-      ...(auth.user?.permissions.includes('reception.read') ? [{ key: '/reception', label: <Link to="/reception">Tiếp nhận và hàng chờ</Link> }] : []),
-      ...(auth.user?.permissions.includes('accounts.manage') ? [{ key: '/accounts', label: <Link to="/accounts">Quản lý tài khoản</Link> }] : []),
-      ...(auth.user?.permissions.includes('patients.read') ? [{ key: '/patients', label: <Link to="/patients">Bệnh nhân</Link> }] : []),
-      ...(auth.user?.effectiveRoles.includes('Dentist') || auth.user?.permissions.includes('settings.general.manage')
-        ? [{ key: '/system-settings', label: <Link to="/system-settings">Thiết lập hệ thống</Link> }] : []),
-      ...(auth.user?.effectiveRoles.includes('Dentist') ? [{ key: '/treatment-templates', label: <Link to="/treatment-templates">Mẫu điều trị</Link> }] : []),
-      ...(auth.user?.effectiveRoles.some(r => ['Admin', 'ClinicOwner', 'Dentist'].includes(r)) ? [{ key: '/commercial/treatment',
-        label: <Link to="/commercial/treatment">Giá và duyệt điều trị</Link> }] : []),
-      ...(auth.user?.permissions.includes('patient-links.verify') ? [{ key: '/link-verification', label: <Link to="/link-verification">Xác minh liên kết hồ sơ</Link> }] : []),
-    ]} />
-    <Layout.Content className="workspace-content">{error && <Alert className="form-alert" type="error" message={error} showIcon />}
-      {auth.idleSecondsLeft !== null && auth.idleSecondsLeft <= 60 && <Alert className="form-alert" type="warning" showIcon
-        message={auth.idleSecondsLeft > 0 ? `Phiên staff sẽ hết hạn sau ${auth.idleSecondsLeft} giây nếu không tương tác.` : 'Phiên đã hết hạn. Vui lòng đăng nhập lại.'} />}
-      <Outlet /></Layout.Content>
-  </Layout>;
-}
 
 function Home() {
   const { user, refresh } = useAuth();
