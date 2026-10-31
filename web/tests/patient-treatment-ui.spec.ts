@@ -104,6 +104,7 @@ async function prepare(page: Page, withItem = true, withFinance = false) {
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Đăng xuất', exact: true })).toBeVisible();
   await page.goto('/patients/123'); await page.getByRole('tab', { name: 'Điều trị & Thanh toán' }).click();
+  await expect(page.locator('.staff-sidebar')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'KẾ HOẠCH ĐIỀU TRỊ/DỊCH VỤ' })).toBeVisible();
   return state;
 }
@@ -140,7 +141,7 @@ test('hàng chỉ có răng, thời gian và text; lưu một lần bấm, lỗi
 test('Thực hiện mở hàng sửa; × hủy và ✓ mới lưu/gạch ngang; xóa kế hoạch giữ actual', async ({ page }) => {
   const state = await prepare(page);
   await page.getByRole('button', { name: 'Chức năng Trám răng', exact: true }).click();
-  await expect(page.getByRole('menuitem')).toHaveCount(4);
+  await expect(page.locator('.ant-dropdown:visible').getByRole('menuitem')).toHaveCount(4);
   await page.getByRole('menuitem', { name: 'Thực hiện', exact: true }).click();
   await expect(page.getByLabel('Nhập quá trình điều trị')).toBeVisible();
   await expect(page.getByLabel('Ghi chú việc đã làm')).toHaveValue('Ghi chú kế hoạch');
@@ -267,7 +268,8 @@ test('ghi chú chỉ lưu bằng nút xác nhận, bàn phím và responsive kh�
   for (const width of [390,768,1440]) {
     await page.setViewportSize({ width, height: 950 });
     const scroll = await page.evaluate(() => document.documentElement.scrollWidth);
-    expect(scroll).toBeLessThanOrEqual(width+1);
+    const overflow = await page.evaluate(()=>Array.from(document.querySelectorAll('body *')).filter(e=>e.getBoundingClientRect().right>innerWidth+1).slice(0,16).map(e=>({tag:e.tagName,cls:e.className,width:e.getBoundingClientRect().width,right:e.getBoundingClientRect().right})));
+    expect(scroll,JSON.stringify(overflow)).toBeLessThanOrEqual(width+1);
     await page.screenshot({ path: `test-results/treatment-v25-${width}.png`, fullPage: true });
   }
   await page.emulateMedia({ reducedMotion: 'reduce' });
