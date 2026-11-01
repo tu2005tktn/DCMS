@@ -1,3 +1,4 @@
+import CustomerDashboard from './CustomerDashboard';
 import { Alert, Button, Card, Form, Input, Spin, Typography } from 'antd';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link, Navigate, NavLink, Outlet, useNavigate } from 'react-router-dom';
@@ -218,26 +219,4 @@ export function CustomerRegisterPage() {
   </CustomerAuthFrame>;
 }
 
-export function CustomerHomePage() {
-  const { state } = useCustomerAuth();
-  if (state.status !== 'authenticated') return null;
-  return <div className="customer-home">
-    <div className="customer-page-heading"><span className="customer-kicker">Trang chủ</span>
-      <h1>Xin chào, {state.user.fullName}</h1>
-      <p>Đặt lịch khám, xem lịch hẹn và theo dõi hồ sơ của chính bạn tại đây.</p></div>
-    <section className="customer-home-primary" aria-labelledby="customer-book-title">
-      <div><h2 id="customer-book-title">Đặt lịch khám</h2>
-        <p>Chọn chi nhánh, bác sĩ và khung giờ phù hợp cho bản thân hoặc người thân.</p>
-        <Link to="/customer/book" className="customer-link-button customer-link-button-light">Bắt đầu đặt lịch</Link></div>
-      <div className="customer-home-mark"><ToothMark /></div>
-    </section>
-    <div className="customer-home-grid">
-      <Card className="customer-action-card"><h2>Lịch hẹn của tôi</h2>
-        <p>Xem lịch sắp tới, lịch sử và những lịch có thể đổi hoặc hủy.</p>
-        <Link to="/customer/appointments" className="customer-text-action">Xem lịch hẹn <span aria-hidden="true">→</span></Link></Card>
-      <Card className="customer-action-card"><h2>Liên kết hồ sơ của tôi</h2>
-        <p>Gửi yêu cầu và theo dõi việc xác minh hồ sơ của chính bạn.</p>
-        <Link to="/customer/patient-link" className="customer-text-action">Liên kết hồ sơ của tôi <span aria-hidden="true">→</span></Link></Card>
-    </div>
-  </div>;
-}
+export function CustomerHomePage() { return <CustomerDashboard />; }
