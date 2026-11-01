@@ -157,6 +157,7 @@ DCMS.Api.Features.Settings.SettingsEndpoints.MapSettingsEndpoints(app);
 DCMS.Api.Features.Finance.FinanceEndpoints.MapFinanceEndpoints(app);
 DCMS.Api.Features.Prescriptions.PrescriptionEndpoints.MapPrescriptionEndpoints(app);
 app.MapPatientLinkEndpoints();
+DCMS.Api.Features.FamilyMembers.FamilyMemberEndpoints.MapFamilyMemberEndpoints(app);
 app.MapPatientEndpoints();
 app.MapTreatmentEndpoints();
 DCMS.Api.Features.SystemSettings.SystemSettingsEndpoints.MapSystemSettingsEndpoints(app);

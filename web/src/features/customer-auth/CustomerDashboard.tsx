@@ -77,6 +77,8 @@ export default function CustomerDashboard() {
     <section aria-labelledby="customer-dashboard-shortcuts-title" className="customer-dashboard-shortcuts">
       <h2 id="customer-dashboard-shortcuts-title">Truy cập nhanh</h2>
       <div className="customer-dashboard-shortcut-grid">
+        <Link to="/customer/family-members" aria-label="Người thân của tôi" className="customer-dashboard-shortcut"><span className="customer-dashboard-shortcut-icon"><UserOutlined aria-hidden="true" /></span>
+          <span><strong>Người thân của tôi</strong><span>Lưu thông tin để chọn nhanh khi đặt lịch hộ.</span></span><RightOutlined aria-hidden="true" /></Link>
         <Link to="/customer/appointments" className="customer-dashboard-shortcut"><span className="customer-dashboard-shortcut-icon"><CalendarOutlined aria-hidden="true" /></span>
           <span><strong>Lịch hẹn của tôi</strong><span>Xem lịch sắp tới, lịch sử và chi tiết lịch hẹn.</span></span><RightOutlined aria-hidden="true" /></Link>
         <Link to="/customer/patient-link" aria-label="Liên kết hồ sơ của tôi" className="customer-dashboard-shortcut"><span className="customer-dashboard-shortcut-icon"><LinkOutlined aria-hidden="true" /></span>

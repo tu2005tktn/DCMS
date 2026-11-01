@@ -1,5 +1,8 @@
 # Booking contact prefill
 
+## Saved relatives — 01/11/2026
+See CUSTOMER-FAMILY-MEMBERS.md. Relative must select a saved name/birthDate. Manual-person choices and inline creation are removed from booking; manage relatives on the existing family-members page. Without a selection, Continue is disabled. Copy once on explicit selection; edits/back navigation never overwrite that copy. Booker/contact remain the current account's. Self/account changes clear the relative selection and birthDate. Existing attendee.birthDate accepts the Relative date; no familyMemberId/Patient link is added to Appointment. Relative list failure allows retry; Self booking remains available.
+
 Decision: 19 October 2026. Authenticated customers booking for Self should not retype information already available on their account.
 
 - Sign-in user and authenticated `/api/auth/me` add nullable `phoneNumber` and `email` for the current account only. Existing fields/authorization remain unchanged; no other account or patient contacts are exposed.

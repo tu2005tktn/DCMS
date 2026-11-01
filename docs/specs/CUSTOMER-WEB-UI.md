@@ -1,5 +1,8 @@
 # Giao diện cổng bệnh nhân Web — bản cải thiện 19/10/2026
 
+## Người thân — 01/11/2026
+Thêm route, nav và Dashboard shortcut Người thân của tôi; CRUD tên/quan hệ/ngày sinh và chọn nhanh trong booking theo CUSTOMER-FAMILY-MEMBERS.md. Giữ hệ màu/Ant Design, mobile cards và desktop table. Không đổi Patient/check-in/liên kết, nguồn slot hoặc quy tắc đặt lịch.
+
 ## Dashboard theo chức năng hiện có — 01/11/2026
 
 - Trang `/customer/home` đổi bố cục thành lời chào, lịch hẹn gần nhất, thẻ đặt lịch và lối vào Lịch hẹn/Liên kết hồ sơ. Không thay backend, route, quyền hoặc quy trình đặt/đổi/hủy lịch.

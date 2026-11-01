@@ -1,4 +1,5 @@
 import Workspace from './StaffWorkspace';
+import FamilyMembersPage from '../features/family-members/FamilyMembersPage';
 import VisitPage from '../features/examinations/ExaminationPage';
 import PaymentsPage from '../features/finance/PaymentsPage';
 import ReceiptPrintPage from '../features/finance/ReceiptPrintPage';
@@ -48,6 +49,7 @@ export default function App() {
     <Route path="/customer" element={<CustomerGuard><CustomerShell /></CustomerGuard>}>
       <Route index element={<Navigate to="/customer/home" replace />} />
       <Route path="home" element={<CustomerHomePage />} />
+      <Route path="family-members" element={<FamilyMembersPage />} />
       <Route path="verify-email" element={<Navigate to="/customer/home" replace />} />
       <Route path="patient-link" element={<CustomerPatientLinkPage />} />
       <Route path="appointments" element={<CustomerAppointmentsPage />} />
