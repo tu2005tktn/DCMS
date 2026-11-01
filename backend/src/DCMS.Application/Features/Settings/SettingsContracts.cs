@@ -67,5 +67,4 @@ public interface ISettingsService
     Task<GroupDto> GroupStateAsync(int actor, Guid id, StateCommand command, CancellationToken ct);
     Task<StaffAccessDto[]> StaffAsync(int actor, CancellationToken ct);
     Task<StaffAccessDto> AssignAsync(int actor, int employeeId, AssignGroup command, CancellationToken ct);
-    Task<Page<object>> AuditAsync(int actor, string? section, int page, int pageSize, CancellationToken ct);
 }

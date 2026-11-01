@@ -27,3 +27,7 @@
 .reference-catalogs-menu { border-inline-end: none !important; }
 .reference-catalogs-body { min-width: 0; }
 @media (max-width: 768px) { .reference-catalogs { grid-template-columns: minmax(0, 1fr); } }
+
+/* DCMS-132 settings history: before/after side by side, stacked on narrow screens. */
+.settings-audit-diff { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.settings-audit-diff pre { max-height: 320px; overflow: auto; white-space: pre-wrap; word-break: break-word; margin: 4px 0 0; }

@@ -6,6 +6,8 @@ import { useAuth } from '../authentication/AuthContext';
 import GeneralSettingsPanel from './GeneralSettingsPanel';
 import ReferenceCatalogPanel from './ReferenceCatalogPanel';
 import SupplyCatalogPanel from './SupplyCatalogPanel';
+import SettingsAuditPanel from './SettingsAuditPanel';
+import { downloadExport } from './exportFile';
 import type { SettingsCapabilities } from './generalSettings';
 import './systemSettings.css';
 
@@ -39,9 +41,10 @@ export default function SystemSettingsPage() {
   if (!capabilities) return <Card loading />;
   const tabs = [
     ...(capabilities.sections.some(x => x.key === 'general') ? [{ key: 'general', label: 'Thiết lập chung', children: <GeneralSettingsPanel onDirtyChange={v => { dirty.current = v; }} /> }] : []),
-    ...(capabilities.sections.some(x => x.key === 'catalogs') ? [{ key: 'catalogs', label: 'Danh mục hồ sơ/nghiệp vụ', children: <ReferenceCatalogPanel /> }] : []),
+    ...(capabilities.sections.some(x => x.key === 'catalogs') ? [{ key: 'catalogs', label: 'Danh mục hồ sơ/nghiệp vụ', children: <ReferenceCatalogPanel allowedKinds={capabilities.catalogKinds} /> }] : []),
     ...(capabilities.sections.some(x => x.key === 'supplies') ? [{ key: 'supplies', label: 'Vật tư, labo & thuốc', children: <SupplyCatalogPanel /> }] : []),
     ...(capabilities.sections.some(x => x.key === 'materials') ? [{ key: 'materials', label: 'Dụng cụ / Vật liệu', children: <MaterialCatalog /> }] : []),
+    ...(capabilities.sections.some(x => x.key === 'audit') ? [{ key: 'audit', label: 'Lịch sử thiết lập', children: <SettingsAuditPanel /> }] : []),
   ];
   if (!tabs.length) return <Result status="403" title="Bạn không có quyền thực hiện thao tác này." extra={<Link to="/">Về trang chủ</Link>} />;
   const active = tabs.some(x => x.key === search.get('tab')) ? search.get('tab')! : tabs[0].key;
@@ -89,6 +92,13 @@ function MaterialCatalog() {
     return () => { live = false; };
   }, [allowed, revision]);
   function tab(value: string) { setKind(value as Kind); setPage(1); setQuery(''); setSearch(''); setCategoryId(undefined); setData(null); }
+  const [exportError, setExportError] = useState<string>();
+  async function exportMaterials() {
+    setExportError(undefined);
+    const params = new URLSearchParams({ q: query }); if (categoryId) params.set('categoryId', categoryId);
+    try { await downloadExport(`${base}/materials/export?${params}`, 'danh-muc-vat-lieu.xlsx'); }
+    catch (e) { setExportError((e as Error).message); }
+  }
   function open(row?: Row) {
     pending.current = null; setFormError(undefined); form.resetFields();
     form.setFieldsValue({ name: row?.name ?? '', categoryId: row?.categoryId }); setDialog({kind, row});
@@ -140,7 +150,9 @@ function MaterialCatalog() {
           onChange={e => { setSearch(e.target.value); if (!e.target.value) {setQuery('');setPage(1);} }} onSearch={v => {setQuery(v.trim());setPage(1);}} />
         {itemMode && <Select aria-label="Lọc danh mục" placeholder="Tất cả danh mục" allowClear showSearch optionFilterProp="label" value={categoryId} loading={!categories && !categoryError} options={options} onChange={v => {setCategoryId(v);setPage(1);}} />}
         <Button type="primary" onClick={() => open()} disabled={itemMode && (!categories || !categories.length)}>Thêm mới</Button>
+        {itemMode && user?.permissions.includes('settings.export.materials') && <Button disabled={busy} onClick={() => void exportMaterials()}>Xuất Excel</Button>}
       </div>
+      {exportError && <Alert type="error" showIcon closable message={exportError} onClose={() => setExportError(undefined)} />}
       {categoryError && <Alert type="error" showIcon message={categoryError} action={<Button onClick={() => setRevision(v=>v+1)}>Thử lại danh mục</Button>} />}
       {itemMode && categories?.length === 0 && <Alert type="info" showIcon message="Chưa có danh mục. Hãy tạo danh mục trước khi thêm dụng cụ/vật liệu." action={<Button onClick={() => tab('material-categories')}>Tạo danh mục</Button>} />}
       {error && <Alert type="error" showIcon message={error} action={<Button onClick={() => setRevision(v=>v+1)}>Thử lại</Button>} />}

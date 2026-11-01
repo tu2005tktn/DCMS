@@ -139,6 +139,8 @@ public static class DependencyInjection
         services.AddScoped<DCMS.Application.Features.SystemSettings.ISystemCatalogService, Features.SystemSettings.SystemCatalogService>();
         services.AddScoped<DCMS.Application.Features.SystemSettings.IGeneralSettingsService, Features.SystemSettings.GeneralSettingsService>();
         services.AddScoped<DCMS.Application.Features.SystemSettings.IReferenceCatalogService, Features.SystemSettings.ReferenceCatalogService>();
+        services.AddScoped<DCMS.Application.Features.SystemSettings.ISettingsAuditService, Features.SystemSettings.SettingsAuditService>();
+        services.AddScoped<DCMS.Application.Features.SystemSettings.IServiceCatalogExport, Features.SystemSettings.ServiceCatalogExport>();
         services.AddScoped<DCMS.Application.Features.SystemSettings.ISupplyCatalog<DCMS.Application.Features.SystemSettings.ProviderInput, DCMS.Application.Features.SystemSettings.ProviderDto>, Features.SystemSettings.ProviderCatalog>();
         services.AddScoped<DCMS.Application.Features.SystemSettings.ISupplyCatalog<DCMS.Application.Features.SystemSettings.LabWorkTypeInput, DCMS.Application.Features.SystemSettings.LabWorkTypeDto>, Features.SystemSettings.LabWorkTypeCatalog>();
         services.AddScoped<Features.SystemSettings.MedicineCatalog>();

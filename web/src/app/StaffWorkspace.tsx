@@ -34,7 +34,7 @@ export default function StaffWorkspace() {
     { key:'/clinical-services', title:'Dịch vụ cận lâm sàng', icon:<ExperimentOutlined />, group:'Chuyên môn', visible:has('services.read') },
     { key:'/payments', title:'Thanh toán', icon:<CreditCardOutlined />, group:'Quản trị', visible:has('finance.read') },
     { key:'/accounts', title:'Quản lý tài khoản', icon:<AuditOutlined />, group:'Quản trị', visible:has('accounts.manage') },
-    { key:'/system-settings', title:'Thiết lập hệ thống', icon:<SettingOutlined />, group:'Quản trị', visible:role('Dentist')||has('settings.general.manage') },
+    { key:'/system-settings', title:'Thiết lập hệ thống', icon:<SettingOutlined />, group:'Quản trị', visible:role('Dentist')||has('settings.read') },
     { key:'/booking-settings', title:'Cài đặt đặt lịch', icon:<ScheduleOutlined />, group:'Quản trị', visible:user?.accountType==='Staff' },
     { key:'/link-verification', title:'Xác minh liên kết hồ sơ', icon:<LinkOutlined />, group:'Quản trị', visible:has('patient-links.verify') },
   ];

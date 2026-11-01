@@ -179,6 +179,7 @@ export default function SupplyCatalogPanel() {
       const apiBase = (import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5080').replace(/\/$/, '');
       const response = await fetch(`${apiBase}${base}/${section.resource}/export?${new URLSearchParams({ q: query, status })}`,
         { headers: { Authorization: `Bearer ${readAccessToken() ?? ''}` }, cache: 'no-store' });
+      if (response.status === 403) throw new ApiError(403, 'MSG06', 'Bạn không có quyền xuất Excel danh mục này.');
       if (!response.ok) throw new ApiError(response.status, 'MSG144', 'Không thể xuất Excel. Vui lòng thử lại.');
       const url = URL.createObjectURL(await response.blob());
       const link = Object.assign(document.createElement('a'), { href: url, download: `danh-muc-${section.resource}.xlsx` });
@@ -198,7 +199,7 @@ export default function SupplyCatalogPanel() {
         <Segmented<Status> value={status} onChange={v => { setStatus(v); setPage(1); }}
           options={[{ value: 'Active', label: 'Đang dùng' }, { value: 'Inactive', label: 'Ngừng dùng' }, { value: 'All', label: 'Tất cả' }]} />
         <Button type="primary" onClick={() => open()}>Thêm mới</Button>
-        {section.exportable && <Button disabled={busy} onClick={() => void exportExcel()}>Xuất Excel</Button>}
+        {section.exportable && user?.permissions.includes(`settings.export.${section.resource}`) && <Button disabled={busy} onClick={() => void exportExcel()}>Xuất Excel</Button>}
       </div>
       {error && <Alert type="error" showIcon message={error} action={<Button onClick={() => setRevision(v => v + 1)}>Thử lại</Button>} />}
       <Table<Row> rowKey="id" loading={loading} dataSource={data?.items ?? []} scroll={{ x: 900 }}

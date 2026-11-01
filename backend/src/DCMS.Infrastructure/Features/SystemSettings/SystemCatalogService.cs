@@ -88,6 +88,16 @@ public sealed class SystemCatalogService(DcmsDbContext db, UserManager<Applicati
             .Select(x => new MaterialDto(x.Id, x.Name, x.CategoryId, x.Category.Name, x.Version)).ToArrayAsync(ct);
         return new(items, total, page, pageSize);
     }
+    // DCMS-132: same filter as the list, read-only, at most 10 000 rows; the export grant is checked by the caller.
+    public async Task<byte[]> ExportMaterialsAsync(int actorId, string? q, Guid? categoryId, CancellationToken ct)
+    {
+        await AuthorizeAsync(actorId); var search = Search(q, 1, 20);
+        if (categoryId.HasValue) await CategoryRow(categoryId.Value, ct);
+        var rows = await db.MaterialCatalogItems.AsNoTracking().Where(x => !x.IsDeleted && !x.Category.IsDeleted && x.NormalizedName.Contains(search) && (!categoryId.HasValue || x.CategoryId == categoryId))
+            .OrderBy(x => x.Category.NormalizedName).ThenBy(x => x.NormalizedName).ThenBy(x => x.Id).Take(10_000)
+            .Select(x => new[] { x.Category.Name, x.Name }).ToListAsync(ct);
+        return Xlsx.Write("Dụng cụ - Vật liệu", [["Nhóm", "Tên dụng cụ/vật liệu"], .. rows]);
+    }
     public async Task<MaterialCategoryDto> CategoryAsync(int actorId, Guid id, CancellationToken ct)
     { await AuthorizeAsync(actorId); await CategoryRow(id, ct); return await CategoryResult(id, ct); }
     public async Task<MaterialDto> MaterialAsync(int actorId, Guid id, CancellationToken ct)

@@ -35,7 +35,7 @@ internal static class ClinicSettingsStore
     public static GeneralSettings Read(string json) => JsonSerializer.Deserialize<GeneralSettings>(json, Json) ?? GeneralSettings.Default;
 }
 
-public sealed partial class GeneralSettingsService(DcmsDbContext db, UserManager<ApplicationUser> users, TimeProvider clock) : IGeneralSettingsService
+public sealed partial class GeneralSettingsService(DcmsDbContext db, UserManager<ApplicationUser> users, TimeProvider clock, DCMS.Application.Features.Settings.ISettingsAccess access) : IGeneralSettingsService
 {
     private static readonly Guid Resource = new("00000000-0000-4000-8000-000000000058");
     private static readonly int[] IdleChoices = [5, 10, 20, 30, 60, 90, 120];
@@ -83,10 +83,19 @@ public sealed partial class GeneralSettingsService(DcmsDbContext db, UserManager
     public async Task<SettingsCapabilities> CapabilitiesAsync(int actorId, CancellationToken ct)
     {
         var roles = await users.GetRolesAsync(await StaffAsync(actorId));
+        var owner = roles.Contains(AccountRoles.ClinicOwner);
+        // DCMS-132 / SET-AT-01: catalog tabs follow catalog.{kind}.read grants; customer groups have no grant and stay owner-only.
+        string[] granted;
+        try { granted = owner ? [] : (await access.ResolveAsync(actorId, ct)).Permissions; }
+        catch (BusinessException ex) when (ex.Status == 403) { granted = []; }
+        string[] kinds = owner ? ReferenceKinds.All
+            : ReferenceKinds.All.Where(kind => granted.Contains($"catalog.{kind}.read")).ToArray();
         var sections = new List<SettingsSection>();
-        if (roles.Contains(AccountRoles.ClinicOwner)) { sections.Add(new("general", true)); sections.Add(new("catalogs", true)); }
+        if (owner) sections.Add(new("general", true));
+        if (kinds.Length > 0) sections.Add(new("catalogs", true));
         if (AccountRoles.Effective(roles).Contains(AccountRoles.Dentist)) { sections.Add(new("materials", true)); sections.Add(new("supplies", true)); }
-        return new(sections);
+        if (owner || granted.Contains("settings.audit.read")) sections.Add(new("audit", false));
+        return new(sections, kinds);
     }
 
     public async Task<GeneralSettingsDto> GetAsync(int actorId, CancellationToken ct)

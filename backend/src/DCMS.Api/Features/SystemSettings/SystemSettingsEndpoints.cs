@@ -1,4 +1,5 @@
 using DCMS.Api.Features.Authentication;
+using DCMS.Application.Features.Settings;
 using DCMS.Application.Features.SystemSettings;
 using Microsoft.AspNetCore.Mvc;
 namespace DCMS.Api.Features.SystemSettings;
@@ -18,6 +19,13 @@ public static class SystemSettingsEndpoints
         g.MapGet("/{id:guid}/history", async (HttpContext c, Guid id, ISupplyCatalog<TInput, TDto> s, CancellationToken ct) => Results.Ok(await s.HistoryAsync(AuthenticationEndpoints.AccountId(c.User), id, ct)));
     }
 
+    private static async Task<int> ExportGrant(HttpContext c, ISettingsAccess access, string resource, CancellationToken ct)
+    {
+        var actor = AuthenticationEndpoints.AccountId(c.User);
+        await access.RequireAsync(actor, "settings.export." + resource, ct);
+        return actor;
+    }
+
     public static void MapSystemSettingsEndpoints(this IEndpointRouteBuilder app)
     {
         var groups = app.MapGroup("/api/system-settings/material-categories").RequireAuthorization().WithTags("System settings");
@@ -28,6 +36,9 @@ public static class SystemSettingsEndpoints
         groups.MapPut("/{id:guid}", async (HttpContext c, Guid id, UpdateCategoryRequest r, ISystemCatalogService s, CancellationToken ct) => Results.Ok(await s.UpdateCategoryAsync(AuthenticationEndpoints.AccountId(c.User), id, r, ct)));
         groups.MapDelete("/{id:guid}", async (HttpContext c, Guid id, [FromBody] DeleteCatalogRequest r, ISystemCatalogService s, CancellationToken ct) => Results.Ok(await s.DeleteCategoryAsync(AuthenticationEndpoints.AccountId(c.User), id, r, ct)));
         var items = app.MapGroup("/api/system-settings/materials").RequireAuthorization().WithTags("System settings");
+        items.MapGet("/export", async (HttpContext c, string? q, Guid? categoryId, ISystemCatalogService s, ISettingsAccess access, CancellationToken ct) =>
+            Results.File(await s.ExportMaterialsAsync(await ExportGrant(c, access, "materials", ct), q, categoryId, ct),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"danh-muc-vat-lieu-{DateTime.UtcNow:yyyyMMdd}.xlsx"));
         items.MapGet("/", async (HttpContext c, string? q, Guid? categoryId, int? page, int? pageSize, ISystemCatalogService s, CancellationToken ct) => Results.Ok(await s.MaterialsAsync(AuthenticationEndpoints.AccountId(c.User), q, categoryId, page ?? 1, pageSize ?? 20, ct)));
         items.MapGet("/{id:guid}", async (HttpContext c, Guid id, ISystemCatalogService s, CancellationToken ct) => Results.Ok(await s.MaterialAsync(AuthenticationEndpoints.AccountId(c.User), id, ct)));
         items.MapPost("/", async (HttpContext c, CreateMaterialRequest r, ISystemCatalogService s, CancellationToken ct) => { var result = await s.CreateMaterialAsync(AuthenticationEndpoints.AccountId(c.User), r, ct); return Results.Created($"/api/system-settings/materials/{result.Id}", result); });
@@ -49,10 +60,14 @@ public static class SystemSettingsEndpoints
         // S58 đợt 4 typed catalogs (docs/specs/S58-SUPPLY-CATALOGS.md); literal segments win over {kind} below.
         MapSupply<ProviderInput, ProviderDto>(settings, "providers");
         MapSupply<LabWorkTypeInput, LabWorkTypeDto>(settings, "lab-work-types");
-        settings.MapGet("/catalogs/medicines/export", async (HttpContext c, string? q, string? status, IMedicineCatalog s, CancellationToken ct) =>
-            Results.File(await s.ExportAsync(AuthenticationEndpoints.AccountId(c.User), q, status, ct),
+        // DCMS-132: every export needs the list's read access and its own export grant.
+        settings.MapGet("/catalogs/medicines/export", async (HttpContext c, string? q, string? status, IMedicineCatalog s, ISettingsAccess access, CancellationToken ct) =>
+            Results.File(await s.ExportAsync(await ExportGrant(c, access, "medicines", ct), q, status, ct),
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"danh-muc-thuoc-{DateTime.UtcNow:yyyyMMdd}.xlsx"));
         MapSupply<MedicineInput, MedicineDto>(settings, "medicines");
+        settings.MapGet("/catalogs/services/export", async (HttpContext c, string? q, string? status, IServiceCatalogExport s, CancellationToken ct) =>
+            Results.File(await s.ExportAsync(AuthenticationEndpoints.AccountId(c.User), q, status, ct),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"danh-muc-dich-vu-{DateTime.UtcNow:yyyyMMdd}.xlsx"));
         // S58 danh mục tham chiếu (docs/specs/S58-REFERENCE-CATALOGS.md).
         var catalogs = settings.MapGroup("/catalogs/{kind}");
         catalogs.MapGet("/", async (HttpContext c, string kind, string? q, string? status, int? page, int? pageSize, IReferenceCatalogService s, CancellationToken ct) =>
