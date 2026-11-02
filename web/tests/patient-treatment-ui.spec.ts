@@ -15,7 +15,7 @@ async function prepare(page: Page, withItem = true, withFinance = false) {
   const user = { id: 7, userName: 'synthetic.dentist', fullName: 'Bác sĩ thử nghiệm', accountType: 'Staff',
     roles: ['Dentist'], effectiveRoles: ['Dentist'], permissions: ['patients.read'] };
   const state = { version: 1, items: (withItem ? [{ ...item }] : []) as any[], drafts: new Map<string, any>(),
-    activities: [] as any[], activityEdits: new Map<string, any>(), conflict: false, notes: '', collection: null as any, requests: [] as any[], materialReads: [] as {q:string;page:number}[], failMaterialOnce: false,
+    activities: [] as any[], activityEdits: new Map<string, any>(), conflict: false, notes: '', collection: null as any, accountVersion: 1, requests: [] as any[], materialReads: [] as {q:string;page:number}[], failMaterialOnce: false,
     materials: [
       { id:'mat-1', name:'Composite A2', categoryId:'group-1', categoryName:'Vật liệu trám', version:1 },
       { id:'mat-2', name:'Gương khám', categoryId:'group-2', categoryName:'Dụng cụ khám', version:1 },
@@ -100,10 +100,11 @@ async function prepare(page: Page, withItem = true, withFinance = false) {
     }
     if (path.endsWith('/close')) return route.fulfill({ status: 409, json: { code: 'MSG243', message: 'MSG243 — Còn hạng mục chưa được xử lý' } });
     if (path.endsWith('/note')) { state.notes = r.postDataJSON().note; state.version++; return ok({ dossier: detail() }); }
-    if (path.endsWith('/finance')) return ok({ available: true, sourceVersion: 'ledger-1', asOf: '2026-10-27T02:00:00Z', allowedActions: ['Collect'], unusedAdvanceVnd: 0,
+    if (path.endsWith('/finance')) return ok({ available: true, sourceVersion: String(state.accountVersion), asOf: '2026-10-27T02:00:00Z', allowedActions: ['Collect', 'Confirm', 'Cancel'], unusedAdvanceVnd: 0,
       charges: [{ id: 'charge-1', version: 1, sourceCode: 'A', postedAt: '2026-10-27T01:00:00Z', service: 'Trám răng', dentist: user.fullName, netVnd: 600000, confirmedAllocatedVnd: 0, dueVnd: 600000 }], receipts: state.collection ? [state.collection] : [] });
-    if (path.endsWith('/collections')) { state.collection = { ...r.postDataJSON(), id: 'collection-1', code: 'PT-SYNTHETIC', collector: user.fullName, status: 'Pending', unusedAdvanceVnd: 0 };
+    if (path.endsWith('/collections')) { state.accountVersion++; state.collection = { ...r.postDataJSON(), id: 'collection-1', version: 1, code: 'PT-SYNTHETIC', collector: user.fullName, status: 'Pending', unusedAdvanceVnd: 0 };
       state.requests.push(state.collection); return ok(state.collection); }
+    if (path === '/api/finance/payments/collection-1/confirm') { state.accountVersion++; state.collection = { ...state.collection, version: 2, status: 'Confirmed' }; return ok(state.collection); }
     if (path === `/api/dossiers/${dossierId}`) return ok(detail());
     return route.fulfill({ status: 404, json: { code: 'NOT_MOCKED', message: `Unexpected mock path ${path}` } });
   });
@@ -315,6 +316,12 @@ test('mock thu tiền kiểm tổng phân bổ, chuyển khoản Pending và gi�
   await page.getByRole('button', { name: 'Xác nhận tiền thực nhận' }).click();
   await expect(page.getByText('Chứng từ PT-SYNTHETIC')).toBeVisible();
   expect(state.collection.status).toBe('Pending'); expect(state.collection.allocations[0].amountVnd).toBe(300000);
+  await expect(page.getByRole('button', { name: 'In chứng từ' })).toBeDisabled();
+  await page.getByRole('button', { name: 'Xác nhận tiền vào' }).click();
+  await page.getByLabel('Mã giao dịch ngân hàng').fill('SYNTHETIC-BANK-1');
+  await page.getByLabel('Nội dung đối soát').fill('SYNTHETIC đã đối soát');
+  await page.getByRole('dialog').getByRole('button', { name: 'OK' }).click();
+  await expect.poll(() => state.collection.status).toBe('Confirmed');
 });
 
 test('ghi chú chỉ lưu bằng nút xác nhận, bàn phím và responsive không tràn viewport', async ({ page }) => {
