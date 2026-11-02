@@ -143,7 +143,9 @@ body:has(.patient-treatment-shell) .workspace-content { width: 100%; max-width: 
 .treatment-sheet-notes > div { padding-left: 1px; font-size: 12px; }
 .treatment-sheet-notes p { margin: 4px 0; color: #667085; }
 .treatment-sheet-note-hint { color: #98a2b3; font-size: 11px; }
-.treatment-sheet-create-row { display: flex; justify-content: center; padding: 13px 0 30px; }
+.treatment-sheet-create-row { display: flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content: center; padding: 13px 0 30px; min-width:0; }
+.treatment-sheet-create-row > label { display:flex; flex-wrap:wrap; gap:8px; align-items:center; max-width:100%; }
+.treatment-sheet-create-row > .ant-alert { width:100%; min-width:0; }
 .treatment-sheet-create.ant-btn { min-width: 146px; min-height: 35px; padding: 5px 14px; color: #fff; background: var(--sheet-green); border-color: var(--sheet-green); border-radius: 1px; font-size: 12px; font-weight: 600; }
 .treatment-sheet-draft-notice { margin-bottom: 18px; }
 .treatment-sheet-body .treatment-sheet-images { margin-top: -44px; }

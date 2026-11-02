@@ -1181,7 +1181,7 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .IsConcurrencyToken()
                         .HasColumnType("integer");
 
-                    b.Property<Guid>("VisitId")
+                    b.Property<Guid?>("VisitId")
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
@@ -1198,6 +1198,8 @@ namespace DCMS.Infrastructure.Persistence.Migrations
 
                     b.ToTable("CLINICAL_DOCUMENT", null, t =>
                         {
+                            t.HasCheckConstraint("CK_CLINICAL_DOCUMENT_Context", "\"VisitId\" IS NOT NULL OR \"DossierId\" IS NOT NULL");
+
                             t.HasCheckConstraint("CK_CLINICAL_DOCUMENT_State", "\"FileState\" IN ('PendingScan','Ready','Rejected')");
                         });
                 });
@@ -4881,6 +4883,16 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<int>("CreatedBy")
                         .HasColumnType("integer");
 
+                    b.Property<string>("DefinitionKind")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)")
+                        .HasDefaultValue("LegacySteps");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(160)
@@ -4895,6 +4907,73 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasIndex("BranchId", "Name");
 
                     b.ToTable("TREATMENT_TEMPLATE", (string)null);
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Treatment.TreatmentTemplateItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("AssistantId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("AssistantName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<long>("CostVnd")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateOnly?>("Date")
+                        .HasColumnType("date");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("DentistId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("DentistName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int?>("EstimatedMinutes")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ServiceId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ServiceName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("TeethJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<Guid>("TemplateId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AssistantId");
+
+                    b.HasIndex("DentistId");
+
+                    b.HasIndex("ServiceId");
+
+                    b.HasIndex("TemplateId", "Position");
+
+                    b.ToTable("TREATMENT_TEMPLATE_ITEM", (string)null);
                 });
 
             modelBuilder.Entity("DCMS.Domain.Features.Treatment.TreatmentTemplateVersion", b =>
@@ -5617,8 +5696,7 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasOne("DCMS.Domain.Features.Visits.Visit", null)
                         .WithMany()
                         .HasForeignKey("VisitId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("DCMS.Domain.Features.Examinations.DocumentAudit", b =>
@@ -6383,6 +6461,31 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasOne("DCMS.Domain.Features.Scheduling.SchedulingBranch", null)
                         .WithMany()
                         .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Treatment.TreatmentTemplateItem", b =>
+                {
+                    b.HasOne("DCMS.Domain.Features.Accounts.EmployeeProfile", null)
+                        .WithMany()
+                        .HasForeignKey("AssistantId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("DCMS.Domain.Features.Accounts.EmployeeProfile", null)
+                        .WithMany()
+                        .HasForeignKey("DentistId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("DCMS.Domain.Features.Scheduling.SchedulingService", null)
+                        .WithMany()
+                        .HasForeignKey("ServiceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DCMS.Domain.Features.Treatment.TreatmentTemplate", null)
+                        .WithMany()
+                        .HasForeignKey("TemplateId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

@@ -40,6 +40,7 @@ async function prepare(page: Page, withItem = true, withFinance = false) {
       return ok({items:items.slice((number-1)*20,number*20),total:items.length,page:number,pageSize:20});
     }
     if (path === '/api/patients/123') return ok(patient);
+    if (path.endsWith('/dossiers/create-context')) return ok({dentistId:7,branches:[{id:1,name:'CN thử nghiệm'}]});
     if (path === '/api/appointments/options') return ok({ branches: [{ id: 1, name: 'CN thử nghiệm' }], dentists: [{ id: 7, branchId: 1, name: user.fullName }], services: [{ id: 3, branchId: 1, name: 'Trám răng' }] });
     if (path.endsWith('/dossiers/summary')) return ok({ dossierCount: 2, plannedNetVnd: 900000, financialAvailable: false, pendingFeeCount: state.activities.length });
     if (path === '/api/patients/123/dossiers') return ok({ items: [{ id: dossierId, code: 'DT-001', version: state.version, state: 'Open' }], total: 1, page: 1, pageSize: 20 });
@@ -108,6 +109,56 @@ async function prepare(page: Page, withItem = true, withFinance = false) {
   await expect(page.getByRole('heading', { name: 'KẾ HOẠCH ĐIỀU TRỊ/DỊCH VỤ' })).toBeVisible();
   return state;
 }
+
+test('ngày giảm dần, thiếu ngày cuối, sửa giữ vị trí và không đổi dữ liệu gốc', async ({page})=>{
+  const state=await prepare(page);
+  state.items.push({...item,id:'date-old',serviceName:'Dịch vụ cũ',estimatedStart:'2026-01-01',plannedOrder:2},{...item,id:'date-new',serviceName:'Dịch vụ mới',estimatedStart:'2026-11-02',plannedOrder:3});
+  await page.reload();await page.getByRole('tab',{name:'Điều trị & Thanh toán'}).click();
+  const rows=page.locator('.treatment-sheet-plan-table tbody tr');await expect(rows.nth(0)).toContainText('Dịch vụ mới');await expect(rows.nth(1)).toContainText('Dịch vụ cũ');await expect(rows.nth(2)).toContainText('Trám răng');
+  await page.getByRole('button',{name:'Chức năng Dịch vụ cũ',exact:true}).click();await page.getByRole('menuitem',{name:'Sửa',exact:true}).click();
+  await expect(rows.nth(1)).toHaveAttribute('aria-label','Nhập hạng mục kế hoạch');
+  await page.getByLabel('Ngày dự kiến',{exact:true}).fill('2027-01-01');await expect(rows.nth(1)).toHaveAttribute('aria-label','Nhập hạng mục kế hoạch');
+});
+test('tạo phiếu nhanh không Modal hoặc chuyển trang, retry cùng key và mở đúng ID', async ({page})=>{
+  await prepare(page);const id='99999999-9999-4999-8999-999999999999';const calls:any[]=[];let fail=true;
+  const dossier={id,code:'DT-NEW',patientId:123,branchId:1,dentistId:7,state:'Open',version:1,planVersion:0,planState:'Empty',items:[],timeline:[],paymentTerms:[],note:null,createdAt:'2026-11-02T00:00:00Z'};
+  await page.route('**/api/patients/123/dossiers/quick',async r=>{calls.push(r.request().postDataJSON());if(fail){fail=false;return r.fulfill({status:503,json:{code:'MSG144',message:'Lỗi tạo thử nghiệm'}});}return r.fulfill({json:{dossier}});});
+  await page.route(`**/api/dossiers/${id}`,r=>r.fulfill({json:dossier}));
+  await page.getByRole('button',{name:'Tạo phiếu mới',exact:true}).click();await expect(page.getByText('Lỗi tạo thử nghiệm',{exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Tạo phiếu mới',exact:true}).click();
+  await expect(page.locator(`#treatment-sheet-${id}`)).toBeVisible();await expect(page).toHaveURL(/\/patients\/123$/);await expect(page.getByRole('dialog',{name:'Tạo đợt điều trị'})).toHaveCount(0);
+  expect(calls[0].requestKey).toBe(calls[1].requestKey);expect(calls[1]).not.toHaveProperty('diagnosis');expect(calls[1]).not.toHaveProperty('dentistId');
+});
+
+test('áp kế hoạch thêm cuối bảng, giữ ghi chú và retry cùng key', async ({ page }) => {
+  const state = await prepare(page); let fail = true; const requests: any[] = [];
+  const source = { id: '55555555-5555-4555-8555-555555555555', name: 'Kế hoạch nguồn', branchId: 1, version: 2, itemCount: 1, totalCostVnd: 1000000,
+    items: [{ id: 'source-row', serviceId: 3, serviceName: 'Dịch vụ từ kế hoạch', teeth: ['25', '26'], date: null, estimatedMinutes: 25, note: null, dentistId: null, assistantId: null, costVnd: 1000000 }] };
+  await page.route('**/api/treatment-templates/item-plans?*', r => r.fulfill({ json: { items: [source], total: 1, page: 1, pageSize: 20 } }));
+  await page.route(`**/api/treatment-templates/item-plans/${source.id}`, r => r.fulfill({ json: source }));
+  await page.route('**/sheet-items/from-item-plan', async r => {
+    requests.push(r.request().postDataJSON());
+    if (fail) { fail = false; return r.fulfill({ status: 503, json: { code: 'MSG144', message: 'Lỗi thử nghiệm nhập kế hoạch' } }); }
+    state.items.push({ ...item, id: source.id, serviceName: source.items[0].serviceName, quantity: 1, agreedUnitPriceVnd: 1000000 }); state.version++;
+    return r.fulfill({ json: { createdItemIds: [source.id] } });
+  });
+  await expect(page.getByRole('button', { name: 'Lịch sử phiếu', exact: true })).toHaveCount(0);
+  await page.getByLabel('Ghi chú hồ sơ', { exact: true }).fill('Ghi chú chưa lưu cần giữ');
+  await page.getByRole('button', { name: 'Kế hoạch điều trị', exact: true }).click();
+  const modal = page.getByRole('dialog', { name: 'Chọn kế hoạch điều trị' });
+  await modal.getByRole('combobox').fill('nguồn'); await page.getByText('Kế hoạch nguồn · 1 hạng mục', { exact: true }).click();
+  await expect(modal.getByText('Dịch vụ từ kế hoạch', { exact: true })).toBeVisible();
+  for (const width of [390, 768, 1440]) {
+    await page.setViewportSize({ width, height: 1000 });
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width + 1);
+    await page.screenshot({ path: `../.artifacts/import-item-plan-${width}.png`, fullPage: true });
+  }
+  await modal.getByRole('button', { name: 'Áp dụng', exact: true }).click(); await expect(modal.getByText('Lỗi thử nghiệm nhập kế hoạch')).toBeVisible();
+  await modal.getByRole('button', { name: 'Áp dụng', exact: true }).click(); await expect(modal).not.toBeVisible();
+  expect(requests[0].requestKey).toBe(requests[1].requestKey);
+  await expect(page.locator('.treatment-sheet-plan-table')).toContainText('Dịch vụ từ kế hoạch'); await expect(page.locator('.treatment-sheet-plan-table')).toContainText('Trám răng');
+  await expect(page.getByLabel('Ghi chú hồ sơ', { exact: true })).toHaveValue('Ghi chú chưa lưu cần giữ');
+});
 
 test('hàng chỉ có răng, thời gian và text; lưu một lần bấm, lỗi giữ form và không nhân nháp', async ({ page }) => {
   const state = await prepare(page, false);
@@ -378,3 +429,58 @@ test('vật liệu lỗi tải đầu tiên cho thử lại; danh mục trống 
 });
 
 
+
+
+test('ô ảnh chọn file tại phiếu, giữ route và dùng chung tab Hình ảnh', async ({ page }) => {
+  await prepare(page);
+  const images: any[] = [];
+  const uploads: any[] = [];
+  await page.route('**/api/clinical-documents**', async route => {
+    const r=route.request(), u=new URL(r.url());
+    if(u.pathname.endsWith('/content')) return route.fulfill({contentType:'image/png',body:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aZ9sAAAAASUVORK5CYII=','base64')});
+    if(r.method()==='POST') {
+      const body=r.postDataBuffer()!.toString('utf8'); uploads.push(body);
+      const d={documentId:'photo-1',version:1,fileName:'anh.png',contentType:'image/png',sizeBytes:68,documentType:'Other',source:'Clinic',sourceDate:'2026-11-02',context:{dossierId},uploaderName:'Bác sĩ',uploadedAt:new Date().toISOString(),fileState:'Ready',allowedActions:['view','download']};
+      images.push(d); return route.fulfill({json:{document:d,documents:[{document:d}]}});
+    }
+    expect(u.searchParams.get('imagesOnly')).toBe('true');
+    return route.fulfill({json:{items:images,total:images.length,page:1,pageSize:20,constraints:{maxFiles:10,maxBytes:20971520},allowedActions:['upload']}});
+  });
+  const before=page.url();
+  const chooserPromise=page.waitForEvent('filechooser');
+  await page.getByRole('button',{name:'Thêm ảnh',exact:true}).click();
+  const chooser=await chooserPromise;
+  await chooser.setFiles({name:'anh.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aZ9sAAAAASUVORK5CYII=','base64')});
+  await expect(page.getByRole('img',{name:'anh.png',exact:true})).toBeVisible();
+  expect(page.url()).toBe(before); expect(uploads).toHaveLength(1);
+  expect(uploads[0]).toContain('"dossierId":"'+dossierId+'"'); expect(uploads[0]).toContain('"visitId":null');
+  await page.getByRole('tab',{name:'Hình ảnh',exact:true}).click();
+  await expect(page.locator('[role="tabpanel"]:visible').getByRole('img',{name:'anh.png',exact:true})).toBeVisible();
+});
+
+
+test('ảnh lỗi giữ file và requestKey; không mở nội dung chờ kiểm tra', async ({page})=>{
+  await prepare(page); const posts:string[]=[]; let saved=false,contentReads=0;
+  await page.route('**/api/clinical-documents**',async route=>{
+    const r=route.request(),url=new URL(r.url());
+    if(url.pathname.endsWith('/content')){contentReads++;return route.abort();}
+    const d={documentId:'pending-1',version:1,fileName:'cho.png',contentType:'image/png',fileState:'PendingScan',context:{dossierId}};
+    if(r.method()==='POST') { posts.push(r.postDataBuffer()!.toString()); if(posts.length===1)return route.fulfill({status:503,json:{message:'Lỗi tải ảnh thử nghiệm'}}); saved=true;return route.fulfill({json:{document:d}}); }
+    return route.fulfill({json:{items:saved?[d]:[],total:saved?1:0,page:1,pageSize:20,constraints:{maxFiles:10,maxBytes:20971520}}});
+  });
+  await page.getByLabel('Chọn ảnh từ máy').setInputFiles({name:'cho.png',mimeType:'image/png',buffer:Buffer.from('synthetic')});
+  await expect(page.getByText('Lỗi tải ảnh thử nghiệm')).toBeVisible();
+  await page.getByRole('button',{name:'Thử lại tải ảnh'}).click();
+  await expect(page.getByText('Đang kiểm tra an toàn')).toBeVisible();
+  expect(posts).toHaveLength(2);
+  const keys=posts.map(body=>body.match(/"requestKey":"([^"]+)"/)?.[1]);expect(keys[0]).toBeTruthy();expect(keys[1]).toBe(keys[0]);expect(contentReads).toBe(0);
+});
+
+for(const width of [390,768,1440]) test('ô thêm ảnh dùng bàn phím và bố cục '+width,async({page})=>{
+  await page.setViewportSize({width,height:900});await prepare(page);
+  const button=page.getByRole('button',{name:'Thêm ảnh',exact:true});await button.focus();
+  const choosing=page.waitForEvent('filechooser');await button.press('Enter');const chooser=await choosing;expect(chooser.isMultiple()).toBe(true);
+  await chooser.setFiles({name:'wrong.pdf',mimeType:'application/pdf',buffer:Buffer.from('synthetic')});
+  await expect(page.getByText('Chỉ chọn ảnh JPEG/PNG không rỗng, tối đa 20 MB mỗi ảnh.')).toBeVisible();
+  const box=await button.boundingBox();expect(box?.width).toBeGreaterThanOrEqual(44);expect(box!.x+box!.width).toBeLessThanOrEqual(width);
+});

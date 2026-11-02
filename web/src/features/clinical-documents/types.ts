@@ -36,6 +36,7 @@ export type PatientDocumentContexts = {
   plans: { id: string; label: string; dossierId: string }[];
 };
 export type DocumentQuery = {
+  imagesOnly?: boolean;
   patientId: number; visitId?: string; dossierId?: string; planId?: string; type?: DocumentType; from?: string; to?: string;
   page: number; pageSize: number;
 };

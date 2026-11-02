@@ -72,7 +72,7 @@ public sealed partial class TreatmentDossierService
     }
 
     private async Task<TreatmentItem> AddSheetItemAsync(int actorId, TreatmentDossier dossier,
-        SheetRow row, Guid itemId, SheetDecision? decision, CancellationToken ct)
+        SheetRow row, Guid itemId, SheetDecision? decision, CancellationToken ct, bool finalize = true)
     {
         var clinicianEntry = decision == null;
         decision ??= new SheetDecision("Proposed", null, null);
@@ -106,7 +106,7 @@ public sealed partial class TreatmentDossierService
             try { _ = TreatmentPlanRules.Discount(gross, discountType!, row.DiscountValue); }
             catch (ArgumentOutOfRangeException) { throw Error("MSG252"); }
         }
-        dossier.PlanVersion++;
+        if (finalize) dossier.PlanVersion++;
         var item = new TreatmentItem { Id = itemId, DossierId = dossier.Id, ServiceId = service.Id,
             ServiceName = service.Name, Unit = service.Unit, Region = Clean(row.Region) ?? Clean(string.Join(", ", row.Regions ?? [])),
             Note = Clean(row.Note), ResponsibleDentistId = row.DentistId, AssistantId = row.AssistantId,
@@ -128,14 +128,51 @@ public sealed partial class TreatmentDossierService
         }
         dossier.Items.Add(item);
         db.TreatmentItems.Add(item);
+        if (finalize) await FinalizeSheetItemsAsync(actorId, dossier, clinicianEntry, ct);
+        return item;
+    }
+
+    private async Task FinalizeSheetItemsAsync(int actorId, TreatmentDossier dossier, bool clinicianEntry, CancellationToken ct)
+    {
         dossier.PlanState = "Committed";
         dossier.Goals ??= clinicianEntry ? "Kế hoạch do bác sĩ ghi nhận" : "Kế hoạch điều trị theo thỏa thuận từng hạng mục";
         dossier.Version++; dossier.UpdatedAt = clock.GetUtcNow();
         await CarryForwardUnchangedProgressionAsync(dossier, actorId, ct);
         Event(dossier, actorId, "PlanCommitted", new { dossier.PlanId, dossier.PlanVersion,
             dossier.Goals, dossier.PaymentTermsJson, Items = dossier.Items.OrderBy(x => x.PlannedOrder).Select(ItemDto).ToArray() });
-        return item;
     }
+
+    public Task<ImportItemPlanResult> ImportItemPlanAsync(int actorId, Guid dossierId, ImportItemPlanRequest request, CancellationToken ct) =>
+        SheetCommandAsync(actorId, dossierId, request.RequestKey, "SheetImportItemPlan", new { dossierId, request }, async dossier =>
+        {
+            if (dossier.Version != request.ExpectedVersion) throw Error("MSG111", 409);
+            if (dossier.State != "Open" || dossier.PlanState == "Draft") throw Error("MSG240", 409);
+            var source = await db.TreatmentTemplates.AsNoTracking().SingleOrDefaultAsync(x => x.Id == request.ItemPlanId && x.DefinitionKind == "ItemPlan" && x.DeletedAt == null, ct) ?? throw Error("MSG113", 404);
+            if (source.BranchId != dossier.BranchId) throw Error("MSG06", 403);
+            if (source.Version != request.ExpectedItemPlanVersion) throw Error("MSG111", 409);
+            var rows = await db.Set<TreatmentTemplateItem>().AsNoTracking().Where(x => x.TemplateId == source.Id && x.DeletedAt == null).OrderBy(x => x.Position).ThenBy(x => x.Id).ToListAsync(ct);
+            if (rows.Count == 0) throw Error("MSG04");
+            var created = new List<Guid>();
+            dossier.PlanVersion++;
+            foreach (var row in rows)
+            {
+                try {
+                    var input = new SheetRow(row.Date, row.ServiceId, dossier.DentistId, JsonSerializer.Deserialize<string[]>(row.TeethJson), 1, row.CostVnd, row.Note, row.AssistantId,
+                        null, "VND", 0, null, row.CostVnd, null, row.EstimatedMinutes);
+                    // Reuse all sheet limits, not just the catalog's more permissive tooth limits.
+                    input = ReadRow(JsonSerializer.SerializeToElement(input, Json));
+                    var item = await AddSheetItemAsync(actorId, dossier, input, Guid.NewGuid(), null, ct, false);
+                    item.ServiceName = row.ServiceName;
+                    created.Add(item.Id);
+                } catch (BusinessException e) when (e.Status == 400) {
+                    throw new BusinessException(400, new("ITEM_PLAN_IMPORT_INVALID", $"Hạng mục {row.Position} ({row.ServiceName}) không còn hợp lệ. Vui lòng sửa kế hoạch nguồn.") { Field = $"items.{row.Id}" });
+                }
+            }
+            await FinalizeSheetItemsAsync(actorId, dossier, true, ct);
+            Event(dossier, actorId, "ItemPlanImported", new { source.Id, source.Version, snapshot = rows, mapping = rows.Select((x, i) => new { sourceItemId = x.Id, itemId = created[i] }).ToArray() });
+            await db.SaveChangesAsync(ct);
+            return new ImportItemPlanResult(await DetailAsync(dossier, ct), created.ToArray(), source.Id, source.Version);
+        }, ct);
 
     private async Task CarryForwardUnchangedProgressionAsync(TreatmentDossier dossier, int actorId, CancellationToken ct)
     {

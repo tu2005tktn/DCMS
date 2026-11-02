@@ -3,6 +3,10 @@ using System.Text.Json;
 
 namespace DCMS.Application.Features.Treatment;
 
+public sealed record QuickDossierRequest(int BranchId, Guid RequestKey, Guid? SourceVisitId = null, int? ExpectedSourceVisitVersion = null);
+public sealed record DossierCreateBranch(int Id, string Name);
+public sealed record DossierCreateContext(int DentistId, IReadOnlyList<DossierCreateBranch> Branches);
+
 public sealed record CreateDossierRequest(int BranchId, int DentistId, string? Diagnosis, string? Note,
     DateOnly? StartedOn, Guid RequestKey, Guid? SourceVisitId = null, int? ExpectedSourceVisitVersion = null);
 public sealed record PaymentTermInput(string Purpose, long AmountVnd, DateOnly DueOn, string? Evidence,
@@ -101,6 +105,8 @@ public sealed record OwnTreatmentSummaryItem(Guid DossierId, string Code, string
 
 public interface ITreatmentDossierService
 {
+    Task<DossierCreateContext> CreateContextAsync(int actorId, int patientId, CancellationToken ct);
+    Task<TreatmentChange> QuickCreateAsync(int actorId, int patientId, QuickDossierRequest request, CancellationToken ct);
     Task<ConfirmSheetActualResult> EditSheetActivityAsync(int actorId, Guid dossierId, Guid activityId, EditSheetActivityRequest request, CancellationToken ct);
     Task<ConfirmSheetActualResult> DeleteSheetActivityAsync(int actorId, Guid dossierId, Guid activityId, SheetActivityActionRequest request, CancellationToken ct);
     Task<TreatmentChange> EditSheetItemAsync(int actorId, Guid dossierId, Guid itemId, EditSheetItemRequest request, CancellationToken ct);
@@ -110,6 +116,7 @@ public interface ITreatmentDossierService
     Task<TreatmentSheetContext> SheetContextAsync(int actorId, Guid dossierId, CancellationToken ct);
     Task<TreatmentActivityPage> ActivitiesAsync(int actorId, Guid dossierId, Guid? visitId, DateOnly? from, DateOnly? to, int page, int pageSize, CancellationToken ct);
     Task<TreatmentChange> ConfirmSheetPlanAsync(int actorId, Guid dossierId, Guid rowId, ConfirmSheetPlanRequest request, CancellationToken ct);
+    Task<ImportItemPlanResult> ImportItemPlanAsync(int actorId, Guid dossierId, ImportItemPlanRequest request, CancellationToken ct);
     Task<ConfirmSheetActualResult> ConfirmSheetActualAsync(int actorId, Guid dossierId, Guid rowId, ConfirmSheetActualRequest request, CancellationToken ct);
     Task<TreatmentChange> ScheduleNoteAsync(int actorId, Guid dossierId, Guid itemId, ScheduleNoteRequest request, CancellationToken ct);
     Task<TreatmentChange> DecideSheetItemAsync(int actorId, Guid dossierId, Guid itemId, DecideSheetItemRequest request, CancellationToken ct);

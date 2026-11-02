@@ -160,6 +160,7 @@ app.MapPatientLinkEndpoints();
 DCMS.Api.Features.FamilyMembers.FamilyMemberEndpoints.MapFamilyMemberEndpoints(app);
 app.MapPatientEndpoints();
 app.MapTreatmentEndpoints();
+DCMS.Api.Features.Treatment.ItemPlanEndpoints.MapItemPlanEndpoints(app);
 DCMS.Api.Features.SystemSettings.SystemSettingsEndpoints.MapSystemSettingsEndpoints(app);
 app.MapClinicalWorkEndpoints();
 app.MapSchedulingEndpoints();

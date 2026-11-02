@@ -1,6 +1,6 @@
-import { Alert, Button, Dropdown, Empty, Form, Input, Modal, Select, Skeleton, Typography } from 'antd';
+import { Alert, Button, Dropdown, Empty, Modal, Select, Skeleton, Typography } from 'antd';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+
 import { api, type ApiError } from '../../services/api';
 import { useAuth } from '../authentication/AuthContext';
 import type { AppointmentOptions, DossierListItem, DossierPage, TreatmentChange, TreatmentDossier } from './types';
@@ -10,16 +10,16 @@ import DossierClosureModal from './DossierClosureModal';
 import type { DossierTotals } from './sheetTypes';
 import FinancialPatientDossiers from './FinancialPatientDossiers';
 
-type Values = { branchId: number; dentistId: number; diagnosis: string; note?: string };
+
 const displayTime = (value: string) => new Intl.DateTimeFormat('vi-VN', {
   dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Ho_Chi_Minh',
 }).format(new Date(value));
 
-export default function DossierList({ patientId, visitId, sourceVisitVersion, diagnosis, branchId: contextBranchId, dentistId,
+export default function DossierList({ patientId, visitId, sourceVisitVersion, branchId: contextBranchId,
   patientName, patientCode, patientAge }: { patientId: number; visitId?: string; diagnosis?: string | null;
   branchId?: number; dentistId?: number; sourceVisitVersion?: number; patientName?: string; patientCode?: string; patientAge?: number | null }) {
   const auth = useAuth();
-  const navigate = useNavigate();
+
   const [page, setPage] = useState<DossierPage | null>(null);
   const [options, setOptions] = useState<AppointmentOptions | null>(null);
   const [optionsError, setOptionsError] = useState<string | null>(null);
@@ -28,7 +28,7 @@ export default function DossierList({ patientId, visitId, sourceVisitVersion, di
   const [pageNumber, setPageNumber] = useState(1);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [selected, setSelected] = useState<TreatmentDossier | null>(null);
-  const [open, setOpen] = useState(false);
+
   const [busy, setBusy] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DossierListItem | null>(null);
@@ -40,9 +40,15 @@ export default function DossierList({ patientId, visitId, sourceVisitVersion, di
   const [clinicalTarget, setClinicalTarget] = useState<{ dossier: TreatmentDossier; completed: boolean } | null>(null);
   const [totals, setTotals] = useState<DossierTotals | null>(null);
   const [totalsError, setTotalsError] = useState<string | null>(null);
-  const [form] = Form.useForm<Values>();
+  const [createContext,setCreateContext] = useState<{dentistId:number;branches:{id:number;name:string}[]} | null>(null);
+  const [branchId,setBranchId] = useState<number>();
+  const [unsaved,setUnsaved] = useState(false);
+  const [contextRetry,setContextRetry]=useState(0);
+  const created = useRef<DossierListItem | null>(null);
+  const sending = useRef(false);
+  const createPayload = useRef('');
   const createKey = useRef(crypto.randomUUID());
-  const branchId = Form.useWatch('branchId', form);
+
   const canUse = auth.user?.effectiveRoles.includes('Dentist') ?? false;
   const onPlanTotalChange = useCallback(() => {
     void api<DossierTotals>(`/api/patients/${patientId}/dossiers/summary`).then(setTotals).catch(f => setTotalsError((f as Error).message));
@@ -51,10 +57,10 @@ export default function DossierList({ patientId, visitId, sourceVisitVersion, di
   useEffect(() => {
     if (!canUse) return;
     let active = true;
-    setActiveId(null); setSelected(null);
-    setPage(null); setError(null);
+    setActiveId(created.current?.patientId===patientId && pageNumber===1 ? created.current.id : null); setSelected(null);
+    if(!(created.current?.patientId===patientId && pageNumber===1))setPage(null); setError(null);
     api<DossierPage>(`/api/patients/${patientId}/dossiers?page=${pageNumber}&pageSize=20`)
-      .then(result => { if (active) { setPage(result); setActiveId(result.items[0]?.id ?? null); } })
+      .then(result => { if (active) { const pinned = created.current?.patientId === patientId ? created.current : null; const items = pinned && pageNumber === 1 && !result.items.some(x=>x.id===pinned.id) ? [pinned,...result.items] : result.items; setPage({...result,items}); setActiveId(pinned && pageNumber === 1 ? pinned.id : result.items[0]?.id ?? null); } })
       .catch(failure => { if (active) setError(failure as ApiError); });
     api<DossierTotals>(`/api/patients/${patientId}/dossiers/summary`).then(v => { if (active) { setTotals(v); setTotalsError(null); } })
       .catch(f => { if (active) setTotalsError((f as Error).message); });
@@ -70,20 +76,26 @@ export default function DossierList({ patientId, visitId, sourceVisitVersion, di
     return () => { active = false; };
   }, [canUse, revision]);
 
-  async function create(values: Values) {
-    if (busy) return;
-    setBusy(true); setSaveError(null);
+  useEffect(() => {
+    if (!canUse) return; let active=true; setCreateContext(null);
+    void api<{dentistId:number;branches:{id:number;name:string}[]}>(`/api/patients/${patientId}/dossiers/create-context`).then(value=>{
+      if (active) { setCreateContext(value); setBranchId(previous => value.branches.some(b=>b.id===previous) ? previous : contextBranchId && value.branches.some(b=>b.id===contextBranchId) ? contextBranchId : value.branches.length===1 ? value.branches[0].id : undefined); }
+    }).catch(e=>{if(active)setSaveError(e.message);});
+    return ()=>{active=false;};
+  },[patientId,canUse,contextBranchId,contextRetry]);
+  async function create() {
+    if (sending.current || !branchId) return;
+    if (unsaved && !window.confirm('Bỏ các thay đổi chưa lưu để tạo phiếu mới?')) return;
+    sending.current=true; setBusy(true); setSaveError(null);
+    const body={branchId,...(visitId && sourceVisitVersion ? {sourceVisitId:visitId,expectedSourceVisitVersion:sourceVisitVersion}:{})};
+    const payload=JSON.stringify(body); if(createPayload.current!==payload){createPayload.current=payload;createKey.current=crypto.randomUUID();}
     try {
-      const result = await api<TreatmentChange>(`/api/patients/${patientId}/dossiers`, {
-        method: 'POST', body: JSON.stringify({ ...values, requestKey: createKey.current,
-          ...(visitId && sourceVisitVersion ? { sourceVisitId: visitId, expectedSourceVisitVersion: sourceVisitVersion } : {}) }),
-      });
-      setOpen(false); form.resetFields(); createKey.current = crypto.randomUUID();
-      navigate(`/patients/${patientId}/dossiers/${result.dossier.id}${visitId ? `?visitId=${visitId}` : ''}`);
-    } catch (failure) { setSaveError((failure as Error).message); }
-    finally { setBusy(false); }
+      const result=await api<TreatmentChange>(`/api/patients/${patientId}/dossiers/quick`,{method:'POST',body:JSON.stringify({...body,requestKey:createKey.current})});
+      created.current={...result.dossier}; setPage(current=>({items:[created.current!,...(current?.items ?? []).filter(x=>x.id!==result.dossier.id)],total:(current?.total ?? 0)+1,page:1,pageSize:20})); setUnsaved(false);setSelected(result.dossier);setActiveId(result.dossier.id);setPageNumber(1);setRevision(v=>v+1);
+      createKey.current=crypto.randomUUID();createPayload.current='';
+    } catch(e){setSaveError((e as Error).message);}finally{sending.current=false;setBusy(false);}
   }
-
+  useEffect(()=>{if(activeId && created.current?.id===activeId && page?.items.some(x=>x.id===activeId))document.getElementById(`treatment-sheet-${activeId}`)?.scrollIntoView({behavior:'smooth',block:'start'});},[activeId,page]);
   async function deleteDossier() {
     if (!deleteTarget || deleteBusy) return;
     setDeleteBusy(true); setDeleteError(null);
@@ -92,6 +104,7 @@ export default function DossierList({ patientId, visitId, sourceVisitVersion, di
         method: 'DELETE', body: JSON.stringify({ expectedVersion: deleteTarget.version,
           requestKey: deleteKey.current }),
       });
+      if(created.current?.id===deleteTarget.id)created.current=null;
       setDeleteTarget(null); setSelected(null); setRevision(value => value + 1);
       deleteKey.current = crypto.randomUUID();
     } catch (failure) { setDeleteError((failure as Error).message); }
@@ -121,9 +134,9 @@ export default function DossierList({ patientId, visitId, sourceVisitVersion, di
         {(totals?.pendingFeeCount ?? 0) > 0 && <div>{totals?.pendingFeeCount} hoạt động đang chờ ghi phí</div>}
       </>}
     </div></div>
-    {error ? <Alert type="error" showIcon message={error.message}
+    {error && <Alert type="error" showIcon message={error.message}
       action={<Button onClick={() => setRevision(value => value + 1)}>Thử lại</Button>} />
-      : !page ? <Skeleton active /> : page.items.length === 0
+      }{!page ? (error ? null : <Skeleton active />) : page.items.length === 0
         ? <Empty description="Chưa có phiếu điều trị. Bác sĩ có thể tạo phiếu mới cho bệnh nhân này." />
         : <><div className="treatment-list-cards">{page.items.map(item => <article key={item.id}
           className={`treatment-sheet-card${activeId === item.id ? ' is-open' : ''}`}>
@@ -162,12 +175,17 @@ export default function DossierList({ patientId, visitId, sourceVisitVersion, di
             action={<Button size="small" onClick={() => setRevision(value => value + 1)}>Tải lại</Button>} />}
           {activeId === item.id && <div id={`treatment-sheet-${item.id}`}>
             <TreatmentSheet patientId={patientId} dossierId={item.id} dossierVersion={item.version} visitId={visitId}
-              options={options} onLoaded={setSelected} onPlanTotalChange={onPlanTotalChange} />
+              options={options} onUnsavedChange={setUnsaved} onLoaded={setSelected} onPlanTotalChange={onPlanTotalChange} />
           </div>}
         </article>)}</div>
         {page.total > page.page * page.pageSize && <Button onClick={() => setPageNumber(value => value + 1)}>Xem thêm phiếu</Button>}
         {page.page > 1 && <Button onClick={() => setPageNumber(value => value - 1)}>Trang trước</Button>}</>}
-    <div className="treatment-sheet-create-row"><Button className="treatment-sheet-create" onClick={() => { setSaveError(null); createKey.current = crypto.randomUUID(); form.setFieldsValue({ diagnosis: diagnosis ?? undefined, branchId: contextBranchId, dentistId }); setOpen(true); }}>+ TẠO PHIẾU MỚI</Button></div>
+    <div className="treatment-sheet-create-row">
+      <label>Chi nhánh <Select aria-label="Chi nhánh tạo phiếu" style={{minWidth:200}} value={branchId} disabled={busy || !!contextBranchId} placeholder="Chọn chi nhánh" options={createContext?.branches.map(x=>({value:x.id,label:x.name})) ?? []} onChange={setBranchId}/></label>
+      <Button className="treatment-sheet-create" aria-label="Tạo phiếu mới" loading={busy} disabled={!branchId || !createContext?.branches.length} onClick={()=>void create()}>+ TẠO PHIẾU MỚI</Button>
+      {saveError && <Alert type="error" message={saveError} action={<Button onClick={()=>createContext && branchId ? void create() : setContextRetry(v=>v+1)}>Thử lại</Button>}/>}
+      {optionsError && <Alert type="error" message={optionsError}/>}
+    </div>
     {clinicalTarget && <DossierClosureModal dossier={clinicalTarget.dossier} completed={clinicalTarget.completed}
       onClose={() => setClinicalTarget(null)} onSaved={() => { setClinicalTarget(null); setRevision(v => v + 1); }} />}
     <Modal open={!!deleteTarget} title={`Xóa phiếu ${deleteTarget?.code ?? ''}?`}
@@ -176,28 +194,6 @@ export default function DossierList({ patientId, visitId, sourceVisitVersion, di
       <Typography.Paragraph>Chỉ xóa được phiếu còn trống, chưa có kế hoạch hoặc dữ liệu điều trị. Phiếu đã có nghiệp vụ cần dùng quy trình đóng hồ sơ.</Typography.Paragraph>
       {deleteError && <Alert type="error" showIcon message={deleteError} />}
     </Modal>
-    <Modal open={open} title="Tạo đợt điều trị" okText="Tạo hồ sơ" okButtonProps={{ loading: busy }}
-      onOk={() => form.submit()} onCancel={() => { if (!busy) { setOpen(false); createKey.current = crypto.randomUUID(); } }}>
-      <Typography.Paragraph>Đợt điều trị có thể kéo dài nhiều buổi. Tạo hồ sơ chưa tạo lịch hẹn hoặc khoản thu.</Typography.Paragraph>
-      {optionsError && <Alert type="error" showIcon message={`Không tải được chi nhánh và bác sĩ: ${optionsError}`}
-        action={<Button onClick={() => setRevision(value => value + 1)}>Thử lại</Button>} />}
-      {saveError && <Alert type="error" showIcon className="form-alert" message={saveError} />}
-      <Form form={form} layout="vertical" onValuesChange={() => { createKey.current = crypto.randomUUID(); }}
-        onFinish={values => void create(values)}>
-        <Form.Item name="branchId" label="Chi nhánh" rules={[{ required: true, message: 'Chọn chi nhánh.' }]}>
-          <Select options={options?.branches.map(x => ({ value: x.id, label: x.name })) ?? []} />
-        </Form.Item>
-        <Form.Item name="dentistId" label="Bác sĩ phụ trách" rules={[{ required: true, message: 'Chọn bác sĩ.' }]}>
-          <Select disabled={!branchId} options={options?.dentists.filter(x => x.branchId === branchId)
-            .map(x => ({ value: x.id, label: x.name })) ?? []} />
-        </Form.Item>
-        <Form.Item name="diagnosis" label="Chẩn đoán hoặc lý do điều trị" rules={[
-          { required: true, whitespace: true, message: 'Nhập chẩn đoán hoặc lý do.' },
-          { max: 4000, message: 'Không quá 4000 ký tự.' },
-        ]}><Input.TextArea rows={3} maxLength={4000} /></Form.Item>
-        <Form.Item name="note" label="Ghi chú" rules={[{ max: 4000, message: 'Không quá 4000 ký tự.' }]}>
-          <Input.TextArea rows={2} maxLength={4000} /></Form.Item>
-      </Form>
-    </Modal>
+
   </section>;
 }
