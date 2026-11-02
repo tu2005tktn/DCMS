@@ -29,7 +29,7 @@ export default function StaffWorkspace() {
     { key:'/patients', title:'Bệnh nhân', icon:<TeamOutlined />, group:'Vận hành', visible:has('patients.read') },
     { key:'/working-schedules', title:'Lịch làm việc', icon:<CalendarOutlined />, group:'Vận hành', visible:user?.accountType==='Staff' },
     { key:'/support-inbox', title:'Hộp thư hỗ trợ', icon:<InboxOutlined />, group:'Vận hành', visible:has('appointments.support.handle') },
-    { key:'/treatment-templates', title:'Mẫu điều trị', icon:<FileTextOutlined />, group:'Chuyên môn', visible:role('Dentist') },
+    { key:'/treatment-templates', title:'Kế hoạch điều trị', icon:<FileTextOutlined />, group:'Chuyên môn', visible:role('Dentist') },
     { key:'/commercial/treatment', title:'Giá và duyệt điều trị', icon:<MedicineBoxOutlined />, group:'Chuyên môn', visible:role('Admin','ClinicOwner','Dentist') },
     { key:'/clinical-services', title:'Dịch vụ cận lâm sàng', icon:<ExperimentOutlined />, group:'Chuyên môn', visible:has('services.read') },
     { key:'/payments', title:'Thanh toán', icon:<CreditCardOutlined />, group:'Quản trị', visible:has('finance.read') },

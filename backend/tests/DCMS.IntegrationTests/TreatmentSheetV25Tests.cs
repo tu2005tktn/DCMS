@@ -78,6 +78,59 @@ public sealed class TreatmentSheetV25Tests(ApiFixture fixture) : IClassFixture<A
     private static SheetDecision Agreed => new("Agreed", "SYNTHETIC tư vấn và giá", "SYNTHETIC người khám");
 
     [Fact]
+    public async Task QuickCreateIsBlankAuthorizedAndConcurrentRetrySafe()
+    {
+        using var c = await Login(); var s = await Prepare(false);
+        var context = (await c.GetFromJsonAsync<DossierCreateContext>($"/api/patients/{s.Patient}/dossiers/create-context"))!;
+        Assert.Equal(s.Dentist, context.DentistId); Assert.Contains(context.Branches,x=>x.Id==s.Branch);
+        var url=$"/api/patients/{s.Patient}/dossiers/quick"; var command=new QuickDossierRequest(s.Branch,Guid.NewGuid());
+        var responses=await Task.WhenAll(c.PostAsJsonAsync(url,command),c.PostAsJsonAsync(url,command));
+        foreach(var response in responses) Assert.True(response.IsSuccessStatusCode,await response.Content.ReadAsStringAsync());
+        var a=(await responses[0].Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;var b=(await responses[1].Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
+        Assert.Equal(a.Id,b.Id);Assert.Equal("",a.Diagnosis);Assert.Empty(a.Items);Assert.Equal(s.Dentist,a.DentistId);
+        Assert.Equal(HttpStatusCode.Conflict,(await c.PostAsJsonAsync(url,command with{SourceVisitId=Guid.NewGuid()})).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden,(await c.PostAsJsonAsync(url,command with{BranchId=int.MaxValue,RequestKey=Guid.NewGuid()})).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest,(await c.PostAsJsonAsync($"/api/patients/{s.Patient}/dossiers",new CreateDossierRequest(s.Branch,s.Dentist,null,null,null,Guid.NewGuid()))).StatusCode);
+        using var scope=fixture.Services.CreateScope();var db=scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
+        Assert.Equal(1,await db.TreatmentDossiers.CountAsync(x=>x.PatientId==s.Patient));
+        Assert.False(await db.Appointments.AnyAsync(x=>x.PatientId==s.Patient));Assert.False(await db.ClinicalActivities.AnyAsync(x=>x.PatientId==s.Patient));
+        var patient=await db.Patients.FindAsync(s.Patient);patient!.IsArchived=true;await db.SaveChangesAsync();
+        Assert.Equal(HttpStatusCode.NotFound,(await c.PostAsJsonAsync(url,command)).StatusCode);
+    }
+
+    [Fact]
+    public async Task ImportReusablePlanIsAtomicSnapshotAndIdempotent()
+    {
+        using var c = await Login(); var s = await Prepare(false); var dossier = await Create(c, s);
+        const string root = "/api/treatment-templates/item-plans";
+        var response = await c.PostAsJsonAsync(root, new ItemPlanCreate(s.Branch, "SYNTHETIC reusable", Guid.NewGuid())); response.EnsureSuccessStatusCode();
+        var plan = (await response.Content.ReadFromJsonAsync<ItemPlanDto>())!;
+        for (var i = 0; i < 2; i++) {
+            response = await c.PostAsJsonAsync($"{root}/{plan.Id}/items", new ItemPlanRowInput(null, ["25", "26"], s.Service, 25, null, null, null, 600000, plan.Version, Guid.NewGuid()));
+            response.EnsureSuccessStatusCode(); plan = (await response.Content.ReadFromJsonAsync<ItemPlanDto>())!;
+        }
+        var command = new ImportItemPlanRequest(plan.Id, plan.Version, dossier.Version, Guid.NewGuid());
+        var url = $"/api/dossiers/{dossier.Id}/sheet-items/from-item-plan";
+        var results = await Task.WhenAll(c.PostAsJsonAsync(url, command), c.PostAsJsonAsync(url, command));
+        foreach (var result in results) Assert.True(result.IsSuccessStatusCode, await result.Content.ReadAsStringAsync());
+        var imported = (await results[0].Content.ReadFromJsonAsync<ImportItemPlanResult>())!;
+        Assert.Equal(2, imported.CreatedItemIds.Length); Assert.Equal(dossier.Version + 1, imported.Dossier.Version); Assert.Equal(dossier.PlanVersion + 1, imported.Dossier.PlanVersion);
+        Assert.All(imported.Dossier.Items, x => { Assert.Equal(1, x.Quantity); Assert.Equal(600000, x.AgreedUnitPriceVnd); Assert.Equal(s.Dentist, x.ResponsibleDentistId); Assert.Equal("ClinicianEntry", x.EntrySource); Assert.Equal("Proposed", x.Decision); });
+        Assert.Equal(HttpStatusCode.Conflict, (await c.PostAsJsonAsync(url, command with { ExpectedVersion = imported.Dossier.Version })).StatusCode);
+        // A stale source and an invalid second row must leave all existing patient items unchanged.
+        Assert.Equal(HttpStatusCode.Conflict, (await c.PostAsJsonAsync(url, command with { ExpectedItemPlanVersion = plan.Version - 1, ExpectedVersion = imported.Dossier.Version, RequestKey = Guid.NewGuid() })).StatusCode);
+        using (var scope = fixture.Services.CreateScope()) {
+            var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
+            var row = await db.Set<DCMS.Domain.Features.Treatment.TreatmentTemplateItem>().FindAsync(plan.Items[1].Id); row!.TeethJson = "[\"99\"]"; await db.SaveChangesAsync();
+        }
+        Assert.Equal(HttpStatusCode.BadRequest, (await c.PostAsJsonAsync(url, command with { ExpectedVersion = imported.Dossier.Version, RequestKey = Guid.NewGuid() })).StatusCode);
+        var after = (await c.GetFromJsonAsync<TreatmentDossierDto>($"/api/dossiers/{dossier.Id}"))!; Assert.Equal(2, after.Items.Count); Assert.Equal(imported.Dossier.Version, after.Version);
+        using var check = fixture.Services.CreateScope(); var context = check.ServiceProvider.GetRequiredService<DcmsDbContext>();
+        Assert.False(await context.ClinicalActivities.AnyAsync(x => x.DossierId == dossier.Id));
+        Assert.False(context.Database.HasPendingModelChanges());
+    }
+
+    [Fact]
     public async Task ConfirmPlanHasStableIdsAndRejectsCompetingVersionWithoutCreatingActualOrMoney()
     {
         using var c = await Login(); var s = await Prepare(); var dossier = await Create(c, s);

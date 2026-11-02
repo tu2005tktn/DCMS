@@ -70,6 +70,7 @@ public sealed class DcmsDbContext(DbContextOptions<DcmsDbContext> options)
 
     protected override void OnModelCreating(ModelBuilder model)
     {
+        FamilyMemberModel.Configure(model);
         base.OnModelCreating(model);
         SchedulingModel.Configure(model);
         AppointmentModel.Configure(model);

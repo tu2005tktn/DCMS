@@ -1181,7 +1181,7 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .IsConcurrencyToken()
                         .HasColumnType("integer");
 
-                    b.Property<Guid>("VisitId")
+                    b.Property<Guid?>("VisitId")
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
@@ -1198,6 +1198,8 @@ namespace DCMS.Infrastructure.Persistence.Migrations
 
                     b.ToTable("CLINICAL_DOCUMENT", null, t =>
                         {
+                            t.HasCheckConstraint("CK_CLINICAL_DOCUMENT_Context", "\"VisitId\" IS NOT NULL OR \"DossierId\" IS NOT NULL");
+
                             t.HasCheckConstraint("CK_CLINICAL_DOCUMENT_State", "\"FileState\" IN ('PendingScan','Ready','Rejected')");
                         });
                 });
@@ -1486,6 +1488,81 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasIndex("UpdatedBy");
 
                     b.ToTable("VISIT_EXAMINATION", (string)null);
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.FamilyMembers.FamilyMember", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateOnly?>("BirthDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("ContactPhone")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("FullName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Gender")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<int>("OwnerAccountId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Relationship")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerAccountId", "DeletedAt");
+
+                    b.ToTable("CUSTOMER_FAMILY_MEMBER", (string)null);
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.FamilyMembers.FamilyMemberReceipt", b =>
+                {
+                    b.Property<int>("OwnerAccountId")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("RequestKey")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Fingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("ResultJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.HasKey("OwnerAccountId", "RequestKey");
+
+                    b.ToTable("CUSTOMER_FAMILY_RECEIPT", (string)null);
                 });
 
             modelBuilder.Entity("DCMS.Domain.Features.Finance.BranchReceiptSequence", b =>
@@ -4806,6 +4883,16 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<int>("CreatedBy")
                         .HasColumnType("integer");
 
+                    b.Property<string>("DefinitionKind")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)")
+                        .HasDefaultValue("LegacySteps");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(160)
@@ -4820,6 +4907,73 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasIndex("BranchId", "Name");
 
                     b.ToTable("TREATMENT_TEMPLATE", (string)null);
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Treatment.TreatmentTemplateItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("AssistantId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("AssistantName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<long>("CostVnd")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateOnly?>("Date")
+                        .HasColumnType("date");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("DentistId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("DentistName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int?>("EstimatedMinutes")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ServiceId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ServiceName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("TeethJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<Guid>("TemplateId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AssistantId");
+
+                    b.HasIndex("DentistId");
+
+                    b.HasIndex("ServiceId");
+
+                    b.HasIndex("TemplateId", "Position");
+
+                    b.ToTable("TREATMENT_TEMPLATE_ITEM", (string)null);
                 });
 
             modelBuilder.Entity("DCMS.Domain.Features.Treatment.TreatmentTemplateVersion", b =>
@@ -5542,8 +5696,7 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasOne("DCMS.Domain.Features.Visits.Visit", null)
                         .WithMany()
                         .HasForeignKey("VisitId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("DCMS.Domain.Features.Examinations.DocumentAudit", b =>
@@ -5646,6 +5799,24 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasOne("DCMS.Domain.Features.Visits.Visit", null)
                         .WithOne()
                         .HasForeignKey("DCMS.Domain.Features.Examinations.VisitExamination", "VisitId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.FamilyMembers.FamilyMember", b =>
+                {
+                    b.HasOne("DCMS.Infrastructure.Features.Accounts.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.FamilyMembers.FamilyMemberReceipt", b =>
+                {
+                    b.HasOne("DCMS.Infrastructure.Features.Accounts.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerAccountId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
@@ -6290,6 +6461,31 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasOne("DCMS.Domain.Features.Scheduling.SchedulingBranch", null)
                         .WithMany()
                         .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Treatment.TreatmentTemplateItem", b =>
+                {
+                    b.HasOne("DCMS.Domain.Features.Accounts.EmployeeProfile", null)
+                        .WithMany()
+                        .HasForeignKey("AssistantId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("DCMS.Domain.Features.Accounts.EmployeeProfile", null)
+                        .WithMany()
+                        .HasForeignKey("DentistId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("DCMS.Domain.Features.Scheduling.SchedulingService", null)
+                        .WithMany()
+                        .HasForeignKey("ServiceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DCMS.Domain.Features.Treatment.TreatmentTemplate", null)
+                        .WithMany()
+                        .HasForeignKey("TemplateId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

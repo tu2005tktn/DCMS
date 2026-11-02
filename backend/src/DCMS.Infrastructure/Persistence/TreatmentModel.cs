@@ -110,12 +110,27 @@ internal static class TreatmentModel
         });
         model.Entity<TreatmentTemplate>(b =>
         {
+            b.Property(x => x.DefinitionKind).HasMaxLength(24).HasDefaultValue("LegacySteps");
             b.ToTable("TREATMENT_TEMPLATE"); b.HasKey(x => x.Id);
             b.HasIndex(x => new { x.BranchId, x.Name });
             b.Property(x => x.Name).HasMaxLength(160);
             b.Property(x => x.Version).IsConcurrencyToken();
             b.HasMany(x => x.Versions).WithOne().HasForeignKey(x => x.TemplateId).OnDelete(DeleteBehavior.Restrict);
             b.HasOne<SchedulingBranch>().WithMany().HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Restrict);
+        });
+        model.Entity<TreatmentTemplateItem>(b =>
+        {
+            b.ToTable("TREATMENT_TEMPLATE_ITEM"); b.HasKey(x => x.Id);
+            b.HasIndex(x => new { x.TemplateId, x.Position });
+            b.HasOne<TreatmentTemplate>().WithMany().HasForeignKey(x => x.TemplateId).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<SchedulingService>().WithMany().HasForeignKey(x => x.ServiceId).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<DCMS.Domain.Features.Accounts.EmployeeProfile>().WithMany().HasForeignKey(x => x.DentistId).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<DCMS.Domain.Features.Accounts.EmployeeProfile>().WithMany().HasForeignKey(x => x.AssistantId).OnDelete(DeleteBehavior.Restrict);
+            b.Property(x => x.TeethJson).HasColumnType("jsonb");
+            b.Property(x => x.ServiceName).HasMaxLength(200);
+            b.Property(x => x.DentistName).HasMaxLength(200);
+            b.Property(x => x.AssistantName).HasMaxLength(200);
+            b.Property(x => x.Note).HasMaxLength(1000);
         });
         model.Entity<TreatmentTemplateVersion>(b =>
         {

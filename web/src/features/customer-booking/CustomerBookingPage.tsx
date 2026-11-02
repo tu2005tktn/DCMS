@@ -1,6 +1,9 @@
 import { Alert, Button, Card, Empty, Input, Select, Spin, Steps, Typography } from 'antd';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
+import FamilyMemberPicker from '../family-members/FamilyMemberPicker';
+import { clinicToday, useFamilyApi, validBirthDate, type FamilyMember } from '../family-members/types';
+import '../family-members/familyMembers.css';
 import { ApiError } from '../../services/api';
 import { customerApi } from '../../services/customerApi';
 import { useCustomerAuth } from '../customer-auth/CustomerAuthContext';
@@ -13,7 +16,7 @@ type Slot = { start: string; end: string; chairId: number; dentistId: number;
   scheduleVersion: number; assistantScheduleVersion: number | null; bookingSettingsVersion?: number };
 type BookingResult = { appointmentId: string; code: string; version: number; status: string;
   startAt: string; endAt: string; notification: { code: string; message: string } };
-type ContactErrors = { bookerName?: string; contact?: string; attendeeName?: string };
+type ContactErrors = { bookerName?: string; contact?: string; attendeeName?: string; attendeeBirthDate?: string };
 
 const formatTime = (value: string) => new Date(value).toLocaleString('vi-VN', {
   timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
@@ -30,6 +33,18 @@ const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const stepNames = ['Người khám', 'Chọn lịch', 'Liên hệ', 'Xem lại', 'Hoàn tất'];
 
 export default function CustomerBookingPage() {
+  const { state } = useCustomerAuth();
+  return <BookingForm key={state.status === 'authenticated' ? state.user.id : 'anonymous'} />;
+}
+function BookingForm() {
+  const [params] = useSearchParams();
+  const familyRequest = useFamilyApi();
+  const [selectedMember, setSelectedMember] = useState<FamilyMember | null>(null);
+  const [familyError, setFamilyError] = useState('');
+  const [familyLoading, setFamilyLoading] = useState(false);
+  const [familyRevision, setFamilyRevision] = useState(0);
+  const familySelection = useRef(0);
+  const [attendeeBirthDate, setAttendeeBirthDate] = useState('');
   const { state, expire, reload } = useCustomerAuth();
   const token = state.status === 'authenticated' ? state.accessToken : undefined;
   const [options, setOptions] = useState<Options | null>(null);
@@ -55,6 +70,23 @@ export default function CustomerBookingPage() {
   const retryRef = useRef<{ fingerprint: string; key: string } | null>(null);
   const prefilledAccount = useRef<number | null>(null);
   const account = state.status === 'authenticated' ? state.user : null;
+  const linkedMemberId = params.get('familyMemberId');
+  useEffect(() => {
+    if (!linkedMemberId || !account?.id) return;
+    let active = true; const controller = new AbortController(); const selection = ++familySelection.current;
+    setRelation('Relative'); setFamilyLoading(true); setFamilyError('');
+    setSelectedMember(null); setAttendeeName(''); setAttendeeBirthDate('');
+    void familyRequest<FamilyMember>(`/${encodeURIComponent(linkedMemberId)}`, { signal: controller.signal })
+      .then(member => { if (active && selection === familySelection.current) { setSelectedMember(member); setAttendeeName(member.fullName); setAttendeeBirthDate(member.birthDate ?? ''); } })
+      .catch(failure => { if (active && selection === familySelection.current) setFamilyError(failure instanceof ApiError && failure.status === 404 ? 'Người thân đã xóa hoặc không còn khả dụng. Hãy chọn lại người thân đã lưu.' : (failure as Error).message); })
+      .finally(() => { if (active && selection === familySelection.current) setFamilyLoading(false); });
+    return () => { active = false; controller.abort(); };
+  }, [linkedMemberId, account?.id, familyRequest, familyRevision]);
+  function chooseMember(member: FamilyMember | null) {
+    familySelection.current++; setFamilyLoading(false); setFamilyError('');
+    setSelectedMember(member); setAttendeeName(member?.fullName ?? ''); setAttendeeBirthDate(member?.birthDate ?? '');
+    setFieldErrors(previous => ({ ...previous, attendeeName: undefined, attendeeBirthDate: undefined }));
+  }
   useEffect(() => {
     if (!account || prefilledAccount.current === account.id) return;
     const changedAccount = prefilledAccount.current !== null;
@@ -107,6 +139,7 @@ export default function CustomerBookingPage() {
     if (!phonePattern.test(contact.trim()) && !emailPattern.test(contact.trim()))
       next.contact = 'Nhập số điện thoại Việt Nam hoặc email hợp lệ.';
     if (!attendeeName.trim() || attendeeName.trim().length > 100) next.attendeeName = 'Nhập họ tên người khám (1–100 ký tự).';
+    if (relation === 'Relative' && !validBirthDate(attendeeBirthDate)) next.attendeeBirthDate = 'Ngày sinh không hợp lệ hoặc sau ngày hiện tại.';
     setFieldErrors(next);
     return Object.keys(next).length === 0;
   }
@@ -118,7 +151,7 @@ export default function CustomerBookingPage() {
     const payload = {
       branchId, booker: { name: bookerName.trim(), phone: phonePattern.test(cleanContact) ? cleanContact : null,
         email: phonePattern.test(cleanContact) ? null : cleanContact },
-      attendee: { patientId: null, name: attendeeName.trim(), birthDate: null },
+      attendee: { patientId: null, name: attendeeName.trim(), birthDate: relation === 'Relative' ? attendeeBirthDate || null : null },
       attendeeRelation: relation, kind: 'Standard', source: 'App', serviceId: service.id, reason: reason.trim() || null,
       dentistId, assistantId: null, chairId: null, startAt: slot.start,
       durationMinutes: service.publicDurationMinutes, followUpId: null, exceptionReason: null, bookingSettingsVersion: slot.bookingSettingsVersion,
@@ -169,14 +202,19 @@ export default function CustomerBookingPage() {
         <h2>Bạn đặt lịch cho ai?</h2><p>Chúng tôi sẽ dùng lựa chọn này để hiển thị đúng thông tin người khám.</p>
         <div className="customer-relation-options" role="group" aria-label="Người khám">
           <Button className="customer-relation-option" aria-pressed={relation === 'Self'} onClick={() => {
-            if (relation !== 'Self') { setRelation('Self'); if (account) setAttendeeName(account.fullName); }
+            if (relation !== 'Self') { familySelection.current++; setFamilyLoading(false); setFamilyError(''); setRelation('Self'); setSelectedMember(null); setAttendeeBirthDate(''); if (account) setAttendeeName(account.fullName); }
           }}><strong>Bản thân</strong><span>Tôi là người đến khám</span></Button>
           <Button className="customer-relation-option" aria-pressed={relation === 'Relative'} onClick={() => {
-            if (relation !== 'Relative') { setRelation('Relative'); setAttendeeName(''); }
+            if (relation !== 'Relative') { setRelation('Relative'); chooseMember(null); }
           }}><strong>Người thân</strong><span>Tôi đặt lịch cho một người khác</span></Button>
         </div>
         {relation === 'Relative' && <Alert type="info" showIcon message="Đặt lịch cho người thân không cấp quyền xem hồ sơ bệnh án của họ." />}
-        <div className="customer-booking-actions"><Button type="primary" onClick={() => setStep(1)}>Tiếp tục</Button></div>
+        {relation === 'Relative' && <>
+          {familyLoading && <p role="status">Đang tải người thân đã chọn…</p>}
+          {familyError && <Alert type="error" showIcon message={familyError} action={<Button onClick={() => setFamilyRevision(r => r + 1)}>Thử lại</Button>} />}
+          <FamilyMemberPicker selected={selectedMember} onChange={chooseMember} />
+        </>}
+        <div className="customer-booking-actions"><Button type="primary" disabled={familyLoading || (relation === 'Relative' && !selectedMember)} onClick={() => setStep(1)}>Tiếp tục</Button></div>
       </div>}
       {step === 1 && <div className="customer-booking-section">
         <h2>Chọn nơi khám và khung giờ</h2>
@@ -244,6 +282,11 @@ export default function CustomerBookingPage() {
           <fieldset className="customer-booking-person"><legend>Người đến khám</legend><p>{relation === 'Self' ? 'Thông tin của bạn.' : 'Thông tin người thân sẽ đến khám.'}</p>
             <label>Họ tên người khám<Input value={attendeeName} maxLength={100} onChange={event => setAttendeeName(event.target.value)}
               status={fieldErrors.attendeeName ? 'error' : undefined} />{fieldErrors.attendeeName && <Typography.Text type="danger">{fieldErrors.attendeeName}</Typography.Text>}</label>
+            {relation === 'Relative' && <label>Ngày sinh người khám (không bắt buộc)<Input id="booking-attendee-birth" type="date" max={clinicToday()} value={attendeeBirthDate}
+              onChange={e => { setAttendeeBirthDate(e.target.value); setFieldErrors(previous => ({ ...previous, attendeeBirthDate: undefined })); }}
+              aria-invalid={!!fieldErrors.attendeeBirthDate} status={fieldErrors.attendeeBirthDate ? 'error' : undefined}
+              aria-describedby={fieldErrors.attendeeBirthDate ? 'booking-attendee-birth-error' : undefined} />
+              {fieldErrors.attendeeBirthDate && <span className="customer-field-error" id="booking-attendee-birth-error">{fieldErrors.attendeeBirthDate}</span>}</label>}
           </fieldset>
         </div>
         {relation === 'Relative' && <Alert type="info" showIcon message="Đặt lịch cho người thân không cấp quyền xem hồ sơ bệnh án của họ." />}
@@ -263,6 +306,7 @@ export default function CustomerBookingPage() {
         <dl className="customer-review-grid">
           <div className="customer-review-item"><dt>Người đặt</dt><dd>{bookerName} · {contact}</dd></div>
           <div className="customer-review-item"><dt>Người khám</dt><dd>{attendeeName} ({relation === 'Self' ? 'Bản thân' : 'Người thân'})</dd></div>
+          {relation === 'Relative' && attendeeBirthDate && <div className="customer-review-item"><dt>Ngày sinh người khám</dt><dd>{formatBookingDate(attendeeBirthDate)}</dd></div>}
         </dl>
         <div className="customer-booking-actions"><Button onClick={() => setStep(2)}>Sửa thông tin</Button>
           <Button type="primary" loading={submitting} disabled={authExpired} onClick={() => void confirm()}>Xác nhận đặt lịch</Button></div>

@@ -1,5 +1,8 @@
 namespace DCMS.Application.Features.Treatment;
 
+public sealed record ImportItemPlanRequest(Guid ItemPlanId, int ExpectedItemPlanVersion, int ExpectedVersion, Guid RequestKey);
+public sealed record ImportItemPlanResult(TreatmentDossierDto Dossier, Guid[] CreatedItemIds, Guid ItemPlanId, int ItemPlanVersion);
+
 public sealed record SheetService(int Id, int BranchId, string Name, string Unit, long? ReferenceUnitPriceVnd, int PriceVersion);
 public sealed record SheetMember(int Id, string Name, bool CanDentist);
 public sealed record SheetVisit(Guid Id, int Version, DateTimeOffset ArrivalAt, int DentistId);

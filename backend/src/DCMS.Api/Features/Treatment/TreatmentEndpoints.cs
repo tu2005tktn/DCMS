@@ -24,6 +24,10 @@ public static class TreatmentEndpoints
                 AuthenticationEndpoints.AccountId(context.User), serviceId, request, ct)));
         var patient = endpoints.MapGroup("/api/patients/{patientId:int}/dossiers")
             .RequireAuthorization(DentistPolicy).WithTags("UC-13/39 S21/S43 Treatment");
+        patient.MapGet("/create-context", async (HttpContext context, int patientId, ITreatmentDossierService service, CancellationToken ct) =>
+            Results.Ok(await service.CreateContextAsync(AuthenticationEndpoints.AccountId(context.User), patientId, ct)));
+        patient.MapPost("/quick", async (HttpContext context, int patientId, QuickDossierRequest request, ITreatmentDossierService service, CancellationToken ct) =>
+            Results.Ok(await service.QuickCreateAsync(AuthenticationEndpoints.AccountId(context.User), patientId, request, ct)));
         patient.MapGet("/", async (HttpContext context, int patientId, int? branchId, int? page, int? pageSize,
             ITreatmentDossierService service, CancellationToken ct) =>
             Results.Ok(await service.ListAsync(AuthenticationEndpoints.AccountId(context.User), patientId,
@@ -40,6 +44,8 @@ public static class TreatmentEndpoints
 
         var dossier = endpoints.MapGroup("/api/dossiers/{dossierId:guid}")
             .RequireAuthorization(DentistPolicy).WithTags("UC-13/39 S21/S43 Treatment");
+        dossier.MapPost("/sheet-items/from-item-plan", async (HttpContext context, Guid dossierId, ImportItemPlanRequest request, ITreatmentDossierService service, CancellationToken ct) =>
+            Results.Ok(await service.ImportItemPlanAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, request, ct)));
         dossier.MapGet("/", async (HttpContext context, Guid dossierId, ITreatmentDossierService service, CancellationToken ct) =>
             Results.Ok(await service.GetAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, ct)));
         dossier.MapGet("/sheet-context", async (HttpContext context, Guid dossierId, ITreatmentDossierService service, CancellationToken ct) =>

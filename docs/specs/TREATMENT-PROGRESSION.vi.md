@@ -1,5 +1,8 @@
 # S58/S21/S24 — Mẫu, tiến trình điều trị và chỉ định quay lại
 
+## Giao diện kế hoạch dùng lại — 02/11/2026
+Menu `/treatment-templates` nay hiển thị Kế hoạch điều trị dạng hạng mục theo `TREATMENT-ITEM-PLANS.md`. Mẫu bước tiến trình cũ và hợp đồng bên dưới giữ tại `/treatment-templates/legacy`. DefinitionKind LegacySteps/ItemPlan phân biệt nguồn; API progression cũ chỉ đọc/sửa/áp dụng LegacySteps chưa xóa. Kế hoạch ItemPlan CRUD độc lập, chưa áp dụng vào dossier và không tạo bước/actual/lịch/tiền.
+
 Nguồn nghiệp vụ hiện hành: DCMS_Screen_Specifications_v2.3 và DCMS_Use_Cases_Business_Rules_Messages_v2.3, 24/10/2026; bổ sung phân công 25/10/2026; UC-13/14/17/24/51/53, GBR-129–132/135/153/154/156/162, AT30/31/32/37/42/45/46/47/52. Vinh sở hữu S58, phần Steps của S21 và backend chỉ định; UI S24 thuộc DCMS-106. Quyết định không quản lý thuốc theo lô vẫn có hiệu lực.
 
 ## Bổ sung hợp đồng v2.3
