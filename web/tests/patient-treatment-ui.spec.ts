@@ -58,7 +58,14 @@ async function prepare(page: Page, withItem = true, withFinance = false) {
     if (path.endsWith('/confirm-plan')) {
       if (state.conflict) return route.fulfill({ status: 409, json: { code: 'MSG111', message: 'MSG111 — phiên bản đã thay đổi' } });
       const id = path.split('/').at(-2)!, draft = state.drafts.get(id); const body = r.postDataJSON(); state.requests.push(body);
-      state.items.push({ ...item, id, region: draft.row.regions.join(', '), quantity: draft.row.quantity, decision: body.decision?.decision ?? 'Proposed', entrySource: 'ClinicianEntry', estimatedMinutes: draft.row.estimatedMinutes, agreedUnitPriceVnd: draft.row.unitPriceVnd });
+      state.items.push({ ...item, id, serviceId: draft.row.serviceId, serviceName: draft.row.serviceName,
+        region: draft.row.regions.join(', '), quantity: draft.row.quantity, decision: body.decision?.decision ?? 'Proposed',
+        entrySource: 'ClinicianEntry', estimatedStart: draft.row.date ?? null, estimatedMinutes: draft.row.estimatedMinutes,
+        note: draft.row.note, responsibleDentistId: draft.row.dentistId, assistantId: draft.row.assistantId,
+        displayCompleted: false, progress: 'NotStarted', agreedUnitPriceVnd: draft.row.unitPriceVnd,
+        discount: draft.row.discountValue > 0 ? { type: draft.row.discountType === 'Percent' ? 'Percent' : 'Fixed', value: draft.row.discountValue,
+          reason: draft.row.discountNote, status: 'Approved', amountVnd: draft.row.discountType === 'Percent'
+            ? Math.round(draft.row.costVnd * draft.row.discountValue / 100) : draft.row.discountValue } : null });
       state.drafts.delete(id); state.version++; return ok({ dossier: detail() });
     }
     if (path.endsWith('/confirm-actual')) {
@@ -192,7 +199,7 @@ test('hàng chỉ có răng, thời gian và text; lưu một lần bấm, lỗi
 test('Thực hiện mở hàng sửa; × hủy và ✓ mới lưu/gạch ngang; xóa kế hoạch giữ actual', async ({ page }) => {
   const state = await prepare(page);
   await page.getByRole('button', { name: 'Chức năng Trám răng', exact: true }).click();
-  await expect(page.locator('.ant-dropdown:visible').getByRole('menuitem')).toHaveCount(4);
+  await expect(page.locator('.ant-dropdown:visible').getByRole('menuitem')).toHaveCount(5);
   await page.getByRole('menuitem', { name: 'Thực hiện', exact: true }).click();
   await expect(page.getByLabel('Nhập quá trình điều trị')).toBeVisible();
   await expect(page.getByLabel('Ghi chú việc đã làm')).toHaveValue('Ghi chú kế hoạch');
@@ -483,4 +490,55 @@ for(const width of [390,768,1440]) test('ô thêm ảnh dùng bàn phím và b�
   await chooser.setFiles({name:'wrong.pdf',mimeType:'application/pdf',buffer:Buffer.from('synthetic')});
   await expect(page.getByText('Chỉ chọn ảnh JPEG/PNG không rỗng, tối đa 20 MB mỗi ảnh.')).toBeVisible();
   const box=await button.boundingBox();expect(box?.width).toBeGreaterThanOrEqual(44);expect(box!.x+box!.width).toBeLessThanOrEqual(width);
+});
+
+
+
+test('Sao chép lưu ngay đủ dữ liệu, không editor/xác nhận và giữ nguyên nguồn',async({page})=>{
+  const state=await prepare(page);Object.assign(state.items[0],{estimatedStart:'2026-11-02',estimatedMinutes:35,note:'Ghi chú sao chép',assistantId:8,displayCompleted:true,agreedUnitPriceVnd:275000,
+    discount:{type:'Percent',value:10,reason:'Giảm theo ca',status:'Approved',amountVnd:55000}});
+  const original=structuredClone(state.items[0]);await page.goto('/patients/123?tab=treatment');
+  await expect(page.locator('.treatment-sheet-row-completed')).toHaveCount(1);
+  const writes:string[]=[];page.on('request',r=>{if(r.method()!=='GET'&&r.url().includes('/api/'))writes.push(r.url());});
+  await page.getByRole('button',{name:'Chức năng Trám răng',exact:true}).click();await page.getByRole('menuitem',{name:'Sao chép',exact:true}).click();
+  await expect(page.locator('.treatment-sheet-plan-table tbody > tr')).toHaveCount(2);
+  await expect(page.getByRole('row',{name:'Nhập hạng mục kế hoạch',exact:true})).toHaveCount(0);await expect(page.getByRole('button',{name:'Đồng ý',exact:true})).toHaveCount(0);
+  expect(state.items[0]).toEqual(original);const copy=state.items[1];expect(copy.id).not.toBe(original.id);
+  expect(copy).toMatchObject({estimatedStart:'2026-11-02',estimatedMinutes:35,note:'Ghi chú sao chép',assistantId:8,region:'25, 26',quantity:2,agreedUnitPriceVnd:275000,displayCompleted:false,progress:'NotStarted',decision:'Proposed'});
+  expect(copy.discount).toMatchObject(original.discount);expect(state.activities).toHaveLength(0);
+  expect(writes.filter(u=>u.endsWith('/confirm-plan'))).toHaveLength(1);expect(writes.some(u=>u.includes('/sheet-items/'))).toBe(false);
+  await expect(page.getByText('Tổng dự toán: 1.100.000 ₫',{exact:true})).toBeVisible();await expect(page.getByText('Thành tiền: 990.000 ₫',{exact:true})).toBeVisible();
+  await page.reload();await expect(page.locator('.treatment-sheet-plan-table tbody > tr')).toHaveCount(2);await expect(page.locator('.treatment-sheet-row-completed')).toHaveCount(1);
+});
+
+test('Sao chép lỗi mạng thử lại cùng ID/key, không mở hàng và không ghi hai bản',async({page})=>{
+  const state=await prepare(page);const confirms:any[]=[];let failed=false;
+  await page.route('**/sheet-drafts/*/confirm-plan',async route=>{confirms.push({url:route.request().url(),body:route.request().postDataJSON()});if(!failed){failed=true;return route.fulfill({status:503,json:{code:'MSG144',message:'Lỗi sao chép thử nghiệm'}});}return route.fallback();});
+  await page.getByRole('button',{name:'Chức năng Trám răng',exact:true}).click();await page.getByRole('menuitem',{name:'Sao chép',exact:true}).click();
+  await expect(page.getByText('Lỗi sao chép thử nghiệm')).toBeVisible();expect(state.items).toHaveLength(1);expect(state.drafts.size).toBe(1);
+  await expect(page.getByRole('row',{name:'Nhập hạng mục kế hoạch',exact:true})).toHaveCount(0);
+  await page.getByRole('button',{name:'Thử lại sao chép',exact:true}).click();await expect(page.locator('.treatment-sheet-plan-table tbody > tr')).toHaveCount(2);
+  expect(confirms).toHaveLength(2);expect(confirms[1]).toEqual(confirms[0]);expect(state.items).toHaveLength(2);expect(state.drafts.size).toBe(0);expect(state.activities).toHaveLength(0);
+});
+
+test('Sao chép MSG111 đọc version mới rồi thử lại, khóa thao tác khi đang nhập',async({page})=>{
+  const state=await prepare(page);state.conflict=true;
+  await page.getByRole('button',{name:'Chức năng Trám răng',exact:true}).click();await page.getByRole('menuitem',{name:'Sao chép',exact:true}).click();
+  await expect(page.getByText('MSG111 — phiên bản đã thay đổi',{exact:true})).toBeVisible();state.conflict=false;state.version++;
+  await page.getByRole('button',{name:'Đọc lại phiên bản sao chép',exact:true}).click();await page.getByRole('button',{name:'Thử lại sao chép',exact:true}).click();
+  await expect(page.locator('.treatment-sheet-plan-table tbody > tr')).toHaveCount(2);expect(state.items).toHaveLength(2);
+  await page.getByRole('button',{name:'Thêm hạng mục kế hoạch',exact:true}).click();await page.getByRole('button',{name:'Chức năng Trám răng',exact:true}).first().click();
+  await expect(page.getByRole('menuitem',{name:'Sao chép',exact:true})).toHaveAttribute('aria-disabled','true');await page.keyboard.press('Escape');
+  await page.getByRole('button',{name:'Đóng hàng nhập',exact:true}).click();expect(state.items).toHaveLength(2);
+});
+
+test('Sao chép đang gửi khóa bấm lặp, lần sao chép mới sau thành công dùng ID mới',async({page})=>{
+  const state=await prepare(page);let release!:()=>void;const gate=new Promise<void>(resolve=>{release=resolve;});let count=0;
+  await page.route('**/sheet-drafts/*/confirm-plan',async route=>{count++;if(count===1)await gate;return route.fallback();});
+  await page.getByRole('button',{name:'Chức năng Trám răng',exact:true}).click();await page.getByRole('menuitem',{name:'Sao chép',exact:true}).click();
+  await expect.poll(()=>count).toBe(1);await page.getByRole('button',{name:'Chức năng Trám răng',exact:true}).click();
+  await expect(page.getByRole('menuitem',{name:'Sao chép',exact:true})).toHaveAttribute('aria-disabled','true');release();await page.keyboard.press('Escape');
+  await expect(page.locator('.treatment-sheet-plan-table tbody > tr')).toHaveCount(2);
+  await page.getByRole('button',{name:'Chức năng Trám răng',exact:true}).first().click();await page.getByRole('menuitem',{name:'Sao chép',exact:true}).click();
+  await expect(page.locator('.treatment-sheet-plan-table tbody > tr')).toHaveCount(3);expect(new Set(state.items.map(i=>i.id)).size).toBe(3);expect(state.activities).toHaveLength(0);
 });

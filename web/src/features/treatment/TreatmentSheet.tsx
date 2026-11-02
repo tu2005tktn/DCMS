@@ -30,6 +30,8 @@ export default function TreatmentSheet({ patientId, dossierId, dossierVersion, o
   const [busy, setBusy] = useState(false), actionGuard = useRef(false);
   const actionKey = useRef<{ payload: string; key: string } | null>(null);
   const write = useRef<{ id: string; payload: string; key: string; expected: number; saved?: number } | null>(null);
+  const copying = useRef<{ sourceId: string; row: SheetActualPreview; draftKey: string; confirmKey: string; expected: number; saved?: number } | null>(null);
+  const [copyError, setCopyError] = useState<{ message: string; stale: boolean } | null>(null);
   const [note, setNote] = useState(''), [noteBusy, setNoteBusy] = useState(false), [noteError, setNoteError] = useState<string>();
   const noteDirty = useRef(false), noteSaved = useRef('');
   const noteKey = useRef<{ text: string; key: string; version: number } | null>(null);
@@ -102,14 +104,55 @@ export default function TreatmentSheet({ patientId, dossierId, dossierVersion, o
     } catch (e) { setError((e as Error).message); return false; }
     finally { actionGuard.current = false; setBusy(false); }
   }
-  function edit(item: TreatmentItem) {
+  function planRow(item: TreatmentItem, id = item.id): SheetActualPreview {
     const percent = item.discount?.type === 'Percent';
-    setEditor({ kind: 'plan', itemId: item.id, row: { id: item.id, serviceId: item.serviceId, serviceName: item.serviceName,
+    return { id, serviceId: item.serviceId, serviceName: item.serviceName,
       date: item.estimatedStart ?? undefined, regions: (item.region ?? '').split(/[,;\s]+/).filter(Boolean), quantity: item.quantity,
       dentistId: item.responsibleDentistId ?? dossier!.dentistId, dentistName: '', assistantId: item.assistantId ?? undefined,
       note: item.note ?? undefined, estimatedMinutes: item.estimatedMinutes ?? undefined, unitPriceVnd: item.agreedUnitPriceVnd,
       costVnd: Math.round(item.quantity * item.agreedUnitPriceVnd), discountType: percent ? 'Percent' : 'VND',
-      discountValue: item.discount?.value ?? 0, discountNote: item.discount?.reason } });
+      discountValue: item.discount?.value ?? 0, discountNote: item.discount?.reason };
+  }
+  function edit(item: TreatmentItem) {
+    setError(undefined); write.current = null;
+    setEditor({ kind: 'plan', itemId: item.id, row: planRow(item) });
+  }
+  async function copyItem(item?: TreatmentItem) {
+    if (!dossier || !context || editor || actionGuard.current) return;
+    if (!copying.current) {
+      if (!item) return;
+      copying.current = { sourceId: item.id, row: planRow(item, crypto.randomUUID()),
+        draftKey: crypto.randomUUID(), confirmKey: crypto.randomUUID(), expected: dossier.version };
+    }
+    const attempt = copying.current;
+    actionGuard.current = true; setBusy(true); setCopyError(null);
+    try {
+      if (attempt.saved === undefined) {
+        const draft = await api<Draft>(`/api/dossiers/${dossierId}/sheet-drafts/${attempt.row.id}`, { method: 'PUT',
+          body: JSON.stringify({ kind: 'Plan', row: attempt.row, expectedVersion: 0, requestKey: attempt.draftKey }) });
+        attempt.saved = draft.version;
+      }
+      const result = await api<{ dossier: TreatmentDossier }>(`/api/dossiers/${dossierId}/sheet-drafts/${attempt.row.id}/confirm-plan`, { method: 'POST',
+        body: JSON.stringify({ expectedVersion: attempt.expected, expectedDraftVersion: attempt.saved,
+          requestKey: attempt.confirmKey, decision: null }) });
+      accept({ value: result.dossier, ctx: context, rows: drafts.filter(d => d.id !== attempt.row.id) });
+      copying.current = null; refresh();
+    } catch (e) { setCopyError({ message: (e as Error).message, stale: e instanceof ApiError && e.code === 'MSG111' }); }
+    finally { actionGuard.current = false; setBusy(false); }
+  }
+  async function reloadCopy() {
+    if (actionGuard.current) return;
+    actionGuard.current = true; setBusy(true);
+    try {
+      const loaded = await load(); accept(loaded);
+      const attempt = copying.current;
+      if (attempt && loaded.value.items.some(i => i.id === attempt.row.id)) { copying.current = null; setCopyError(null); }
+      else if (attempt) {
+        attempt.expected = loaded.value.version; attempt.confirmKey = crypto.randomUUID();
+        setCopyError({ message: 'Đã đọc phiên bản mới. Bạn có thể thử lại sao chép.', stale: false });
+      }
+    } catch (e) { setCopyError({ message: (e as Error).message, stale: true }); }
+    finally { actionGuard.current = false; setBusy(false); }
   }
   function editActivity(activity: SheetActivity) {
     setEditor({ kind: 'actual', activity, row: { id: activity.id, serviceId: activity.serviceId,
@@ -167,6 +210,9 @@ export default function TreatmentSheet({ patientId, dossierId, dossierVersion, o
     onCancel={closeEditor} onSubmit={(r,v,_values,key) => saveRow(kind,r,v,key)} onReload={reloadSource} />;
   return <div className="treatment-sheet-body">
     {error && <Alert type="error" message={error} action={<Button onClick={() => void reloadSource().catch(e => setError(e.message))}>Đọc lại phiên bản</Button>} />}
+    {copyError && <Alert type="error" message={copyError.message} action={copyError.stale
+      ? <Button disabled={busy} onClick={() => void reloadCopy()}>Đọc lại phiên bản sao chép</Button>
+      : <Button disabled={busy} onClick={() => void copyItem()}>Thử lại sao chép</Button>} />}
     <div className="treatment-sheet-tools">
       {dossier.sourceExaminationId && <Link to={`/visits/${dossier.sourceExaminationId}`}>Mở nguồn khám</Link>}</div>
     <h2 className="treatment-sheet-print-title">Phiếu điều trị {dossier.code}</h2>
@@ -181,6 +227,7 @@ export default function TreatmentSheet({ patientId, dossierId, dossierVersion, o
         <td><Dropdown trigger={['click']} menu={{ items: [
           { key: 'perform', label: 'Thực hiện', disabled: !canWrite || busy || !!editor, onClick: () => beginTransfer(item) },
           { key: 'complete', label: item.displayCompleted ? 'Bỏ hoàn tất' : 'Hoàn tất', disabled: !canWrite || busy || !!editor, onClick: () => void act(item,'mark') },
+          { key: 'copy', label: 'Sao chép', disabled: !canWrite || busy || !!editor || !!copyError, onClick: () => void copyItem(item) },
           { key: 'edit', label: 'Sửa', disabled: !canWrite || busy || !!editor, onClick: () => edit(item) },
           { key: 'delete', label: 'Xóa', disabled: !canWrite || busy || !!editor, onClick: () => { setError(undefined); setDeleting(item); } },
         ] }}><button className="treatment-sheet-row-action" aria-label={`Chức năng ${item.serviceName}`}>⋯</button></Dropdown></td>
