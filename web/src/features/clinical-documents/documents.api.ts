@@ -26,7 +26,7 @@ const httpDocumentsApi: DocumentsApi = {
   contexts: patientId => api(`/api/patients/${patientId}/document-contexts`),
   list: q => {
     const query = new URLSearchParams({ patientId: String(q.patientId), page: String(q.page), pageSize: String(q.pageSize) });
-    for (const key of ['visitId', 'dossierId', 'planId', 'type', 'from', 'to'] as const) if (q[key]) query.set(key, String(q[key]));
+    for (const key of ['visitId', 'dossierId', 'planId', 'type', 'from', 'to', 'imagesOnly'] as const) if (q[key]) query.set(key, String(q[key]));
     return api(`/api/clinical-documents?${query}`);
   },
   detail: id => api(`/api/clinical-documents/${encodeURIComponent(id)}`),

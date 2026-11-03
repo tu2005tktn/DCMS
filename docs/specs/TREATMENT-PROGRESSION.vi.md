@@ -1,5 +1,8 @@
 # S58/S21/S24 — Mẫu, tiến trình điều trị và chỉ định quay lại
 
+## Giao diện kế hoạch dùng lại — 02/11/2026
+Menu `/treatment-templates` nay hiển thị Kế hoạch điều trị dạng hạng mục theo `TREATMENT-ITEM-PLANS.md`. Mẫu bước tiến trình cũ và hợp đồng bên dưới giữ tại `/treatment-templates/legacy`. DefinitionKind LegacySteps/ItemPlan phân biệt nguồn; API progression cũ chỉ đọc/sửa/áp dụng LegacySteps chưa xóa. Kế hoạch ItemPlan CRUD độc lập, chưa áp dụng vào dossier và không tạo bước/actual/lịch/tiền.
+
 Nguồn nghiệp vụ hiện hành: DCMS_Screen_Specifications_v2.3 và DCMS_Use_Cases_Business_Rules_Messages_v2.3, 24/10/2026; bổ sung phân công 25/10/2026; UC-13/14/17/24/51/53, GBR-129–132/135/153/154/156/162, AT30/31/32/37/42/45/46/47/52. Vinh sở hữu S58, phần Steps của S21 và backend chỉ định; UI S24 thuộc DCMS-106. Quyết định không quản lý thuốc theo lô vẫn có hiệu lực.
 
 ## Bổ sung hợp đồng v2.3
@@ -61,6 +64,8 @@ Ví dụ request cho UI S24 của Tuấn (IDs lấy từ GET dossier/steps, Dent
 ```
 
 `POST /api/follow-up-instructions` trả HTTP 201 với `{ "instruction": { "id": "...", "status": "NeedsBooking", "version": 1, "activeAppointmentId": null, "allowedActions": ["reviseWindow", "cancel", "supersede", "findSlots"], "overdue": false, ... }, "notification": { "code": "MSG231", "message": "Đã lưu chỉ định quay lại. Chưa có lịch hẹn được đặt." } }`. UI dùng `instruction.id` làm `followUpId` trong `POST /api/appointments` khi bệnh nhân tự thân đã xác minh hoặc staff đặt; `Find slots` chỉ đọc availability, không chuyển trạng thái. `expectedVersion` lấy từ response gần nhất khi sửa chỉ định. UI S24 không được suy ra Patient từ số điện thoại hay quyền xem hồ sơ người thân.
+
+Cập nhật 03/11/2026: hạng mục nguồn của chỉ định (`source.dossierId` + `source.itemId`) được nhận khi `Decision = Agreed` **hoặc** `EntrySource = ClinicianEntry` (hạng mục nhập trực tiếp trên phiếu); các điều kiện phiếu `Open`, kế hoạch `Committed` và đúng `PlanVersion` giữ nguyên. Tab Lịch hẹn dùng chỉ định này để đặt buổi kế tiếp, xem [TREATMENT-NEXT-VISIT-BOOKING.md](TREATMENT-NEXT-VISIT-BOOKING.md).
 
 Booking port phải dùng cùng scoped DbContext/transaction: `ValidateAsync` kiểm Patient, window, duration, dentist, readiness và một active appointment; `MarkBookedAsync` ghi link; `MarkNeedsBookingAsync` kiểm đúng appointment ID và giữ lịch sử. Reschedule kiểm lại instruction trước đổi slot. Outbox ghi trong cùng transaction; dispatcher và UI S24 thuộc task khác. `GET /api/availability` vẫn là nguồn slot, không mở calendar engine mới.
 

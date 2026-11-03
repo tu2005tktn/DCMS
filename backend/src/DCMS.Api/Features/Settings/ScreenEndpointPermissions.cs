@@ -74,6 +74,9 @@ public static class ScreenEndpointPermissions
         if (p.StartsWith("/api/reviews/")) return Need("treatment.read");
         if (p.StartsWith("/api/follow-up-instructions")) return Need(read ? "treatment.read" : "treatment.progress.manage");
         if (p.StartsWith("/api/dossiers")) {
+            if (p.Contains("/payments")) return Need(read ? "finance.read" : "finance.payments.create");
+            if (p.EndsWith("/sheet-items/from-item-plan")) return Need("treatment.items.create");
+            if (p.EndsWith("/plan/planned-dates")) return Need("treatment.items.update");
             if (read) return Need("treatment.read");
             if (p.Contains("/visits/")) return Need("treatment.visits.manage");
             if (p.Contains("/sheet-activities/")) return Need(method == "DELETE" ? "treatment.actuals.delete" : "treatment.actuals.update");
@@ -86,6 +89,7 @@ public static class ScreenEndpointPermissions
             return Need(method == "DELETE" ? "treatment.dossiers.delete" : "treatment.dossiers.update");
         }
         if (p.StartsWith("/api/patients/")) {
+            if (p.EndsWith("/next-visit-candidates")) return Need("treatment.read");
             if (p.EndsWith("/dossiers/financial-context")) return Need("finance.read");
             if (p.Contains("/dossiers")) return Need(read ? "treatment.read" : "treatment.dossiers.create");
             if (p.EndsWith("/examinations")) return Need("examinations.read");

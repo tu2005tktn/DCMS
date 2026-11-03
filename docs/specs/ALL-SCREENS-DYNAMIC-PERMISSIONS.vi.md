@@ -27,7 +27,7 @@ Yêu cầu 02/11/2026: mở rộng phân quyền động cho tất cả màn hì
 | Hồ sơ điều trị | treatment.read | dossiers.create/update/delete; plan.manage; revisions.manage; visits.manage |
 | Dòng kế hoạch điều trị | treatment.read | items.create/update/delete/price |
 | Quá trình thực hiện | treatment.read | actuals.create/update/delete; progress.manage |
-| Mẫu điều trị | treatment.templates.read | manage |
+| Kế hoạch điều trị dùng lại / API mẫu cũ | treatment.templates.read | manage |
 | Giá điều trị | treatment.prices.read | manage |
 | Duyệt thương mại điều trị | treatment.commercial.read | approve |
 | Thanh toán / phiếu thu | finance.read | payments.create/confirm/cancel, receipts.print, receipt-sequence.manage; quotes.manage, investigations.perform, costs.read/manage giữ hiện có |
@@ -56,6 +56,7 @@ Yêu cầu 02/11/2026: mở rộng phân quyền động cho tất cả màn hì
 - Kê đơn/tài liệu tách quyền đọc/ghi khỏi quyền ghi kết luận khám; vẫn kiểm vai trò chuyên môn và phạm vi, không làm đơn thuốc thành bắt buộc.
 - API capabilities/allowedActions và UI không quảng bá thao tác mà nhân viên không được cấp. Thu hồi quyền có hiệu lực từ request tiếp theo; UI refresh/focus giữ bản nhập khi chỉ mất quyền ghi.
 - Không tự cấp các quyền mới cho nhóm hạn chế hiện có. Không thay role/membership/lịch làm việc hoặc dữ liệu lâm sàng chỉ để gán quyền.
+- Tích hợp main PR #39/#40 ngày 03/11: áp kế hoạch dùng lại cần items.create; ngày dự kiến cần items.update; thanh toán theo phiếu cần finance.read/payments.create. Các API người thân giữ Public/ownership. Chi tiết và bằng chứng ở `docs/implementation/VINH-MAIN-INTEGRATION-20261103.vi.md`.
 
 ## Kiểm chứng
 

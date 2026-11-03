@@ -1,3 +1,4 @@
+import PatientImageGallery from '../clinical-documents/PatientImageGallery';
 import PatientExaminationsTab from '../examinations/PatientExaminationsTab';
 import ExaminationTreatmentHandoff from '../examinations/ExaminationTreatmentHandoff';
 import { Alert, Button, Card, Descriptions, Empty, Form, Input, message, Modal, Result, Skeleton, Space, Tabs, Tag, Timeline, Typography } from 'antd';
@@ -188,8 +189,8 @@ export default function PatientProfilePage() {
         </> },
         ...(canReadExaminations ? [{ key:'examinations',label:'Khám',children:<>{patientBanner}<PatientExaminationsTab key={patient.id} patientId={patient.id} active={tab==='examinations'} refreshKey={revision}/></> }] : []),
         ...(canReadTreatment ? [{ key: 'treatment', label: 'Điều trị & Thanh toán', children: sourceExaminationVisitId ? <ExaminationTreatmentHandoff patientId={patient.id} visitId={sourceExaminationVisitId} version={search.get('examinationVersion')}/> : <DossierList patientId={patient.id} visitId={visitId} patientName={patient.fullName} patientCode={patient.patientCode} patientAge={age} /> }] : []),
-        ...(canReadDocuments ? [{ key: 'files', label: 'Hình ảnh', children: <Link to={`/patients/${patient.id}/documents`}>Mở hình ảnh và tài liệu của bệnh nhân</Link> }] : []),
-        ...(canReadAppointments ? [{ key: 'appointments', label: 'Lịch hẹn', children: <PatientAppointmentsTab key={patient.id} patientId={patient.id} active={tab === 'appointments'} revision={revision} /> }] : []),
+        ...(canReadDocuments ? [{ key: 'files', label: 'Hình ảnh', children: <PatientImageGallery patientId={patient.id} /> }] : []),
+        ...(canReadAppointments ? [{ key: 'appointments', label: 'Lịch hẹn', children: <PatientAppointmentsTab key={patient.id} patientId={patient.id} patientName={patient.fullName} patientPhone={patient.phone} active={tab === 'appointments'} revision={revision} /> }] : []),
         ...(canReadPrescriptions ? [{ key: 'prescriptions', label: 'Đơn thuốc', children: <Pending feature="đơn thuốc (S23)" /> }] : []),
       ]} />
     <PatientFormDrawer open={editing} patient={patient} onClose={() => setEditing(false)} onSaved={change => { setEditing(false); saved(change); }} />

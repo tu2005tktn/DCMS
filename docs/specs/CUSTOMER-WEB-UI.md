@@ -1,5 +1,17 @@
 # Giao diện cổng bệnh nhân Web — bản cải thiện 19/10/2026
 
+## Người thân — 01/11/2026
+Thêm route, nav và Dashboard shortcut Người thân của tôi; CRUD tên/quan hệ/ngày sinh và chọn nhanh trong booking theo CUSTOMER-FAMILY-MEMBERS.md. Giữ hệ màu/Ant Design, mobile cards và desktop table. Không đổi Patient/check-in/liên kết, nguồn slot hoặc quy tắc đặt lịch.
+
+## Dashboard theo chức năng hiện có — 01/11/2026
+
+- Trang `/customer/home` đổi bố cục thành lời chào, lịch hẹn gần nhất, thẻ đặt lịch và lối vào Lịch hẹn/Liên kết hồ sơ. Không thay backend, route, quyền hoặc quy trình đặt/đổi/hủy lịch.
+- Dùng lại `GET /api/me/appointments?scope=UPCOMING&status=ALL&page=1&pageSize=20` như màn danh sách. Hiển thị phần tử đầu tiên theo thứ tự sắp tới do server trả về; không tự xác định quyền hoặc sắp lại trạng thái. Chỉ hiển thị các trường sẵn có của AppointmentCard: mã, thời gian, thời lượng, nha sĩ, người khám và trạng thái. Chi nhánh/dịch vụ không có trong DTO danh sách thì không suy đoán.
+- Nút Xem lịch hẹn mở đúng `/customer/appointments/:code`; nút Xem tất cả mở danh sách hiện có. Không đưa thao tác đổi/hủy trực tiếp lên Dashboard.
+- Có loading, không có lịch, lỗi tải và thử lại; 401 dùng cơ chế expire hiện có. Lỗi tải không hiển thị như không có lịch. Nút đặt lịch và liên kết hồ sơ vẫn dùng được khi tải danh sách lỗi.
+- Chưa có nguồn thông báo riêng trong cổng hiện tại: không thêm panel thông báo, số đếm, nhắc lịch hoặc nội dung giả. Không thêm AI, sơ đồ răng, lịch sử điều trị, đơn thuốc hay bệnh án chi tiết. Liên kết hồ sơ vẫn là màn sẵn có, không tự biến thành quyền đọc bệnh án đầy đủ.
+- CSS giới hạn trong Dashboard bệnh nhân; giữ đăng nhập/đăng ký/khôi phục, cổng nhân viên và các trang bệnh nhân khác. Responsive 390/768/1440; vùng bấm >=44px, focus rõ. Kiểm mock với danh sách/empty/lỗi/retry/401 và điều hướng; không tạo dữ liệu thử trong database.
+
 ## Phạm vi và nguyên tắc
 
 - Cải thiện giao diện của `/access` và các trang `/customer/*` hiện có: đăng nhập, đăng ký, khôi phục, trang chủ, đặt lịch sau đăng nhập, danh sách và chi tiết lịch, đổi/hủy lịch, liên kết hồ sơ. Ưu tiên luồng đặt và quản lý lịch.

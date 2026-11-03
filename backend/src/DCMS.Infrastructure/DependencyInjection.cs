@@ -144,6 +144,8 @@ public static class DependencyInjection
         services.AddScoped<Features.SystemSettings.MedicineCatalog>();
         services.AddScoped<DCMS.Application.Features.SystemSettings.IMedicineCatalog>(sp => sp.GetRequiredService<Features.SystemSettings.MedicineCatalog>());
         services.AddScoped<DCMS.Application.Features.SystemSettings.ISupplyCatalog<DCMS.Application.Features.SystemSettings.MedicineInput, DCMS.Application.Features.SystemSettings.MedicineDto>>(sp => sp.GetRequiredService<Features.SystemSettings.MedicineCatalog>());
+        services.AddScoped<DCMS.Application.Features.FamilyMembers.IFamilyMemberService, Features.FamilyMembers.FamilyMemberService>();
+        services.AddScoped<DCMS.Application.Features.Treatment.IItemPlanService, Features.Treatment.ItemPlanService>();
         return services;
     }
 }

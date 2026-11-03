@@ -34,7 +34,7 @@ test('every sidebar entry follows grants, even for an owner role', async ({ page
     ['appointments.read', 'Lịch hẹn'], ['working-schedules.read', 'Lịch làm việc'],
     ['booking-settings.read', 'Cài đặt đặt lịch'], ['patients.read', 'Bệnh nhân'],
     ['reception.read', 'Tiếp nhận và hàng chờ'], ['appointments.support.handle', 'Hộp thư hỗ trợ'],
-    ['treatment.templates.read', 'Mẫu điều trị'], ['treatment.prices.read', 'Giá và duyệt điều trị'],
+    ['treatment.templates.read', 'Kế hoạch điều trị'], ['treatment.prices.read', 'Giá và duyệt điều trị'],
     ['services.read', 'Dịch vụ cận lâm sàng'], ['finance.read', 'Thanh toán'],
     ['accounts.read', 'Quản lý tài khoản'], ['settings.read', 'Thiết lập hệ thống'],
     ['patient-links.read', 'Xác minh liên kết hồ sơ'],
@@ -64,11 +64,11 @@ test('booking settings reader can inspect but cannot change or save configuratio
 test('treatment template reader can inspect templates without writing', async ({ page }) => {
   const state = await prepare(page, ['treatment.templates.read'], {
     '/api/appointments/options': { branches: [{ id: 1, name: 'SYNTHETIC branch' }], dentists: [], chairs: [], services: [] },
-    '/api/treatment-templates': [],
+    '/api/treatment-templates/item-plans': { items: [], total: 0, page: 1, pageSize: 20 },
+    '/api/treatment-templates/item-plans/options': { services: [], members: [] },
   });
   await page.goto('/treatment-templates');
-  await expect(page.getByRole('heading', { name: 'Mẫu điều trị S58', exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Lưu bản nháp', exact: true })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Tạo mẫu', exact: true })).toBeDisabled();
-  expect(state.calls).toContain('/api/treatment-templates');
+  await expect(page.getByRole('heading', { name: 'Kế hoạch điều trị', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Tạo kế hoạch', exact: true })).toBeDisabled();
+  await expect.poll(() => state.calls).toContain('/api/treatment-templates/item-plans');
 });

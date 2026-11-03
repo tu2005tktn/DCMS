@@ -34,7 +34,7 @@ Sidebar có **Thiết lập hệ thống**, mở `/settings`; header hiển th�
 | Phân quyền truy cập | `access-groups` | S04/S52, UC-31 | OS12 |
 | Chi nhánh/cơ sở | `branches` | S57, UC-50 | OS13–14 |
 
-**Danh mục phụ** Nguồn khách hàng, Nghề nghiệp, Tiền sử hành chính, Loại CSKH, Loại chi mở trong Thiết lập chung → Danh mục hồ sơ/nghiệp vụ hoặc từ nút quản lý cạnh select nguồn. Đây là phần DCMS đã nêu ở S58, không phải nhóm thứ 12 quan sát trên oDental. Mẫu điều trị dẫn đến `/treatment-templates` hiện có và giữ quyền nha sĩ.
+**Danh mục phụ** Nguồn khách hàng, Nghề nghiệp, Tiền sử hành chính, Loại CSKH, Loại chi mở trong Thiết lập chung → Danh mục hồ sơ/nghiệp vụ hoặc từ nút quản lý cạnh select nguồn. Đây là phần DCMS đã nêu ở S58, không phải nhóm thứ 12 quan sát trên oDental. Kế hoạch điều trị dẫn đến `/treatment-templates`, giữ quyền nha sĩ và CRUD hạng mục theo `TREATMENT-ITEM-PLANS.md`; Mẫu tiến trình cũ giữ tại `/treatment-templates/legacy`.
 
 Luồng chỉnh sửa: mở nhóm → tải dữ liệu và quyền → tìm/lọc → Thêm/Sửa → kiểm tra → xem tác động khi cần → Lưu → đọc lại ID/version/trạng thái từ server. Mỗi form chỉ lưu một phạm vi; không có nút “Lưu tất cả” gồm cả quyền, giá và chi nhánh.
 

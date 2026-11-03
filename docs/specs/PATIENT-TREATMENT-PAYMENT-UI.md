@@ -22,7 +22,27 @@ Dòng nhập kế hoạch và quá trình cho nhập nhiều số răng, SL riê
 
 Theo ảnh tham chiếu của người dùng, trang hồ sơ dùng toàn bộ chiều rộng: thanh trắng cao gọn với mũi tên và tiêu đề ở trái, năm tab ở giữa, dấu đóng ở phải. Không lặp banner bệnh nhân phía trên tab Điều trị & Thanh toán. Tab Thông tin cơ bản vẫn hiển thị banner và dữ liệu hành chính hiện có; lịch sử thay đổi có đường mở phụ tại đó. Ngay dưới thanh tab của trang điều trị là tên/mã/tuổi bệnh nhân ở trái và ba số liệu xếp ngang ở phải. Ở màn hình hẹp, các thành phần xuống dòng hợp lý và bảng cuộn ngang trong vùng riêng.
 
-Các nhãn tài chính trong ảnh là **Tổng cộng**, **Đã trả**, **Còn lại**. Khi chưa có ledger, UI phải ghi rõ **Tổng cộng (dự kiến)** và “Chưa có dữ liệu đối soát” cho hai số sau; không hiển thị 0 đ hoặc tự tính còn lại. Hai số sau chỉ lấy từ nguồn ledger khi `financialSummary.available` và giá trị tương ứng khác null. Giá kế hoạch và mốc thanh toán không phải tiền đã thu.
+**Cập nhật 03/11/2026 (thay thế quy tắc tài chính cũ ngay bên dưới, theo yêu cầu người dùng):**
+
+- Bỏ thanh tóm tắt ở đầu danh sách phiếu (Tổng cộng dự kiến, Đã trả, Còn nợ, số hoạt động chờ ghi phí). Dòng tên/mã/tuổi bệnh nhân giữ nguyên. Không gọi `GET /api/patients/{id}/dossiers/summary` từ danh sách nữa; endpoint và contract API không đổi.
+- Trong phiếu bỏ dòng **Phí đã ghi nhận**.
+- **Đã trả** = `financialSummary.allocatedVnd` của phiếu khi `financialSummary.available` và giá trị khác null; ngược lại hiển thị `0`. Không dùng khoản dự toán hay mốc thanh toán làm số đã trả.
+- **Còn nợ** (sửa 03/11/2026) = tổng **Còn nợ** của các việc đã làm trong QUÁ TRÌNH ĐIỀU TRỊ, tức Σ max(0, Chi phí − Giảm giá − Đã trả) theo `payments/context`. Cách tính cũ "Thành tiền của kế hoạch − Đã trả" bị bỏ vì kế hoạch và việc đã làm có thể có giá khác nhau, làm Còn nợ sai (ví dụ về 0 dù còn việc chưa trả). Việc chỉ nằm trong kế hoạch, chưa làm, chưa phát sinh nợ. Khi chưa tải được dữ liệu thanh toán mới dùng tạm Thành tiền − Đã trả (tối thiểu 0). Đây không phải `outstandingVnd` của ledger nên không gọi là công nợ kế toán.
+- Hạng mục hoãn/từ chối không vào Thành tiền theo quy tắc hiện hành của dải Kế hoạch.
+
+### Form Tạo thanh toán mới (03/11/2026)
+
+Nút **TRẢ TIỀN...** của phiếu mở hộp thoại **Tạo thanh toán mới** (Ant Design Modal) theo ảnh tham chiếu; dữ liệu và quy tắc ở [TREATMENT-DOSSIER-PAYMENTS.md](TREATMENT-DOSSIER-PAYMENTS.md). Hộp thoại thay Drawer ledger cũ cho nút này; **LỊCH SỬ** liệt kê các thanh toán đã lưu của phiếu (ngày, tổng tiền, phương thức, người thu, ghi chú, các dòng).
+
+- Trường theo thứ tự: **Ngày thanh toán** (mặc định hôm nay giờ Việt Nam); khung nền vàng nhạt hướng dẫn nhập tiền theo từng dịch vụ/thủ thuật; **Tổng tiền thanh toán (đ)** nhập được trực tiếp (đã chốt 03/11/2026): khi nhập tổng, hệ thống tự chia vào các việc đã làm theo thứ tự cũ nhất trước, mỗi dòng không quá Còn nợ, rồi điền số đã chia vào các ô bên dưới; tổng không được vượt tổng Còn nợ của phiếu. Người dùng vẫn sửa được từng ô, và khi sửa ô thì Tổng tự cộng lại các dòng; để trống ô hạng mục là chấp nhận được. Server vẫn nhận phân bổ theo từng dòng như cũ; bảng `Ngày ĐT/DV | Bác sĩ | Điều trị/dịch vụ | Số tiền TT (đ)` điền sẵn từ các việc đã làm trong QUÁ TRÌNH ĐIỀU TRỊ, ô số tiền mặc định 0; **Thanh toán bằng** (Tiền mặt/Chuyển khoản); **Người thu tiền**; **Ghi chú**; nút **QUAY LẠI** và **LƯU LẠI**.
+- Mỗi ô số tiền chỉ nhận số nguyên từ 0 tới Còn nợ của dòng; dòng hết nợ bị khóa và ghi rõ "Đã thanh toán đủ". Dòng không có tên dịch vụ hiển thị "—".
+- Không có việc đã làm, hoặc tất cả hết nợ: hiện thông báo tương ứng và tắt LƯU LẠI. Tổng bằng 0 tắt LƯU LẠI.
+- Đang lưu thì khóa hộp thoại. Lỗi (kể cả MSG111 vượt Còn nợ) hiển thị ngay trong hộp thoại, giữ dữ liệu đã nhập và nêu bước tiếp theo; sau MSG111 tải lại các dòng. Một `requestKey` cho cùng nội dung, đổi nội dung thì tạo key mới.
+- Lưu thành công: đóng hộp thoại, tải lại **Đã trả**, **Còn nợ** và cột **Đã trả** của từng việc trong phiếu.
+- Khả năng truy cập: nhãn cho mọi trường và từng ô số tiền (theo tên dịch vụ), focus rõ, thao tác bàn phím, không chỉ dùng màu để báo lỗi. Màn hình hẹp: bảng cuộn ngang trong vùng riêng.
+- Quy tắc ledger/"chuyển khoản chỉ tính sau xác minh" ở bên dưới không áp dụng cho form này.
+
+Quy tắc cũ (chỉ còn giá trị lịch sử): các nhãn tài chính trong ảnh là **Tổng cộng**, **Đã trả**, **Còn lại**. Khi chưa có ledger, UI phải ghi rõ **Tổng cộng (dự kiến)** và “Chưa có dữ liệu đối soát” cho hai số sau; không hiển thị 0 đ hoặc tự tính còn lại. Giá kế hoạch và mốc thanh toán không phải tiền đã thu.
 
 Mỗi phiếu là một khung trắng lớn có thể mở/thu, viền nhạt và ít khoảng cách giữa các vùng. Hàng đầu chỉ hiển thị ngày lập, mã phiếu và cụm nhãn màu, xóa, in ở góc phải; **không hiển thị hàng “Các chẩn đoán”** theo yêu cầu giao diện mới. Dữ liệu chẩn đoán của dossier không bị xóa và biểu mẫu tạo dossier hiện có vẫn tuân thủ hợp đồng API. Kế hoạch và quá trình có dải tiêu đề xám nhạt, bảng đầy đủ chiều ngang và các cột như mẫu; nút thêm nhỏ màu xanh nằm ở cuối mỗi bảng. Dưới bảng quá trình là tổng và cụm thanh toán bên phải; không hiển thị ô VAT khi chưa có chính sách thuế. Tiếp theo là vùng Hình ảnh với ô nét đứt rồi vùng Ghi chú; nút xanh “+ TẠO PHIẾU MỚI” nằm giữa dưới danh sách. Các phần thiếu API vẫn được thể hiện đúng vị trí và trạng thái không khả dụng, không biến thành dữ liệu giả.
 

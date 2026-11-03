@@ -353,14 +353,37 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
         return result;
     }
 
-    public async Task<TreatmentChange> CreateAsync(int actorId, int patientId, CreateDossierRequest request,
-        CancellationToken ct)
+    public async Task<DossierCreateContext> CreateContextAsync(int actorId, int patientId, CancellationToken ct)
+    {
+        var account = await users.FindByIdAsync(actorId.ToString());
+        if (account == null || !account.IsActive || account.AccountType != "Staff" || !AccountRoles.Effective(await users.GetRolesAsync(account)).Contains(AccountRoles.Dentist)) throw Error("MSG06",403);
+        if (!await db.Patients.AnyAsync(x => x.Id == patientId && !x.IsArchived, ct)) throw Error("MSG113",404);
+        var employee = await db.Employees.AsNoTracking().SingleOrDefaultAsync(x => x.AccountId == actorId, ct) ?? throw Error("MSG06",403);
+        var branches = await (from m in db.Set<SchedulingMember>() join b in db.Set<SchedulingBranch>() on m.BranchId equals b.Id
+            where m.EmployeeId == employee.Id && m.Active && m.CanDentist && b.Active orderby b.Name select new DossierCreateBranch(b.Id,b.Name)).ToListAsync(ct);
+        var scope = await access.ResolveAsync(actorId, ct);
+        if (scope.Assigned && !scope.Owner) branches = branches.Where(x => scope.BranchIds.Contains(x.Id)).ToList();
+        return new(employee.Id, branches);
+    }
+    public Task<TreatmentChange> CreateAsync(int actorId, int patientId, CreateDossierRequest request, CancellationToken ct) => CreateCoreAsync(actorId, patientId, request, ct, false);
+    public async Task<TreatmentChange> QuickCreateAsync(int actorId, int patientId, QuickDossierRequest request, CancellationToken ct)
+    {
+        var context = await CreateContextAsync(actorId, patientId, ct);
+        if (!context.Branches.Any(x => x.Id == request.BranchId)) throw Error("MSG06",403);
+        return await CreateCoreAsync(actorId, patientId, new CreateDossierRequest(request.BranchId, context.DentistId, null, null, null, request.RequestKey, request.SourceVisitId, request.ExpectedSourceVisitVersion), ct, true);
+    }
+    private async Task<TreatmentChange> CreateCoreAsync(int actorId, int patientId, CreateDossierRequest request,
+        CancellationToken ct, bool quick)
     {
         await DentistAsync(actorId, request.BranchId, ct);
-        var replay = await ReplayAsync(actorId, request.RequestKey, "Create", new { patientId, request }, ct);
+        await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
+        await db.Database.ExecuteSqlRawAsync($"SELECT pg_advisory_xact_lock({Features.Scheduling.WorkingScheduleService.TransactionLock})", ct);
+        if (!await db.Patients.AsNoTracking().AnyAsync(x => x.Id == patientId && !x.IsArchived, ct)) throw Error("MSG113", 404);
+        var command = quick ? "QuickCreate" : "Create";
+        var replay = await ReplayAsync(actorId, request.RequestKey, command, new { patientId, request }, ct);
         if (replay != null) return replay;
         var diagnosis = Clean(request.Diagnosis);
-        if (diagnosis == null || diagnosis.Length > 4000 || Clean(request.Note)?.Length > 4000) throw Error("MSG04");
+        if ((!quick && diagnosis == null) || diagnosis?.Length > 4000 || Clean(request.Note)?.Length > 4000) throw Error("MSG04");
         if (!await db.Patients.AsNoTracking().AnyAsync(x => x.Id == patientId && !x.IsArchived, ct))
             throw Error("MSG113", 404);
         if (!await db.Set<SchedulingMember>().AsNoTracking().AnyAsync(x => x.BranchId == request.BranchId
@@ -370,11 +393,11 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
         {
             Code = "HS" + Guid.NewGuid().ToString("N")[..12].ToUpperInvariant(),
             PatientId = patientId, BranchId = request.BranchId, DentistId = request.DentistId,
-            Diagnosis = diagnosis, Note = Clean(request.Note),
+            Diagnosis = diagnosis ?? "", Note = Clean(request.Note),
             StartedOn = request.StartedOn ?? DateOnly.FromDateTime(now.ToOffset(TimeSpan.FromHours(7)).DateTime),
             CreatedAt = now, UpdatedAt = now
         };
-        await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+
         db.TreatmentDossiers.Add(dossier);
         if (request.SourceVisitId.HasValue)
         {
@@ -391,7 +414,7 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
         Event(dossier, actorId, "DossierCreated", new { dossier.Code, dossier.Diagnosis });
         await db.SaveChangesAsync(ct);
         var result = new TreatmentChange(await DetailAsync(dossier, ct), SystemMessages.Get("MSG222", "hồ sơ điều trị", value: dossier.Code));
-        StoreReceipt(actorId, request.RequestKey, "Create", new { patientId, request }, result);
+        StoreReceipt(actorId, request.RequestKey, command, new { patientId, request }, result);
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
         return result;

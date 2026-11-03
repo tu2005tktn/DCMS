@@ -110,12 +110,27 @@ internal static class TreatmentModel
         });
         model.Entity<TreatmentTemplate>(b =>
         {
+            b.Property(x => x.DefinitionKind).HasMaxLength(24).HasDefaultValue("LegacySteps");
             b.ToTable("TREATMENT_TEMPLATE"); b.HasKey(x => x.Id);
             b.HasIndex(x => new { x.BranchId, x.Name });
             b.Property(x => x.Name).HasMaxLength(160);
             b.Property(x => x.Version).IsConcurrencyToken();
             b.HasMany(x => x.Versions).WithOne().HasForeignKey(x => x.TemplateId).OnDelete(DeleteBehavior.Restrict);
             b.HasOne<SchedulingBranch>().WithMany().HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Restrict);
+        });
+        model.Entity<TreatmentTemplateItem>(b =>
+        {
+            b.ToTable("TREATMENT_TEMPLATE_ITEM"); b.HasKey(x => x.Id);
+            b.HasIndex(x => new { x.TemplateId, x.Position });
+            b.HasOne<TreatmentTemplate>().WithMany().HasForeignKey(x => x.TemplateId).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<SchedulingService>().WithMany().HasForeignKey(x => x.ServiceId).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<DCMS.Domain.Features.Accounts.EmployeeProfile>().WithMany().HasForeignKey(x => x.DentistId).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<DCMS.Domain.Features.Accounts.EmployeeProfile>().WithMany().HasForeignKey(x => x.AssistantId).OnDelete(DeleteBehavior.Restrict);
+            b.Property(x => x.TeethJson).HasColumnType("jsonb");
+            b.Property(x => x.ServiceName).HasMaxLength(200);
+            b.Property(x => x.DentistName).HasMaxLength(200);
+            b.Property(x => x.AssistantName).HasMaxLength(200);
+            b.Property(x => x.Note).HasMaxLength(1000);
         });
         model.Entity<TreatmentTemplateVersion>(b =>
         {
@@ -173,6 +188,27 @@ internal static class TreatmentModel
                 t.HasCheckConstraint("CK_FOLLOW_UP_WINDOW", "\"EarliestOn\" <= \"TargetOn\" AND \"TargetOn\" <= \"LatestOn\"");
                 t.HasCheckConstraint("CK_FOLLOW_UP_DURATION", "\"DurationMinutes\" BETWEEN 15 AND 480 AND \"DurationMinutes\" % 15 = 0");
             });
+        });
+        model.Entity<DossierPayment>(b =>
+        {
+            b.ToTable("TREATMENT_DOSSIER_PAYMENT"); b.HasKey(x => x.Id);
+            b.HasIndex(x => new { x.DossierId, x.PaidOn });
+            b.Property(x => x.Method).HasMaxLength(20);
+            b.Property(x => x.Note).HasMaxLength(1000);
+            b.HasOne<TreatmentDossier>().WithMany().HasForeignKey(x => x.DossierId).OnDelete(DeleteBehavior.Restrict);
+            b.HasMany(x => x.Lines).WithOne().HasForeignKey(x => x.PaymentId).OnDelete(DeleteBehavior.Cascade);
+            b.ToTable(t =>
+            {
+                t.HasCheckConstraint("CK_DOSSIER_PAYMENT_TOTAL", "\"TotalVnd\" > 0");
+                t.HasCheckConstraint("CK_DOSSIER_PAYMENT_METHOD", "\"Method\" IN ('Cash','Transfer')");
+            });
+        });
+        model.Entity<DossierPaymentLine>(b =>
+        {
+            b.ToTable("TREATMENT_DOSSIER_PAYMENT_LINE"); b.HasKey(x => new { x.PaymentId, x.ActivityId });
+            b.HasIndex(x => x.ActivityId);
+            b.HasOne<ClinicalActivity>().WithMany().HasForeignKey(x => x.ActivityId).OnDelete(DeleteBehavior.Restrict);
+            b.ToTable(t => t.HasCheckConstraint("CK_DOSSIER_PAYMENT_LINE_AMOUNT", "\"AmountVnd\" > 0"));
         });
         model.Entity<TreatmentProgressionReceipt>(b =>
         {

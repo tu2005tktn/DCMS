@@ -65,6 +65,7 @@ public sealed class AllScreensPermissionApiTests(ReceptionFixture fixture) : ICl
     [InlineData("working-schedules.read", "Dentist", "/api/working-schedules/options", "/api/working-schedules/recurring/publish", "POST")]
     [InlineData("booking-settings.read", "Dentist", "/api/booking-settings/options", "/api/booking-settings/{branch}", "PUT")]
     [InlineData("treatment.templates.read", "Dentist", "/api/treatment-templates?branchId={branch}", "/api/treatment-templates", "POST")]
+    [InlineData("treatment.templates.read", "Dentist", "/api/treatment-templates/item-plans?branchId={branch}", "/api/treatment-templates/item-plans", "POST")]
     [InlineData("treatment.prices.read", "Admin", "/api/service-prices", "/api/service-prices/{service}", "PUT")]
     [InlineData("treatment.commercial.read", "Admin", "/api/commercial/dossiers", "/api/commercial/dossiers/11111111-1111-4111-8111-111111111111/deposit-exception", "POST")]
     [InlineData("treatment.read", "Dentist", "/api/patients/{patient}/dossiers?branchId={branch}", "/api/patients/{patient}/dossiers", "POST")]
@@ -139,6 +140,21 @@ public sealed class AllScreensPermissionApiTests(ReceptionFixture fixture) : ICl
         await Assign(owner, staff, AccountRoles.ClinicAssistant, "reception.read"); using var user = await reception.Login(name);
         Assert.Equal(HttpStatusCode.OK, (await user.GetAsync($"/api/visits/{visit.VisitId}")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await user.GetAsync($"/api/visits/{visit.VisitId}/examination")).StatusCode);
+    }
+    [Fact] public async Task DossierPaymentRightsAreIndependentOfClinicalEditing() {
+        var setup = await reception.Prepare(); using var owner = await reception.Login("owner.demo"); using var dentist = await reception.Login("dentist.demo");
+        var dossier = (await Ok<DCMS.Application.Features.Treatment.TreatmentChange>(await dentist.PostAsJsonAsync($"/api/patients/{setup.PatientId}/dossiers", new DCMS.Application.Features.Treatment.CreateDossierRequest(setup.BranchId, setup.DentistId, "SYNTHETIC payment access", null, null, Guid.NewGuid())))).Dossier;
+        var (staff, name) = await Staff(setup.BranchId, AccountRoles.Dentist);
+        var group = await Assign(owner, staff, AccountRoles.Dentist, "treatment.dossiers.update"); using var user = await reception.Login(name);
+        Assert.Equal(HttpStatusCode.OK, (await user.GetAsync($"/api/dossiers/{dossier.Id}")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await user.GetAsync($"/api/dossiers/{dossier.Id}/payments/context")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await user.PostAsJsonAsync($"/api/dossiers/{dossier.Id}/payments", new {})).StatusCode);
+        group = (await owner.GetFromJsonAsync<GroupDto>($"/api/system-settings/access-groups/{group.Id}"))!;
+        await Ok<GroupDto>(await owner.PutAsJsonAsync($"/api/system-settings/access-groups/{group.Id}", new GroupCommand(Guid.NewGuid(), new(group.Code, group.Name, group.BaseRole, ["finance.read"]), group.Version, "SYNTHETIC finance only")));
+        Assert.Equal(HttpStatusCode.OK, (await user.GetAsync($"/api/dossiers/{dossier.Id}/payments/context")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await user.GetAsync($"/api/dossiers/{dossier.Id}/payments")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await user.GetAsync($"/api/dossiers/{dossier.Id}")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await user.PostAsJsonAsync($"/api/dossiers/{dossier.Id}/payments", new {})).StatusCode);
     }
     [Fact] public async Task PrescriptionReadDoesNotRequireExaminationWriteOrReceptionAccess() {
         var setup = await reception.Prepare(); using var assistant = await reception.Login(); var visit = await reception.Check(assistant, setup);

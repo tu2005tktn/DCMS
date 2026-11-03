@@ -1,4 +1,5 @@
 import Workspace from './StaffWorkspace';
+import FamilyMembersPage from '../features/family-members/FamilyMembersPage';
 import VisitPage from '../features/examinations/ExaminationPage';
 import PaymentsPage from '../features/finance/PaymentsPage';
 import ReceiptPrintPage from '../features/finance/ReceiptPrintPage';
@@ -34,7 +35,8 @@ import CustomerAppointmentDetailPage from '../features/customer-appointments/Cus
 import DossierPage from '../features/treatment/DossierPage';
 import PlanPage from '../features/treatment/PlanPage';
 import RevisionPage from '../features/treatment/RevisionPage';
-import TemplatePage from '../features/treatment/TemplatePage';
+
+import ItemPlansPage from '../features/treatment/ItemPlansPage';
 import CommercialTreatmentPage from '../features/treatment/CommercialTreatmentPage';
 
 export default function App() {
@@ -48,6 +50,7 @@ export default function App() {
     <Route path="/customer" element={<CustomerGuard><CustomerShell /></CustomerGuard>}>
       <Route index element={<Navigate to="/customer/home" replace />} />
       <Route path="home" element={<CustomerHomePage />} />
+      <Route path="family-members" element={<FamilyMembersPage />} />
       <Route path="verify-email" element={<Navigate to="/customer/home" replace />} />
       <Route path="patient-link" element={<CustomerPatientLinkPage />} />
       <Route path="appointments" element={<CustomerAppointmentsPage />} />
@@ -75,7 +78,8 @@ export default function App() {
       <Route path="patients/:id/dossiers/:dossierId" element={<Protected permission="treatment.read"><DossierPage /></Protected>} />
       <Route path="patients/:id/dossiers/:dossierId/plan" element={<Protected permission="treatment.read"><PlanPage /></Protected>} />
       <Route path="patients/:id/dossiers/:dossierId/plan/revise/:itemId" element={<Protected permission="treatment.revisions.manage"><RevisionPage /></Protected>} />
-      <Route path="treatment-templates" element={<Protected permission="treatment.templates.read"><TemplatePage /></Protected>} />
+      <Route path="treatment-templates" element={<Protected permission="treatment.templates.read"><ItemPlansPage /></Protected>} />
+      <Route path="treatment-templates/legacy" element={<Navigate to="/treatment-templates" replace />} />
       <Route path="commercial/treatment" element={<Protected permission={['treatment.prices.read','treatment.commercial.read']}><CommercialTreatmentPage /></Protected>} />
       <Route path="appointments" element={<Protected permission="appointments.read"><AppointmentCalendarPage /></Protected>} />
       <Route path="reception" element={<Protected permission="reception.read"><ReceptionPage /></Protected>} />

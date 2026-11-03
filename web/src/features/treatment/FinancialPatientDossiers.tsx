@@ -1,7 +1,6 @@
 import { Alert, Button, Empty, Skeleton } from 'antd';
 import { useEffect, useState } from 'react';
 import { api } from '../../services/api';
-import DossierFinancialPanel from './DossierFinancialPanel';
 import { money } from './types';
 
 type FinancialDossier = { id: string; code: string; clinicalState: string;
@@ -23,7 +22,6 @@ export default function FinancialPatientDossiers({ patientId }: { patientId: num
       <p>Phí đã ghi nhận: {r.summary?.available && r.summary.postedChargeVnd != null ? money(r.summary.postedChargeVnd) : 'Chưa có dữ liệu đối soát'}</p>
       <p>Đã phân bổ: {r.summary?.available && r.summary.allocatedVnd != null ? money(r.summary.allocatedVnd) : 'Chưa có dữ liệu đối soát'}</p>
       <p>Còn nợ: {r.summary?.available && r.summary.outstandingVnd != null ? money(r.summary.outstandingVnd) : 'Chưa có dữ liệu đối soát'}</p>
-      <DossierFinancialPanel dossierId={r.id} available={r.summary?.available ?? false} onChanged={() => setReload(v => v + 1)} />
     </article>)}
   </section>;
 }

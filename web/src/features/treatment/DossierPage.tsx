@@ -101,7 +101,7 @@ export default function DossierPage() {
     <Typography.Paragraph><Link to={`/patients/${id}`}>← Hồ sơ bệnh nhân</Link></Typography.Paragraph>
     <div className="treatment-page-heading"><div>
       <Typography.Title level={2}>Đợt điều trị {dossier.code}</Typography.Title>
-      <Typography.Paragraph>{dossier.diagnosis}</Typography.Paragraph>
+      <Typography.Paragraph>{dossier.diagnosis || 'Chưa ghi nhận'}</Typography.Paragraph>
     </div><Tag>{stateLabel[dossier.state]}</Tag></div>
     {(notice || revisionNotice) && <Alert type="success" showIcon className="form-alert"
       message={notice || revisionNotice} />}

@@ -80,6 +80,7 @@ public static class SystemMessages
         "MSG245" => "Phương án đã thay đổi. Vui lòng kiểm tra khoản đã ghi nhận, công nợ và số dư trước khi điều chỉnh; hệ thống không tự hoàn tiền.",
         "MSG249" => "Đã ghi nhận quyết định của bệnh nhân. Hạng mục chưa đồng ý sẽ không được thực hiện; có thể kết thúc lượt tư vấn.",
         "MSG252" => "Vui lòng ghi mức giá hoặc giảm trừ đã thỏa thuận, lý do và hạng mục áp dụng. Khoản đã chốt cần điều chỉnh theo đúng quyền.",
+        "MSG258" => "Ngày hẹn lệch quá 4 ngày so với ngày dự kiến của kế hoạch điều trị. Vui lòng chọn ngày trong khoảng cho phép hoặc đổi ngày dự kiến trong kế hoạch.",
         "MSG255" => $"{field} chưa được phòng khám xác nhận hoặc cấu hình. Chưa tạo dịch vụ, lịch hẹn hay thông báo gửi ra ngoài.",
         "MSG256" => "Phân bổ thanh toán chưa khớp số tiền nhận hoặc vượt số dư có thể sử dụng. Vui lòng kiểm tra từng dòng và phần tiền ứng trước khi xác nhận.",
         "MSG257" => "Giá dịch vụ không được âm. Giảm giá, voucher hoặc khấu trừ vui lòng ghi nhận bằng chương trình khuyến mãi hoặc giảm trừ có lý do.",
