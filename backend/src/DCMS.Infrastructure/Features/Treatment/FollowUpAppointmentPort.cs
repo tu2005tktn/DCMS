@@ -34,7 +34,7 @@ public sealed class FollowUpAppointmentPort(DcmsDbContext db, ITreatmentLabReadi
             if (sourceDossier == null || sourceDossier.PatientId != instruction.PatientId ||
                 sourceDossier.BranchId != instruction.BranchId || sourceDossier.State != "Open" ||
                 sourceDossier.PlanState != "Committed" || sourceDossier.PlanVersion != instruction.PlanVersion ||
-                sourceDossier.Items.All(x => x.Id != instruction.ItemId || x.Decision != "Agreed"))
+                sourceDossier.Items.All(x => x.Id != instruction.ItemId || !TreatmentItemRules.IsEffective(x)))
                 throw Error("MSG230");
             return;
         }

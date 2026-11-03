@@ -38,6 +38,10 @@ public static class TreatmentEndpoints
             var result = await service.CreateAsync(AuthenticationEndpoints.AccountId(context.User), patientId, request, ct);
             return Results.Created($"/api/dossiers/{result.Dossier.Id}", result);
         });
+        endpoints.MapGet("/api/patients/{patientId:int}/next-visit-candidates", async (HttpContext context, int patientId,
+            ITreatmentDossierService service, CancellationToken ct) => Results.Ok(await service.NextVisitCandidatesAsync(
+                AuthenticationEndpoints.AccountId(context.User), patientId, ct))).RequireAuthorization(DentistPolicy)
+            .WithTags("Next plan item to book");
         patient.MapGet("/summary", async (HttpContext context, int patientId, int? branchId,
             ITreatmentDossierService service, CancellationToken ct) => Results.Ok(await service.SummaryAsync(
                 AuthenticationEndpoints.AccountId(context.User), patientId, branchId, ct)));

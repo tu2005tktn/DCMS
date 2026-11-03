@@ -585,7 +585,7 @@ public sealed class TreatmentProgressionService(DcmsDbContext db, UserManager<Ap
                 var dossier = await DossierAsync(actorId, source.DossierId.Value, ct);
                 if (dossier.PatientId != request.PatientId || dossier.BranchId != request.BranchId ||
                     dossier.State != "Open" || dossier.PlanState != "Committed" || source.ItemId is not Guid itemId ||
-                    dossier.Items.All(x => x.Id != itemId || x.Decision != "Agreed")) throw Error("MSG06", 403);
+                    dossier.Items.All(x => x.Id != itemId || !TreatmentItemRules.IsEffective(x))) throw Error("MSG06", 403);
                 if (source.StepId.HasValue)
                 {
                     var step = await db.TreatmentSteps.AsNoTracking().SingleOrDefaultAsync(x =>

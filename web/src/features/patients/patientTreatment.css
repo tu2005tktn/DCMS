@@ -225,6 +225,14 @@ body:has(.patient-treatment-shell) .workspace-content { width: 100%; max-width: 
 .treatment-sheet-row-completed > td:not(:last-child) small { text-decoration: line-through; }
 .treatment-sheet-payment > p { margin: 0; min-height: 23px; font-size: 12px; }
 
+/* Tab Lịch hẹn: hạng mục kế tiếp cần hẹn. */
+.next-visit { margin-bottom: 16px; }
+.next-visit-main { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.next-visit-main .ant-btn { min-height: 44px; min-width: 120px; }
+.next-visit-meta { color: #475467; font-size: 13px; margin-top: 2px; }
+.next-visit-rest { margin-top: 10px; }
+.next-visit-rest ul { margin: 4px 0 0; padding-left: 18px; font-size: 13px; }
+
 /* Hộp thoại Tạo thanh toán mới: Modal được render ngoài cây của phiếu nên dùng lớp riêng. */
 .dossier-payment-form { display: grid; gap: 12px; }
 .dossier-payment-row { display: grid; grid-template-columns: 170px minmax(0, 1fr); align-items: center; gap: 12px; }

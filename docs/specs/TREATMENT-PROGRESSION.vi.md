@@ -65,6 +65,8 @@ Ví dụ request cho UI S24 của Tuấn (IDs lấy từ GET dossier/steps, Dent
 
 `POST /api/follow-up-instructions` trả HTTP 201 với `{ "instruction": { "id": "...", "status": "NeedsBooking", "version": 1, "activeAppointmentId": null, "allowedActions": ["reviseWindow", "cancel", "supersede", "findSlots"], "overdue": false, ... }, "notification": { "code": "MSG231", "message": "Đã lưu chỉ định quay lại. Chưa có lịch hẹn được đặt." } }`. UI dùng `instruction.id` làm `followUpId` trong `POST /api/appointments` khi bệnh nhân tự thân đã xác minh hoặc staff đặt; `Find slots` chỉ đọc availability, không chuyển trạng thái. `expectedVersion` lấy từ response gần nhất khi sửa chỉ định. UI S24 không được suy ra Patient từ số điện thoại hay quyền xem hồ sơ người thân.
 
+Cập nhật 03/11/2026: hạng mục nguồn của chỉ định (`source.dossierId` + `source.itemId`) được nhận khi `Decision = Agreed` **hoặc** `EntrySource = ClinicianEntry` (hạng mục nhập trực tiếp trên phiếu); các điều kiện phiếu `Open`, kế hoạch `Committed` và đúng `PlanVersion` giữ nguyên. Tab Lịch hẹn dùng chỉ định này để đặt buổi kế tiếp, xem [TREATMENT-NEXT-VISIT-BOOKING.md](TREATMENT-NEXT-VISIT-BOOKING.md).
+
 Booking port phải dùng cùng scoped DbContext/transaction: `ValidateAsync` kiểm Patient, window, duration, dentist, readiness và một active appointment; `MarkBookedAsync` ghi link; `MarkNeedsBookingAsync` kiểm đúng appointment ID và giữ lịch sử. Reschedule kiểm lại instruction trước đổi slot. Outbox ghi trong cùng transaction; dispatcher và UI S24 thuộc task khác. `GET /api/availability` vẫn là nguồn slot, không mở calendar engine mới.
 
 ## Trạng thái, lỗi và nghiệm thu
