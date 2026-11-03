@@ -15,6 +15,7 @@ async function prepare(page: Page, withItem = true, withFinance = false) {
   const user = { id: 7, userName: 'synthetic.dentist', fullName: 'Bác sĩ thử nghiệm', accountType: 'Staff',
     roles: ['Dentist'], effectiveRoles: ['Dentist'], permissions: ['patients.read', 'treatment.read', 'treatment.dossiers.create', 'treatment.dossiers.update', 'treatment.dossiers.delete', 'treatment.items.create', 'treatment.items.update', 'treatment.items.delete', 'treatment.items.price', 'treatment.actuals.create', 'treatment.actuals.update', 'treatment.actuals.delete', 'treatment.templates.read', 'finance.read', 'finance.payments.create', 'documents.read', 'documents.upload'] };
   const state = { version: 1, items: (withItem ? [{ ...item }] : []) as any[], drafts: new Map<string, any>(),
+    activities: [] as any[], activityEdits: new Map<string, any>(), conflict: false, notes: '', collection: null as any, accountVersion: 1, requests: [] as any[], materialReads: [] as {q:string;page:number}[], failMaterialOnce: false,
     activities: [] as any[], activityEdits: new Map<string, any>(), conflict: false, notes: '', payments: [] as any[], requests: [] as any[], materialReads: [] as {q:string;page:number}[], failMaterialOnce: false,
     materials: [
       { id:'mat-1', name:'Composite A2', categoryId:'group-1', categoryName:'Vật liệu trám', version:1 },
@@ -100,6 +101,11 @@ async function prepare(page: Page, withItem = true, withFinance = false) {
     }
     if (path.endsWith('/close')) return route.fulfill({ status: 409, json: { code: 'MSG243', message: 'MSG243 — Còn hạng mục chưa được xử lý' } });
     if (path.endsWith('/note')) { state.notes = r.postDataJSON().note; state.version++; return ok({ dossier: detail() }); }
+    if (path.endsWith('/finance')) return ok({ available: true, sourceVersion: String(state.accountVersion), asOf: '2026-10-27T02:00:00Z', allowedActions: ['Collect', 'Confirm', 'Cancel'], unusedAdvanceVnd: 0,
+      charges: [{ id: 'charge-1', version: 1, sourceCode: 'A', postedAt: '2026-10-27T01:00:00Z', service: 'Trám răng', dentist: user.fullName, netVnd: 600000, confirmedAllocatedVnd: 0, dueVnd: 600000 }], receipts: state.collection ? [state.collection] : [] });
+    if (path.endsWith('/collections')) { state.accountVersion++; state.collection = { ...r.postDataJSON(), id: 'collection-1', version: 1, code: 'PT-SYNTHETIC', collector: user.fullName, status: 'Pending', unusedAdvanceVnd: 0 };
+      state.requests.push(state.collection); return ok(state.collection); }
+    if (path === '/api/finance/payments/collection-1/confirm') { state.accountVersion++; state.collection = { ...state.collection, version: 2, status: 'Confirmed' }; return ok(state.collection); }
     if (path.endsWith('/payments/context')) {
       const lines = state.activities.map(a => { const cost = Math.round(a.quantity * a.priceSnapshotVnd), discount = a.discountSnapshotVnd ?? 0,
         paid = state.payments.flatMap(p => p.lines).filter(l => l.activityId === a.id).reduce((s, l) => s + l.amountVnd, 0);
@@ -322,6 +328,20 @@ test('form Tạo thanh toán mới điền sẵn việc đã làm, tự cộng t
   state.activities.push({ id: 'a1', visitId, dossierId, itemId, planVersion: 1, serviceId: 3, region: '25', quantity: 1, unit: 'răng', performerId: 7, performedAt: '2026-10-26T02:00:00Z', outcome: 'Buổi đầu', feeStatus: 'Pending', priceSnapshotVnd: 300000, serviceNameSnapshot: 'Trám răng' });
   await page.reload(); await page.getByRole('tab', { name: 'Điều trị & Thanh toán' }).click();
   await page.getByRole('button', { name: 'TRẢ TIỀN...' }).click();
+  await page.getByLabel('Tiền thực nhận (VND)').fill('300000');
+  await page.getByRole('button', { name: 'Xác nhận tiền thực nhận' }).click();
+  await expect(page.getByText('MSG256 — Phân bổ chưa khớp tiền nhận hoặc vượt khoản nợ.')).toBeVisible();
+  await page.getByLabel('Phân bổ Trám răng').fill('300000');
+  await page.getByLabel('Phương thức', { exact: true }).focus(); await page.keyboard.press('ArrowDown'); await page.keyboard.press('ArrowDown'); await page.keyboard.press('Enter');
+  await page.getByRole('button', { name: 'Xác nhận tiền thực nhận' }).click();
+  await expect(page.getByText('Chứng từ PT-SYNTHETIC')).toBeVisible();
+  expect(state.collection.status).toBe('Pending'); expect(state.collection.allocations[0].amountVnd).toBe(300000);
+  await expect(page.getByRole('button', { name: 'In chứng từ' })).toBeDisabled();
+  await page.getByRole('button', { name: 'Xác nhận tiền vào' }).click();
+  await page.getByLabel('Mã giao dịch ngân hàng').fill('SYNTHETIC-BANK-1');
+  await page.getByLabel('Nội dung đối soát').fill('SYNTHETIC đã đối soát');
+  await page.getByRole('dialog').getByRole('button', { name: 'OK' }).click();
+  await expect.poll(() => state.collection.status).toBe('Confirmed');
   const dialog = page.getByRole('dialog', { name: 'Tạo thanh toán mới' });
   await expect(dialog.getByText('Trám răng', { exact: true })).toBeVisible();
   await expect(dialog.getByText('Còn nợ 300.000 ₫')).toBeVisible();

@@ -21,7 +21,12 @@ public static class FinanceEndpoints
         g.MapPost("/providers", async (HttpContext c, CreateProvider command, IFinanceService s, CancellationToken ct) => Results.Ok(await s.CreateProviderAsync(Actor(c), command, ct)));
         g.MapGet("/queue", async (HttpContext c, int branchId, IFinanceService s, CancellationToken ct) => Results.Ok(await s.QueueAsync(Actor(c), branchId, ct)));
         g.MapGet("/visits/{visitId:guid}", async (HttpContext c, Guid visitId, IFinanceService s, CancellationToken ct) => Results.Ok(await s.BillAsync(Actor(c), visitId, ct)));
+        g.MapGet("/dossiers/{dossierId:guid}", async (HttpContext c, Guid dossierId, IFinanceService s, CancellationToken ct) => Results.Ok(await s.DossierBillAsync(Actor(c), dossierId, ct)));
         g.MapPost("/visits/{visitId:guid}/payments", async (HttpContext c, Guid visitId, CollectPayment command, IFinanceService s, CancellationToken ct) => Results.Ok(await s.CollectAsync(Actor(c), visitId, command, ct)));
+        g.MapPost("/dossiers/{dossierId:guid}/payments", async (HttpContext c, Guid dossierId, CollectPayment command, IFinanceService s, CancellationToken ct) => Results.Ok(await s.CollectDossierAsync(Actor(c), dossierId, command, ct)));
+        var treatment = endpoints.MapGroup("/api/dossiers/{dossierId:guid}").RequireAuthorization();
+        treatment.MapGet("/finance", async (HttpContext c, Guid dossierId, IFinanceService s, CancellationToken ct) => Results.Ok(await s.TreatmentSnapshotAsync(Actor(c), dossierId, ct)));
+        treatment.MapPost("/collections", async (HttpContext c, Guid dossierId, DCMS.Application.Features.Treatment.ConfirmCollectionRequest command, IFinanceService s, CancellationToken ct) => Results.Ok(await s.CollectTreatmentAsync(Actor(c), dossierId, command, ct)));
         g.MapPost("/payments/{id:guid}/confirm", async (HttpContext c, Guid id, ConfirmPayment command, IFinanceService s, CancellationToken ct) => Results.Ok(await s.ConfirmAsync(Actor(c), id, command, ct)));
         g.MapPost("/payments/{id:guid}/cancel", async (HttpContext c, Guid id, CancelPayment command, IFinanceService s, CancellationToken ct) => Results.Ok(await s.CancelAsync(Actor(c), id, command, ct)));
         g.MapGet("/receipt-preview", async (HttpContext c, int branchId, IFinanceService s, CancellationToken ct) => Results.Ok(await s.PreviewReceiptAsync(Actor(c), branchId, ct)));

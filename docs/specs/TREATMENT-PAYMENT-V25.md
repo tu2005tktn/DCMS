@@ -1,5 +1,7 @@
 # Điều trị và Thanh toán v2.5
 
+**Cập nhật 02/11/2026:** Phần ghi phí và thu tiền điều trị đã nối với ledger chung theo [TREATMENT-LEDGER-INTEGRATION.vi.md](TREATMENT-LEDGER-INTEGRATION.vi.md). Các đoạn bên dưới ghi lại trạng thái và phạm vi từng đợt triển khai trước đó; khi nói adapter tài chính chưa sẵn sàng, áp dụng đặc tả tích hợp mới cho runtime hiện tại.
+
 ## Nguồn và quyết định
 
 DCMS_Screen_Specifications_v2.5.docx và DCMS_Use_Cases_Business_Rules_Messages_v2.5.docx (26/10/2026): S21/S22/S38/S39/S43, UC-13/14/19/20/21/23/39, GBR-163–175, AT59–74. Ngày 27/10 người dùng chốt: S21/S22/S43 thật; Triển sở hữu ledger S38/S39; hoàn tất là đóng lâm sàng; không hiện dải chẩn đoán/checkbox VAT.

@@ -1708,6 +1708,9 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<int>("BranchId")
                         .HasColumnType("integer");
 
+                    b.Property<Guid?>("DossierId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid?>("InvestigationId")
                         .HasColumnType("uuid");
 
@@ -1751,7 +1754,7 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<long>("UnitPriceVnd")
                         .HasColumnType("bigint");
 
-                    b.Property<Guid>("VisitId")
+                    b.Property<Guid?>("VisitId")
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
@@ -1759,6 +1762,8 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasIndex("ActivityId");
 
                     b.HasIndex("BranchId");
+
+                    b.HasIndex("DossierId");
 
                     b.HasIndex("InvestigationId");
 
@@ -1776,6 +1781,8 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.ToTable("FINANCE_CHARGE", null, t =>
                         {
                             t.HasCheckConstraint("CK_FINANCE_CHARGE_AMOUNT", "\"AmountVnd\" >= 0 AND \"Quantity\" > 0 AND \"UnitPriceVnd\" >= 0");
+
+                            t.HasCheckConstraint("CK_FINANCE_CHARGE_SOURCE", "(\"VisitId\" IS NOT NULL) <> (\"DossierId\" IS NOT NULL)");
                         });
                 });
 
@@ -1886,6 +1893,9 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<Guid?>("DossierId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Method")
                         .IsRequired()
                         .HasMaxLength(16)
@@ -1925,7 +1935,7 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .IsConcurrencyToken()
                         .HasColumnType("integer");
 
-                    b.Property<Guid>("VisitId")
+                    b.Property<Guid?>("VisitId")
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
@@ -1933,6 +1943,8 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasIndex("ConfirmedBy");
 
                     b.HasIndex("CreatedBy");
+
+                    b.HasIndex("DossierId");
 
                     b.HasIndex("VisitId");
 
@@ -1947,6 +1959,8 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.ToTable("PAYMENT_RECEIPT", null, t =>
                         {
                             t.HasCheckConstraint("CK_PAYMENT_RECEIPT", "\"AmountVnd\" > 0 AND \"Method\" IN ('Cash','Transfer') AND \"State\" IN ('Pending','Posted','Cancelled')");
+
+                            t.HasCheckConstraint("CK_PAYMENT_RECEIPT_SOURCE", "(\"VisitId\" IS NOT NULL) <> (\"DossierId\" IS NOT NULL)");
                         });
                 });
 
@@ -5954,6 +5968,11 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("DCMS.Domain.Features.Treatment.TreatmentDossier", null)
+                        .WithMany()
+                        .HasForeignKey("DossierId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("DCMS.Domain.Features.Examinations.InvestigationOrder", null)
                         .WithMany()
                         .HasForeignKey("InvestigationId")
@@ -5980,8 +5999,7 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasOne("DCMS.Domain.Features.Visits.Visit", null)
                         .WithMany()
                         .HasForeignKey("VisitId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("DCMS.Domain.Features.Finance.FinanceCommandReceipt", b =>
@@ -6042,6 +6060,11 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("DCMS.Domain.Features.Treatment.TreatmentDossier", null)
+                        .WithMany()
+                        .HasForeignKey("DossierId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("DCMS.Domain.Features.Patients.PatientProfile", null)
                         .WithMany()
                         .HasForeignKey("PatientId")
@@ -6051,8 +6074,7 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasOne("DCMS.Domain.Features.Visits.Visit", null)
                         .WithMany()
                         .HasForeignKey("VisitId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("DCMS.Domain.Features.Finance.ProviderPayable", b =>

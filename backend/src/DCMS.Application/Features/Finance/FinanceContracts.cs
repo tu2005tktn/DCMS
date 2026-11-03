@@ -36,6 +36,19 @@ public sealed record BillInvestigation(Guid Id, string Name, string Kind, string
 public sealed record BillDto(Guid VisitId, int PatientId, string PatientName, int BranchId, string BranchName, int AccountVersion,
     long TotalVnd, long PaidVnd, long RemainingVnd, IReadOnlyList<ChargeDto> Charges, IReadOnlyList<PaymentDto> Payments,
     IReadOnlyList<PayableDto>? ProviderPayables, string? SuggestedPayer, string[] AllowedActions, IReadOnlyList<BillInvestigation> Investigations);
+public sealed record DossierChargeDto(Guid Id, Guid ActivityId, string Name, string Unit, decimal Quantity,
+    long GrossVnd, long DiscountVnd, long AmountVnd, long PaidVnd, long RemainingVnd, DateTimeOffset PostedAt);
+public sealed record DossierBillDto(Guid DossierId, int PatientId, string PatientName, int BranchId, string BranchName,
+    int AccountVersion, long TotalVnd, long PaidVnd, long RemainingVnd,
+    IReadOnlyList<DossierChargeDto> Charges, IReadOnlyList<PaymentDto> Payments, string? SuggestedPayer, string[] AllowedActions);
+public sealed record TreatmentFinanceCharge(Guid Id, int Version, string SourceCode, DateTimeOffset PostedAt,
+    string Service, string Dentist, long NetVnd, long ConfirmedAllocatedVnd, long DueVnd);
+public sealed record TreatmentFinanceReceipt(Guid Id, int Version, string Code, DateTimeOffset ReceivedAt, DateTimeOffset RecordedAt,
+    long ReceivedVnd, string Method, string Collector, string? Payer, string? Note, string Status,
+    IReadOnlyList<AllocationInput> Allocations, long UnusedAdvanceVnd);
+public sealed record TreatmentFinanceSnapshot(bool Available, string SourceVersion, DateTimeOffset AsOf,
+    string[] AllowedActions, IReadOnlyList<TreatmentFinanceCharge> Charges,
+    IReadOnlyList<TreatmentFinanceReceipt> Receipts, long UnusedAdvanceVnd);
 public sealed record QueueBill(Guid VisitId, int PatientId, string PatientName, int BranchId, long TotalVnd, long RemainingVnd, int PendingPayments, int PendingServices,int PendingExaminationFees=0);
 public sealed record ReceiptPrintDto(Guid? ReceiptId, bool Preview, string? Number, string PatientName, string BranchName,
     string Method, long AmountVnd, long PreviouslyPaidVnd, long RemainingVnd, string Payer, string Collector,
@@ -58,7 +71,12 @@ public interface IFinanceService
     Task<InvestigationBillingDto> PerformAsync(int actor, Guid visitId, Guid id, PerformInvestigation command, CancellationToken ct);
     Task<QueueBill[]> QueueAsync(int actor, int branchId, CancellationToken ct);
     Task<BillDto> BillAsync(int actor, Guid visitId, CancellationToken ct);
+    Task<DossierBillDto> DossierBillAsync(int actor, Guid dossierId, CancellationToken ct);
+    Task<TreatmentFinanceSnapshot> TreatmentSnapshotAsync(int actor, Guid dossierId, CancellationToken ct);
     Task<PaymentDto> CollectAsync(int actor, Guid visitId, CollectPayment command, CancellationToken ct);
+    Task<PaymentDto> CollectDossierAsync(int actor, Guid dossierId, CollectPayment command, CancellationToken ct);
+    Task<TreatmentFinanceReceipt> CollectTreatmentAsync(int actor, Guid dossierId,
+        DCMS.Application.Features.Treatment.ConfirmCollectionRequest command, CancellationToken ct);
     Task<PaymentDto> ConfirmAsync(int actor, Guid id, ConfirmPayment command, CancellationToken ct);
     Task<PaymentDto> CancelAsync(int actor, Guid id, CancelPayment command, CancellationToken ct);
     Task<ReceiptPrintDto> PreviewReceiptAsync(int actor, int branchId, CancellationToken ct);
