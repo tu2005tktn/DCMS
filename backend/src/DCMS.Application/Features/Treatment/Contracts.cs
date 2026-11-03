@@ -114,6 +114,9 @@ public interface ITreatmentDossierService
     Task<TreatmentChange> DeleteSheetItemAsync(int actorId, Guid dossierId, Guid itemId, SheetItemActionRequest request, CancellationToken ct);
     Task<ConfirmSheetActualResult> PerformSheetItemAsync(int actorId, Guid dossierId, Guid itemId, PerformSheetItemRequest request, CancellationToken ct);
     Task<TreatmentSheetContext> SheetContextAsync(int actorId, Guid dossierId, CancellationToken ct);
+    Task<DossierPaymentContext> PaymentContextAsync(int actorId, Guid dossierId, CancellationToken ct);
+    Task<IReadOnlyList<DossierPaymentDto>> PaymentsAsync(int actorId, Guid dossierId, CancellationToken ct);
+    Task<DossierPaymentDto> CreatePaymentAsync(int actorId, Guid dossierId, CreateDossierPaymentRequest request, CancellationToken ct);
     Task<TreatmentActivityPage> ActivitiesAsync(int actorId, Guid dossierId, Guid? visitId, DateOnly? from, DateOnly? to, int page, int pageSize, CancellationToken ct);
     Task<TreatmentChange> ConfirmSheetPlanAsync(int actorId, Guid dossierId, Guid rowId, ConfirmSheetPlanRequest request, CancellationToken ct);
     Task<ImportItemPlanResult> ImportItemPlanAsync(int actorId, Guid dossierId, ImportItemPlanRequest request, CancellationToken ct);

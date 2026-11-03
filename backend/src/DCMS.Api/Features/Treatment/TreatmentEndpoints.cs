@@ -50,6 +50,13 @@ public static class TreatmentEndpoints
             Results.Ok(await service.GetAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, ct)));
         dossier.MapGet("/sheet-context", async (HttpContext context, Guid dossierId, ITreatmentDossierService service, CancellationToken ct) =>
             Results.Ok(await service.SheetContextAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, ct)));
+        dossier.MapGet("/payments/context", async (HttpContext context, Guid dossierId, ITreatmentDossierService service, CancellationToken ct) =>
+            Results.Ok(await service.PaymentContextAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, ct)));
+        dossier.MapGet("/payments", async (HttpContext context, Guid dossierId, ITreatmentDossierService service, CancellationToken ct) =>
+            Results.Ok(await service.PaymentsAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, ct)));
+        dossier.MapPost("/payments", async (HttpContext context, Guid dossierId, CreateDossierPaymentRequest request,
+            ITreatmentDossierService service, CancellationToken ct) => Results.Ok(await service.CreatePaymentAsync(
+                AuthenticationEndpoints.AccountId(context.User), dossierId, request, ct)));
         dossier.MapGet("/activities", async (HttpContext context, Guid dossierId, Guid? visitId, DateOnly? from, DateOnly? to,
             int? page, int? pageSize, ITreatmentDossierService service, CancellationToken ct) => Results.Ok(await service.ActivitiesAsync(
                 AuthenticationEndpoints.AccountId(context.User), dossierId, visitId, from, to, page ?? 1, pageSize ?? 20, ct)));
