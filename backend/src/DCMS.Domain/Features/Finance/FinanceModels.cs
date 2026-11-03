@@ -22,7 +22,8 @@ public sealed class FinanceCharge
     public Guid Id { get; set; } = Guid.NewGuid();
     public int PatientId { get; set; }
     public int BranchId { get; set; }
-    public Guid VisitId { get; set; }
+    public Guid? VisitId { get; set; }
+    public Guid? DossierId { get; set; }
     public string SourceKind { get; set; } = "";
     public Guid SourceId { get; set; }
     public Guid? InvestigationId { get; set; }
@@ -50,7 +51,8 @@ public sealed class ProviderPayable
 public sealed class PaymentReceipt
 {
     public Guid Id { get; set; } = Guid.NewGuid();
-    public Guid VisitId { get; set; }
+    public Guid? VisitId { get; set; }
+    public Guid? DossierId { get; set; }
     public int PatientId { get; set; }
     public int BranchId { get; set; }
     public string PatientName { get; set; } = "";
