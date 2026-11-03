@@ -17,6 +17,15 @@ export type SheetDecision = { decision: string; counseling?: string; decisionMak
 export type DossierTotals = { dossierCount: number; plannedGrossVnd: number; plannedDiscountVnd: number;
   plannedNetVnd: number; financialAvailable: boolean; postedNetVnd: number | null;
   confirmedAllocatedVnd: number | null; outstandingVnd: number | null; unusedAdvanceVnd: number | null; pendingFeeCount: number };
+export type PaymentContext = {
+  paidVnd: number; collectors: { id: number; name: string }[]; defaultCollectorId: number | null;
+  lines: { activityId: string; performedAt: string; dentistName: string; serviceName: string | null;
+    costVnd: number; discountVnd: number; paidVnd: number; dueVnd: number }[];
+};
+export type DossierPayment = {
+  id: string; paidOn: string; method: 'Cash' | 'Transfer'; collectorId: number; collectorName: string; note: string | null;
+  totalVnd: number; createdAt: string; lines: { activityId: string; serviceName: string | null; amountVnd: number }[];
+};
 
 export function isFdi(value: string) {
   const n = Number(value), quadrant = Math.floor(n / 10), position = n % 10;

@@ -15,7 +15,7 @@ async function prepare(page: Page, withItem = true, withFinance = false) {
   const user = { id: 7, userName: 'synthetic.dentist', fullName: 'Bác sĩ thử nghiệm', accountType: 'Staff',
     roles: ['Dentist'], effectiveRoles: ['Dentist'], permissions: ['patients.read'] };
   const state = { version: 1, items: (withItem ? [{ ...item }] : []) as any[], drafts: new Map<string, any>(),
-    activities: [] as any[], activityEdits: new Map<string, any>(), conflict: false, notes: '', collection: null as any, requests: [] as any[], materialReads: [] as {q:string;page:number}[], failMaterialOnce: false,
+    activities: [] as any[], activityEdits: new Map<string, any>(), conflict: false, notes: '', payments: [] as any[], requests: [] as any[], materialReads: [] as {q:string;page:number}[], failMaterialOnce: false,
     materials: [
       { id:'mat-1', name:'Composite A2', categoryId:'group-1', categoryName:'Vật liệu trám', version:1 },
       { id:'mat-2', name:'Gương khám', categoryId:'group-2', categoryName:'Dụng cụ khám', version:1 },
@@ -100,10 +100,20 @@ async function prepare(page: Page, withItem = true, withFinance = false) {
     }
     if (path.endsWith('/close')) return route.fulfill({ status: 409, json: { code: 'MSG243', message: 'MSG243 — Còn hạng mục chưa được xử lý' } });
     if (path.endsWith('/note')) { state.notes = r.postDataJSON().note; state.version++; return ok({ dossier: detail() }); }
-    if (path.endsWith('/finance')) return ok({ available: true, sourceVersion: 'ledger-1', asOf: '2026-10-27T02:00:00Z', allowedActions: ['Collect'], unusedAdvanceVnd: 0,
-      charges: [{ id: 'charge-1', version: 1, sourceCode: 'A', postedAt: '2026-10-27T01:00:00Z', service: 'Trám răng', dentist: user.fullName, netVnd: 600000, confirmedAllocatedVnd: 0, dueVnd: 600000 }], receipts: state.collection ? [state.collection] : [] });
-    if (path.endsWith('/collections')) { state.collection = { ...r.postDataJSON(), id: 'collection-1', code: 'PT-SYNTHETIC', collector: user.fullName, status: 'Pending', unusedAdvanceVnd: 0 };
-      state.requests.push(state.collection); return ok(state.collection); }
+    if (path.endsWith('/payments/context')) {
+      const lines = state.activities.map(a => { const cost = Math.round(a.quantity * a.priceSnapshotVnd), discount = a.discountSnapshotVnd ?? 0,
+        paid = state.payments.flatMap(p => p.lines).filter(l => l.activityId === a.id).reduce((s, l) => s + l.amountVnd, 0);
+        return { activityId: a.id, performedAt: a.performedAt, dentistName: user.fullName, serviceName: a.serviceNameSnapshot ?? 'Trám răng',
+          costVnd: cost, discountVnd: discount, paidVnd: paid, dueVnd: Math.max(0, cost - discount - paid) }; });
+      return ok({ paidVnd: lines.reduce((s, l) => s + l.paidVnd, 0), lines, collectors: [{ id: 7, name: user.fullName }], defaultCollectorId: 7 });
+    }
+    if (path.endsWith('/payments') && r.method() === 'POST') {
+      const body = r.postDataJSON(); state.requests.push({ command: 'payment', ...body });
+      const saved = { id: `payment-${state.payments.length + 1}`, paidOn: body.paidOn, method: body.method, collectorId: body.collectorId, collectorName: user.fullName, note: body.note,
+        totalVnd: body.lines.reduce((s: number, l: any) => s + l.amountVnd, 0), createdAt: '2026-11-03T03:00:00Z', lines: body.lines.map((l: any) => ({ ...l, serviceName: 'Trám răng' })) };
+      state.payments.push(saved); return ok(saved);
+    }
+    if (path.endsWith('/payments')) return ok([...state.payments].reverse());
     if (path === `/api/dossiers/${dossierId}`) return ok(detail());
     return route.fulfill({ status: 404, json: { code: 'NOT_MOCKED', message: `Unexpected mock path ${path}` } });
   });
@@ -297,24 +307,41 @@ test('đọc quá trình nhiều buổi, tổng toàn bộ phiếu và đóng c�
   await expect(page.getByText('MSG243 — Còn hạng mục chưa được xử lý', { exact: true })).toBeVisible();
 });
 
-test('tài chính thật chưa nối không dùng dữ liệu giả và form mock kiểm phân bổ Pending', async ({ page }) => {
+test('Đã trả mặc định 0, Còn nợ bằng Thành tiền trừ Đã trả và form chưa có việc đã làm không cho lưu', async ({ page }) => {
   await prepare(page);
+  await expect(page.locator('.treatment-sheet-payment')).toContainText('Đã trả: 0 ₫');
+  await expect(page.locator('.treatment-sheet-payment')).not.toContainText('Phí đã ghi nhận');
   await page.getByRole('button', { name: 'TRẢ TIỀN...' }).click();
-  await expect(page.getByText('Nguồn thanh toán của phòng khám chưa được kết nối. Chưa thể xác nhận tiền hoặc xem chứng từ.')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Xác nhận tiền thực nhận' })).toHaveCount(0);
+  await expect(page.getByRole('dialog', { name: 'Tạo thanh toán mới' })).toBeVisible();
+  await expect(page.getByText('Phiếu chưa có việc đã làm để thanh toán.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'LƯU LẠI' })).toBeDisabled();
 });
 
-test('mock thu tiền kiểm tổng phân bổ, chuyển khoản Pending và giữ mã chứng từ', async ({ page }) => {
-  const state = await prepare(page, true, true);
+test('form Tạo thanh toán mới điền sẵn việc đã làm, tự cộng tổng, chặn vượt nợ và cập nhật Đã trả/Còn nợ', async ({ page }) => {
+  const state = await prepare(page);
+  state.activities.push({ id: 'a1', visitId, dossierId, itemId, planVersion: 1, serviceId: 3, region: '25', quantity: 1, unit: 'răng', performerId: 7, performedAt: '2026-10-26T02:00:00Z', outcome: 'Buổi đầu', feeStatus: 'Pending', priceSnapshotVnd: 300000, serviceNameSnapshot: 'Trám răng' });
+  await page.reload(); await page.getByRole('tab', { name: 'Điều trị & Thanh toán' }).click();
   await page.getByRole('button', { name: 'TRẢ TIỀN...' }).click();
-  await page.getByLabel('Tiền thực nhận (VND)').fill('300000');
-  await page.getByRole('button', { name: 'Xác nhận tiền thực nhận' }).click();
-  await expect(page.getByText('MSG256 — Phân bổ chưa khớp tiền nhận hoặc vượt khoản nợ.')).toBeVisible();
-  await page.getByLabel('Phân bổ Trám răng').fill('300000');
-  await page.getByLabel('Phương thức', { exact: true }).focus(); await page.keyboard.press('ArrowDown'); await page.keyboard.press('ArrowDown'); await page.keyboard.press('Enter');
-  await page.getByRole('button', { name: 'Xác nhận tiền thực nhận' }).click();
-  await expect(page.getByText('Chứng từ PT-SYNTHETIC')).toBeVisible();
-  expect(state.collection.status).toBe('Pending'); expect(state.collection.allocations[0].amountVnd).toBe(300000);
+  const dialog = page.getByRole('dialog', { name: 'Tạo thanh toán mới' });
+  await expect(dialog.getByText('Trám răng', { exact: true })).toBeVisible();
+  await expect(dialog.getByText('Còn nợ 300.000 ₫')).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'LƯU LẠI' })).toBeDisabled();
+  const amount = dialog.getByLabel(/Số tiền thanh toán Trám răng/);
+  await amount.fill('999999'); await amount.blur();
+  await expect(dialog.getByLabel('Tổng tiền thanh toán (đ)')).toHaveValue('300.000');
+  await amount.fill('100000'); await amount.blur();
+  await expect(dialog.getByLabel('Tổng tiền thanh toán (đ)')).toHaveValue('100.000');
+  const total = dialog.getByLabel('Tổng tiền thanh toán (đ)');
+  await total.fill('120000'); await total.blur();
+  await expect(amount).toHaveValue('120.000');
+  await total.fill('100000'); await total.blur();
+  await expect(amount).toHaveValue('100.000');
+  await dialog.getByRole('button', { name: 'LƯU LẠI' }).click();
+  await expect(dialog).toBeHidden();
+  const sent = state.requests.find(x => x.command === 'payment');
+  expect(sent.lines).toEqual([{ activityId: 'a1', amountVnd: 100000 }]); expect(sent.method).toBe('Cash'); expect(sent.collectorId).toBe(7);
+  await expect(page.locator('.treatment-sheet-payment')).toContainText('Đã trả: 100.000 ₫');
+  await expect(page.locator('.treatment-sheet-payment')).toContainText(/Còn nợ: [\d.]+ ₫/);
 });
 
 test('ghi chú chỉ lưu bằng nút xác nhận, bàn phím và responsive không tràn viewport', async ({ page }) => {
