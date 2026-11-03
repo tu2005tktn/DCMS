@@ -184,7 +184,7 @@ export default function PatientProfilePage() {
         { key:'examinations',label:'Khám',children:<PatientExaminationsTab key={patient.id} patientId={patient.id} active={tab==='examinations'}/> },
         { key: 'treatment', label: 'Điều trị & Thanh toán', children: sourceExaminationVisitId ? <ExaminationTreatmentHandoff patientId={patient.id} visitId={sourceExaminationVisitId} version={search.get('examinationVersion')}/> : <DossierList patientId={patient.id} visitId={visitId} patientName={patient.fullName} patientCode={patient.patientCode} patientAge={age} /> },
         { key: 'files', label: 'Hình ảnh', children: <PatientImageGallery patientId={patient.id} /> },
-        { key: 'appointments', label: 'Lịch hẹn', children: <PatientAppointmentsTab key={patient.id} patientId={patient.id} active={tab === 'appointments'} revision={revision} /> },
+        { key: 'appointments', label: 'Lịch hẹn', children: <PatientAppointmentsTab key={patient.id} patientId={patient.id} patientName={patient.fullName} patientPhone={patient.phone} active={tab === 'appointments'} revision={revision} /> },
         { key: 'prescriptions', label: 'Đơn thuốc', children: <Pending feature="đơn thuốc (S23)" /> },
       ]} />
     <PatientFormDrawer open={editing} patient={patient} onClose={() => setEditing(false)} onSaved={change => { setEditing(false); saved(change); }} />

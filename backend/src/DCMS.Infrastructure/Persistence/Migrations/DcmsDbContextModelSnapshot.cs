@@ -4074,6 +4074,78 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.ToTable("CLINICAL_REVIEW", (string)null);
                 });
 
+            modelBuilder.Entity("DCMS.Domain.Features.Treatment.DossierPayment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("BranchId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("CollectorEmployeeId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("CreatedBy")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("DossierId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Method")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateOnly>("PaidOn")
+                        .HasColumnType("date");
+
+                    b.Property<int>("PatientId")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("TotalVnd")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DossierId", "PaidOn");
+
+                    b.ToTable("TREATMENT_DOSSIER_PAYMENT", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_DOSSIER_PAYMENT_METHOD", "\"Method\" IN ('Cash','Transfer')");
+
+                            t.HasCheckConstraint("CK_DOSSIER_PAYMENT_TOTAL", "\"TotalVnd\" > 0");
+                        });
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Treatment.DossierPaymentLine", b =>
+                {
+                    b.Property<Guid>("PaymentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ActivityId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("AmountVnd")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("PaymentId", "ActivityId");
+
+                    b.HasIndex("ActivityId");
+
+                    b.ToTable("TREATMENT_DOSSIER_PAYMENT_LINE", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_DOSSIER_PAYMENT_LINE_AMOUNT", "\"AmountVnd\" > 0");
+                        });
+                });
+
             modelBuilder.Entity("DCMS.Domain.Features.Treatment.FollowUpInstruction", b =>
                 {
                     b.Property<Guid>("Id")
@@ -6377,6 +6449,30 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("DCMS.Domain.Features.Treatment.DossierPayment", b =>
+                {
+                    b.HasOne("DCMS.Domain.Features.Treatment.TreatmentDossier", null)
+                        .WithMany()
+                        .HasForeignKey("DossierId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Treatment.DossierPaymentLine", b =>
+                {
+                    b.HasOne("DCMS.Domain.Features.Treatment.ClinicalActivity", null)
+                        .WithMany()
+                        .HasForeignKey("ActivityId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DCMS.Domain.Features.Treatment.DossierPayment", null)
+                        .WithMany("Lines")
+                        .HasForeignKey("PaymentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("DCMS.Domain.Features.Treatment.FollowUpInstruction", b =>
                 {
                     b.HasOne("DCMS.Domain.Features.Patients.PatientProfile", null)
@@ -6658,6 +6754,11 @@ namespace DCMS.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("DCMS.Domain.Features.Settings.AccessGroup", b =>
                 {
                     b.Navigation("Grants");
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Treatment.DossierPayment", b =>
+                {
+                    b.Navigation("Lines");
                 });
 
             modelBuilder.Entity("DCMS.Domain.Features.Treatment.TreatmentDossier", b =>

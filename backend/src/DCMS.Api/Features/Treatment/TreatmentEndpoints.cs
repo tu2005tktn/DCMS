@@ -38,6 +38,10 @@ public static class TreatmentEndpoints
             var result = await service.CreateAsync(AuthenticationEndpoints.AccountId(context.User), patientId, request, ct);
             return Results.Created($"/api/dossiers/{result.Dossier.Id}", result);
         });
+        endpoints.MapGet("/api/patients/{patientId:int}/next-visit-candidates", async (HttpContext context, int patientId,
+            ITreatmentDossierService service, CancellationToken ct) => Results.Ok(await service.NextVisitCandidatesAsync(
+                AuthenticationEndpoints.AccountId(context.User), patientId, ct))).RequireAuthorization(DentistPolicy)
+            .WithTags("Next plan item to book");
         patient.MapGet("/summary", async (HttpContext context, int patientId, int? branchId,
             ITreatmentDossierService service, CancellationToken ct) => Results.Ok(await service.SummaryAsync(
                 AuthenticationEndpoints.AccountId(context.User), patientId, branchId, ct)));
@@ -50,6 +54,13 @@ public static class TreatmentEndpoints
             Results.Ok(await service.GetAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, ct)));
         dossier.MapGet("/sheet-context", async (HttpContext context, Guid dossierId, ITreatmentDossierService service, CancellationToken ct) =>
             Results.Ok(await service.SheetContextAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, ct)));
+        dossier.MapGet("/payments/context", async (HttpContext context, Guid dossierId, ITreatmentDossierService service, CancellationToken ct) =>
+            Results.Ok(await service.PaymentContextAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, ct)));
+        dossier.MapGet("/payments", async (HttpContext context, Guid dossierId, ITreatmentDossierService service, CancellationToken ct) =>
+            Results.Ok(await service.PaymentsAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, ct)));
+        dossier.MapPost("/payments", async (HttpContext context, Guid dossierId, CreateDossierPaymentRequest request,
+            ITreatmentDossierService service, CancellationToken ct) => Results.Ok(await service.CreatePaymentAsync(
+                AuthenticationEndpoints.AccountId(context.User), dossierId, request, ct)));
         dossier.MapGet("/activities", async (HttpContext context, Guid dossierId, Guid? visitId, DateOnly? from, DateOnly? to,
             int? page, int? pageSize, ITreatmentDossierService service, CancellationToken ct) => Results.Ok(await service.ActivitiesAsync(
                 AuthenticationEndpoints.AccountId(context.User), dossierId, visitId, from, to, page ?? 1, pageSize ?? 20, ct)));
@@ -74,6 +85,12 @@ public static class TreatmentEndpoints
         dossier.MapPatch("/plan/items/{itemId:guid}/schedule-note", async (HttpContext context, Guid dossierId, Guid itemId,
             ScheduleNoteRequest request, ITreatmentDossierService service, CancellationToken ct) => Results.Ok(await service.ScheduleNoteAsync(
                 AuthenticationEndpoints.AccountId(context.User), dossierId, itemId, request, ct)));
+        dossier.MapGet("/plan/items/{itemId:guid}/planned-date-preview", async (HttpContext context, Guid dossierId, Guid itemId,
+            DateOnly plannedOn, ITreatmentDossierService service, CancellationToken ct) => Results.Ok(await service.PlannedDatePreviewAsync(
+                AuthenticationEndpoints.AccountId(context.User), dossierId, itemId, plannedOn, ct)));
+        dossier.MapPost("/plan/planned-dates", async (HttpContext context, Guid dossierId, ApplyPlannedDatesRequest request,
+            ITreatmentDossierService service, CancellationToken ct) => Results.Ok(await service.ApplyPlannedDatesAsync(
+                AuthenticationEndpoints.AccountId(context.User), dossierId, request, ct)));
         dossier.MapPost("/plan/items/{itemId:guid}/decision", async (HttpContext context, Guid dossierId, Guid itemId,
             DecideSheetItemRequest request, ITreatmentDossierService service, CancellationToken ct) => Results.Ok(await service.DecideSheetItemAsync(
                 AuthenticationEndpoints.AccountId(context.User), dossierId, itemId, request, ct)));

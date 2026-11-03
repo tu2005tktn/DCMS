@@ -1,13 +1,11 @@
 import { Alert, Button, Dropdown, Empty, Modal, Select, Skeleton, Typography } from 'antd';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { api, type ApiError } from '../../services/api';
 import { useAuth } from '../authentication/AuthContext';
 import type { AppointmentOptions, DossierListItem, DossierPage, TreatmentChange, TreatmentDossier } from './types';
-import { money } from './types';
 import TreatmentSheet from './TreatmentSheet';
 import DossierClosureModal from './DossierClosureModal';
-import type { DossierTotals } from './sheetTypes';
 import FinancialPatientDossiers from './FinancialPatientDossiers';
 
 
@@ -38,8 +36,6 @@ export default function DossierList({ patientId, visitId, sourceVisitVersion, br
   const [statusError, setStatusError] = useState<{ id: string; message: string } | null>(null);
   const [statusBusyId, setStatusBusyId] = useState<string | null>(null);
   const [clinicalTarget, setClinicalTarget] = useState<{ dossier: TreatmentDossier; completed: boolean } | null>(null);
-  const [totals, setTotals] = useState<DossierTotals | null>(null);
-  const [totalsError, setTotalsError] = useState<string | null>(null);
   const [createContext,setCreateContext] = useState<{dentistId:number;branches:{id:number;name:string}[]} | null>(null);
   const [branchId,setBranchId] = useState<number>();
   const [unsaved,setUnsaved] = useState(false);
@@ -50,9 +46,6 @@ export default function DossierList({ patientId, visitId, sourceVisitVersion, br
   const createKey = useRef(crypto.randomUUID());
 
   const canUse = auth.user?.effectiveRoles.includes('Dentist') ?? false;
-  const onPlanTotalChange = useCallback(() => {
-    void api<DossierTotals>(`/api/patients/${patientId}/dossiers/summary`).then(setTotals).catch(f => setTotalsError((f as Error).message));
-  }, [patientId]);
 
   useEffect(() => {
     if (!canUse) return;
@@ -62,8 +55,6 @@ export default function DossierList({ patientId, visitId, sourceVisitVersion, br
     api<DossierPage>(`/api/patients/${patientId}/dossiers?page=${pageNumber}&pageSize=20`)
       .then(result => { if (active) { const pinned = created.current?.patientId === patientId ? created.current : null; const items = pinned && pageNumber === 1 && !result.items.some(x=>x.id===pinned.id) ? [pinned,...result.items] : result.items; setPage({...result,items}); setActiveId(pinned && pageNumber === 1 ? pinned.id : result.items[0]?.id ?? null); } })
       .catch(failure => { if (active) setError(failure as ApiError); });
-    api<DossierTotals>(`/api/patients/${patientId}/dossiers/summary`).then(v => { if (active) { setTotals(v); setTotalsError(null); } })
-      .catch(f => { if (active) setTotalsError((f as Error).message); });
     return () => { active = false; };
   }, [patientId, pageNumber, revision, canUse]);
   useEffect(() => {
@@ -126,14 +117,7 @@ export default function DossierList({ patientId, visitId, sourceVisitVersion, br
       <Typography.Paragraph>{patientName || 'Bệnh nhân'} (MSKH: {patientCode || `#${patientId}`},
         {' '}{patientAge !== null && patientAge !== undefined ? `${patientAge} tuổi` : 'chưa rõ tuổi'})</Typography.Paragraph>
     </div>
-    <div className="treatment-sheets-summary" aria-label="Tóm tắt các phiếu được phép xem">
-      {totalsError ? <Alert type="error" message={totalsError} /> : <>
-        <div><strong>Tổng cộng (dự kiến):</strong> <span>{totals ? money(totals.plannedNetVnd) : 'Đang tải…'}</span></div>
-        <div><strong>Đã trả:</strong> <span>{totals?.financialAvailable && totals.confirmedAllocatedVnd != null ? money(totals.confirmedAllocatedVnd) : 'Chưa có dữ liệu đối soát'}</span></div>
-        <div><strong>Còn nợ:</strong> <span>{totals?.financialAvailable && totals.outstandingVnd != null ? money(totals.outstandingVnd) : 'Chưa có dữ liệu đối soát'}</span></div>
-        {(totals?.pendingFeeCount ?? 0) > 0 && <div>{totals?.pendingFeeCount} hoạt động đang chờ ghi phí</div>}
-      </>}
-    </div></div>
+    </div>
     {error && <Alert type="error" showIcon message={error.message}
       action={<Button onClick={() => setRevision(value => value + 1)}>Thử lại</Button>} />
       }{!page ? (error ? null : <Skeleton active />) : page.items.length === 0
@@ -175,7 +159,7 @@ export default function DossierList({ patientId, visitId, sourceVisitVersion, br
             action={<Button size="small" onClick={() => setRevision(value => value + 1)}>Tải lại</Button>} />}
           {activeId === item.id && <div id={`treatment-sheet-${item.id}`}>
             <TreatmentSheet patientId={patientId} dossierId={item.id} dossierVersion={item.version} visitId={visitId}
-              options={options} onUnsavedChange={setUnsaved} onLoaded={setSelected} onPlanTotalChange={onPlanTotalChange} />
+              options={options} onUnsavedChange={setUnsaved} onLoaded={setSelected} />
           </div>}
         </article>)}</div>
         {page.total > page.page * page.pageSize && <Button onClick={() => setPageNumber(value => value + 1)}>Xem thêm phiếu</Button>}

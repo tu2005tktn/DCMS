@@ -1,6 +1,8 @@
 import { Alert, Button, Drawer, Form, Input, InputNumber, Modal, Select, Space, Table } from 'antd';
 import { useRef, useState } from 'react';
 import { api } from '../../services/api';
+import DossierPaymentModal from './DossierPaymentModal';
+import type { DossierPayment } from './sheetTypes';
 import { money } from './types';
 
 export type FinancialCharge = { id: string; version: number; sourceCode: string; postedAt: string;
@@ -99,7 +101,20 @@ export default function DossierFinancialPanel({ dossierId, available, onChanged 
       setSnapshot(await api<Snapshot>(`/api/dossiers/${dossierId}/finance`)); onChanged();
     } catch (failure) { setError((failure as Error).message); }
     finally { setBusy(false); }
+const day = (v: string) => new Date(`${v}T00:00:00`).toLocaleDateString('vi-VN');
+
+// Payment entry points of a dossier. Data and rules: docs/specs/TREATMENT-DOSSIER-PAYMENTS.md.
+export default function DossierFinancialPanel({ dossierId, onChanged }: { dossierId: string; onChanged: () => void }) {
+  const [paying, setPaying] = useState(false), [historyOpen, setHistoryOpen] = useState(false);
+  const [history, setHistory] = useState<DossierPayment[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function openHistory() {
+    setHistoryOpen(true); setError(null); setHistory(null);
+    try { setHistory(await api<DossierPayment[]>(`/api/dossiers/${dossierId}/payments`)); }
+    catch (failure) { setError((failure as Error).message); }
   }
+
   return <Space wrap>
     <Button onClick={() => void open('history')}>LỊCH SỬ</Button>
     <Button className="treatment-sheet-create" onClick={() => void open('pay')}>TRẢ TIỀN...</Button>
@@ -151,6 +166,23 @@ export default function DossierFinancialPanel({ dossierId, available, onChanged 
           {snapshot?.allowedActions.includes('Cancel') && <Button danger onClick={() => setVerification({ action: 'cancel', receipt, reference: '', note: '' })}>Hủy khoản chờ</Button>}
         </Space>}
       </div>}
+    <Button onClick={() => void openHistory()}>LỊCH SỬ</Button>
+    <Button className="treatment-sheet-create" onClick={() => setPaying(true)}>TRẢ TIỀN...</Button>
+    <DossierPaymentModal dossierId={dossierId} open={paying} onClose={() => setPaying(false)} onSaved={onChanged} />
+    <Drawer open={historyOpen} width={720} title="Lịch sử thanh toán" onClose={() => setHistoryOpen(false)}>
+      {error && <Alert role="alert" type="error" showIcon message={error}
+        action={<Button onClick={() => void openHistory()}>Thử lại</Button>} />}
+      {!history && !error && <Skeleton active />}
+      {history && <Table<DossierPayment> rowKey="id" dataSource={history} pagination={false} size="small"
+        locale={{ emptyText: 'Phiếu chưa có thanh toán.' }}
+        columns={[
+          { title: 'Ngày', render: (_, p) => day(p.paidOn) },
+          { title: 'Số tiền', align: 'right', render: (_, p) => money(p.totalVnd) },
+          { title: 'Phương thức', render: (_, p) => p.method === 'Cash' ? 'Tiền mặt' : 'Chuyển khoản' },
+          { title: 'Người thu', dataIndex: 'collectorName' },
+          { title: 'Nội dung', render: (_, p) => <>{p.lines.map(l => <div key={l.activityId}>{l.serviceName ?? '—'}: {money(l.amountVnd)}</div>)}
+            {p.note && <small>{p.note}</small>}</> },
+        ]} />}
     </Drawer>
     <Modal open={verification !== null} title={verification?.action === 'confirm' ? 'Xác nhận chuyển khoản' : 'Hủy khoản chờ'}
       confirmLoading={busy} onOk={() => void verify()} onCancel={() => { if (!busy) { setVerification(null); pending.current = null; } }}>

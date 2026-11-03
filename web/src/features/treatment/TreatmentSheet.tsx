@@ -8,7 +8,7 @@ import { money } from './types';
 import TreatmentSheetDraftRow, { type SheetActualPreview } from './TreatmentSheetDraftForms';
 import DossierFinancialPanel from './DossierFinancialPanel';
 import ApplyItemPlanModal from './ApplyItemPlanModal';
-import type { ActivityPage, SheetActivity, SheetContext } from './sheetTypes';
+import type { ActivityPage, PaymentContext, SheetActivity, SheetContext } from './sheetTypes';
 
 type Draft = { id: string; kind: 'Plan' | 'Actual'; row: SheetActualPreview; version: number };
 type Editor = { kind: 'plan' | 'actual'; row?: SheetActualPreview; itemId?: string; activity?: SheetActivity; transferItemId?: string };
@@ -18,13 +18,13 @@ const included = (i: TreatmentItem) => !i.sheetDeleted && !i.hiddenFromSheet && 
 
 export default function TreatmentSheet({ patientId, dossierId, dossierVersion, options, onLoaded, onPlanTotalChange, onUnsavedChange }: {
   patientId: number; dossierId: string; dossierVersion: number; visitId?: string; options: AppointmentOptions | null;
-  onUnsavedChange?: (dirty: boolean) => void; onLoaded: (v: TreatmentDossier | null) => void; onPlanTotalChange: (id: string, total: number) => void;
+  onUnsavedChange?: (dirty: boolean) => void; onLoaded: (v: TreatmentDossier | null) => void; onPlanTotalChange?: (id: string, total: number) => void;
 }) {
   const [dossier, setDossier] = useState<TreatmentDossier | null>(null), [context, setContext] = useState<SheetContext | null>(null);
   const [drafts, setDrafts] = useState<Draft[]>([]), [activities, setActivities] = useState<ActivityPage | null>(null);
   const [error, setError] = useState<string>(), [activityError, setActivityError] = useState<string>();
   const [reload, setReload] = useState(0), [page, setPage] = useState(1), [editor, setEditor] = useState<Editor | null>(null);
-  const [selectPlan, setSelectPlan] = useState(false);
+  const [selectPlan, setSelectPlan] = useState(false), [payments, setPayments] = useState<PaymentContext | null>(null);
   const [deletingActivity, setDeletingActivity] = useState<SheetActivity | null>(null);
   const [deleting, setDeleting] = useState<TreatmentItem | null>(null);
   const [busy, setBusy] = useState(false), actionGuard = useRef(false);
@@ -44,7 +44,7 @@ export default function TreatmentSheet({ patientId, dossierId, dossierVersion, o
   }
   function accept({ value, ctx, rows }: Awaited<ReturnType<typeof load>>) {
     setDossier(value); setContext(ctx); setDrafts(rows.map(r => ({ ...r, row: { ...r.row, id: r.id, draftVersion: r.version } })));
-    onLoaded(value); onPlanTotalChange(value.id, value.items.filter(included).reduce((s,i) => s + Math.round(i.quantity * i.agreedUnitPriceVnd) - (i.discount?.status === 'Approved' ? i.discount.amountVnd : 0), 0));
+    onLoaded(value); onPlanTotalChange?.(value.id, value.items.filter(included).reduce((s,i) => s + Math.round(i.quantity * i.agreedUnitPriceVnd) - (i.discount?.status === 'Approved' ? i.discount.amountVnd : 0), 0));
     if (!noteDirty.current) { setNote(value.note ?? ''); noteSaved.current = value.note ?? ''; }
   }
   useEffect(() => { let live = true; setError(undefined); void load().then(v => { if (live) accept(v); }).catch(e => { if (live) setError(e.message); }); return () => { live = false; }; }, [dossierId, dossierVersion, reload, patientId]);
@@ -53,6 +53,11 @@ export default function TreatmentSheet({ patientId, dossierId, dossierVersion, o
     void api<ActivityPage>(`/api/dossiers/${dossierId}/activities?page=${page}&pageSize=20`).then(v => { if (live) setActivities(v); }).catch(e => { if (live) setActivityError(e.message); });
     return () => { live = false; };
   }, [dossierId, page, reload]);
+  useEffect(() => {
+    let live = true;
+    void api<PaymentContext>(`/api/dossiers/${dossierId}/payments/context`).then(v => { if (live) setPayments(v); }).catch(() => { if (live) setPayments(null); });
+    return () => { live = false; };
+  }, [dossierId, reload]);
   useEffect(() => { const warn = (e: BeforeUnloadEvent) => { if (noteDirty.current) e.preventDefault(); }; window.addEventListener('beforeunload', warn); return () => window.removeEventListener('beforeunload', warn); }, []);
   useEffect(() => { onUnsavedChange?.(!!editor || noteDirty.current); return () => onUnsavedChange?.(false); }, [editor, note, onUnsavedChange]);
   async function reloadSource() {
@@ -203,7 +208,10 @@ export default function TreatmentSheet({ patientId, dossierId, dossierVersion, o
   ].sort((a,b)=>a.day===b.day ? a.order-b.order || a.id.localeCompare(b.id) : !a.day ? 1 : !b.day ? -1 : b.day.localeCompare(a.day));  const gross = items.filter(included).reduce((s,i) => s + Math.round(i.quantity * i.agreedUnitPriceVnd), 0);
   const discount = items.filter(included).reduce((s,i) => s + (i.discount?.status === 'Approved' ? i.discount.amountVnd : 0), 0);
   const member = (id?: number | null) => context.members.find(m => m.id === id)?.name ?? '—';
-  const canWrite = context.allowedActions.includes('Draft'), finance = dossier.financialSummary;
+  const canWrite = context.allowedActions.includes('Draft');
+  const paid = payments?.paidVnd ?? 0;
+  // Debt is what the performed activities still owe; the plan total can differ from what was actually done.
+  const owed = payments ? payments.lines.reduce((s, l) => s + l.dueVnd, 0) : Math.max(0, gross - discount - paid);
   const closeEditor = () => { setEditor(null); write.current = null; refresh(); };
   const rowEditor = (kind: 'plan' | 'actual') => editor?.kind === kind && <TreatmentSheetDraftRow key={editor.row?.id ?? `new-${kind}`} kind={kind}
     dossier={dossier} options={options} context={context} initialPlan={kind === 'plan' ? editor.row : undefined} initialActual={kind === 'actual' ? editor.row : undefined}
@@ -238,7 +246,7 @@ export default function TreatmentSheet({ patientId, dossierId, dossierVersion, o
       <div className="treatment-sheet-table-scroll"><table className="treatment-sheet-table treatment-sheet-actual-table"><thead><tr><th>Ngày</th><th>Răng</th><th>Điều trị/dịch vụ</th><th>Ghi chú</th><th>Bác sĩ & phụ tá</th><th>Labo</th><th>Chi phí</th><th>Giảm giá</th><th>Đã trả</th><th /></tr></thead><tbody>
         {activities?.items.filter(a => a.id !== editor?.activity?.id).map(a => <tr key={a.id}><td>{date(a.performedAt)}</td><td>{a.region || '—'}</td><td>{a.serviceNameSnapshot ?? dossier.items.find(i => i.id === a.itemId)?.serviceName ?? context.services.find(s => s.id === a.serviceId)?.name ?? 'Dịch vụ đã lưu'}</td><td>{a.outcome || '—'}</td>
           <td>{member(a.performerId)}<small>{member(a.assistantId)}</small></td><td>{a.labWorkSnapshot || '—'}</td><td>{money(Math.round(a.quantity*a.priceSnapshotVnd))}<small>{fees[a.feeStatus] ?? a.feeStatus}</small></td><td>{money(a.discountSnapshotVnd ?? 0)}</td>
-          <td>{finance?.available && finance.lines?.some(l => l.activityId === a.id) ? money(finance.lines.filter(l => l.activityId === a.id).reduce((s,l) => s+l.confirmedAllocatedVnd,0)) : 'Chưa có dữ liệu'}</td>
+          <td>{money(payments?.lines.find(l => l.activityId === a.id)?.paidVnd ?? 0)}</td>
           <td><div className="treatment-sheet-edit-actions"><Button size="small" title="Sửa" aria-label={`Sửa quá trình ${a.serviceNameSnapshot ?? 'điều trị'}`} disabled={!canWrite || busy || !!editor} onClick={() => editActivity(a)}>✎</Button>
             <Button size="small" title="Xóa" aria-label={`Xóa quá trình ${a.serviceNameSnapshot ?? 'điều trị'}`} disabled={!canWrite || busy || !!editor} onClick={() => { setError(undefined); setDeletingActivity(a); }}>×</Button></div></td></tr>)}
         {activities?.total === 0 && <tr><td colSpan={10}>Phiếu chưa có việc điều trị.</td></tr>}
@@ -247,10 +255,9 @@ export default function TreatmentSheet({ patientId, dossierId, dossierVersion, o
         {rowEditor('actual')}
       </tbody></table></div><Button className="treatment-sheet-create" aria-label="Thêm quá trình điều trị" disabled={!canWrite || !!editor || busy} onClick={() => setEditor({kind:'actual'})}>+ Thêm việc đã làm</Button>
       {(activities?.total ?? 0) > 20 && <Pagination current={page} total={activities?.total} pageSize={20} onChange={setPage} />}
-      <div className="treatment-sheet-payment"><p><strong>Phí đã ghi nhận:</strong> {finance?.available && finance.postedChargeVnd != null ? money(finance.postedChargeVnd) : 'Chưa có dữ liệu đối soát'}</p>
-        <p><strong>Đã trả:</strong> {finance?.available && finance.allocatedVnd != null ? money(finance.allocatedVnd) : 'Chưa có dữ liệu đối soát'}</p>
-        <p><strong>Còn nợ:</strong> {finance?.available && finance.outstandingVnd != null ? money(finance.outstandingVnd) : 'Chưa có dữ liệu đối soát'}</p>
-        <DossierFinancialPanel dossierId={dossierId} available={finance?.available ?? false} onChanged={refresh} /></div></section>
+      <div className="treatment-sheet-payment"><p><strong>Đã trả:</strong> {money(paid)}</p>
+        <p><strong>Còn nợ:</strong> {money(owed)}</p>
+        <DossierFinancialPanel dossierId={dossierId} onChanged={refresh} /></div></section>
     <section className="treatment-sheet-images"><h3 className="treatment-sheet-section-title">HÌNH ẢNH</h3><PatientImageGallery patientId={patientId} dossierId={dossierId} canUpload /></section>
     <section className="treatment-sheet-notes"><h3 className="treatment-sheet-minor-heading">GHI CHÚ</h3><Input.TextArea aria-label="Ghi chú hồ sơ" value={note} maxLength={4000} disabled={!canWrite || noteBusy}
       onChange={e => { setNote(e.target.value); noteDirty.current = e.target.value !== noteSaved.current; }} /><Button size="small" loading={noteBusy} disabled={!canWrite || note === noteSaved.current} onClick={() => void saveNote()}>Lưu ghi chú</Button>{noteError && <Alert type="error" message={noteError} />}</section>
