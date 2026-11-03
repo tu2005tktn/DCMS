@@ -85,6 +85,12 @@ public static class TreatmentEndpoints
         dossier.MapPatch("/plan/items/{itemId:guid}/schedule-note", async (HttpContext context, Guid dossierId, Guid itemId,
             ScheduleNoteRequest request, ITreatmentDossierService service, CancellationToken ct) => Results.Ok(await service.ScheduleNoteAsync(
                 AuthenticationEndpoints.AccountId(context.User), dossierId, itemId, request, ct)));
+        dossier.MapGet("/plan/items/{itemId:guid}/planned-date-preview", async (HttpContext context, Guid dossierId, Guid itemId,
+            DateOnly plannedOn, ITreatmentDossierService service, CancellationToken ct) => Results.Ok(await service.PlannedDatePreviewAsync(
+                AuthenticationEndpoints.AccountId(context.User), dossierId, itemId, plannedOn, ct)));
+        dossier.MapPost("/plan/planned-dates", async (HttpContext context, Guid dossierId, ApplyPlannedDatesRequest request,
+            ITreatmentDossierService service, CancellationToken ct) => Results.Ok(await service.ApplyPlannedDatesAsync(
+                AuthenticationEndpoints.AccountId(context.User), dossierId, request, ct)));
         dossier.MapPost("/plan/items/{itemId:guid}/decision", async (HttpContext context, Guid dossierId, Guid itemId,
             DecideSheetItemRequest request, ITreatmentDossierService service, CancellationToken ct) => Results.Ok(await service.DecideSheetItemAsync(
                 AuthenticationEndpoints.AccountId(context.User), dossierId, itemId, request, ct)));

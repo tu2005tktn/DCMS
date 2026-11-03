@@ -58,6 +58,18 @@ public sealed class FollowUpAppointmentPort(DcmsDbContext db, ITreatmentLabReadi
         }
     }
 
+    // A booking may only fall within the item's planned window (at most the tolerance either side of its planned date).
+    private async Task CheckPlanWindowAsync(FollowUpInstruction instruction, DateTimeOffset startAt, CancellationToken ct)
+    {
+        if (instruction.StepId.HasValue || !instruction.DossierId.HasValue || !instruction.ItemId.HasValue) return;
+        var item = await db.TreatmentDossiers.AsNoTracking().Where(x => x.Id == instruction.DossierId)
+            .SelectMany(x => x.Items).SingleOrDefaultAsync(x => x.Id == instruction.ItemId, ct);
+        var offset = TimeSpan.FromHours(7);
+        if (item == null || TreatmentItemRules.BookingWindow(item, DateOnly.FromDateTime(clock.GetUtcNow().ToOffset(offset).DateTime)) is not { } window) return;
+        var local = DateOnly.FromDateTime(startAt.ToOffset(offset).DateTime);
+        if (local < window.From || local > window.To) throw Error("MSG258");
+    }
+
     public async Task ValidateAsync(Guid followUpId, int patientId, int branchId, int dentistId, int durationMinutes,
         DateTimeOffset startAt, CancellationToken ct)
     {
@@ -69,6 +81,7 @@ public sealed class FollowUpAppointmentPort(DcmsDbContext db, ITreatmentLabReadi
         if (row.Capability != null && !await capabilities.HasCapabilityAsync(branchId, dentistId,
             row.Capability, ct)) throw Error("MSG230");
         await CheckReadinessAsync(row, startAt, ct);
+        await CheckPlanWindowAsync(row, startAt, ct);
     }
 
     public async Task MarkBookedAsync(Guid followUpId, Guid appointmentId, CancellationToken ct)

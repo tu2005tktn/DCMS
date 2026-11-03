@@ -232,6 +232,10 @@ body:has(.patient-treatment-shell) .workspace-content { width: 100%; max-width: 
 .next-visit-meta { color: #475467; font-size: 13px; margin-top: 2px; }
 .next-visit-rest { margin-top: 10px; }
 .next-visit-rest ul { margin: 4px 0 0; padding-left: 18px; font-size: 13px; }
+.next-visit-sync { display: flex; flex-direction: column; gap: 10px; }
+.next-visit-sync .ant-checkbox-wrapper { min-height: 44px; align-items: center; }
+.next-visit-deviation { display: block; margin: 6px 0; font-size: 13px; }
+.booking-slots .ant-btn { min-height: 44px; }
 
 /* Hộp thoại Tạo thanh toán mới: Modal được render ngoài cây của phiếu nên dùng lớp riêng. */
 .dossier-payment-form { display: grid; gap: 12px; }

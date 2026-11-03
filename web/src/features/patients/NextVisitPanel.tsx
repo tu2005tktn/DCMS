@@ -1,9 +1,8 @@
 import { Alert, Button, Card, Skeleton, Tag, Typography } from 'antd';
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { api, ApiError } from '../../services/api';
 import NextVisitBookingDrawer, { type NextVisitCandidate, type NextVisitPatient } from '../appointments/NextVisitBookingDrawer';
-import { formatClock, formatDate, localDate } from '../appointments/types';
+import { formatDate } from '../appointments/types';
 
 const line = (c: NextVisitCandidate) => `${c.serviceName}${c.region ? ` · ${c.region}` : ''}`;
 
@@ -38,10 +37,6 @@ export default function NextVisitPanel({ patient, active, revision, onBooked }: 
             {next.status === 'NeedsBooking' && <Tag color="gold">Đã có chỉ định, chưa có lịch</Tag>}</div>
           <Button type="primary" onClick={() => setBooking(next)}>Đặt lịch</Button></div></Card>
           : <Alert type="info" showIcon message={booked.length > 0 ? 'Mọi hạng mục chưa thực hiện đã có lịch hẹn.' : 'Chưa có hạng mục nào trong kế hoạch cần hẹn.'} />}
-        {booked.length > 0 && <div className="next-visit-rest"><Typography.Text type="secondary">Đã hẹn</Typography.Text>
-          <ul>{booked.map(x => <li key={x.itemId}><Tag color="green">Đã hẹn</Tag>{line(x)} ·{' '}
-            {x.appointment && <Link to={`/appointments/${x.appointment.id}`}>{x.appointment.code}</Link>}
-            {x.appointment && ` · ${formatDate(localDate(x.appointment.startAt))} ${formatClock(x.appointment.startAt)}`}</li>)}</ul></div>}
       </>}
     <NextVisitBookingDrawer open={!!booking} candidate={booking} patient={patient} onClose={() => setBooking(null)}
       onBooked={() => { setBooking(null); setRetry(v => v + 1); onBooked(); }} />

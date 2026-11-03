@@ -115,6 +115,8 @@ public interface ITreatmentDossierService
     Task<ConfirmSheetActualResult> PerformSheetItemAsync(int actorId, Guid dossierId, Guid itemId, PerformSheetItemRequest request, CancellationToken ct);
     Task<TreatmentSheetContext> SheetContextAsync(int actorId, Guid dossierId, CancellationToken ct);
     Task<NextVisitCandidates> NextVisitCandidatesAsync(int actorId, int patientId, CancellationToken ct);
+    Task<PlannedDatePreview> PlannedDatePreviewAsync(int actorId, Guid dossierId, Guid itemId, DateOnly plannedOn, CancellationToken ct);
+    Task<TreatmentChange> ApplyPlannedDatesAsync(int actorId, Guid dossierId, ApplyPlannedDatesRequest request, CancellationToken ct);
     Task<DossierPaymentContext> PaymentContextAsync(int actorId, Guid dossierId, CancellationToken ct);
     Task<IReadOnlyList<DossierPaymentDto>> PaymentsAsync(int actorId, Guid dossierId, CancellationToken ct);
     Task<DossierPaymentDto> CreatePaymentAsync(int actorId, Guid dossierId, CreateDossierPaymentRequest request, CancellationToken ct);
