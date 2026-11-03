@@ -4,8 +4,8 @@ namespace DCMS.Application.Features.Settings;
 
 public static class SettingsGrants
 {
-    public static readonly string[] CatalogKinds = ["diagnoses", "patient-sources", "occupations", "intake-history", "care-types", "expense-categories"];
-    public static readonly string[] CatalogLabels = ["Chẩn đoán", "Nguồn khách hàng", "Nghề nghiệp", "Tiền sử hành chính", "Loại CSKH", "Loại chi"];
+    public static readonly string[] CatalogKinds = ["diagnoses", "patient-sources", "occupations", "intake-history", "care-types", "expense-categories", "customer-groups"];
+    public static readonly string[] CatalogLabels = ["Chẩn đoán", "Nguồn khách hàng", "Nghề nghiệp", "Tiền sử hành chính", "Loại CSKH", "Loại chi", "Nhóm khách hàng"];
     public static readonly GrantDefinition[] Definitions = [
         new("settings.read", "Mở Thiết lập hệ thống", null, null),
         new("settings.general.read", "Xem cấu hình chung", null, "settings.read"),
@@ -17,7 +17,10 @@ public static class SettingsGrants
         new("accounts.manage", "Quản lý tài khoản", AccountRoles.Admin, null),
         new("patients.read", "Xem bệnh nhân", null, null),
         new("patients.manage", "Sửa hành chính bệnh nhân", AccountRoles.ClinicAssistant, "patients.read"),
-        new("patient-links.verify", "Xác minh liên kết", AccountRoles.ClinicAssistant, "patients.read"),
+        new("patients.create", "Thêm hồ sơ bệnh nhân", AccountRoles.ClinicAssistant, "patients.read"),
+        new("patients.update", "Sửa hồ sơ bệnh nhân", AccountRoles.ClinicAssistant, "patients.read"),
+        new("patients.archive", "Ngừng sử dụng / khôi phục hồ sơ bệnh nhân", AccountRoles.ClinicAssistant, "patients.read"),
+        new("patient-links.verify", "Xác minh liên kết", AccountRoles.ClinicAssistant, "patient-links.read"),
         new("reception.read", "Xem tiếp nhận", null, null),
         new("reception.check-in", "Check-in", AccountRoles.ClinicAssistant, "reception.read"),
         new("appointments.support.handle", "Xử lý yêu cầu lịch hẹn", null, null),
@@ -32,6 +35,7 @@ public static class SettingsGrants
         new("finance.costs.manage", "Ghi chi phí thuê ngoài", null, "finance.costs.read"),
         new("services.read", "Xem dịch vụ cận lâm sàng", null, null),
         new("services.manage", "Quản lý dịch vụ cận lâm sàng", null, "services.read"),
+        .. ScreenGrants.Definitions,
         .. CatalogKinds.SelectMany(kind => new[] {
             new GrantDefinition($"catalog.{kind}.read", $"{CatalogLabels[Array.IndexOf(CatalogKinds,kind)]}: Xem", null, "settings.read"),
             new GrantDefinition($"catalog.{kind}.create", $"{CatalogLabels[Array.IndexOf(CatalogKinds,kind)]}: Thêm", null, $"catalog.{kind}.read"),
@@ -44,9 +48,11 @@ public static class SettingsGrants
         var definition = Definitions.SingleOrDefault(x => x.Key == permission);
         if (definition == null) return false;
         if (roles.Contains(AccountRoles.ClinicOwner) && IsSettings(permission)) return true;
+        if (ScreenGrants.Allows(permission, roles) is { } allowed) return allowed;
         if (permission.StartsWith("finance.") || permission == "investigations.perform" || permission.StartsWith("services.")) {
             if (roles.Contains(AccountRoles.ClinicOwner)) return true;
-            if (permission.StartsWith("finance.costs.")) return false;
+            if (permission == "finance.read" && roles.Contains(AccountRoles.Admin)) return true;
+            if (permission.StartsWith("finance.costs.")) return roles.Contains(AccountRoles.Admin);
             if (permission.StartsWith("finance.payments.")) return roles.Contains(AccountRoles.ClinicAssistant);
             if (permission == "finance.quotes.manage") return roles.Contains(AccountRoles.Dentist);
             if (permission.StartsWith("services.")) return roles.Contains(AccountRoles.Dentist) || roles.Contains(AccountRoles.Admin);
@@ -58,5 +64,10 @@ public static class SettingsGrants
         return true;
     }
     public static bool IsSettings(string key) => key.StartsWith("settings.") || key.StartsWith("catalog.") || key.StartsWith("access-groups.") || key == "staff.access.assign";
-    public static string[] Legacy(string[] roles) => Definitions.Where(x => !IsSettings(x.Key) && RoleAllows(x.Key, roles)).Select(x => x.Key).ToArray();
+    public static string[] Legacy(string[] roles) => ScreenGrants.Expand(Definitions.Where(x =>
+        (!IsSettings(x.Key) || ScreenGrants.LegacySettings(x.Key, roles))
+        && x.Key != "finance.receipt-sequence.manage"
+        && (!x.Key.StartsWith("finance.costs.") || roles.Contains(AccountRoles.ClinicOwner))
+        && (x.Key != "finance.read" || roles.Any(role => role is AccountRoles.ClinicOwner or AccountRoles.Dentist or AccountRoles.ClinicAssistant))
+        && RoleAllows(x.Key, roles)).Select(x => x.Key));
 }

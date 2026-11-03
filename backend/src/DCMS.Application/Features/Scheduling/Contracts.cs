@@ -11,7 +11,7 @@ public sealed record PublishResult(ScheduleDto Schedule, SystemMessage Notificat
 public sealed record AffectedAppointment(Guid Id, string Code, DateTimeOffset Start, DateTimeOffset End, string Attendee, string Status);
 public sealed record SchedulePreview(AffectedAppointment[] AffectedAppointments);
 public sealed record BranchOption(int Id, string Name);
-public sealed record EmployeeOption(int Id, int BranchId, string Name, bool CanDentist, bool CanEdit, bool Self);
+public sealed record EmployeeOption(int Id, int BranchId, string Name, bool CanDentist, bool CanEdit, bool Self, bool? CanView = null);
 public sealed record ChairOption(int Id, int BranchId, string Name);
 public sealed record ServiceOption(int Id, int BranchId, string Name, int PublicDurationMinutes);
 public sealed record ScheduleOptions(BranchOption[] Branches, EmployeeOption[] Employees, ChairOption[] Chairs, ServiceOption[] Services);

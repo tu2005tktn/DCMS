@@ -1,3 +1,4 @@
+import { usePermissions } from '../authentication/usePermissions';
 import { Alert, Button, Dropdown, Input, Modal, Pagination, Skeleton } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import PatientImageGallery from '../clinical-documents/PatientImageGallery';
@@ -20,6 +21,7 @@ export default function TreatmentSheet({ patientId, dossierId, dossierVersion, o
   patientId: number; dossierId: string; dossierVersion: number; visitId?: string; options: AppointmentOptions | null;
   onUnsavedChange?: (dirty: boolean) => void; onLoaded: (v: TreatmentDossier | null) => void; onPlanTotalChange?: (id: string, total: number) => void;
 }) {
+  const has = usePermissions();
   const [dossier, setDossier] = useState<TreatmentDossier | null>(null), [context, setContext] = useState<SheetContext | null>(null);
   const [drafts, setDrafts] = useState<Draft[]>([]), [activities, setActivities] = useState<ActivityPage | null>(null);
   const [error, setError] = useState<string>(), [activityError, setActivityError] = useState<string>();
@@ -55,6 +57,7 @@ export default function TreatmentSheet({ patientId, dossierId, dossierVersion, o
   }, [dossierId, page, reload]);
   useEffect(() => {
     let live = true;
+    if (!has('finance.read')) { setPayments(null); return; }
     void api<PaymentContext>(`/api/dossiers/${dossierId}/payments/context`).then(v => { if (live) setPayments(v); }).catch(() => { if (live) setPayments(null); });
     return () => { live = false; };
   }, [dossierId, reload]);
@@ -224,20 +227,20 @@ export default function TreatmentSheet({ patientId, dossierId, dossierVersion, o
     <div className="treatment-sheet-tools">
       {dossier.sourceExaminationId && <Link to={`/visits/${dossier.sourceExaminationId}`}>Mở nguồn khám</Link>}</div>
     <h2 className="treatment-sheet-print-title">Phiếu điều trị {dossier.code}</h2>
-    <section><div className="treatment-sheet-band"><h3>KẾ HOẠCH ĐIỀU TRỊ/DỊCH VỤ</h3><Button disabled={!canWrite || !!editor || busy || noteBusy} title={editor ? 'Lưu hoặc hủy hàng đang nhập trước khi chọn kế hoạch.' : undefined} onClick={() => setSelectPlan(true)}>Kế hoạch điều trị</Button><div><span>Tổng dự toán: {money(gross)}</span><span>Giảm giá: {money(discount)}</span><strong>Thành tiền: {money(gross-discount)}</strong></div></div>
+    <section><div className="treatment-sheet-band"><h3>KẾ HOẠCH ĐIỀU TRỊ/DỊCH VỤ</h3><Button disabled={!has('treatment.items.create') || !has('treatment.templates.read') || !canWrite || !!editor || busy || noteBusy} title={editor ? 'Lưu hoặc hủy hàng đang nhập trước khi chọn kế hoạch.' : undefined} onClick={() => setSelectPlan(true)}>Kế hoạch điều trị</Button><div><span>Tổng dự toán: {money(gross)}</span><span>Giảm giá: {money(discount)}</span><strong>Thành tiền: {money(gross-discount)}</strong></div></div>
       <div className="treatment-sheet-table-scroll"><table className="treatment-sheet-table treatment-sheet-plan-table"><thead><tr>
         <th>Ngày</th><th>Răng</th><th>Điều trị/dịch vụ</th><th>Thời gian dự kiến (phút)</th><th>Ghi chú</th><th>Bác sĩ & phụ tá</th><th>Chi phí</th><th>Giảm giá</th>
-        <th><button className="treatment-sheet-plus" aria-label="Thêm hạng mục kế hoạch" disabled={!canWrite || !!editor || busy} onClick={() => setEditor({ kind: 'plan' })}>+</button></th>
-      </tr></thead><tbody>{planRows.map(entry => { if ((entry.item && entry.id===editor?.itemId) || (entry.draft && entry.id===editor?.row?.id)) return rowEditor('plan'); if(entry.draft){const d=entry.draft;return <tr key={d.id}><td>{d.row.date || '—'}</td><td>{d.row.regions?.join(', ')}</td><td>{d.row.serviceName}<small>Nháp</small></td><td>{d.row.estimatedMinutes ?? '—'}</td><td>{d.row.note}</td><td>{member(d.row.dentistId)}</td><td>{money(d.row.costVnd)}</td><td>—</td><td><Button size="small" onClick={() => setEditor({ kind:'plan',row:d.row })}>Sửa nháp</Button></td></tr>;}const item=entry.item!;return <tr key={item.id} className={item.displayCompleted ? 'treatment-sheet-row-completed' : undefined}>
+        <th><button className="treatment-sheet-plus" aria-label="Thêm hạng mục kế hoạch" disabled={!has('treatment.items.create') || !canWrite || !!editor || busy} onClick={() => setEditor({ kind: 'plan' })}>+</button></th>
+      </tr></thead><tbody>{planRows.map(entry => { if ((entry.item && entry.id===editor?.itemId) || (entry.draft && entry.id===editor?.row?.id)) return rowEditor('plan'); if(entry.draft){const d=entry.draft;return <tr key={d.id}><td>{d.row.date || '—'}</td><td>{d.row.regions?.join(', ')}</td><td>{d.row.serviceName}<small>Nháp</small></td><td>{d.row.estimatedMinutes ?? '—'}</td><td>{d.row.note}</td><td>{member(d.row.dentistId)}</td><td>{money(d.row.costVnd)}</td><td>—</td><td><Button size="small" disabled={!has('treatment.items.create')} onClick={() => setEditor({ kind:'plan',row:d.row })}>Sửa nháp</Button></td></tr>;}const item=entry.item!;return <tr key={item.id} className={item.displayCompleted ? 'treatment-sheet-row-completed' : undefined}>
         <td>{item.estimatedStart ? date(item.estimatedStart) : '—'}</td><td>{item.region || '—'}</td><td>{item.serviceName}</td><td>{item.estimatedMinutes ?? '—'}</td><td>{item.note || '—'}</td>
         <td>{member(item.responsibleDentistId ?? dossier.dentistId)}<small>{member(item.assistantId)}</small></td>
         <td>{money(Math.round(item.quantity*item.agreedUnitPriceVnd))}</td><td>{item.discount?.status === 'Approved' ? money(item.discount.amountVnd) : '—'}</td>
         <td><Dropdown trigger={['click']} menu={{ items: [
-          { key: 'perform', label: 'Thực hiện', disabled: !canWrite || busy || !!editor, onClick: () => beginTransfer(item) },
-          { key: 'complete', label: item.displayCompleted ? 'Bỏ hoàn tất' : 'Hoàn tất', disabled: !canWrite || busy || !!editor, onClick: () => void act(item,'mark') },
-          { key: 'copy', label: 'Sao chép', disabled: !canWrite || busy || !!editor || !!copyError, onClick: () => void copyItem(item) },
-          { key: 'edit', label: 'Sửa', disabled: !canWrite || busy || !!editor, onClick: () => edit(item) },
-          { key: 'delete', label: 'Xóa', disabled: !canWrite || busy || !!editor, onClick: () => { setError(undefined); setDeleting(item); } },
+          { key: 'perform', label: 'Thực hiện', disabled: !has('treatment.actuals.create') || !canWrite || busy || !!editor, onClick: () => beginTransfer(item) },
+          { key: 'complete', label: item.displayCompleted ? 'Bỏ hoàn tất' : 'Hoàn tất', disabled: !has('treatment.items.update') || !canWrite || busy || !!editor, onClick: () => void act(item,'mark') },
+          { key: 'copy', label: 'Sao chép', disabled: !has('treatment.items.create') || !canWrite || busy || !!editor || !!copyError, onClick: () => void copyItem(item) },
+          { key: 'edit', label: 'Sửa', disabled: !has('treatment.items.update') || !canWrite || busy || !!editor, onClick: () => edit(item) },
+          { key: 'delete', label: 'Xóa', disabled: !has('treatment.items.delete') || !canWrite || busy || !!editor, onClick: () => { setError(undefined); setDeleting(item); } },
         ] }}><button className="treatment-sheet-row-action" aria-label={`Chức năng ${item.serviceName}`}>⋯</button></Dropdown></td>
       </tr>;})}{editor?.kind === 'plan' && !planRows.some(r=>r.id===(editor.itemId ?? editor.row?.id)) && rowEditor('plan')}
       {!items.length && !editor && !drafts.some(d => d.kind === 'Plan') && <tr><td colSpan={9}>Chưa có hạng mục. Nhấn + để thêm.</td></tr>}</tbody></table></div></section>
@@ -247,20 +250,20 @@ export default function TreatmentSheet({ patientId, dossierId, dossierVersion, o
         {activities?.items.filter(a => a.id !== editor?.activity?.id).map(a => <tr key={a.id}><td>{date(a.performedAt)}</td><td>{a.region || '—'}</td><td>{a.serviceNameSnapshot ?? dossier.items.find(i => i.id === a.itemId)?.serviceName ?? context.services.find(s => s.id === a.serviceId)?.name ?? 'Dịch vụ đã lưu'}</td><td>{a.outcome || '—'}</td>
           <td>{member(a.performerId)}<small>{member(a.assistantId)}</small></td><td>{a.labWorkSnapshot || '—'}</td><td>{money(Math.round(a.quantity*a.priceSnapshotVnd))}<small>{fees[a.feeStatus] ?? a.feeStatus}</small></td><td>{money(a.discountSnapshotVnd ?? 0)}</td>
           <td>{money(payments?.lines.find(l => l.activityId === a.id)?.paidVnd ?? 0)}</td>
-          <td><div className="treatment-sheet-edit-actions"><Button size="small" title="Sửa" aria-label={`Sửa quá trình ${a.serviceNameSnapshot ?? 'điều trị'}`} disabled={!canWrite || busy || !!editor} onClick={() => editActivity(a)}>✎</Button>
-            <Button size="small" title="Xóa" aria-label={`Xóa quá trình ${a.serviceNameSnapshot ?? 'điều trị'}`} disabled={!canWrite || busy || !!editor} onClick={() => { setError(undefined); setDeletingActivity(a); }}>×</Button></div></td></tr>)}
+          <td><div className="treatment-sheet-edit-actions"><Button size="small" title="Sửa" aria-label={`Sửa quá trình ${a.serviceNameSnapshot ?? 'điều trị'}`} disabled={!has('treatment.actuals.update') || !canWrite || busy || !!editor} onClick={() => editActivity(a)}>✎</Button>
+            <Button size="small" title="Xóa" aria-label={`Xóa quá trình ${a.serviceNameSnapshot ?? 'điều trị'}`} disabled={!has('treatment.actuals.delete') || !canWrite || busy || !!editor} onClick={() => { setError(undefined); setDeletingActivity(a); }}>×</Button></div></td></tr>)}
         {activities?.total === 0 && <tr><td colSpan={10}>Phiếu chưa có việc điều trị.</td></tr>}
         {!activities && !activityError && <tr><td colSpan={10}><Skeleton active paragraph={{rows:1}} /></td></tr>}
-        {drafts.filter(d => d.kind === 'Actual' && d.id !== editor?.row?.id).map(d => <tr key={d.id}><td>{d.row.date || '—'}</td><td>{d.row.regions?.join(', ')}</td><td>{d.row.serviceName}<small>Nháp</small></td><td>{d.row.note}</td><td>{member(d.row.dentistId)}</td><td>{d.row.labWork}</td><td>{money(d.row.costVnd)}</td><td>—</td><td>—</td><td><Button size="small" onClick={() => setEditor({kind:'actual',row:d.row})}>Sửa nháp</Button></td></tr>)}
+        {drafts.filter(d => d.kind === 'Actual' && d.id !== editor?.row?.id).map(d => <tr key={d.id}><td>{d.row.date || '—'}</td><td>{d.row.regions?.join(', ')}</td><td>{d.row.serviceName}<small>Nháp</small></td><td>{d.row.note}</td><td>{member(d.row.dentistId)}</td><td>{d.row.labWork}</td><td>{money(d.row.costVnd)}</td><td>—</td><td>—</td><td><Button size="small" disabled={!has('treatment.actuals.create')} onClick={() => setEditor({kind:'actual',row:d.row})}>Sửa nháp</Button></td></tr>)}
         {rowEditor('actual')}
-      </tbody></table></div><Button className="treatment-sheet-create" aria-label="Thêm quá trình điều trị" disabled={!canWrite || !!editor || busy} onClick={() => setEditor({kind:'actual'})}>+ Thêm việc đã làm</Button>
+      </tbody></table></div><Button className="treatment-sheet-create" aria-label="Thêm quá trình điều trị" disabled={!has('treatment.actuals.create') || !canWrite || !!editor || busy} onClick={() => setEditor({kind:'actual'})}>+ Thêm việc đã làm</Button>
       {(activities?.total ?? 0) > 20 && <Pagination current={page} total={activities?.total} pageSize={20} onChange={setPage} />}
       <div className="treatment-sheet-payment"><p><strong>Đã trả:</strong> {money(paid)}</p>
         <p><strong>Còn nợ:</strong> {money(owed)}</p>
-        <DossierFinancialPanel dossierId={dossierId} onChanged={refresh} /></div></section>
-    <section className="treatment-sheet-images"><h3 className="treatment-sheet-section-title">HÌNH ẢNH</h3><PatientImageGallery patientId={patientId} dossierId={dossierId} canUpload /></section>
-    <section className="treatment-sheet-notes"><h3 className="treatment-sheet-minor-heading">GHI CHÚ</h3><Input.TextArea aria-label="Ghi chú hồ sơ" value={note} maxLength={4000} disabled={!canWrite || noteBusy}
-      onChange={e => { setNote(e.target.value); noteDirty.current = e.target.value !== noteSaved.current; }} /><Button size="small" loading={noteBusy} disabled={!canWrite || note === noteSaved.current} onClick={() => void saveNote()}>Lưu ghi chú</Button>{noteError && <Alert type="error" message={noteError} />}</section>
+        {has('finance.read') && <DossierFinancialPanel dossierId={dossierId} onChanged={refresh} />}</div></section>
+    <section className="treatment-sheet-images"><h3 className="treatment-sheet-section-title">HÌNH ẢNH</h3>{has('documents.read') && <PatientImageGallery patientId={patientId} dossierId={dossierId} canUpload={has('documents.upload')} />}</section>
+    <section className="treatment-sheet-notes"><h3 className="treatment-sheet-minor-heading">GHI CHÚ</h3><Input.TextArea aria-label="Ghi chú hồ sơ" value={note} maxLength={4000} disabled={!has('treatment.dossiers.update') || !canWrite || noteBusy}
+      onChange={e => { setNote(e.target.value); noteDirty.current = e.target.value !== noteSaved.current; }} /><Button size="small" loading={noteBusy} disabled={!has('treatment.dossiers.update') || !canWrite || note === noteSaved.current} onClick={() => void saveNote()}>Lưu ghi chú</Button>{noteError && <Alert type="error" message={noteError} />}</section>
     <Modal open={!!deleting} title="Bạn có muốn xóa dòng này không?" okText="Đồng ý" cancelText="Không đồng ý" confirmLoading={busy}
       closable={!busy} cancelButtonProps={{ disabled: busy }} onCancel={() => setDeleting(null)} onOk={() => { if (deleting) void act(deleting,'delete').then(ok => { if (ok) setDeleting(null); }); }}>
       <p>{deleting?.serviceName}</p>{error && <Alert type="error" message={error} />}</Modal>

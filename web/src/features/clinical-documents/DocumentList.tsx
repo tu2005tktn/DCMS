@@ -1,3 +1,4 @@
+import { usePermissions } from '../authentication/usePermissions';
 import { Alert, Button, Empty, Input, Select, Space, Table, Tag, Tooltip, Typography } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { ApiError } from '../../services/api';
@@ -23,6 +24,7 @@ export default function DocumentList({ patientId, contexts, filters, onFiltersCh
   onFiltersChange: (next: DocumentFilters) => void; uploadContext: UploadContext;
   review?: (document: DocumentItem) => Promise<void>; lockedVisitId?: string;
 }) {
+  const has = usePermissions();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [data, setData] = useState<DocumentPage | null>(null);
@@ -51,7 +53,7 @@ export default function DocumentList({ patientId, contexts, filters, onFiltersCh
   }, [data]);
 
   const reload = () => { polls.current = 0; setRevision(v => v + 1); };
-  const canUpload = data?.allowedActions.includes('upload') ?? false;
+  const canUpload = has('documents.upload') && (data?.allowedActions.includes('upload') ?? false);
 
   return <>
     <div className="document-filters">
@@ -88,7 +90,7 @@ export default function DocumentList({ patientId, contexts, filters, onFiltersCh
             ? <Tooltip title={d.rejectReason}><Tag color={fileStateColors.Rejected}>{fileStateLabels.Rejected}</Tag></Tooltip>
             : <Tag color={fileStateColors[d.fileState]}>{fileStateLabels[d.fileState]}</Tag> },
           { title: 'Bác sĩ xem kết quả', render: (_, d) => d.reviews?.some(r => r.visitId === lockedVisitId)
-            ? <Tag color="green">Đã review trong lượt này</Tag> : <Space><Tag>Chưa review</Tag>{review && <Button size="small" disabled={d.fileState !== 'Ready'}
+            ? <Tag color="green">Đã review trong lượt này</Tag> : <Space><Tag>Chưa review</Tag>{review && has('documents.review') && <Button size="small" disabled={d.fileState !== 'Ready'}
               onClick={e => { e.stopPropagation(); void review(d).then(reload).catch(() => {}); }}>Xác nhận đã xem</Button>}</Space> },
         ]} />}
     <DocumentDetailDrawer documentId={selected} onClose={() => setSelected(null)} />

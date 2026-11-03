@@ -12,11 +12,12 @@ using Microsoft.EntityFrameworkCore;
 
 namespace DCMS.Infrastructure.Features.Scheduling;
 
-public sealed class BookingSettingsService(DcmsDbContext db, UserManager<ApplicationUser> users) : IBookingSettingsService
+public sealed class BookingSettingsService(DcmsDbContext db, UserManager<ApplicationUser> users, DCMS.Application.Features.Settings.ISettingsAccess access) : IBookingSettingsService
 {
     private static BusinessException Error(string code, int status) => new(status, SystemMessages.Get(code));
     public async Task<BranchOption[]> OptionsAsync(int actorId, CancellationToken ct)
     {
+        var scope = await access.ResolveAsync(actorId, ct);
         var user = await users.FindByIdAsync(actorId.ToString());
         if (user == null || !user.IsActive || user.AccountType != "Staff") throw Error("MSG06", 403);
         var roles = AccountRoles.Effective(await users.GetRolesAsync(user));
@@ -25,6 +26,7 @@ public sealed class BookingSettingsService(DcmsDbContext db, UserManager<Applica
             join employee in db.Employees on member.EmployeeId equals employee.Id
             join branch in db.Set<SchedulingBranch>() on member.BranchId equals branch.Id
             where employee.AccountId == actorId && member.Active && branch.Active && (dentist || member.CanManageSchedules)
+                && (!scope.Assigned || scope.Owner || scope.BranchIds.Contains(branch.Id))
             orderby branch.Name select new BranchOption(branch.Id, branch.Name)).ToArrayAsync(ct);
     }
     private async Task Authorize(int actorId, int branchId, CancellationToken ct)

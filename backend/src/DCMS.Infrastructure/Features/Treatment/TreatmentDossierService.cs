@@ -16,7 +16,7 @@ using Microsoft.EntityFrameworkCore;
 namespace DCMS.Infrastructure.Features.Treatment;
 
 public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManager<ApplicationUser> users,
-    TimeProvider clock, ITreatmentFinancialSummaryPort financialPort, IClinicalWorkService clinicalWork) : ITreatmentDossierService
+    TimeProvider clock, ITreatmentFinancialSummaryPort financialPort, IClinicalWorkService clinicalWork, DCMS.Application.Features.Settings.ISettingsAccess access) : ITreatmentDossierService
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     private static BusinessException Error(string code, int status = 400) =>
@@ -59,6 +59,8 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
 
     private async Task CommercialAsync(int actorId, int branchId, CancellationToken ct)
     {
+        var scope = await access.ResolveAsync(actorId, ct);
+        if (scope.Assigned && !scope.Owner && !scope.BranchIds.Contains(branchId)) throw Error("MSG06", 403);
         var account = await users.FindByIdAsync(actorId.ToString());
         if (account is not { IsActive: true, AccountType: "Staff" }) throw Error("MSG06", 403);
         var roles = AccountRoles.Effective(await users.GetRolesAsync(account));
@@ -76,6 +78,8 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
 
     private async Task<int> DentistAsync(int actorId, int branchId, CancellationToken ct)
     {
+        var scope = await access.ResolveAsync(actorId, ct);
+        if (scope.Assigned && !scope.Owner && !scope.BranchIds.Contains(branchId)) throw Error("MSG06", 403);
         var account = await users.FindByIdAsync(actorId.ToString());
         if (account == null || !account.IsActive || account.AccountType != "Staff") throw Error("MSG06", 403);
         var roles = AccountRoles.Effective(await users.GetRolesAsync(account));
@@ -182,6 +186,8 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
             x.EmployeeId == employee.Id && x.Active && x.CanDentist).Select(x => x.BranchId);
         var query = db.TreatmentDossiers.AsNoTracking().Where(x => x.PatientId == patientId
             && x.State != "Deleted" && allowed.Contains(x.BranchId));
+        var scope = await access.ResolveAsync(actorId, ct);
+        if (scope.Assigned && !scope.Owner) query = query.Where(x => scope.BranchIds.Contains(x.BranchId));
         if (branchId.HasValue) query = query.Where(x => x.BranchId == branchId.Value);
         var total = await query.CountAsync(ct);
         var rows = await query.OrderByDescending(x => x.UpdatedAt).ThenBy(x => x.Id)
@@ -355,6 +361,8 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
         var employee = await db.Employees.AsNoTracking().SingleOrDefaultAsync(x => x.AccountId == actorId, ct) ?? throw Error("MSG06",403);
         var branches = await (from m in db.Set<SchedulingMember>() join b in db.Set<SchedulingBranch>() on m.BranchId equals b.Id
             where m.EmployeeId == employee.Id && m.Active && m.CanDentist && b.Active orderby b.Name select new DossierCreateBranch(b.Id,b.Name)).ToListAsync(ct);
+        var scope = await access.ResolveAsync(actorId, ct);
+        if (scope.Assigned && !scope.Owner) branches = branches.Where(x => scope.BranchIds.Contains(x.Id)).ToList();
         return new(employee.Id, branches);
     }
     public Task<TreatmentChange> CreateAsync(int actorId, int patientId, CreateDossierRequest request, CancellationToken ct) => CreateCoreAsync(actorId, patientId, request, ct, false);
@@ -439,9 +447,18 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
         if (linkedItems.Any(id => request.Items.All(x => x.Id != id || x.Decision != "Agreed")))
             throw Error("MSG233", 409);
         var existing = dossier.Items.ToDictionary(x => x.Id);
+        if (request.Items.Any(x => !x.Id.HasValue)) await access.RequireAsync(actorId, "treatment.items.create", ct);
+        if (existing.Keys.Any(itemId => request.Items.All(x => x.Id != itemId))) await access.RequireAsync(actorId, "treatment.items.delete", ct);
         var incoming = new HashSet<Guid>();
         foreach (var input in request.Items)
         {
+            if (input.Id is { } itemId && existing.TryGetValue(itemId, out var oldItem)
+                && (input.AgreedUnitPriceVnd != oldItem.AgreedUnitPriceVnd
+                    || input.ClearDiscount && oldItem.DiscountType != null
+                    || input.Discount is { } discount && (discount.Type != oldItem.DiscountType
+                        || discount.Value != oldItem.DiscountValue || Clean(discount.Reason) != oldItem.DiscountReason
+                        || discount.QualifyingItemId != oldItem.DiscountQualifyingItemId)))
+                await access.RequireAsync(actorId, "treatment.items.price", ct);
             if (input.Quantity <= 0 || input.Quantity > 999999999 || decimal.Round(input.Quantity, 3) != input.Quantity
                 || input.AgreedUnitPriceVnd < 0
                 || decimal.Round(input.Quantity * input.AgreedUnitPriceVnd, 0,
@@ -778,6 +795,8 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
             throw Error("MSG06", 403);
         var query = db.TreatmentDossiers.AsNoTracking().Include(x => x.Items)
             .Where(x => x.State == "Open" && x.PlanState == "Draft");
+        var scope = await access.ResolveAsync(actorId, ct);
+        if (scope.Assigned && !scope.Owner) query = query.Where(x => scope.BranchIds.Contains(x.BranchId));
         if (!roles.Contains(AccountRoles.Admin))
         {
             var isOwner = roles.Contains(AccountRoles.ClinicOwner);

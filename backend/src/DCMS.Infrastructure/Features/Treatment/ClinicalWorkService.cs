@@ -61,6 +61,8 @@ public sealed class ClinicalWorkService(DcmsDbContext db, UserManager<Applicatio
 
     private async Task<int> DentistAsync(int actorId, int branchId, CancellationToken ct)
     {
+        var scope = await settingsAccess.ResolveAsync(actorId, ct);
+        if (scope.Assigned && !scope.Owner && !scope.BranchIds.Contains(branchId)) throw Error("MSG06", 403);
         var user = await users.FindByIdAsync(actorId.ToString());
         if (user == null || !user.IsActive || user.AccountType != "Staff" ||
             !AccountRoles.Effective(await users.GetRolesAsync(user)).Contains(AccountRoles.Dentist))
@@ -73,14 +75,14 @@ public sealed class ClinicalWorkService(DcmsDbContext db, UserManager<Applicatio
     }
 
     private async Task<ClinicalVisitState> VisitAsync(int actorId, Guid id, int expectedVersion,
-        CancellationToken ct)
+        CancellationToken ct, string permission = "treatment.actuals.create")
     {
         if (id == Guid.Empty) throw Error("MSG04");
         var visit = await visits.GetAsync(id, ct);
         if (!visit.Available) throw Error("MSG144", 503);
         await DentistAsync(actorId, visit.BranchId, ct);
         if (await db.Visits.AnyAsync(x => x.Id == id, ct))
-            await new DCMS.Infrastructure.Features.Examinations.ClinicalAccess(db, users, clock, settingsAccess).VisitAsync(actorId, id, true, ct);
+            await new DCMS.Infrastructure.Features.Examinations.ClinicalAccess(db, users, clock, settingsAccess).VisitAsync(actorId, id, true, ct, permission);
         if (!visit.InProgress) throw Error("MSG230", 409);
         if (expectedVersion > 0 && visit.Version != expectedVersion) throw Error("MSG111", 409);
         return visit;
@@ -200,7 +202,7 @@ public sealed class ClinicalWorkService(DcmsDbContext db, UserManager<Applicatio
 
     public async Task<TreatmentContextDto> ContextAsync(int actorId, Guid visitId, CancellationToken ct)
     {
-        var visit = await VisitAsync(actorId, visitId, 0, ct);
+        var visit = await VisitAsync(actorId, visitId, 0, ct, "treatment.read");
         var activities = await db.ClinicalActivities.AsNoTracking().Where(x =>
                 x.PatientId == visit.PatientId && x.BranchId == visit.BranchId && x.State == "Posted")
             .OrderByDescending(x => x.CreatedAt).Take(100).ToListAsync(ct);
@@ -380,7 +382,7 @@ public sealed class ClinicalWorkService(DcmsDbContext db, UserManager<Applicatio
         await using var gate = await ClinicalRequestLock.AcquireAsync(db, request.RequestKey, ct);
         var replay = await ReplayAsync(actorId, request.RequestKey, "ReviewCreate", request, ct);
         if (replay.HasValue) return Map(await db.ClinicalReviews.AsNoTracking().SingleAsync(x => x.Id == replay, ct));
-        var visit = await VisitAsync(actorId, request.VisitId, request.ExpectedVisitVersion, ct);
+        var visit = await VisitAsync(actorId, request.VisitId, request.ExpectedVisitVersion, ct, "treatment.progress.manage");
         if (Clean(request.Complaint) is not { Length: <= 4000 } ||
             Clean(request.Findings) is not { Length: <= 4000 } ||
             request.Coverage is not ("PendingAssessment" or "Covered" or "NotCovered") ||
@@ -429,7 +431,7 @@ public sealed class ClinicalWorkService(DcmsDbContext db, UserManager<Applicatio
 
     public async Task<IReadOnlyList<ReviewDto>> ReviewsAsync(int actorId, Guid visitId, CancellationToken ct)
     {
-        await VisitAsync(actorId, visitId, 0, ct);
+        await VisitAsync(actorId, visitId, 0, ct, "treatment.read");
         return (await db.ClinicalReviews.AsNoTracking().Where(x => x.VisitId == visitId)
             .OrderByDescending(x => x.RecordedAt).ToListAsync(ct)).Select(Map).ToArray();
     }

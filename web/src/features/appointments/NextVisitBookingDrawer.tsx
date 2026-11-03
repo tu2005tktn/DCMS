@@ -37,6 +37,7 @@ export default function NextVisitBookingDrawer({ open, candidate, patient, onClo
   open: boolean; candidate: NextVisitCandidate | null; patient: NextVisitPatient;
   onClose: () => void; onBooked: (result: AppointmentResult) => void;
 }) {
+  const has = usePermissions();
   const [date, setDate] = useState(''), [limitEnd, setLimitEnd] = useState('');
   const [days, setDays] = useState<DaySlots[]>([]);
   const [slots, setSlots] = useState<AvailabilitySlot[] | null>(null), [slot, setSlot] = useState<AvailabilitySlot | null>(null);
@@ -122,7 +123,7 @@ export default function NextVisitBookingDrawer({ open, candidate, patient, onClo
 
   const needsException = !!slot && Date.parse(slot.start) < Date.now() + 60 * 60_000;
   const contactValid = cleanPhone(bookerContact) || cleanEmail(bookerContact);
-  const canConfirm = !!slot && !busy && bookerName.trim().length > 0 && bookerName.trim().length <= 100 && contactValid
+  const canConfirm = has('appointments.create') && has('treatment.progress.manage') && !!slot && !busy && bookerName.trim().length > 0 && bookerName.trim().length <= 100 && contactValid
     && (!needsException || exceptionReason.trim().length > 0);
 
   async function confirm() {
@@ -199,7 +200,7 @@ export default function NextVisitBookingDrawer({ open, candidate, patient, onClo
       </Checkbox></div>)}
     </div>
     <Space className="patient-section">
-      <Button type="primary" loading={busy} disabled={picked.length === 0} onClick={() => void applyDates()}>Cập nhật ngày dự kiến</Button>
+      <Button type="primary" loading={busy} disabled={!has('treatment.items.update') || picked.length === 0} onClick={() => void applyDates()}>Cập nhật ngày dự kiến</Button>
       <Button disabled={busy} onClick={() => onBooked(after.result)}>Giữ nguyên</Button>
     </Space>
   </Drawer>;
@@ -247,3 +248,4 @@ export default function NextVisitBookingDrawer({ open, candidate, patient, onClo
     </>}
   </Drawer>;
 }
+import { usePermissions } from '../authentication/usePermissions';

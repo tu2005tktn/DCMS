@@ -73,7 +73,10 @@ public sealed partial class TreatmentDossierService
                 SheetVersion = before.SheetVersion + 1, SheetDeleted = false, FeeStatus = moneyChanged ? "NeedsAdjustment" : before.FeeStatus };
             dossier.Version++; dossier.UpdatedAt = clock.GetUtcNow();
             Event(dossier, actorId, "SheetActivityEdited", new { activityId = source.Id, after.SheetVersion, activity = after, before });
-            if (moneyChanged) RecordSheetFeeCorrection(actorId, dossier, before, after);
+            if (moneyChanged) {
+                await access.RequireAsync(actorId, "treatment.items.price", ct);
+                RecordSheetFeeCorrection(actorId, dossier, before, after);
+            }
             await db.SaveChangesAsync(ct);
             return after;
     }

@@ -181,7 +181,7 @@ public sealed class ClinicalDocumentService(DcmsDbContext db, ClinicalAccess acc
     {
         if (r.RequestKey == Guid.Empty || r.ExpectedVersion <= 0) throw Error("MSG04");
         await using var tx = await db.Database.BeginTransactionAsync(ct); await LockAsync(ct);
-        var d = await RowAsync(actorId, documentId, ct); var v = await access.VisitAsync(actorId, r.VisitId, true, ct);
+        var d = await RowAsync(actorId, documentId, ct); var v = await access.VisitAsync(actorId, r.VisitId, true, ct, "documents.review");
         var sourceBranch = d.VisitId.HasValue ? (await db.Visits.SingleAsync(x => x.Id == d.VisitId, ct)).BranchId
             : (await db.TreatmentDossiers.SingleAsync(x => x.Id == d.DossierId, ct)).BranchId;
         if (r.PatientId != d.PatientId || v.PatientId != d.PatientId || v.BranchId != sourceBranch) throw Error("MSG113", 404);

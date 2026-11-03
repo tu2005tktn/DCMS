@@ -14,7 +14,7 @@ using static DCMS.Infrastructure.Features.Examinations.ClinicalAccess;
 namespace DCMS.Infrastructure.Features.Examinations;
 
 public sealed class ExaminationService(DcmsDbContext db, ClinicalAccess access, IReceptionService reception,
-    IClinicalDocumentService documents, TimeProvider clock, IInvestigationService investigations, DCMS.Application.Features.Finance.IExaminationFeeService fees) : IExaminationService
+    IClinicalDocumentService documents, TimeProvider clock, IInvestigationService investigations, DCMS.Application.Features.Finance.IExaminationFeeService fees, DCMS.Application.Features.Settings.ISettingsAccess permissions) : IExaminationService
 {
     internal static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     internal static string Hash(object value) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(value, Json))));
@@ -31,12 +31,14 @@ public sealed class ExaminationService(DcmsDbContext db, ClinicalAccess access, 
         var initial = new ExaminationContent(v.ArrivalReason ?? v.Note, prior == null ? new() : prior.MedicalHistory with { Verified = false },
             prior == null ? new() : prior.Allergies with { Verified = false }, prior == null ? new() : prior.Medications with { Verified = false }, [], null, null);
         var own = await db.Employees.AnyAsync(x => x.Id == v.DentistId && x.AccountId == actorId, ct);
-        var canWrite = own && await access.BranchAsync(actorId, v.BranchId, false, ct);
+        var responsible = own && await access.BranchAsync(actorId, v.BranchId, false, ct);
+        var state = await permissions.ResolveAsync(actorId, ct);
+        var canWrite = responsible && state.Permissions.Contains("examinations.manage");
         string[] actions = canWrite ? v.Status == VisitStatuses.Queued ? ["start"]
             : v.Status == VisitStatuses.InProgress && row?.Confirmed != true ? ["save", "confirm"]
             : row?.Confirmed == true && v.Status == VisitStatuses.InProgress ? ["amend", "complete"]
             : row?.Confirmed == true && v.Status == VisitStatuses.Completed ? (Dto(row).Content.Disposition == "ProceedToTreatment" ? ["handoff", "amend"] : ["amend"]) : [] : [];
-        var visitResult = await reception.VisitAsync(actorId, visitId, ct);
+        var visitResult = await reception.VisitAsync(actorId, visitId, ct, clinical: true);
         var patient = await db.Patients.AsNoTracking().Where(p => p.Id == v.PatientId)
             .Select(p => new { p.Id, p.PatientCode, p.FullName, p.BirthDate, p.Gender }).SingleAsync(ct);
         var today = DateOnly.FromDateTime(clock.GetUtcNow().ToOffset(TimeSpan.FromHours(7)).DateTime);
@@ -47,6 +49,8 @@ public sealed class ExaminationService(DcmsDbContext db, ClinicalAccess access, 
         }
         var orders = (await investigations.ListAsync(actorId,visitId,ct)).Items;
         if(orders.Any(x=>x.RequiredForDiagnosis && x.State is not ("Reviewed" or "Cancelled"))) actions = actions.Where(x=>x!="handoff").ToArray();
+        if (!state.Permissions.Contains("treatment.dossiers.create")) actions = actions.Where(x => x != "handoff").ToArray();
+        if (responsible && v.Status == VisitStatuses.InProgress && state.Permissions.Contains("prescriptions.manage")) actions = [..actions, "prescribe"];
         var examinationVersion = await db.Set<VisitAudit>().CountAsync(x => x.VisitId == visitId && SaveActions.Contains(x.Action), ct);
         return new(visitResult, row == null ? null : Dto(row, examinationVersion), initial, actions,
             new(patient.Id, patient.PatientCode, patient.FullName, patient.BirthDate, patient.Gender, age), Investigations: orders);
@@ -199,7 +203,7 @@ public sealed class ExaminationService(DcmsDbContext db, ClinicalAccess access, 
     }
     public async Task<IReadOnlyList<ExaminationHistory>> HistoryAsync(int actorId, Guid visitId, CancellationToken ct)
     {
-        await reception.VisitAsync(actorId, visitId, ct);
+        await reception.VisitAsync(actorId, visitId, ct, clinical: true);
         var v = await access.VisitAsync(actorId, visitId, false, ct);
         var rows = await (from e in db.Set<VisitExamination>().AsNoTracking() join visit in db.Visits on e.VisitId equals visit.Id
             where visit.PatientId == v.PatientId && visit.BranchId == v.BranchId && visit.Id != visitId
@@ -236,10 +240,14 @@ public sealed class ExaminationService(DcmsDbContext db, ClinicalAccess access, 
                 && (v.Purpose == AttendancePurposes.InitialExamination || v.Purpose == AttendancePurposes.PeriodicOrNewProblem || e != null)
             orderby v.ArrivalAt descending, v.Id
             select new { Visit = v, a.Code, BranchName = b.Name, DentistName = d.FullName, Examination = e,
+                CompletedAt = v.Status == VisitStatuses.Completed
+                    ? db.Set<VisitAudit>().Where(audit => audit.VisitId == v.Id && audit.Action == "CompleteVisit")
+                        .Select(audit => (DateTimeOffset?)audit.OccurredAt).Min()
+                    : null,
                 Version = db.Set<VisitAudit>().Count(audit => audit.VisitId == v.Id && SaveActions.Contains(audit.Action)) })
             .Take(100).ToArrayAsync(ct);
         return rows.Select(x => new PatientExamination(x.Visit.Id, x.Code, x.Visit.BranchId, x.BranchName, x.DentistName,
-            x.Visit.ArrivalAt, x.Visit.Status, x.Examination == null ? null : Dto(x.Examination, x.Version))).ToArray();
+            x.Visit.ArrivalAt, x.Visit.Status, x.Examination == null ? null : Dto(x.Examination, x.Version), x.CompletedAt)).ToArray();
     }
 
     public async Task<IReadOnlyList<ExaminationVersion>> VersionsAsync(int actorId, Guid visitId, CancellationToken ct)

@@ -15,7 +15,7 @@ namespace DCMS.Infrastructure.Features.Appointments;
 // Read side of UC-05 for S10/S12 (staff) and S14/S16 (patient app). Every request recomputes the actor's scope;
 // filters and IDs from the client never widen it. Contract: docs/implementation/UC04-05-S10-S11.md.
 public sealed class AppointmentQueryService(DcmsDbContext db, UserManager<ApplicationUser> users, TimeProvider clock,
-    IConfiguration configuration) : IAppointmentQueryService
+    IConfiguration configuration, DCMS.Application.Features.Settings.ISettingsAccess access) : IAppointmentQueryService
 {
     private static readonly TimeSpan ClinicOffset = TimeSpan.FromHours(7);
     private static readonly int[] PageSizes = [20, 50, 100];
@@ -44,6 +44,8 @@ public sealed class AppointmentQueryService(DcmsDbContext db, UserManager<Applic
 
     private async Task<Scope> ScopeAsync(int actorId, int branchId, CancellationToken ct)
     {
+        var dynamicScope = await access.ResolveAsync(actorId, ct);
+        if (dynamicScope.Assigned && !dynamicScope.Owner && !dynamicScope.BranchIds.Contains(branchId)) throw Error("MSG06", 403);
         var (employeeId, broad) = await ActorAsync(actorId, ct);
         var membership = await db.Set<SchedulingMember>().AsNoTracking()
             .SingleOrDefaultAsync(x => x.BranchId == branchId && x.EmployeeId == employeeId && x.Active, ct) ?? throw Error("MSG06", 403);
@@ -56,6 +58,8 @@ public sealed class AppointmentQueryService(DcmsDbContext db, UserManager<Applic
     {
         var (employeeId, broad) = await ActorAsync(actorId, ct);
         var mine = await db.Set<SchedulingMember>().AsNoTracking().Where(x => x.EmployeeId == employeeId && x.Active).ToListAsync(ct);
+        var dynamicScope = await access.ResolveAsync(actorId, ct);
+        mine = mine.Where(x => !dynamicScope.Assigned || dynamicScope.Owner || dynamicScope.BranchIds.Contains(x.BranchId)).ToList();
         mine = mine.Where(x => broad || x.CanManageSchedules || x.CanDentist).ToList();
         if (mine.Count == 0) throw Error("MSG06", 403);
         var branchIds = mine.Select(x => x.BranchId).ToArray();

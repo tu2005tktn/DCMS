@@ -148,6 +148,8 @@ Các mục sau dùng quy tắc SET-01–08; ID stable, `version`, `active` và a
 
 ## 7. Nhóm quyền và nhân viên
 
+Cập nhật triển khai form checkbox và quyền hành chính chi tiết: [S58-DYNAMIC-ACCESS-GROUPS.vi.md](S58-DYNAMIC-ACCESS-GROUPS.vi.md).
+
 [D] Nhóm = tên bộ grant; bốn seed: Doctors/Dentists → Dentist, Assistants → ClinicAssistant, Receptionists → ClinicAssistant + Reception profile, Accountants → ClinicAssistant + Collections/report profile. Không tạo bốn Identity role mới có đặc quyền ngầm theo tên tiếng Anh. Profile phải được triển khai thành tập grant hữu hạn theo hành vi đã hỗ trợ.
 
 [P] Form gồm code, tên, mô tả, trạng thái, role nền, bảng **Màn hình / Xem / Thêm / Sửa / Ngừng dùng / Xuất / Phạm vi**, và chi tiết quyền nghiệp vụ khi cần. Quyền con cần quyền xem cha; tắt cha preview các grant sẽ thu hồi, không giữ quyền con ẩn nhưng vẫn có hiệu lực. Bản đầu mỗi nhân viên có tối đa một access group trong phòng khám, giữ các Identity roles được cấp riêng; không tự xóa roles khi đổi group. Quyền hiệu lực vẫn bị ràng buộc bởi role nền và scope, không đơn thuần union mọi grant.

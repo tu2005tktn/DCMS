@@ -15,6 +15,12 @@ public static class SettingsEndpoints
         var groups=endpoints.MapGroup("/api/system-settings/access-groups").RequireAuthorization().WithTags("S58 Access groups");
         groups.MapGet("/",async(HttpContext c,ISettingsService s,CancellationToken ct)=>Results.Ok(await s.GroupsAsync(Actor(c),ct)));
         groups.MapGet("/grant-definitions",async(HttpContext c,ISettingsAccess access,CancellationToken ct)=>{await access.RequireAsync(Actor(c),"access-groups.read",ct);return Results.Ok(SettingsGrants.Definitions);});
+        groups.MapGet("/grant-options",async(HttpContext c,ISettingsAccess access,CancellationToken ct)=>{
+            await access.RequireAsync(Actor(c),"access-groups.read",ct);
+            string[] baseRoles = [Domain.Features.Accounts.AccountRoles.Admin, Domain.Features.Accounts.AccountRoles.Dentist, Domain.Features.Accounts.AccountRoles.ClinicAssistant];
+            return Results.Ok(SettingsGrants.Definitions.Where(x => x.Key is not ("patients.manage" or "accounts.manage"))
+                .Select(x => new GrantOption(x.Key,x.Label,x.RequiredRole,x.Parent,baseRoles.Where(role => SettingsGrants.RoleAllows(x.Key,[role])).ToArray())));
+        });
         groups.MapGet("/staff",async(HttpContext c,ISettingsService s,CancellationToken ct)=>Results.Ok(await s.StaffAsync(Actor(c),ct)));
         groups.MapGet("/{id:guid}",async(HttpContext c,Guid id,ISettingsService s,CancellationToken ct)=>Results.Ok((await s.GroupsAsync(Actor(c),ct)).SingleOrDefault(x=>x.Id==id)??throw Infrastructure.Features.Settings.SettingsAccess.Error("MSG113",404)));
         groups.MapPost("/",async(HttpContext c,GroupCommand command,ISettingsService s,CancellationToken ct)=>Results.Ok(await s.SaveGroupAsync(Actor(c),null,command,ct)));

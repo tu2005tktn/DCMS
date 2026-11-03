@@ -73,8 +73,11 @@ public sealed class SettingsService(DcmsDbContext db, ISettingsAccess access, Us
         var state=await access.RequireAsync(actor,"access-groups.read",ct);
         var employees=await (from e in db.Employees.AsNoTracking() join u in db.Users.AsNoTracking() on e.AccountId equals u.Id where u.AccountType=="Staff" select new {e.Id,e.AccountId,e.FullName,u.IsActive,u.Version}).ToListAsync(ct);
         var assignments=await db.Set<StaffAccessAssignment>().AsNoTracking().ToListAsync(ct);var members=await db.Set<SchedulingMember>().AsNoTracking().Where(x=>x.Active).ToListAsync(ct);
+        var roles=await (from link in db.UserRoles join role in db.Roles on link.RoleId equals role.Id select new {link.UserId,role.Name}).ToArrayAsync(ct);
         return employees.Where(e=>state.Owner||members.Where(m=>m.EmployeeId==e.Id).Any()&&members.Where(m=>m.EmployeeId==e.Id).All(m=>state.BranchIds.Contains(m.BranchId)))
-            .Select(e=>{var a=assignments.SingleOrDefault(x=>x.AccountId==e.AccountId);return new StaffAccessDto(e.Id,e.AccountId,e.FullName,e.IsActive,e.Version,a?.GroupId,a?.Version??0,a?.BranchIds??members.Where(m=>m.EmployeeId==e.Id).Select(m=>m.BranchId).ToArray());}).ToArray();
+            .Select(e=>{var a=assignments.SingleOrDefault(x=>x.AccountId==e.AccountId);var membership=members.Where(m=>m.EmployeeId==e.Id).Select(m=>m.BranchId).Distinct().ToArray();
+                return new StaffAccessDto(e.Id,e.AccountId,e.FullName,e.IsActive,e.Version,a?.GroupId,a?.Version??0,a?.BranchIds??membership,
+                    AccountRoles.Effective(roles.Where(r=>r.UserId==e.AccountId).Select(r=>r.Name!)),membership);}).ToArray();
     }
     public Task<StaffAccessDto> AssignAsync(int actor,int employeeId,AssignGroup command,CancellationToken ct)=>Run(actor,"staff.access.assign",command.RequestKey,"group.assign","staff:"+employeeId,command,command.Reason,async state=>{
         var employee=await db.Employees.SingleAsync(x=>x.Id==employeeId,ct);var user=await db.Users.SingleAsync(x=>x.Id==employee.AccountId,ct);var group=await Group(command.GroupId,ct);

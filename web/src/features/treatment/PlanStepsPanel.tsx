@@ -1,3 +1,4 @@
+import { usePermissions } from '../authentication/usePermissions';
 import { Alert, Button, Card, Checkbox, Drawer, Empty, Form, Input, InputNumber, Modal, Result, Select, Skeleton, Space, Table, Tag, Typography } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { api, type ApiError } from '../../services/api';
@@ -15,6 +16,7 @@ type FollowUpForm = { reason: string; earliestOn: string; targetOn: string; late
 export default function PlanStepsPanel({ dossier, dirty, onChanged }: {
   dossier: TreatmentDossier; dirty: boolean; onChanged: () => void;
 }) {
+  const has = usePermissions();
   const [rows, setRows] = useState<PlanStep[] | null>(null);
   const [reload, setReload] = useState(0);
   const [action, setAction] = useState<Action | null>(null);
@@ -116,7 +118,7 @@ export default function PlanStepsPanel({ dossier, dirty, onChanged }: {
       { title: 'Kết quả', render: (_: unknown, row: PlanStep) => <Tag>{row.outcome === 'Partial' ? 'Đã làm một phần' : row.outcome === 'Completed' ? 'Hoàn tất' : 'Chưa thực hiện'}</Tag> },
       { title: 'Sẵn sàng', render: (_: unknown, row: PlanStep) => <><Tag color={row.readiness === 'Ready' ? 'green' : 'orange'}>
         {row.readiness === 'Ready' ? 'Đủ điều kiện' : 'Đang bị chặn'}</Tag>{row.blockers.map(text => <div key={text} className="treatment-muted">{text}</div>)}</> },
-      { title: 'Thao tác', render: (_: unknown, row: PlanStep) => dossier.planState === 'Committed' && dossier.state === 'Open'
+      { title: 'Thao tác', render: (_: unknown, row: PlanStep) => has('treatment.progress.manage') && dossier.planState === 'Committed' && dossier.state === 'Open'
         ? <Space wrap><Button disabled={row.outcome === 'Completed'} onClick={() => { form.resetFields(); setAction({ step: row, kind: 'progress' }); requestKey.current = crypto.randomUUID(); actionEffectiveAt.current = new Date().toISOString(); }}>Ghi một phần</Button>
           <Button disabled={row.outcome === 'Completed'} onClick={() => { followUpForm.resetFields(); setFollowUpStep(row); requestKey.current = crypto.randomUUID(); }}>Chỉ định thêm buổi</Button>
           <Button disabled={row.outcome === 'Completed'} onClick={() => { form.resetFields(); setAction({ step: row, kind: row.holdReason ? 'release-hold' : 'hold' }); requestKey.current = crypto.randomUUID(); actionEffectiveAt.current = new Date().toISOString(); }}>

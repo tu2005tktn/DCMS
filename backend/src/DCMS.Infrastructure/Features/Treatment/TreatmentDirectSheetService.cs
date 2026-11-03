@@ -54,6 +54,8 @@ public sealed partial class TreatmentDossierService
             if (!TreatmentSheetRules.ValidQuantity(row.Quantity, service.Unit)) throw Error("MSG04");
             if (row.AssistantId.HasValue && !await db.Set<SchedulingMember>().AnyAsync(x => x.EmployeeId == row.AssistantId && x.BranchId == dossier.BranchId && x.Active && !x.CanDentist, ct)) throw Error("MSG04");
             var unitPrice = row.UnitPriceVnd ?? checked((long)(row.CostVnd / row.Quantity));
+            if (unitPrice != item.AgreedUnitPriceVnd || row.DiscountValue != (item.DiscountValue ?? 0))
+                await access.RequireAsync(actorId, "treatment.items.price", ct);
             if (TreatmentPlanRules.Gross(row.Quantity, unitPrice) != row.CostVnd) throw Error("MSG04");
             var type = row.DiscountType == "VND" ? "Fixed" : row.DiscountType;
             if (row.DiscountValue < 0 || row.DiscountValue > 0 && (type is not ("Fixed" or "Percent") || Clean(row.DiscountNote) == null)) throw Error("MSG252");

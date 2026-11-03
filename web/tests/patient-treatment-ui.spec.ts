@@ -13,7 +13,7 @@ const item = { id: itemId, serviceId: 3, serviceName: 'Trám răng', region: '25
   material: null, note: 'Ghi chú kế hoạch', discount: null, responsibleDentistId: 7 };
 async function prepare(page: Page, withItem = true, withFinance = false) {
   const user = { id: 7, userName: 'synthetic.dentist', fullName: 'Bác sĩ thử nghiệm', accountType: 'Staff',
-    roles: ['Dentist'], effectiveRoles: ['Dentist'], permissions: ['patients.read'] };
+    roles: ['Dentist'], effectiveRoles: ['Dentist'], permissions: ['patients.read', 'treatment.read', 'treatment.dossiers.create', 'treatment.dossiers.update', 'treatment.dossiers.delete', 'treatment.items.create', 'treatment.items.update', 'treatment.items.delete', 'treatment.items.price', 'treatment.actuals.create', 'treatment.actuals.update', 'treatment.actuals.delete', 'treatment.templates.read', 'finance.read', 'finance.payments.create', 'documents.read', 'documents.upload'] };
   const state = { version: 1, items: (withItem ? [{ ...item }] : []) as any[], drafts: new Map<string, any>(),
     activities: [] as any[], activityEdits: new Map<string, any>(), conflict: false, notes: '', collection: null as any, accountVersion: 1, requests: [] as any[], materialReads: [] as {q:string;page:number}[], failMaterialOnce: false,
     activities: [] as any[], activityEdits: new Map<string, any>(), conflict: false, notes: '', payments: [] as any[], requests: [] as any[], materialReads: [] as {q:string;page:number}[], failMaterialOnce: false,
@@ -297,7 +297,7 @@ test('Thêm việc đã làm không cần kế hoạch/Visit; không còn bộ l
   await page.getByRole('button', { name: 'Đồng ý', exact: true }).click();
   await expect(page.getByText('Ghi trực tiếp theo phiếu', { exact: true })).toBeVisible();
   expect(state.activities[0].visitId).toBeNull();
-  await expect(page.getByText('Chưa có dữ liệu', { exact: true })).toBeVisible();
+  await expect(page.getByRole('row').filter({ hasText: 'Ghi trực tiếp theo phiếu' }).locator('td').nth(7)).toHaveText('0 ₫');
 });
 
 test('đọc quá trình nhiều buổi, tổng toàn bộ phiếu và đóng có kiểm tra lâm sàng', async ({ page }) => {
@@ -306,7 +306,7 @@ test('đọc quá trình nhiều buổi, tổng toàn bộ phiếu và đóng c�
     { id: 'a2', visitId: secondVisit, dossierId, itemId, planVersion: 1, serviceId: 3, region: '26', quantity: 1, unit: 'răng', performerId: 7, performedAt: '2026-10-27T02:00:00Z', outcome: 'Buổi sau', feeStatus: 'Pending', priceSnapshotVnd: 300000 });
   await page.reload(); await page.getByRole('tab', { name: 'Điều trị & Thanh toán' }).click();
   await expect(page.getByText('Buổi đầu', { exact: true })).toBeVisible(); await expect(page.getByText('Buổi sau', { exact: true })).toBeVisible();
-  await expect(page.getByText('900.000 ₫', { exact: true })).toBeVisible();
+  await expect(page.locator('.treatment-sheet-payment')).toContainText(/Còn nợ:\s*600\.000\s*₫/);
   await page.getByRole('button', { name: 'Trạng thái phiếu: Chưa xong' }).click(); await page.getByRole('menuitem', { name: 'Hoàn tất', exact: true }).click();
   await expect(page.getByText(/Còn 1 hạng mục chưa hoàn tất/)).toBeVisible();
   await page.getByRole('button', { name: 'Xác nhận kết thúc' }).click();
@@ -385,7 +385,12 @@ test('ghi chú chỉ lưu bằng nút xác nhận, bàn phím và responsive kh�
 
 async function selectNoteMaterial(page: import('@playwright/test').Page, index: number, name: string, search: string) {
   const input = page.getByRole('combobox',{name:`Tên dụng cụ/vật liệu ${index}`,exact:true});
-  await input.click(); await input.fill(search);
+  await input.click();
+  const results = page.waitForResponse(response => {
+    const url = new URL(response.url());
+    return url.pathname === '/api/system-settings/materials' && url.searchParams.get('q') === search;
+  });
+  await input.fill(search); await results;
   await page.locator('.material-note-select-popup:visible').getByText(name,{exact:true}).click();
 }
 

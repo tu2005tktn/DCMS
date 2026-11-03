@@ -1,3 +1,6 @@
+import { usePermissions } from '../authentication/usePermissions';
+import { Alert, Button, Drawer, Skeleton, Space, Table } from 'antd';
+import { useState } from 'react';
 import { Alert, Button, Drawer, Form, Input, InputNumber, Modal, Select, Space, Table } from 'antd';
 import { useRef, useState } from 'react';
 import { api } from '../../services/api';
@@ -105,6 +108,7 @@ const day = (v: string) => new Date(`${v}T00:00:00`).toLocaleDateString('vi-VN')
 
 // Payment entry points of a dossier. Data and rules: docs/specs/TREATMENT-DOSSIER-PAYMENTS.md.
 export default function DossierFinancialPanel({ dossierId, onChanged }: { dossierId: string; onChanged: () => void }) {
+  const has = usePermissions();
   const [paying, setPaying] = useState(false), [historyOpen, setHistoryOpen] = useState(false);
   const [history, setHistory] = useState<DossierPayment[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -116,6 +120,8 @@ export default function DossierFinancialPanel({ dossierId, onChanged }: { dossie
   }
 
   return <Space wrap>
+    <Button disabled={!has('finance.read')} onClick={() => void openHistory()}>LỊCH SỬ</Button>
+    <Button disabled={!has('finance.payments.create')} className="treatment-sheet-create" onClick={() => setPaying(true)}>TRẢ TIỀN...</Button>
     <Button onClick={() => void open('history')}>LỊCH SỬ</Button>
     <Button className="treatment-sheet-create" onClick={() => void open('pay')}>TRẢ TIỀN...</Button>
     <Drawer open={mode !== null} width={760} title={mode === 'history' ? 'Lịch sử thanh toán' : 'Trả tiền cho phiếu'}

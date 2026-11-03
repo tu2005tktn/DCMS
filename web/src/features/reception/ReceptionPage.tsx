@@ -7,6 +7,7 @@ import { formatClock, formatDate, statusLabels } from '../appointments/types';
 import { arrivalClock, purposeLabels, visitLabels, type PageResult, type ReceptionAppointment, type ReceptionOptions, type VisitResult } from './types';
 
 export default function ReceptionPage() {
+  const has = usePermissions();
   const navigate = useNavigate();
   const [options, setOptions] = useState<ReceptionOptions>();
   const [branchId, setBranch] = useState<number>(); const [date, setDate] = useState('');
@@ -44,7 +45,7 @@ export default function ReceptionPage() {
   return <>
     <Space wrap style={{ justifyContent: 'space-between', width: '100%' }}>
       <Typography.Title level={2}>Tiếp nhận {date && (date === clinicDate ? 'hôm nay' : formatDate(date))}</Typography.Title>
-      <Space><Button onClick={() => setRevision(x => x + 1)}>Tải lại</Button>{options?.canCheckIn && branchId &&
+      <Space><Button onClick={() => setRevision(x => x + 1)}>Tải lại</Button>{has('appointments.create') && options?.canCheckIn && branchId &&
         <Button type="primary" onClick={() => setBooking({ branchId, date, dentistId, kind: 'WalkIn', source: 'InPerson' })}>Xếp lịch khách vãng lai</Button>}</Space>
     </Space>
     <Typography.Paragraph>Lịch hẹn và lượt khám có trạng thái riêng. Đối chiếu người thực sự đến trước khi tiếp nhận.</Typography.Paragraph>
@@ -86,3 +87,4 @@ export default function ReceptionPage() {
       onBooked={result => { setBooking(null); navigate(`/reception/appointments/${result.appointmentId}`); }} />
   </>;
 }
+import { usePermissions } from '../authentication/usePermissions';

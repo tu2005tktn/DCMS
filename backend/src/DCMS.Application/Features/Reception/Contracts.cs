@@ -41,6 +41,6 @@ public interface IReceptionService
     Task<ReceptionDetail> DetailAsync(int actorId, Guid appointmentId, CancellationToken ct);
     Task<IReadOnlyList<ReceptionCourse>> CoursesAsync(int actorId, Guid appointmentId, int patientId, CancellationToken ct);
     Task<ReceptionPage<VisitResult>> QueueAsync(int actorId, ReceptionQuery query, CancellationToken ct);
-    Task<VisitResult> VisitAsync(int actorId, Guid visitId, CancellationToken ct);
+    Task<VisitResult> VisitAsync(int actorId, Guid visitId, CancellationToken ct, bool clinical = false);
     Task<VisitResult> CheckInAsync(int actorId, Guid appointmentId, CheckInRequest request, CancellationToken ct);
 }

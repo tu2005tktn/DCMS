@@ -426,17 +426,25 @@ public sealed class ExaminationApiTests(ExaminationFixture fixture) : IClassFixt
             Assert.Equal(1, confirmed.Examination!.Version); Assert.Equal(v.VisitId, confirmed.Examination.Id);
             var list = await c.GetFromJsonAsync<PatientExamination[]>($"/api/patients/{v.PatientId}/examinations");
             Assert.Contains(list!, x => x.VisitId == v.VisitId && x.Examination!.Version == 1);
+            Assert.Null(Assert.Single(list!).CompletedAt);
             Assert.Equal(HttpStatusCode.Conflict, (await c.PostAsJsonAsync($"/api/visits/{v.VisitId}/complete", close)).StatusCode);
             close = close with { ExpectedVersion = confirmed.Visit.VisitVersion };
             Assert.Equal(HttpStatusCode.Conflict, (await c.PostAsJsonAsync($"/api/visits/{v.VisitId}/complete", close with { WorkReviewed = false })).StatusCode);
             var closed = await Ok<ExaminationWorkspace>(await c.PostAsJsonAsync($"/api/visits/{v.VisitId}/complete", close));
             Assert.Equal("Completed", closed.Visit.Status); Assert.Equal("Completed", closed.Visit.AppointmentStatus);
             Assert.True((await Ok<ExaminationWorkspace>(await c.PostAsJsonAsync($"/api/visits/{v.VisitId}/complete",close))).Replayed);
+            var history = Assert.Single((await c.GetFromJsonAsync<PatientExamination[]>($"/api/patients/{v.PatientId}/examinations"))!);
+            Assert.Equal(v.VisitId, history.VisitId); Assert.Equal("Completed", history.VisitStatus);
+            Assert.NotNull(history.CompletedAt); Assert.True(history.Examination!.Confirmed);
+            Assert.Equal(Content(true).Advice, history.Examination.Content.Advice);
             Assert.Equal(HttpStatusCode.Conflict, (await c.GetAsync($"/api/visits/{v.VisitId}/clinical-handoff")).StatusCode);
             var amendment = new AmendExamination(v.PatientId,closed.Visit.VisitVersion,Guid.NewGuid(),Content(true) with { Conclusion = "SYNTHETIC đính chính" },"SYNTHETIC bổ sung kết luận");
             Assert.Equal(HttpStatusCode.BadRequest, (await c.PostAsJsonAsync(Exam(v.VisitId)+"/amend",amendment with { Reason = " " })).StatusCode);
             var amended = await Ok<ExaminationWorkspace>(await c.PostAsJsonAsync(Exam(v.VisitId)+"/amend",amendment));
             Assert.Equal("Completed", amended.Visit.Status); Assert.Equal(2,amended.Examination!.Version);
+            var amendedHistory = Assert.Single((await c.GetFromJsonAsync<PatientExamination[]>($"/api/patients/{v.PatientId}/examinations"))!);
+            Assert.Equal(history.CompletedAt, amendedHistory.CompletedAt); Assert.Equal(2, amendedHistory.Examination!.Version);
+            Assert.Equal(amendment.Content.Conclusion, amendedHistory.Examination.Content.Conclusion);
             Assert.True((await Ok<ExaminationWorkspace>(await c.PostAsJsonAsync(Exam(v.VisitId)+"/amend",amendment))).Replayed);
             var versions = await c.GetFromJsonAsync<ExaminationVersion[]>(Exam(v.VisitId)+"/versions");
             Assert.Equal(2,versions!.Length); Assert.Equal("SYNTHETIC đính chính",versions[0].Content.Conclusion);
@@ -445,6 +453,11 @@ public sealed class ExaminationApiTests(ExaminationFixture fixture) : IClassFixt
             Assert.False(await db.ClinicalActivities.AnyAsync(x => x.VisitId == v.VisitId));
             Assert.False(await db.TreatmentDossiers.AnyAsync(x => x.PatientId == v.PatientId));
             Assert.Equal(1,await db.Set<DCMS.Domain.Features.Visits.VisitAudit>().CountAsync(x=>x.VisitId==v.VisitId && x.Action=="CompleteVisit"));
+            Assert.Equal(history.CompletedAt, (await db.Set<DCMS.Domain.Features.Visits.VisitAudit>().SingleAsync(x=>x.VisitId==v.VisitId && x.Action=="CompleteVisit")).OccurredAt);
+            var other = new DCMS.Domain.Features.Patients.PatientProfile { PatientCode = "HISTORY-" + Guid.NewGuid().ToString("N"),
+                FullName = "SYNTHETIC bệnh nhân khác", Phone = "0912345678", CreatedAt = fixture.Clock.Now, UpdatedAt = fixture.Clock.Now };
+            db.Add(other); await db.SaveChangesAsync();
+            Assert.Empty((await c.GetFromJsonAsync<PatientExamination[]>($"/api/patients/{other.Id}/examinations"))!);
         }
     }
     [Theory] [InlineData("FollowUp")] [InlineData("Referral")]

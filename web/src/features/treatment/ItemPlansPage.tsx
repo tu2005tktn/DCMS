@@ -1,3 +1,4 @@
+import { usePermissions } from '../authentication/usePermissions';
 import { Alert, Button, Card, Empty, Input, Modal, Pagination, Popconfirm, Result, Select, Skeleton, Space, Table, Typography } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 
@@ -12,6 +13,8 @@ export default function ItemPlansPage() {
   return user?.effectiveRoles.includes('Dentist') ? <ItemPlansWorkspace key={user.id} /> : <Result status="403" title="Bạn không có quyền quản lý kế hoạch điều trị." />;
 }
 function ItemPlansWorkspace() {
+  const has = usePermissions();
+  const canManage = has('treatment.templates.manage');
   const [branches, setBranches] = useState<{ id: number; name: string }[]>([]), [branch, setBranch] = useState<number>();
   const [data, setData] = useState<ItemPlanPage | null>(null), [options, setOptions] = useState<ItemPlanOptions | null>(null);
   const [plan, setPlan] = useState<ItemPlan | null>(null), [editing, setEditing] = useState<ItemPlanRow | 'new' | null>(null);
@@ -49,7 +52,7 @@ function ItemPlansWorkspace() {
     catch (e) { setError(e as ApiError); } finally { setBusy(false); }
   }
   async function write(path: string, method: string, body: object, deleted = false) {
-    if (sending.current) return; sending.current = true; setBusy(true); setError(null);
+    if (!canManage || sending.current) return; sending.current = true; setBusy(true); setError(null);
     const payload = JSON.stringify(body), action = method + path;
     const previous = retry.current.get(action), key = previous?.payload === payload ? previous.key : crypto.randomUUID();
     retry.current.set(action, { payload, key });
@@ -77,7 +80,7 @@ function ItemPlansWorkspace() {
     {error && <Alert showIcon type="error" message={`${error.code ?? ''}: ${error.message}`} description={error.code === 'MSG111' ? 'Bản nhập vẫn được giữ. Đọc phiên bản mới để đối chiếu trước khi lưu lại.' : undefined}
       action={error.code === 'MSG111' && plan ? <Button disabled={busy} onClick={readLatest}>Xem phiên bản mới</Button> : undefined} />}
     {!nameDialog && comparison}
-    <Card title="Danh sách kế hoạch" extra={<Button type="primary" disabled={!branch || busy} onClick={() => { if (canLeave()) { setEditing(null); setName(''); setNameDialog('create'); setDirty(false); setError(null); } }}>Tạo kế hoạch</Button>}>
+    <Card title="Danh sách kế hoạch" extra={<Button type="primary" disabled={!canManage || !branch || busy} onClick={() => { if (canLeave()) { setEditing(null); setName(''); setNameDialog('create'); setDirty(false); setError(null); } }}>Tạo kế hoạch</Button>}>
       <Space.Compact className="item-plan-search"><Input aria-label="Tìm tên kế hoạch" value={search} maxLength={160} allowClear onChange={e => setSearch(e.target.value)} onPressEnter={() => { setKeyword(search.trim()); setPage(1); }} /><Button onClick={() => { setKeyword(search.trim()); setPage(1); }}>Tìm kiếm</Button></Space.Compact>
       {loading && !data ? <Skeleton active /> : <Table rowKey="id" pagination={false} loading={loading} dataSource={data?.items ?? []} scroll={{ x: 650 }}
         locale={{ emptyText: listError ? 'Chưa tải được danh sách.' : <Empty description="Chưa có kế hoạch điều trị." /> }} columns={[
@@ -86,26 +89,26 @@ function ItemPlansWorkspace() {
         ]} />}
       {!!data?.total && <Pagination current={page} total={data.total} pageSize={20} showSizeChanger={false} onChange={setPage} />}
     </Card>
-    {plan && <Card title={plan.name} extra={<Space wrap><Button disabled={busy || !!editing} onClick={() => { setName(plan.name); setNameDialog('rename'); setDirty(false); setError(null); }}>Sửa tên</Button>
+    {plan && <Card title={plan.name} extra={<Space wrap><Button disabled={!canManage || busy || !!editing} onClick={() => { setName(plan.name); setNameDialog('rename'); setDirty(false); setError(null); }}>Sửa tên</Button>
       <Popconfirm title="Bạn có muốn xóa kế hoạch điều trị này không?" okText="Đồng ý" cancelText="Không đồng ý" onConfirm={() => void write(`${itemPlanApi}/${plan.id}`, 'DELETE', { expectedVersion: plan.version }, true)}>
-        <Button danger disabled={busy || !!editing}>Xóa kế hoạch</Button></Popconfirm></Space>}>
+        <Button danger disabled={!canManage || busy || !!editing}>Xóa kế hoạch</Button></Popconfirm></Space>}>
       <p>{plan.itemCount} hạng mục · Tổng chi phí: <strong>{planMoney(plan.totalCostVnd)}</strong></p>
       <div className="item-plan-table-scroll"><table className="item-plan-table">{heading}<tbody>
         {plan.items.map(row => editing !== 'new' && editing?.id === row.id && options ?
-          <ItemPlanRowEditor key={row.id} initial={row} options={options} busy={busy} onDirty={() => setDirty(true)} onSave={saveRow} onCancel={cancelEditing} /> :
+          <ItemPlanRowEditor key={row.id} initial={row} options={options} busy={!canManage || busy} onDirty={() => setDirty(true)} onSave={saveRow} onCancel={cancelEditing} /> :
           <tr key={row.id}><td>{row.date ? row.date.split('-').reverse().join('/') : '—'}</td><td>{row.teeth.join(', ') || '—'}</td><td>{row.serviceName}</td><td>{row.estimatedMinutes ?? '—'}</td><td className="item-plan-note">{row.note || '—'}</td>
             <td>{row.dentistName || '—'}{row.assistantName && <div>Phụ tá: {row.assistantName}</div>}</td><td>{planMoney(row.costVnd)}</td><td><Space wrap>
-              <Button disabled={busy || !!editing} onClick={() => { setEditing(row); setDirty(false); setError(null); }}>Sửa</Button>
+              <Button disabled={!canManage || busy || !!editing} onClick={() => { setEditing(row); setDirty(false); setError(null); }}>Sửa</Button>
               <Popconfirm title="Bạn có muốn xóa hạng mục này không?" okText="Đồng ý" cancelText="Không đồng ý" onConfirm={() => void write(`${itemPlanApi}/${plan.id}/items/${row.id}`, 'DELETE', { expectedVersion: plan.version })}>
-                <Button danger disabled={busy || !!editing}>Xóa</Button></Popconfirm></Space></td></tr>)}
-        {editing === 'new' && options && <ItemPlanRowEditor key={`new:${plan.id}`} initial={null} options={options} busy={busy} onDirty={() => setDirty(true)} onSave={saveRow} onCancel={cancelEditing} />}
-        {editing && editing !== 'new' && !plan.items.some(x => x.id === editing.id) && options && <ItemPlanRowEditor key={editing.id} initial={editing} options={options} busy={busy} onDirty={() => setDirty(true)} onSave={saveRow} onCancel={cancelEditing} />}
+                <Button danger disabled={!canManage || busy || !!editing}>Xóa</Button></Popconfirm></Space></td></tr>)}
+        {editing === 'new' && options && <ItemPlanRowEditor key={`new:${plan.id}`} initial={null} options={options} busy={!canManage || busy} onDirty={() => setDirty(true)} onSave={saveRow} onCancel={cancelEditing} />}
+        {editing && editing !== 'new' && !plan.items.some(x => x.id === editing.id) && options && <ItemPlanRowEditor key={editing.id} initial={editing} options={options} busy={!canManage || busy} onDirty={() => setDirty(true)} onSave={saveRow} onCancel={cancelEditing} />}
         {!plan.items.length && editing !== 'new' && <tr><td colSpan={8}><Empty description="Chưa có hạng mục. Bấm Thêm hạng mục để nhập." /></td></tr>}
       </tbody></table></div>
-      <Button type="primary" disabled={busy || !!editing || !options || plan.itemCount >= 100} onClick={() => { setEditing('new'); setDirty(false); setError(null); }}>+ Thêm hạng mục</Button>
+      <Button type="primary" disabled={!canManage || busy || !!editing || !options || plan.itemCount >= 100} onClick={() => { setEditing('new'); setDirty(false); setError(null); }}>+ Thêm hạng mục</Button>
     </Card>}
     <Modal title={nameDialog === 'create' ? 'Tạo kế hoạch điều trị' : 'Sửa tên kế hoạch'} open={!!nameDialog} onCancel={() => { if (!busy && canLeave()) { setNameDialog(null); setDirty(false); } }}
-      footer={<Space><Button disabled={busy} onClick={() => { if (canLeave()) { setNameDialog(null); setDirty(false); } }}>Hủy</Button><Button type="primary" loading={busy} disabled={!name.trim() || name.trim().length > 160} onClick={() => {
+      footer={<Space><Button disabled={busy} onClick={() => { if (canLeave()) { setNameDialog(null); setDirty(false); } }}>Hủy</Button><Button type="primary" loading={busy} disabled={!canManage || !name.trim() || name.trim().length > 160} onClick={() => {
         if (nameDialog === 'create') void write(itemPlanApi, 'POST', { branchId: branch, name: name.trim() });
         else if (plan) void write(`${itemPlanApi}/${plan.id}`, 'PUT', { name: name.trim(), expectedVersion: plan.version });
       }}>Lưu</Button></Space>}>

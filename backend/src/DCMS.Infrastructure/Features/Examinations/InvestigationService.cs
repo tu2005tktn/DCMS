@@ -11,12 +11,13 @@ using static DCMS.Infrastructure.Features.Examinations.ClinicalAccess;
 namespace DCMS.Infrastructure.Features.Examinations;
 
 public sealed class InvestigationService(DcmsDbContext db, ClinicalAccess access,
-    IClinicalDocumentService documents, TimeProvider clock) : IInvestigationService
+    IClinicalDocumentService documents, TimeProvider clock, DCMS.Application.Features.Settings.ISettingsAccess permissions) : IInvestigationService
 {
     public async Task<InvestigationPage> ListAsync(int actorId, Guid visitId, CancellationToken ct)
     {
         var visit = await access.VisitAsync(actorId, visitId, false, ct);
         var dentist = await access.BranchAsync(actorId, visit.BranchId, false, ct);
+        var grants = (await permissions.ResolveAsync(actorId, ct)).Permissions;
         var own = await db.Employees.AnyAsync(x => x.Id == visit.DentistId && x.AccountId == actorId, ct);
         var active = visit.Status == VisitStatuses.InProgress;
         var confirmed = await db.Set<VisitExamination>().AnyAsync(x => x.VisitId == visitId && x.Confirmed, ct);
@@ -31,15 +32,18 @@ public sealed class InvestigationService(DcmsDbContext db, ClinicalAccess access
             foreach (var id in await db.Set<ClinicalDocument>().AsNoTracking().Where(x => x.InvestigationId == row.Id).OrderBy(x => x.UploadedAt).Select(x => x.Id).ToArrayAsync(ct))
                 files.Add(await documents.DetailAsync(actorId, id, ct));
             var actions = new List<string>();
-            if (active && row.State == "Ordered" && (!dentist || own)) actions.AddRange(["upload", "result"]);
-            if (active && own && row.State == "ResultAvailable") actions.Add("review");
-            if (active && own && row.State is "Ordered" or "ResultAvailable") actions.Add("cancel");
+            if (active && row.State == "Ordered" && (!dentist || own)) {
+                if (grants.Contains("documents.upload")) actions.Add("upload");
+                if (grants.Contains("investigations.results.receive")) actions.Add("result");
+            }
+            if (active && own && row.State == "ResultAvailable" && grants.Contains("examinations.manage")) actions.Add("review");
+            if (active && own && row.State is "Ordered" or "ResultAvailable" && grants.Contains("examinations.manage")) actions.Add("cancel");
             items.Add(new(row.Id, visitId, row.Kind, row.Name, row.Region, row.Reason, row.RequiredForDiagnosis,
                 row.State, row.Version, Name(row.CreatedBy) ?? "", row.CreatedAt, row.ResultText, Name(row.ResultBy), row.ResultAt,
                 row.Interpretation, Name(row.ReviewedBy), row.ReviewedAt, row.CancellationReason, row.CancelledAt,
                 JsonSerializer.Deserialize<Guid[]>(row.ResultDocumentIdsJson)!, files, actions));
         }
-        return new(visitId, visit.Version, active && own && !confirmed, items);
+        return new(visitId, visit.Version, active && own && !confirmed && grants.Contains("examinations.manage"), items);
     }
     public Task<InvestigationPage> CreateAsync(int actorId, Guid visitId, CreateInvestigation request, CancellationToken ct) =>
         CommandAsync(actorId, visitId, null, request.PatientId, request.ExpectedVisitVersion, null, request.RequestKey, "CreateInvestigation", request, ct);
@@ -55,7 +59,8 @@ public sealed class InvestigationService(DcmsDbContext db, ClinicalAccess access
         if (key == Guid.Empty || patientId <= 0 || expectedVisit <= 0 || expectedOrder is <= 0) throw Error("MSG04");
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         await db.Database.ExecuteSqlRawAsync($"SELECT pg_advisory_xact_lock({WorkingScheduleService.TransactionLock})", ct);
-        var visit = await access.VisitAsync(actorId, visitId, action != "ReceiveInvestigationResult", ct);
+        var visit = await access.VisitAsync(actorId, visitId, action != "ReceiveInvestigationResult", ct,
+            action == "ReceiveInvestigationResult" ? "investigations.results.receive" : "examinations.manage");
         if (visit.PatientId != patientId) throw Error("MSG113", 404);
         if (action == "ReceiveInvestigationResult") {
             var dentist = await access.BranchAsync(actorId, visit.BranchId, false, ct);

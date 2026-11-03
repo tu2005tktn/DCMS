@@ -12,7 +12,7 @@ async function mock(page: Page, config: { existing?: boolean; error?: boolean; s
   await page.addInitScript(() => sessionStorage.setItem('dcms.web.access-token', 'synthetic'));
   await page.route('**/api/**', async route => {
     const req = route.request(), url = new URL(req.url()), path = url.pathname, method = req.method();
-    if (path === '/api/auth/me') return route.fulfill({ json: { id: 1, fullName: 'Nha sĩ mẫu', userName: 'synthetic', accountType: 'Staff', roles: config.forbidden ? ['ClinicAssistant'] : ['Dentist'], effectiveRoles: config.forbidden ? ['ClinicAssistant'] : ['Dentist'], permissions: ['patients.read'] } });
+    if (path === '/api/auth/me') return route.fulfill({ json: { id: 1, fullName: 'Nha sĩ mẫu', userName: 'synthetic', accountType: 'Staff', roles: config.forbidden ? ['ClinicAssistant'] : ['Dentist'], effectiveRoles: config.forbidden ? ['ClinicAssistant'] : ['Dentist'], permissions: config.forbidden ? ['patients.read'] : ['patients.read', 'treatment.templates.read', 'treatment.templates.manage'] } });
     if (path === '/api/auth/session/idle') return route.fulfill({ json: { deadlineAt: new Date(Date.now() + 600000).toISOString(), serverNow: new Date().toISOString(), activityVersion: 1 } });
     if (path === '/api/appointments/options') return route.fulfill({ json: { branches: [{ id: 1, name: 'Chi nhánh A' }, { id: 2, name: 'Chi nhánh B' }], services: [], employees: [] } });
     if (path === '/api/treatment-templates') return route.fulfill({ json: [] });
@@ -134,7 +134,7 @@ test('responsive, bàn phím, đổi chi nhánh dirty và lối vào mẫu cũ',
   await expect(page.getByRole('link', { name: 'Mẫu tiến trình cũ', exact: true })).toHaveCount(0); await page.goto('/treatment-templates/legacy'); await expect(page).toHaveURL(/\/treatment-templates$/);
 });
 test('role khác bị chặn URL', async ({ page }) => {
-  await mock(page, { forbidden: true }); await page.goto('/treatment-templates'); await expect(page.getByText('Bạn không có quyền quản lý kế hoạch điều trị.')).toBeVisible();
+  await mock(page, { forbidden: true }); await page.goto('/treatment-templates'); await expect(page.getByText('Bạn không có quyền thực hiện thao tác này.')).toBeVisible();
 });
 test('lỗi tải có thử lại và không hiển thị trống thành công', async ({ page }) => {
   const config = { existing: true, listError: true }; await mock(page, config); await page.goto('/treatment-templates');

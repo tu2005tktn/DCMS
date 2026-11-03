@@ -318,7 +318,7 @@ public sealed class SchedulingApiTests(ApiFixture fixture) : IClassFixture<ApiFi
     {
         var s = await Create(); using var owner = await Login("owner.demo"); await Publish(owner, Command(s)); await Publish(owner, Command(s, employee: s.Assistant));
         using var scope = fixture.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
-        var service = new DCMS.Infrastructure.Features.Scheduling.WorkingScheduleService(db, new FixedClock(Start(s, 480)));
+        var service = new DCMS.Infrastructure.Features.Scheduling.WorkingScheduleService(db, new FixedClock(Start(s, 480)), scope.ServiceProvider.GetRequiredService<DCMS.Application.Features.Settings.ISettingsAccess>());
         var query = new AvailabilityQuery(s.Branch, s.Dentist, s.Service, s.Date, 60, s.Assistant);
         var result = await service.QueryAsync(query, null, default);
         Assert.DoesNotContain(result.Slots, x => x.Start == Start(s, 525)); Assert.Contains(result.Slots, x => x.Start == Start(s, 540));

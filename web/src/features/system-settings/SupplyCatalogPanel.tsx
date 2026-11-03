@@ -88,7 +88,8 @@ export default function SupplyCatalogPanel() {
   // Static message does not render under React 19 + antd 5 (errors were silently lost); use the hook instance.
   const [toast, toastContext] = message.useMessage();
   const { user } = useAuth();
-  const visibleSections = sections.filter(s => s.key !== 'medicines' || user?.effectiveRoles.includes('ClinicOwner'));
+  const can = (resource: string, action: string) => user?.permissions.includes(`catalog.${resource}.${action}`) ?? false;
+  const visibleSections = sections.filter(s => can(s.resource, 'read'));
   const [key, setKey] = useState<SectionKey>('suppliers'), [status, setStatus] = useState<Status>('Active');
   const [search, setSearch] = useState(''), [query, setQuery] = useState(''), [page, setPage] = useState(1), [size, setSize] = useState(20);
   const [data, setData] = useState<Page | null>(null), [loading, setLoading] = useState(false), [error, setError] = useState<string>(), [revision, setRevision] = useState(0);
@@ -99,12 +100,14 @@ export default function SupplyCatalogPanel() {
   const [busy, setBusy] = useState(false), guard = useRef(false), requestKey = useRef<{ fingerprint: string; key: string } | null>(null);
   const [form] = Form.useForm<Record<string, unknown>>();
   const section = sections.find(x => x.key === key)!;
+  useEffect(() => { if (!visibleSections.some(item => item.key === key) && visibleSections.length) setKey(visibleSections[0].key); }, [key, user]);
 
   function keyFor(fingerprint: string) {
     if (requestKey.current?.fingerprint !== fingerprint) requestKey.current = { fingerprint, key: crypto.randomUUID() };
     return requestKey.current.key;
   }
   useEffect(() => {
+    if (!can(section.resource, 'read')) return;
     let live = true; setLoading(true); setError(undefined);
     const params = new URLSearchParams({ q: query, status, page: String(page), pageSize: String(size), ...(section.type ? { type: section.type } : {}) });
     void api<Page>(`${base}/${section.resource}?${params}`).then(v => {
@@ -113,7 +116,7 @@ export default function SupplyCatalogPanel() {
       setData(v);
     }).catch(e => { if (live) { setError((e as Error).message); setData(null); } }).finally(() => { if (live) setLoading(false); });
     return () => { live = false; };
-  }, [key, status, query, page, size, revision]);
+  }, [key, status, query, page, size, revision, user]);
 
   function select(next: SectionKey) { setKey(next); setPage(1); setSearch(''); setQuery(''); setData(null); }
   async function run<T>(action: () => Promise<T>, onError: (e: ApiError) => void) {
@@ -197,8 +200,8 @@ export default function SupplyCatalogPanel() {
           onChange={e => { setSearch(e.target.value); if (!e.target.value) { setQuery(''); setPage(1); } }} onSearch={v => { setQuery(v.trim()); setPage(1); }} />
         <Segmented<Status> value={status} onChange={v => { setStatus(v); setPage(1); }}
           options={[{ value: 'Active', label: 'Đang dùng' }, { value: 'Inactive', label: 'Ngừng dùng' }, { value: 'All', label: 'Tất cả' }]} />
-        <Button type="primary" onClick={() => open()}>Thêm mới</Button>
-        {section.exportable && <Button disabled={busy} onClick={() => void exportExcel()}>Xuất Excel</Button>}
+        {can(section.resource, 'create') && <Button type="primary" onClick={() => open()}>Thêm mới</Button>}
+        {section.exportable && can(section.resource, 'export') && <Button disabled={busy} onClick={() => void exportExcel()}>Xuất Excel</Button>}
       </div>
       {error && <Alert type="error" showIcon message={error} action={<Button onClick={() => setRevision(v => v + 1)}>Thử lại</Button>} />}
       <Table<Row> rowKey="id" loading={loading} dataSource={data?.items ?? []} scroll={{ x: 900 }}
@@ -211,8 +214,8 @@ export default function SupplyCatalogPanel() {
           ...section.columns,
           { title: 'Trạng thái', dataIndex: 'active', width: 110, render: (v: boolean) => v ? <Tag color="green">Đang dùng</Tag> : <Tag>Ngừng dùng</Tag> },
           { title: 'Thao tác', key: 'actions', width: 240, fixed: 'right', render: (_, row) => <Space wrap>
-            <Button size="small" aria-label={`Sửa ${row.name}`} onClick={() => open(row)}>Sửa</Button>
-            <Button size="small" danger={row.active} disabled={busy} onClick={() => void previewState(row)}>{row.active ? 'Ngừng dùng' : 'Khôi phục'}</Button>
+            {can(section.resource, 'update') && <Button size="small" aria-label={`Sửa ${row.name}`} onClick={() => open(row)}>Sửa</Button>}
+            {can(section.resource, 'deactivate') && <Button size="small" danger={row.active} disabled={busy} onClick={() => void previewState(row)}>{row.active ? 'Ngừng dùng' : 'Khôi phục'}</Button>}
             <Button size="small" type="link" onClick={() => void openHistory(row)}>Lịch sử</Button>
           </Space> },
         ]} />

@@ -1,3 +1,4 @@
+import { usePermissions } from '../authentication/usePermissions';
 import { Alert, Button, Dropdown, Empty, Modal, Select, Skeleton, Typography } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 
@@ -16,6 +17,7 @@ const displayTime = (value: string) => new Intl.DateTimeFormat('vi-VN', {
 export default function DossierList({ patientId, visitId, sourceVisitVersion, branchId: contextBranchId,
   patientName, patientCode, patientAge }: { patientId: number; visitId?: string; diagnosis?: string | null;
   branchId?: number; dentistId?: number; sourceVisitVersion?: number; patientName?: string; patientCode?: string; patientAge?: number | null }) {
+  const has = usePermissions();
   const auth = useAuth();
 
   const [page, setPage] = useState<DossierPage | null>(null);
@@ -45,7 +47,8 @@ export default function DossierList({ patientId, visitId, sourceVisitVersion, br
   const createPayload = useRef('');
   const createKey = useRef(crypto.randomUUID());
 
-  const canUse = auth.user?.effectiveRoles.includes('Dentist') ?? false;
+  const canUse = has('treatment.read') && (auth.user?.effectiveRoles.includes('Dentist') ?? false);
+  const canCreate = has('treatment.dossiers.create');
 
   useEffect(() => {
     if (!canUse) return;
@@ -68,12 +71,12 @@ export default function DossierList({ patientId, visitId, sourceVisitVersion, br
   }, [canUse, revision]);
 
   useEffect(() => {
-    if (!canUse) return; let active=true; setCreateContext(null);
+    if (!canUse || !canCreate) { setCreateContext(null); return; } let active=true; setCreateContext(null);
     void api<{dentistId:number;branches:{id:number;name:string}[]}>(`/api/patients/${patientId}/dossiers/create-context`).then(value=>{
       if (active) { setCreateContext(value); setBranchId(previous => value.branches.some(b=>b.id===previous) ? previous : contextBranchId && value.branches.some(b=>b.id===contextBranchId) ? contextBranchId : value.branches.length===1 ? value.branches[0].id : undefined); }
     }).catch(e=>{if(active)setSaveError(e.message);});
     return ()=>{active=false;};
-  },[patientId,canUse,contextBranchId,contextRetry]);
+  },[patientId,canUse,canCreate,contextBranchId,contextRetry]);
   async function create() {
     if (sending.current || !branchId) return;
     if (unsaved && !window.confirm('Bỏ các thay đổi chưa lưu để tạo phiếu mới?')) return;
@@ -110,7 +113,7 @@ export default function DossierList({ patientId, visitId, sourceVisitVersion, br
     finally { setStatusBusyId(null); }
   }
 
-  if (!canUse) return <FinancialPatientDossiers patientId={patientId} />;
+  if (!canUse) return has('finance.read') ? <FinancialPatientDossiers patientId={patientId} /> : <Alert type="info" message="Bạn chưa được cấp quyền xem hồ sơ điều trị." />;
   return <section className="treatment-list treatment-sheets" aria-label="Các phiếu điều trị">
     <div className="treatment-sheets-heading"><div>
       <Typography.Title level={4}>DS PHIẾU ĐIỀU TRỊ/DỊCH VỤ</Typography.Title>
@@ -134,11 +137,11 @@ export default function DossierList({ patientId, visitId, sourceVisitVersion, br
               ] }}><button type="button"
                 className={`treatment-sheet-state ${item.state === 'Completed' ? 'is-complete' : 'is-pending'}`}
                 aria-label={`Trạng thái phiếu: ${item.state === 'Completed' ? 'Hoàn tất' : item.state === 'Stopped' ? 'Đã ngừng' : 'Chưa xong'}`}
-                aria-busy={statusBusyId === item.id} disabled={statusBusyId === item.id}
+                aria-busy={statusBusyId === item.id} disabled={!has('treatment.dossiers.update') || statusBusyId === item.id}
                 title="Chọn trạng thái phiếu">
                 {item.state === 'Completed' ? 'Hoàn tất' : item.state === 'Stopped' ? 'Đã ngừng' : 'Chưa xong'} <span aria-hidden="true">⌄</span>
               </button></Dropdown>
-              <Button aria-label={`Xóa phiếu ${item.code}`} onClick={() => {
+              <Button disabled={!has('treatment.dossiers.delete')} aria-label={`Xóa phiếu ${item.code}`} onClick={() => {
                 setDeleteTarget(item); setDeleteError(null); deleteKey.current = crypto.randomUUID();
               }}>
                 <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true">
@@ -166,7 +169,7 @@ export default function DossierList({ patientId, visitId, sourceVisitVersion, br
         {page.page > 1 && <Button onClick={() => setPageNumber(value => value - 1)}>Trang trước</Button>}</>}
     <div className="treatment-sheet-create-row">
       <label>Chi nhánh <Select aria-label="Chi nhánh tạo phiếu" style={{minWidth:200}} value={branchId} disabled={busy || !!contextBranchId} placeholder="Chọn chi nhánh" options={createContext?.branches.map(x=>({value:x.id,label:x.name})) ?? []} onChange={setBranchId}/></label>
-      <Button className="treatment-sheet-create" aria-label="Tạo phiếu mới" loading={busy} disabled={!branchId || !createContext?.branches.length} onClick={()=>void create()}>+ TẠO PHIẾU MỚI</Button>
+      <Button className="treatment-sheet-create" aria-label="Tạo phiếu mới" loading={busy} disabled={!has('treatment.dossiers.create') || !branchId || !createContext?.branches.length} onClick={()=>void create()}>+ TẠO PHIẾU MỚI</Button>
       {saveError && <Alert type="error" message={saveError} action={<Button onClick={()=>createContext && branchId ? void create() : setContextRetry(v=>v+1)}>Thử lại</Button>}/>}
       {optionsError && <Alert type="error" message={optionsError}/>}
     </div>

@@ -1,0 +1,8 @@
+.receipt-print-signatures { display: flex; justify-content: space-around; gap: 24px; margin-top: 24px; text-align: center; }
+.receipt-print-signatures > div { flex: 1; min-height: 120px; }
+.receipt-print-signatures p { margin-top: 4px; }
+@media print {
+  .receipt-print .receipt-print-actions { display: none !important; }
+  .receipt-print > .ant-card { margin: 0; border: 0; box-shadow: none; }
+  .receipt-print-signatures { break-inside: avoid; }
+}

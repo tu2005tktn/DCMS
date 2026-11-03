@@ -14,7 +14,7 @@ async function setup(page: Page) {
     const url = new URL(route.request().url());
     let body: unknown = {};
     if (url.pathname === '/api/auth/me') body = { id: 2, userName: 'fixture', fullName: 'Fixture', accountType: 'Staff',
-      roles: ['Dentist'], effectiveRoles: ['Dentist'], permissions: ['patients.read'], hasVerifiedPatientLink: false };
+      roles: ['Dentist'], effectiveRoles: ['Dentist'], permissions: ['patients.read', 'appointments.read', 'appointments.create', 'treatment.read', 'treatment.progress.manage', 'treatment.items.update'], hasVerifiedPatientLink: false };
     else if (url.pathname === '/api/patients/7') body = { id: 7, patientCode: 'P-FIXTURE', fullName: 'Synthetic patient',
       isArchived: false, createdAt: '2026-10-19T00:00:00Z', updatedAt: '2026-10-19T00:00:00Z', version: 1, link: {}, intakeHistory: [] };
     else if (url.pathname === '/api/patients/7/appointments') {
@@ -63,7 +63,7 @@ async function setupNextVisit(page: Page, candidatesStatus = 200, extra: { candi
     const url = new URL(route.request().url()), method = route.request().method();
     const json = (body: unknown, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
     if (url.pathname === '/api/auth/me') return json({ id: 2, userName: 'fixture', fullName: 'Fixture', accountType: 'Staff',
-      roles: ['Dentist'], effectiveRoles: ['Dentist'], permissions: ['patients.read'], hasVerifiedPatientLink: false });
+      roles: ['Dentist'], effectiveRoles: ['Dentist'], permissions: ['patients.read', 'appointments.read', 'appointments.create', 'treatment.read', 'treatment.progress.manage', 'treatment.items.update'], hasVerifiedPatientLink: false });
     if (url.pathname === '/api/patients/7') return json({ id: 7, patientCode: 'P-FIXTURE', fullName: 'Synthetic patient',
       isArchived: false, createdAt: '2026-10-19T00:00:00Z', updatedAt: '2026-10-19T00:00:00Z', version: 1, link: {}, intakeHistory: [] });
     if (url.pathname === '/api/patients/7/appointments') return json({ items: [], total: 0, page: 1, pageSize: 20 });

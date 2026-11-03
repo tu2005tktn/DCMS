@@ -1,3 +1,4 @@
+import { usePermissions } from '../authentication/usePermissions';
 import { Alert, Button, Card, Empty, Form, Input, InputNumber, Modal, Select, Skeleton, Space, Tag, Typography } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -13,6 +14,7 @@ type CommercialPlan = { dossierId: string; code: string; branchId: number; versi
   preview: { grossVnd: number; approvedDiscountVnd: number; netBeforeTaxVnd: number } };
 
 export default function CommercialTreatmentPage() {
+  const has = usePermissions();
   const [search, setSearch] = useSearchParams();
   const selectedId = search.get('dossier');
   const [list, setList] = useState<CommercialListItem[] | null>(null);
@@ -29,17 +31,17 @@ export default function CommercialTreatmentPage() {
 
   async function reload() {
     const [dossiers, catalog] = await Promise.all([
-      api<CommercialListItem[]>('/api/commercial/dossiers'), api<ServicePrice[]>('/api/service-prices'),
+      has('treatment.commercial.read') ? api<CommercialListItem[]>('/api/commercial/dossiers') : Promise.resolve([] as CommercialListItem[]), api<ServicePrice[]>('/api/service-prices'),
     ]);
     setList(dossiers); setPrices(catalog);
-    if (selectedId) setPlan(await api<CommercialPlan>(`/api/commercial/dossiers/${selectedId}/plan`));
+    if (selectedId && has('treatment.commercial.read')) setPlan(await api<CommercialPlan>(`/api/commercial/dossiers/${selectedId}/plan`));
     else setPlan(null);
   }
   useEffect(() => {
     let active = true;
-    Promise.all([api<CommercialListItem[]>('/api/commercial/dossiers'),
+    Promise.all([has('treatment.commercial.read') ? api<CommercialListItem[]>('/api/commercial/dossiers') : Promise.resolve([] as CommercialListItem[]),
       api<ServicePrice[]>('/api/service-prices'),
-      selectedId ? api<CommercialPlan>(`/api/commercial/dossiers/${selectedId}/plan`) : Promise.resolve(null)])
+      selectedId && has('treatment.commercial.read') ? api<CommercialPlan>(`/api/commercial/dossiers/${selectedId}/plan`) : Promise.resolve(null)])
       .then(([dossiers, catalog, selected]) => { if (active) { setList(dossiers); setPrices(catalog); setPlan(selected); setError(null); } })
       .catch(failure => { if (active) setError((failure as Error).message); });
     return () => { active = false; };
@@ -109,13 +111,13 @@ export default function CommercialTreatmentPage() {
                 ? money(item.discount.value) : `${item.discount.value}%`} · {item.discount.reason}</div>
                 {item.discount.qualifyingItemId && <div className="treatment-muted">Điều kiện: hạng mục #{item.discount.qualifyingItemId.slice(0, 8)}</div>}
                 <Tag color={item.discount.status === 'Approved' ? 'green' : 'orange'}>{item.discount.status}</Tag></>}</div>
-            {item.discount?.status === 'Proposed' && <Space><Button disabled={busy} onClick={() => void decide(item, 'Rejected')}>Từ chối</Button>
-              <Button type="primary" loading={busy} onClick={() => void decide(item, 'Approved')}>Duyệt</Button></Space>}
+            {item.discount?.status === 'Proposed' && <Space><Button disabled={!has('treatment.commercial.approve') || busy} onClick={() => void decide(item, 'Rejected')}>Từ chối</Button>
+              <Button type="primary" disabled={!has('treatment.commercial.approve')} loading={busy} onClick={() => void decide(item, 'Approved')}>Duyệt</Button></Space>}
           </div>)}
           <div className="treatment-price-summary"><span>Giá trước giảm: {money(plan.preview.grossVnd)}</span>
             <span>Đã duyệt: {money(plan.preview.approvedDiscountVnd)}</span>
             <strong>Dự kiến trước thuế: {money(plan.preview.netBeforeTaxVnd)}</strong></div>
-          <Button onClick={() => { requestKey.current = crypto.randomUUID(); setDepositOpen(true); }}>
+          <Button disabled={!has('treatment.commercial.approve')} onClick={() => { requestKey.current = crypto.randomUUID(); setDepositOpen(true); }}>
             {plan.depositExceptionReason ? 'Sửa ngoại lệ không cọc' : 'Duyệt ngoại lệ không cọc'}</Button>
           {plan.depositExceptionReason && <Typography.Paragraph>Lý do đã duyệt: {plan.depositExceptionReason}</Typography.Paragraph>}
         </>}</Card>
@@ -125,7 +127,7 @@ export default function CommercialTreatmentPage() {
         : prices.map(price => <div key={price.serviceId} className="treatment-item-row">
           <div><strong>{price.name}</strong><div>Chi nhánh #{price.branchId} · {price.referenceUnitPriceVnd == null
             ? 'Chưa có giá tham chiếu' : money(price.referenceUnitPriceVnd)}</div></div>
-          <Button onClick={() => { priceForm.setFieldsValue({ referenceUnitPriceVnd: price.referenceUnitPriceVnd, unit: price.unit ?? 'lần' });
+          <Button disabled={!has('treatment.prices.manage')} onClick={() => { priceForm.setFieldsValue({ referenceUnitPriceVnd: price.referenceUnitPriceVnd, unit: price.unit ?? 'lần' });
             requestKey.current = crypto.randomUUID(); setPriceEditing(price); }}>Cập nhật giá</Button>
         </div>)}</Card>
     <Modal open={priceEditing !== null} title={`Giá tham chiếu · ${priceEditing?.name ?? ''}`} okText="Lưu giá"

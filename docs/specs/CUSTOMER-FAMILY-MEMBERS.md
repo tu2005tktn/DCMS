@@ -33,4 +33,3 @@ API integration PostgreSQL cách ly kiểm CRUD, ownership/Public/active, valida
 # Xem hồ sơ người thân — giao diện tạm
 
 Trang Người thân của tôi có nút **Xem hồ sơ** trên từng dòng desktop/thẻ mobile, bên cạnh Đặt lịch/Sửa/Xóa. Bấm mở Modal Ant Design với tiêu đề `Hồ sơ của [Tên người thân]`, trạng thái trống **Chưa có hồ sơ nào** và nút **Đóng**. Nút ×, Escape và Đóng trả về danh sách, giữ tìm kiếm/phân trang. Modal dùng thông tin người thân đang hiển thị, không gọi API bệnh án hoặc ghi dữ liệu. Đây là trạng thái giao diện tạm khi chưa tích hợp nguồn/quyền xem hồ sơ, không kết luận người thân chưa từng có bệnh án thực tế. Không thêm API, migration, Patient, liên kết hồ sơ hoặc thay đổi booking/CRUD. Component riêng để sau này tích hợp nguồn đã kiểm quyền. Test mock kiểm đúng người, ba cách đóng, bàn phím, responsive 390/768/1440 và không phát sinh request khi mở/đóng.
-

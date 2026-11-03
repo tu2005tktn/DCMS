@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { api, ApiError } from '../../services/api';
 import { money } from './types';
 import type { PaymentContext } from './sheetTypes';
+import { usePermissions } from '../authentication/usePermissions';
 
 const today = () => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date());
 const day = (v: string) => new Date(v).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -13,6 +14,7 @@ const digits = (v: string | undefined) => Number((v ?? '').replace(/\D/g, '')) |
 export default function DossierPaymentModal({ dossierId, open, onClose, onSaved }: {
   dossierId: string; open: boolean; onClose: () => void; onSaved: () => void;
 }) {
+  const has = usePermissions();
   const [ctx, setCtx] = useState<PaymentContext | null>(null);
   const [loading, setLoading] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState<string | null>(null);
   const [amounts, setAmounts] = useState<Record<string, number>>({});
@@ -44,7 +46,7 @@ export default function DossierPaymentModal({ dossierId, open, onClose, onSaved 
     let rest = Math.min(Math.max(value, 0), totalDue);
     setAmounts(Object.fromEntries((ctx?.lines ?? []).map(l => { const part = Math.min(l.dueVnd, rest); rest -= part; return [l.activityId, part]; })));
   }
-  const canSave = !!ctx && !busy && total > 0 && !!collectorId && !!paidOn && paidOn <= today();
+  const canSave = has('finance.payments.create') && !!ctx && !busy && total > 0 && !!collectorId && !!paidOn && paidOn <= today();
 
   async function save() {
     if (!canSave || !collectorId) return;

@@ -13,12 +13,14 @@ using Microsoft.EntityFrameworkCore;
 
 namespace DCMS.Infrastructure.Features.Treatment;
 
-public sealed class ServicePriceService(DcmsDbContext db, UserManager<ApplicationUser> users) : IServicePriceService
+public sealed class ServicePriceService(DcmsDbContext db, UserManager<ApplicationUser> users, DCMS.Application.Features.Settings.ISettingsAccess access) : IServicePriceService
 {
     private static BusinessException Error(string code, int status) => new(status, SystemMessages.Get(code));
 
     private async Task AuthorizeAsync(int actorId, int branchId, bool manage, CancellationToken ct)
     {
+        var scope = await access.ResolveAsync(actorId, ct);
+        if (scope.Assigned && !scope.Owner && !scope.BranchIds.Contains(branchId)) throw Error("MSG06", 403);
         var user = await users.FindByIdAsync(actorId.ToString());
         if (user is not { IsActive: true, AccountType: "Staff" }) throw Error("MSG06", 403);
         var roles = AccountRoles.Effective(await users.GetRolesAsync(user));
@@ -43,6 +45,8 @@ public sealed class ServicePriceService(DcmsDbContext db, UserManager<Applicatio
             && !roles.Contains(AccountRoles.Dentist))
             throw Error("MSG06", 403);
         var query = db.Set<SchedulingService>().AsNoTracking().Where(x => x.Active);
+        var scope = await access.ResolveAsync(actorId, ct);
+        if (scope.Assigned && !scope.Owner) query = query.Where(x => scope.BranchIds.Contains(x.BranchId));
         if (!roles.Contains(AccountRoles.Admin))
         {
             var isOwner = roles.Contains(AccountRoles.ClinicOwner);

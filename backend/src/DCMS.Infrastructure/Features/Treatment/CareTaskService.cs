@@ -15,7 +15,7 @@ using Microsoft.EntityFrameworkCore;
 namespace DCMS.Infrastructure.Features.Treatment;
 
 public sealed class CareTaskService(DcmsDbContext db, UserManager<ApplicationUser> users,
-    TimeProvider clock) : ICareTaskService
+    TimeProvider clock, DCMS.Application.Features.Settings.ISettingsAccess access) : ICareTaskService
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     private static BusinessException Error(string code, int status = 400) =>
@@ -28,6 +28,8 @@ public sealed class CareTaskService(DcmsDbContext db, UserManager<ApplicationUse
     {
         var user = await users.FindByIdAsync(actorId.ToString());
         if (user == null || !user.IsActive || user.AccountType != "Staff") throw Error("MSG06", 403);
+        var scope = await access.ResolveAsync(actorId, ct);
+        if (scope.Assigned && !scope.Owner && !scope.BranchIds.Contains(branchId)) throw Error("MSG06", 403);
         var roles = AccountRoles.Effective(await users.GetRolesAsync(user));
         if (!roles.Contains(AccountRoles.Dentist) && !roles.Contains(AccountRoles.ClinicAssistant))
             throw Error("MSG06", 403);
