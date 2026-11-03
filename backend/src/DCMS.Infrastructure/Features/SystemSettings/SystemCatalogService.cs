@@ -12,14 +12,13 @@ using Microsoft.EntityFrameworkCore;
 
 namespace DCMS.Infrastructure.Features.SystemSettings;
 
-public sealed class SystemCatalogService(DcmsDbContext db, UserManager<ApplicationUser> users, TimeProvider clock) : ISystemCatalogService
+public sealed class SystemCatalogService(DcmsDbContext db, UserManager<ApplicationUser> users, TimeProvider clock, DCMS.Application.Features.Settings.ISettingsAccess access) : ISystemCatalogService
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     private static BusinessException Error(string code, int status = 400, string? field = null) => new(status, SystemMessages.Get(code) with { Field = field });
     private async Task AuthorizeAsync(int actorId)
     {
-        var user = await users.FindByIdAsync(actorId.ToString());
-        if (user is not { IsActive: true, AccountType: "Staff" } || !AccountRoles.Effective(await users.GetRolesAsync(user)).Contains(AccountRoles.Dentist)) throw Error("MSG06", 403);
+        await access.RequireAsync(actorId, "catalog.materials.read", CancellationToken.None);
     }
     private static string Name(string? value)
     {

@@ -18,15 +18,15 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
 {
     static PrescriptionLineDto Dto(ExternalPrescriptionLine x) => new(x.Id, x.VisitId, x.MedicineId, x.MedicineCode,
         x.MedicineName, x.Strength, x.DosageForm, x.Unit, x.Instructions, x.Quantity, x.Version);
-    async Task<Visit> Visit(int actor, Guid id, CancellationToken ct)
+    async Task<Visit> Visit(int actor, Guid id, CancellationToken ct, string permission = "prescriptions.read")
     {
         var visit = await db.Set<Visit>().SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw Error("MSG113", 404);
-        await access.OperationalAsync(actor, "examinations.manage", visit.BranchId, ct);
+        await access.OperationalAsync(actor, permission, visit.BranchId, ct);
         return visit;
     }
     public async Task<PrescriptionMedicineOption[]> OptionsAsync(int actor, int branchId, string? search, CancellationToken ct)
     {
-        await access.OperationalAsync(actor, "examinations.manage", branchId, ct);
+        await access.OperationalAsync(actor, "prescriptions.manage", branchId, ct);
         if (search?.Length > 100) throw Error("MSG04");
         var q = search?.Trim().ToUpperInvariant() ?? "";
         return await db.Set<CatalogMedicine>().AsNoTracking().Where(x => x.IsActive && x.PrescriptionEligible &&
@@ -42,7 +42,7 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
     }
     public async Task<PrescriptionLineDto> SaveLineAsync(int actor, Guid visitId, Guid? lineId, SavePrescriptionLine c, CancellationToken ct)
     {
-        var visit = await Visit(actor, visitId, ct);
+        var visit = await Visit(actor, visitId, ct, "prescriptions.manage");
         if (c.RequestKey == Guid.Empty || c.Quantity is < 1 or > 10_000 || c.Instructions?.Length > 1000) throw Error("MSG04");
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         await db.Database.ExecuteSqlRawAsync("SELECT pg_advisory_xact_lock(6462362088)", ct);
@@ -53,7 +53,7 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
             if (prior.Fingerprint != hash) throw Error("MSG111", 409);
             return JsonSerializer.Deserialize<PrescriptionLineDto>(prior.ResultJson, ClinicSettingsStore.Json)!;
         }
-        await access.OperationalAsync(actor, "examinations.manage", visit.BranchId, ct);
+        await access.OperationalAsync(actor, "prescriptions.manage", visit.BranchId, ct);
         var medicine = await db.Set<CatalogMedicine>().AsNoTracking().SingleOrDefaultAsync(x => x.Id == c.MedicineId && x.IsActive && x.PrescriptionEligible, ct)
             ?? throw Error("MSG113", 404);
         ExternalPrescriptionLine line;

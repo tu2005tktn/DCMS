@@ -1,0 +1,14 @@
+.access-group-toolbar { margin-bottom: 16px; }
+.access-group-fields { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
+.access-group-modal .ant-modal-body { max-height: 72vh; overflow-y: auto; padding-right: 8px; }
+.access-grant-list { margin: 16px 0; }
+.access-grant-section { padding: 12px 8px; border-bottom: 1px solid #e9edf2; }
+.access-grant-section > .ant-checkbox-wrapper { background: #f6f8fa; padding: 8px; width: 100%; }
+.access-grant-heading { font-weight: 600; }
+.access-grant-child { margin: 12px 0 0 28px; }
+.access-group-error { margin-top: 12px; }
+@media (max-width: 600px) {
+  .access-group-fields { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .access-grant-child { margin-left: 16px; }
+  .access-group-modal .ant-modal-body { max-height: 68vh; }
+}

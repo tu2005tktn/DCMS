@@ -1,3 +1,4 @@
+import { usePermissions } from '../authentication/usePermissions';
 import { Alert, Button, Drawer, Form, Input, InputNumber, Select, Space, Table } from 'antd';
 import { useRef, useState } from 'react';
 import { api } from '../../services/api';
@@ -15,6 +16,7 @@ type Snapshot = { available: boolean; sourceVersion: string; asOf: string; allow
 export default function DossierFinancialPanel({ dossierId, available, onChanged }: {
   dossierId: string; available: boolean; onChanged: () => void;
 }) {
+  const has = usePermissions();
   const [mode, setMode] = useState<'pay' | 'history' | null>(null);
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [receipt, setReceipt] = useState<FinancialReceipt | null>(null);
@@ -113,7 +115,7 @@ export default function DossierFinancialPanel({ dossierId, available, onChanged 
           <Form.Item name="payer" label="Người nộp"><Input maxLength={160} /></Form.Item>
           <Form.Item name="note" label="Ghi chú thanh toán"><Input.TextArea maxLength={1000} /></Form.Item>
           <p>Người thu lấy từ phiên đăng nhập. Chuyển khoản chỉ tăng số đã trả sau xác minh.</p>
-          <Button type="primary" htmlType="submit" loading={busy} disabled={!snapshot.allowedActions.includes('Collect')}>Xác nhận tiền thực nhận</Button>
+          <Button type="primary" htmlType="submit" loading={busy} disabled={!has('finance.payments.create') || !snapshot.allowedActions.includes('Collect')}>Xác nhận tiền thực nhận</Button>
         </Form>}
       </>}
       {receipt && <div className="treatment-receipt-preview" style={{ fontSize: largeFont ? 18 : 14 }}>
@@ -122,7 +124,7 @@ export default function DossierFinancialPanel({ dossierId, available, onChanged 
         <strong>{money(receipt.receivedVnd)}</strong><p>Trạng thái: {receipt.status}</p>
         <ul>{receipt.allocations.map(a => <li key={a.chargeId}>{snapshot?.charges.find(c => c.id === a.chargeId)?.service ?? a.chargeId}: {money(a.amountVnd)}</li>)}</ul>
         <p>Ứng chưa dùng từ chứng từ: {money(receipt.unusedAdvanceVnd)}</p><p>{receipt.note}</p>
-        <Space wrap><Button onClick={printReceipt}>In chứng từ</Button><Button onClick={downloadReceipt}>Lưu ảnh</Button>
+        <Space wrap><Button disabled={!has('finance.receipts.print')} onClick={printReceipt}>In chứng từ</Button><Button disabled={!has('finance.receipts.print')} onClick={downloadReceipt}>Lưu ảnh</Button>
           <Button onClick={() => setLargeFont(v => !v)}>Cỡ chữ {largeFont ? 'thường' : 'lớn'}</Button><Button onClick={() => setReceipt(null)}>Quay lại</Button></Space>
       </div>}
     </Drawer>

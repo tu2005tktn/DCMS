@@ -26,6 +26,16 @@ Không có hệ thống grant tường minh trong code hiện tại, nên `setti
 
 Mặc định (giữ hành vi đang chạy): `staffIdleTimeoutMinutes = 20`; mọi `requiredFields` = false; `patientCode = { mode: AutoWithManualOverride, prefix: "BN" }` (thuật toán hiện hành `BN` + sequence 6 chữ số); `receiptPrint`: bật `showReceiptNumber`, `paymentMethod`, `totalFee`, `discount`, `previouslyPaid`, `remaining`, `paymentNote`, tắt phần còn lại.
 
+### Bản sửa trang in phiếu thu — 02/11/2026 (SET-AT-26/27)
+
+Trang `/payments/{id}/print` phải đọc `settings` từ chính DTO in phiếu thu (`GET /api/finance/payments/{id}/print`); không dùng mặc định phía web hoặc chỉ ẩn bằng CSS. `paymentMethod=false` phải loại bỏ cả nhãn “Phương thức” và giá trị khỏi trang xem/in. Tương tự, `previouslyPaid`, `remaining`, `paymentNote` điều khiển các dòng đã thanh toán trước phiếu này, còn lại tại thời điểm phiếu và ghi chú; `showReceiptNumber` điều khiển mã trên tiêu đề. `internalUseNote` bật dòng “Phiếu thu dùng nội bộ”; `signatureLines` bật khu vực ký của người nộp/người thu.
+
+Số tiền thực nhận, bệnh nhân, người nộp, người thu và thời điểm phát hành vẫn lấy từ DTO phiếu đã phát hành. `defaultPayerToPatient`/`defaultCollectorToActor` là chính sách điền mặc định lúc ghi nhận, không được dùng để thay tên trên phiếu đã phát hành khi in lại. DTO hiện chưa cung cấp địa chỉ/điện thoại bệnh nhân, bác sĩ/trợ thủ, tổng phí/giảm giá/tổng công nợ; bản sửa này không suy diễn hoặc tạo số liệu cho các trường đó, cũng không coi các toggle đó đã có consumer đầy đủ.
+
+Khi bấm “In phiếu”, dùng DTO trả về từ `POST /api/finance/payments/{id}/print` để cập nhật nội dung trước khi gọi hộp thoại in, vì mẫu có thể đã đổi sau lúc mở trang. Gửi lại sau lỗi mạng dùng cùng `requestKey` cho đến khi có phản hồi thành công; khóa thao tác khi đang gửi. Lỗi ghi nhận in giữ nội dung phiếu và hiển thị lỗi để thử lại, không mở hộp thoại in. Nút/link thao tác phải ẩn trong print media. Không đổi số phiếu, số tiền, phân bổ, sequence hoặc schema.
+
+Kiểm tra hồi quy gồm hai trạng thái bật/tắt, Cash/Transfer, đổi mẫu sau khi mở trang rồi in, lỗi/retry và print media. Bằng chứng API thật phải dùng schema kiểm thử riêng; browser mock và API thật được báo riêng.
+
 Receipt/audit lệnh ghi dùng chung `SYSTEM_CATALOG_CHANGE` (requestKey, actor, command, resource cố định của Thiết lập chung, fingerprint, before/result JSON, thời điểm) trong cùng transaction với version mới.
 
 ## Nội dung và validation

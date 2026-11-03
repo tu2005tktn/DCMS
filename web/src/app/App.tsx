@@ -60,29 +60,29 @@ export default function App() {
       <Route index element={<Home />} />
     </Route>
     <Route element={<Protected><Workspace /></Protected>}>
-      <Route path="system-settings" element={<Protected><SystemSettingsPage /></Protected>} />
+      <Route path="system-settings" element={<Protected permission="settings.read"><SystemSettingsPage /></Protected>} />
       <Route path="payments" element={<Protected permission="finance.read"><PaymentsPage /></Protected>} />
       <Route path="visits/:visitId/payments" element={<Protected permission="finance.read"><PaymentsPage /></Protected>} />
-      <Route path="visits/:visitId/prescription" element={<Protected permission="examinations.manage"><PrescriptionPage /></Protected>} />
-      <Route path="payments/:id/print" element={<Protected permission="finance.read"><ReceiptPrintPage /></Protected>} />
+      <Route path="visits/:visitId/prescription" element={<Protected permission="prescriptions.read"><PrescriptionPage /></Protected>} />
+      <Route path="payments/:id/print" element={<Protected permission="finance.receipts.print"><ReceiptPrintPage /></Protected>} />
       <Route path="clinical-services" element={<Protected permission="services.read"><ClinicalServicesPage /></Protected>} />
-      <Route path="working-schedules" element={<WorkingSchedulesPage />} />
-      <Route path="booking-settings" element={<BookingSettingsPage />} />
-      <Route path="accounts" element={<Protected permission="accounts.manage"><AccountsPage /></Protected>} />
+      <Route path="working-schedules" element={<Protected permission="working-schedules.read"><WorkingSchedulesPage /></Protected>} />
+      <Route path="booking-settings" element={<Protected permission="booking-settings.read"><BookingSettingsPage /></Protected>} />
+      <Route path="accounts" element={<Protected permission="accounts.read"><AccountsPage /></Protected>} />
       <Route path="patients" element={<Protected permission="patients.read"><PatientSearchPage /></Protected>} />
       <Route path="patients/:id" element={<Protected permission="patients.read"><PatientProfilePage /></Protected>} />
-      <Route path="patients/:id/documents" element={<Protected permission="patients.read"><PatientDocumentsPage /></Protected>} />
-      <Route path="patients/:id/dossiers/:dossierId" element={<Protected permission="patients.read"><DossierPage /></Protected>} />
-      <Route path="patients/:id/dossiers/:dossierId/plan" element={<Protected permission="patients.read"><PlanPage /></Protected>} />
-      <Route path="patients/:id/dossiers/:dossierId/plan/revise/:itemId" element={<Protected permission="patients.read"><RevisionPage /></Protected>} />
-      <Route path="treatment-templates" element={<Protected><TemplatePage /></Protected>} />
-      <Route path="commercial/treatment" element={<Protected><CommercialTreatmentPage /></Protected>} />
-      <Route path="appointments" element={<Protected><AppointmentCalendarPage /></Protected>} />
+      <Route path="patients/:id/documents" element={<Protected permission="documents.read"><PatientDocumentsPage /></Protected>} />
+      <Route path="patients/:id/dossiers/:dossierId" element={<Protected permission="treatment.read"><DossierPage /></Protected>} />
+      <Route path="patients/:id/dossiers/:dossierId/plan" element={<Protected permission="treatment.read"><PlanPage /></Protected>} />
+      <Route path="patients/:id/dossiers/:dossierId/plan/revise/:itemId" element={<Protected permission="treatment.revisions.manage"><RevisionPage /></Protected>} />
+      <Route path="treatment-templates" element={<Protected permission="treatment.templates.read"><TemplatePage /></Protected>} />
+      <Route path="commercial/treatment" element={<Protected permission={['treatment.prices.read','treatment.commercial.read']}><CommercialTreatmentPage /></Protected>} />
+      <Route path="appointments" element={<Protected permission="appointments.read"><AppointmentCalendarPage /></Protected>} />
       <Route path="reception" element={<Protected permission="reception.read"><ReceptionPage /></Protected>} />
       <Route path="reception/appointments/:appointmentId" element={<Protected permission="reception.read"><CheckInPage /></Protected>} />
-      <Route path="visits/:visitId" element={<Protected permission="reception.read"><VisitPage /></Protected>} />
-      <Route path="appointments/:id" element={<Protected><AppointmentDetailPage /></Protected>} />
-      <Route path="link-verification" element={<Protected permission="patient-links.verify"><LinkVerificationPage /></Protected>} />
+      <Route path="visits/:visitId" element={<Protected permission="examinations.read"><VisitPage /></Protected>} />
+      <Route path="appointments/:id" element={<Protected permission="appointments.read"><AppointmentDetailPage /></Protected>} />
+      <Route path="link-verification" element={<Protected permission="patient-links.read"><LinkVerificationPage /></Protected>} />
       <Route path="support-inbox" element={<Protected permission="appointments.support.handle"><SupportInboxPage /></Protected>} />
       <Route path="*" element={<Result status="404" title="Không tìm thấy trang" extra={<Link to="/">Về trang chủ</Link>} />} />
     </Route>
@@ -99,11 +99,11 @@ function Entry() {
   return <Navigate to="/access" replace />;
 }
 
-function Protected({ children, permission }: { children: ReactNode; permission?: string }) {
+function Protected({ children, permission }: { children: ReactNode; permission?: string | string[] }) {
   const { user, initializing } = useAuth();
   if (initializing) return <main className="page">Đang kiểm tra phiên…</main>;
   if (!user) return <Navigate to="/sign-in" replace />;
-  if (permission && !user.permissions.includes(permission)) return <Result status="403" title="Bạn không có quyền thực hiện thao tác này." extra={<Link to="/">Về trang chủ</Link>} />;
+  if (permission && !(Array.isArray(permission) ? permission : [permission]).some(key => user.permissions.includes(key))) return <Result status="403" title="Bạn không có quyền thực hiện thao tác này." extra={<Link to="/">Về trang chủ</Link>} />;
   return children;
 }
 
@@ -113,7 +113,7 @@ function Home() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   return <><Typography.Title level={2}>Tài khoản của tôi</Typography.Title>
-    <Card title={user?.fullName} extra={<Button loading={busy} onClick={() => {
+    <Card title={user?.fullName} extra={<Button aria-label="Cập nhật quyền" loading={busy} onClick={() => {
       setBusy(true); setError(null); void refresh().catch(e => setError((e as Error).message)).finally(() => setBusy(false));
     }}>Cập nhật quyền</Button>}>
       {error && <Alert type="error" message={error} showIcon className="form-alert" />}

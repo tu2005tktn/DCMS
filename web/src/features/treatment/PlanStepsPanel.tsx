@@ -1,3 +1,4 @@
+import { usePermissions } from '../authentication/usePermissions';
 import { Alert, Button, Card, Checkbox, Drawer, Empty, Form, Input, InputNumber, Modal, Result, Select, Skeleton, Space, Table, Tag, Typography } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { api, type ApiError } from '../../services/api';
@@ -15,6 +16,7 @@ type FollowUpForm = { reason: string; earliestOn: string; targetOn: string; late
 export default function PlanStepsPanel({ dossier, dirty, onChanged }: {
   dossier: TreatmentDossier; dirty: boolean; onChanged: () => void;
 }) {
+  const has = usePermissions();
   const [rows, setRows] = useState<PlanStep[] | null>(null);
   const [reload, setReload] = useState(0);
   const [templates, setTemplates] = useState<TemplateListItem[]>([]);
@@ -49,7 +51,7 @@ export default function PlanStepsPanel({ dossier, dirty, onChanged }: {
     let live = true;
     setRows(null); setError(null);
     Promise.all([api<PlanStep[]>(`/api/dossiers/${dossier.id}/steps`),
-      api<TemplateListItem[]>(`/api/treatment-templates?branchId=${dossier.branchId}`)])
+      has('treatment.templates.read') ? api<TemplateListItem[]>(`/api/treatment-templates?branchId=${dossier.branchId}`) : Promise.resolve([])])
       .then(([steps, list]) => { if (live) { setRows(steps); setTemplates(list.filter(x => x.activeVersion !== null)); } })
       .catch(failure => { if (live) setError(failure as ApiError); });
     return () => { live = false; };
@@ -156,7 +158,7 @@ export default function PlanStepsPanel({ dossier, dirty, onChanged }: {
       { title: 'Kết quả', render: (_: unknown, row: PlanStep) => <Tag>{row.outcome === 'Partial' ? 'Đã làm một phần' : row.outcome === 'Completed' ? 'Hoàn tất' : 'Chưa thực hiện'}</Tag> },
       { title: 'Sẵn sàng', render: (_: unknown, row: PlanStep) => <><Tag color={row.readiness === 'Ready' ? 'green' : 'orange'}>
         {row.readiness === 'Ready' ? 'Đủ điều kiện' : 'Đang bị chặn'}</Tag>{row.blockers.map(text => <div key={text} className="treatment-muted">{text}</div>)}</> },
-      { title: 'Thao tác', render: (_: unknown, row: PlanStep) => dossier.planState === 'Committed' && dossier.state === 'Open'
+      { title: 'Thao tác', render: (_: unknown, row: PlanStep) => has('treatment.progress.manage') && dossier.planState === 'Committed' && dossier.state === 'Open'
         ? <Space wrap><Button disabled={row.outcome === 'Completed'} onClick={() => { form.resetFields(); setAction({ step: row, kind: 'progress' }); requestKey.current = crypto.randomUUID(); actionEffectiveAt.current = new Date().toISOString(); }}>Ghi một phần</Button>
           <Button disabled={row.outcome === 'Completed'} onClick={() => { followUpForm.resetFields(); setFollowUpStep(row); requestKey.current = crypto.randomUUID(); }}>Chỉ định thêm buổi</Button>
           <Button disabled={row.outcome === 'Completed'} onClick={() => { form.resetFields(); setAction({ step: row, kind: row.holdReason ? 'release-hold' : 'hold' }); requestKey.current = crypto.randomUUID(); actionEffectiveAt.current = new Date().toISOString(); }}>
@@ -164,14 +166,14 @@ export default function PlanStepsPanel({ dossier, dirty, onChanged }: {
     ]} /> : <Empty description={dossier.planState === 'Committed'
       ? 'Chưa có bước điều trị. Bác sĩ có thể thêm bước cho hạng mục đã đồng ý.'
       : 'Chưa có bước điều trị. Có thể áp dụng mẫu vào bản nháp kế hoạch.'} />}
-    {rows && dossier.planState === 'Committed' && dossier.state === 'Open' && agreedItems.length > 0 && <Button
+    {has('treatment.progress.manage') && rows && dossier.planState === 'Committed' && dossier.state === 'Open' && agreedItems.length > 0 && <Button
       disabled={dirty} onClick={() => { addForm.resetFields(); addForm.setFieldsValue({ estimatedMinutes: 30,
         reservedMinutes: 30, estimatedMinMinutes: null, estimatedMaxMinutes: null,
         predecessorIds: [], chargingCoverage: 'IncludedInItem' });
         requestKey.current = crypto.randomUUID(); setAddingStep(true); }} style={{ marginTop: 16 }}>
       Thêm bước cho bệnh nhân
     </Button>}
-    {rows?.length === 0 && dossier.planState !== 'Committed' && <div style={{ marginTop: 24 }}>
+    {has('treatment.plan.manage') && has('treatment.templates.read') && rows?.length === 0 && dossier.planState !== 'Committed' && <div style={{ marginTop: 24 }}>
       <Typography.Title level={4}>Áp dụng mẫu vào hồ sơ này</Typography.Title>
       {agreedItems.length === 0 && <Alert type="info" showIcon message="Cần lưu ít nhất một hạng mục đã đồng ý trước khi áp dụng mẫu." />}
       <Select aria-label="Chọn mẫu đang dùng" placeholder="Chọn mẫu đang dùng" style={{ width: '100%', maxWidth: 420 }}

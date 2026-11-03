@@ -15,7 +15,7 @@ const initialFilters: Filters = { keyword: '', birthDate: '', includeArchived: f
 export default function PatientSearchPage() {
   const auth = useAuth();
   const navigate = useNavigate();
-  const canManage = auth.user?.permissions.includes('patients.manage') ?? false;
+  const canManage = auth.user?.permissions.some(p => p === 'patients.manage' || p === 'patients.create') ?? false;
   const [draft, setDraft] = useState<Filters>(initialFilters);
   const [filters, setFilters] = useState<Filters>(initialFilters);
   const [page, setPage] = useState(1);

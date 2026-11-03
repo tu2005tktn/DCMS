@@ -48,7 +48,9 @@ public sealed class FinanceService(DcmsDbContext db, ISettingsAccess access, Tim
         return await Run(actor, c.RequestKey, "SaveService", id?.ToString() ?? "new", c, c.BranchId, null, async () =>
         {
             await access.OperationalAsync(actor, "services.manage", c.BranchId, ct);
-            var name = Text(c.Name, 160); var unit = Text(c.Unit, 40); if (!Kinds.Contains(c.Kind)) throw Error("MSG04"); if (c.PriceVnd.HasValue) Money(c.PriceVnd.Value);
+            var name = Text(c.Name, 160); var unit = Text(c.Unit, 40); if (!Kinds.Contains(c.Kind)) throw Error("MSG04");
+            if (c.PriceVnd == null) throw new BusinessException(400, SystemMessages.Get("MSG02", "Đơn giá cận lâm sàng") with { Field = "priceVnd" });
+            Money(c.PriceVnd.Value);
             SchedulingService row;
             if (id.HasValue) { await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock({(long)id.Value + 905000L})", ct); row = await db.Set<SchedulingService>().SingleOrDefaultAsync(x => x.Id == id && x.BranchId == c.BranchId && x.IsInvestigationService, ct) ?? throw Error("MSG113", 404); if (row.PriceVersion != c.ExpectedVersion) throw Error("MSG111", 409); row.PriceVersion++; }
             else { if (c.ExpectedVersion != 0) throw Error("MSG111", 409); row = new() { BranchId = c.BranchId, IsInvestigationService = true, PublicBookable = false }; db.Add(row); }
@@ -84,8 +86,9 @@ public sealed class FinanceService(DcmsDbContext db, ISettingsAccess access, Tim
                 await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock({(long)c.ServiceId.Value + 905000L})", ct);
                 var service = await db.Set<SchedulingService>().SingleOrDefaultAsync(x => x.Id == c.ServiceId && x.BranchId == v.BranchId && x.Active && x.IsInvestigationService, ct) ?? throw Invalid("Chọn dịch vụ cận lâm sàng đang hoạt động.");
                 if (service.InvestigationKind != o.Kind) throw Invalid("Nhóm dịch vụ không khớp chỉ định."); if (service.PriceVersion != c.ExpectedPriceVersion) throw Error("MSG111", 409);
-                var price = c.AgreedUnitPriceVnd ?? service.ReferenceUnitPriceVnd ?? throw Invalid("Dịch vụ chưa có giá. Hãy ghi giá thỏa thuận và căn cứ."); Money(price); Money(checked(price * c.Quantity));
-                if (price == 0 || service.ReferenceUnitPriceVnd != price) o.QuoteEvidence = Text(c.Evidence, 1000); else if (c.Evidence != null) o.QuoteEvidence = Text(c.Evidence, 1000);
+                if (service.ReferenceUnitPriceVnd == null) throw Invalid("Dịch vụ chưa được thiết lập giá. Hãy cập nhật đơn giá trong danh mục trước khi lập phí.");
+                var price = c.AgreedUnitPriceVnd ?? service.ReferenceUnitPriceVnd.Value; Money(price); Money(checked(price * c.Quantity));
+                if (service.ReferenceUnitPriceVnd != price) o.QuoteEvidence = Text(c.Evidence, 1000); else if (c.Evidence != null) o.QuoteEvidence = Text(c.Evidence, 1000);
                 o.ServiceId = service.Id; o.ServiceNameSnapshot = service.Name; o.UnitSnapshot = service.BillingUnit; o.Quantity = c.Quantity; o.UnitPriceSnapshotVnd = price; o.PriceVersionSnapshot = service.PriceVersion;
                 if (c.Mode == "OutsourcedClinic")
                 {
@@ -166,7 +169,7 @@ public sealed class FinanceService(DcmsDbContext db, ISettingsAccess access, Tim
             p.ConfirmationNote = Text(c.Note, 1000); await ValidateAllocations(p.VisitId, p.Allocations.Select(x => new AllocationInput(x.ChargeId, x.AmountVnd)).ToArray(), ct); p.BankReference = reference; p.NormalizedBankReference = normalized; await Post(p, actor, ct); p.Version++; await Touch(p.PatientId, p.BranchId, ct); return await Payment(p,ct);
         }, ct);
     }
-    public async Task<PaymentDto> CancelAsync(int actor, Guid id, CancelPayment c, CancellationToken ct) { var p = await db.Set<PaymentReceipt>().Include(x => x.Allocations).SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw Error("MSG113", 404); await access.OperationalAsync(actor, "finance.payments.create", p.BranchId, ct); return await Run(actor, c.RequestKey, "CancelPayment", id.ToString(), c, p.BranchId, p.VisitId, async () => { await access.OperationalAsync(actor, "finance.payments.create", p.BranchId, ct); await db.Entry(p).ReloadAsync(ct); if (p.Version != c.ExpectedVersion) throw Error("MSG111", 409); if (p.State != "Pending") throw Error("MSG42", 409); p.CancellationReason = Text(c.Reason, 1000); p.State = "Cancelled"; p.Version++; await Touch(p.PatientId, p.BranchId, ct); return await Payment(p,ct); }, ct); }
+    public async Task<PaymentDto> CancelAsync(int actor, Guid id, CancelPayment c, CancellationToken ct) { var p = await db.Set<PaymentReceipt>().Include(x => x.Allocations).SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw Error("MSG113", 404); await access.OperationalAsync(actor, "finance.payments.cancel", p.BranchId, ct); return await Run(actor, c.RequestKey, "CancelPayment", id.ToString(), c, p.BranchId, p.VisitId, async () => { await access.OperationalAsync(actor, "finance.payments.cancel", p.BranchId, ct); await db.Entry(p).ReloadAsync(ct); if (p.Version != c.ExpectedVersion) throw Error("MSG111", 409); if (p.State != "Pending") throw Error("MSG42", 409); p.CancellationReason = Text(c.Reason, 1000); p.State = "Cancelled"; p.Version++; await Touch(p.PatientId, p.BranchId, ct); return await Payment(p,ct); }, ct); }
 
     async Task<(int Version, DCMS.Application.Features.SystemSettings.ReceiptPrintSettings Settings)> PrintSettings(CancellationToken ct)
     {
@@ -217,17 +220,17 @@ public sealed class FinanceService(DcmsDbContext db, ISettingsAccess access, Tim
     }
     public async Task<ReceiptSequenceDto> ReceiptSequenceAsync(int actor, int branchId, CancellationToken ct)
     {
-        await access.OperationalAsync(actor, "settings.general.manage", branchId, ct);
+        await access.OperationalAsync(actor, "finance.receipt-sequence.manage", branchId, ct);
         var row = await db.Set<BranchReceiptSequence>().SingleOrDefaultAsync(x => x.BranchId == branchId, ct);
         return new(branchId, row?.NextNumber ?? 1, Math.Max(0, (row?.NextNumber ?? 1) - 1), row?.Version ?? 0);
     }
     public async Task<ReceiptSequenceDto> UpdateReceiptSequenceAsync(int actor, int branchId, UpdateReceiptSequence c, CancellationToken ct)
     {
-        await access.OperationalAsync(actor, "settings.general.manage", branchId, ct);
+        await access.OperationalAsync(actor, "finance.receipt-sequence.manage", branchId, ct);
         if (c.NextNumber < 1 || string.IsNullOrWhiteSpace(c.Reason) || c.Reason.Length > 500) throw Error("MSG04");
         return await Run(actor, c.RequestKey, "UpdateReceiptSequence", branchId.ToString(), c, branchId, null, async () =>
         {
-            await access.OperationalAsync(actor, "settings.general.manage", branchId, ct);
+            await access.OperationalAsync(actor, "finance.receipt-sequence.manage", branchId, ct);
             var row = await db.Set<BranchReceiptSequence>().SingleOrDefaultAsync(x => x.BranchId == branchId, ct);
             if (row == null) { if (c.ExpectedVersion != 0) throw Error("MSG111", 409); row = new() { BranchId = branchId, NextNumber = 1, Version = 0 }; db.Add(row); }
             if (row.Version != c.ExpectedVersion) throw Error("MSG111", 409);

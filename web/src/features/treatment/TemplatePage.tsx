@@ -1,3 +1,4 @@
+import { usePermissions } from '../authentication/usePermissions';
 import { Alert, Button, Card, Drawer, Empty, Form, Input, InputNumber, Result, Select, Skeleton, Space, Table, Tag, Typography } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { api, type ApiError } from '../../services/api';
@@ -12,6 +13,7 @@ const blankStep = (): StepDefinition => ({ logicalStepId: crypto.randomUUID(), i
   earliestOffsetDays: null, targetOffsetDays: null, latestOffsetDays: null, chargingCoverage: 'IncludedInItem' });
 
 export default function TemplatePage() {
+  const has = usePermissions();
   const [options, setOptions] = useState<AppointmentOptions | null>(null);
   const [branchId, setBranchId] = useState<number | null>(null);
   const [list, setList] = useState<TemplateListItem[]>([]);
@@ -103,7 +105,7 @@ export default function TemplatePage() {
     {error && <Alert type="error" showIcon message={error.message}
       description={error.code === 'MSG111' || error.code === 'MSG236' ? 'Nội dung đang sửa vẫn được giữ. Hãy tải lại phiên bản trước khi xác nhận.' : undefined} />}
     {notice && <Alert type="success" showIcon message={notice} />}
-    <div className="treatment-detail-grid"><Card title="Mẫu trong chi nhánh" extra={<Button onClick={() => {
+    <div className="treatment-detail-grid"><Card title="Mẫu trong chi nhánh" extra={<Button disabled={!has('treatment.templates.manage')} onClick={() => {
       setTemplate(null); setName(''); setSteps([blankStep()]); requestKey.current = crypto.randomUUID(); setDirty(true);
     }}>Tạo mẫu</Button>}>
       {list.length === 0 ? <Empty description="Chưa có mẫu điều trị. Bác sĩ có thể tạo bản nháp đầu tiên." />
@@ -112,7 +114,7 @@ export default function TemplatePage() {
           <Button onClick={() => void open(row.id)}>Mở</Button></div>)}
     </Card><Card title={template ? `${template.name} · phiên bản hệ thống ${template.version}` : 'Bản nháp mới'} loading={loading}>
       <label htmlFor="template-name">Tên mẫu</label><Input id="template-name" value={name} maxLength={160}
-        disabled={!!template} onChange={event => { setName(event.target.value); requestKey.current = crypto.randomUUID(); setDirty(true); }} />
+        disabled={!has('treatment.templates.manage') || !!template} onChange={event => { setName(event.target.value); requestKey.current = crypto.randomUUID(); setDirty(true); }} />
       {template && <Space wrap style={{ marginTop: 16 }}>
         {template.versions.map(version => <Tag key={version.number} color={version.state === 'Active' ? 'green' : undefined}>
           V{version.number} · {version.state === 'Active' ? 'Đang dùng' : version.state === 'Draft' ? 'Bản nháp' : 'Đã ngừng'}</Tag>)}
@@ -123,7 +125,7 @@ export default function TemplatePage() {
         { title: 'Bước', render: (_: unknown, row: StepDefinition) => <><strong>{row.name || 'Bước mới'}</strong><div>{row.region}</div></> },
         { title: 'Ước tính / giữ chỗ', render: (_: unknown, row: StepDefinition) => `${row.estimatedMinMinutes != null && row.estimatedMaxMinutes != null ? `${row.estimatedMinMinutes}–${row.estimatedMaxMinutes} · ` : ''}${row.estimatedMinutes} / ${row.reservedMinutes} phút` },
         { title: 'Tiền nhiệm', render: (_: unknown, row: StepDefinition) => row.predecessorIds.length },
-        { title: 'Thao tác', render: (_: unknown, row: StepDefinition, index: number) => !template || draft ?
+        { title: 'Thao tác', render: (_: unknown, row: StepDefinition, index: number) => has('treatment.templates.manage') && (!template || draft) ?
           <Space><Button onClick={() => stepEditor(index)}>Sửa</Button><Button danger onClick={() => {
             setSteps(current => current.filter(x => x.logicalStepId !== row.logicalStepId)
               .map(x => ({ ...x, predecessorIds: x.predecessorIds.filter(id => id !== row.logicalStepId) })));
@@ -131,21 +133,21 @@ export default function TemplatePage() {
           }}>Bỏ</Button></Space> : null },
       ]} />
       <Space wrap style={{ marginTop: 16 }}>
-        {(!template || draft) && <><Button onClick={() => stepEditor(steps.length)}>Thêm bước</Button>
+        {has('treatment.templates.manage') && (!template || draft) && <><Button onClick={() => stepEditor(steps.length)}>Thêm bước</Button>
           <Button type="primary" loading={busy} disabled={!name.trim() || steps.length === 0} onClick={save}>Lưu bản nháp</Button></>}
-        {draft && <Button loading={busy} disabled={steps.length === 0 || dirty} onClick={() => void command(
+        {has('treatment.templates.manage') && draft && <Button loading={busy} disabled={steps.length === 0 || dirty} onClick={() => void command(
           `/api/treatment-templates/${template!.id}/versions/${draft.number}/activate`,
           { expectedVersion: template!.version, requestKey: keyFor(`activate:${template!.id}:${draft.number}`) })}>Kích hoạt</Button>}
-        {active && !draft && <Button loading={busy} onClick={() => void command(
+        {has('treatment.templates.manage') && active && !draft && <Button loading={busy} onClick={() => void command(
           `/api/treatment-templates/${template!.id}/versions`,
           { expectedVersion: template!.version, steps, requestKey: keyFor(`new:${template!.id}:${template!.version}`) })}>Tạo phiên bản mới</Button>}
-        {active && <Button danger loading={busy} onClick={() => void command(
+        {has('treatment.templates.manage') && active && <Button danger loading={busy} onClick={() => void command(
           `/api/treatment-templates/${template!.id}/versions/${active.number}/retire`,
           { expectedVersion: template!.version, requestKey: keyFor(`retire:${template!.id}:${active.number}`) })}>Ngừng sử dụng</Button>}
       </Space>
     </Card></div>
     <Drawer open={editing !== null} width={520} title={editing === steps.length ? 'Thêm bước' : 'Sửa bước'}
-      onClose={() => setEditing(null)} extra={<Button type="primary" onClick={() => form.submit()}>Lưu bước</Button>}>
+      onClose={() => setEditing(null)} extra={<Button type="primary" disabled={!has('treatment.templates.manage')} onClick={() => form.submit()}>Lưu bước</Button>}>
       <Form form={form} layout="vertical" onFinish={values => {
         if (!durationRangeValid(values.estimatedMinMinutes, values.estimatedMaxMinutes,
           values.estimatedMinutes, values.reservedMinutes)) {

@@ -1,6 +1,7 @@
 import { Alert, Button, Drawer, Empty, Form, Input, Menu, Modal, Segmented, Space, Table, Tag, Timeline, Typography, message } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { api, ApiError } from '../../services/api';
+import { useAuth } from '../authentication/AuthContext';
 
 // S58 danh mục tham chiếu. Contract: docs/specs/S58-REFERENCE-CATALOGS.md.
 type Kind = 'diagnoses' | 'patient-sources' | 'occupations' | 'intake-history' | 'care-types' | 'expense-categories' | 'customer-groups';
@@ -36,6 +37,10 @@ function useRequestKey() {
 const patientKinds: Kind[] = ['customer-groups', 'patient-sources', 'occupations', 'intake-history'];
 
 export default function ReferenceCatalogPanel() {
+  const { user } = useAuth();
+  const owner = user?.effectiveRoles.includes('ClinicOwner') ?? false;
+  const can = (kind: Kind, action: string) => owner || (user?.permissions.includes(`catalog.${kind}.${action}`) ?? false);
+  const allowedKinds = kinds.filter(kind => can(kind.key, 'read'));
   // Static message does not render under React 19 + antd 5 (errors were silently lost); use the hook instance.
   const [toast, toastContext] = message.useMessage();
   const [kind, setKind] = useState<Kind>('diagnoses'), [status, setStatus] = useState<Status>('Active');
@@ -48,8 +53,10 @@ export default function ReferenceCatalogPanel() {
   const saveKey = useRequestKey(), stateKey = useRequestKey();
   const [form] = Form.useForm<Values>();
   const meta = kinds.find(x => x.key === kind)!;
+  useEffect(() => { if (!allowedKinds.some(item => item.key === kind) && allowedKinds.length) setKind(allowedKinds[0].key); }, [kind, user]);
 
   useEffect(() => {
+    if (!allowedKinds.some(item => item.key === kind)) return;
     let live = true; setLoading(true); setError(undefined);
     const params = new URLSearchParams({ q: query, status, page: String(page), pageSize: String(size) });
     void api<Page>(`${base}/${kind}?${params}`).then(v => {
@@ -58,7 +65,7 @@ export default function ReferenceCatalogPanel() {
       setData(v);
     }).catch(e => { if (live) { setError((e as Error).message); setData(null); } }).finally(() => { if (live) setLoading(false); });
     return () => { live = false; };
-  }, [kind, status, query, page, size, revision]);
+  }, [kind, status, query, page, size, revision, user]);
 
   function selectKind(next: Kind) { setKind(next); setPage(1); setSearch(''); setQuery(''); setData(null); }
   function open(entry?: Entry) {
@@ -116,7 +123,7 @@ export default function ReferenceCatalogPanel() {
   return <div className="reference-catalogs">
     {toastContext}
     <Menu className="reference-catalogs-menu" mode="inline" selectedKeys={[kind]} onClick={e => selectKind(e.key as Kind)}
-      items={kinds.map(x => ({ key: x.key, label: x.label }))} />
+      items={allowedKinds.map(x => ({ key: x.key, label: x.label }))} />
     <div className="reference-catalogs-body">
       <Typography.Title level={4}>{meta.label}</Typography.Title>
       {meta.help && <Typography.Paragraph type="secondary">{meta.help}</Typography.Paragraph>}
@@ -125,7 +132,7 @@ export default function ReferenceCatalogPanel() {
           onChange={e => { setSearch(e.target.value); if (!e.target.value) { setQuery(''); setPage(1); } }} onSearch={v => { setQuery(v.trim()); setPage(1); }} />
         <Segmented<Status> value={status} onChange={v => { setStatus(v); setPage(1); }}
           options={[{ value: 'Active', label: 'Đang dùng' }, { value: 'Inactive', label: 'Ngừng dùng' }, { value: 'All', label: 'Tất cả' }]} />
-        <Button type="primary" onClick={() => open()}>Thêm mới</Button>
+        {can(kind, 'create') && <Button type="primary" onClick={() => open()}>Thêm mới</Button>}
       </div>
       {error && <Alert type="error" showIcon message={error} action={<Button onClick={() => setRevision(v => v + 1)}>Thử lại</Button>} />}
       <Table<Entry> rowKey="id" loading={loading} dataSource={data?.items ?? []} scroll={{ x: 760 }}
@@ -139,8 +146,8 @@ export default function ReferenceCatalogPanel() {
           ...(patientKinds.includes(kind) ? [{ title: 'Số hồ sơ', dataIndex: 'patientCount', width: 100, align: 'right' as const }] : []),
           { title: 'Trạng thái', dataIndex: 'active', width: 120, render: (v: boolean) => v ? <Tag color="green">Đang dùng</Tag> : <Tag>Ngừng dùng</Tag> },
           { title: 'Thao tác', key: 'actions', width: 250, render: (_, row) => <Space wrap>
-            <Button size="small" aria-label={`Sửa ${row.name}`} onClick={() => open(row)}>Sửa</Button>
-            {!(row.reserved && row.active) && <Button size="small" danger={row.active} disabled={busy} onClick={() => void previewState(row)}>{row.active ? 'Ngừng dùng' : 'Khôi phục'}</Button>}
+            {can(kind, 'update') && <Button size="small" aria-label={`Sửa ${row.name}`} onClick={() => open(row)}>Sửa</Button>}
+            {can(kind, 'deactivate') && !(row.reserved && row.active) && <Button size="small" danger={row.active} disabled={busy} onClick={() => void previewState(row)}>{row.active ? 'Ngừng dùng' : 'Khôi phục'}</Button>}
             <Button size="small" type="link" onClick={() => void openHistory(row)}>Lịch sử</Button>
           </Space> },
         ]} />

@@ -274,6 +274,7 @@ public sealed partial class TreatmentDossierService
     {
         var dossier = await DossierAsync(actorId, dossierId, ct);
         var employee = await DentistAsync(actorId, dossier.BranchId, ct);
+        var permissions = (await access.ResolveAsync(actorId, ct)).Permissions;
         var services = await db.Set<SchedulingService>().AsNoTracking().Where(x => x.BranchId == dossier.BranchId && x.Active)
             .OrderBy(x => x.Name).Select(x => new SheetService(x.Id, x.BranchId, x.Name, x.Unit, x.ReferenceUnitPriceVnd, x.PriceVersion)).ToListAsync(ct);
         var members = await (from member in db.Set<SchedulingMember>().AsNoTracking()
@@ -288,7 +289,14 @@ public sealed partial class TreatmentDossierService
         var documents = await db.Set<ClinicalDocument>().AsNoTracking().Where(x => x.PatientId == dossier.PatientId
             && x.DossierId == dossierId && x.PlanId == dossier.PlanId && x.FileState == "Ready")
             .Select(x => new SheetConsentDocument(x.Id, x.FileName, x.Version)).ToListAsync(ct);
-        return new(services, members, visits, dossier.State == "Open" ? ["Draft", "Decide", "Perform", "Close"] : ["Reopen"], steps, documents);
+        var actions = new List<string>();
+        if (dossier.State == "Open") {
+            if (permissions.Any(x => x is "treatment.items.create" or "treatment.items.update" or "treatment.actuals.create" or "treatment.actuals.update" or "treatment.dossiers.update" or "treatment.plan.manage")) actions.Add("Draft");
+            if (permissions.Contains("treatment.items.update")) actions.Add("Decide");
+            if (permissions.Contains("treatment.actuals.create")) actions.Add("Perform");
+            if (permissions.Contains("treatment.dossiers.update")) actions.Add("Close");
+        } else if (permissions.Contains("treatment.dossiers.update")) actions.Add("Reopen");
+        return new(services, members, visits, actions.ToArray(), steps, permissions.Contains("documents.read") ? documents : []);
     }
 
     public async Task<TreatmentActivityPage> ActivitiesAsync(int actorId, Guid dossierId, Guid? visitId,

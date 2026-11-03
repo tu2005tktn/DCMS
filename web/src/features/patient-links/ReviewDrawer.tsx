@@ -1,3 +1,4 @@
+import { usePermissions } from '../authentication/usePermissions';
 import { Alert, Button, Col, Descriptions, Drawer, Empty, Form, Input, Modal, Row, Space, Spin, Table, Tabs, Tag, Timeline, Typography, message } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { api, ApiError } from '../../services/api';
@@ -11,6 +12,7 @@ type Props = { id: number | null; onClose: () => void; onChanged: () => void };
 
 // S08 comparison panel: account and proposed Patient side by side, then Verify / Reject / Revoke.
 export default function ReviewDrawer({ id, onClose, onChanged }: Props) {
+  const has = usePermissions();
   const [toast, toastContext] = message.useMessage();
   const [modal, modalContext] = Modal.useModal();
   const [detail, setDetail] = useState<LinkReviewDetail | null>(null);
@@ -169,12 +171,12 @@ export default function ReviewDrawer({ id, onClose, onChanged }: Props) {
             </Form.Item>
           </Form>
           <Space wrap>
-            <Button type="primary" loading={saving} disabled={detail.conflict.accountHasActiveLink || selectedMismatches.length > 0} onClick={() => void verify()}>Xác minh</Button>
-            <Button danger disabled={saving} onClick={() => setDecision('reject')}>Từ chối</Button>
+            <Button type="primary" loading={saving} disabled={!has('patient-links.verify') || detail.conflict.accountHasActiveLink || selectedMismatches.length > 0} onClick={() => void verify()}>Xác minh</Button>
+            <Button danger disabled={!has('patient-links.verify') || saving} onClick={() => setDecision('reject')}>Từ chối</Button>
           </Space>
         </>}
 
-        {detail.status === 'VERIFIED' && <Space className="link-section"><Button danger loading={saving} onClick={() => setDecision('revoke')}>Thu hồi liên kết</Button></Space>}
+        {detail.status === 'VERIFIED' && <Space className="link-section"><Button danger disabled={!has('patient-links.verify')} loading={saving} onClick={() => setDecision('revoke')}>Thu hồi liên kết</Button></Space>}
 
         {(detail.reviewedAt || detail.revokedAt || detail.withdrawnAt) && <Descriptions title="Kết quả xử lý" className="link-section" column={1} size="small" bordered items={[
           { label: 'Người xác minh / từ chối', children: detail.reviewerName ? `${detail.reviewerName} — ${formatTime(detail.reviewedAt)}` : '—' },

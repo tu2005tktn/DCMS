@@ -78,7 +78,29 @@ public sealed class FinanceApiTests(ReceptionFixture fixture) : IClassFixture<Re
             var charge = Assert.Single((await d.GetFromJsonAsync<BillDto>(Bill(v.VisitId)))!.Charges); Assert.Equal(0, charge.AmountVnd); Assert.Equal(s.Name, charge.Name); Assert.Equal("Lần", charge.Unit);
         }
     }
-    [Fact] public async Task NullCatalogPriceIsNotFreeAndExplicitPriceNeedsEvidence() { var (v, o, d, s) = await Prepare(); using (d) { s = await Ok<InvestigationServiceDto>(await d.PutAsJsonAsync($"/api/finance/services/{s.Id}", new SaveInvestigationService(Guid.NewGuid(), v.BranchId, s.Name, "Lab", "Lần", null, s.Version))); Assert.Equal(HttpStatusCode.BadRequest, (await d.PostAsJsonAsync(Billing(v.VisitId, o.Id) + "/quote", Quote(v, o, s))).StatusCode); Assert.Equal(HttpStatusCode.BadRequest, (await d.PostAsJsonAsync(Billing(v.VisitId, o.Id) + "/quote", Quote(v, o, s) with { AgreedUnitPriceVnd = 100000 })).StatusCode); await Ok<InvestigationBillingDto>(await d.PostAsJsonAsync(Billing(v.VisitId, o.Id) + "/quote", Quote(v, o, s) with { AgreedUnitPriceVnd = 100000, Evidence = "SYNTHETIC thỏa thuận" })); } }
+    [Fact] public async Task LegacyMissingCatalogPriceRequiresSetupBeforeAnyPatientQuote()
+    {
+        var (v,o,d,s)=await Prepare();using(d)
+        {
+            Assert.Equal(HttpStatusCode.BadRequest,(await d.PutAsJsonAsync($"/api/finance/services/{s.Id}",new SaveInvestigationService(Guid.NewGuid(),v.BranchId,s.Name,"Lab","Lần",null,s.Version))).StatusCode);
+            // Only this isolated test fixture can construct an old row without a configured price.
+            using(var scope=fixture.Services.CreateScope())await scope.ServiceProvider.GetRequiredService<DcmsDbContext>().Set<DCMS.Domain.Features.Scheduling.SchedulingService>().Where(x=>x.Id==s.Id).ExecuteUpdateAsync(update=>update.SetProperty(x=>x.ReferenceUnitPriceVnd,(long?)null));
+            Assert.Equal(HttpStatusCode.BadRequest,(await d.PostAsJsonAsync(Billing(v.VisitId,o.Id)+"/quote",Quote(v,o,s))).StatusCode);
+            Assert.Equal(HttpStatusCode.BadRequest,(await d.PostAsJsonAsync(Billing(v.VisitId,o.Id)+"/quote",Quote(v,o,s) with {AgreedUnitPriceVnd=100000,Evidence="SYNTHETIC ngoại lệ"})).StatusCode);
+            Assert.Empty((await d.GetFromJsonAsync<BillDto>(Bill(v.VisitId)))!.Charges);
+            s=await Ok<InvestigationServiceDto>(await d.PutAsJsonAsync($"/api/finance/services/{s.Id}",new SaveInvestigationService(Guid.NewGuid(),v.BranchId,s.Name,"Lab","Lần",100000,s.Version)));
+            var quoted=await Ok<InvestigationBillingDto>(await d.PostAsJsonAsync(Billing(v.VisitId,o.Id)+"/quote",Quote(v,o,s)));Assert.Equal(100000,quoted.UnitPriceVnd);
+        }
+    }
+    [Fact] public async Task ConfiguredZeroPriceNeedsNoSecondFreePriceJustification()
+    {
+        var(v,o,d,s)=await Prepare();using(d)
+        {
+            s=await Ok<InvestigationServiceDto>(await d.PutAsJsonAsync($"/api/finance/services/{s.Id}",new SaveInvestigationService(Guid.NewGuid(),v.BranchId,s.Name,"Lab","Lần",0,s.Version)));
+            var quoted=await Ok<InvestigationBillingDto>(await d.PostAsJsonAsync(Billing(v.VisitId,o.Id)+"/quote",Quote(v,o,s)));Assert.Equal(0,quoted.UnitPriceVnd);
+            await Perform(d,v,o.Id,quoted);var bill=(await d.GetFromJsonAsync<BillDto>(Bill(v.VisitId)))!;Assert.Equal(0,Assert.Single(bill.Charges).AmountVnd);Assert.Empty(bill.Payments);
+        }
+    }
     [Theory][InlineData(false)][InlineData(true)] public async Task ClinicalCancellationDoesNotCreateOrReverseCharges(bool performed) { var (v, o, d, s) = await Prepare(); using (d) { var b = await Ok<InvestigationBillingDto>(await d.PostAsJsonAsync(Billing(v.VisitId, o.Id) + "/quote", Quote(v, o, s))); if (performed) b = await Perform(d, v, o.Id, b); await Ok<InvestigationPage>(await d.PostAsJsonAsync($"{Orders(v.VisitId)}/{o.Id}/cancel", new CancelInvestigation(v.PatientId, b.VisitVersion, b.OrderVersion, Guid.NewGuid(), "SYNTHETIC hủy"))); Assert.Equal(performed ? 200000 : 0, (await d.GetFromJsonAsync<BillDto>(Bill(v.VisitId)))!.TotalVnd); } }
     [Fact] public async Task ReadDoesNotCreateAccountSequenceOrCharge() { var (v, _, d, _) = await Prepare(); using (d) { for (var i = 0; i < 2; i++) Assert.Equal(0, (await d.GetFromJsonAsync<BillDto>(Bill(v.VisitId)))!.AccountVersion); using var scope = fixture.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>(); Assert.False(await db.Set<FinancialAccount>().AnyAsync(x => x.PatientId == v.PatientId)); Assert.False(await db.Set<BranchReceiptSequence>().AnyAsync(x => x.BranchId == v.BranchId)); } }
     [Fact]

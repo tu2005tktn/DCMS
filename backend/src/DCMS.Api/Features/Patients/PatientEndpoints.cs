@@ -9,6 +9,9 @@ public static class PatientEndpoints
 {
     public const string ReadPolicy = "ReadPatients";
     public const string ManagePolicy = "ManagePatients";
+    public const string CreatePolicy = "CreatePatients";
+    public const string UpdatePolicy = "UpdatePatients";
+    public const string ArchivePolicy = "ArchivePatients";
 
     public static void MapPatientEndpoints(this IEndpointRouteBuilder endpoints)
     {
@@ -41,15 +44,15 @@ public static class PatientEndpoints
         {
             var result = await service.CreateAsync(AuthenticationEndpoints.AccountId(context.User), request, ct);
             return Results.Created($"/api/patients/{result.Patient.Id}", result);
-        }).RequireAuthorization(ManagePolicy);
+        }).RequireAuthorization(CreatePolicy);
         group.MapPut("/{id:int}", async (HttpContext context, int id, UpdatePatientRequest request, IPatientService service, CancellationToken ct) =>
             Results.Ok(await service.UpdateAsync(AuthenticationEndpoints.AccountId(context.User), id, request, ct)))
-            .RequireAuthorization(ManagePolicy);
+            .RequireAuthorization(UpdatePolicy);
         group.MapPost("/{id:int}/archive", async (HttpContext context, int id, ArchivePatientRequest request, IPatientService service, CancellationToken ct) =>
             Results.Ok(await service.ArchiveAsync(AuthenticationEndpoints.AccountId(context.User), id, request, true, ct)))
-            .RequireAuthorization(ManagePolicy);
+            .RequireAuthorization(ArchivePolicy);
         group.MapPost("/{id:int}/restore", async (HttpContext context, int id, ArchivePatientRequest request, IPatientService service, CancellationToken ct) =>
             Results.Ok(await service.ArchiveAsync(AuthenticationEndpoints.AccountId(context.User), id, request, false, ct)))
-            .RequireAuthorization(ManagePolicy);
+            .RequireAuthorization(ArchivePolicy);
     }
 }

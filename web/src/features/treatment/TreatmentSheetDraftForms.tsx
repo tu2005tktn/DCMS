@@ -1,3 +1,4 @@
+import { usePermissions } from '../authentication/usePermissions';
 import { Button, Form, Input, InputNumber, Select, Tooltip } from 'antd';
 import { ToolOutlined } from '@ant-design/icons';
 import MaterialNotePicker from './MaterialNotePicker';
@@ -21,6 +22,7 @@ export default function TreatmentSheetDraftRow({ kind, dossier, options, context
   onCancel: () => void; onSubmit: (row: SheetActualPreview, version: number, values: Record<string, unknown>, key: string) => Promise<void>;
   onReload: () => Promise<void>;
 }) {
+  const has = usePermissions();
   const [form] = Form.useForm<Values>();
   const [materialPicker, setMaterialPicker] = useState(false);
   const initial = initialPlan ?? initialActual;
@@ -88,8 +90,8 @@ export default function TreatmentSheetDraftRow({ kind, dossier, options, context
     <td>{field('dentistId', <Select size="small" showSearch optionFilterProp="label" aria-label="Bác sĩ" options={dentists} />, true)}
       {field('assistantId', <Select size="small" showSearch optionFilterProp="label" allowClear aria-label="Phụ tá" placeholder="Phụ tá" options={assistants} />)}</td>
     {kind === 'actual' && <td>{field('labWork', <Input.TextArea rows={2} maxLength={1000} aria-label="Ghi chú Labo" placeholder="Công việc Labo" />)}</td>}
-    <td>{field('costVnd', <InputNumber min={0} precision={0} size="small" aria-label="Chi phí" />, true)}</td>
-    <td data-col="discount">{field('discountValue', <InputNumber min={0} precision={0} size="small" aria-label="Giảm giá" />)}
+    <td>{field('costVnd', <InputNumber min={0} precision={0} size="small" aria-label="Chi phí" disabled={!!initial && !has('treatment.items.price')} />, true)}</td>
+    <td data-col="discount">{field('discountValue', <InputNumber min={0} precision={0} size="small" aria-label="Giảm giá" disabled={!!initial && !has('treatment.items.price')} />)}
       {field('discountType', <Select size="small" aria-label="Loại giảm giá" options={[{ value: 'VND', label: '₫' }, { value: 'Percent', label: '%' }]} />)}
       {field('discountNote', <Input size="small" aria-label="Ghi chú giảm giá" placeholder="Lý do giảm trừ" maxLength={1000} />)}</td>
     {kind === 'actual' && <td>—</td>}

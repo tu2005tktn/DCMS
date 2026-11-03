@@ -1,3 +1,4 @@
+import { usePermissions } from '../authentication/usePermissions';
 import { Alert, Button, Dropdown, Empty, Form, Input, Modal, Select, Skeleton, Typography } from 'antd';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -18,6 +19,7 @@ const displayTime = (value: string) => new Intl.DateTimeFormat('vi-VN', {
 export default function DossierList({ patientId, visitId, sourceVisitVersion, diagnosis, branchId: contextBranchId, dentistId,
   patientName, patientCode, patientAge }: { patientId: number; visitId?: string; diagnosis?: string | null;
   branchId?: number; dentistId?: number; sourceVisitVersion?: number; patientName?: string; patientCode?: string; patientAge?: number | null }) {
+  const has = usePermissions();
   const auth = useAuth();
   const navigate = useNavigate();
   const [page, setPage] = useState<DossierPage | null>(null);
@@ -43,7 +45,7 @@ export default function DossierList({ patientId, visitId, sourceVisitVersion, di
   const [form] = Form.useForm<Values>();
   const createKey = useRef(crypto.randomUUID());
   const branchId = Form.useWatch('branchId', form);
-  const canUse = auth.user?.effectiveRoles.includes('Dentist') ?? false;
+  const canUse = has('treatment.read') && (auth.user?.effectiveRoles.includes('Dentist') ?? false);
   const onPlanTotalChange = useCallback(() => {
     void api<DossierTotals>(`/api/patients/${patientId}/dossiers/summary`).then(setTotals).catch(f => setTotalsError((f as Error).message));
   }, [patientId]);
@@ -106,7 +108,7 @@ export default function DossierList({ patientId, visitId, sourceVisitVersion, di
     finally { setStatusBusyId(null); }
   }
 
-  if (!canUse) return <FinancialPatientDossiers patientId={patientId} />;
+  if (!canUse) return has('finance.read') ? <FinancialPatientDossiers patientId={patientId} /> : <Alert type="info" message="Bạn chưa được cấp quyền xem hồ sơ điều trị." />;
   return <section className="treatment-list treatment-sheets" aria-label="Các phiếu điều trị">
     <div className="treatment-sheets-heading"><div>
       <Typography.Title level={4}>DS PHIẾU ĐIỀU TRỊ/DỊCH VỤ</Typography.Title>
@@ -137,11 +139,11 @@ export default function DossierList({ patientId, visitId, sourceVisitVersion, di
               ] }}><button type="button"
                 className={`treatment-sheet-state ${item.state === 'Completed' ? 'is-complete' : 'is-pending'}`}
                 aria-label={`Trạng thái phiếu: ${item.state === 'Completed' ? 'Hoàn tất' : item.state === 'Stopped' ? 'Đã ngừng' : 'Chưa xong'}`}
-                aria-busy={statusBusyId === item.id} disabled={statusBusyId === item.id}
+                aria-busy={statusBusyId === item.id} disabled={!has('treatment.dossiers.update') || statusBusyId === item.id}
                 title="Chọn trạng thái phiếu">
                 {item.state === 'Completed' ? 'Hoàn tất' : item.state === 'Stopped' ? 'Đã ngừng' : 'Chưa xong'} <span aria-hidden="true">⌄</span>
               </button></Dropdown>
-              <Button aria-label={`Xóa phiếu ${item.code}`} onClick={() => {
+              <Button disabled={!has('treatment.dossiers.delete')} aria-label={`Xóa phiếu ${item.code}`} onClick={() => {
                 setDeleteTarget(item); setDeleteError(null); deleteKey.current = crypto.randomUUID();
               }}>
                 <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true">
@@ -167,7 +169,7 @@ export default function DossierList({ patientId, visitId, sourceVisitVersion, di
         </article>)}</div>
         {page.total > page.page * page.pageSize && <Button onClick={() => setPageNumber(value => value + 1)}>Xem thêm phiếu</Button>}
         {page.page > 1 && <Button onClick={() => setPageNumber(value => value - 1)}>Trang trước</Button>}</>}
-    <div className="treatment-sheet-create-row"><Button className="treatment-sheet-create" onClick={() => { setSaveError(null); createKey.current = crypto.randomUUID(); form.setFieldsValue({ diagnosis: diagnosis ?? undefined, branchId: contextBranchId, dentistId }); setOpen(true); }}>+ TẠO PHIẾU MỚI</Button></div>
+    <div className="treatment-sheet-create-row"><Button className="treatment-sheet-create" disabled={!has('treatment.dossiers.create')} onClick={() => { setSaveError(null); createKey.current = crypto.randomUUID(); form.setFieldsValue({ diagnosis: diagnosis ?? undefined, branchId: contextBranchId, dentistId }); setOpen(true); }}>+ TẠO PHIẾU MỚI</Button></div>
     {clinicalTarget && <DossierClosureModal dossier={clinicalTarget.dossier} completed={clinicalTarget.completed}
       onClose={() => setClinicalTarget(null)} onSaved={() => { setClinicalTarget(null); setRevision(v => v + 1); }} />}
     <Modal open={!!deleteTarget} title={`Xóa phiếu ${deleteTarget?.code ?? ''}?`}

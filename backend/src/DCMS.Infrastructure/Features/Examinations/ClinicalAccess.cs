@@ -12,9 +12,9 @@ namespace DCMS.Infrastructure.Features.Examinations;
 public sealed class ClinicalAccess(DcmsDbContext db, UserManager<ApplicationUser> users, TimeProvider clock, DCMS.Application.Features.Settings.ISettingsAccess settingsAccess)
 {
     public static BusinessException Error(string code, int status = 400) => new(status, SystemMessages.Get(code));
-    public async Task<bool> BranchAsync(int actorId, int branchId, bool dentistOnly, CancellationToken ct)
+    public async Task<bool> BranchAsync(int actorId, int branchId, bool dentistOnly, CancellationToken ct, string? permission = null)
     {
-        await settingsAccess.OperationalAsync(actorId,dentistOnly ? "examinations.manage" : "examinations.read",branchId,ct);
+        await settingsAccess.OperationalAsync(actorId,permission ?? (dentistOnly ? "examinations.manage" : "examinations.read"),branchId,ct);
         var u = await users.FindByIdAsync(actorId.ToString());
         if (u == null || !u.IsActive || u.LockoutEnabled && u.LockoutEnd > clock.GetUtcNow()) throw Error("MSG07", 401);
         var roles = AccountRoles.Effective(await users.GetRolesAsync(u));
@@ -27,10 +27,10 @@ public sealed class ClinicalAccess(DcmsDbContext db, UserManager<ApplicationUser
             select m).AnyAsync(ct)) throw Error("MSG06", 403);
         return dentist && await db.Set<SchedulingMember>().AnyAsync(x => x.EmployeeId == e.Id && x.BranchId == branchId && x.Active && x.CanDentist, ct);
     }
-    public async Task<Visit> VisitAsync(int actorId, Guid id, bool dentistOnly, CancellationToken ct)
+    public async Task<Visit> VisitAsync(int actorId, Guid id, bool dentistOnly, CancellationToken ct, string? permission = null)
     {
         var v = await db.Visits.SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw Error("MSG113", 404);
-        await BranchAsync(actorId, v.BranchId, dentistOnly, ct);
+        await BranchAsync(actorId, v.BranchId, dentistOnly, ct, permission);
         if (dentistOnly && !await db.Employees.AnyAsync(x => x.Id == v.DentistId && x.AccountId == actorId, ct)) throw Error("MSG06", 403);
         return v;
     }

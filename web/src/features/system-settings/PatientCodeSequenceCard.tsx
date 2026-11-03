@@ -1,3 +1,4 @@
+import { usePermissions } from '../authentication/usePermissions';
 import { Alert, Button, Descriptions, Form, Input, InputNumber, List, Modal, Space, Typography, message } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { api, ApiError } from '../../services/api';
@@ -7,6 +8,7 @@ const base = '/api/system-settings/settings/patient-code-sequence';
 
 // DCMS-122 / SET-AT-08: the next number is shown for information only (no reservation) and can only move forward.
 export default function PatientCodeSequenceCard({ revision }: { revision: number }) {
+  const has = usePermissions();
   const [data, setData] = useState<PatientCodeSequence | null>(null), [loadError, setLoadError] = useState<string>();
   const [open, setOpen] = useState(false), [next, setNext] = useState<number | null>(null), [reason, setReason] = useState('');
   const [preview, setPreview] = useState<PatientCodeSequencePreview | null>(null), [busy, setBusy] = useState(false), [error, setError] = useState<ApiError>();
@@ -67,19 +69,19 @@ export default function PatientCodeSequenceCard({ revision }: { revision: number
           { key: 'max', label: `Số lớn nhất đang có (${data.prefix || 'không tiền tố'})`, children: data.highestExisting ?? '—' },
         ]} />
         <Typography.Text type="secondary">Chỉ để xem, không giữ chỗ mã. Mã đã tồn tại (kể cả nhập tay) được bỏ qua khi cấp.</Typography.Text>
-        <Button onClick={start}>Đổi số tiếp theo</Button>
+        <Button disabled={!has('settings.general.manage')} onClick={start}>Đổi số tiếp theo</Button>
       </Space>}
 
     <Modal open={open} title="Đổi số tiếp theo của mã bệnh nhân" okText="Lưu" cancelText="Hủy" confirmLoading={busy} closable={!busy}
       cancelButtonProps={{ disabled: busy }} okButtonProps={{ disabled: !preview?.allowed || preview.stale || !reason.trim() }}
       onCancel={() => { if (!busy) setOpen(false); }} onOk={() => void save()}>
-      {data && <Form layout="vertical" disabled={busy}>
+      {data && <Form layout="vertical" disabled={busy || !has('settings.general.manage')}>
         {error && <Alert className="form-alert" type="error" showIcon message={error.message} />}
         <Form.Item label="Số tiếp theo mới" required validateStatus={tooLow ? 'error' : undefined}
           help={tooLow ? `Chỉ được tăng: phải lớn hơn ${data.nextNumber}.` : `Hiện tại: ${data.nextNumber}`}>
           <Space.Compact>
             <InputNumber min={1} precision={0} style={{ width: 200 }} value={next} onChange={v => { setNext(v); setPreview(null); }} />
-            <Button disabled={next == null || tooLow} onClick={() => void check()}>Xem trước</Button>
+            <Button disabled={!has('settings.general.manage') || next == null || tooLow} onClick={() => void check()}>Xem trước</Button>
           </Space.Compact>
         </Form.Item>
         {preview?.stale && <Alert className="form-alert" type="warning" showIcon message="Số tiếp theo vừa thay đổi (có hồ sơ mới hoặc người khác vừa sửa). Đọc lại rồi xem trước lần nữa."

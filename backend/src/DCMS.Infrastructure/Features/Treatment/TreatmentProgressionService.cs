@@ -17,7 +17,7 @@ namespace DCMS.Infrastructure.Features.Treatment;
 public sealed class TreatmentProgressionService(DcmsDbContext db, UserManager<ApplicationUser> users,
     ITreatmentActualEvidencePort actual, ITreatmentLabReadinessPort lab,
     ITreatmentVisitActivitySourcePort visitActivity, ITreatmentDentistCapabilityPort capabilities,
-    TimeProvider clock)
+    TimeProvider clock, DCMS.Application.Features.Settings.ISettingsAccess access)
     : ITreatmentProgressionService
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
@@ -30,6 +30,8 @@ public sealed class TreatmentProgressionService(DcmsDbContext db, UserManager<Ap
 
     private async Task DentistAsync(int actorId, int branchId, CancellationToken ct)
     {
+        var scope = await access.ResolveAsync(actorId, ct);
+        if (scope.Assigned && !scope.Owner && !scope.BranchIds.Contains(branchId)) throw Error("MSG06", 403);
         var account = await users.FindByIdAsync(actorId.ToString());
         if (account == null || !account.IsActive || account.AccountType != "Staff" ||
             !AccountRoles.Effective(await users.GetRolesAsync(account)).Contains(AccountRoles.Dentist))
@@ -545,6 +547,8 @@ public sealed class TreatmentProgressionService(DcmsDbContext db, UserManager<Ap
         if (employee == null) throw Error("MSG06", 403);
         var branches = db.Set<SchedulingMember>().AsNoTracking().Where(x => x.EmployeeId == employee.Id
             && x.Active && x.CanDentist).Select(x => x.BranchId);
+        var scope = await access.ResolveAsync(actorId, ct);
+        if (scope.Assigned && !scope.Owner) branches = branches.Where(branch => scope.BranchIds.Contains(branch));
         var rows = await db.FollowUpInstructions.AsNoTracking().Where(x => x.PatientId == patientId
             && branches.Contains(x.BranchId)).OrderBy(x => x.TargetOn).ThenBy(x => x.Id).ToListAsync(ct);
         return rows.Select(FollowUpDto).ToArray();
