@@ -26,8 +26,8 @@ public sealed class MaterialPurchaseApiTests(ApiFixture fixture) : IClassFixture
         var r = await c.PostAsJsonAsync("/api/system-settings/materials", new CreateMaterialRequest(name ?? Unique("SYNTHETIC material "), group.Id, Guid.NewGuid()));
         Assert.True(r.IsSuccessStatusCode, await r.Content.ReadAsStringAsync()); return (await r.Content.ReadFromJsonAsync<MaterialDto>())!;
     }
-    private static CreateMaterialPurchaseRequest Create(Guid material, decimal quantity = 2, long price = 150_000, long paid = 0, DateOnly? entered = null, DateOnly? received = null, string unit = "hộp", Guid? key = null) =>
-        new(entered ?? Today, received, material, quantity, unit, price, paid, key ?? Guid.NewGuid());
+    private static CreateMaterialPurchaseRequest Create(Guid material, decimal quantity = 2, long price = 150_000, long paid = 0, DateOnly? entered = null, DateOnly? received = null, string unit = "hộp", Guid? key = null, DateOnly? expires = null) =>
+        new(entered ?? Today, received, expires, material, quantity, unit, price, paid, key ?? Guid.NewGuid());
     private static async Task<string> Body(HttpResponseMessage r) => await r.Content.ReadAsStringAsync();
 
     [Fact]
@@ -57,6 +57,9 @@ public sealed class MaterialPurchaseApiTests(ApiFixture fixture) : IClassFixture
         await Expect(Create(material.Id, entered: Today.AddDays(1)), "PURCHASE_DATE_INVALID", "enteredOn");
         await Expect(Create(material.Id, entered: Today, received: Today.AddDays(-1)), "PURCHASE_DATE_INVALID", "receivedOn");
         await Expect(Create(material.Id, received: Today.AddDays(1)), "PURCHASE_DATE_INVALID", "receivedOn");
+        await Expect(Create(material.Id, entered: Today, expires: Today.AddDays(-1)), "PURCHASE_DATE_INVALID", "expiresOn");
+        Assert.Equal(HttpStatusCode.Created, (await c.PostAsJsonAsync(Purchases, Create(material.Id, expires: Today.AddYears(3)))).StatusCode);
+        Assert.Equal(HttpStatusCode.Created, (await c.PostAsJsonAsync(Purchases, Create(material.Id, expires: Today))).StatusCode);
         await Expect(Create(material.Id, quantity: 0), "", "quantity");
         await Expect(Create(material.Id, quantity: -1), "", "quantity");
         await Expect(Create(material.Id, quantity: 1.2345m), "", "quantity");
@@ -75,9 +78,9 @@ public sealed class MaterialPurchaseApiTests(ApiFixture fixture) : IClassFixture
         var replay = (await (await c.PostAsJsonAsync(Purchases, request)).Content.ReadFromJsonAsync<MaterialPurchaseDto>())!;
         Assert.Equal(created.Id, replay.Id);
         Assert.Equal(HttpStatusCode.Conflict, (await c.PostAsJsonAsync(Purchases, request with { Quantity = 3 })).StatusCode);
-        var update = new UpdateMaterialPurchaseRequest(Today, null, other.Id, 4, "lọ", 50_000, 200_000, created.Version, Guid.NewGuid());
+        var update = new UpdateMaterialPurchaseRequest(Today, null, Today.AddYears(2), other.Id, 4, "lọ", 50_000, 200_000, created.Version, Guid.NewGuid());
         var updated = (await (await c.PutAsJsonAsync($"{Purchases}/{created.Id}", update)).Content.ReadFromJsonAsync<MaterialPurchaseDto>())!;
-        Assert.Equal(2, updated.Version); Assert.Equal(200_000, updated.TotalVnd); Assert.Equal(0, updated.DueVnd); Assert.Equal(other.Name, updated.MaterialName);
+        Assert.Equal(Today.AddYears(2), updated.ExpiresOn); Assert.Equal(2, updated.Version); Assert.Equal(200_000, updated.TotalVnd); Assert.Equal(0, updated.DueVnd); Assert.Equal(other.Name, updated.MaterialName);
         Assert.Equal(HttpStatusCode.Conflict, (await c.PutAsJsonAsync($"{Purchases}/{created.Id}", update with { RequestKey = Guid.NewGuid() })).StatusCode);
         var staleDelete = await c.SendAsync(new HttpRequestMessage(HttpMethod.Delete, $"{Purchases}/{created.Id}") { Content = JsonContent.Create(new DeleteCatalogRequest(1, Guid.NewGuid())) });
         Assert.Equal(HttpStatusCode.Conflict, staleDelete.StatusCode);
