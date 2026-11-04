@@ -1,0 +1,12 @@
+{
+  "categories": [
+    { "name": "Implant", "items": [ "Trụ implant", "Abutment", "Trụ lành thương (healing abutment)", "Vít bít (cover screw)" ] },
+    { "name": "Phẫu thuật và ghép xương", "items": [ "Xương ghép", "Màng ghép", "Chỉ khâu tiêu", "Chỉ khâu không tiêu" ] },
+    { "name": "Chỉnh nha (niềng răng)", "items": [ "Vít chỉnh nha (mini-implant)", "Keo dán mắc cài" ] },
+    { "name": "Vật liệu trám", "items": [ "Composite A1", "Composite A2", "Composite A3", "Composite A3.5", "Keo dán (bonding)", "Glass ionomer (GIC)" ] },
+    { "name": "Xi măng gắn", "items": [ "Xi măng nhựa" ] },
+    { "name": "Nội nha", "items": [ "Chất trám bít ống tủy (sealer)" ] },
+    { "name": "Lấy dấu", "items": [ "Silicone lấy dấu" ] },
+    { "name": "Tẩy trắng", "items": [ "Gel tẩy trắng tại phòng khám", "Gel tẩy trắng tại nhà" ] }
+  ]
+}

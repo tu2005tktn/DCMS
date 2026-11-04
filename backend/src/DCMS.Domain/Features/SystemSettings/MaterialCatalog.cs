@@ -22,6 +22,28 @@ public sealed class MaterialCatalogItem
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
 }
+// Purchase log row (docs/specs/MATERIAL-PURCHASES.md). Name snapshots keep history stable when the catalog changes.
+public sealed class MaterialPurchase
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid MaterialId { get; set; }
+    public MaterialCatalogItem Material { get; set; } = null!;
+    public string MaterialName { get; set; } = "";
+    public string CategoryName { get; set; } = "";
+    public DateOnly EnteredOn { get; set; }
+    public DateOnly? ReceivedOn { get; set; }
+    public decimal Quantity { get; set; }
+    public string Unit { get; set; } = "";
+    public long UnitPriceVnd { get; set; }
+    public long TotalVnd { get; set; }
+    public long PaidVnd { get; set; }
+    public int Version { get; set; } = 1;
+    public bool IsDeleted { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+    public int CreatedBy { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; }
+    public int UpdatedBy { get; set; }
+}
 public sealed class SystemCatalogChange
 {
     public Guid RequestKey { get; set; }

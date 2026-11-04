@@ -19,6 +19,14 @@ internal static class SystemSettingsModel
             b.HasOne(x => x.Category).WithMany().HasForeignKey(x => x.CategoryId).OnDelete(DeleteBehavior.Restrict);
             b.HasIndex(x => new { x.CategoryId, x.NormalizedName }).IsUnique().HasFilter("NOT \"IsDeleted\"");
         });
+        model.Entity<MaterialPurchase>(b => {
+            b.ToTable("MATERIAL_PURCHASE"); b.HasKey(x => x.Id);
+            b.Property(x => x.MaterialName).HasMaxLength(160); b.Property(x => x.CategoryName).HasMaxLength(160);
+            b.Property(x => x.Quantity).HasPrecision(12, 3); b.Property(x => x.Unit).HasMaxLength(40);
+            b.Property(x => x.Version).IsConcurrencyToken();
+            b.HasOne(x => x.Material).WithMany().HasForeignKey(x => x.MaterialId).OnDelete(DeleteBehavior.Restrict);
+            b.HasIndex(x => new { x.EnteredOn, x.Id }).HasFilter("NOT \"IsDeleted\"");
+        });
         model.Entity<SystemCatalogChange>(b => {
             b.ToTable("SYSTEM_CATALOG_CHANGE"); b.HasKey(x => x.RequestKey); b.Property(x => x.RequestKey).ValueGeneratedNever();
             b.Property(x => x.Command).HasMaxLength(48); b.Property(x => x.Fingerprint).HasMaxLength(64);

@@ -33,6 +33,14 @@ public static class SystemSettingsEndpoints
         items.MapPost("/", async (HttpContext c, CreateMaterialRequest r, ISystemCatalogService s, CancellationToken ct) => { var result = await s.CreateMaterialAsync(AuthenticationEndpoints.AccountId(c.User), r, ct); return Results.Created($"/api/system-settings/materials/{result.Id}", result); });
         items.MapPut("/{id:guid}", async (HttpContext c, Guid id, UpdateMaterialRequest r, ISystemCatalogService s, CancellationToken ct) => Results.Ok(await s.UpdateMaterialAsync(AuthenticationEndpoints.AccountId(c.User), id, r, ct)));
         items.MapDelete("/{id:guid}", async (HttpContext c, Guid id, [FromBody] DeleteCatalogRequest r, ISystemCatalogService s, CancellationToken ct) => Results.Ok(await s.DeleteMaterialAsync(AuthenticationEndpoints.AccountId(c.User), id, r, ct)));
+        // Purchase log (docs/specs/MATERIAL-PURCHASES.md); the service checks the catalog.materials.* permission per command.
+        var purchases = app.MapGroup("/api/system-settings/material-purchases").RequireAuthorization().WithTags("System settings");
+        purchases.MapGet("/", async (HttpContext c, string? q, DateOnly? from, DateOnly? to, string? payment, int? page, int? pageSize, IMaterialPurchaseService s, CancellationToken ct) =>
+            Results.Ok(await s.ListAsync(AuthenticationEndpoints.AccountId(c.User), q, from, to, payment, page ?? 1, pageSize ?? 20, ct)));
+        purchases.MapGet("/{id:guid}", async (HttpContext c, Guid id, IMaterialPurchaseService s, CancellationToken ct) => Results.Ok(await s.GetAsync(AuthenticationEndpoints.AccountId(c.User), id, ct)));
+        purchases.MapPost("/", async (HttpContext c, CreateMaterialPurchaseRequest r, IMaterialPurchaseService s, CancellationToken ct) => { var result = await s.CreateAsync(AuthenticationEndpoints.AccountId(c.User), r, ct); return Results.Created($"/api/system-settings/material-purchases/{result.Id}", result); });
+        purchases.MapPut("/{id:guid}", async (HttpContext c, Guid id, UpdateMaterialPurchaseRequest r, IMaterialPurchaseService s, CancellationToken ct) => Results.Ok(await s.UpdateAsync(AuthenticationEndpoints.AccountId(c.User), id, r, ct)));
+        purchases.MapDelete("/{id:guid}", async (HttpContext c, Guid id, [FromBody] DeleteCatalogRequest r, IMaterialPurchaseService s, CancellationToken ct) => Results.Ok(await s.DeleteAsync(AuthenticationEndpoints.AccountId(c.User), id, r, ct)));
         // S58 Thiết lập chung (docs/specs/S58-GENERAL-SETTINGS.md); the service checks the ClinicOwner role on every request.
         var settings = app.MapGroup("/api/system-settings/settings").RequireAuthorization().WithTags("S58 Settings");
         settings.MapGet("/capabilities", async (HttpContext c, IGeneralSettingsService s, CancellationToken ct) => Results.Ok(await s.CapabilitiesAsync(AuthenticationEndpoints.AccountId(c.User), ct)));

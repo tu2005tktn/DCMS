@@ -11,6 +11,7 @@ import { Link, Navigate, Route, Routes } from 'react-router-dom';
 import { useAuth } from '../features/authentication/AuthContext';
 import SignInPage from '../features/authentication/SignInPage';
 import SystemSettingsPage from '../features/system-settings/SystemSettingsPage';
+import MaterialsPage from '../features/system-settings/MaterialsPage';
 import AccountsPage from '../features/accounts/AccountsPage';
 import WorkingSchedulesPage from '../features/working-schedules/WorkingSchedulesPage';
 import BookingSettingsPage from '../features/working-schedules/BookingSettingsPage';
@@ -64,6 +65,7 @@ export default function App() {
     </Route>
     <Route element={<Protected><Workspace /></Protected>}>
       <Route path="system-settings" element={<Protected permission="settings.read"><SystemSettingsPage /></Protected>} />
+      <Route path="materials" element={<Protected permission="catalog.materials.read"><MaterialsPage /></Protected>} />
       <Route path="payments" element={<Protected permission="finance.read"><PaymentsPage /></Protected>} />
       <Route path="visits/:visitId/payments" element={<Protected permission="finance.read"><PaymentsPage /></Protected>} />
       <Route path="visits/:visitId/prescription" element={<Protected permission="prescriptions.read"><PrescriptionPage /></Protected>} />

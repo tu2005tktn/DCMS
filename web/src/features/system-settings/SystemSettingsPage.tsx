@@ -136,9 +136,10 @@ function MaterialCatalog() {
   if (!allowed) return <Result status="403" title="Bạn không có quyền thực hiện thao tác này." extra={<Link to="/">Về trang chủ</Link>} />;
   const options = categories?.map(c => ({value:c.id,label:c.name})) ?? [];
   const itemMode = kind === 'materials';
+  const tabItems = [{key:'materials',label:'Dụng cụ / Vật liệu'},{key:'material-categories',label:'Danh mục'}];
   return <div>
     <Typography.Paragraph type="secondary">Danh mục dụng cụ và vật liệu dùng chung cho các chi nhánh.</Typography.Paragraph>
-    <Card><Tabs activeKey={kind} onChange={tab} items={[{key:'materials',label:'Dụng cụ / Vật liệu'},{key:'material-categories',label:'Danh mục'}]} />
+    <Card><Tabs activeKey={kind} onChange={tab} items={tabItems} />
       <div className="system-settings-toolbar">
         <Input.Search aria-label="Tìm kiếm theo tên" placeholder="Tìm kiếm theo tên" maxLength={160} allowClear value={search}
           onChange={e => { setSearch(e.target.value); if (!e.target.value) {setQuery('');setPage(1);} }} onSearch={v => {setQuery(v.trim());setPage(1);}} />

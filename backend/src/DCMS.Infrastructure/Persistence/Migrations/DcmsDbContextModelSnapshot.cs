@@ -3481,6 +3481,78 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.ToTable("MATERIAL_CATALOG_ITEM", (string)null);
                 });
 
+            modelBuilder.Entity("DCMS.Domain.Features.SystemSettings.MaterialPurchase", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CategoryName")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("CreatedBy")
+                        .HasColumnType("integer");
+
+                    b.Property<DateOnly>("EnteredOn")
+                        .HasColumnType("date");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("MaterialId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("MaterialName")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
+                    b.Property<long>("PaidVnd")
+                        .HasColumnType("bigint");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(12, 3)
+                        .HasColumnType("numeric(12,3)");
+
+                    b.Property<DateOnly?>("ReceivedOn")
+                        .HasColumnType("date");
+
+                    b.Property<long>("TotalVnd")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<long>("UnitPriceVnd")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("UpdatedBy")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MaterialId");
+
+                    b.HasIndex("EnteredOn", "Id")
+                        .HasFilter("NOT \"IsDeleted\"");
+
+                    b.ToTable("MATERIAL_PURCHASE", (string)null);
+                });
+
             modelBuilder.Entity("DCMS.Domain.Features.SystemSettings.MaterialCategory", b =>
                 {
                     b.Property<Guid>("Id")
@@ -6429,6 +6501,17 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("Category");
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.SystemSettings.MaterialPurchase", b =>
+                {
+                    b.HasOne("DCMS.Domain.Features.SystemSettings.MaterialCatalogItem", "Material")
+                        .WithMany()
+                        .HasForeignKey("MaterialId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Material");
                 });
 
             modelBuilder.Entity("DCMS.Domain.Features.Treatment.CareContactAttempt", b =>
