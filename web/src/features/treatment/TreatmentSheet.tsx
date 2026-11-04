@@ -1,5 +1,6 @@
 import { usePermissions } from '../authentication/usePermissions';
-import { Alert, Button, Dropdown, Input, Modal, Pagination, Skeleton } from 'antd';
+import { Alert, Button, Dropdown, Input, Modal, Pagination, Skeleton, Tooltip } from 'antd';
+import { ToolOutlined } from '@ant-design/icons';
 import { useEffect, useRef, useState } from 'react';
 import PatientImageGallery from '../clinical-documents/PatientImageGallery';
 import { Link } from 'react-router-dom';
@@ -9,6 +10,7 @@ import { money } from './types';
 import TreatmentSheetDraftRow, { type SheetActualPreview } from './TreatmentSheetDraftForms';
 import DossierFinancialPanel from './DossierFinancialPanel';
 import ApplyItemPlanModal from './ApplyItemPlanModal';
+import MaterialNotePicker from './MaterialNotePicker';
 import type { ActivityPage, PaymentContext, SheetActivity, SheetContext } from './sheetTypes';
 
 type Draft = { id: string; kind: 'Plan' | 'Actual'; row: SheetActualPreview; version: number };
@@ -38,6 +40,8 @@ export default function TreatmentSheet({ patientId, dossierId, dossierVersion, o
   const noteDirty = useRef(false), noteSaved = useRef('');
   const noteKey = useRef<{ text: string; key: string; version: number } | null>(null);
   const refresh = () => setReload(v => v + 1);
+  const [materialFor, setMaterialFor] = useState<SheetActivity | null>(null);
+  const materialKey = useRef<{ payload: string; key: string } | null>(null);
   async function load() {
     const [value, ctx, rows] = await Promise.all([api<TreatmentDossier>(`/api/dossiers/${dossierId}`),
       api<SheetContext>(`/api/dossiers/${dossierId}/sheet-context`), api<Draft[]>(`/api/dossiers/${dossierId}/sheet-drafts`)]);
@@ -162,14 +166,26 @@ export default function TreatmentSheet({ patientId, dossierId, dossierVersion, o
     } catch (e) { setCopyError({ message: (e as Error).message, stale: true }); }
     finally { actionGuard.current = false; setBusy(false); }
   }
-  function editActivity(activity: SheetActivity) {
-    setEditor({ kind: 'actual', activity, row: { id: activity.id, serviceId: activity.serviceId,
+  // Saves the picked materials straight into the note of a saved activity (same PUT as editing a row).
+  async function saveMaterials(activity: SheetActivity, note: string) {
+    if (!dossier) throw new Error('Chưa tải được phiếu.');
+    const row = { ...activityRow(activity), note };
+    const payload = JSON.stringify({ id: activity.id, note });
+    if (materialKey.current?.payload !== payload) materialKey.current = { payload, key: crypto.randomUUID() };
+    await api(`/api/dossiers/${dossierId}/sheet-activities/${activity.id}`, { method: 'PUT', body: JSON.stringify({ row,
+      expectedVersion: dossier.version, expectedActivityVersion: activity.version,
+      expectedSheetVersion: activity.sheetVersion ?? 0, requestKey: materialKey.current.key }) });
+    materialKey.current = null; setMaterialFor(null); refresh();
+  }
+  function editActivity(activity: SheetActivity) { setEditor({ kind: 'actual', activity, row: activityRow(activity) }); }
+  function activityRow(activity: SheetActivity): SheetActualPreview {
+    return { id: activity.id, serviceId: activity.serviceId,
       serviceName: activity.serviceNameSnapshot ?? '', date: new Intl.DateTimeFormat('sv-SE', {timeZone:'Asia/Ho_Chi_Minh'}).format(new Date(activity.performedAt)),
       regions: (activity.region ?? '').split(/[,;\s]+/).filter(Boolean), quantity: activity.quantity,
       dentistId: activity.performerId, dentistName: '', assistantId: activity.assistantId, note: activity.outcome,
       labWork: activity.labWorkSnapshot, costVnd: Math.round(activity.quantity * activity.priceSnapshotVnd),
       unitPriceVnd: activity.priceSnapshotVnd, discountType: activity.sheetDiscountType === 'Percent' ? 'Percent' : 'VND',
-      discountValue: activity.sheetDiscountValue ?? activity.discountSnapshotVnd ?? 0, discountNote: activity.sheetDiscountReason } });
+      discountValue: activity.sheetDiscountValue ?? activity.discountSnapshotVnd ?? 0, discountNote: activity.sheetDiscountReason };
   }
   function beginTransfer(item: TreatmentItem) {
     const existing = activities?.items.find(a => a.itemId === item.id && a.sourceKind === 'Dossier');
@@ -247,7 +263,9 @@ export default function TreatmentSheet({ patientId, dossierId, dossierVersion, o
     <section><div className="treatment-sheet-band"><h3>QUÁ TRÌNH ĐIỀU TRỊ/DỊCH VỤ</h3></div>
       {activityError && <Alert type="error" message={activityError} action={<Button onClick={refresh}>Thử lại</Button>} />}
       <div className="treatment-sheet-table-scroll"><table className="treatment-sheet-table treatment-sheet-actual-table"><thead><tr><th>Ngày</th><th>Răng</th><th>Điều trị/dịch vụ</th><th>Ghi chú</th><th>Bác sĩ & phụ tá</th><th>Labo</th><th>Chi phí</th><th>Giảm giá</th><th>Đã trả</th><th /></tr></thead><tbody>
-        {activities?.items.filter(a => a.id !== editor?.activity?.id).map(a => <tr key={a.id}><td>{date(a.performedAt)}</td><td>{a.region || '—'}</td><td>{a.serviceNameSnapshot ?? dossier.items.find(i => i.id === a.itemId)?.serviceName ?? context.services.find(s => s.id === a.serviceId)?.name ?? 'Dịch vụ đã lưu'}</td><td>{a.outcome || '—'}</td>
+        {activities?.items.filter(a => a.id !== editor?.activity?.id).map(a => <tr key={a.id}><td>{date(a.performedAt)}</td><td>{a.region || '—'}</td><td>{a.serviceNameSnapshot ?? dossier.items.find(i => i.id === a.itemId)?.serviceName ?? context.services.find(s => s.id === a.serviceId)?.name ?? 'Dịch vụ đã lưu'}</td><td><div className="treatment-sheet-note-input"><span>{a.outcome || '—'}</span>
+            <Tooltip title="Chọn vật liệu dùng"><Button className="material-note-trigger" type="text" size="small" icon={<ToolOutlined />} aria-label={`Chọn vật liệu dùng cho ${a.serviceNameSnapshot ?? 'điều trị'}`}
+              disabled={!has('treatment.actuals.update') || !canWrite || busy || !!editor} onClick={() => setMaterialFor(a)} /></Tooltip></div></td>
           <td>{member(a.performerId)}<small>{member(a.assistantId)}</small></td><td>{a.labWorkSnapshot || '—'}</td><td>{money(Math.round(a.quantity*a.priceSnapshotVnd))}<small>{fees[a.feeStatus] ?? a.feeStatus}</small></td><td>{money(a.discountSnapshotVnd ?? 0)}</td>
           <td>{money(payments?.lines.find(l => l.activityId === a.id)?.paidVnd ?? 0)}</td>
           <td><div className="treatment-sheet-edit-actions"><Button size="small" title="Sửa" aria-label={`Sửa quá trình ${a.serviceNameSnapshot ?? 'điều trị'}`} disabled={!has('treatment.actuals.update') || !canWrite || busy || !!editor} onClick={() => editActivity(a)}>✎</Button>
@@ -267,6 +285,8 @@ export default function TreatmentSheet({ patientId, dossierId, dossierVersion, o
     <Modal open={!!deleting} title="Bạn có muốn xóa dòng này không?" okText="Đồng ý" cancelText="Không đồng ý" confirmLoading={busy}
       closable={!busy} cancelButtonProps={{ disabled: busy }} onCancel={() => setDeleting(null)} onOk={() => { if (deleting) void act(deleting,'delete').then(ok => { if (ok) setDeleting(null); }); }}>
       <p>{deleting?.serviceName}</p>{error && <Alert type="error" message={error} />}</Modal>
+    {materialFor && <MaterialNotePicker note={materialFor.outcome ?? ''} onCancel={() => { materialKey.current = null; setMaterialFor(null); }}
+      onApply={value => saveMaterials(materialFor, value)} />}
     {selectPlan && <ApplyItemPlanModal branchId={dossier.branchId} dossierId={dossierId} version={dossier.version} onReload={reloadSource} onClose={() => setSelectPlan(false)} onApplied={() => { setSelectPlan(false); refresh(); }} />}
     <Modal open={!!deletingActivity} title="Bạn có muốn xóa dòng này không?" okText="Đồng ý" cancelText="Không đồng ý" confirmLoading={busy}
       closable={!busy} cancelButtonProps={{disabled:busy}} onCancel={() => setDeletingActivity(null)} onOk={() => { if (deletingActivity) void deleteActivity(deletingActivity).then(ok => { if (ok) setDeletingActivity(null); }); }}>

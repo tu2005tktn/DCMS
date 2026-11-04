@@ -39,6 +39,14 @@ Thêm route, nav và Dashboard shortcut Người thân của tôi; CRUD tên/qua
 - Giữ trạng thái tải, chưa đủ bộ lọc, không có slot và lỗi kết nối với hướng xử lý rõ. Khi slot bị tranh, giữ thông tin đã nhập, tải lại giờ và yêu cầu chọn giờ mới. Việc chọn giờ vẫn giữ nguyên requestKey/payload và kiểm tra server hiện có.
 - Mockup là tham chiếu bố cục, không phải dữ liệu lịch thực và không mở thêm chức năng hoặc route. Chỉ thay giao diện Web bệnh nhân; không sửa backend, API, quyền hay màn hình nhân viên.
 
+### Rà soát UX bằng `ui-ux-pro-max` (19/10/2026)
+
+- Giữ hệ màu xanh DCMS, Inter và bố cục đặt lịch đang dùng. Các gợi ý quảng bá như carousel lời chứng thực không áp dụng cho cổng bệnh nhân thực hiện giao dịch; không thêm nội dung giả hoặc đổi API.
+- Ở bước chọn lịch, ngay cạnh ô ngày hiển thị rõ ngày đã chọn theo `ngày/tháng/năm` và ghi “Giờ Việt Nam”. Ô chọn ngày vẫn giữ thao tác lịch quen thuộc; phần tóm tắt và giờ hẹn dùng cùng định dạng địa phương.
+- Ở bước thông tin người đặt/người khám, khi bấm tiếp tục mà dữ liệu chưa hợp lệ, hiển thị một vùng tóm tắt lỗi ở đầu bước, chuyển focus tới vùng này, có liên kết về từng trường lỗi và vẫn giữ lỗi ngay cạnh trường. Khi người dùng sửa trường, lỗi tương ứng được xóa; dữ liệu nhập không bị mất.
+- Trên biểu mẫu đăng nhập và đăng ký bệnh nhân, lỗi kiểm tra nhiều trường cũng được tóm tắt ở đầu biểu mẫu, có liên kết tới trường cần sửa và chuyển focus tới tóm tắt sau khi gửi. Lỗi từng trường của Ant Design và dữ liệu đã nhập được giữ nguyên. Điều này không áp dụng cho cổng nhân viên.
+- Trên màn hình nhỏ, tiến trình đặt lịch vẫn nêu rõ bước hiện tại trong tổng số 5 bước và có thanh tiến độ nhìn thấy được. Mọi trạng thái lỗi và tiến độ phải có chữ, không chỉ dựa vào màu. Kiểm tra bàn phím và bố cục tại 320, 390, 768 và 1440 px.
+
 - Dùng xanh `#175CD3`, chữ `#17233D`, nền `#F4F7FB`, nền nhấn `#EAF2FF`, thành công `#15803D`, lỗi `#B42318`. Nhãn trường, nút chính, trạng thái chọn, focus, thông báo và khoảng cách nhất quán. Modal Ant Design cần class riêng vì được render ngoài cây `.customer-portal`.
 - Ở khoảng 390, 768 và 1440 px: không tràn ngang, điều hướng và hành động chính còn nhìn thấy/dùng được. Focus rõ; thao tác bàn phím, phóng to 200%, reduced motion và vùng bấm khoảng 44 px. Không chỉ dùng màu để biểu thị trạng thái.
 - Playwright dùng API giả lập để xác nhận người chưa đăng nhập không vào được `/customer/book`, tài khoản Public đã đăng nhập đặt lịch được, cùng các ca slot rỗng/bị tranh, lỗi mạng, lịch hẹn, đổi/hủy/yêu cầu hỗ trợ và liên kết hồ sơ. Build Web và kiểm tra hồi quy `/sign-in` nhân viên. Không tạo dữ liệu thử trong database dự án.

@@ -28,7 +28,11 @@ public sealed class GoogleAuthenticationService(
         }
 
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
-        // Google subject identifies this account; a matching email never grants access to another account.
+        // A new Google identity must not claim or duplicate an email already used by another account.
+        if (await users.FindByEmailAsync(identity.Email) != null)
+            throw new BusinessException(409, new SystemMessage("GOOGLE_EMAIL_EXISTS",
+                "Email này đã có tài khoản. Vui lòng đăng nhập bằng phương thức đã đăng ký hoặc chọn tài khoản Google khác."));
+
         if (!await roles.RoleExistsAsync(AccountRoles.Guest))
             throw new BusinessException(503, SystemMessages.Get("MSG144"));
 

@@ -61,7 +61,7 @@ function quantityText(value: string | null) {
 }
 
 export default function MaterialNotePicker({ note, onApply, onCancel }: {
-  note: string; onApply: (note: string) => void; onCancel: () => void;
+  note: string; onApply: (note: string) => void | Promise<void>; onCancel: () => void;
 }) {
   const [lines, setLines] = useState<Line[]>(() => [blank()]);
   const [error, setError] = useState<string>(), [errors, setErrors] = useState<Record<string,string>>({});
@@ -84,7 +84,9 @@ export default function MaterialNotePicker({ note, onApply, onCancel }: {
     const block = `Vật liệu dùng: ${lines.map(v => `${label(v.material!)} × ${quantityText(v.quantity)}`).join('; ')}.`;
     const combined = note ? `${note}\n\n${block}` : block;
     if (combined.length > 1000) { setError(`Ghi chú sau khi thêm có ${combined.length} ký tự, vượt giới hạn 1.000. Vui lòng giảm nội dung hoặc số vật liệu.`); return; }
-    applied.current = true; onApply(combined);
+    applied.current = true;
+    // Async apply (saved rows) keeps the Modal and selection open on failure so the user can retry.
+    void Promise.resolve(onApply(combined)).catch((e: unknown) => { applied.current = false; setError(e instanceof Error ? e.message : 'Không lưu được vật liệu.'); });
   }
   return <Modal open title="Vật liệu dùng" width={760} className="material-note-modal" okText="Lưu" cancelText="Hủy"
     okButtonProps={{'aria-label':'Lưu vật liệu'}} onOk={submit} onCancel={onCancel} destroyOnClose>
