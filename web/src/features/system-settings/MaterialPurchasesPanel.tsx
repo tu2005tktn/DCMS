@@ -6,24 +6,17 @@ import { clinicToday, formatDate } from '../appointments/types';
 import { useAuth } from '../authentication/AuthContext';
 
 // Purchase log of materials/instruments. Rules and API: docs/specs/MATERIAL-PURCHASES.md.
-type Purchase = { id: string; enteredOn: string; receivedOn: string | null; expiresOn: string | null; materialId: string; materialName: string; categoryName: string;
+type Purchase = { id: string; enteredOn: string; receivedOn: string | null; materialId: string; materialName: string; categoryName: string;
   quantity: number; unit: string; unitPriceVnd: number; totalVnd: number; paidVnd: number; dueVnd: number; version: number };
 type Totals = { totalVnd: number; paidVnd: number; dueVnd: number };
 type PurchasePage = { items: Purchase[]; total: number; page: number; pageSize: number; totals: Totals };
 type Material = { id: string; name: string; categoryName: string };
-type Values = { enteredOn: string; receivedOn?: string; expiresOn?: string; materialId?: string; quantity?: number; unit?: string; unitPriceVnd?: number; paidVnd?: number };
+type Values = { enteredOn: string; receivedOn?: string; materialId?: string; quantity?: number; unit?: string; unitPriceVnd?: number; paidVnd?: number };
 const base = '/api/system-settings';
 const vnd = (n: number) => `${n.toLocaleString('vi-VN')} ₫`;
 const units = ['cái', 'lọ', 'miếng', 'hộp', 'tuýp', 'chai', 'ống', 'bộ', 'gói', 'túi', 'g', 'mL'].map(value => ({ value }));
 const paymentOptions = [{ value: 'unpaid', label: 'Chưa thanh toán' }, { value: 'partial', label: 'Còn nợ' }, { value: 'paid', label: 'Đã thanh toán đủ' }];
 const paymentTag = (row: Purchase) => row.dueVnd <= 0 ? <Tag color="green">Đã thanh toán đủ</Tag> : row.paidVnd > 0 ? <Tag color="orange">Còn nợ</Tag> : <Tag color="red">Chưa thanh toán</Tag>;
-
-function expiryTag(expiresOn: string | null) {
-  if (!expiresOn) return <span style={{ color: '#667085' }}>—</span>;
-  const today = clinicToday(), limit = new Date(`${today}T00:00:00`); limit.setDate(limit.getDate() + 90);
-  const soon = limit.toLocaleDateString('sv-SE');
-  return <>{formatDate(expiresOn)}{expiresOn < today ? <><br /><Tag color="red">Hết hạn</Tag></> : expiresOn <= soon ? <><br /><Tag color="orange">Sắp hết hạn</Tag></> : null}</>;
-}
 
 async function allMaterials() {
   const result: Material[] = [];
@@ -70,14 +63,14 @@ export default function MaterialPurchasesPanel() {
 
   function open(row?: Purchase) {
     pending.current = null; setFormError(undefined); form.resetFields();
-    form.setFieldsValue(row ? { enteredOn: row.enteredOn, receivedOn: row.receivedOn ?? undefined, expiresOn: row.expiresOn ?? undefined, materialId: row.materialId, quantity: row.quantity, unit: row.unit,
+    form.setFieldsValue(row ? { enteredOn: row.enteredOn, receivedOn: row.receivedOn ?? undefined, materialId: row.materialId, quantity: row.quantity, unit: row.unit,
       unitPriceVnd: row.unitPriceVnd, paidVnd: row.paidVnd } : { enteredOn: clinicToday(), quantity: 1, paidVnd: 0 });
     setDialog({ row });
   }
   async function save(values: Values) {
     if (!dialog || guard.current) return;
     guard.current = true; setBusy(true); setFormError(undefined);
-    const body = { enteredOn: values.enteredOn, receivedOn: values.receivedOn || null, expiresOn: values.expiresOn || null, materialId: values.materialId, quantity: values.quantity,
+    const body = { enteredOn: values.enteredOn, receivedOn: values.receivedOn || null, materialId: values.materialId, quantity: values.quantity,
       unit: (values.unit ?? '').trim(), unitPriceVnd: values.unitPriceVnd ?? 0, paidVnd: values.paidVnd ?? 0, ...(dialog.row ? { expectedVersion: dialog.row.version } : {}) };
     const fingerprint = JSON.stringify({ id: dialog.row?.id, body });
     if (pending.current?.body !== fingerprint) pending.current = { body: fingerprint, key: crypto.randomUUID() };
@@ -134,13 +127,12 @@ export default function MaterialPurchasesPanel() {
     {materialError && <Alert type="error" showIcon message={materialError} action={<Button onClick={() => setRevision(v => v + 1)}>Thử lại danh mục</Button>} />}
     {materials?.length === 0 && <Alert type="info" showIcon message="Chưa có dụng cụ/vật liệu trong danh mục. Hãy thêm danh mục trước khi ghi nhập hàng." />}
     {error && <Alert type="error" showIcon message={error} action={<Button onClick={() => setRevision(v => v + 1)}>Thử lại</Button>} />}
-    <Table<Purchase> rowKey="id" size="small" bordered loading={loading} dataSource={data?.items ?? []} scroll={{ x: 1020 }}
+    <Table<Purchase> rowKey="id" size="small" bordered loading={loading} dataSource={data?.items ?? []} scroll={{ x: 900 }}
       locale={{ emptyText: <Empty description="Chưa có lần nhập hàng nào." /> }}
       pagination={{ current: page, pageSize: size, total: data?.total ?? 0, showSizeChanger: true, pageSizeOptions: [20, 50, 100], showTotal: total => `Có ${total} kết quả.`, onChange: (p, s) => { setPage(s !== size ? 1 : p); setSize(s); } }}
       columns={[
         { title: 'Ngày nhập', dataIndex: 'enteredOn', width: 110, render: v => formatDate(v) },
         { title: 'Ngày nhận', dataIndex: 'receivedOn', width: 110, render: v => v ? formatDate(v) : <span style={{ color: '#667085' }}>Chưa nhận</span> },
-        { title: 'Hạn dùng', dataIndex: 'expiresOn', width: 120, render: v => expiryTag(v) },
         { title: 'Tên dụng cụ/vật liệu', key: 'name', render: (_v, r) => <>{r.materialName} <small style={{ color: '#667085' }}>· {r.categoryName}</small></> },
         { title: 'SL', key: 'quantity', width: 100, align: 'right', render: (_v, r) => `${r.quantity.toLocaleString('vi-VN')} ${r.unit}` },
         { title: 'Đơn giá', dataIndex: 'unitPriceVnd', width: 120, align: 'right', render: v => vnd(v) },
@@ -159,7 +151,6 @@ export default function MaterialPurchasesPanel() {
         <Space align="start" wrap>
           <Form.Item name="enteredOn" label="Ngày nhập" rules={[{ required: true, message: 'Vui lòng nhập Ngày nhập.' }]}><Input type="date" aria-label="Ngày nhập" max={clinicToday()} /></Form.Item>
           <Form.Item name="receivedOn" label="Ngày nhận" extra="Để trống nếu chưa nhận hàng."><Input type="date" aria-label="Ngày nhận" max={clinicToday()} /></Form.Item>
-          <Form.Item name="expiresOn" label="Hạn dùng" extra="Ghi trên nhãn; để trống nếu không có."><Input type="date" aria-label="Hạn dùng" /></Form.Item>
         </Space>
         <Form.Item name="materialId" label="Dụng cụ/Vật liệu" rules={[{ required: true, message: 'Vui lòng chọn dụng cụ/vật liệu.' }]}>
           <Select aria-label="Dụng cụ/Vật liệu" showSearch optionFilterProp="label" placeholder="Chọn dụng cụ/vật liệu" loading={!materials} options={options} />

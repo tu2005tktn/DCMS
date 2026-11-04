@@ -32,7 +32,6 @@ public sealed class MaterialPurchase
     public string CategoryName { get; set; } = "";
     public DateOnly EnteredOn { get; set; }
     public DateOnly? ReceivedOn { get; set; }
-    public DateOnly? ExpiresOn { get; set; }
     public decimal Quantity { get; set; }
     public string Unit { get; set; } = "";
     public long UnitPriceVnd { get; set; }

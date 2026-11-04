@@ -3501,9 +3501,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<DateOnly>("EnteredOn")
                         .HasColumnType("date");
 
-                    b.Property<DateOnly?>("ExpiresOn")
-                        .HasColumnType("date");
-
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 

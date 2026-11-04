@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 
-type Purchase = { id: string; enteredOn: string; receivedOn: string | null; expiresOn: string | null; materialId: string; materialName: string; categoryName: string; quantity: number; unit: string;
+type Purchase = { id: string; enteredOn: string; receivedOn: string | null; materialId: string; materialName: string; categoryName: string; quantity: number; unit: string;
   unitPriceVnd: number; totalVnd: number; paidVnd: number; dueVnd: number; version: number; isDeleted?: boolean };
 
 async function prepare(page: Page) {
@@ -31,7 +31,7 @@ async function prepare(page: Page) {
     if (method === 'DELETE') { row!.isDeleted = true; return ok({}); }
     const material = materials.find(m => m.id === body.materialId)!, total = Math.round(body.quantity * body.unitPriceVnd);
     if (body.paidVnd > total) return route.fulfill({ status: 400, json: { code: 'PURCHASE_PAID_EXCEEDS_TOTAL', message: 'Số đã thanh toán không được lớn hơn Tổng.', field: 'paidVnd' } });
-    const next = { enteredOn: body.enteredOn, receivedOn: body.receivedOn, expiresOn: body.expiresOn, materialId: material.id, materialName: material.name, categoryName: material.categoryName, quantity: body.quantity,
+    const next = { enteredOn: body.enteredOn, receivedOn: body.receivedOn, materialId: material.id, materialName: material.name, categoryName: material.categoryName, quantity: body.quantity,
       unit: body.unit, unitPriceVnd: body.unitPriceVnd, totalVnd: total, paidVnd: body.paidVnd, dueVnd: total - body.paidVnd };
     if (method === 'POST') { const created = { id: crypto.randomUUID(), version: 1, ...next }; state.purchases.push(created); return ok(created); }
     Object.assign(row!, next, { version: row!.version + 1 }); return ok(row);
@@ -51,7 +51,6 @@ test('thêm, sửa, lọc và xóa lần nhập hàng; tổng và còn nợ tín
   await page.getByLabel('Số lượng', { exact: true }).fill('2');
   await page.getByRole('combobox', { name: 'Đơn vị', exact: true }).fill('cái');
   await page.getByLabel('Đơn giá', { exact: true }).fill('1500000');
-  await page.getByLabel('Hạn dùng', { exact: true }).fill('2020-01-31');
   await page.getByLabel('Đã thanh toán', { exact: true }).fill('4000000');
   await expect(page.getByText('Số đã thanh toán lớn hơn Tổng.')).toBeVisible();
   await page.getByLabel('Đã thanh toán', { exact: true }).fill('1000000');
@@ -60,8 +59,6 @@ test('thêm, sửa, lọc và xóa lần nhập hàng; tổng và còn nợ tín
   await expect(page.getByRole('button', { name: 'Sửa nhập hàng Implant SYNTHETIC' })).toBeVisible();
   expect(state.purchases[0]).toMatchObject({ totalVnd: 3_000_000, paidVnd: 1_000_000, dueVnd: 2_000_000, unit: 'cái' });
   await expect(page.locator('.ant-table').getByText('Chưa nhận', { exact: true })).toBeVisible();
-  await expect(page.locator('.ant-table').getByText('Hết hạn', { exact: true })).toBeVisible();
-  expect(state.purchases[0].expiresOn).toBe('2020-01-31');
   await expect(page.getByText('Còn nợ', { exact: true }).first()).toBeVisible();
 
   await page.getByRole('button', { name: 'Sửa nhập hàng Implant SYNTHETIC' }).click();
