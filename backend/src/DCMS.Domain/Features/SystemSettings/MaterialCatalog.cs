@@ -33,6 +33,7 @@ public sealed class MaterialPurchase
     public string CategoryName { get; set; } = "";
     public Guid? SupplierId { get; set; }
     public string? SupplierName { get; set; }
+    public string? LotNumber { get; set; }
     public DateOnly EnteredOn { get; set; }
     public DateOnly? ReceivedOn { get; set; }
     public DateOnly? ExpiresOn { get; set; }
@@ -50,6 +51,22 @@ public sealed class MaterialPurchase
     public int CreatedBy { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
     public int UpdatedBy { get; set; }
+}
+// One material line consumed by a treatment activity (docs/specs/MATERIAL-STOCK.md).
+public sealed class MaterialUsage
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid ActivityId { get; set; }
+    public Guid MaterialId { get; set; }
+    public string MaterialName { get; set; } = "";
+    public string? UsageUnit { get; set; }
+    public decimal Quantity { get; set; }
+    public int PatientId { get; set; }
+    public int BranchId { get; set; }
+    public Guid? DossierId { get; set; }
+    public DateTimeOffset UsedAt { get; set; }
+    public int? RecordedBy { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
 }
 public sealed class SystemCatalogChange
 {

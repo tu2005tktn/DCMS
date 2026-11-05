@@ -10,7 +10,7 @@ import { money } from './types';
 import TreatmentSheetDraftRow, { type SheetActualPreview } from './TreatmentSheetDraftForms';
 import DossierFinancialPanel from './DossierFinancialPanel';
 import ApplyItemPlanModal from './ApplyItemPlanModal';
-import MaterialNotePicker from './MaterialNotePicker';
+import MaterialNotePicker, { mergeMaterialUses, type MaterialUse } from './MaterialNotePicker';
 import type { ActivityPage, PaymentContext, SheetActivity, SheetContext } from './sheetTypes';
 
 type Draft = { id: string; kind: 'Plan' | 'Actual'; row: SheetActualPreview; version: number };
@@ -167,10 +167,13 @@ export default function TreatmentSheet({ patientId, dossierId, dossierVersion, o
     finally { actionGuard.current = false; setBusy(false); }
   }
   // Saves the picked materials straight into the note of a saved activity (same PUT as editing a row).
-  async function saveMaterials(activity: SheetActivity, note: string) {
+  async function saveMaterials(activity: SheetActivity, note: string, picked: MaterialUse[]) {
     if (!dossier) throw new Error('Chưa tải được phiếu.');
-    const row = { ...activityRow(activity), note };
-    const payload = JSON.stringify({ id: activity.id, note });
+    // The server replaces the activity's usage lines, so send the lines already deducted plus the newly picked ones.
+    const existing = await api<{ items: { materialId: string; quantity: number }[] }>(`/api/system-settings/material-usage?activityId=${activity.id}&pageSize=100`);
+    const materials = mergeMaterialUses(existing.items.map(x => ({ materialId: x.materialId, quantity: x.quantity })), picked);
+    const row = { ...activityRow(activity), note, materials };
+    const payload = JSON.stringify({ id: activity.id, note, materials });
     if (materialKey.current?.payload !== payload) materialKey.current = { payload, key: crypto.randomUUID() };
     await api(`/api/dossiers/${dossierId}/sheet-activities/${activity.id}`, { method: 'PUT', body: JSON.stringify({ row,
       expectedVersion: dossier.version, expectedActivityVersion: activity.version,
@@ -286,7 +289,7 @@ export default function TreatmentSheet({ patientId, dossierId, dossierVersion, o
       closable={!busy} cancelButtonProps={{ disabled: busy }} onCancel={() => setDeleting(null)} onOk={() => { if (deleting) void act(deleting,'delete').then(ok => { if (ok) setDeleting(null); }); }}>
       <p>{deleting?.serviceName}</p>{error && <Alert type="error" message={error} />}</Modal>
     {materialFor && <MaterialNotePicker note={materialFor.outcome ?? ''} onCancel={() => { materialKey.current = null; setMaterialFor(null); }}
-      onApply={value => saveMaterials(materialFor, value)} />}
+      onApply={(value, uses) => saveMaterials(materialFor, value, uses)} />}
     {selectPlan && <ApplyItemPlanModal branchId={dossier.branchId} dossierId={dossierId} version={dossier.version} onReload={reloadSource} onClose={() => setSelectPlan(false)} onApplied={() => { setSelectPlan(false); refresh(); }} />}
     <Modal open={!!deletingActivity} title="Bạn có muốn xóa dòng này không?" okText="Đồng ý" cancelText="Không đồng ý" confirmLoading={busy}
       closable={!busy} cancelButtonProps={{disabled:busy}} onCancel={() => setDeletingActivity(null)} onOk={() => { if (deletingActivity) void deleteActivity(deletingActivity).then(ok => { if (ok) setDeletingActivity(null); }); }}>

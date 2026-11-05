@@ -3485,6 +3485,60 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.ToTable("MATERIAL_CATALOG_ITEM", (string)null);
                 });
 
+            modelBuilder.Entity("DCMS.Domain.Features.SystemSettings.MaterialUsage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ActivityId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("BranchId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DossierId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("MaterialId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("MaterialName")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
+                    b.Property<int>("PatientId")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.Property<int?>("RecordedBy")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("UsageUnit")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<DateTimeOffset>("UsedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ActivityId");
+
+                    b.HasIndex("MaterialId");
+
+                    b.HasIndex("UsedAt");
+
+                    b.ToTable("MATERIAL_USAGE", (string)null);
+                });
+
             modelBuilder.Entity("DCMS.Domain.Features.SystemSettings.MaterialPurchase", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3514,6 +3568,10 @@ namespace DCMS.Infrastructure.Persistence.Migrations
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
+
+                    b.Property<string>("LotNumber")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
 
                     b.Property<Guid>("MaterialId")
                         .HasColumnType("uuid");
@@ -6545,6 +6603,15 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Material");
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.SystemSettings.MaterialUsage", b =>
+                {
+                    b.HasOne("DCMS.Domain.Features.SystemSettings.MaterialCatalogItem", null)
+                        .WithMany()
+                        .HasForeignKey("MaterialId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("DCMS.Domain.Features.Treatment.CareContactAttempt", b =>

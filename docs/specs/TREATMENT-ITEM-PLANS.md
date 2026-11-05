@@ -24,3 +24,9 @@ Nhóm `/api/treatment-templates/item-plans`, require TreatmentDentist và kiểm
 
 ## Ranh giới và kiểm chứng
 Không tạo Appointment/reservation/actual/charge/payment, không thay bảng phiếu điều trị. Ngày chỉ là mặc định, không giữ ghế. Không discount/quantity/perform/complete ở đây. Migration additive, không seed hoặc đổi hồ sơ cũ. Test PostgreSQL cách ly CRUD/validation/role/branch/replay/race/snapshot/migration và bảo vệ legacy; UI mock nhập/sửa/hủy/xóa/error/MSG111/responsive390/768/1440/keyboard, backend+Web build. Migration dcms_dev và từng lệnh Git cần duyệt riêng.
+
+## Bố cục phiếu điều trị khi thu nhỏ màn hình (05/11/2026)
+Hai bảng **Kế hoạch điều trị/dịch vụ** và **Quá trình điều trị/dịch vụ** phải xem được đủ mọi cột mà không cần kéo thanh trượt ngang ở bất kỳ độ rộng nào. Từ 901 px trở lên: bảng chiếm đúng chiều rộng khung, cột chia theo phần trăm, chữ tự xuống dòng, riêng số tiền không xuống dòng. Từ 900 px trở xuống: mỗi dòng hiện thành một thẻ xếp dọc, mỗi trường có nhãn cột ("Ngày", "Răng", "Chi phí"…) ở bên trái và giá trị ở bên phải; dòng nhập/sửa dùng cùng cách xếp. Dòng thông báo trống/đang tải giữ nguyên một khối. Chỉ đổi giao diện: dữ liệu, API và quyền không đổi; bản in giữ dạng bảng.
+
+## Vật liệu dùng trừ tồn kho (06/11/2026)
+Dòng "Quá trình điều trị/dịch vụ" nhận thêm `materials: [{ materialId, quantity }]` (trong `row` của confirm actual, perform, sửa hoạt động). Hộp "Vật liệu dùng" vẫn ghi ghi chú văn bản như trước và gửi thêm danh sách có cấu trúc; máy chủ trừ tồn kho theo `MATERIAL-STOCK.md`, thiếu tồn thì chặn lưu (409 `MATERIAL_STOCK_INSUFFICIENT`). Sửa hoạt động gửi `materials` = thay thế toàn bộ dòng đã trừ (`null` giữ nguyên); xóa hoạt động hoàn lại tồn. Hộp vật liệu trên dòng đã lưu tự gộp số lượng đã trừ trước đó với phần mới chọn.

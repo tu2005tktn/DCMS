@@ -1,7 +1,7 @@
 import { usePermissions } from '../authentication/usePermissions';
 import { Button, Form, Input, InputNumber, Select, Tooltip } from 'antd';
 import { ToolOutlined } from '@ant-design/icons';
-import MaterialNotePicker from './MaterialNotePicker';
+import MaterialNotePicker, { mergeMaterialUses, type MaterialUse } from './MaterialNotePicker';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { AppointmentOptions, TreatmentDossier, TreatmentItem } from './types';
 import { isFdi, type SheetContext } from './sheetTypes';
@@ -12,7 +12,7 @@ export type SheetPlanPreview = {
   note?: string; dentistName: string; assistantName?: string; assistantId?: number;
   costVnd: number; discountVnd?: number; discountType: 'VND' | 'Percent'; discountValue: number; discountNote?: string;
 };
-export type SheetActualPreview = SheetPlanPreview & { sourceItemId?: string; labWork?: string; labSupplier?: string };
+export type SheetActualPreview = SheetPlanPreview & { sourceItemId?: string; labWork?: string; labSupplier?: string; materials?: MaterialUse[] };
 type Values = Omit<SheetActualPreview, 'id' | 'regions'> & { toothNumbers?: string };
 
 export default function TreatmentSheetDraftRow({ kind, dossier, options, context, initialPlan, initialActual,
@@ -26,6 +26,8 @@ export default function TreatmentSheetDraftRow({ kind, dossier, options, context
   const [form] = Form.useForm<Values>();
   const [materialPicker, setMaterialPicker] = useState(false);
   const initial = initialPlan ?? initialActual;
+  // Structured materials picked for this row; the server deducts them from stock when the activity is recorded.
+  const materials = useRef<MaterialUse[]>(initialActual?.materials ?? []);
   const id = useRef(initial?.id ?? crypto.randomUUID());
   const pending = useRef<{ payload: string; key: string } | null>(null), guard = useRef(false);
   const [busy, setBusy] = useState(false), [dirty, setDirty] = useState(false), [error, setError] = useState<string>();
@@ -56,7 +58,7 @@ export default function TreatmentSheetDraftRow({ kind, dossier, options, context
         discountType: values.discountType ?? 'VND', discountNote: values.discountNote, labWork: values.labWork,
         serviceName: services.find(s => s.id === values.serviceId)?.name ?? '',
         dentistName: dentists.find(m => m.value === values.dentistId)?.label ?? '',
-        sourceItemId: initialActual?.sourceItemId };
+        sourceItemId: initialActual?.sourceItemId, ...(kind === 'actual' && materials.current.length ? { materials: materials.current } : {}) };
       const payload = JSON.stringify(row);
       if (pending.current?.payload !== payload) pending.current = { payload, key: crypto.randomUUID() };
       setBusy(true); setError(undefined);
@@ -86,7 +88,7 @@ export default function TreatmentSheetDraftRow({ kind, dossier, options, context
     <td data-col="note"><div className="treatment-sheet-note-input">{field('note', <Input.TextArea rows={2} maxLength={1000} aria-label={kind === 'plan' ? 'Ghi chú' : 'Ghi chú việc đã làm'} />)}
       {kind === 'actual' && <Tooltip title="Chọn vật liệu dùng"><Button className="material-note-trigger" type="text" size="small" icon={<ToolOutlined />} aria-label="Chọn vật liệu dùng" onClick={()=>setMaterialPicker(true)} /></Tooltip>}
     </div>{materialPicker && <MaterialNotePicker note={form.getFieldValue('note') ?? ''} onCancel={()=>setMaterialPicker(false)}
-      onApply={value=>{form.setFieldValue('note',value);setDirty(true);setError(undefined);setMaterialPicker(false);}} />}</td>
+      onApply={(value,uses)=>{materials.current=mergeMaterialUses(materials.current,uses);form.setFieldValue('note',value);setDirty(true);setError(undefined);setMaterialPicker(false);}} />}</td>
     <td>{field('dentistId', <Select size="small" showSearch optionFilterProp="label" aria-label="Bác sĩ" options={dentists} />, true)}
       {field('assistantId', <Select size="small" showSearch optionFilterProp="label" allowClear aria-label="Phụ tá" placeholder="Phụ tá" options={assistants} />)}</td>
     {kind === 'actual' && <td>{field('labWork', <Input.TextArea rows={2} maxLength={1000} aria-label="Ghi chú Labo" placeholder="Công việc Labo" />)}</td>}

@@ -166,4 +166,16 @@ public sealed class MaterialPurchaseApiTests(ApiFixture fixture) : IClassFixture
         var r = await assistant.GetAsync(Purchases);
         Assert.True(r.StatusCode is HttpStatusCode.Forbidden, $"{r.StatusCode}: {await Body(r)}");
     }
+
+    [Fact]
+    public async Task LotNumberIsOptionalTrimmedAndLimited()
+    {
+        using var c = await Login(); var material = await Material(c);
+        var created = await c.PostAsJsonAsync(Purchases, Create(material.Id) with { LotNumber = "  LOT-2026/A1 " });
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var row = (await created.Content.ReadFromJsonAsync<MaterialPurchaseDto>())!; Assert.Equal("LOT-2026/A1", row.LotNumber);
+        var blank = (await (await c.PostAsJsonAsync(Purchases, Create(material.Id) with { LotNumber = "   " })).Content.ReadFromJsonAsync<MaterialPurchaseDto>())!; Assert.Null(blank.LotNumber);
+        var tooLong = await c.PostAsJsonAsync(Purchases, Create(material.Id) with { LotNumber = new string('9', 61) });
+        Assert.Equal(HttpStatusCode.BadRequest, tooLong.StatusCode); Assert.Contains("lotNumber", await Body(tooLong));
+    }
 }

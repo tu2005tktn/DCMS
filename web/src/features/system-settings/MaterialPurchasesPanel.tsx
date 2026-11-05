@@ -8,12 +8,12 @@ import { useAuth } from '../authentication/AuthContext';
 // Purchase log of materials/instruments. Rules and API: docs/specs/MATERIAL-PURCHASES.md.
 type Purchase = { id: string; enteredOn: string; receivedOn: string | null; expiresOn: string | null; materialId: string; materialName: string; categoryName: string;
   quantity: number; unit: string; unitPriceVnd: number; totalVnd: number; paidVnd: number; dueVnd: number; version: number;
-  conversionFactor: number; usageUnit: string | null; usageQuantity: number; usageUnitPriceVnd: number; supplierId: string | null; supplierName: string | null };
+  conversionFactor: number; usageUnit: string | null; usageQuantity: number; usageUnitPriceVnd: number; supplierId: string | null; supplierName: string | null; lotNumber: string | null };
 type Supplier = { id: string; name: string };
 type Totals = { totalVnd: number; paidVnd: number; dueVnd: number };
 type PurchasePage = { items: Purchase[]; total: number; page: number; pageSize: number; totals: Totals };
 type Material = { id: string; name: string; categoryName: string; usageUnit?: string | null };
-type Values = { enteredOn: string; receivedOn?: string; expiresOn?: string; materialId?: string; quantity?: number; unit?: string; conversionFactor?: number; supplierId?: string; unitPriceVnd?: number; paidVnd?: number };
+type Values = { enteredOn: string; receivedOn?: string; expiresOn?: string; materialId?: string; quantity?: number; unit?: string; conversionFactor?: number; lotNumber?: string; supplierId?: string; unitPriceVnd?: number; paidVnd?: number };
 type SupplierValues = { name: string };
 const newSupplierCode = () => `NCC-${crypto.randomUUID().replace(/-/g, '').slice(0, 6).toUpperCase()}`;
 const num = (n: number) => n.toLocaleString('vi-VN', { maximumFractionDigits: 3 });
@@ -101,14 +101,14 @@ export default function MaterialPurchasesPanel() {
   }
   function open(row?: Purchase) {
     pending.current = null; setFormError(undefined); form.resetFields(); loadSuppliers();
-    form.setFieldsValue(row ? { enteredOn: row.enteredOn, receivedOn: row.receivedOn ?? undefined, expiresOn: row.expiresOn ?? undefined, materialId: row.materialId, quantity: row.quantity, unit: row.unit,
+    form.setFieldsValue(row ? { enteredOn: row.enteredOn, receivedOn: row.receivedOn ?? undefined, expiresOn: row.expiresOn ?? undefined, lotNumber: row.lotNumber ?? undefined, materialId: row.materialId, quantity: row.quantity, unit: row.unit,
       conversionFactor: row.conversionFactor, supplierId: row.supplierId ?? undefined, unitPriceVnd: row.unitPriceVnd, paidVnd: row.paidVnd } : { enteredOn: clinicToday(), quantity: 1, conversionFactor: 1, paidVnd: 0 });
     setDialog({ row });
   }
   async function save(values: Values) {
     if (!dialog || guard.current) return;
     guard.current = true; setBusy(true); setFormError(undefined);
-    const body = { enteredOn: values.enteredOn, receivedOn: values.receivedOn || null, expiresOn: values.expiresOn || null, materialId: values.materialId, quantity: values.quantity,
+    const body = { enteredOn: values.enteredOn, receivedOn: values.receivedOn || null, expiresOn: values.expiresOn || null, lotNumber: (values.lotNumber ?? '').trim() || null, materialId: values.materialId, quantity: values.quantity,
       unit: (values.unit ?? '').trim(), conversionFactor: usageUnit ? (values.conversionFactor ?? 1) : 1, supplierId: values.supplierId ?? null, unitPriceVnd: values.unitPriceVnd ?? 0, paidVnd: values.paidVnd ?? 0, ...(dialog.row ? { expectedVersion: dialog.row.version } : {}) };
     const fingerprint = JSON.stringify({ id: dialog.row?.id, body });
     if (pending.current?.body !== fingerprint) pending.current = { body: fingerprint, key: crypto.randomUUID() };
@@ -172,6 +172,7 @@ export default function MaterialPurchasesPanel() {
         { title: 'Ngày nhập', dataIndex: 'enteredOn', width: 110, render: v => formatDate(v) },
         { title: 'Ngày nhận', dataIndex: 'receivedOn', width: 110, render: v => v ? formatDate(v) : <span style={{ color: '#667085' }}>Chưa nhận</span> },
         { title: 'Hạn dùng', dataIndex: 'expiresOn', width: 120, render: v => expiryTag(v) },
+        { title: 'Số lô', dataIndex: 'lotNumber', width: 110, render: v => v ?? <span style={{ color: '#667085' }}>—</span> },
         { title: 'Tên dụng cụ/vật liệu', key: 'name', render: (_v, r) => <>{r.materialName} <small style={{ color: '#667085' }}>· {r.categoryName}</small>{r.supplierName && <><br /><small style={{ color: '#667085' }}>NCC: {r.supplierName}</small></>}</> },
         { title: 'SL', key: 'quantity', width: 100, align: 'right', render: (_v, r) => <>{r.quantity.toLocaleString('vi-VN')} {r.unit}{r.usageUnit && r.conversionFactor !== 1 && <><br /><small style={{ color: '#667085' }}>= {num(r.usageQuantity)} {r.usageUnit}</small></>}</> },
         { title: 'Đơn giá', dataIndex: 'unitPriceVnd', width: 120, align: 'right', render: v => vnd(v) },
@@ -191,6 +192,7 @@ export default function MaterialPurchasesPanel() {
           <Form.Item name="enteredOn" label="Ngày nhập" rules={[{ required: true, message: 'Vui lòng nhập Ngày nhập.' }]}><Input type="date" aria-label="Ngày nhập" max={clinicToday()} /></Form.Item>
           <Form.Item name="receivedOn" label="Ngày nhận"><Input type="date" aria-label="Ngày nhận" max={clinicToday()} /></Form.Item>
           <Form.Item name="expiresOn" label="Hạn dùng"><Input type="date" aria-label="Hạn dùng" /></Form.Item>
+          <Form.Item name="lotNumber" label="Số lô"><Input aria-label="Số lô" maxLength={60} /></Form.Item>
         </Space>
         <Form.Item name="materialId" label="Dụng cụ/Vật liệu" rules={[{ required: true, message: 'Vui lòng chọn dụng cụ/vật liệu.' }]}>
           <Select aria-label="Dụng cụ/Vật liệu" showSearch optionFilterProp="label" placeholder="Chọn dụng cụ/vật liệu" loading={!materials} options={options} />

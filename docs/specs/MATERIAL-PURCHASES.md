@@ -109,4 +109,8 @@ Backend (PostgreSQL cách ly): tạo/đọc/sửa/xóa, tính Tổng làm tròn,
 
 ## Giới hạn
 
-Chưa có: số lô, nhà cung cấp, số hóa đơn, ghi chú, nhiều dòng trong một phiếu, tồn kho/xuất dùng, theo chi nhánh, tách quyền tài chính. Lô/hạn dùng được khuyến nghị làm tiếp cho nhóm vật liệu cấy ghép vì cần truy vết.
+Tồn kho và xuất dùng theo `MATERIAL-STOCK.md`: sửa/xóa dòng nhập làm tồn âm bị chặn (`MATERIAL_STOCK_NEGATIVE`). Chưa có: số lô, số hóa đơn, ghi chú, nhiều dòng trong một phiếu, theo chi nhánh, tách quyền tài chính. Lô/hạn dùng được khuyến nghị làm tiếp cho nhóm vật liệu cấy ghép vì cần truy vết.
+
+## Số lô (06/11/2026)
+
+Mỗi dòng nhập có thêm **Số lô** (`lotNumber`): không bắt buộc, ghi theo nhãn trên bao bì, trim, tối đa 60 ký tự, lỗi → MSG04 `field=lotNumber`. Cột "Số lô" nằm cạnh Hạn dùng trong bảng nhập hàng; ô "Số lô" nằm cạnh Hạn dùng trong modal. DTO, `POST` và `PUT` thêm `lotNumber` (null = để trống). Thẻ Tồn kho (`MATERIAL-STOCK.md`) hiển thị số lô của từng lần nhập. Số lô không có ràng buộc duy nhất; xuất dùng vẫn chưa gắn với lô cụ thể.

@@ -32,6 +32,15 @@ async function prepare(page: Page, withItem = true, withFinance = false) {
     const ok = (json: unknown) => route.fulfill({ json });
     if (path === '/api/auth/me') return ok(user);
     if (path === '/api/auth/sign-in') return ok({ accessToken: 'synthetic', user });
+    // Usage lines already deducted for an activity (docs/specs/MATERIAL-STOCK.md); none in these scenarios.
+    if (path === '/api/system-settings/material-usage') return ok({ items: [], total: 0, page: 1, pageSize: 100 });
+    if (path === '/api/system-settings/material-stock/available') {
+      const q = url.searchParams.get('q') ?? '', number = Number(url.searchParams.get('page') ?? 1);
+      state.materialReads.push({q,page:number});
+      if (state.failMaterialOnce) { state.failMaterialOnce = false; return route.fulfill({status:503,json:{code:'MSG144',message:'Không thể tải danh mục thử nghiệm.'}}); }
+      const items = state.materials.filter(m=>m.name.toLowerCase().includes(q.toLowerCase())).map(m=>({materialId:m.id,name:m.name,categoryName:m.categoryName,usageUnit:null,stock:(m as {stock?:number}).stock}));
+      return ok({items:items.slice((number-1)*20,number*20),total:items.length,page:number,pageSize:20});
+    }
     if (path === '/api/system-settings/materials') {
       const q = url.searchParams.get('q') ?? '', number = Number(url.searchParams.get('page') ?? 1);
       state.materialReads.push({q,page:number});
@@ -380,7 +389,7 @@ async function selectNoteMaterial(page: import('@playwright/test').Page, index: 
   await input.click();
   const results = page.waitForResponse(response => {
     const url = new URL(response.url());
-    return url.pathname === '/api/system-settings/materials' && url.searchParams.get('q') === search;
+    return url.pathname === '/api/system-settings/material-stock/available' && url.searchParams.get('q') === search;
   });
   await input.fill(search); await results;
   await page.locator('.material-note-select-popup:visible').getByText(name,{exact:true}).click();
@@ -473,7 +482,7 @@ test('vật liệu lỗi tải đầu tiên cho thử lại; danh mục trống 
   state.materials=[];
   await page.getByRole('button',{name:'Chọn vật liệu dùng',exact:true}).click();
   await page.getByRole('combobox',{name:'Tên dụng cụ/vật liệu 1',exact:true}).press('ArrowDown');
-  await expect(page.getByText('Không có dụng cụ/vật liệu phù hợp.',{exact:true})).toBeVisible();
+  await expect(page.getByText('Kho chưa có vật liệu nào phù hợp.',{exact:true})).toBeVisible();
   await page.keyboard.press('Escape');await page.getByRole('button',{name:'Hủy',exact:true}).click();
   await expect(page.getByLabel('Ghi chú việc đã làm')).toHaveValue('Nội dung ban đầu');
   expect(state.requests).toHaveLength(0);

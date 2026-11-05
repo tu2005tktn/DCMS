@@ -41,6 +41,13 @@ public static class SystemSettingsEndpoints
         purchases.MapPost("/", async (HttpContext c, CreateMaterialPurchaseRequest r, IMaterialPurchaseService s, CancellationToken ct) => { var result = await s.CreateAsync(AuthenticationEndpoints.AccountId(c.User), r, ct); return Results.Created($"/api/system-settings/material-purchases/{result.Id}", result); });
         purchases.MapPut("/{id:guid}", async (HttpContext c, Guid id, UpdateMaterialPurchaseRequest r, IMaterialPurchaseService s, CancellationToken ct) => Results.Ok(await s.UpdateAsync(AuthenticationEndpoints.AccountId(c.User), id, r, ct)));
         purchases.MapDelete("/{id:guid}", async (HttpContext c, Guid id, [FromBody] DeleteCatalogRequest r, IMaterialPurchaseService s, CancellationToken ct) => Results.Ok(await s.DeleteAsync(AuthenticationEndpoints.AccountId(c.User), id, r, ct)));
+        // Stock and usage history (docs/specs/MATERIAL-STOCK.md); read-only, catalog.materials.read.
+        app.MapGet("/api/system-settings/material-stock", async (HttpContext c, string? q, int? page, int? pageSize, IMaterialStockService s, CancellationToken ct) =>
+            Results.Ok(await s.StockAsync(AuthenticationEndpoints.AccountId(c.User), q, page ?? 1, pageSize ?? 20, ct))).RequireAuthorization().WithTags("System settings");
+        app.MapGet("/api/system-settings/material-stock/available", async (HttpContext c, string? q, int? page, int? pageSize, IMaterialStockService s, CancellationToken ct) =>
+            Results.Ok(await s.AvailableAsync(AuthenticationEndpoints.AccountId(c.User), q, page ?? 1, pageSize ?? 20, ct))).RequireAuthorization().WithTags("System settings");
+        app.MapGet("/api/system-settings/material-usage", async (HttpContext c, Guid? materialId, Guid? activityId, string? q, DateOnly? from, DateOnly? to, int? page, int? pageSize, IMaterialStockService s, CancellationToken ct) =>
+            Results.Ok(await s.UsageAsync(AuthenticationEndpoints.AccountId(c.User), materialId, activityId, q, from, to, page ?? 1, pageSize ?? 20, ct))).RequireAuthorization().WithTags("System settings");
         // S58 Thiết lập chung (docs/specs/S58-GENERAL-SETTINGS.md); the service checks the ClinicOwner role on every request.
         var settings = app.MapGroup("/api/system-settings/settings").RequireAuthorization().WithTags("S58 Settings");
         settings.MapGet("/capabilities", async (HttpContext c, IGeneralSettingsService s, CancellationToken ct) => Results.Ok(await s.CapabilitiesAsync(AuthenticationEndpoints.AccountId(c.User), ct)));

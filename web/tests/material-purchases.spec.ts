@@ -22,6 +22,10 @@ async function prepare(page: Page) {
       const body = r.postDataJSON(); state.supplierRequests.push(body);
       const created = { id: `s-${state.suppliers.length + 1}`, code: body.entry.code, name: body.entry.name, version: 1 }; state.suppliers.push(created); return ok(created);
     }
+    if (path === '/api/system-settings/material-stock') return ok({ items: [{ purchaseId: 'p-1', materialId: 'm-2', name: 'Composite SYNTHETIC', categoryName: 'Trám', usageUnit: 'g', supplierName: 'Công ty Có Sẵn', lotNumber: 'LOT-A1', receivedOn: '2026-10-01', expiresOn: '2026-12-01', received: 120, used: 30.5, remaining: 89.5 },
+      { purchaseId: 'p-2', materialId: 'm-2', name: 'Composite SYNTHETIC', categoryName: 'Trám', usageUnit: 'g', supplierName: null, lotNumber: null, receivedOn: '2026-11-02', expiresOn: '2027-06-01', received: 50, used: 0, remaining: 50 }], total: 2, page: 1, pageSize: 20 });
+    if (path === '/api/system-settings/material-usage') return ok({ items: [{ id: 'u-1', usedAt: '2026-11-05T03:00:00+00:00', materialId: 'm-2', materialName: 'Composite SYNTHETIC', quantity: 2.5, usageUnit: 'g',
+      patientId: 1, patientName: 'SYNTHETIC Patient', branchId: 1, branchName: 'Cơ sở 1', dossierId: 'd-1', dossierCode: 'HS-001', recordedByName: 'SYNTHETIC Dentist' }], total: 1, page: 1, pageSize: 20 });
     const id = path.split('/')[4];
     if (!path.startsWith('/api/system-settings/material-purchases')) return route.fulfill({ status: 404, json: { code: 'NOT_MOCKED', message: path } });
     if (method === 'GET') {
@@ -38,7 +42,7 @@ async function prepare(page: Page) {
     if (body.paidVnd > total) return route.fulfill({ status: 400, json: { code: 'PURCHASE_PAID_EXCEEDS_TOTAL', message: 'Số đã thanh toán không được lớn hơn Tổng.', field: 'paidVnd' } });
     const next = { enteredOn: body.enteredOn, receivedOn: body.receivedOn, expiresOn: body.expiresOn, materialId: material.id, materialName: material.name, categoryName: material.categoryName, quantity: body.quantity,
       unit: body.unit, unitPriceVnd: body.unitPriceVnd, totalVnd: total, paidVnd: body.paidVnd, dueVnd: total - body.paidVnd,
-      supplierId: body.supplierId ?? null, supplierName: state.suppliers.find(s => s.id === body.supplierId)?.name ?? null, conversionFactor: body.conversionFactor ?? 1, usageUnit: material.usageUnit ?? null, usageQuantity: body.quantity * (body.conversionFactor ?? 1), usageUnitPriceVnd: body.unitPriceVnd / (body.conversionFactor ?? 1) };
+      lotNumber: body.lotNumber ?? null, supplierId: body.supplierId ?? null, supplierName: state.suppliers.find(s => s.id === body.supplierId)?.name ?? null, conversionFactor: body.conversionFactor ?? 1, usageUnit: material.usageUnit ?? null, usageQuantity: body.quantity * (body.conversionFactor ?? 1), usageUnitPriceVnd: body.unitPriceVnd / (body.conversionFactor ?? 1) };
     if (method === 'POST') { const created = { id: crypto.randomUUID(), version: 1, ...next }; state.purchases.push(created); return ok(created); }
     Object.assign(row!, next, { version: row!.version + 1 }); return ok(row);
   });
@@ -58,12 +62,14 @@ test('thêm, sửa, lọc và xóa lần nhập hàng; tổng và còn nợ tín
   await page.getByRole('combobox', { name: 'Đơn vị', exact: true }).fill('cái');
   await page.getByLabel('Đơn giá', { exact: true }).fill('1500000');
   await page.getByLabel('Hạn dùng', { exact: true }).fill('2020-01-31');
+  await page.getByLabel('Số lô', { exact: true }).fill('  LOT-77 ');
   await page.getByLabel('Đã thanh toán', { exact: true }).fill('4000000');
   await expect(page.getByText('Số đã thanh toán lớn hơn Tổng.')).toBeVisible();
   await page.getByLabel('Đã thanh toán', { exact: true }).fill('1000000');
   await expect(page.getByText('Còn nợ: 2.000.000 ₫')).toBeVisible();
   await page.getByRole('button', { name: 'Lưu', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Sửa nhập hàng Implant SYNTHETIC' })).toBeVisible();
+  expect(state.requests[0].lotNumber).toBe('LOT-77'); await expect(page.getByRole('cell', { name: 'LOT-77', exact: true })).toBeVisible();
   expect(state.purchases[0]).toMatchObject({ totalVnd: 3_000_000, paidVnd: 1_000_000, dueVnd: 2_000_000, unit: 'cái' });
   await expect(page.locator('.ant-table').getByText('Chưa nhận', { exact: true })).toBeVisible();
   await expect(page.locator('.ant-table').getByText('Hết hạn', { exact: true })).toBeVisible();
@@ -138,4 +144,17 @@ test('mất mạng giữ form và gửi lại cùng requestKey', async ({ page }
   expect(state.requests).toHaveLength(2);
   expect(state.requests[0].requestKey).toBe(state.requests[1].requestKey);
   expect(state.purchases).toHaveLength(1);
+});
+
+test('thẻ Tồn kho và Lịch sử xuất dùng hiển thị số liệu từ máy chủ', async ({ page }) => {
+  await prepare(page);
+  await page.getByRole('tab', { name: 'Tồn kho', exact: true }).click();
+  // Each received purchase is its own row with its own expiry date.
+  const stockRows = page.getByRole('row', { name: /Composite SYNTHETIC/ });
+  await expect(stockRows).toHaveCount(2);
+  await expect(stockRows.nth(0)).toContainText('120'); await expect(stockRows.nth(0)).toContainText('30,5'); await expect(stockRows.nth(0)).toContainText('89,5'); await expect(stockRows.nth(0)).toContainText('Công ty Có Sẵn'); await expect(stockRows.nth(0)).toContainText('LOT-A1');
+  await expect(stockRows.nth(1)).toContainText('50'); await expect(stockRows.nth(1)).not.toContainText('Công ty Có Sẵn');
+  await page.getByRole('tab', { name: 'Lịch sử xuất dùng', exact: true }).click();
+  const usageRow = page.getByRole('row', { name: /SYNTHETIC Patient/ });
+  await expect(usageRow).toContainText('Composite SYNTHETIC'); await expect(usageRow).toContainText('2,5 g'); await expect(usageRow).toContainText('HS-001'); await expect(usageRow).toContainText('Cơ sở 1');
 });
