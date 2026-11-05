@@ -16,6 +16,8 @@ public sealed class DcmsDbContext(DbContextOptions<DcmsDbContext> options)
 {
     public DbSet<DCMS.Domain.Features.SystemSettings.MaterialCategory> MaterialCategories => Set<DCMS.Domain.Features.SystemSettings.MaterialCategory>();
     public DbSet<DCMS.Domain.Features.SystemSettings.MaterialCatalogItem> MaterialCatalogItems => Set<DCMS.Domain.Features.SystemSettings.MaterialCatalogItem>();
+    public DbSet<DCMS.Domain.Features.SystemSettings.MaterialUsage> MaterialUsages => Set<DCMS.Domain.Features.SystemSettings.MaterialUsage>();
+    public DbSet<DCMS.Domain.Features.SystemSettings.MaterialPurchase> MaterialPurchases => Set<DCMS.Domain.Features.SystemSettings.MaterialPurchase>();
     public DbSet<DCMS.Domain.Features.SystemSettings.SystemCatalogChange> SystemCatalogChanges => Set<DCMS.Domain.Features.SystemSettings.SystemCatalogChange>();
     public DbSet<DCMS.Domain.Features.SystemSettings.ClinicSettingsVersion> ClinicSettingsVersions => Set<DCMS.Domain.Features.SystemSettings.ClinicSettingsVersion>();
     public DbSet<DCMS.Domain.Features.SystemSettings.ReferenceEntry> ReferenceEntries => Set<DCMS.Domain.Features.SystemSettings.ReferenceEntry>();

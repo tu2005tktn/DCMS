@@ -15,9 +15,28 @@ internal static class SystemSettingsModel
         model.Entity<MaterialCatalogItem>(b => {
             b.ToTable("MATERIAL_CATALOG_ITEM"); b.HasKey(x => x.Id);
             b.Property(x => x.Name).HasMaxLength(160); b.Property(x => x.NormalizedName).HasMaxLength(160);
+            b.Property(x => x.UsageUnit).HasMaxLength(40);
             b.Property(x => x.Version).IsConcurrencyToken();
             b.HasOne(x => x.Category).WithMany().HasForeignKey(x => x.CategoryId).OnDelete(DeleteBehavior.Restrict);
             b.HasIndex(x => new { x.CategoryId, x.NormalizedName }).IsUnique().HasFilter("NOT \"IsDeleted\"");
+        });
+        model.Entity<MaterialPurchase>(b => {
+            b.ToTable("MATERIAL_PURCHASE"); b.HasKey(x => x.Id);
+            b.Property(x => x.MaterialName).HasMaxLength(160); b.Property(x => x.CategoryName).HasMaxLength(160);
+            b.Property(x => x.Quantity).HasPrecision(12, 3); b.Property(x => x.Unit).HasMaxLength(40);
+            b.Property(x => x.ConversionFactor).HasPrecision(12, 3); b.Property(x => x.UsageQuantity).HasPrecision(18, 3); b.Property(x => x.UsageUnit).HasMaxLength(40);
+            b.Property(x => x.Version).IsConcurrencyToken();
+            b.Property(x => x.SupplierName).HasMaxLength(160); b.Property(x => x.LotNumber).HasMaxLength(60);
+            b.HasOne(x => x.Material).WithMany().HasForeignKey(x => x.MaterialId).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<CatalogProvider>().WithMany().HasForeignKey(x => x.SupplierId).OnDelete(DeleteBehavior.Restrict);
+            b.HasIndex(x => new { x.EnteredOn, x.Id }).HasFilter("NOT \"IsDeleted\"");
+        });
+        model.Entity<MaterialUsage>(b => {
+            b.ToTable("MATERIAL_USAGE"); b.HasKey(x => x.Id);
+            b.Property(x => x.MaterialName).HasMaxLength(160); b.Property(x => x.UsageUnit).HasMaxLength(40);
+            b.Property(x => x.Quantity).HasPrecision(18, 3);
+            b.HasOne<MaterialCatalogItem>().WithMany().HasForeignKey(x => x.MaterialId).OnDelete(DeleteBehavior.Restrict);
+            b.HasIndex(x => x.MaterialId); b.HasIndex(x => x.ActivityId); b.HasIndex(x => x.UsedAt);
         });
         model.Entity<SystemCatalogChange>(b => {
             b.ToTable("SYSTEM_CATALOG_CHANGE"); b.HasKey(x => x.RequestKey); b.Property(x => x.RequestKey).ValueGeneratedNever();

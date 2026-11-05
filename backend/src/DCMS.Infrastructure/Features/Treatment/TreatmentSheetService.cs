@@ -14,7 +14,8 @@ public sealed partial class TreatmentDossierService
     private sealed record SheetRow(DateOnly? Date, int ServiceId, int DentistId, string[]? Regions,
         decimal Quantity, long CostVnd, string? Note, int? AssistantId, Guid? SourceItemId,
         string? DiscountType, decimal DiscountValue, string? DiscountNote, long? UnitPriceVnd = null,
-        string? Region = null, int? EstimatedMinutes = null, string? LabWork = null);
+        string? Region = null, int? EstimatedMinutes = null, string? LabWork = null,
+        DCMS.Application.Features.SystemSettings.MaterialUseLine[]? Materials = null);
 
     private static SheetRow ReadRow(JsonElement json)
     {
@@ -287,6 +288,9 @@ public sealed partial class TreatmentDossierService
                 ChargingBasisEvidence = Clean(request.ChargingBasisEvidence), PriceSnapshotVnd = item.AgreedUnitPriceVnd,
                 CreatedAt = clock.GetUtcNow(), FeeStatus = "NotRequested" };
             db.ClinicalActivities.Add(activity);
+            await db.SaveChangesAsync(ct);
+            await DCMS.Infrastructure.Features.SystemSettings.MaterialStock.ReplaceAsync(db, clock, activity.Id, activity.PatientId, activity.BranchId,
+                activity.DossierId, activity.PerformedAt, actorId, row.Materials, ct);
             await db.SaveChangesAsync(ct);
             var posted = await clinicalWork.PostWithinTransactionAsync(actorId, activity.Id,
                 new PostActivityRequest(activity.Version, visit.Version, request.ExpectedStepVersion,

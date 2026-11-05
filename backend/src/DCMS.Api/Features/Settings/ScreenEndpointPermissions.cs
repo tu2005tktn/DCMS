@@ -33,6 +33,7 @@ public static class ScreenEndpointPermissions
             var kind = p.Split('/')[5]; if (kind.StartsWith('{')) kind = values?.GetValueOrDefault("kind") ?? "{kind}";
             return Need($"catalog.{kind}.{(read ? p.EndsWith("/export") ? "export" : "read" : p.Contains("/state") ? "deactivate" : method == "POST" ? "create" : "update")}");
         }
+        if (p == "/api/work-statistics") return Need("finance.read");
         if (p.StartsWith("/api/system-settings/material")) return Need($"catalog.materials.{(read ? "read" : method == "DELETE" ? "deactivate" : method == "POST" ? "create" : "update")}");
         if (p.StartsWith("/api/accounts")) return Need(read ? p.EndsWith("/audit") ? "accounts.audit" : "accounts.read" : p.EndsWith("/state") ? "accounts.state" : method == "POST" ? "accounts.create" : "accounts.update");
         if (p.StartsWith("/api/patient-link-reviews")) return Need(read ? "patient-links.read" : "patient-links.verify");

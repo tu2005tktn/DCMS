@@ -131,6 +131,7 @@
 .customer-booking .customer-back { margin-bottom: 14px; }
 .customer-booking .ant-steps { margin-bottom: 25px; }
 .customer-booking-progress { display: none; }
+.customer-booking-progress-bar { display: none; }
 .customer-booking-card .ant-card-body { padding: clamp(22px, 3vw, 36px); }
 .customer-booking-section { display: grid; gap: 20px; }
 .customer-booking-section h2 { margin: 0; font-size: 24px; }
@@ -151,6 +152,7 @@
 .customer-schedule-filters .customer-booking-fields { grid-template-columns: 1fr; gap: 14px; }
 .customer-schedule-filters .customer-booking-fields > div { min-width: 0; }
 .customer-schedule-filters .customer-field, .customer-schedule-filters .ant-input { width: 100%; }
+.customer-booking-date-hint { display: block; margin-top: 6px; color: var(--customer-muted); font-size: 13px; }
 .customer-schedule-times { grid-area: times; min-height: 100%; }
 .customer-schedule-times-heading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px; padding-bottom: 12px; border-bottom: 1px solid var(--customer-line); }
 .customer-schedule-times-heading h3, .customer-schedule-summary h3 { margin: 0; font-size: 19px; }
@@ -187,6 +189,13 @@
 .customer-booking-person p { margin: 0 0 14px; font-size: 14px; }
 .customer-booking-person label { display: block; }
 .customer-booking-person .ant-input { display: block; margin-top: 6px; }
+.customer-form-error-summary { padding: 16px 18px; border: 1px solid #eab2ad; border-left: 4px solid var(--customer-danger); border-radius: 10px; background: #fff6f5; }
+.customer-form-error-summary:focus { outline: 3px solid #7bb4ff; outline-offset: 3px; }
+.customer-form-error-summary strong { color: #8f1f17; }
+.customer-form-error-summary ul { margin: 8px 0 0; padding-left: 20px; }
+.customer-form-error-summary li + li { margin-top: 4px; }
+.customer-form-error-summary a { color: #8f1f17; font-weight: 600; text-decoration: underline; }
+.customer-field-error { display: block; margin-top: 5px; color: var(--customer-danger); font-size: 13px; font-weight: 500; }
 .customer-booking-actions { display: flex; flex-wrap: wrap; gap: 10px; padding-top: 4px; }
 .customer-booking-actions .ant-btn-primary { min-width: 164px; }
 .customer-review-heading { margin: 2px 0 -10px; font-size: 17px; }
@@ -318,6 +327,10 @@
   .customer-booking .ant-steps { display: none; }
   .customer-booking-progress { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 18px; padding: 11px 15px; border-radius: 10px; background: var(--customer-tint); color: #0e438f; }
   .customer-booking-progress strong { text-align: right; }
+  .customer-booking-progress-bar { display: block; width: 100%; height: 6px; margin: -8px 0 22px; overflow: hidden; border: 0; border-radius: 6px; appearance: none; background: #dce6f3; }
+  .customer-booking-progress-bar::-webkit-progress-bar { background: #dce6f3; }
+  .customer-booking-progress-bar::-webkit-progress-value { border-radius: 6px; background: var(--customer-blue); }
+  .customer-booking-progress-bar::-moz-progress-bar { border-radius: 6px; background: var(--customer-blue); }
   .customer-schedule-filters, .customer-schedule-times, .customer-schedule-summary { padding: 16px; }
   .customer-schedule-filters .customer-booking-fields { gap: 12px; }
   .customer-schedule-summary dl > div { align-items: baseline; }

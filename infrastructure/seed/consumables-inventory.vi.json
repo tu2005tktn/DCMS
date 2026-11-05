@@ -1,0 +1,39 @@
+{
+  "note": "Vật liệu giá trị cao và có hạn dùng, cần quản lý kho chặt (lô, hạn dùng, truy vết). Quy cách mua (purchaseUnit, perPurchase) là phổ biến trên thị trường, mỗi nhà cung cấp/nhãn hiệu có thể khác nên phải đối chiếu hóa đơn thật. reorderLevel để trống vì phụ thuộc lượng bệnh nhân từng chi nhánh. storage theo nhãn hãng khi không có hướng dẫn chung. Không gồm thuốc (thuốc tê, kháng sinh thuộc danh mục Thuốc), vật tư rẻ, dụng cụ tái sử dụng và hàng labo.",
+  "fields": {
+    "useUnit": "đơn vị ghi nhận khi dùng/xuất",
+    "purchaseUnit": "đơn vị khi mua/nhập",
+    "perPurchase": "số đơn vị dùng trong một đơn vị mua; null nếu tùy nhãn hiệu",
+    "tracksExpiry": "có theo dõi hạn dùng khi nhập kho",
+    "traceability": "bắt buộc ghi hãng, mã sản phẩm và lô để truy vết theo bệnh nhân",
+    "storage": "điều kiện bảo quản gợi ý"
+  },
+  "items": [
+    { "group": "Implant", "name": "Trụ implant", "useUnit": "cái", "purchaseUnit": "cái", "perPurchase": 1, "tracksExpiry": true, "traceability": true, "storage": "Nguyên bao bì vô trùng", "reorderLevel": null },
+    { "group": "Implant", "name": "Abutment", "useUnit": "cái", "purchaseUnit": "cái", "perPurchase": 1, "tracksExpiry": true, "traceability": true, "storage": "Theo nhãn hãng", "reorderLevel": null },
+    { "group": "Implant", "name": "Trụ lành thương (healing abutment)", "useUnit": "cái", "purchaseUnit": "cái", "perPurchase": 1, "tracksExpiry": true, "traceability": true, "storage": "Nguyên bao bì vô trùng", "reorderLevel": null },
+    { "group": "Implant", "name": "Vít bít (cover screw)", "useUnit": "cái", "purchaseUnit": "cái", "perPurchase": 1, "tracksExpiry": true, "traceability": true, "storage": "Nguyên bao bì vô trùng", "reorderLevel": null },
+
+    { "group": "Phẫu thuật và ghép xương", "name": "Xương ghép", "useUnit": "g", "purchaseUnit": "lọ", "perPurchase": null, "tracksExpiry": true, "traceability": true, "storage": "Theo nhãn hãng", "reorderLevel": null },
+    { "group": "Phẫu thuật và ghép xương", "name": "Màng ghép", "useUnit": "miếng", "purchaseUnit": "miếng", "perPurchase": 1, "tracksExpiry": true, "traceability": true, "storage": "Theo nhãn hãng", "reorderLevel": null },
+    { "group": "Phẫu thuật và ghép xương", "name": "Chỉ khâu tiêu", "useUnit": "sợi", "purchaseUnit": "hộp", "perPurchase": 12, "tracksExpiry": true, "traceability": false, "storage": "Nhiệt độ phòng, nguyên bao bì vô trùng", "reorderLevel": null },
+    { "group": "Phẫu thuật và ghép xương", "name": "Chỉ khâu không tiêu", "useUnit": "sợi", "purchaseUnit": "hộp", "perPurchase": 12, "tracksExpiry": true, "traceability": false, "storage": "Nhiệt độ phòng, nguyên bao bì vô trùng", "reorderLevel": null },
+
+    { "group": "Chỉnh nha (niềng răng)", "name": "Vít chỉnh nha (mini-implant)", "useUnit": "cái", "purchaseUnit": "cái", "perPurchase": 1, "tracksExpiry": true, "traceability": true, "storage": "Nguyên bao bì vô trùng", "reorderLevel": null },
+    { "group": "Chỉnh nha (niềng răng)", "name": "Keo dán mắc cài", "useUnit": "ống", "purchaseUnit": "bộ", "perPurchase": null, "tracksExpiry": true, "traceability": false, "storage": "Theo nhãn hãng, tránh sáng", "reorderLevel": null },
+
+    { "group": "Vật liệu trám", "name": "Composite A1", "useUnit": "tuýp", "purchaseUnit": "tuýp", "perPurchase": 1, "tracksExpiry": true, "traceability": false, "storage": "Theo nhãn hãng; thường 4–20 °C, tránh sáng", "reorderLevel": null },
+    { "group": "Vật liệu trám", "name": "Composite A2", "useUnit": "tuýp", "purchaseUnit": "tuýp", "perPurchase": 1, "tracksExpiry": true, "traceability": false, "storage": "Theo nhãn hãng; thường 4–20 °C, tránh sáng", "reorderLevel": null },
+    { "group": "Vật liệu trám", "name": "Composite A3", "useUnit": "tuýp", "purchaseUnit": "tuýp", "perPurchase": 1, "tracksExpiry": true, "traceability": false, "storage": "Theo nhãn hãng; thường 4–20 °C, tránh sáng", "reorderLevel": null },
+    { "group": "Vật liệu trám", "name": "Composite A3.5", "useUnit": "tuýp", "purchaseUnit": "tuýp", "perPurchase": 1, "tracksExpiry": true, "traceability": false, "storage": "Theo nhãn hãng; thường 4–20 °C, tránh sáng", "reorderLevel": null },
+    { "group": "Vật liệu trám", "name": "Keo dán (bonding)", "useUnit": "chai", "purchaseUnit": "chai", "perPurchase": 1, "tracksExpiry": true, "traceability": false, "storage": "Nhạy sáng, đậy kín; để tủ lạnh nếu hãng yêu cầu", "reorderLevel": null },
+    { "group": "Vật liệu trám", "name": "Glass ionomer (GIC)", "useUnit": "liều", "purchaseUnit": "hộp", "perPurchase": null, "tracksExpiry": true, "traceability": false, "storage": "Nơi khô mát, đậy kín bột và dung dịch", "reorderLevel": null },
+
+    { "group": "Xi măng gắn", "name": "Xi măng nhựa", "useUnit": "ống", "purchaseUnit": "ống", "perPurchase": 1, "tracksExpiry": true, "traceability": false, "storage": "Theo nhãn hãng", "reorderLevel": null },
+    { "group": "Nội nha", "name": "Chất trám bít ống tủy (sealer)", "useUnit": "liều", "purchaseUnit": "bộ", "perPurchase": null, "tracksExpiry": true, "traceability": false, "storage": "Theo nhãn hãng", "reorderLevel": null },
+    { "group": "Lấy dấu", "name": "Silicone lấy dấu", "useUnit": "khay", "purchaseUnit": "bộ", "perPurchase": null, "tracksExpiry": true, "traceability": false, "storage": "Theo nhãn hãng", "reorderLevel": null },
+
+    { "group": "Tẩy trắng", "name": "Gel tẩy trắng tại phòng khám", "useUnit": "ống", "purchaseUnit": "bộ", "perPurchase": null, "tracksExpiry": true, "traceability": false, "storage": "Theo nhãn hãng; thường để mát", "reorderLevel": null },
+    { "group": "Tẩy trắng", "name": "Gel tẩy trắng tại nhà", "useUnit": "ống", "purchaseUnit": "hộp", "perPurchase": null, "tracksExpiry": true, "traceability": false, "storage": "Theo nhãn hãng; thường để mát", "reorderLevel": null }
+  ]
+}

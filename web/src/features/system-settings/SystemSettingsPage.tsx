@@ -11,9 +11,9 @@ import type { SettingsCapabilities } from './generalSettings';
 import './systemSettings.css';
 
 type Kind = 'materials' | 'material-categories';
-type Row = { id: string; name: string; version: number; categoryId?: string; categoryName?: string; itemCount?: number };
+type Row = { id: string; name: string; version: number; categoryId?: string; categoryName?: string; itemCount?: number; usageUnit?: string | null };
 type Page = { items: Row[]; total: number; page: number; pageSize: number };
-type Values = { name: string; categoryId?: string };
+type Values = { name: string; categoryId?: string; usageUnit?: string };
 const base = '/api/system-settings';
 
 async function allCategories() {
@@ -95,12 +95,12 @@ function MaterialCatalog() {
   function tab(value: string) { setKind(value as Kind); setPage(1); setQuery(''); setSearch(''); setCategoryId(undefined); setData(null); }
   function open(row?: Row) {
     pending.current = null; setFormError(undefined); form.resetFields();
-    form.setFieldsValue({ name: row?.name ?? '', categoryId: row?.categoryId }); setDialog({kind, row});
+    form.setFieldsValue({ name: row?.name ?? '', categoryId: row?.categoryId, usageUnit: row?.usageUnit ?? undefined }); setDialog({kind, row});
   }
   async function save(values: Values) {
     if (!dialog || guard.current) return;
     guard.current = true; setBusy(true); setFormError(undefined);
-    const body = { name: values.name.trim(), ...(dialog.kind === 'materials' ? { categoryId: values.categoryId } : {}), ...(dialog.row ? { expectedVersion: dialog.row.version } : {}) };
+    const body = { name: values.name.trim(), ...(dialog.kind === 'materials' ? { categoryId: values.categoryId, usageUnit: values.usageUnit?.trim() || null } : {}), ...(dialog.row ? { expectedVersion: dialog.row.version } : {}) };
     const fingerprint = JSON.stringify({kind:dialog.kind,id:dialog.row?.id,body});
     if (pending.current?.body !== fingerprint) pending.current = {body:fingerprint,key:crypto.randomUUID()};
     try {
@@ -108,7 +108,7 @@ function MaterialCatalog() {
       setDialog(null); form.resetFields(); pending.current = null; setRevision(v => v+1);
     } catch (e) {
       const failure = e as ApiError; setFormError(failure.message);
-      if (failure.field === 'name') form.setFields([{name:'name',errors:[failure.message]}]);
+      if (failure.field === 'name' || failure.field === 'usageUnit') form.setFields([{name:failure.field,errors:[failure.message]}]);
     } finally { guard.current = false; setBusy(false); }
   }
   async function readVersion(deletion = false) {
@@ -136,9 +136,9 @@ function MaterialCatalog() {
   if (!allowed) return <Result status="403" title="Bạn không có quyền thực hiện thao tác này." extra={<Link to="/">Về trang chủ</Link>} />;
   const options = categories?.map(c => ({value:c.id,label:c.name})) ?? [];
   const itemMode = kind === 'materials';
+  const tabItems = [{key:'materials',label:'Dụng cụ / Vật liệu'},{key:'material-categories',label:'Danh mục'}];
   return <div>
-    <Typography.Paragraph type="secondary">Danh mục dụng cụ và vật liệu dùng chung cho các chi nhánh.</Typography.Paragraph>
-    <Card><Tabs activeKey={kind} onChange={tab} items={[{key:'materials',label:'Dụng cụ / Vật liệu'},{key:'material-categories',label:'Danh mục'}]} />
+    <Card><Tabs activeKey={kind} onChange={tab} items={tabItems} />
       <div className="system-settings-toolbar">
         <Input.Search aria-label="Tìm kiếm theo tên" placeholder="Tìm kiếm theo tên" maxLength={160} allowClear value={search}
           onChange={e => { setSearch(e.target.value); if (!e.target.value) {setQuery('');setPage(1);} }} onSearch={v => {setQuery(v.trim());setPage(1);}} />
@@ -154,6 +154,7 @@ function MaterialCatalog() {
         columns={[{title:'STT',key:'ordinal',width:65,render:(_v,_r,index)=>(page-1)*size+index+1},
           {title:itemMode ? 'Tên' : 'Tên danh mục',dataIndex:'name'},
           itemMode ? {title:'Thuộc danh mục',dataIndex:'categoryName'} : {title:'Số mục đang thuộc nhóm',dataIndex:'itemCount',width:200},
+          ...(itemMode ? [{title:'Đơn vị dùng',dataIndex:'usageUnit',width:130,render:(v:string|null)=>v ?? <span style={{color:'#667085'}}>—</span>}] : []),
           {title:'Thao tác',key:'actions',width:150,render:(_v,row)=><Space><Button size="small" disabled={!canUpdate} aria-label={`Sửa ${row.name}`} onClick={()=>open(row)}>Sửa</Button><Button danger size="small" disabled={!canDelete} aria-label={`Xóa ${row.name}`} onClick={()=>{setDeleting({kind,row});setDeleteError(undefined);deletePending.current=null;}}>Xóa</Button></Space>}]} />
     </Card>
     <Modal forceRender open={!!dialog} title={`${dialog?.row ? 'Sửa' : 'Thêm'} ${dialog?.kind === 'materials' ? 'dụng cụ/vật liệu' : 'danh mục'}`} okText="Lưu" okButtonProps={{'aria-label':'Lưu'}} cancelText="Hủy" confirmLoading={busy}
@@ -163,6 +164,7 @@ function MaterialCatalog() {
       <Form form={form} layout="vertical" disabled={busy} onFinish={v=>void save(v)}>
         <Form.Item name="name" label={dialog?.kind === 'materials' ? 'Tên' : 'Tên danh mục'} rules={[{required:true,whitespace:true,message:'Vui lòng nhập tên.'},{max:160,message:'Tên tối đa 160 ký tự.'}]}><Input aria-label={dialog?.kind === 'materials' ? 'Tên' : 'Tên danh mục'} maxLength={160} autoComplete="off" /></Form.Item>
         {dialog?.kind === 'materials' && <Form.Item name="categoryId" label="Thuộc danh mục" rules={[{required:true,message:'Vui lòng chọn danh mục.'}]}><Select aria-label="Thuộc danh mục" showSearch optionFilterProp="label" placeholder="Chọn danh mục" loading={!categories} options={options} /></Form.Item>}
+        {dialog?.kind === 'materials' && <Form.Item name="usageUnit" label="Đơn vị dùng" rules={[{max:40,message:'Tối đa 40 ký tự.'}]}><Input aria-label="Đơn vị dùng" maxLength={40} autoComplete="off" placeholder="Ví dụ: sợi, g, cái" /></Form.Item>}
       </Form>
     </Modal>
     <Modal open={!!deleting} title={deleting?.kind === 'materials' ? 'Bạn có muốn xóa dụng cụ/vật liệu này không?' : 'Bạn có muốn xóa danh mục này không?'} okText="Đồng ý" okButtonProps={{'aria-label':'Đồng ý'}} cancelText="Không đồng ý" confirmLoading={busy}

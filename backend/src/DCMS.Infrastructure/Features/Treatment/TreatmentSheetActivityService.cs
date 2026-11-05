@@ -77,6 +77,8 @@ public sealed partial class TreatmentDossierService
                 await access.RequireAsync(actorId, "treatment.items.price", ct);
                 RecordSheetFeeCorrection(actorId, dossier, before, after);
             }
+            await DCMS.Infrastructure.Features.SystemSettings.MaterialStock.ReplaceAsync(db, clock, source.Id, source.PatientId, source.BranchId,
+                source.DossierId, after.PerformedAt, actorId, row.Materials, ct);
             await db.SaveChangesAsync(ct);
             return after;
     }
@@ -91,6 +93,7 @@ public sealed partial class TreatmentDossierService
             dossier.Version++; dossier.UpdatedAt = clock.GetUtcNow();
             Event(dossier, actorId, "SheetActivityDeleted", new { activityId, after.SheetVersion, activity = after, before });
             if (before.PriceSnapshotVnd > 0 && !before.SheetDeleted) RecordSheetFeeCorrection(actorId, dossier, before, after);
+            await DCMS.Infrastructure.Features.SystemSettings.MaterialStock.ReleaseAsync(db, activityId, ct);
             await db.SaveChangesAsync(ct);
             return new ConfirmSheetActualResult(await DetailAsync(dossier, ct), after);
         }, ct);

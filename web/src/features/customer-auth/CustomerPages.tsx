@@ -10,7 +10,18 @@ import { useCustomerAuth } from './CustomerAuthContext';
 type Registration = { fullName: string; phoneNumber: string; email: string; password: string; confirmPassword: string };
 type CredentialPolicy = { requiredLength: number; maximumLength: number; requireDigit: boolean;
   requireLowercase: boolean; requireUppercase: boolean; requireNonAlphanumeric: boolean };
+type AuthIssue = { field: string; message: string };
 const phonePattern = /^0[35789][0-9]{8}$/;
+
+function AuthErrorSummary({ issues, formName, id }: { issues: AuthIssue[]; formName: string; id: string }) {
+  if (issues.length === 0) return null;
+  return <div id={id} className="customer-form-error-summary" role="alert" tabIndex={-1}>
+    <strong>Kiểm tra lại thông tin sau:</strong>
+    <ul>{issues.map(issue => <li key={issue.field}>
+      <a href={`#${formName}_${issue.field}`}>{issue.message}</a>
+    </li>)}</ul>
+  </div>;
+}
 
 function ToothMark({ className = '' }: { className?: string }) {
   return <svg className={className} viewBox="0 0 64 64" fill="none" aria-hidden="true" focusable="false">
@@ -108,6 +119,9 @@ export function CustomerSignInPage() {
   const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [issues, setIssues] = useState<AuthIssue[]>([]);
+  const [validationAttempt, setValidationAttempt] = useState(0);
+  useEffect(() => { if (validationAttempt > 0) document.getElementById('customer-sign-in-errors')?.focus(); }, [validationAttempt]);
   if (state.status === 'authenticated') return <Navigate to="/customer/home" replace />;
 
   async function submit(values: { userName: string; password: string }) {
@@ -125,7 +139,13 @@ export function CustomerSignInPage() {
     footer={<Link to="/access">Chọn lại cổng đăng nhập</Link>}>
       {(error || (state.status === 'anonymous' && state.message)) &&
         <Alert className="form-alert" type="error" showIcon message={error ?? (state.status === 'anonymous' ? state.message : '')} />}
-      <Form layout="vertical" requiredMark={false} onFinish={values => void submit(values)} disabled={busy}>
+      <Form name="customer-sign-in" layout="vertical" requiredMark={false} onFinish={values => void submit(values)} disabled={busy}
+        onFinishFailed={({ errorFields }) => {
+          setIssues(errorFields.map(field => ({ field: String(field.name[0]), message: field.errors[0] })));
+          setValidationAttempt(value => value + 1);
+        }}
+        onValuesChange={changed => setIssues(current => current.filter(issue => !(issue.field in changed)))}>
+        <AuthErrorSummary id="customer-sign-in-errors" formName="customer-sign-in" issues={issues} />
         <Form.Item name="userName" label="Số điện thoại" rules={[{ required: true, message: 'Vui lòng nhập số điện thoại.' },
           { pattern: phonePattern, message: 'Nhập số di động Việt Nam gồm 10 chữ số.' }]}>
           <Input autoComplete="username" inputMode="numeric" maxLength={10} />
@@ -150,6 +170,9 @@ export function CustomerRegisterPage() {
   const [error, setError] = useState<string | null>(null);
   const [duplicateContact, setDuplicateContact] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
+  const [issues, setIssues] = useState<AuthIssue[]>([]);
+  const [validationAttempt, setValidationAttempt] = useState(0);
+  useEffect(() => { if (validationAttempt > 0) document.getElementById('customer-register-errors')?.focus(); }, [validationAttempt]);
   useEffect(() => { void customerApi<CredentialPolicy>('/api/auth/policy').then(setPolicy).catch(() => undefined); }, []);
 
   async function submit(values: Registration) {
@@ -179,7 +202,13 @@ export function CustomerRegisterPage() {
       {error && <Alert className="form-alert" type="error" showIcon message={error}
         description={duplicateContact ? <>Số điện thoại hoặc email có thể đã được sử dụng. Hãy <Link to="/customer/sign-in">đăng nhập</Link> hoặc <Link to="/customer/recover">khôi phục tài khoản</Link>.</> : undefined} />}
       {success && <Alert className="form-alert" type="success" showIcon message={`${success} Đang chuyển tới đăng nhập...`} />}
-      <Form form={form} layout="vertical" requiredMark={false} onFinish={values => void submit(values)} disabled={busy || !!success}>
+      <Form form={form} name="customer-register" layout="vertical" requiredMark={false} onFinish={values => void submit(values)} disabled={busy || !!success}
+        onFinishFailed={({ errorFields }) => {
+          setIssues(errorFields.map(field => ({ field: String(field.name[0]), message: field.errors[0] })));
+          setValidationAttempt(value => value + 1);
+        }}
+        onValuesChange={changed => setIssues(current => current.filter(issue => !(issue.field in changed)))}>
+        <AuthErrorSummary id="customer-register-errors" formName="customer-register" issues={issues} />
         <Form.Item name="fullName" label="Họ tên" rules={[{ required: true, whitespace: true, message: 'Vui lòng nhập họ tên.' },
           { max: 160, message: 'Họ tên không được vượt quá 160 ký tự.' }]}>
           <Input autoComplete="name" maxLength={160} />

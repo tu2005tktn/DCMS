@@ -1,4 +1,4 @@
-import { Alert, Button, Card, Empty, Input, Select, Spin, Steps, Typography } from 'antd';
+import { Alert, Button, Card, Empty, Input, Select, Spin, Steps } from 'antd';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import FamilyMemberPicker from '../family-members/FamilyMemberPicker';
@@ -31,6 +31,12 @@ const tomorrow = () => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Ho_Chi
 const phonePattern = /^0\d{9}$/;
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const stepNames = ['Người khám', 'Chọn lịch', 'Liên hệ', 'Xem lại', 'Hoàn tất'];
+const contactErrorTargets = [
+  { key: 'bookerName', id: 'booking-booker-name' },
+  { key: 'contact', id: 'booking-contact' },
+  { key: 'attendeeName', id: 'booking-attendee-name' },
+  { key: 'attendeeBirthDate', id: 'booking-attendee-birth' },
+] as const;
 
 export default function CustomerBookingPage() {
   const { state } = useCustomerAuth();
@@ -64,6 +70,7 @@ function BookingForm() {
   const [contact, setContact] = useState('');
   const [attendeeName, setAttendeeName] = useState(state.status === 'authenticated' ? state.user.fullName : '');
   const [fieldErrors, setFieldErrors] = useState<ContactErrors>({});
+  const [validationAttempt, setValidationAttempt] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<BookingResult | null>(null);
   const submittingRef = useRef(false);
@@ -96,6 +103,7 @@ function BookingForm() {
     setContact(value => changedAccount ? accountContact : value || accountContact);
     setAttendeeName(value => relation === 'Self' ? changedAccount ? account.fullName : value || account.fullName : changedAccount ? '' : value);
   }, [account?.id, account?.fullName, account?.phoneNumber, account?.email, relation]);
+  const errorSummaryRef = useRef<HTMLDivElement>(null);
 
   const services = useMemo(() => options?.services.filter(item => item.branchId === branchId) ?? [], [options, branchId]);
   const dentists = useMemo(() => options?.employees.filter(item => item.branchId === branchId && item.canDentist) ?? [], [options, branchId]);
@@ -107,6 +115,11 @@ function BookingForm() {
     { label: 'Buổi sáng', items: slots.filter(item => Number(formatClock(item.start).slice(0, 2)) < 12) },
     { label: 'Buổi chiều', items: slots.filter(item => Number(formatClock(item.start).slice(0, 2)) >= 12) },
   ].filter(group => group.items.length > 0), [slots]);
+  const hasContactErrors = Object.values(fieldErrors).some(Boolean);
+
+  useEffect(() => {
+    if (validationAttempt > 0 && step === 2) errorSummaryRef.current?.focus();
+  }, [validationAttempt, step]);
 
   useEffect(() => {
     if (state.status === 'initializing' || state.status === 'error') return;
@@ -141,6 +154,7 @@ function BookingForm() {
     if (!attendeeName.trim() || attendeeName.trim().length > 100) next.attendeeName = 'Nhập họ tên người khám (1–100 ký tự).';
     if (relation === 'Relative' && !validBirthDate(attendeeBirthDate)) next.attendeeBirthDate = 'Ngày sinh không hợp lệ hoặc sau ngày hiện tại.';
     setFieldErrors(next);
+    if (Object.keys(next).length > 0) setValidationAttempt(value => value + 1);
     return Object.keys(next).length === 0;
   }
 
@@ -194,6 +208,7 @@ function BookingForm() {
         description="Dịch vụ cho lần khám này là Khám. Nếu đang tiếp tục một phác đồ điều trị, hãy liên hệ phòng khám để đặt buổi theo chỉ định của nha sĩ." />
       <p>Chọn khung giờ phù hợp. Phòng khám sẽ xác nhận lịch ngay khi đặt thành công.</p></div>
     <div className="customer-booking-progress"><span>Bước {step + 1}/5</span><strong>{stepNames[step]}</strong></div>
+    <progress className="customer-booking-progress-bar" max={stepNames.length} value={step + 1} aria-label="Tiến độ đặt lịch" />
     <Steps current={step} size="small" items={stepNames.map(title => ({ title }))} />
     {error && <Alert className="form-alert" type="error" showIcon message={error}
       action={authExpired ? <Link to="/customer/sign-in">Đăng nhập</Link> : undefined} />}
@@ -229,7 +244,9 @@ function BookingForm() {
                 value={service ? `Khám · ${service.publicDurationMinutes} phút` : 'Chưa có dịch vụ Khám khả dụng tại chi nhánh này'} /></div>
               <div><label htmlFor="booking-dentist">Bác sĩ</label><Select id="booking-dentist" className="customer-field" value={dentistId} placeholder="Chọn bác sĩ"
                 options={dentists.map(item => ({ value: item.id, label: item.name }))} onChange={setDentistId} /></div>
-              <div><label htmlFor="booking-date">Ngày khám</label><Input id="booking-date" className="customer-field" type="date" value={date} onChange={event => setDate(event.target.value)} /></div>
+              <div><label htmlFor="booking-date">Ngày khám</label><Input id="booking-date" className="customer-field" type="date" lang="vi-VN"
+                aria-describedby="booking-date-hint" value={date} onChange={event => setDate(event.target.value)} />
+                <span className="customer-booking-date-hint" id="booking-date-hint">Ngày đã chọn: {formatBookingDate(date)} · Giờ Việt Nam</span></div>
             </div>
             {!options?.branches.length && <Empty description="Chưa có chi nhánh nhận đặt lịch" />}
           </section>
@@ -269,19 +286,30 @@ function BookingForm() {
       </div>}
       {step === 2 && <div className="customer-booking-section">
         <h2>Thông tin người đặt và người khám</h2><p>Phòng khám dùng thông tin liên hệ để trao đổi về lịch hẹn.</p>
+        {hasContactErrors && <div className="customer-form-error-summary" role="alert" tabIndex={-1} ref={errorSummaryRef}>
+          <strong>Kiểm tra thông tin trước khi tiếp tục</strong>
+          <ul>{contactErrorTargets.map(({ key, id }) => fieldErrors[key] &&
+            <li key={key}><a href={`#${id}`}>{fieldErrors[key]}</a></li>)}</ul>
+        </div>}
         {slot && <div className="customer-booking-selection"><span>Lịch đang đặt</span><strong>{formatTime(slot.start)}</strong>
           <span>{branch?.name} · {dentist?.name}</span></div>}
         <div className="customer-booking-contact-grid">
           <fieldset className="customer-booking-person"><legend>Người đặt lịch</legend><p>Người phòng khám sẽ liên hệ khi cần.</p>
             <div className="customer-booking-fields">
-              <label>Họ tên người đặt<Input value={bookerName} maxLength={100} onChange={event => setBookerName(event.target.value)}
-                status={fieldErrors.bookerName ? 'error' : undefined} />{fieldErrors.bookerName && <Typography.Text type="danger">{fieldErrors.bookerName}</Typography.Text>}</label>
-              <label>Số điện thoại Việt Nam hoặc email<Input value={contact} onChange={event => setContact(event.target.value)}
-                status={fieldErrors.contact ? 'error' : undefined} />{fieldErrors.contact && <Typography.Text type="danger">{fieldErrors.contact}</Typography.Text>}</label>
+              <label>Họ tên người đặt<Input id="booking-booker-name" value={bookerName} maxLength={100} onChange={event => {
+                setBookerName(event.target.value); setFieldErrors(previous => ({ ...previous, bookerName: undefined }));
+              }} aria-invalid={!!fieldErrors.bookerName} aria-describedby={fieldErrors.bookerName ? 'booking-booker-name-error' : undefined}
+                status={fieldErrors.bookerName ? 'error' : undefined} />{fieldErrors.bookerName && <span className="customer-field-error" id="booking-booker-name-error">{fieldErrors.bookerName}</span>}</label>
+              <label>Số điện thoại Việt Nam hoặc email<Input id="booking-contact" value={contact} onChange={event => {
+                setContact(event.target.value); setFieldErrors(previous => ({ ...previous, contact: undefined }));
+              }} aria-invalid={!!fieldErrors.contact} aria-describedby={fieldErrors.contact ? 'booking-contact-error' : undefined}
+                status={fieldErrors.contact ? 'error' : undefined} />{fieldErrors.contact && <span className="customer-field-error" id="booking-contact-error">{fieldErrors.contact}</span>}</label>
             </div></fieldset>
           <fieldset className="customer-booking-person"><legend>Người đến khám</legend><p>{relation === 'Self' ? 'Thông tin của bạn.' : 'Thông tin người thân sẽ đến khám.'}</p>
-            <label>Họ tên người khám<Input value={attendeeName} maxLength={100} onChange={event => setAttendeeName(event.target.value)}
-              status={fieldErrors.attendeeName ? 'error' : undefined} />{fieldErrors.attendeeName && <Typography.Text type="danger">{fieldErrors.attendeeName}</Typography.Text>}</label>
+            <label>Họ tên người khám<Input id="booking-attendee-name" value={attendeeName} maxLength={100} onChange={event => {
+              setAttendeeName(event.target.value); setFieldErrors(previous => ({ ...previous, attendeeName: undefined }));
+            }} aria-invalid={!!fieldErrors.attendeeName} aria-describedby={fieldErrors.attendeeName ? 'booking-attendee-name-error' : undefined}
+              status={fieldErrors.attendeeName ? 'error' : undefined} />{fieldErrors.attendeeName && <span className="customer-field-error" id="booking-attendee-name-error">{fieldErrors.attendeeName}</span>}</label>
             {relation === 'Relative' && <label>Ngày sinh người khám (không bắt buộc)<Input id="booking-attendee-birth" type="date" max={clinicToday()} value={attendeeBirthDate}
               onChange={e => { setAttendeeBirthDate(e.target.value); setFieldErrors(previous => ({ ...previous, attendeeBirthDate: undefined })); }}
               aria-invalid={!!fieldErrors.attendeeBirthDate} status={fieldErrors.attendeeBirthDate ? 'error' : undefined}

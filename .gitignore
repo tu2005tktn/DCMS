@@ -45,3 +45,5 @@ dcms-mobile-qr.png
 web/public/models/*
 !web/public/models/dental/
 !web/public/models/dental/**
+*.bat
+.claude/settings.local.json

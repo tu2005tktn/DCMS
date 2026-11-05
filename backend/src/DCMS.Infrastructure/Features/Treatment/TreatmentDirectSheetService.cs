@@ -145,6 +145,9 @@ public sealed partial class TreatmentDossierService
             CreatedAt = clock.GetUtcNow(), FeeStatus = "NotRequested" };
         db.ClinicalActivities.Add(activity);
         await db.SaveChangesAsync(ct);
+        await DCMS.Infrastructure.Features.SystemSettings.MaterialStock.ReplaceAsync(db, clock, activity.Id, activity.PatientId, activity.BranchId,
+            activity.DossierId, activity.PerformedAt, actorId, input?.Materials, ct);
+        await db.SaveChangesAsync(ct);
         return await clinicalWork.PostWithinTransactionAsync(actorId, activity.Id,
             new PostActivityRequest(activity.Version, 0, null, null, key), ct,
             input == null ? null : new ClinicalFeeRequest($"clinical-fee:{activity.Id}", activity.Id, activity.Version + 1,
