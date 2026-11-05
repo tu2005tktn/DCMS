@@ -39,6 +39,38 @@ Nguồn: danh mục nhà phân phối (Dentsply Sirona, SigmaGraft, Henry Schein
 
 Sổ dùng chung toàn hệ thống như danh mục (không theo chi nhánh). Không có nhà cung cấp, số hóa đơn hay ghi chú trong bản này.
 
+## Quy đổi đơn vị nhập sang đơn vị dùng (05/11/2026)
+
+Lúc nhập ghi theo đơn vị chứng từ (hộp, tuýp, thùng…) nhưng lúc dùng đếm theo đơn vị nhỏ hơn (sợi, gram, gói…). Danh mục mỗi mục có `usageUnit` (xem [SYSTEM-SETTINGS-MATERIAL-CATALOG.md](SYSTEM-SETTINGS-MATERIAL-CATALOG.md)); mỗi dòng nhập có thêm hệ số quy đổi để suy ra số lượng theo đơn vị dùng, làm dữ liệu cho tồn kho sau này.
+
+| Trường dòng nhập | Ràng buộc |
+|---|---|
+| `conversionFactor` (Hệ số quy đổi) | Số 1 đơn vị nhập = bao nhiêu đơn vị dùng. Mặc định 1; > 0, tối đa 3 chữ số thập phân, tối đa 1.000.000. Request không gửi = 1 |
+| `usageUnit` (đơn vị dùng, bản chụp) | Server chụp từ danh mục lúc lưu (null nếu danh mục chưa khai báo); client không gửi. Giữ nguyên khi danh mục đổi sau này |
+| `usageQuantity` | Server tính, không nhập: Số lượng × Hệ số, làm tròn 3 chữ số thập phân (nửa lên); phải ≤ 1.000.000.000 |
+| `usageUnitPriceVnd` | Chỉ trong DTO, không lưu: Đơn giá ÷ Hệ số, làm tròn 2 chữ số thập phân (nửa lên), để xem giá vốn mỗi đơn vị dùng |
+
+Hệ số và bản chụp đơn vị chốt theo từng lần nhập; đổi hệ số hay đơn vị dùng trong danh mục không đổi dòng cũ. Tổng, Đã thanh toán và Còn nợ không phụ thuộc hệ số. Lỗi hệ số: MSG04 kèm `field=conversionFactor`. Khi danh mục chưa có đơn vị dùng, form ẩn ô hệ số (gửi 1). Dòng nhập cũ: `conversionFactor=1`, `usageQuantity=Quantity`, `usageUnit=null`.
+
+API: `POST`/`PUT` nhận thêm `conversionFactor` (không bắt buộc); DTO thêm `conversionFactor`, `usageUnit`, `usageQuantity`, `usageUnitPriceVnd`. Cột `ConversionFactor` numeric(12,3) not null default 1, `UsageUnit` varchar(40) null, `UsageQuantity` numeric(18,3) not null trên `MATERIAL_PURCHASE`; migration cộng thêm, dòng cũ nhận mặc định và `UsageQuantity=Quantity`.
+
+UI: trong modal, khi mục được chọn có đơn vị dùng, hiện dòng "1 {Đơn vị} = [Hệ số] {đơn vị dùng}" (ô Hệ số mặc định 1) và dòng xem "Quy ra: {usageQuantity} {đơn vị dùng} · {giá mỗi đơn vị dùng}". Bảng: dưới Số lượng ghi nhỏ "= {usageQuantity} {đơn vị dùng}" khi có đơn vị dùng và hệ số khác 1.
+
+## Công ty cung cấp (05/11/2026)
+
+Mỗi dòng nhập có thể ghi công ty cung cấp, lấy từ danh mục **Công ty cung cấp vật liệu** đã có trong Thiết lập hệ thống (`CATALOG_PROVIDER`, loại Cung cấp vật liệu hoặc Cả hai; xem [S58-SUPPLY-CATALOGS.md](S58-SUPPLY-CATALOGS.md)). Không tạo danh mục mới.
+
+| Trường | Ràng buộc |
+|---|---|
+| `supplierId` | Không bắt buộc. Nếu có: công ty phải đang dùng và loại ≠ Labo, không thì 400 `PURCHASE_SUPPLIER_INVALID` field=`supplierId` "Công ty cung cấp không còn dùng. Vui lòng chọn công ty khác." |
+| `supplierName` | Server chụp tên lúc lưu (null nếu không chọn); đổi tên hay ngừng dùng công ty sau đó không đổi dòng cũ |
+
+API: `POST`/`PUT` nhận thêm `supplierId`; DTO thêm `supplierId`, `supplierName`. Cột `SupplierId` uuid null (FK Restrict tới `CATALOG_PROVIDER`) và `SupplierName` varchar(160) null; migration cộng thêm, dòng cũ để trống. Bộ lọc danh sách chưa có theo công ty.
+
+UI: trong modal có ô chọn "Công ty cung cấp" (không bắt buộc, tìm kiếm, tải từ `GET /api/system-settings/reference-options?kind=suppliers`) kèm nút "+" bên cạnh. Bấm "+" mở hộp nhỏ **Thêm công ty cung cấp** (chỉ có ô Tên công ty, bắt buộc; số điện thoại, email, địa chỉ để trống và bổ sung sau trong Thiết lập hệ thống) và lưu qua API danh mục công ty hiện có (`POST /api/system-settings/settings/catalogs/providers`, loại `Supplier`, mã tự sinh dạng `NCC-XXXXXX`, người dùng đổi được trong Thiết lập hệ thống). Lưu xong, công ty mới được chọn sẵn trong ô. Nút "+" chỉ bật khi có quyền `catalog.providers.create`. Tên trùng báo lỗi tại ô Tên và giữ hộp. Bảng nhập hàng hiển thị công ty dưới tên vật liệu ("NCC: …") khi có.
+
+Số lượng và Hệ số quy đổi trong modal hiển thị số thường (1, 2,5), không ép 3 chữ số thập phân; ràng buộc tối đa 3 chữ số vẫn do server kiểm. Khung quy đổi không đổi màu nền, chỉ gồm "1 {đơn vị nhập} = [hệ số]" (không lặp đơn vị dùng sau ô nhập) và dòng "Quy ra".
+
 ## Quyền
 
 Dùng quyền danh mục hiện có (`catalog.materials.read/create/update/deactivate`), tức Dentist hiệu lực như tab Dụng cụ / Vật liệu. Không thêm khóa quyền mới. Ghi chú: người xem được sổ nhập cũng thấy giá và số tiền đã trả; nếu cần tách quyền tài chính thì thêm khóa quyền riêng sau.
@@ -77,4 +109,4 @@ Backend (PostgreSQL cách ly): tạo/đọc/sửa/xóa, tính Tổng làm tròn,
 
 ## Giới hạn
 
-Chưa có: số lô, hạn dùng, nhà cung cấp, số hóa đơn, ghi chú, nhiều dòng trong một phiếu, tồn kho/xuất dùng, theo chi nhánh, tách quyền tài chính. Lô/hạn dùng được khuyến nghị làm tiếp cho nhóm vật liệu cấy ghép vì cần truy vết.
+Chưa có: số lô, nhà cung cấp, số hóa đơn, ghi chú, nhiều dòng trong một phiếu, tồn kho/xuất dùng, theo chi nhánh, tách quyền tài chính. Lô/hạn dùng được khuyến nghị làm tiếp cho nhóm vật liệu cấy ghép vì cần truy vết.

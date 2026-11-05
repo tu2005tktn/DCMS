@@ -33,6 +33,11 @@ function Post-Json([string] $path, $body) {
     Invoke-RestMethod -Method Post -Headers $headers -Uri "$ApiBase$path" -ContentType 'application/json; charset=utf-8' `
         -Body ([System.Text.Encoding]::UTF8.GetBytes($json))
 }
+function Put-Json([string] $path, $body) {
+    $json = $body | ConvertTo-Json
+    Invoke-RestMethod -Method Put -Headers $headers -Uri "$ApiBase$path" -ContentType 'application/json; charset=utf-8' `
+        -Body ([System.Text.Encoding]::UTF8.GetBytes($json))
+}
 function Key([string] $name) { $name.Trim().Normalize([Text.NormalizationForm]::FormC).ToUpperInvariant() }
 
 $categories = @{}
@@ -46,11 +51,20 @@ foreach ($group in $data.categories) {
         $created++
     }
     $existing = @{}
-    if ($category) { foreach ($m in Get-AllPages "/api/system-settings/materials?categoryId=$($category.id)") { $existing[(Key $m.name)] = $true } }
+    if ($category) { foreach ($m in Get-AllPages "/api/system-settings/materials?categoryId=$($category.id)") { $existing[(Key $m.name)] = $m } }
     foreach ($name in $group.items) {
-        if ($existing.ContainsKey((Key $name))) { $skipped++; continue }
+        $unit = $data.usageUnits.$name
+        if ($existing.ContainsKey((Key $name))) {
+            $row = $existing[(Key $name)]
+            if ($unit -and -not $row.usageUnit) {
+                Write-Host "  ~ Đơn vị dùng: $name = $unit"
+                if ($Apply) { Put-Json "/api/system-settings/materials/$($row.id)" @{ name = $row.name; categoryId = $row.categoryId; usageUnit = $unit; expectedVersion = $row.version; requestKey = [guid]::NewGuid() } | Out-Null }
+                $created++
+            } else { $skipped++ }
+            continue
+        }
         Write-Host "  + $($group.name) / $name"
-        if ($Apply) { Post-Json '/api/system-settings/materials' @{ name = $name; categoryId = $category.id; requestKey = [guid]::NewGuid() } | Out-Null }
+        if ($Apply) { Post-Json '/api/system-settings/materials' @{ name = $name; categoryId = $category.id; usageUnit = $unit; requestKey = [guid]::NewGuid() } | Out-Null }
         $created++
     }
 }

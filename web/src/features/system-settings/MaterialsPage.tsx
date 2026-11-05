@@ -6,7 +6,6 @@ import './systemSettings.css';
 export default function MaterialsPage() {
   return <div className="system-settings-page">
     <Typography.Title level={2}>Dụng cụ - vật liệu</Typography.Title>
-    <Typography.Paragraph type="secondary">Sổ nhập hàng: ngày nhập, ngày nhận, số lượng, đơn giá, tổng và số đã thanh toán.</Typography.Paragraph>
     <MaterialPurchasesPanel />
   </div>;
 }

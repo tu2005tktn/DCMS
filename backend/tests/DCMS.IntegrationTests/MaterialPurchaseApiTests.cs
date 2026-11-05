@@ -19,15 +19,15 @@ public sealed class MaterialPurchaseApiTests(ApiFixture fixture) : IClassFixture
     }
     private static string Unique(string text) => text + Guid.NewGuid().ToString("N");
     private static DateOnly Today => DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7));
-    private async Task<MaterialDto> Material(HttpClient c, string? name = null)
+    private async Task<MaterialDto> Material(HttpClient c, string? name = null, string? usageUnit = null)
     {
         var category = await c.PostAsJsonAsync("/api/system-settings/material-categories", new CreateCategoryRequest(Unique("SYNTHETIC group "), Guid.NewGuid()));
         var group = (await category.Content.ReadFromJsonAsync<MaterialCategoryDto>())!;
-        var r = await c.PostAsJsonAsync("/api/system-settings/materials", new CreateMaterialRequest(name ?? Unique("SYNTHETIC material "), group.Id, Guid.NewGuid()));
+        var r = await c.PostAsJsonAsync("/api/system-settings/materials", new CreateMaterialRequest(name ?? Unique("SYNTHETIC material "), group.Id, Guid.NewGuid(), usageUnit));
         Assert.True(r.IsSuccessStatusCode, await r.Content.ReadAsStringAsync()); return (await r.Content.ReadFromJsonAsync<MaterialDto>())!;
     }
-    private static CreateMaterialPurchaseRequest Create(Guid material, decimal quantity = 2, long price = 150_000, long paid = 0, DateOnly? entered = null, DateOnly? received = null, string unit = "hộp", Guid? key = null, DateOnly? expires = null) =>
-        new(entered ?? Today, received, expires, material, quantity, unit, price, paid, key ?? Guid.NewGuid());
+    private static CreateMaterialPurchaseRequest Create(Guid material, decimal quantity = 2, long price = 150_000, long paid = 0, DateOnly? entered = null, DateOnly? received = null, string unit = "hộp", Guid? key = null, DateOnly? expires = null, decimal factor = 1) =>
+        new(entered ?? Today, received, expires, material, quantity, unit, price, paid, key ?? Guid.NewGuid(), factor);
     private static async Task<string> Body(HttpResponseMessage r) => await r.Content.ReadAsStringAsync();
 
     [Fact]
@@ -42,6 +42,56 @@ public sealed class MaterialPurchaseApiTests(ApiFixture fixture) : IClassFixture
         var renamed = await c.PutAsJsonAsync($"/api/system-settings/materials/{material.Id}", new UpdateMaterialRequest("SYNTHETIC renamed " + Guid.NewGuid().ToString("N"), material.CategoryId, material.Version, Guid.NewGuid()));
         Assert.Equal(HttpStatusCode.OK, renamed.StatusCode);
         Assert.Equal(material.Name, (await c.GetFromJsonAsync<MaterialPurchaseDto>($"{Purchases}/{row.Id}"))!.MaterialName);
+    }
+
+    [Fact]
+    public async Task UsageUnitAndConversionFactorAreSnapshottedPerRow()
+    {
+        using var c = await Login(); var material = await Material(c, usageUnit: "  sợi ");
+        Assert.Equal("sợi", material.UsageUnit);
+        var row = (await (await c.PostAsJsonAsync(Purchases, Create(material.Id, quantity: 2.5m, price: 50_000, unit: "hộp", factor: 12))).Content.ReadFromJsonAsync<MaterialPurchaseDto>())!;
+        Assert.Equal(12, row.ConversionFactor); Assert.Equal(30, row.UsageQuantity); Assert.Equal("sợi", row.UsageUnit); Assert.Equal(4166.67m, row.UsageUnitPriceVnd); Assert.Equal(125_000, row.TotalVnd);
+        var cleared = await c.PutAsJsonAsync($"/api/system-settings/materials/{material.Id}", new UpdateMaterialRequest(material.Name, material.CategoryId, material.Version, Guid.NewGuid(), null));
+        Assert.Equal(HttpStatusCode.OK, cleared.StatusCode); Assert.Null((await cleared.Content.ReadFromJsonAsync<MaterialDto>())!.UsageUnit);
+        var after = (await c.GetFromJsonAsync<MaterialPurchaseDto>($"{Purchases}/{row.Id}"))!;
+        Assert.Equal("sợi", after.UsageUnit); Assert.Equal(30, after.UsageQuantity);
+        var plain = (await (await c.PostAsJsonAsync(Purchases, Create(material.Id))).Content.ReadFromJsonAsync<MaterialPurchaseDto>())!;
+        Assert.Equal(1, plain.ConversionFactor); Assert.Equal(2, plain.UsageQuantity); Assert.Null(plain.UsageUnit);
+        var tooLong = await c.PostAsJsonAsync("/api/system-settings/materials", new CreateMaterialRequest(Unique("SYNTHETIC long "), material.CategoryId, Guid.NewGuid(), new string('a', 41)));
+        Assert.Equal(HttpStatusCode.BadRequest, tooLong.StatusCode); Assert.Contains("usageUnit", await Body(tooLong));
+    }
+
+    [Fact]
+    public async Task SupplierMustBeAnActiveNonLabCompanyAndIsSnapshotted()
+    {
+        using var c = await Login(); var material = await Material(c);
+        async Task<ProviderDto> Provider(string type)
+        {
+            var code = "T" + Guid.NewGuid().ToString("N")[..10].ToUpperInvariant();
+            var r = await c.PostAsJsonAsync("/api/system-settings/settings/catalogs/providers", new CreateSupplyRequest<ProviderInput>(Guid.NewGuid(), new ProviderInput(code, Unique("SYNTHETIC company "), type, null, null, null)));
+            Assert.True(r.IsSuccessStatusCode, await Body(r)); return (await r.Content.ReadFromJsonAsync<ProviderDto>())!;
+        }
+        var supplier = await Provider(ProviderTypes.Supplier); var lab = await Provider(ProviderTypes.Lab);
+        var ok = (await (await c.PostAsJsonAsync(Purchases, Create(material.Id) with { SupplierId = supplier.Id })).Content.ReadFromJsonAsync<MaterialPurchaseDto>())!;
+        Assert.Equal(supplier.Id, ok.SupplierId); Assert.Equal(supplier.Name, ok.SupplierName);
+        var none = (await (await c.PostAsJsonAsync(Purchases, Create(material.Id))).Content.ReadFromJsonAsync<MaterialPurchaseDto>())!;
+        Assert.Null(none.SupplierId); Assert.Null(none.SupplierName);
+        foreach (var bad in new[] { lab.Id, Guid.NewGuid() })
+        {
+            var r = await c.PostAsJsonAsync(Purchases, Create(material.Id) with { SupplierId = bad });
+            Assert.Equal(HttpStatusCode.BadRequest, r.StatusCode); Assert.Contains("PURCHASE_SUPPLIER_INVALID", await Body(r));
+        }
+    }
+
+    [Fact]
+    public async Task InvalidConversionFactorIsRejectedWithField()
+    {
+        using var c = await Login(); var material = await Material(c, usageUnit: "g");
+        foreach (var factor in new[] { 0m, -1m, 1.2345m, 1_000_001m })
+        {
+            var r = await c.PostAsJsonAsync(Purchases, Create(material.Id, factor: factor));
+            Assert.Equal(HttpStatusCode.BadRequest, r.StatusCode); Assert.Contains("conversionFactor", await Body(r));
+        }
     }
 
     [Fact]

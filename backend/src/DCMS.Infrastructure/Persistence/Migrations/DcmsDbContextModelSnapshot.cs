@@ -3468,6 +3468,10 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("UsageUnit")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
                     b.Property<int>("Version")
                         .IsConcurrencyToken()
                         .HasColumnType("integer");
@@ -3491,6 +3495,10 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(160)
                         .HasColumnType("character varying(160)");
+
+                    b.Property<decimal>("ConversionFactor")
+                        .HasPrecision(12, 3)
+                        .HasColumnType("numeric(12,3)");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -3525,6 +3533,13 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<DateOnly?>("ReceivedOn")
                         .HasColumnType("date");
 
+                    b.Property<Guid?>("SupplierId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SupplierName")
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
                     b.Property<long>("TotalVnd")
                         .HasColumnType("bigint");
 
@@ -3542,6 +3557,14 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<int>("UpdatedBy")
                         .HasColumnType("integer");
 
+                    b.Property<decimal>("UsageQuantity")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.Property<string>("UsageUnit")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
                     b.Property<int>("Version")
                         .IsConcurrencyToken()
                         .HasColumnType("integer");
@@ -3549,6 +3572,8 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("MaterialId");
+
+                    b.HasIndex("SupplierId");
 
                     b.HasIndex("EnteredOn", "Id")
                         .HasFilter("NOT \"IsDeleted\"");
@@ -6513,6 +6538,11 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasForeignKey("MaterialId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.HasOne("DCMS.Domain.Features.SystemSettings.CatalogProvider", null)
+                        .WithMany()
+                        .HasForeignKey("SupplierId")
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Material");
                 });

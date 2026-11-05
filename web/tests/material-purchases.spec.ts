@@ -5,9 +5,9 @@ type Purchase = { id: string; enteredOn: string; receivedOn: string | null; expi
 
 async function prepare(page: Page) {
   const user = { id: 7, userName: 'synthetic', fullName: 'SYNTHETIC Dentist', accountType: 'Staff', roles: ['Dentist'], effectiveRoles: ['Dentist'],
-    permissions: ['settings.read', 'catalog.materials.read', 'catalog.materials.create', 'catalog.materials.update', 'catalog.materials.deactivate'] };
-  const materials = [{ id: 'm-1', name: 'Implant SYNTHETIC', categoryName: 'Implant', version: 1 }, { id: 'm-2', name: 'Composite SYNTHETIC', categoryName: 'Trám', version: 1 }];
-  const state = { purchases: [] as Purchase[], requests: [] as any[], failNetwork: false };
+    permissions: ['settings.read', 'catalog.providers.create', 'catalog.materials.read', 'catalog.materials.create', 'catalog.materials.update', 'catalog.materials.deactivate'] };
+  const materials = [{ id: 'm-1', name: 'Implant SYNTHETIC', categoryName: 'Implant', version: 1 }, { id: 'm-2', name: 'Composite SYNTHETIC', categoryName: 'Trám', version: 1, usageUnit: 'g' }];
+  const state = { purchases: [] as Purchase[], requests: [] as any[], failNetwork: false, suppliers: [{ id: 's-1', code: 'NCC-OLD', name: 'Công ty Có Sẵn', version: 1 }] as any[], supplierRequests: [] as any[] };
   const live = () => state.purchases.filter(p => !p.isDeleted);
   await page.route('**/api/**', async route => {
     const r = route.request(), url = new URL(r.url()), path = url.pathname, method = r.method();
@@ -17,6 +17,11 @@ async function prepare(page: Page) {
     if (path === '/api/system-settings/settings/capabilities') return ok({ sections: [{ key: 'materials', label: 'Dụng cụ / Vật liệu' }] });
     if (path === '/api/system-settings/materials') return ok({ items: materials, total: materials.length, page: 1, pageSize: 100 });
     if (path === '/api/system-settings/material-categories') return ok({ items: [], total: 0, page: 1, pageSize: 100 });
+    if (path === '/api/system-settings/reference-options') return ok(state.suppliers);
+    if (path === '/api/system-settings/settings/catalogs/providers' && method === 'POST') {
+      const body = r.postDataJSON(); state.supplierRequests.push(body);
+      const created = { id: `s-${state.suppliers.length + 1}`, code: body.entry.code, name: body.entry.name, version: 1 }; state.suppliers.push(created); return ok(created);
+    }
     const id = path.split('/')[4];
     if (!path.startsWith('/api/system-settings/material-purchases')) return route.fulfill({ status: 404, json: { code: 'NOT_MOCKED', message: path } });
     if (method === 'GET') {
@@ -32,7 +37,8 @@ async function prepare(page: Page) {
     const material = materials.find(m => m.id === body.materialId)!, total = Math.round(body.quantity * body.unitPriceVnd);
     if (body.paidVnd > total) return route.fulfill({ status: 400, json: { code: 'PURCHASE_PAID_EXCEEDS_TOTAL', message: 'Số đã thanh toán không được lớn hơn Tổng.', field: 'paidVnd' } });
     const next = { enteredOn: body.enteredOn, receivedOn: body.receivedOn, expiresOn: body.expiresOn, materialId: material.id, materialName: material.name, categoryName: material.categoryName, quantity: body.quantity,
-      unit: body.unit, unitPriceVnd: body.unitPriceVnd, totalVnd: total, paidVnd: body.paidVnd, dueVnd: total - body.paidVnd };
+      unit: body.unit, unitPriceVnd: body.unitPriceVnd, totalVnd: total, paidVnd: body.paidVnd, dueVnd: total - body.paidVnd,
+      supplierId: body.supplierId ?? null, supplierName: state.suppliers.find(s => s.id === body.supplierId)?.name ?? null, conversionFactor: body.conversionFactor ?? 1, usageUnit: material.usageUnit ?? null, usageQuantity: body.quantity * (body.conversionFactor ?? 1), usageUnitPriceVnd: body.unitPriceVnd / (body.conversionFactor ?? 1) };
     if (method === 'POST') { const created = { id: crypto.randomUUID(), version: 1, ...next }; state.purchases.push(created); return ok(created); }
     Object.assign(row!, next, { version: row!.version + 1 }); return ok(row);
   });
@@ -75,6 +81,46 @@ test('thêm, sửa, lọc và xóa lần nhập hàng; tổng và còn nợ tín
   await page.getByRole('button', { name: 'Xóa nhập hàng Implant SYNTHETIC' }).click();
   await page.getByRole('button', { name: 'Đồng ý', exact: true }).click();
   await expect(page.getByText('Chưa có lần nhập hàng nào.')).toBeVisible();
+});
+
+test('hệ số quy đổi chỉ hiện khi mục có đơn vị dùng và quy ra đúng', async ({ page }) => {
+  const state = await prepare(page);
+  await page.getByRole('button', { name: 'Thêm mới', exact: true }).click();
+  await page.getByRole('combobox', { name: 'Dụng cụ/Vật liệu', exact: true }).click();
+  await page.locator('.ant-select-dropdown:visible').getByText('Implant SYNTHETIC', { exact: true }).click();
+  await expect(page.getByLabel('Hệ số quy đổi', { exact: true })).toHaveCount(0);
+  await page.getByRole('combobox', { name: 'Dụng cụ/Vật liệu', exact: true }).click({ force: true });
+  await page.locator('.ant-select-dropdown:visible').getByText('Composite SYNTHETIC', { exact: true }).click();
+  await page.getByRole('combobox', { name: 'Đơn vị', exact: true }).fill('tuýp');
+  await page.getByLabel('Số lượng', { exact: true }).fill('2');
+  await page.getByLabel('Hệ số quy đổi', { exact: true }).fill('4');
+  await page.getByLabel('Đơn giá', { exact: true }).fill('200000');
+  await expect(page.getByText('Quy ra: 8 g')).toBeVisible();
+  await page.getByRole('button', { name: 'Lưu', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Sửa nhập hàng Composite SYNTHETIC' })).toBeVisible();
+  expect(state.requests[0]).toMatchObject({ conversionFactor: 4 });
+  await expect(page.locator('.ant-table').getByText('= 8 g')).toBeVisible();
+});
+
+test('chọn hoặc thêm nhanh công ty cung cấp bằng dấu cộng', async ({ page }) => {
+  const state = await prepare(page);
+  await page.getByRole('button', { name: 'Thêm mới', exact: true }).click();
+  await page.getByRole('combobox', { name: 'Dụng cụ/Vật liệu', exact: true }).click();
+  await page.locator('.ant-select-dropdown:visible').getByText('Implant SYNTHETIC', { exact: true }).click();
+  await page.getByRole('combobox', { name: 'Đơn vị', exact: true }).fill('cái');
+  await page.getByLabel('Đơn giá', { exact: true }).fill('100000');
+  await page.getByLabel('Số lượng', { exact: true }).fill('1');
+  await expect(page.getByLabel('Số lượng', { exact: true })).toHaveValue('1');
+  await page.getByRole('button', { name: 'Thêm công ty cung cấp', exact: true }).click();
+  await page.getByLabel('Tên công ty', { exact: true }).fill('Công ty Mới SYNTHETIC');
+  await page.getByRole('button', { name: 'Lưu công ty', exact: true }).click();
+  expect(state.supplierRequests).toHaveLength(1);
+  expect(state.supplierRequests[0].entry).toMatchObject({ name: 'Công ty Mới SYNTHETIC', type: 'Supplier' });
+  expect(state.supplierRequests[0].entry.code).toMatch(/^NCC-[A-Z0-9]{6}$/);
+  await expect(page.locator('.ant-select-selection-item', { hasText: 'Công ty Mới SYNTHETIC' })).toBeVisible();
+  await page.getByRole('button', { name: 'Lưu', exact: true }).click();
+  await expect(page.locator('.ant-table').getByText('NCC: Công ty Mới SYNTHETIC')).toBeVisible();
+  expect(state.requests[0].supplierId).toBe('s-2');
 });
 
 test('mất mạng giữ form và gửi lại cùng requestKey', async ({ page }) => {
