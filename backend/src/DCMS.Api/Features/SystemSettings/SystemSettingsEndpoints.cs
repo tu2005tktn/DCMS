@@ -41,6 +41,9 @@ public static class SystemSettingsEndpoints
         purchases.MapPost("/", async (HttpContext c, CreateMaterialPurchaseRequest r, IMaterialPurchaseService s, CancellationToken ct) => { var result = await s.CreateAsync(AuthenticationEndpoints.AccountId(c.User), r, ct); return Results.Created($"/api/system-settings/material-purchases/{result.Id}", result); });
         purchases.MapPut("/{id:guid}", async (HttpContext c, Guid id, UpdateMaterialPurchaseRequest r, IMaterialPurchaseService s, CancellationToken ct) => Results.Ok(await s.UpdateAsync(AuthenticationEndpoints.AccountId(c.User), id, r, ct)));
         purchases.MapDelete("/{id:guid}", async (HttpContext c, Guid id, [FromBody] DeleteCatalogRequest r, IMaterialPurchaseService s, CancellationToken ct) => Results.Ok(await s.DeleteAsync(AuthenticationEndpoints.AccountId(c.User), id, r, ct)));
+        // Work/service statistics (docs/specs/WORK-SERVICE-STATISTICS.md); finance.read is checked by the service.
+        app.MapGet("/api/work-statistics", async (HttpContext c, DateOnly? from, DateOnly? to, int? branchId, string? q, int? page, int? pageSize, DCMS.Application.Features.Treatment.IWorkStatisticsService s, CancellationToken ct) =>
+            Results.Ok(await s.ListAsync(AuthenticationEndpoints.AccountId(c.User), from, to, branchId, q, page ?? 1, pageSize ?? 20, ct))).RequireAuthorization().WithTags("Work statistics");
         // Stock and usage history (docs/specs/MATERIAL-STOCK.md); read-only, catalog.materials.read.
         app.MapGet("/api/system-settings/material-stock", async (HttpContext c, string? q, int? page, int? pageSize, IMaterialStockService s, CancellationToken ct) =>
             Results.Ok(await s.StockAsync(AuthenticationEndpoints.AccountId(c.User), q, page ?? 1, pageSize ?? 20, ct))).RequireAuthorization().WithTags("System settings");

@@ -1,6 +1,6 @@
 import { Alert, Avatar, Button, Drawer, Layout, Menu, Typography } from 'antd';
 import type { MenuProps } from 'antd';
-import { CalendarOutlined, TeamOutlined, ScheduleOutlined, MedicineBoxOutlined, ExperimentOutlined,
+import { CalendarOutlined, TeamOutlined, ScheduleOutlined, MedicineBoxOutlined, ExperimentOutlined, BarChartOutlined,
   CreditCardOutlined, SettingOutlined, UserOutlined, FileTextOutlined, AuditOutlined, InboxOutlined,
   LinkOutlined, MenuOutlined, LogoutOutlined, CloseOutlined } from '@ant-design/icons';
 import { useEffect, useState, type ReactNode } from 'react';
@@ -33,6 +33,7 @@ export default function StaffWorkspace() {
     { key:'/materials', title:'Dụng cụ - vật liệu', icon:<ExperimentOutlined />, group:'Chuyên môn', visible:has('catalog.materials.read') },
     { key:'/clinical-services', title:'Dịch vụ cận lâm sàng', icon:<ExperimentOutlined />, group:'Chuyên môn', visible:has('services.read') },
     { key:'/payments', title:'Thanh toán', icon:<CreditCardOutlined />, group:'Quản trị', visible:has('finance.read') },
+    { key:'/work-statistics', title:'Thống kê công việc/dịch vụ', icon:<BarChartOutlined />, group:'Quản trị', visible:has('finance.read') },
     { key:'/accounts', title:'Quản lý tài khoản', icon:<AuditOutlined />, group:'Quản trị', visible:has('accounts.read') },
     { key:'/system-settings', title:'Thiết lập hệ thống', icon:<SettingOutlined />, group:'Quản trị', visible:has('settings.read') },
     { key:'/booking-settings', title:'Cài đặt đặt lịch', icon:<ScheduleOutlined />, group:'Quản trị', visible:has('booking-settings.read') },
