@@ -150,7 +150,7 @@ Mở PowerShell tại thư mục gốc:
 & .\infrastructure\scripts\start-api.ps1
 ```
 
-Lệnh thứ hai (tùy chọn) nạp dữ liệu mẫu cho phòng khám: dịch vụ, kế hoạch điều trị, danh sách tên dụng cụ/vật liệu (không có nhập/xuất). Cần chạy sau `-SeedDemo`, chỉ ở Development, chạy lại không nhân đôi dữ liệu. Chi tiết: `docs/specs/TREATMENT-CATALOG-SEED.md` và `docs/specs/MATERIAL-CATALOG-SEED.md`.
+Lệnh thứ hai (tùy chọn) nạp dữ liệu mẫu cho phòng khám: dịch vụ, kế hoạch điều trị, danh sách tên dụng cụ/vật liệu (không có nhập/xuất), công ty labo và loại công việc labo (không có giá). Cần chạy sau `-SeedDemo`, chỉ ở Development, chạy lại không nhân đôi dữ liệu. Chi tiết: `docs/specs/TREATMENT-CATALOG-SEED.md`, `docs/specs/MATERIAL-CATALOG-SEED.md` và `docs/specs/LAB-CATALOG-SEED.md`.
 
 Lệnh đầu áp dụng migration còn thiếu và thêm dữ liệu demo chưa có, rồi kết thúc. Lệnh thứ hai chạy HTTP server; giữ terminal này mở. Script đọc `.env`, đặt connection string và JWT config trong process, chạy profile `http` ở Development. API ở `http://localhost:5080`. Seed không thay đổi account đã có và không xóa dữ liệu.
 

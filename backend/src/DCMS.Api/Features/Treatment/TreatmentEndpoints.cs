@@ -70,6 +70,17 @@ public static class TreatmentEndpoints
         dossier.MapPost("/sheet-drafts/{rowId:guid}/confirm-actual", async (HttpContext context, Guid dossierId, Guid rowId,
             ConfirmSheetActualRequest request, ITreatmentDossierService service, CancellationToken ct) => Results.Ok(await service.ConfirmSheetActualAsync(
                 AuthenticationEndpoints.AccountId(context.User), dossierId, rowId, request, ct)));
+        dossier.MapGet("/lab-orders", async (HttpContext context, Guid dossierId, ITreatmentDossierService service, CancellationToken ct) =>
+            Results.Ok(await service.LabOrdersAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, ct)));
+        dossier.MapGet("/sheet-activities/{activityId:guid}/lab-order", async (HttpContext context, Guid dossierId, Guid activityId, ITreatmentDossierService service, CancellationToken ct) =>
+            Results.Ok(await service.LabOrderContextAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, activityId, ct)));
+        dossier.MapPut("/sheet-activities/{activityId:guid}/lab-order", async (HttpContext context, Guid dossierId, Guid activityId, SaveLabOrderRequest request, ITreatmentDossierService service, CancellationToken ct) =>
+            Results.Ok(await service.SaveLabOrderAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, activityId, request, ct)));
+        dossier.MapDelete("/sheet-activities/{activityId:guid}/lab-order", async (HttpContext context, Guid dossierId, Guid activityId, ITreatmentDossierService service, CancellationToken ct) =>
+        {
+            await service.DeleteLabOrderAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, activityId, ct);
+            return Results.NoContent();
+        });
         dossier.MapPut("/sheet-activities/{activityId:guid}", async (HttpContext context, Guid dossierId, Guid activityId, EditSheetActivityRequest request,
             ITreatmentDossierService service, CancellationToken ct) => Results.Ok(await service.EditSheetActivityAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, activityId, request, ct)));
         dossier.MapDelete("/sheet-activities/{activityId:guid}", async (HttpContext context, Guid dossierId, Guid activityId, [FromBody] SheetActivityActionRequest request,

@@ -373,6 +373,55 @@ public sealed class TreatmentSheetV25Tests(ApiFixture fixture) : IClassFixture<A
     }
 
     [Fact]
+    public async Task LabOrderCanBeSavedOverwrittenListedAndDeletedWithValidation()
+    {
+        using var dentist = await Login();
+        var setup = await Prepare(false); var dossier = await Create(dentist, setup);
+        var draft = await Draft(dentist, setup, dossier.Id, "Plan");
+        var plan = await dentist.PostAsJsonAsync($"/api/dossiers/{dossier.Id}/sheet-drafts/{draft.Id}/confirm-plan",
+            new ConfirmSheetPlanRequest(dossier.Version, draft.Version, null, Guid.NewGuid()));
+        dossier = (await plan.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
+        var performed = await dentist.PostAsJsonAsync($"/api/dossiers/{dossier.Id}/sheet-items/{Assert.Single(dossier.Items).Id}/perform", new SheetItemActionRequest(dossier.Version, Guid.NewGuid()));
+        var activity = (await performed.Content.ReadFromJsonAsync<ConfirmSheetActualResult>())!.Activity;
+        var url = $"/api/dossiers/{dossier.Id}/sheet-activities/{activity.Id}/lab-order";
+        Guid labId, supplierId;
+        using (var scope = fixture.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>(); var now = DateTimeOffset.UtcNow;
+            var lab = new DCMS.Domain.Features.SystemSettings.CatalogProvider { Code = "LAB-T-" + Guid.NewGuid().ToString("N")[..6], Name = "Xưởng thử", NormalizedName = "XƯỞNG THỬ", Type = "Lab", CreatedAt = now, UpdatedAt = now };
+            var supplier = new DCMS.Domain.Features.SystemSettings.CatalogProvider { Code = "SUP-T-" + Guid.NewGuid().ToString("N")[..6], Name = "Cung cấp thử", NormalizedName = "CUNG CẤP THỬ", Type = "Supplier", CreatedAt = now, UpdatedAt = now };
+            db.AddRange(lab, supplier); await db.SaveChangesAsync(); labId = lab.Id; supplierId = supplier.Id;
+        }
+        var context = (await dentist.GetFromJsonAsync<LabOrderContext>(url))!;
+        Assert.Null(context.Order); Assert.False(string.IsNullOrEmpty(context.Patient.Name)); Assert.Contains(context.Options.Labs, l => l.Id == labId);
+        Assert.DoesNotContain(context.Options.Labs, l => l.Id == supplierId); Assert.NotEmpty(context.Options.Dentists);
+        var dentistId = context.Options.DefaultDentistId ?? context.Options.Dentists[0].Id;
+        var today = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7));
+        SaveLabOrderRequest Request(Action<Dictionary<string, object?>>? tweak = null, int? version = null) => new(null, today, today.AddDays(7), null, dentistId, labId, null, "Mão sứ", "Vai", null, null,
+            ["ovoid"], false, ["36", "37"], new() { ["1"] = "A2" }, "Gửi gấp", "Zirconia", 2, 3_000_000, 1_000_000, "7 năm", version);
+
+        var saved = await dentist.PutAsJsonAsync(url, Request()); Assert.True(saved.IsSuccessStatusCode, await saved.Content.ReadAsStringAsync());
+        var order = (await saved.Content.ReadFromJsonAsync<LabOrderDto>())!; Assert.Equal(1, order.Version); Assert.Equal(["36", "37"], order.Teeth); Assert.Equal("A2", order.Shade["1"]);
+        var list = (await dentist.GetFromJsonAsync<LabOrderSummary[]>($"/api/dossiers/{dossier.Id}/lab-orders"))!;
+        Assert.Equal("Mão sứ", Assert.Single(list).WorkName);
+        Assert.Equal(HttpStatusCode.Conflict, (await dentist.PutAsJsonAsync(url, Request(version: 9))).StatusCode);
+        var again = await dentist.PutAsJsonAsync(url, Request(version: 1) with { Quantity = 3 });
+        Assert.Equal(2, (await again.Content.ReadFromJsonAsync<LabOrderDto>())!.Version);
+
+        foreach (var bad in new[] { Request(version: 2) with { Teeth = ["99"] }, Request(version: 2) with { Teeth = ["36", "36"] }, Request(version: 2) with { Teeth = ["55"] },
+            Request(version: 2) with { DeliveredOn = today.AddDays(-1) }, Request(version: 2) with { PaidVnd = 4_000_000 }, Request(version: 2) with { WorkName = " " },
+            Request(version: 2) with { DentistId = -5 }, Request(version: 2) with { LabProviderId = supplierId }, Request(version: 2) with { MarginInner = "Lạ" },
+            Request(version: 2) with { Shade = new() { ["9"] = "A1" } }, Request(version: 2) with { Quantity = 0 } })
+            Assert.Equal(HttpStatusCode.BadRequest, (await dentist.PutAsJsonAsync(url, bad)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await dentist.PutAsJsonAsync(url, Request(version: 2) with { IsChild = true, Teeth = ["55"] })).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await dentist.GetAsync($"/api/dossiers/{dossier.Id}/sheet-activities/{Guid.NewGuid()}/lab-order")).StatusCode);
+
+        Assert.Equal(HttpStatusCode.NoContent, (await dentist.DeleteAsync(url)).StatusCode);
+        Assert.Empty((await dentist.GetFromJsonAsync<LabOrderSummary[]>($"/api/dossiers/{dossier.Id}/lab-orders"))!);
+        Assert.Equal(HttpStatusCode.NotFound, (await dentist.DeleteAsync(url)).StatusCode);
+    }
+
+    [Fact]
     public async Task DirectTreatmentChargeCanBeCollectedInPartsAndSummaryUsesConfirmedAllocations()
     {
         using var dentist = await Login(); using var cashier = await Login("owner.demo");

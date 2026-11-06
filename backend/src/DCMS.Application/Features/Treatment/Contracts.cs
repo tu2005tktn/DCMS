@@ -117,6 +117,10 @@ public interface ITreatmentDossierService
     Task<NextVisitCandidates> NextVisitCandidatesAsync(int actorId, int patientId, CancellationToken ct);
     Task<PlannedDatePreview> PlannedDatePreviewAsync(int actorId, Guid dossierId, Guid itemId, DateOnly plannedOn, CancellationToken ct);
     Task<TreatmentChange> ApplyPlannedDatesAsync(int actorId, Guid dossierId, ApplyPlannedDatesRequest request, CancellationToken ct);
+    Task<IReadOnlyList<LabOrderSummary>> LabOrdersAsync(int actorId, Guid dossierId, CancellationToken ct);
+    Task<LabOrderContext> LabOrderContextAsync(int actorId, Guid dossierId, Guid activityId, CancellationToken ct);
+    Task<LabOrderDto> SaveLabOrderAsync(int actorId, Guid dossierId, Guid activityId, SaveLabOrderRequest request, CancellationToken ct);
+    Task DeleteLabOrderAsync(int actorId, Guid dossierId, Guid activityId, CancellationToken ct);
     Task<DossierPaymentContext> PaymentContextAsync(int actorId, Guid dossierId, CancellationToken ct);
     Task<IReadOnlyList<DossierPaymentDto>> PaymentsAsync(int actorId, Guid dossierId, CancellationToken ct);
     Task<DossierPaymentDto> CreatePaymentAsync(int actorId, Guid dossierId, CreateDossierPaymentRequest request, CancellationToken ct);

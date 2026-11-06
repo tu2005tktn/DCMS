@@ -144,6 +144,7 @@ if (args.Contains("--seed-clinic-catalog"))
     using var catalogScope = app.Services.CreateScope();
     Console.WriteLine(await catalogScope.ServiceProvider.GetRequiredService<DCMS.Infrastructure.Features.Treatment.DevelopmentTreatmentCatalogSeeder>().SeedAsync(args.Contains("--refresh")));
     Console.WriteLine(await catalogScope.ServiceProvider.GetRequiredService<DCMS.Infrastructure.Features.SystemSettings.DevelopmentMaterialSeeder>().SeedAsync());
+    Console.WriteLine(await catalogScope.ServiceProvider.GetRequiredService<DCMS.Infrastructure.Features.SystemSettings.DevelopmentLabSeeder>().SeedAsync());
     return;
 }
 

@@ -16,7 +16,7 @@ Dùng chung lệnh với dữ liệu dịch vụ/kế hoạch: `--seed-clinic-ca
 ## Không nạp (đã bỏ 06/11/2026)
 
 - **Nhập hàng** (`MaterialPurchase`), tồn kho, xuất dùng (`MaterialUsage`) và **công ty cung cấp mẫu**: không nạp. Người dùng tự ghi nhập/xuất khi chạy thử.
-- **Dữ liệu labo** (công ty labo, loại công việc labo): không có dữ liệu mẫu.
+- Công ty labo và loại công việc labo: xem [LAB-CATALOG-SEED.md](LAB-CATALOG-SEED.md).
 
 ## Quy tắc dữ liệu
 

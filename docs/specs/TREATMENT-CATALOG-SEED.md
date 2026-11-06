@@ -33,7 +33,7 @@ Từ thư mục gốc, sau khi PostgreSQL và biến môi trường development 
 dotnet run --project backend\src\DCMS.Api --no-build --launch-profile http -- --seed-clinic-catalog
 ```
 
-Cách ngắn hơn: `& .\infrastructure\scripts\start-api.ps1 -SeedClinicCatalog`. Lệnh cũng nạp luôn danh sách tên dụng cụ/vật liệu (chỉ danh mục, không nhập/xuất) ([MATERIAL-CATALOG-SEED.md](MATERIAL-CATALOG-SEED.md)). Lệnh chỉ nạp rồi thoát, in số dịch vụ và số kế hoạch đã tạo/bỏ qua. Chỉ chạy khi `ASPNETCORE_ENVIRONMENT=Development`, nếu không sẽ báo lỗi.
+Cách ngắn hơn: `& .\infrastructure\scripts\start-api.ps1 -SeedClinicCatalog`. Lệnh cũng nạp luôn danh sách tên dụng cụ/vật liệu (chỉ danh mục, không nhập/xuất) và công ty, loại công việc labo ([LAB-CATALOG-SEED.md](LAB-CATALOG-SEED.md)) ([MATERIAL-CATALOG-SEED.md](MATERIAL-CATALOG-SEED.md)). Lệnh chỉ nạp rồi thoát, in số dịch vụ và số kế hoạch đã tạo/bỏ qua. Chỉ chạy khi `ASPNETCORE_ENVIRONMENT=Development`, nếu không sẽ báo lỗi.
 
 ## Kiểm thử
 
