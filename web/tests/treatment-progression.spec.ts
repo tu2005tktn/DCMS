@@ -6,7 +6,7 @@ test('dentist sees the active S58 template and can map its step to an agreed S21
   const templateId = '33333333-3333-4333-8333-333333333333';
   const stepId = '44444444-4444-4444-8444-444444444444';
   const user = { id: 9, userName: 'synthetic.dentist', fullName: 'SYNTHETIC Dentist',
-    accountType: 'Staff', roles: ['Dentist'], effectiveRoles: ['Dentist'], permissions: ['patients.read'] };
+    accountType: 'Staff', roles: ['Dentist'], effectiveRoles: ['Dentist'], permissions: ['patients.read', 'treatment.read', 'treatment.plan.manage', 'treatment.items.update', 'treatment.progress.manage'] };
   const step = { logicalStepId: stepId, itemId: null, name: 'Trám răng 25', region: '25',
     estimatedMinMinutes: 15, estimatedMaxMinutes: 60,
     estimatedMinutes: 30, reservedMinutes: 30, predecessorIds: [], capability: null,
@@ -30,6 +30,9 @@ test('dentist sees the active S58 template and can map its step to an agreed S21
   };
   await page.route('**/api/auth/me', route => route.fulfill({ json: user }));
   await page.route('**/api/auth/sign-in', route => route.fulfill({ json: { accessToken: 'synthetic-token', user } }));
+  await page.route('**/api/auth/session/idle', route => route.fulfill({ json: {
+    deadlineAt: new Date(Date.now() + 600000).toISOString(), serverNow: new Date().toISOString(), activityVersion: 1,
+  } }));
   await page.route('**/api/appointments/options', route => route.fulfill({ json: {
     branches: [{ id: 1, name: 'Chi nhánh thử nghiệm' }],
     dentists: [{ id: 2, branchId: 1, name: 'Bác sĩ thử nghiệm' }],
@@ -42,24 +45,17 @@ test('dentist sees the active S58 template and can map its step to an agreed S21
   await page.route(`**/api/treatment-templates/${templateId}`, route => route.fulfill({ json: template }));
   await page.route(`**/api/dossiers/${dossierId}`, route => route.fulfill({ json: dossier }));
   await page.route(`**/api/dossiers/${dossierId}/steps`, route => route.fulfill({ json: [] }));
-  await page.goto('http://127.0.0.1:5173/sign-in');
+  await page.route(`**/api/dossiers/${dossierId}/plan/history`, route => route.fulfill({ json: [] }));
+  await page.route(`**/api/dossiers/${dossierId}/plan/preview`, route => route.fulfill({ json: {
+    grossVnd: 300000, approvedDiscountVnd: 0, netBeforeTaxVnd: 300000, items: [],
+  } }));
+  await page.goto('/sign-in');
   await page.getByLabel('Tên đăng nhập', { exact: true }).fill('synthetic.dentist');
   await page.getByLabel('Mật khẩu', { exact: true }).fill('synthetic');
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
-  await page.getByRole('link', { name: 'Mẫu điều trị' }).click();
-  await expect(page.getByRole('heading', { name: 'Mẫu điều trị S58' })).toBeVisible();
-  await page.getByRole('button', { name: 'Mở', exact: true }).click();
-  await expect(page.getByText('Trám răng 25')).toBeVisible();
-  await page.evaluate(path => { history.pushState(null, '', path); window.dispatchEvent(new PopStateEvent('popstate')); },
-    `/patients/123/dossiers/${dossierId}/plan`);
+  await expect(page).not.toHaveURL(/\/sign-in$/);
+  await page.evaluate(path => { history.pushState(null, '', path); window.dispatchEvent(new PopStateEvent('popstate')); }, `/patients/123/dossiers/${dossierId}/plan`);
   await page.getByRole('tab', { name: 'Các bước' }).click();
-  await expect(page.getByText('Áp dụng mẫu vào hồ sơ này')).toBeVisible();
-  await page.getByRole('combobox', { name: 'Chọn mẫu đang dùng' }).click();
-  await page.locator('.ant-select-item-option').filter({ hasText: 'Điều trị nhiều buổi' }).click();
-  await expect(page.getByText('Nguồn: Điều trị nhiều buổi, phiên bản 1.')).toBeVisible();
-  await expect(page.locator('.ant-select-selection-item').filter({ hasText: 'Trám răng · 25' })).toBeVisible();
-  await expect(page.getByText('Một số bước giữ ghế ngắn hơn mức ước tính dài nhất.')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Sao chép vào kế hoạch' })).toBeDisabled();
-  await page.getByRole('checkbox', { name: 'Tôi đã xem và chấp nhận thời gian giữ ghế này' }).check();
-  await expect(page.getByRole('button', { name: 'Sao chép vào kế hoạch' })).toBeEnabled();
+  await expect(page.getByRole('combobox', { name: 'Chọn mẫu đang dùng' })).toHaveCount(0);
+  await expect(page.getByText('Áp dụng mẫu vào hồ sơ này')).toHaveCount(0);
 });

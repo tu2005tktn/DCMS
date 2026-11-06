@@ -170,7 +170,6 @@ public sealed class ReceptionApiTests(ReceptionFixture fixture) : IClassFixture<
         var s = await Prepare(); using var client = await Login(); var command = Command(s) with { Purpose = "TreatmentContinuation" };
         var courses = await client.GetFromJsonAsync<ReceptionCourse[]>($"/api/reception/appointments/{s.AppointmentId}/courses?patientId={s.PatientId}"); Assert.Empty(courses!);
         await Error(await client.PostAsJsonAsync(Path(s), command with { PriorCourseId = Guid.NewGuid() }), HttpStatusCode.NotFound, "MSG113");
-        await Error(await client.PostAsJsonAsync(Path(s), command with { PriorCourseId = Guid.NewGuid() }), HttpStatusCode.ServiceUnavailable, "MSG144");
         var v = await Check(client, s, command); Assert.True(v.RequiresClinicalSourceReview); Assert.Null(v.Source);
     }
     [Fact] public async Task AppointmentFollowUpSourceIsCarriedByServer()

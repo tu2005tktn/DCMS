@@ -1,6 +1,6 @@
 # DCMS-111 S17 S18 Tiếp nhận check-in và hàng chờ khám
 
-Ngày chốt contract: **25/10/2026**. Trạng thái ngày **26/10/2026**: đã triển khai phần tiếp nhận DCMS-111 và đọc Visit bàn giao; xem [bằng chứng và giới hạn](../implementation/DCMS-111-RECEPTION.md). Nguồn: yêu cầu người dùng trong phiên này; [DCMS-111](https://capstone-fpt-fa26.atlassian.net/browse/DCMS-111), [luồng DCMS-110](CLINIC-FLOW-DCMS-110.vi.md), [UC/GBR/MSG v2.4](DCMS_Use_Cases_Business_Rules_Messages_v2.4.docx) UC-07 và [Screen Specifications v2.4](DCMS_Screen_Specifications_v2.4.docx) S17/S18.
+Ngày chốt contract: **25/10/2026**. Trạng thái ngày **26/10/2026**: đã triển khai phần tiếp nhận DCMS-111 và đọc Visit bàn giao; xem [bằng chứng và giới hạn](../implementation/DCMS-111-RECEPTION.md). Nguồn: yêu cầu người dùng trong phiên này; [DCMS-111](https://capstone-fpt-fa26.atlassian.net/browse/DCMS-111), [luồng DCMS-110](CLINIC-FLOW-DCMS-110.vi.md), [UC/GBR/MSG v2.5](DCMS_Use_Cases_Business_Rules_Messages_v2.5.docx) UC-07 và [Screen Specifications v2.5](DCMS_Screen_Specifications_v2.5.docx) S17/S18.
 
 ## Quyết định triển khai ngày 25/10/2026
 

@@ -1,3 +1,4 @@
+import CustomerDashboard from './CustomerDashboard';
 import { Alert, Button, Card, Form, Input, Spin, Typography } from 'antd';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link, Navigate, NavLink, Outlet, useNavigate } from 'react-router-dom';
@@ -9,7 +10,18 @@ import { useCustomerAuth } from './CustomerAuthContext';
 type Registration = { fullName: string; phoneNumber: string; email: string; password: string; confirmPassword: string };
 type CredentialPolicy = { requiredLength: number; maximumLength: number; requireDigit: boolean;
   requireLowercase: boolean; requireUppercase: boolean; requireNonAlphanumeric: boolean };
+type AuthIssue = { field: string; message: string };
 const phonePattern = /^0[35789][0-9]{8}$/;
+
+function AuthErrorSummary({ issues, formName, id }: { issues: AuthIssue[]; formName: string; id: string }) {
+  if (issues.length === 0) return null;
+  return <div id={id} className="customer-form-error-summary" role="alert" tabIndex={-1}>
+    <strong>Kiểm tra lại thông tin sau:</strong>
+    <ul>{issues.map(issue => <li key={issue.field}>
+      <a href={`#${formName}_${issue.field}`}>{issue.message}</a>
+    </li>)}</ul>
+  </div>;
+}
 
 function ToothMark({ className = '' }: { className?: string }) {
   return <svg className={className} viewBox="0 0 64 64" fill="none" aria-hidden="true" focusable="false">
@@ -94,6 +106,7 @@ export function CustomerShell() {
     </div></header>
     <nav aria-label="Điều hướng khách hàng" className="customer-navigation"><div className="customer-nav-inner">
       <NavLink to="/customer/home" end className={({ isActive }) => `customer-nav-link${isActive ? ' active' : ''}`}>Trang chủ</NavLink>
+      <NavLink to="/customer/family-members" aria-label="Người thân của tôi" className={({ isActive }) => `customer-nav-link${isActive ? ' active' : ''}`}><span className="customer-nav-long">Người thân của tôi</span><span className="customer-nav-short" aria-hidden="true">Người thân</span></NavLink>
       <NavLink to="/customer/appointments" aria-label="Lịch hẹn của tôi" className={({ isActive }) => `customer-nav-link${isActive ? ' active' : ''}`}><span className="customer-nav-long">Lịch hẹn của tôi</span><span className="customer-nav-short" aria-hidden="true">Lịch hẹn</span></NavLink>
       <NavLink to="/customer/patient-link" aria-label="Liên kết hồ sơ" className={({ isActive }) => `customer-nav-link${isActive ? ' active' : ''}`}><span className="customer-nav-long">Liên kết hồ sơ</span><span className="customer-nav-short" aria-hidden="true">Hồ sơ</span></NavLink>
     </div></nav>
@@ -106,6 +119,9 @@ export function CustomerSignInPage() {
   const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [issues, setIssues] = useState<AuthIssue[]>([]);
+  const [validationAttempt, setValidationAttempt] = useState(0);
+  useEffect(() => { if (validationAttempt > 0) document.getElementById('customer-sign-in-errors')?.focus(); }, [validationAttempt]);
   if (state.status === 'authenticated') return <Navigate to="/customer/home" replace />;
 
   async function submit(values: { userName: string; password: string }) {
@@ -123,7 +139,13 @@ export function CustomerSignInPage() {
     footer={<Link to="/access">Chọn lại cổng đăng nhập</Link>}>
       {(error || (state.status === 'anonymous' && state.message)) &&
         <Alert className="form-alert" type="error" showIcon message={error ?? (state.status === 'anonymous' ? state.message : '')} />}
-      <Form layout="vertical" requiredMark={false} onFinish={values => void submit(values)} disabled={busy}>
+      <Form name="customer-sign-in" layout="vertical" requiredMark={false} onFinish={values => void submit(values)} disabled={busy}
+        onFinishFailed={({ errorFields }) => {
+          setIssues(errorFields.map(field => ({ field: String(field.name[0]), message: field.errors[0] })));
+          setValidationAttempt(value => value + 1);
+        }}
+        onValuesChange={changed => setIssues(current => current.filter(issue => !(issue.field in changed)))}>
+        <AuthErrorSummary id="customer-sign-in-errors" formName="customer-sign-in" issues={issues} />
         <Form.Item name="userName" label="Số điện thoại" rules={[{ required: true, message: 'Vui lòng nhập số điện thoại.' },
           { pattern: phonePattern, message: 'Nhập số di động Việt Nam gồm 10 chữ số.' }]}>
           <Input autoComplete="username" inputMode="numeric" maxLength={10} />
@@ -148,6 +170,9 @@ export function CustomerRegisterPage() {
   const [error, setError] = useState<string | null>(null);
   const [duplicateContact, setDuplicateContact] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
+  const [issues, setIssues] = useState<AuthIssue[]>([]);
+  const [validationAttempt, setValidationAttempt] = useState(0);
+  useEffect(() => { if (validationAttempt > 0) document.getElementById('customer-register-errors')?.focus(); }, [validationAttempt]);
   useEffect(() => { void customerApi<CredentialPolicy>('/api/auth/policy').then(setPolicy).catch(() => undefined); }, []);
 
   async function submit(values: Registration) {
@@ -177,7 +202,13 @@ export function CustomerRegisterPage() {
       {error && <Alert className="form-alert" type="error" showIcon message={error}
         description={duplicateContact ? <>Số điện thoại hoặc email có thể đã được sử dụng. Hãy <Link to="/customer/sign-in">đăng nhập</Link> hoặc <Link to="/customer/recover">khôi phục tài khoản</Link>.</> : undefined} />}
       {success && <Alert className="form-alert" type="success" showIcon message={`${success} Đang chuyển tới đăng nhập...`} />}
-      <Form form={form} layout="vertical" requiredMark={false} onFinish={values => void submit(values)} disabled={busy || !!success}>
+      <Form form={form} name="customer-register" layout="vertical" requiredMark={false} onFinish={values => void submit(values)} disabled={busy || !!success}
+        onFinishFailed={({ errorFields }) => {
+          setIssues(errorFields.map(field => ({ field: String(field.name[0]), message: field.errors[0] })));
+          setValidationAttempt(value => value + 1);
+        }}
+        onValuesChange={changed => setIssues(current => current.filter(issue => !(issue.field in changed)))}>
+        <AuthErrorSummary id="customer-register-errors" formName="customer-register" issues={issues} />
         <Form.Item name="fullName" label="Họ tên" rules={[{ required: true, whitespace: true, message: 'Vui lòng nhập họ tên.' },
           { max: 160, message: 'Họ tên không được vượt quá 160 ký tự.' }]}>
           <Input autoComplete="name" maxLength={160} />
@@ -218,26 +249,4 @@ export function CustomerRegisterPage() {
   </CustomerAuthFrame>;
 }
 
-export function CustomerHomePage() {
-  const { state } = useCustomerAuth();
-  if (state.status !== 'authenticated') return null;
-  return <div className="customer-home">
-    <div className="customer-page-heading"><span className="customer-kicker">Trang chủ</span>
-      <h1>Xin chào, {state.user.fullName}</h1>
-      <p>Đặt lịch khám, xem lịch hẹn và theo dõi hồ sơ của chính bạn tại đây.</p></div>
-    <section className="customer-home-primary" aria-labelledby="customer-book-title">
-      <div><h2 id="customer-book-title">Đặt lịch khám</h2>
-        <p>Chọn chi nhánh, bác sĩ và khung giờ phù hợp cho bản thân hoặc người thân.</p>
-        <Link to="/customer/book" className="customer-link-button customer-link-button-light">Bắt đầu đặt lịch</Link></div>
-      <div className="customer-home-mark"><ToothMark /></div>
-    </section>
-    <div className="customer-home-grid">
-      <Card className="customer-action-card"><h2>Lịch hẹn của tôi</h2>
-        <p>Xem lịch sắp tới, lịch sử và những lịch có thể đổi hoặc hủy.</p>
-        <Link to="/customer/appointments" className="customer-text-action">Xem lịch hẹn <span aria-hidden="true">→</span></Link></Card>
-      <Card className="customer-action-card"><h2>Liên kết hồ sơ của tôi</h2>
-        <p>Gửi yêu cầu và theo dõi việc xác minh hồ sơ của chính bạn.</p>
-        <Link to="/customer/patient-link" className="customer-text-action">Liên kết hồ sơ của tôi <span aria-hidden="true">→</span></Link></Card>
-    </div>
-  </div>;
-}
+export function CustomerHomePage() { return <CustomerDashboard />; }

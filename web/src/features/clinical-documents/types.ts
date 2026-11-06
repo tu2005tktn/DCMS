@@ -36,6 +36,7 @@ export type PatientDocumentContexts = {
   plans: { id: string; label: string; dossierId: string }[];
 };
 export type DocumentQuery = {
+  imagesOnly?: boolean;
   patientId: number; visitId?: string; dossierId?: string; planId?: string; type?: DocumentType; from?: string; to?: string;
   page: number; pageSize: number;
 };
@@ -54,7 +55,7 @@ export const formatBytes = (n: number) => n < 1024 * 1024 ? `${Math.max(1, Math.
 export const formatDay = (iso: string) => iso.slice(0, 10).split('-').reverse().join('/');
 export const formatStamp = (iso: string) => new Date(iso).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
 export function contextLabel(c: DocumentContextRef) {
-  return [c.visitLabel, c.dossierLabel, c.planLabel].filter(Boolean).join(' · ') || 'Hồ sơ chung';
+  return [c.visitLabel, c.dossierLabel, c.planLabel, c.investigationLabel].filter(Boolean).join(' · ') || 'Hồ sơ chung';
 }
 export function newRequestKey() {
   return typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID()

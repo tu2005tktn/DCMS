@@ -54,6 +54,10 @@ public static class DependencyInjection
         services.AddScoped<IEmailVerificationService, EmailVerificationService>();
         services.AddScoped<IAccountService, AccountService>();
         services.AddScoped<IAuthenticationService, AuthenticationService>();
+        services.AddScoped<StaffIdleService>();
+        services.AddScoped<IStaffIdleService>(sp => sp.GetRequiredService<StaffIdleService>());
+        services.AddScoped<DCMS.Application.Features.Settings.ISettingsAccess, Features.Settings.SettingsAccess>();
+        services.AddScoped<DCMS.Application.Features.Settings.ISettingsService, Features.Settings.SettingsService>();
         services.AddScoped<IRegistrationService, RegistrationService>();
         services.AddHttpClient();
         services.AddSingleton<IGoogleTokenVerifier, GoogleTokenVerifier>();
@@ -65,7 +69,11 @@ public static class DependencyInjection
         services.AddScoped<IPatientService, PatientService>();
         services.AddScoped<ITreatmentDossierService, TreatmentDossierService>();
         services.AddScoped<IServicePriceService, ServicePriceService>();
-        services.AddScoped<ITreatmentFinancialSummaryPort, UnavailableTreatmentFinancialSummaryPort>();
+        services.AddScoped<Features.Finance.FinanceService>();
+        services.AddScoped<DCMS.Application.Features.Finance.IExaminationFeeService,Features.Finance.ExaminationFeeService>();
+        services.AddScoped<DCMS.Application.Features.Finance.IFinanceService>(sp=>sp.GetRequiredService<Features.Finance.FinanceService>());
+        services.AddScoped<DCMS.Application.Features.Prescriptions.IPrescriptionService, Features.Prescriptions.PrescriptionService>();
+        services.AddScoped<ITreatmentFinancialSummaryPort, Features.Finance.TreatmentFinancialSummaryPort>();
         services.AddScoped<ITreatmentFinancialWorkspace, TreatmentFinancialWorkspace>();
         services.AddScoped<ITreatmentRevisionService, TreatmentRevisionService>();
         services.AddScoped<ITreatmentRevisionActualPort, UnavailableRevisionActualPort>();
@@ -75,7 +83,8 @@ public static class DependencyInjection
         services.AddScoped<IClinicalWorkService, ClinicalWorkService>();
         services.AddScoped<IClinicalVisitPort, Features.Examinations.ClinicalVisitPort>();
         services.AddScoped<IClinicalConsentPort, ClinicalConsentPort>();
-        services.AddScoped<IClinicalChargePort, OutboxClinicalChargePort>();
+        services.AddScoped<OutboxClinicalChargePort>();
+        services.AddScoped<IClinicalChargePort, Features.Finance.ClinicalChargePort>();
         services.AddScoped<ICareTaskService, CareTaskService>();
         services.AddScoped<ITreatmentLabReadinessPort, UnavailableTreatmentLabReadinessPort>();
         services.AddScoped<ITreatmentVisitActivitySourcePort, UnavailableTreatmentVisitActivitySourcePort>();
@@ -93,11 +102,11 @@ public static class DependencyInjection
         services.AddScoped<DCMS.Application.Features.Reception.IReceptionService, Features.Reception.ReceptionService>();
         services.AddScoped<DCMS.Application.Features.Reception.IReceptionSourceReader, Features.Examinations.ReceptionTreatmentSourceReader>();
         services.AddScoped<Features.Examinations.ClinicalAccess>();
+        services.AddScoped<DCMS.Application.Features.Examinations.IInvestigationService, Features.Examinations.InvestigationService>();
         services.AddScoped<DCMS.Application.Features.Examinations.IExaminationService, Features.Examinations.ExaminationService>();
         services.AddScoped<DCMS.Application.Features.Examinations.IClinicalDocumentService, Features.Examinations.ClinicalDocumentService>();
         services.AddSingleton<DCMS.Application.Features.Examinations.IClinicalFileScanner, Features.Examinations.ClamAvClinicalFileScanner>();
         services.AddHostedService<Features.Examinations.ClinicalScanWorker>();
-        services.AddScoped<DCMS.Application.Features.Reception.IReceptionSourceReader, Features.Reception.UnavailableReceptionSourceReader>();
         services.AddScoped<IAppointmentQueryService, AppointmentQueryService>();
         services.AddScoped<IAppointmentChangeService, AppointmentChangeService>();
         services.AddScoped<ISupportRequestService, SupportRequestService>();
@@ -128,6 +137,18 @@ public static class DependencyInjection
         }
         else services.AddScoped<IEmailVerificationDelivery, UnavailableEmailVerificationDelivery>();
         services.AddScoped<DCMS.Application.Features.SystemSettings.ISystemCatalogService, Features.SystemSettings.SystemCatalogService>();
+        services.AddScoped<DCMS.Application.Features.SystemSettings.IMaterialPurchaseService, Features.SystemSettings.MaterialPurchaseService>();
+        services.AddScoped<DCMS.Application.Features.SystemSettings.IMaterialStockService, Features.SystemSettings.MaterialStockService>();
+        services.AddScoped<DCMS.Application.Features.Treatment.IWorkStatisticsService, Features.Treatment.WorkStatisticsService>();
+        services.AddScoped<DCMS.Application.Features.SystemSettings.IGeneralSettingsService, Features.SystemSettings.GeneralSettingsService>();
+        services.AddScoped<DCMS.Application.Features.SystemSettings.IReferenceCatalogService, Features.SystemSettings.ReferenceCatalogService>();
+        services.AddScoped<DCMS.Application.Features.SystemSettings.ISupplyCatalog<DCMS.Application.Features.SystemSettings.ProviderInput, DCMS.Application.Features.SystemSettings.ProviderDto>, Features.SystemSettings.ProviderCatalog>();
+        services.AddScoped<DCMS.Application.Features.SystemSettings.ISupplyCatalog<DCMS.Application.Features.SystemSettings.LabWorkTypeInput, DCMS.Application.Features.SystemSettings.LabWorkTypeDto>, Features.SystemSettings.LabWorkTypeCatalog>();
+        services.AddScoped<Features.SystemSettings.MedicineCatalog>();
+        services.AddScoped<DCMS.Application.Features.SystemSettings.IMedicineCatalog>(sp => sp.GetRequiredService<Features.SystemSettings.MedicineCatalog>());
+        services.AddScoped<DCMS.Application.Features.SystemSettings.ISupplyCatalog<DCMS.Application.Features.SystemSettings.MedicineInput, DCMS.Application.Features.SystemSettings.MedicineDto>>(sp => sp.GetRequiredService<Features.SystemSettings.MedicineCatalog>());
+        services.AddScoped<DCMS.Application.Features.FamilyMembers.IFamilyMemberService, Features.FamilyMembers.FamilyMemberService>();
+        services.AddScoped<DCMS.Application.Features.Treatment.IItemPlanService, Features.Treatment.ItemPlanService>();
         return services;
     }
 }

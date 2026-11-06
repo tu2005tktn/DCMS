@@ -16,6 +16,16 @@ public sealed class PatientProfile
     public string? GuardianRelationship { get; set; }
     public string? GuardianPhone { get; set; }
     public string? Note { get; set; }
+    // S58 đợt 3: administrative fields backed by REFERENCE_ENTRY catalogs (docs/specs/S58-PATIENT-CATALOG-FIELDS.md).
+    public DateOnly? ProfileDate { get; set; }
+    public Guid? SourceId { get; set; }
+    public Guid? CustomerGroupId { get; set; }
+    public Guid? OccupationId { get; set; }
+    // Patient-reported intake history; it never replaces dentist-reviewed findings in S19.
+    public Guid[] IntakeHistoryIds { get; set; } = [];
+    public string? IntakeHistoryOther { get; set; }
+    public DateTimeOffset? IntakeRecordedAt { get; set; }
+    public int? IntakeRecordedBy { get; set; }
     public bool IsArchived { get; set; }
     public DateTimeOffset? ArchivedAt { get; set; }
     public string? ArchiveReason { get; set; }
@@ -42,6 +52,16 @@ public sealed class PatientAudit
     public string? Reason { get; set; }
     public string ChangesJson { get; set; } = "[]";
     public DateTimeOffset OccurredAt { get; set; }
+}
+
+// DCMS-122: a create retried with the same actor + requestKey returns this patient instead of issuing a second code.
+public sealed class PatientCreateReceipt
+{
+    public int ActorId { get; set; }
+    public Guid RequestKey { get; set; }
+    public string Fingerprint { get; set; } = "";
+    public int PatientId { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
 }
 
 public static class PatientAuditActions

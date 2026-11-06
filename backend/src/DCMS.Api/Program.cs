@@ -54,7 +54,8 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
             // Trust current database roles, never a stale JWT role claim.
             var identity = new ClaimsIdentity([
                 new Claim("sub", accountId.ToString()), new Claim("sid", sessionId.ToString()),
-                .. current.EffectiveRoles.Select(role => new Claim(ClaimTypes.Role, role))
+                .. current.EffectiveRoles.Select(role => new Claim(ClaimTypes.Role, role)),
+                .. current.Permissions.Select(permission => new Claim("permission",permission))
             ], "CurrentSession", "sub", ClaimTypes.Role);
             context.Principal = new ClaimsPrincipal(identity);
             context.HttpContext.Items["CurrentUser"] = current;
@@ -91,10 +92,13 @@ builder.Services.AddAuthorizationBuilder()
     // Guest is effective for every public account (Patient inherits it) and never for staff.
     .AddPolicy(PatientLinkEndpoints.PublicAccountPolicy, policy => policy.RequireRole(AccountRoles.Guest))
     // Admin, Dentist and Clinic Owner do not inherit link verification.
-    .AddPolicy(PatientLinkEndpoints.VerifyPolicy, policy => policy.RequireRole(AccountRoles.ClinicAssistant))
+    .AddPolicy(PatientLinkEndpoints.VerifyPolicy, policy => policy.RequireRole(AccountRoles.ClinicAssistant).RequireAssertion(c => c.User.HasClaim("permission","patient-links.read") || c.User.HasClaim("permission","patient-links.verify")))
     // S05/S06: Admin has no patient access (GBR-026); Clinic Owner reads through effective Dentist.
-    .AddPolicy(PatientEndpoints.ReadPolicy, policy => policy.RequireRole(AccountRoles.ClinicAssistant, AccountRoles.Dentist))
-    .AddPolicy(PatientEndpoints.ManagePolicy, policy => policy.RequireRole(AccountRoles.ClinicAssistant))
+    .AddPolicy(PatientEndpoints.ReadPolicy, policy => policy.RequireRole(AccountRoles.ClinicAssistant, AccountRoles.Dentist).RequireClaim("permission","patients.read"))
+    .AddPolicy(PatientEndpoints.ManagePolicy, policy => policy.RequireRole(AccountRoles.ClinicAssistant).RequireClaim("permission","patients.manage"))
+    .AddPolicy(PatientEndpoints.CreatePolicy, policy => policy.RequireRole(AccountRoles.ClinicAssistant).RequireAssertion(c => c.User.HasClaim("permission","patients.manage") || c.User.HasClaim("permission","patients.create")))
+    .AddPolicy(PatientEndpoints.UpdatePolicy, policy => policy.RequireRole(AccountRoles.ClinicAssistant).RequireAssertion(c => c.User.HasClaim("permission","patients.manage") || c.User.HasClaim("permission","patients.update")))
+    .AddPolicy(PatientEndpoints.ArchivePolicy, policy => policy.RequireRole(AccountRoles.ClinicAssistant).RequireAssertion(c => c.User.HasClaim("permission","patients.manage") || c.User.HasClaim("permission","patients.archive")))
     .AddPolicy(TreatmentEndpoints.DentistPolicy, policy => policy.RequireRole(AccountRoles.Dentist));
 
 var webOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
@@ -108,6 +112,7 @@ builder.Services.AddSignalR(options =>
 });
 builder.Services.AddScoped<INotificationStore, EfNotificationStore>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<DCMS.Api.Features.Settings.ScreenPermissionScope>();
 builder.Services.AddSingleton<IRealtimeNotifier, SignalRRealtimeNotifier>();
 builder.Services.AddHostedService<AppointmentNotificationWorker>();
 
@@ -147,14 +152,20 @@ app.Use(async (context, next) =>
 });
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseMiddleware<DCMS.Api.Features.Settings.ScreenPermissionMiddleware>();
 app.MapHealthEndpoints();
 app.MapAuthenticationEndpoints();
 app.MapRecoveryEndpoints();
 app.MapEmailVerificationEndpoints();
 app.MapAccountEndpoints();
+DCMS.Api.Features.Settings.SettingsEndpoints.MapSettingsEndpoints(app);
+DCMS.Api.Features.Finance.FinanceEndpoints.MapFinanceEndpoints(app);
+DCMS.Api.Features.Prescriptions.PrescriptionEndpoints.MapPrescriptionEndpoints(app);
 app.MapPatientLinkEndpoints();
+DCMS.Api.Features.FamilyMembers.FamilyMemberEndpoints.MapFamilyMemberEndpoints(app);
 app.MapPatientEndpoints();
 app.MapTreatmentEndpoints();
+DCMS.Api.Features.Treatment.ItemPlanEndpoints.MapItemPlanEndpoints(app);
 DCMS.Api.Features.SystemSettings.SystemSettingsEndpoints.MapSystemSettingsEndpoints(app);
 app.MapClinicalWorkEndpoints();
 app.MapSchedulingEndpoints();

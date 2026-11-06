@@ -4,6 +4,8 @@ namespace DCMS.Domain.Features.Treatment;
 public sealed class TreatmentDossier
 {
     public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid? SourceExaminationVisitId { get; set; }
+    public string? SourceExaminationJson { get; set; }
     public string Code { get; set; } = "";
     public int PatientId { get; set; }
     public int BranchId { get; set; }

@@ -60,6 +60,9 @@ test('customer registers, signs in, and reaches the separate home', async ({ pag
   });
   await page.route('**/api/auth/sign-in', route => route.fulfill(json({ accessToken: 'public-token', user: publicUser })));
   await page.goto('/customer/register');
+  await page.getByRole('button', { name: 'Đăng ký' }).click();
+  await expect(page.locator('#customer-register-errors')).toBeFocused();
+  await expect(page.locator('#customer-register-errors a[href="#customer-register_phoneNumber"]')).toBeVisible();
   await page.getByLabel('Họ tên').fill('Nguyễn Văn A');
   await page.getByLabel('Số điện thoại').fill('0912345678');
   await page.getByLabel('Email').fill('a@example.com');
@@ -68,6 +71,8 @@ test('customer registers, signs in, and reaches the separate home', async ({ pag
   await page.getByRole('button', { name: 'Đăng ký' }).click();
   await expect(page).toHaveURL(/\/customer\/sign-in$/);
   expect(registration?.phoneNumber).toBe('0912345678');
+  await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
+  await expect(page.locator('#customer-sign-in-errors')).toBeFocused();
   await page.getByLabel('Số điện thoại').fill('0912345678');
   await page.getByLabel('Mật khẩu').fill('Password123!');
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
@@ -156,9 +161,15 @@ test('signed-in customer booking retains form after a slot conflict and confirms
   await page.getByRole('button', { name: 'Tiếp tục' }).click();
   await expect(page.getByRole('group', { name: 'Người đặt lịch' })).toBeVisible();
   await expect(page.getByRole('group', { name: 'Người đến khám' })).toBeVisible();
+  await page.getByRole('button', { name: 'Xem lại' }).click();
+  const errorSummary = page.locator('.customer-form-error-summary');
+  await expect(errorSummary).toBeFocused();
+  await expect(errorSummary.getByRole('link', { name: 'Nhập số điện thoại Việt Nam hoặc email hợp lệ.' }))
+    .toHaveAttribute('href', '#booking-contact');
   await page.getByLabel('Họ tên người đặt').fill('Khách A');
   await page.getByLabel('Số điện thoại Việt Nam hoặc email').fill('0912345678');
   await page.getByLabel('Họ tên người khám').fill('Người thân B');
+  await expect(errorSummary).toHaveCount(0);
   await page.getByRole('button', { name: 'Xem lại' }).click();
   await page.getByRole('button', { name: 'Xác nhận đặt lịch' }).click();
   await expect(page.getByText('MSG25: Khung giờ không còn khả dụng.')).toBeVisible();

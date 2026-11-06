@@ -17,7 +17,7 @@ namespace DCMS.Infrastructure.Features.Treatment;
 public sealed class TreatmentProgressionService(DcmsDbContext db, UserManager<ApplicationUser> users,
     ITreatmentActualEvidencePort actual, ITreatmentLabReadinessPort lab,
     ITreatmentVisitActivitySourcePort visitActivity, ITreatmentDentistCapabilityPort capabilities,
-    TimeProvider clock)
+    TimeProvider clock, DCMS.Application.Features.Settings.ISettingsAccess access)
     : ITreatmentProgressionService
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
@@ -30,6 +30,8 @@ public sealed class TreatmentProgressionService(DcmsDbContext db, UserManager<Ap
 
     private async Task DentistAsync(int actorId, int branchId, CancellationToken ct)
     {
+        var scope = await access.ResolveAsync(actorId, ct);
+        if (scope.Assigned && !scope.Owner && !scope.BranchIds.Contains(branchId)) throw Error("MSG06", 403);
         var account = await users.FindByIdAsync(actorId.ToString());
         if (account == null || !account.IsActive || account.AccountType != "Staff" ||
             !AccountRoles.Effective(await users.GetRolesAsync(account)).Contains(AccountRoles.Dentist))
@@ -131,7 +133,7 @@ public sealed class TreatmentProgressionService(DcmsDbContext db, UserManager<Ap
     public async Task<IReadOnlyList<TemplateListItem>> ListTemplatesAsync(int actorId, int branchId, CancellationToken ct)
     {
         await DentistAsync(actorId, branchId, ct);
-        return await db.TreatmentTemplates.AsNoTracking().Where(x => x.BranchId == branchId)
+        return await db.TreatmentTemplates.AsNoTracking().Where(x => x.BranchId == branchId && x.DefinitionKind == "LegacySteps" && x.DeletedAt == null)
             .OrderBy(x => x.Name)
             .Select(x => new TemplateListItem(x.Id, x.BranchId, x.Name, x.Version,
                 x.Versions.Where(v => v.State == "Active").Select(v => (int?)v.Number).FirstOrDefault(),
@@ -141,7 +143,7 @@ public sealed class TreatmentProgressionService(DcmsDbContext db, UserManager<Ap
     public async Task<TreatmentTemplateDto> GetTemplateAsync(int actorId, Guid id, CancellationToken ct)
     {
         var model = await db.TreatmentTemplates.Include(x => x.Versions).AsNoTracking()
-            .SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw Error("MSG113", 404);
+            .SingleOrDefaultAsync(x => x.Id == id && x.DefinitionKind == "LegacySteps" && x.DeletedAt == null, ct) ?? throw Error("MSG113", 404);
         await DentistAsync(actorId, model.BranchId, ct);
         return TemplateDto(model);
     }
@@ -172,7 +174,7 @@ public sealed class TreatmentProgressionService(DcmsDbContext db, UserManager<Ap
         ValidateSteps(request.Steps, false);
         return await CommandAsync(actorId, request.RequestKey, "NewTemplateVersion", new { id, request }, async () =>
         {
-            var model = await db.TreatmentTemplates.Include(x => x.Versions).SingleOrDefaultAsync(x => x.Id == id, ct)
+            var model = await db.TreatmentTemplates.Include(x => x.Versions).SingleOrDefaultAsync(x => x.Id == id && x.DefinitionKind == "LegacySteps" && x.DeletedAt == null, ct)
                 ?? throw Error("MSG113", 404);
             await DentistAsync(actorId, model.BranchId, ct);
             if (model.Version != request.ExpectedVersion) throw Error("MSG111", 409);
@@ -195,7 +197,7 @@ public sealed class TreatmentProgressionService(DcmsDbContext db, UserManager<Ap
         ValidateSteps(request.Steps, false);
         return await CommandAsync(actorId, request.RequestKey, "UpdateTemplateDraft", new { id, number, request }, async () =>
         {
-            var model = await db.TreatmentTemplates.Include(x => x.Versions).SingleOrDefaultAsync(x => x.Id == id, ct)
+            var model = await db.TreatmentTemplates.Include(x => x.Versions).SingleOrDefaultAsync(x => x.Id == id && x.DefinitionKind == "LegacySteps" && x.DeletedAt == null, ct)
                 ?? throw Error("MSG113", 404);
             await DentistAsync(actorId, model.BranchId, ct);
             if (model.Version != request.ExpectedVersion) throw Error("MSG111", 409);
@@ -215,7 +217,7 @@ public sealed class TreatmentProgressionService(DcmsDbContext db, UserManager<Ap
         if (state is not ("Active" or "Retired")) throw Error("MSG04");
         return await CommandAsync(actorId, request.RequestKey, "TemplateState", new { id, number, state, request }, async () =>
         {
-            var model = await db.TreatmentTemplates.Include(x => x.Versions).SingleOrDefaultAsync(x => x.Id == id, ct)
+            var model = await db.TreatmentTemplates.Include(x => x.Versions).SingleOrDefaultAsync(x => x.Id == id && x.DefinitionKind == "LegacySteps" && x.DeletedAt == null, ct)
                 ?? throw Error("MSG113", 404);
             await DentistAsync(actorId, model.BranchId, ct);
             if (model.Version != request.ExpectedVersion) throw Error("MSG111", 409);
@@ -296,6 +298,7 @@ public sealed class TreatmentProgressionService(DcmsDbContext db, UserManager<Ap
             var sourceIds = source.Select(x => x.LogicalStepId).Order().ToArray();
             if (!sourceIds.SequenceEqual(request.Steps.Select(x => x.LogicalStepId).Order())) throw Error("MSG236", 409);
             var owner = await db.TreatmentTemplates.AsNoTracking().SingleAsync(x => x.Id == request.TemplateId, ct);
+            if (owner.DefinitionKind != "LegacySteps" || owner.DeletedAt != null) throw Error("MSG236", 409);
             if (owner.BranchId != dossier.BranchId) throw Error("MSG06", 403);
             var ids = request.Steps.Select(x => x.ItemId!.Value).Distinct().ToArray();
             if (ids.Any(id => dossier.Items.All(x => x.Id != id || x.Decision != "Agreed"))) throw Error("MSG240", 409);
@@ -545,6 +548,8 @@ public sealed class TreatmentProgressionService(DcmsDbContext db, UserManager<Ap
         if (employee == null) throw Error("MSG06", 403);
         var branches = db.Set<SchedulingMember>().AsNoTracking().Where(x => x.EmployeeId == employee.Id
             && x.Active && x.CanDentist).Select(x => x.BranchId);
+        var scope = await access.ResolveAsync(actorId, ct);
+        if (scope.Assigned && !scope.Owner) branches = branches.Where(branch => scope.BranchIds.Contains(branch));
         var rows = await db.FollowUpInstructions.AsNoTracking().Where(x => x.PatientId == patientId
             && branches.Contains(x.BranchId)).OrderBy(x => x.TargetOn).ThenBy(x => x.Id).ToListAsync(ct);
         return rows.Select(FollowUpDto).ToArray();
@@ -584,7 +589,7 @@ public sealed class TreatmentProgressionService(DcmsDbContext db, UserManager<Ap
                 var dossier = await DossierAsync(actorId, source.DossierId.Value, ct);
                 if (dossier.PatientId != request.PatientId || dossier.BranchId != request.BranchId ||
                     dossier.State != "Open" || dossier.PlanState != "Committed" || source.ItemId is not Guid itemId ||
-                    dossier.Items.All(x => x.Id != itemId || x.Decision != "Agreed")) throw Error("MSG06", 403);
+                    dossier.Items.All(x => x.Id != itemId || !TreatmentItemRules.IsEffective(x))) throw Error("MSG06", 403);
                 if (source.StepId.HasValue)
                 {
                     var step = await db.TreatmentSteps.AsNoTracking().SingleOrDefaultAsync(x =>

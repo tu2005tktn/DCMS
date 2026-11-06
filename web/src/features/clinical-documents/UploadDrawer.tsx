@@ -7,7 +7,7 @@ import {
   type DocumentConstraints, type DocumentItem, type DocumentSource, type DocumentType, type PatientDocumentContexts,
 } from './types';
 
-export type UploadContext = { visitId?: string; dossierId?: string; planId?: string; investigationId?: string; consentVersion?: string };
+export type UploadContext = { visitId?: string; dossierId?: string; planId?: string; investigationId?: string; investigationLabel?: string; documentType?: DocumentType; consentVersion?: string };
 type Row = {
   key: string; file: File; requestKey: string; status: 'ready' | 'uploading' | 'done' | 'failed' | 'invalid';
   progress: number; error?: string; result?: DocumentItem;
@@ -43,7 +43,7 @@ export default function UploadDrawer({ open, patientId, contexts, initialContext
   useEffect(() => {
     if (!open) return;
     form.resetFields();
-    form.setFieldsValue({ documentType: 'XRay', source: 'Clinic', sourceDate: today(), visitId: initialContext.visitId,
+    form.setFieldsValue({ documentType: initialContext.documentType ?? 'XRay', source: 'Clinic', sourceDate: today(), visitId: initialContext.visitId,
       dossierId: initialContext.dossierId, planId: initialContext.planId });
     setRows([]); setSelectionError(null);
   }, [open]);
@@ -126,7 +126,7 @@ export default function UploadDrawer({ open, patientId, contexts, initialContext
           options={contexts?.plans.map(p => ({ value: p.id, label: p.label }))} /></Form.Item>
       </div>
       {(initialContext.investigationId || initialContext.consentVersion) && <Typography.Paragraph type="secondary">
-        Ngữ cảnh được truyền vào: {initialContext.investigationId ? `chỉ định cận lâm sàng ${initialContext.investigationId}` : ''}
+        Ngữ cảnh được truyền vào: {initialContext.investigationId ? `chỉ định cận lâm sàng: ${initialContext.investigationLabel ?? 'đã chọn'}` : ''}
         {initialContext.consentVersion ? ` · phiên bản đồng thuận ${initialContext.consentVersion}` : ''}</Typography.Paragraph>}
       <Form.Item name="description" label={`Mô tả (tối đa ${constraints.descriptionMax} ký tự)`}
         rules={[{ max: constraints.descriptionMax, message: `Mô tả không được vượt quá ${constraints.descriptionMax} ký tự.` }]}>

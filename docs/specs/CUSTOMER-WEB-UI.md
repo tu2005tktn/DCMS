@@ -1,5 +1,17 @@
 # Giao diện cổng bệnh nhân Web — bản cải thiện 19/10/2026
 
+## Người thân — 01/11/2026
+Thêm route, nav và Dashboard shortcut Người thân của tôi; CRUD tên/quan hệ/ngày sinh và chọn nhanh trong booking theo CUSTOMER-FAMILY-MEMBERS.md. Giữ hệ màu/Ant Design, mobile cards và desktop table. Không đổi Patient/check-in/liên kết, nguồn slot hoặc quy tắc đặt lịch.
+
+## Dashboard theo chức năng hiện có — 01/11/2026
+
+- Trang `/customer/home` đổi bố cục thành lời chào, lịch hẹn gần nhất, thẻ đặt lịch và lối vào Lịch hẹn/Liên kết hồ sơ. Không thay backend, route, quyền hoặc quy trình đặt/đổi/hủy lịch.
+- Dùng lại `GET /api/me/appointments?scope=UPCOMING&status=ALL&page=1&pageSize=20` như màn danh sách. Hiển thị phần tử đầu tiên theo thứ tự sắp tới do server trả về; không tự xác định quyền hoặc sắp lại trạng thái. Chỉ hiển thị các trường sẵn có của AppointmentCard: mã, thời gian, thời lượng, nha sĩ, người khám và trạng thái. Chi nhánh/dịch vụ không có trong DTO danh sách thì không suy đoán.
+- Nút Xem lịch hẹn mở đúng `/customer/appointments/:code`; nút Xem tất cả mở danh sách hiện có. Không đưa thao tác đổi/hủy trực tiếp lên Dashboard.
+- Có loading, không có lịch, lỗi tải và thử lại; 401 dùng cơ chế expire hiện có. Lỗi tải không hiển thị như không có lịch. Nút đặt lịch và liên kết hồ sơ vẫn dùng được khi tải danh sách lỗi.
+- Chưa có nguồn thông báo riêng trong cổng hiện tại: không thêm panel thông báo, số đếm, nhắc lịch hoặc nội dung giả. Không thêm AI, sơ đồ răng, lịch sử điều trị, đơn thuốc hay bệnh án chi tiết. Liên kết hồ sơ vẫn là màn sẵn có, không tự biến thành quyền đọc bệnh án đầy đủ.
+- CSS giới hạn trong Dashboard bệnh nhân; giữ đăng nhập/đăng ký/khôi phục, cổng nhân viên và các trang bệnh nhân khác. Responsive 390/768/1440; vùng bấm >=44px, focus rõ. Kiểm mock với danh sách/empty/lỗi/retry/401 và điều hướng; không tạo dữ liệu thử trong database.
+
 ## Phạm vi và nguyên tắc
 
 - Cải thiện giao diện của `/access` và các trang `/customer/*` hiện có: đăng nhập, đăng ký, khôi phục, trang chủ, đặt lịch sau đăng nhập, danh sách và chi tiết lịch, đổi/hủy lịch, liên kết hồ sơ. Ưu tiên luồng đặt và quản lý lịch.
@@ -26,6 +38,14 @@
 - Tóm tắt chỉ phản ánh chi nhánh, dịch vụ, bác sĩ, ngày và giờ **đã chọn**. Giờ chưa chọn được ghi rõ; không trình bày tóm tắt như lịch đã xác nhận. Lý do khám không bắt buộc vẫn nhập được trong bước này nhưng không đẩy danh sách giờ ra xa trên màn hình nhỏ.
 - Giữ trạng thái tải, chưa đủ bộ lọc, không có slot và lỗi kết nối với hướng xử lý rõ. Khi slot bị tranh, giữ thông tin đã nhập, tải lại giờ và yêu cầu chọn giờ mới. Việc chọn giờ vẫn giữ nguyên requestKey/payload và kiểm tra server hiện có.
 - Mockup là tham chiếu bố cục, không phải dữ liệu lịch thực và không mở thêm chức năng hoặc route. Chỉ thay giao diện Web bệnh nhân; không sửa backend, API, quyền hay màn hình nhân viên.
+
+### Rà soát UX bằng `ui-ux-pro-max` (19/10/2026)
+
+- Giữ hệ màu xanh DCMS, Inter và bố cục đặt lịch đang dùng. Các gợi ý quảng bá như carousel lời chứng thực không áp dụng cho cổng bệnh nhân thực hiện giao dịch; không thêm nội dung giả hoặc đổi API.
+- Ở bước chọn lịch, ngay cạnh ô ngày hiển thị rõ ngày đã chọn theo `ngày/tháng/năm` và ghi “Giờ Việt Nam”. Ô chọn ngày vẫn giữ thao tác lịch quen thuộc; phần tóm tắt và giờ hẹn dùng cùng định dạng địa phương.
+- Ở bước thông tin người đặt/người khám, khi bấm tiếp tục mà dữ liệu chưa hợp lệ, hiển thị một vùng tóm tắt lỗi ở đầu bước, chuyển focus tới vùng này, có liên kết về từng trường lỗi và vẫn giữ lỗi ngay cạnh trường. Khi người dùng sửa trường, lỗi tương ứng được xóa; dữ liệu nhập không bị mất.
+- Trên biểu mẫu đăng nhập và đăng ký bệnh nhân, lỗi kiểm tra nhiều trường cũng được tóm tắt ở đầu biểu mẫu, có liên kết tới trường cần sửa và chuyển focus tới tóm tắt sau khi gửi. Lỗi từng trường của Ant Design và dữ liệu đã nhập được giữ nguyên. Điều này không áp dụng cho cổng nhân viên.
+- Trên màn hình nhỏ, tiến trình đặt lịch vẫn nêu rõ bước hiện tại trong tổng số 5 bước và có thanh tiến độ nhìn thấy được. Mọi trạng thái lỗi và tiến độ phải có chữ, không chỉ dựa vào màu. Kiểm tra bàn phím và bố cục tại 320, 390, 768 và 1440 px.
 
 - Dùng xanh `#175CD3`, chữ `#17233D`, nền `#F4F7FB`, nền nhấn `#EAF2FF`, thành công `#15803D`, lỗi `#B42318`. Nhãn trường, nút chính, trạng thái chọn, focus, thông báo và khoảng cách nhất quán. Modal Ant Design cần class riêng vì được render ngoài cây `.customer-portal`.
 - Ở khoảng 390, 768 và 1440 px: không tràn ngang, điều hướng và hành động chính còn nhìn thấy/dùng được. Focus rõ; thao tác bàn phím, phóng to 200%, reduced motion và vùng bấm khoảng 44 px. Không chỉ dùng màu để biểu thị trạng thái.

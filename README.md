@@ -1,6 +1,6 @@
 # DCMS
 
-**Đặc tả hiện hành:** [DCMS v2.4 ngày 25/10/2026](docs/specs/README.md), gồm tài liệu màn hình và UC/GBR/MSG. Các báo cáo triển khai bên dưới giữ mốc kiểm chứng ban đầu.
+**Đặc tả hiện hành:** [DCMS v2.5 ngày 26/10/2026](docs/specs/README.md), gồm tài liệu màn hình và UC/GBR/MSG. Các báo cáo triển khai bên dưới giữ mốc kiểm chứng ban đầu.
 
 **S04 / DCMS-75:** [Đặc tả quản lý tài khoản Web](docs/specs/S04-UC31.md) và [hướng dẫn chạy, migration, bằng chứng nghiệm thu](docs/implementation/S04-DCMS-75.md). Đăng nhập Admin dùng API/phiên chung S01; recovery S03 vẫn hoãn.
 
@@ -107,3 +107,6 @@ try {
 ```
 
 The helper sets `ConnectionStrings__DefaultConnection` without displaying credentials. Never commit `.env`, private keys, patient files, database dumps, or model weights. Recovery is intentionally unavailable until a verified channel/proof policy is configured; account administration cannot verify a patient link.
+
+
+Luồng mới: [Cận lâm sàng → dịch vụ → thực hiện → thanh toán](docs/implementation/INVESTIGATION-BILLING.vi.md).

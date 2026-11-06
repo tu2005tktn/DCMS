@@ -2,12 +2,12 @@ using DCMS.Application.Common;
 namespace DCMS.Application.Features.SystemSettings;
 
 public sealed record MaterialCategoryDto(Guid Id, string Name, int ItemCount, int Version);
-public sealed record MaterialDto(Guid Id, string Name, Guid CategoryId, string CategoryName, int Version);
+public sealed record MaterialDto(Guid Id, string Name, Guid CategoryId, string CategoryName, int Version, string? UsageUnit = null);
 public sealed record CatalogPage<T>(IReadOnlyList<T> Items, int Total, int Page, int PageSize);
 public sealed record CreateCategoryRequest(string Name, Guid RequestKey);
 public sealed record UpdateCategoryRequest(string Name, int ExpectedVersion, Guid RequestKey);
-public sealed record CreateMaterialRequest(string Name, Guid CategoryId, Guid RequestKey);
-public sealed record UpdateMaterialRequest(string Name, Guid CategoryId, int ExpectedVersion, Guid RequestKey);
+public sealed record CreateMaterialRequest(string Name, Guid CategoryId, Guid RequestKey, string? UsageUnit = null);
+public sealed record UpdateMaterialRequest(string Name, Guid CategoryId, int ExpectedVersion, Guid RequestKey, string? UsageUnit = null);
 public sealed record DeleteCatalogRequest(int ExpectedVersion, Guid RequestKey);
 public static class CatalogMessages
 {

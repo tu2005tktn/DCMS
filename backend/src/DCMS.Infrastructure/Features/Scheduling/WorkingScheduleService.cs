@@ -10,7 +10,7 @@ using Microsoft.EntityFrameworkCore.Storage;
 
 namespace DCMS.Infrastructure.Features.Scheduling;
 
-public sealed partial class WorkingScheduleService(DcmsDbContext db, TimeProvider clock) : IWorkingScheduleService, IAvailabilityService
+public sealed partial class WorkingScheduleService(DcmsDbContext db, TimeProvider clock, DCMS.Application.Features.Settings.ISettingsAccess access) : IWorkingScheduleService, IAvailabilityService
 {
     public const long TransactionLock = 90403;
     private static BusinessException Error(string code, int status = 400) => new(status, SystemMessages.Get(code));
@@ -39,6 +39,8 @@ public sealed partial class WorkingScheduleService(DcmsDbContext db, TimeProvide
 
     private async Task Authorize(int actorId, int branchId, int? employeeId, CancellationToken ct)
     {
+        var scope = await access.ResolveAsync(actorId, ct);
+        if (scope.Assigned && !scope.Owner && !scope.BranchIds.Contains(branchId)) throw Error("MSG06", 403);
         var own = await db.Employees.AsNoTracking().SingleOrDefaultAsync(x => x.AccountId == actorId, ct);
         var membership = (await ActiveMembers(ct)).SingleOrDefault(x => x.BranchId == branchId && x.EmployeeId == own?.Id);
         if (membership == null || (employeeId.HasValue && !membership.CanManageSchedules && (employeeId != own!.Id || !membership.CanDentist))) throw Error("MSG06", 403);
@@ -46,15 +48,17 @@ public sealed partial class WorkingScheduleService(DcmsDbContext db, TimeProvide
     }
     public async Task<ScheduleOptions> OptionsAsync(int actorId, CancellationToken ct)
     {
+        var scope = await access.ResolveAsync(actorId, ct);
         var members = await ActiveMembers(ct);
         var own = await db.Employees.AsNoTracking().SingleOrDefaultAsync(x => x.AccountId == actorId, ct);
-        var mine = members.Where(x => x.EmployeeId == own?.Id && (x.CanDentist || x.CanManageSchedules)).ToArray();
+        var mine = members.Where(x => x.EmployeeId == own?.Id && (x.CanDentist || x.CanManageSchedules) && (!scope.Assigned || scope.Owner || scope.BranchIds.Contains(x.BranchId))).ToArray();
         if (mine.Length == 0) throw Error("MSG06", 403);
         var branches = mine.Select(x => x.BranchId).ToArray();
         var employees = await db.Employees.AsNoTracking().ToDictionaryAsync(x => x.Id, ct);
         return new(await db.Set<SchedulingBranch>().Where(x => branches.Contains(x.Id)).Select(x => new BranchOption(x.Id, x.Name)).ToArrayAsync(ct),
             members.Where(x => branches.Contains(x.BranchId)).Select(x => new EmployeeOption(x.EmployeeId, x.BranchId, employees[x.EmployeeId].FullName,
-                x.CanDentist, mine.Any(m => m.BranchId == x.BranchId && m.CanManageSchedules) || x.EmployeeId == own!.Id, x.EmployeeId == own!.Id)).ToArray(),
+                x.CanDentist, scope.Permissions.Contains("working-schedules.manage") && (mine.Any(m => m.BranchId == x.BranchId && m.CanManageSchedules) || x.EmployeeId == own!.Id), x.EmployeeId == own!.Id,
+                mine.Any(m => m.BranchId == x.BranchId && m.CanManageSchedules) || x.EmployeeId == own!.Id)).ToArray(),
             await db.Set<SchedulingChair>().Where(x => branches.Contains(x.BranchId) && x.Active).Select(x => new ChairOption(x.Id, x.BranchId, x.Name)).ToArrayAsync(ct),
             await db.Set<SchedulingService>().Where(x => branches.Contains(x.BranchId) && x.Active).Select(x => new ServiceOption(x.Id, x.BranchId, x.Name, x.PublicDurationMinutes)).ToArrayAsync(ct));
     }

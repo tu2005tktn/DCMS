@@ -10,6 +10,7 @@ import { type Account, type AccountPage, type AccountCatalog, formatAccountTime,
 type Audit = { id: number; actorId: number; actorUserName: string; actorFullName: string; targetId: number; occurredAt: string; action: string; reason: string; beforeJson: string; afterJson: string };
 export default function AccountsPage() {
   const auth = useAuth();
+  const can = (permission: string) => auth.user?.permissions.includes(permission) ?? false;
   const [toast, toastContext] = message.useMessage();
   const [data, setData] = useState<AccountPage>({ items: [], total: 0, page: 1, pageSize: 20 });
   const [roles, setRoles] = useState<string[]>([]);
@@ -78,7 +79,7 @@ export default function AccountsPage() {
     {toastContext}
     <div className="page-heading"><div><Typography.Title level={2}>Quản lý tài khoản</Typography.Title>
       <Typography.Paragraph>Tạo tài khoản nhân viên, cấp vai trò và quản lý trạng thái truy cập.</Typography.Paragraph></div>
-      <Button type="primary" onClick={() => setEditor(null)} disabled={roles.length === 0}>Tạo nhân viên</Button></div>
+      <Button type="primary" onClick={() => setEditor(null)} disabled={!can('accounts.create') || roles.length === 0}>Tạo nhân viên</Button></div>
     <Card>
       <div className="table-tools"><Input.Search placeholder="Tìm mã, tên hoặc liên hệ" allowClear maxLength={160}
         onSearch={value => { setSearch(value); setPage(1); }} enterButton="Tìm kiếm" style={{ maxWidth: 460 }} />
@@ -108,9 +109,9 @@ export default function AccountsPage() {
           { title: 'Cập nhật lần cuối', dataIndex: 'updatedAt', sorter: true, render: formatAccountTime },
           { title: 'Thao tác', render: (_, account) => <Space>
             <Button size="small" onClick={() => setDetailId(account.id)}>Chi tiết</Button>
-            {account.accountType === 'Staff' && <Button size="small" onClick={() => setEditor(account)}>Sửa</Button>}
-            <Button size="small" danger={account.isActive} onClick={() => { setStateTarget(account); setStateError(null); reasonForm.resetFields(); }}>{account.isActive ? 'Khóa' : 'Mở khóa'}</Button>
-            <Button size="small" onClick={() => void viewAudit(account)}>Audit</Button>
+            {account.accountType === 'Staff' && can('accounts.update') && <Button size="small" onClick={() => setEditor(account)}>Sửa</Button>}
+            {can('accounts.state') && <Button size="small" danger={account.isActive} onClick={() => { setStateTarget(account); setStateError(null); reasonForm.resetFields(); }}>{account.isActive ? 'Khóa' : 'Mở khóa'}</Button>}
+            {can('accounts.audit') && <Button size="small" onClick={() => void viewAudit(account)}>Audit</Button>}
           </Space> },
         ]} />
     </Card>

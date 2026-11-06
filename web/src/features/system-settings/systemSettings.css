@@ -12,3 +12,18 @@
 /* Contain the measured, hidden horizontal-menu items on this page only. */
 .workspace:has(.system-settings-page) > .ant-menu-horizontal { min-width: 0; overflow: hidden; }
 .system-settings-page .ant-table-wrapper { min-width: 0; }
+
+/* S58 Thiết lập chung */
+.general-settings .ant-card { margin-bottom: 16px; }
+.general-settings .ant-descriptions { margin-bottom: 16px; }
+.general-settings-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0 16px; }
+.general-settings-grid .ant-form-item { margin-bottom: 8px; }
+.general-settings-actions { margin-bottom: 24px; flex-wrap: wrap; }
+.general-settings-tag { margin-left: 8px; }
+.general-settings .ant-radio-wrapper { white-space: normal; }
+
+/* S58 danh mục tham chiếu */
+.reference-catalogs { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 24px; }
+.reference-catalogs-menu { border-inline-end: none !important; }
+.reference-catalogs-body { min-width: 0; }
+@media (max-width: 768px) { .reference-catalogs { grid-template-columns: minmax(0, 1fr); } }

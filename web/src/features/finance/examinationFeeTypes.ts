@@ -1,0 +1,3 @@
+﻿export type ExaminationService={id:number;branchId:number;name:string;unit:string;priceVnd:number|null;version:number;active:boolean};
+export type ExaminationFeeChoice={serviceId:number|null;expectedPriceVersion:number|null;amountVnd:number|null;reason:string|null};
+export type ExaminationFee={visitId:string;patientId:number;branchId:number;visitStatus:string;eligible:boolean;legacy:boolean;state:string;version:number;serviceId:number|null;serviceName:string|null;amountVnd:number|null;reason:string|null;priceSource:string|null;postedAt:string|null;chargeId:string|null;defaultServiceId:number|null;services:ExaminationService[];allowedActions:string[]};

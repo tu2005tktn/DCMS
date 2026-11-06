@@ -1,0 +1,11 @@
+export const itemPlanApi = '/api/treatment-templates/item-plans';
+export type ItemPlanRow = { id: string; position: number; date: string | null; teeth: string[]; serviceId: number;
+  serviceName: string; estimatedMinutes: number | null; note: string | null; dentistId: number | null; dentistName: string | null;
+  assistantId: number | null; assistantName: string | null; costVnd: number };
+export type ItemPlan = { id: string; branchId: number; name: string; version: number; itemCount: number; totalCostVnd: number; items: ItemPlanRow[] };
+export type ItemPlanPage = { items: Omit<ItemPlan, 'items'>[]; total: number; page: number; pageSize: number };
+export type ItemPlanOptions = { services: { id: number; name: string; referenceUnitPriceVnd: number | null }[];
+  members: { id: number; name: string; canDentist: boolean; canAssistant: boolean }[] };
+export type ItemPlanInput = { date: string | null; teeth: string[]; serviceId: number; estimatedMinutes: number | null;
+  note: string | null; dentistId: number | null; assistantId: number | null; costVnd: number };
+export const planMoney = (value: number) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(value);

@@ -14,13 +14,15 @@
     "antd": "5.24.0",
     "react": "19.0.0",
     "react-dom": "19.0.0",
-    "react-router-dom": "^7.18.4"
+    "react-router-dom": "^7.18.4",
+    "three": "^0.186.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.0",
     "@types/node": "22.15.0",
     "@types/react": "19.0.12",
     "@types/react-dom": "19.0.4",
+    "@types/three": "^0.186.0",
     "@vitejs/plugin-react": "4.4.1",
     "typescript": "5.8.3",
     "vite": "^6.4.4"

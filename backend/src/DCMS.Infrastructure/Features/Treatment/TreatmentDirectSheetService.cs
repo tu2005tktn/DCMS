@@ -54,6 +54,8 @@ public sealed partial class TreatmentDossierService
             if (!TreatmentSheetRules.ValidQuantity(row.Quantity, service.Unit)) throw Error("MSG04");
             if (row.AssistantId.HasValue && !await db.Set<SchedulingMember>().AnyAsync(x => x.EmployeeId == row.AssistantId && x.BranchId == dossier.BranchId && x.Active && !x.CanDentist, ct)) throw Error("MSG04");
             var unitPrice = row.UnitPriceVnd ?? checked((long)(row.CostVnd / row.Quantity));
+            if (unitPrice != item.AgreedUnitPriceVnd || row.DiscountValue != (item.DiscountValue ?? 0))
+                await access.RequireAsync(actorId, "treatment.items.price", ct);
             if (TreatmentPlanRules.Gross(row.Quantity, unitPrice) != row.CostVnd) throw Error("MSG04");
             var type = row.DiscountType == "VND" ? "Fixed" : row.DiscountType;
             if (row.DiscountValue < 0 || row.DiscountValue > 0 && (type is not ("Fixed" or "Percent") || Clean(row.DiscountNote) == null)) throw Error("MSG252");
@@ -142,6 +144,9 @@ public sealed partial class TreatmentDossierService
             PerformedAt = date.HasValue ? new DateTimeOffset(date.Value.ToDateTime(TimeOnly.MinValue), TimeSpan.FromHours(7)).ToUniversalTime() : clock.GetUtcNow(),
             CreatedAt = clock.GetUtcNow(), FeeStatus = "NotRequested" };
         db.ClinicalActivities.Add(activity);
+        await db.SaveChangesAsync(ct);
+        await DCMS.Infrastructure.Features.SystemSettings.MaterialStock.ReplaceAsync(db, clock, activity.Id, activity.PatientId, activity.BranchId,
+            activity.DossierId, activity.PerformedAt, actorId, input?.Materials, ct);
         await db.SaveChangesAsync(ct);
         return await clinicalWork.PostWithinTransactionAsync(actorId, activity.Id,
             new PostActivityRequest(activity.Version, 0, null, null, key), ct,

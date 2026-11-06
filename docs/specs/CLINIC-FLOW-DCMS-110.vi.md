@@ -2,7 +2,7 @@
 
 Ngày cập nhật: **25/10/2026**. Đây là hợp đồng luồng và ranh giới tích hợp để triển khai tiếp, chưa phải báo cáo nghiệm thu.
 
-Nguồn: nội dung người dùng xác nhận trong phiên này; [Epic DCMS-110](https://capstone-fpt-fa26.atlassian.net/browse/DCMS-110); [bộ đặc tả v2.4](README.md). Mô tả task được tổ chức lại ngày 25/10/2026 thay cho các đoạn bổ sung chồng nhau. Trạng thái Done của task cũ là đầu mối tìm phần có thể tái sử dụng, không tự chứng minh luồng tích hợp mới đã đạt.
+Nguồn: nội dung người dùng xác nhận trong phiên này; [Epic DCMS-110](https://capstone-fpt-fa26.atlassian.net/browse/DCMS-110); [bộ đặc tả v2.5](README.md). Mô tả task được tổ chức lại ngày 25/10/2026 thay cho các đoạn bổ sung chồng nhau. Trạng thái Done của task cũ là đầu mối tìm phần có thể tái sử dụng, không tự chứng minh luồng tích hợp mới đã đạt.
 
 ## Luồng và thông tin tại từng bước
 

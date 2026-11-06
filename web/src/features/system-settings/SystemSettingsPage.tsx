@@ -1,14 +1,19 @@
 import { Alert, Button, Card, Empty, Form, Input, Modal, Result, Select, Space, Table, Tabs, Typography } from 'antd';
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { api, ApiError } from '../../services/api';
 import { useAuth } from '../authentication/AuthContext';
+import GeneralSettingsPanel from './GeneralSettingsPanel';
+import ReferenceCatalogPanel from './ReferenceCatalogPanel';
+import SupplyCatalogPanel from './SupplyCatalogPanel';
+import AccessGroupsPanel from './AccessGroupsPanel';
+import type { SettingsCapabilities } from './generalSettings';
 import './systemSettings.css';
 
 type Kind = 'materials' | 'material-categories';
-type Row = { id: string; name: string; version: number; categoryId?: string; categoryName?: string; itemCount?: number };
+type Row = { id: string; name: string; version: number; categoryId?: string; categoryName?: string; itemCount?: number; usageUnit?: string | null };
 type Page = { items: Row[]; total: number; page: number; pageSize: number };
-type Values = { name: string; categoryId?: string };
+type Values = { name: string; categoryId?: string; usageUnit?: string };
 const base = '/api/system-settings';
 
 async function allCategories() {
@@ -19,9 +24,46 @@ async function allCategories() {
     if (!batch.items.length || result.length >= batch.total) return result;
   }
 }
+// S58 shell: one tab per section the server allows (GET /api/system-settings/settings/capabilities); each API rechecks access.
 export default function SystemSettingsPage() {
   const { user } = useAuth();
-  const allowed = user?.accountType === 'Staff' && user.effectiveRoles.includes('Dentist');
+  const [modal, modalContext] = Modal.useModal();
+  const [search, setSearch] = useSearchParams();
+  const [capabilities, setCapabilities] = useState<SettingsCapabilities | null>(null), [error, setError] = useState<string>(), [revision, setRevision] = useState(0);
+  const dirty = useRef(false);
+  useEffect(() => {
+    let live = true; setError(undefined);
+    void api<SettingsCapabilities>('/api/system-settings/settings/capabilities').then(v => { if (live) setCapabilities(v); })
+      .catch(e => { if (live) setError((e as Error).message); });
+    return () => { live = false; };
+  }, [revision]);
+  if (error) return <Alert type="error" showIcon message={error} action={<Button onClick={() => setRevision(v => v + 1)}>Thử lại</Button>} />;
+  if (!capabilities) return <Card loading />;
+  const tabs = [
+    ...(capabilities.sections.some(x => x.key === 'general') ? [{ key: 'general', label: 'Thiết lập chung', children: <GeneralSettingsPanel onDirtyChange={v => { dirty.current = v; }} /> }] : []),
+    ...(capabilities.sections.some(x => x.key === 'catalogs') || user?.permissions.some(p => p.startsWith('catalog.') && p.endsWith('.read')) ? [{ key: 'catalogs', label: 'Danh mục hồ sơ/nghiệp vụ', children: <ReferenceCatalogPanel /> }] : []),
+    ...(capabilities.sections.some(x => x.key === 'supplies') ? [{ key: 'supplies', label: 'Vật tư, labo & thuốc', children: <SupplyCatalogPanel /> }] : []),
+    ...(capabilities.sections.some(x => x.key === 'materials') ? [{ key: 'materials', label: 'Dụng cụ / Vật liệu', children: <MaterialCatalog /> }] : []),
+    ...(user?.permissions.includes('access-groups.read') ? [{ key: 'access-groups', label: 'Phân quyền', children: <AccessGroupsPanel /> }] : []),
+  ];
+  if (!tabs.length) return <Result status="403" title="Bạn không có quyền thực hiện thao tác này." extra={<Link to="/">Về trang chủ</Link>} />;
+  const active = tabs.some(x => x.key === search.get('tab')) ? search.get('tab')! : tabs[0].key;
+  function change(key: string) {
+    const go = () => { dirty.current = false; setSearch({ tab: key }, { replace: true }); };
+    if (!dirty.current) { go(); return; }
+    modal.confirm({ title: 'Bỏ thay đổi chưa lưu?', content: 'Thiết lập vừa sửa sẽ không được lưu.', okText: 'Bỏ thay đổi', cancelText: 'Tiếp tục sửa', onOk: go });
+  }
+  return <div className="system-settings-page">
+    {modalContext}
+    <Typography.Title level={2}>Thiết lập hệ thống</Typography.Title>
+    <Tabs activeKey={active} onChange={change} destroyInactiveTabPane items={tabs} />
+  </div>;
+}
+
+function MaterialCatalog() {
+  const { user } = useAuth();
+  const allowed = user?.accountType === 'Staff' && user.permissions.includes('catalog.materials.read');
+  const canCreate = user?.permissions.includes('catalog.materials.create'), canUpdate = user?.permissions.includes('catalog.materials.update'), canDelete = user?.permissions.includes('catalog.materials.deactivate');
   const [kind, setKind] = useState<Kind>('materials'), [query, setQuery] = useState(''), [search, setSearch] = useState('');
   const [categoryId, setCategoryId] = useState<string>(), [page, setPage] = useState(1), [size, setSize] = useState(20);
   const [data, setData] = useState<Page | null>(null), [loading, setLoading] = useState(false), [error, setError] = useState<string>();
@@ -53,12 +95,12 @@ export default function SystemSettingsPage() {
   function tab(value: string) { setKind(value as Kind); setPage(1); setQuery(''); setSearch(''); setCategoryId(undefined); setData(null); }
   function open(row?: Row) {
     pending.current = null; setFormError(undefined); form.resetFields();
-    form.setFieldsValue({ name: row?.name ?? '', categoryId: row?.categoryId }); setDialog({kind, row});
+    form.setFieldsValue({ name: row?.name ?? '', categoryId: row?.categoryId, usageUnit: row?.usageUnit ?? undefined }); setDialog({kind, row});
   }
   async function save(values: Values) {
     if (!dialog || guard.current) return;
     guard.current = true; setBusy(true); setFormError(undefined);
-    const body = { name: values.name.trim(), ...(dialog.kind === 'materials' ? { categoryId: values.categoryId } : {}), ...(dialog.row ? { expectedVersion: dialog.row.version } : {}) };
+    const body = { name: values.name.trim(), ...(dialog.kind === 'materials' ? { categoryId: values.categoryId, usageUnit: values.usageUnit?.trim() || null } : {}), ...(dialog.row ? { expectedVersion: dialog.row.version } : {}) };
     const fingerprint = JSON.stringify({kind:dialog.kind,id:dialog.row?.id,body});
     if (pending.current?.body !== fingerprint) pending.current = {body:fingerprint,key:crypto.randomUUID()};
     try {
@@ -66,7 +108,7 @@ export default function SystemSettingsPage() {
       setDialog(null); form.resetFields(); pending.current = null; setRevision(v => v+1);
     } catch (e) {
       const failure = e as ApiError; setFormError(failure.message);
-      if (failure.field === 'name') form.setFields([{name:'name',errors:[failure.message]}]);
+      if (failure.field === 'name' || failure.field === 'usageUnit') form.setFields([{name:failure.field,errors:[failure.message]}]);
     } finally { guard.current = false; setBusy(false); }
   }
   async function readVersion(deletion = false) {
@@ -94,15 +136,14 @@ export default function SystemSettingsPage() {
   if (!allowed) return <Result status="403" title="Bạn không có quyền thực hiện thao tác này." extra={<Link to="/">Về trang chủ</Link>} />;
   const options = categories?.map(c => ({value:c.id,label:c.name})) ?? [];
   const itemMode = kind === 'materials';
-  return <div className="system-settings-page">
-    <Typography.Title level={2}>Thiết lập hệ thống</Typography.Title>
-    <Typography.Paragraph type="secondary">Danh mục dụng cụ và vật liệu dùng chung cho các chi nhánh.</Typography.Paragraph>
-    <Card><Tabs activeKey={kind} onChange={tab} items={[{key:'materials',label:'Dụng cụ / Vật liệu'},{key:'material-categories',label:'Danh mục'}]} />
+  const tabItems = [{key:'materials',label:'Dụng cụ / Vật liệu'},{key:'material-categories',label:'Danh mục'}];
+  return <div>
+    <Card><Tabs activeKey={kind} onChange={tab} items={tabItems} />
       <div className="system-settings-toolbar">
         <Input.Search aria-label="Tìm kiếm theo tên" placeholder="Tìm kiếm theo tên" maxLength={160} allowClear value={search}
           onChange={e => { setSearch(e.target.value); if (!e.target.value) {setQuery('');setPage(1);} }} onSearch={v => {setQuery(v.trim());setPage(1);}} />
         {itemMode && <Select aria-label="Lọc danh mục" placeholder="Tất cả danh mục" allowClear showSearch optionFilterProp="label" value={categoryId} loading={!categories && !categoryError} options={options} onChange={v => {setCategoryId(v);setPage(1);}} />}
-        <Button type="primary" onClick={() => open()} disabled={itemMode && (!categories || !categories.length)}>Thêm mới</Button>
+        <Button type="primary" onClick={() => open()} disabled={!canCreate || itemMode && (!categories || !categories.length)}>Thêm mới</Button>
       </div>
       {categoryError && <Alert type="error" showIcon message={categoryError} action={<Button onClick={() => setRevision(v=>v+1)}>Thử lại danh mục</Button>} />}
       {itemMode && categories?.length === 0 && <Alert type="info" showIcon message="Chưa có danh mục. Hãy tạo danh mục trước khi thêm dụng cụ/vật liệu." action={<Button onClick={() => tab('material-categories')}>Tạo danh mục</Button>} />}
@@ -113,7 +154,8 @@ export default function SystemSettingsPage() {
         columns={[{title:'STT',key:'ordinal',width:65,render:(_v,_r,index)=>(page-1)*size+index+1},
           {title:itemMode ? 'Tên' : 'Tên danh mục',dataIndex:'name'},
           itemMode ? {title:'Thuộc danh mục',dataIndex:'categoryName'} : {title:'Số mục đang thuộc nhóm',dataIndex:'itemCount',width:200},
-          {title:'Thao tác',key:'actions',width:150,render:(_v,row)=><Space><Button size="small" aria-label={`Sửa ${row.name}`} onClick={()=>open(row)}>Sửa</Button><Button danger size="small" aria-label={`Xóa ${row.name}`} onClick={()=>{setDeleting({kind,row});setDeleteError(undefined);deletePending.current=null;}}>Xóa</Button></Space>}]} />
+          ...(itemMode ? [{title:'Đơn vị dùng',dataIndex:'usageUnit',width:130,render:(v:string|null)=>v ?? <span style={{color:'#667085'}}>—</span>}] : []),
+          {title:'Thao tác',key:'actions',width:150,render:(_v,row)=><Space><Button size="small" disabled={!canUpdate} aria-label={`Sửa ${row.name}`} onClick={()=>open(row)}>Sửa</Button><Button danger size="small" disabled={!canDelete} aria-label={`Xóa ${row.name}`} onClick={()=>{setDeleting({kind,row});setDeleteError(undefined);deletePending.current=null;}}>Xóa</Button></Space>}]} />
     </Card>
     <Modal forceRender open={!!dialog} title={`${dialog?.row ? 'Sửa' : 'Thêm'} ${dialog?.kind === 'materials' ? 'dụng cụ/vật liệu' : 'danh mục'}`} okText="Lưu" okButtonProps={{'aria-label':'Lưu'}} cancelText="Hủy" confirmLoading={busy}
       closable={!busy} cancelButtonProps={{disabled:busy}} onCancel={()=>{if(!busy)setDialog(null);}} onOk={()=>form.submit()}>
@@ -122,6 +164,7 @@ export default function SystemSettingsPage() {
       <Form form={form} layout="vertical" disabled={busy} onFinish={v=>void save(v)}>
         <Form.Item name="name" label={dialog?.kind === 'materials' ? 'Tên' : 'Tên danh mục'} rules={[{required:true,whitespace:true,message:'Vui lòng nhập tên.'},{max:160,message:'Tên tối đa 160 ký tự.'}]}><Input aria-label={dialog?.kind === 'materials' ? 'Tên' : 'Tên danh mục'} maxLength={160} autoComplete="off" /></Form.Item>
         {dialog?.kind === 'materials' && <Form.Item name="categoryId" label="Thuộc danh mục" rules={[{required:true,message:'Vui lòng chọn danh mục.'}]}><Select aria-label="Thuộc danh mục" showSearch optionFilterProp="label" placeholder="Chọn danh mục" loading={!categories} options={options} /></Form.Item>}
+        {dialog?.kind === 'materials' && <Form.Item name="usageUnit" label="Đơn vị dùng" rules={[{max:40,message:'Tối đa 40 ký tự.'}]}><Input aria-label="Đơn vị dùng" maxLength={40} autoComplete="off" placeholder="Ví dụ: sợi, g, cái" /></Form.Item>}
       </Form>
     </Modal>
     <Modal open={!!deleting} title={deleting?.kind === 'materials' ? 'Bạn có muốn xóa dụng cụ/vật liệu này không?' : 'Bạn có muốn xóa danh mục này không?'} okText="Đồng ý" okButtonProps={{'aria-label':'Đồng ý'}} cancelText="Không đồng ý" confirmLoading={busy}

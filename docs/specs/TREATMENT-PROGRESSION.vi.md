@@ -1,5 +1,8 @@
 # S58/S21/S24 — Mẫu, tiến trình điều trị và chỉ định quay lại
 
+## Giao diện kế hoạch dùng lại — 02/11/2026
+Menu `/treatment-templates` nay hiển thị Kế hoạch điều trị dạng hạng mục theo `TREATMENT-ITEM-PLANS.md`. Mẫu bước tiến trình cũ và hợp đồng bên dưới giữ tại `/treatment-templates/legacy`. DefinitionKind LegacySteps/ItemPlan phân biệt nguồn; API progression cũ chỉ đọc/sửa/áp dụng LegacySteps chưa xóa. Kế hoạch ItemPlan CRUD độc lập, chưa áp dụng vào dossier và không tạo bước/actual/lịch/tiền.
+
 Nguồn nghiệp vụ hiện hành: DCMS_Screen_Specifications_v2.3 và DCMS_Use_Cases_Business_Rules_Messages_v2.3, 24/10/2026; bổ sung phân công 25/10/2026; UC-13/14/17/24/51/53, GBR-129–132/135/153/154/156/162, AT30/31/32/37/42/45/46/47/52. Vinh sở hữu S58, phần Steps của S21 và backend chỉ định; UI S24 thuộc DCMS-106. Quyết định không quản lý thuốc theo lô vẫn có hiệu lực.
 
 ## Bổ sung hợp đồng v2.3
@@ -62,6 +65,8 @@ Ví dụ request cho UI S24 của Tuấn (IDs lấy từ GET dossier/steps, Dent
 
 `POST /api/follow-up-instructions` trả HTTP 201 với `{ "instruction": { "id": "...", "status": "NeedsBooking", "version": 1, "activeAppointmentId": null, "allowedActions": ["reviseWindow", "cancel", "supersede", "findSlots"], "overdue": false, ... }, "notification": { "code": "MSG231", "message": "Đã lưu chỉ định quay lại. Chưa có lịch hẹn được đặt." } }`. UI dùng `instruction.id` làm `followUpId` trong `POST /api/appointments` khi bệnh nhân tự thân đã xác minh hoặc staff đặt; `Find slots` chỉ đọc availability, không chuyển trạng thái. `expectedVersion` lấy từ response gần nhất khi sửa chỉ định. UI S24 không được suy ra Patient từ số điện thoại hay quyền xem hồ sơ người thân.
 
+Cập nhật 03/11/2026: hạng mục nguồn của chỉ định (`source.dossierId` + `source.itemId`) được nhận khi `Decision = Agreed` **hoặc** `EntrySource = ClinicianEntry` (hạng mục nhập trực tiếp trên phiếu); các điều kiện phiếu `Open`, kế hoạch `Committed` và đúng `PlanVersion` giữ nguyên. Tab Lịch hẹn dùng chỉ định này để đặt buổi kế tiếp, xem [TREATMENT-NEXT-VISIT-BOOKING.md](TREATMENT-NEXT-VISIT-BOOKING.md).
+
 Booking port phải dùng cùng scoped DbContext/transaction: `ValidateAsync` kiểm Patient, window, duration, dentist, readiness và một active appointment; `MarkBookedAsync` ghi link; `MarkNeedsBookingAsync` kiểm đúng appointment ID và giữ lịch sử. Reschedule kiểm lại instruction trước đổi slot. Outbox ghi trong cùng transaction; dispatcher và UI S24 thuộc task khác. `GET /api/availability` vẫn là nguồn slot, không mở calendar engine mới.
 
 ## Trạng thái, lỗi và nghiệm thu
@@ -76,7 +81,7 @@ Phần dưới được giữ để truy vết thiết kế ban đầu. Khi nộ
 
 # Điều trị nhiều buổi và đặt lịch buổi tiếp theo trong DCMS
 
-> Cập nhật nguồn 25/10/2026: [bộ đặc tả v2.4](README.md) là nguồn hiện hành. Nội dung và bằng chứng dưới đây giữ mốc triển khai ban đầu; chưa được nghiệm thu lại theo v2.4.
+> Cập nhật nguồn 26/10/2026: [bộ đặc tả v2.5](README.md) là nguồn hiện hành. Nội dung và bằng chứng dưới đây giữ mốc triển khai ban đầu; chưa được nghiệm thu lại theo v2.5.
 
 Ngày quyết định: 16/10/2026. Người dùng đã chọn áp dụng hướng phân tích vào **đặc tả và tài liệu trước**. Tài liệu này làm rõ UC-03/04/06/07/10/13/14/17/19/20/24/25/34/39/40/47/48/50/51/53, các màn hình liên quan và GBR-129–136 trong [bộ đặc tả v2](README.md). Đây là hợp đồng để triển khai, không phải báo cáo chức năng đã chạy.
 
@@ -219,7 +224,7 @@ Tất cả màn hình có tải/rỗng/lỗi/quyền/xung đột rõ ràng. Lỗ
 
 ## 10 Hợp đồng API và dữ liệu
 
-Các đường dẫn là **hợp đồng dự kiến** tại thời điểm viết, chưa khẳng định đã triển khai. Đối chiếu lại với [nguồn UC v2.4](DCMS_Use_Cases_Business_Rules_Messages_v2.4.docx) trước khi triển khai; việc đổi liên kết nguồn không xác nhận các API dự kiến dưới đây đã đồng bộ v2.4.
+Các đường dẫn là **hợp đồng dự kiến** tại thời điểm viết, chưa khẳng định đã triển khai. Đối chiếu lại với [nguồn UC v2.5](DCMS_Use_Cases_Business_Rules_Messages_v2.5.docx) trước khi triển khai; việc đổi liên kết nguồn không xác nhận các API dự kiến dưới đây đã đồng bộ v2.5.
 
 | Thao tác | Hợp đồng chính |
 | --- | --- |
@@ -264,3 +269,6 @@ Các quyết định trong tài liệu là thiết kế DCMS được người d
 - [NHS về điều trị tủy](https://www.nhs.uk/tests-and-treatments/root-canal-treatment/): ví dụ điều trị có thể cần nhiều lần hẹn, không dùng làm protocol cố định cho DCMS.
 
 Các nhận định về tỷ trọng phòng khám nhỏ, doanh thu, hiệu suất hai ghế, tỷ lệ khách đến qua Zalo và các thời lượng lâm sàng trong đề xuất gốc chưa được chứng minh bằng khảo sát phòng khám mục tiêu. Không dùng chúng làm định mức bắt buộc. Việc tối ưu lịch cần số liệu thời lượng thực tế, chờ, quá giờ, NoShow và số buổi chưa được đặt trước khi quyết định thuật toán.
+
+
+Chốt 27/10/2026: [tách lượt khám và các buổi điều trị](S19-S20-DCMS-112.md). Một hồ sơ/plan có nhiều Visit điều trị thật; khám chỉ là nguồn snapshot. Kết thúc khám hoặc một buổi điều trị không hoàn tất toàn bộ kế hoạch. UI không gán Visit khám nguồn vào actual điều trị.

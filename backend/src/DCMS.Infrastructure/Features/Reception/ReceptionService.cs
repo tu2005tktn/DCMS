@@ -27,7 +27,7 @@ public sealed class UnavailableReceptionSourceReader : IReceptionSourceReader
 
 public sealed class ReceptionService(DcmsDbContext db, UserManager<ApplicationUser> users,
     IAppointmentQueryService appointments, IAvailabilityService availability, IReceptionSourceReader sources,
-    TimeProvider clock) : IReceptionService
+    TimeProvider clock, DCMS.Application.Features.Settings.ISettingsAccess settingsAccess) : IReceptionService
 {
     private static readonly string[] AppointmentStatuses = ["Confirmed", "CheckedIn", "InProgress", "Completed", "Cancelled", "NoShow"];
     private static readonly TimeSpan ClinicOffset = TimeSpan.FromHours(7);
@@ -50,8 +50,9 @@ public sealed class ReceptionService(DcmsDbContext db, UserManager<ApplicationUs
         return new(employee.Id, assistant, backdate);
     }
 
-    private async Task<Actor> ScopeAsync(int actorId, int branchId, bool write, CancellationToken ct)
+    private async Task<Actor> ScopeAsync(int actorId, int branchId, bool write, CancellationToken ct, string? permission = null)
     {
+        await settingsAccess.OperationalAsync(actorId,permission ?? (write ? "reception.check-in" : "reception.read"),branchId,ct);
         var actor = await ActorAsync(actorId, ct);
         if (write && !actor.Assistant) throw Error("MSG06", 403);
         if (!await (from m in db.Set<SchedulingMember>() join b in db.Set<SchedulingBranch>() on m.BranchId equals b.Id
@@ -66,10 +67,12 @@ public sealed class ReceptionService(DcmsDbContext db, UserManager<ApplicationUs
 
     public async Task<ReceptionOptions> OptionsAsync(int actorId, CancellationToken ct)
     {
+        var permissionState = await settingsAccess.RequireAsync(actorId,"reception.read",ct);
         var actor = await ActorAsync(actorId, ct);
         var options = await appointments.OptionsAsync(actorId, ct);
         var branchIds = await (from m in db.Set<SchedulingMember>() join b in db.Set<SchedulingBranch>() on m.BranchId equals b.Id
             where m.EmployeeId == actor.EmployeeId && m.Active && b.Active && (actor.Assistant || m.CanDentist) select m.BranchId).ToArrayAsync(ct);
+        branchIds = branchIds.Intersect(permissionState.BranchIds).ToArray();
         return new(options with
         {
             Branches = options.Branches.Where(x => branchIds.Contains(x.Id)).ToArray(),
@@ -159,10 +162,13 @@ public sealed class ReceptionService(DcmsDbContext db, UserManager<ApplicationUs
         var items = await ResultsAsync(page, false, ct);
         return new(items, total, query.Page, query.PageSize, ClinicDate(clock.GetUtcNow()), clock.GetUtcNow());
     }
-    public async Task<VisitResult> VisitAsync(int actorId, Guid visitId, CancellationToken ct)
+    public async Task<VisitResult> VisitAsync(int actorId, Guid visitId, CancellationToken ct, bool clinical = false)
     {
         var v = await db.Visits.AsNoTracking().SingleOrDefaultAsync(x => x.Id == visitId, ct) ?? throw Error("MSG113", 404);
-        Own(await ScopeAsync(actorId, v.BranchId, false, ct), v.DentistId);
+        var state = await settingsAccess.ResolveAsync(actorId, ct);
+        var permission = clinical ? state.Permissions.Contains("examinations.read") ? "examinations.read" : "treatment.read" : "reception.read";
+        var actor = await ScopeAsync(actorId, v.BranchId, false, ct, permission);
+        if (!clinical) Own(actor, v.DentistId);
         return await ResultAsync(v, false, ct);
     }
     private async Task<VisitResult> ResultAsync(Visit v, bool replayed, CancellationToken ct) => (await ResultsAsync([v], replayed, ct))[0];

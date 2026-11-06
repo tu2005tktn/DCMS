@@ -19,7 +19,7 @@ namespace DCMS.Infrastructure.Features.Appointments;
 
 public sealed class SupportRequestService(DcmsDbContext db, UserManager<ApplicationUser> users,
     IAppointmentChangeService changes, IRealtimeNotifier realtime,
-    ILogger<SupportRequestService> logger, TimeProvider clock) : ISupportRequestService
+    ILogger<SupportRequestService> logger, TimeProvider clock, DCMS.Application.Features.Settings.ISettingsAccess settingsAccess) : ISupportRequestService
 {
     private static BusinessException Error(string code, int status = 409) => new(status, SystemMessages.Get(code));
     private static string Hash(object value) => Convert.ToHexString(SHA256.HashData(
@@ -372,14 +372,16 @@ public sealed class SupportRequestService(DcmsDbContext db, UserManager<Applicat
 
     private async Task<int[]> StaffBranchesAsync(int actorId, CancellationToken ct)
     {
+        var permissions=await settingsAccess.RequireAsync(actorId,"appointments.support.handle",ct);
         var user = await users.FindByIdAsync(actorId.ToString());
         if (user == null || !user.IsActive || user.AccountType != "Staff"
             || !await users.IsInRoleAsync(user, AccountRoles.ClinicAssistant)) throw Error("MSG06", 403);
-        return await (from member in db.Set<SchedulingMember>().AsNoTracking()
+        var result = await (from member in db.Set<SchedulingMember>().AsNoTracking()
             join employee in db.Employees.AsNoTracking() on member.EmployeeId equals employee.Id
             join branch in db.Set<SchedulingBranch>().AsNoTracking() on member.BranchId equals branch.Id
             where employee.AccountId == actorId && member.Active && branch.Active
             select member.BranchId).Distinct().ToArrayAsync(ct);
+        return result.Intersect(permissions.BranchIds).ToArray();
     }
 
     private async Task RequireBranchAsync(int actorId, int branchId, CancellationToken ct)
