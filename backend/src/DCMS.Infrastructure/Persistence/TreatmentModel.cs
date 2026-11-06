@@ -210,6 +210,33 @@ internal static class TreatmentModel
             b.HasOne<ClinicalActivity>().WithMany().HasForeignKey(x => x.ActivityId).OnDelete(DeleteBehavior.Restrict);
             b.ToTable(t => t.HasCheckConstraint("CK_DOSSIER_PAYMENT_LINE_AMOUNT", "\"AmountVnd\" > 0"));
         });
+        model.Entity<DossierPayOsOrder>(b =>
+        {
+            b.ToTable("TREATMENT_PAYOS_ORDER"); b.HasKey(x => x.Id);
+            b.HasIndex(x => x.OrderCode).IsUnique();
+            b.HasIndex(x => x.RequestKey).IsUnique();
+            b.HasIndex(x => x.PaymentLinkId).IsUnique().HasFilter("\"PaymentLinkId\" IS NOT NULL");
+            b.HasIndex(x => x.DossierId).IsUnique().HasDatabaseName("IX_TREATMENT_PAYOS_ORDER_ActiveDossier")
+                .HasFilter("\"State\" IN ('Creating','Pending','Review')");
+            b.Property(x => x.Fingerprint).HasMaxLength(64);
+            b.Property(x => x.State).HasMaxLength(20);
+            b.Property(x => x.PaymentLinkId).HasMaxLength(100);
+            b.Property(x => x.BankBin).HasMaxLength(12);
+            b.Property(x => x.AccountNumber).HasMaxLength(40);
+            b.Property(x => x.AccountName).HasMaxLength(160);
+            b.Property(x => x.BankReference).HasMaxLength(100);
+            b.Property(x => x.Note).HasMaxLength(1000);
+            b.HasOne<TreatmentDossier>().WithMany().HasForeignKey(x => x.DossierId).OnDelete(DeleteBehavior.Restrict);
+            b.HasMany(x => x.Lines).WithOne().HasForeignKey(x => x.OrderId).OnDelete(DeleteBehavior.Cascade);
+            b.HasOne<DossierPayment>().WithMany().HasForeignKey(x => x.PaymentId).OnDelete(DeleteBehavior.Restrict);
+            b.ToTable(t => t.HasCheckConstraint("CK_TREATMENT_PAYOS_ORDER_AMOUNT", "\"AmountVnd\" > 0"));
+        });
+        model.Entity<DossierPayOsOrderLine>(b =>
+        {
+            b.ToTable("TREATMENT_PAYOS_ORDER_LINE"); b.HasKey(x => new { x.OrderId, x.ActivityId });
+            b.HasOne<ClinicalActivity>().WithMany().HasForeignKey(x => x.ActivityId).OnDelete(DeleteBehavior.Restrict);
+            b.ToTable(t => t.HasCheckConstraint("CK_TREATMENT_PAYOS_ORDER_LINE_AMOUNT", "\"AmountVnd\" > 0"));
+        });
         model.Entity<TreatmentProgressionReceipt>(b =>
         {
             b.ToTable("TREATMENT_PROGRESSION_RECEIPT"); b.HasKey(x => x.RequestKey);

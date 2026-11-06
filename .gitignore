@@ -10,6 +10,7 @@
 .env
 .env.*
 !.env.example
+.run-*.log
 **/appsettings.Local.json
 **/appsettings.Production.json
 *.user

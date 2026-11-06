@@ -19,13 +19,19 @@ export type DossierTotals = { dossierCount: number; plannedGrossVnd: number; pla
   confirmedAllocatedVnd: number | null; outstandingVnd: number | null; unusedAdvanceVnd: number | null; pendingFeeCount: number };
 export type PaymentContext = {
   paidVnd: number; collectors: { id: number; name: string }[]; defaultCollectorId: number | null;
+  dossierCode: string; patientName: string;
   lines: { activityId: string; performedAt: string; dentistName: string; serviceName: string | null;
-    costVnd: number; discountVnd: number; paidVnd: number; dueVnd: number }[];
+    costVnd: number; discountVnd: number; paidVnd: number; dueVnd: number;
+    materials: { name: string; quantity: number; unit: string | null }[] }[];
 };
 export type DossierPayment = {
   id: string; paidOn: string; method: 'Cash' | 'Transfer'; collectorId: number; collectorName: string; note: string | null;
   totalVnd: number; createdAt: string; lines: { activityId: string; serviceName: string | null; amountVnd: number }[];
 };
+export type PayOsOrder = { id: string; orderCode: number; state: 'Creating' | 'Pending' | 'Paid' | 'Cancelled' | 'Expired' | 'Review' | 'LinkError';
+  amountVnd: number; paidOn: string; qrCode: string | null; bankBin: string | null; accountNumber: string | null;
+  accountName: string | null; expiresAt: string; paymentId: string | null;
+  lines: { activityId: string; amountVnd: number }[] };
 
 export function isFdi(value: string) {
   const n = Number(value), quadrant = Math.floor(n / 10), position = n % 10;

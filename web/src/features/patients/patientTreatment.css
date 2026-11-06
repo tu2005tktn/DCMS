@@ -256,4 +256,18 @@ body:has(.patient-treatment-shell) .workspace-content { width: 100%; max-width: 
 .dossier-payment-amount .ant-input-number-input { text-align: right; }
 .dossier-payment-footer { display: flex; justify-content: space-between; gap: 8px; }
 .dossier-payment-save.ant-btn-primary:not(:disabled) { background: #28a745; border-color: #28a745; }
+.transfer-bill { display: grid; gap: 16px; }
+.transfer-bill h3 { margin: 4px 0 0; font-size: 16px; }
+.transfer-bill-scroll { overflow-x: auto; }
+.transfer-bill-table { width: 100%; min-width: 690px; border-collapse: collapse; font-size: 13px; }
+.transfer-bill-table th, .transfer-bill-table td { padding: 10px 8px; border-bottom: 1px solid #e4e7ec; text-align: right; vertical-align: top; }
+.transfer-bill-table th:first-child, .transfer-bill-table td:first-child { text-align: left; min-width: 240px; }
+.transfer-bill-table small { display: block; color: #667085; }
+.transfer-bill-materials { margin-top: 4px; color: #475467; }
+.transfer-bill-pay { display: flex; justify-content: space-between; align-items: center; gap: 24px; padding: 18px; border: 1px solid #d0d5dd; border-radius: 8px; }
+.transfer-bill-pay strong { display: block; font-size: 26px; color: #175cd3; }
+.transfer-bill-pay p { margin: 10px 0 0; }
+.transfer-bill-pay .ant-qrcode { flex: 0 0 auto; }
+.transfer-bill-footnote { margin: 0; color: #667085; font-size: 12px; }
+@media (max-width: 560px) { .transfer-bill-pay { flex-direction: column; align-items: stretch; } .transfer-bill-pay .ant-qrcode { align-self: center; } }
 @media (max-width: 560px) { .dossier-payment-row { grid-template-columns: 1fr; gap: 4px; } }

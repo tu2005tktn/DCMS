@@ -113,9 +113,21 @@ async function prepare(page: Page, withItem = true, withFinance = false) {
       const lines = state.activities.map(a => { const cost = Math.round(a.quantity * a.priceSnapshotVnd), discount = a.discountSnapshotVnd ?? 0,
         paid = state.payments.flatMap(p => p.lines).filter(l => l.activityId === a.id).reduce((s, l) => s + l.amountVnd, 0);
         return { activityId: a.id, performedAt: a.performedAt, dentistName: user.fullName, serviceName: a.serviceNameSnapshot ?? 'Trám răng',
-          costVnd: cost, discountVnd: discount, paidVnd: paid, dueVnd: Math.max(0, cost - discount - paid) }; });
-      return ok({ paidVnd: lines.reduce((s, l) => s + l.paidVnd, 0), lines, collectors: [{ id: 7, name: user.fullName }], defaultCollectorId: 7 });
+          costVnd: cost, discountVnd: discount, paidVnd: paid, dueVnd: Math.max(0, cost - discount - paid), materials: a.materials ?? [] }; });
+      return ok({ paidVnd: lines.reduce((s, l) => s + l.paidVnd, 0), lines, collectors: [{ id: 7, name: user.fullName }], defaultCollectorId: 7,
+        dossierCode: 'DT-SYNTHETIC', patientName: 'Khách hàng thử nghiệm' });
     }
+    if (path.endsWith('/payos-orders') && r.method() === 'POST') {
+      const body = r.postDataJSON(); state.requests.push({ command: 'payos-order', ...body });
+      return ok({ id: 'payos-order-1', orderCode: 12345678, state: 'Pending', amountVnd: body.lines.reduce((s: number, l: any) => s + l.amountVnd, 0),
+        paidOn: body.paidOn, qrCode: '000201010212PAYOS-SYNTHETIC', bankBin: '970415', accountNumber: '1234567890',
+        accountName: 'PHONG KHAM TEST', expiresAt: '2026-11-06T12:00:00Z', paymentId: null, lines: body.lines });
+    }
+    if (path.endsWith('/payos-orders/active')) return ok(null);
+    if (path.endsWith('/payos-orders/payos-order-1')) return ok({ id: 'payos-order-1', orderCode: 12345678,
+      state: (state as any).payosPaid ? 'Paid' : 'Pending', amountVnd: 120000, paidOn: '2026-11-06', qrCode: '000201010212PAYOS-SYNTHETIC',
+      bankBin: '970415', accountNumber: '1234567890', accountName: 'PHONG KHAM TEST', expiresAt: '2026-11-06T12:00:00Z', paymentId: null,
+      lines: [{ activityId: 'transfer-activity', amountVnd: 120000 }] });
     if (path.endsWith('/payments') && r.method() === 'POST') {
       const body = r.postDataJSON(); state.requests.push({ command: 'payment', ...body });
       const saved = { id: `payment-${state.payments.length + 1}`, paidOn: body.paidOn, method: body.method, collectorId: body.collectorId, collectorName: user.fullName, note: body.note,
@@ -363,6 +375,38 @@ test('form Tạo thanh toán mới điền sẵn việc đã làm, tự cộng t
   expect(sent.lines).toEqual([{ activityId: 'a1', amountVnd: 100000 }]); expect(sent.method).toBe('Cash'); expect(sent.collectorId).toBe(7);
   await expect(page.locator('.treatment-sheet-payment')).toContainText('Đã trả: 100.000 ₫');
   await expect(page.locator('.treatment-sheet-payment')).toContainText(/Còn nợ: [\d.]+ ₫/);
+});
+
+test('chuyển khoản mở bill với dịch vụ và vật liệu trong ngày, quay lại giữ số tiền', async ({ page }) => {
+  const state = await prepare(page);
+  const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date());
+  state.activities.push({ id: 'transfer-activity', visitId, dossierId, itemId, planVersion: 1, serviceId: 3,
+    region: '25', quantity: 1, unit: 'răng', performerId: 7, performedAt: `${today}T02:00:00Z`,
+    outcome: 'Điều trị hôm nay', feeStatus: 'Pending', priceSnapshotVnd: 300000, serviceNameSnapshot: 'Trám răng',
+    materials: [{ name: 'Composite', quantity: 2.5, unit: 'g' }] });
+  await page.reload(); await page.getByRole('tab', { name: 'Điều trị & Thanh toán' }).click();
+  await page.getByRole('button', { name: 'TRẢ TIỀN...' }).click();
+  const form = page.getByRole('dialog', { name: 'Tạo thanh toán mới' });
+  await form.getByLabel('Tổng tiền thanh toán (đ)').fill('120000');
+  await form.getByLabel('Tổng tiền thanh toán (đ)').blur();
+  await form.getByRole('combobox', { name: 'Thanh toán bằng' }).press('ArrowDown');
+  await page.locator('.ant-select-dropdown:visible').getByText('Chuyển khoản', { exact: true }).click();
+  await form.getByRole('button', { name: 'TẠO QR VÀ XEM BILL' }).click();
+  const bill = page.getByRole('dialog', { name: 'Bill chuyển khoản PayOS' });
+  await expect(bill).toContainText('Trám răng');
+  await expect(bill).toContainText('Composite (2.5 g)');
+  await expect(bill).toContainText('120.000 ₫');
+  await expect(page).toHaveURL(/\/patients\/123$/);
+  await expect(bill.getByLabel('Mã VietQR chuyển 120.000 ₫')).toBeVisible();
+  await expect(bill).toContainText('Chờ thanh toán');
+  expect(state.requests.filter(x => x.command === 'payos-order')).toHaveLength(1);
+  expect(state.requests.filter(x => x.command === 'payment')).toHaveLength(0);
+  await bill.getByRole('button', { name: 'QUAY LẠI' }).click();
+  await expect(form.getByLabel('Tổng tiền thanh toán (đ)')).toHaveValue('120.000');
+  await form.getByRole('button', { name: 'TẠO QR VÀ XEM BILL' }).click();
+  (state as any).payosPaid = true;
+  await expect(page.getByRole('dialog', { name: 'Bill chuyển khoản PayOS' })).toContainText('Đã thanh toán', { timeout: 8000 });
+  expect(state.requests.filter(x => x.command === 'payment')).toHaveLength(0);
 });
 
 test('ghi chú chỉ lưu bằng nút xác nhận, bàn phím và responsive không tràn viewport', async ({ page }) => {
