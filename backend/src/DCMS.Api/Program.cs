@@ -138,6 +138,15 @@ if (args.Contains("--migrate") || args.Contains("--seed-demo"))
     return;
 }
 
+if (args.Contains("--seed-clinic-catalog"))
+{
+    if (!app.Environment.IsDevelopment()) throw new InvalidOperationException("Development database commands require Development environment.");
+    using var catalogScope = app.Services.CreateScope();
+    Console.WriteLine(await catalogScope.ServiceProvider.GetRequiredService<DCMS.Infrastructure.Features.Treatment.DevelopmentTreatmentCatalogSeeder>().SeedAsync(args.Contains("--refresh")));
+    Console.WriteLine(await catalogScope.ServiceProvider.GetRequiredService<DCMS.Infrastructure.Features.SystemSettings.DevelopmentMaterialSeeder>().SeedAsync());
+    return;
+}
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi().AllowAnonymous();
