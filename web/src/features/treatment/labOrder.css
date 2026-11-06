@@ -1,0 +1,40 @@
+.lab-order-modal .ant-modal-content { padding: 16px 20px; }
+.lab-order-actions { display: flex; justify-content: flex-end; gap: 8px; margin-bottom: 8px; }
+.lab-order-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 8px 16px; border-bottom: 3px solid #d0d5dd; padding-bottom: 8px; margin-bottom: 12px; }
+.lab-order-head h2 { margin: 0; font-weight: 400; font-size: 22px; }
+.lab-order-head-fields { display: flex; flex-wrap: wrap; gap: 8px; }
+.lab-order-head-fields label { display: grid; gap: 2px; font-weight: 700; font-size: 13px; }
+.lab-order-head-fields input { width: 140px; }
+.lab-order-field { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 8px; align-items: start; margin-bottom: 10px; }
+.lab-order-field > label { font-weight: 700; padding-top: 5px; }
+.lab-order-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
+.lab-order-error { color: #b42318; font-size: 12px; margin-top: 2px; }
+.lab-order-margins, .lab-order-shapes, .lab-order-money { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+.lab-order-margins label { display: flex; align-items: center; gap: 6px; }
+.lab-order-money { margin-bottom: 10px; }
+.lab-order-money label { display: grid; gap: 2px; font-weight: 700; font-size: 13px; }
+.lab-order-colour-teeth { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 0 12px; }
+.lab-order-colour-teeth .lab-order-field { grid-template-columns: 1fr; }
+.lab-order-shade { display: grid; grid-template-columns: repeat(2, 1fr); width: 140px; border: 1px solid #d0d5dd; border-radius: 40px 40px 8px 8px; overflow: hidden; background: #f4fbf1; }
+.lab-order-shade input { border: 1px solid #e4e7ec; background: transparent; text-align: center; height: 36px; min-width: 0; }
+.lab-order-teeth { display: grid; gap: 6px; background: #f7f8fa; padding: 8px; border-radius: 6px; }
+.lab-order-teeth-row { display: flex; flex-wrap: wrap; gap: 3px; }
+.lab-order-teeth-row button:nth-child(8n+0) { margin-right: 0; }
+.lab-order-teeth-row button { min-width: 34px; padding: 0 2px; height: 28px; border: 1px solid #d0d5dd; background: #fff; border-radius: 3px; cursor: pointer; font-size: 13px; }
+.lab-order-teeth-row button.on { background: #1677ff; border-color: #1677ff; color: #fff; }
+.lab-order-teeth-row button:disabled { cursor: default; opacity: .7; }
+.lab-order-teeth-legend { display: flex; justify-content: space-between; font-size: 12px; color: #667085; }
+@media screen and (max-width: 700px) {
+  .lab-order-field { grid-template-columns: 1fr; gap: 2px; }
+  .lab-order-field > label { padding-top: 0; }
+  .lab-order-pair, .lab-order-colour-teeth { grid-template-columns: 1fr; }
+  .lab-order-head-fields input { width: 100%; }
+  .lab-order-head-fields { width: 100%; display: grid; grid-template-columns: 1fr 1fr; }
+}
+@media print {
+  body * { visibility: hidden !important; }
+  .lab-order-modal, .lab-order-modal * { visibility: visible !important; }
+  .lab-order-modal { position: absolute; left: 0; top: 0; width: 100%; }
+  .lab-order-modal .ant-modal-content { box-shadow: none; }
+  .lab-order-noprint { display: none !important; }
+}

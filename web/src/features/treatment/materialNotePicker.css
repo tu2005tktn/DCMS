@@ -21,3 +21,7 @@
 
 .material-note-select-popup .ant-select-item-option-content { white-space: normal; overflow-wrap: anywhere; }
 .treatment-sheet-actual-table td:nth-child(4) { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+.treatment-sheet-lab-cell { display: flex; align-items: flex-start; justify-content: space-between; gap: 4px; }
+.treatment-sheet-lab-cell > span { min-width: 0; overflow-wrap: anywhere; }
+.treatment-sheet-lab-cell .lab-order-trigger.ant-btn { flex: 0 0 28px; min-width: 28px; height: 28px; padding: 3px; }
