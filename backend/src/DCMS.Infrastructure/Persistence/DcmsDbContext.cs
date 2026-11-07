@@ -24,6 +24,13 @@ public sealed class DcmsDbContext(DbContextOptions<DcmsDbContext> options)
     public DbSet<DCMS.Domain.Features.SystemSettings.CatalogProvider> CatalogProviders => Set<DCMS.Domain.Features.SystemSettings.CatalogProvider>();
     public DbSet<DCMS.Domain.Features.SystemSettings.LabWorkType> LabWorkTypes => Set<DCMS.Domain.Features.SystemSettings.LabWorkType>();
     public DbSet<DCMS.Domain.Features.SystemSettings.CatalogMedicine> CatalogMedicines => Set<DCMS.Domain.Features.SystemSettings.CatalogMedicine>();
+    public DbSet<DCMS.Domain.Features.Prescriptions.ExternalPrescriptionLine> ExternalPrescriptionLines => Set<DCMS.Domain.Features.Prescriptions.ExternalPrescriptionLine>();
+    public DbSet<DCMS.Domain.Features.Prescriptions.PrescriptionTemplate> PrescriptionTemplates => Set<DCMS.Domain.Features.Prescriptions.PrescriptionTemplate>();
+    public DbSet<DCMS.Domain.Features.Prescriptions.PrescriptionTemplateLine> PrescriptionTemplateLines => Set<DCMS.Domain.Features.Prescriptions.PrescriptionTemplateLine>();
+    public DbSet<DCMS.Domain.Features.Prescriptions.PrescriptionAudit> PrescriptionAudits => Set<DCMS.Domain.Features.Prescriptions.PrescriptionAudit>();
+    public DbSet<DCMS.Domain.Features.Prescriptions.PrescriptionCommandReceipt> PrescriptionCommandReceipts => Set<DCMS.Domain.Features.Prescriptions.PrescriptionCommandReceipt>();
+    public DbSet<DCMS.Domain.Features.Settings.BranchProfile> BranchProfiles => Set<DCMS.Domain.Features.Settings.BranchProfile>();
+    public DbSet<DCMS.Domain.Features.Settings.BranchChair> BranchChairs => Set<DCMS.Domain.Features.Settings.BranchChair>();
     public DbSet<EmployeeProfile> Employees => Set<EmployeeProfile>();
     public DbSet<AuthSession> AuthSessions => Set<AuthSession>();
     public DbSet<AuthRefreshToken> AuthRefreshTokens => Set<AuthRefreshToken>();

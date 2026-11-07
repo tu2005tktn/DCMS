@@ -345,7 +345,10 @@ public sealed class MedicineCatalog(DcmsDbContext db, UserManager<ApplicationUse
         row.Strength = Text(input.Strength, "Hàm lượng", "strength", 200);
         row.DosageForm = Text(input.DosageForm, "Dạng bào chế", "dosageForm", 200);
         row.BaseUnit = Text(input.BaseUnit, "Đơn vị gốc", "baseUnit", 40) ?? throw Error("MSG02", label: "Đơn vị gốc", field: "baseUnit");
+        row.Route = Text(input.Route, "Đường dùng", "route", 40) ?? "Uống";
         row.Packaging = Text(input.Packaging, "Quy cách đóng gói", "packaging", 160);
+        row.Contraindications = Text(input.Contraindications, "Chống chỉ định", "contraindications", 1000);
+        row.AllergyWarnings = Text(input.AllergyWarnings, "Cảnh báo dị ứng", "allergyWarnings", 1000);
         row.Instructions = Text(input.Instructions, "Hướng dẫn sử dụng", "instructions", 1000);
         row.ReferencePrice = Price(input.ReferencePrice);
         row.PrescriptionEligible = input.PrescriptionEligible;
@@ -354,19 +357,22 @@ public sealed class MedicineCatalog(DcmsDbContext db, UserManager<ApplicationUse
     }
 
     protected override bool SameContent(CatalogMedicine a, CatalogMedicine b) => a.Code == b.Code && a.Name == b.Name && a.ActiveIngredient == b.ActiveIngredient
-        && a.Strength == b.Strength && a.DosageForm == b.DosageForm && a.BaseUnit == b.BaseUnit && a.Packaging == b.Packaging
+        && a.Strength == b.Strength && a.DosageForm == b.DosageForm && a.BaseUnit == b.BaseUnit && a.Route == b.Route && a.Packaging == b.Packaging
+        && a.Contraindications == b.Contraindications && a.AllergyWarnings == b.AllergyWarnings
         && a.Instructions == b.Instructions && a.ReferencePrice == b.ReferencePrice && a.PrescriptionEligible == b.PrescriptionEligible
         && a.InternalStockTracked == b.InternalStockTracked;
 
     protected override void Copy(CatalogMedicine from, CatalogMedicine to)
     {
         to.ActiveIngredient = from.ActiveIngredient; to.Strength = from.Strength; to.DosageForm = from.DosageForm; to.BaseUnit = from.BaseUnit;
-        to.Packaging = from.Packaging; to.Instructions = from.Instructions; to.ReferencePrice = from.ReferencePrice;
+        to.Route = from.Route; to.Packaging = from.Packaging; to.Contraindications = from.Contraindications; to.AllergyWarnings = from.AllergyWarnings;
+        to.Instructions = from.Instructions; to.ReferencePrice = from.ReferencePrice;
         to.PrescriptionEligible = from.PrescriptionEligible; to.InternalStockTracked = from.InternalStockTracked;
     }
 
     protected override Task<MedicineDto[]> MapAsync(IReadOnlyList<CatalogMedicine> rows, Func<int, string> actor, CancellationToken ct) =>
-        Task.FromResult(rows.Select(x => new MedicineDto(x.Id, x.Code, x.Name, x.ActiveIngredient, x.Strength, x.DosageForm, x.BaseUnit, x.Packaging,
+        Task.FromResult(rows.Select(x => new MedicineDto(x.Id, x.Code, x.Name, x.ActiveIngredient, x.Strength, x.DosageForm, x.BaseUnit,
+            x.Route, x.Packaging, x.Contraindications, x.AllergyWarnings,
             x.Instructions, x.ReferencePrice, x.PrescriptionEligible, x.InternalStockTracked, x.IsActive, x.Version,
             x.CreatedAt, actor(x.CreatedBy), x.UpdatedAt, actor(x.UpdatedBy))).ToArray());
 

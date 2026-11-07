@@ -44,5 +44,29 @@ public static class SettingsModel
             b.Property(x => x.BeforeJson).HasColumnType("jsonb"); b.Property(x => x.AfterJson).HasColumnType("jsonb");
             b.HasIndex(x => new {x.Section,x.At}); b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.ActorId).OnDelete(DeleteBehavior.Restrict);
         });
+        model.Entity<BranchProfile>(b => {
+            b.ToTable("BRANCH_PROFILE");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.Code).HasMaxLength(40);
+            b.HasIndex(x => x.Code).IsUnique();
+            b.Property(x => x.Name).HasMaxLength(160);
+            b.Property(x => x.Address).HasMaxLength(1000);
+            b.Property(x => x.Phone).HasMaxLength(20);
+            b.Property(x => x.Email).HasMaxLength(254);
+            b.Property(x => x.Website).HasMaxLength(255);
+            b.Property(x => x.TimeZoneId).HasMaxLength(64).HasDefaultValue("Asia/Ho_Chi_Minh");
+            b.Property(x => x.BankCode).HasMaxLength(20);
+            b.Property(x => x.AccountNumber).HasMaxLength(50);
+            b.Property(x => x.PayeeName).HasMaxLength(160);
+            b.Property(x => x.Version).IsConcurrencyToken();
+        });
+        model.Entity<BranchChair>(b => {
+            b.ToTable("BRANCH_CHAIR");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.Code).HasMaxLength(40);
+            b.Property(x => x.Name).HasMaxLength(160);
+            b.Property(x => x.Version).IsConcurrencyToken();
+            b.HasIndex(x => new { x.BranchId, x.Code }).IsUnique();
+        });
     }
 }

@@ -20,9 +20,9 @@ public sealed record LabWorkTypeInput(string? Code, string? Name, Guid? Provider
 public sealed record LabWorkTypeDto(Guid Id, string Code, string Name, Guid? ProviderId, string? ProviderName, bool? ProviderActive, string Unit,
     long? ReferencePrice, string? Warranty, bool Active, int Version, DateTimeOffset CreatedAt, string CreatedByName, DateTimeOffset UpdatedAt, string UpdatedByName);
 public sealed record MedicineInput(string? Code, string? Name, string? ActiveIngredient, string? Strength, string? DosageForm, string? BaseUnit,
-    string? Packaging, string? Instructions, long? ReferencePrice, bool PrescriptionEligible, bool InternalStockTracked);
+    string? Route, string? Packaging, string? Contraindications, string? AllergyWarnings, string? Instructions, long? ReferencePrice, bool PrescriptionEligible, bool InternalStockTracked);
 public sealed record MedicineDto(Guid Id, string Code, string Name, string? ActiveIngredient, string? Strength, string? DosageForm, string BaseUnit,
-    string? Packaging, string? Instructions, long? ReferencePrice, bool PrescriptionEligible, bool InternalStockTracked, bool Active, int Version,
+    string Route, string? Packaging, string? Contraindications, string? AllergyWarnings, string? Instructions, long? ReferencePrice, bool PrescriptionEligible, bool InternalStockTracked, bool Active, int Version,
     DateTimeOffset CreatedAt, string CreatedByName, DateTimeOffset UpdatedAt, string UpdatedByName);
 
 public sealed record CreateSupplyRequest<T>(Guid RequestKey, T? Entry) where T : class;
@@ -48,11 +48,18 @@ public interface IMedicineCatalog : ISupplyCatalog<MedicineInput, MedicineDto>
 // Resource-specific authorization: medicines deliberately retain their existing Owner policy.
 public static class SupplyCatalogPermissions
 {
-    public static bool CanManage(string resource, IEnumerable<string> roles)
+    public static string Read(string resource) => resource switch
     {
-        var values = roles.ToArray();
-        if (values.Contains(DCMS.Domain.Features.Accounts.AccountRoles.ClinicOwner)) return true;
-        return resource is "providers" or "lab-work-types" or "materials" or "material-categories" or "units"
-            && values.Contains(DCMS.Domain.Features.Accounts.AccountRoles.Dentist);
-    }
+        "providers" => "catalog.material-suppliers.read",
+        "lab-work-types" => "catalog.lab-work-types.read",
+        "medicines" => "catalog.medicines.read",
+        _ => throw new ArgumentException(resource)
+    };
+    public static string Manage(string resource) => resource switch
+    {
+        "providers" => "catalog.material-suppliers.manage",
+        "lab-work-types" => "catalog.lab-work-types.manage",
+        "medicines" => "catalog.medicines.manage",
+        _ => throw new ArgumentException(resource)
+    };
 }

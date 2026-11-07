@@ -36,14 +36,14 @@ function useRequestKey() {
 // DCMS-127: kinds stored on the patient master show how many active records use each entry.
 const patientKinds: Kind[] = ['customer-groups', 'patient-sources', 'occupations', 'intake-history'];
 
-export default function ReferenceCatalogPanel() {
+export default function ReferenceCatalogPanel({ initialKind }: { initialKind?: Kind } = {}) {
   const { user } = useAuth();
   const owner = user?.effectiveRoles.includes('ClinicOwner') ?? false;
   const can = (kind: Kind, action: string) => owner || (user?.permissions.includes(`catalog.${kind}.${action}`) ?? false);
   const allowedKinds = kinds.filter(kind => can(kind.key, 'read'));
   // Static message does not render under React 19 + antd 5 (errors were silently lost); use the hook instance.
   const [toast, toastContext] = message.useMessage();
-  const [kind, setKind] = useState<Kind>('diagnoses'), [status, setStatus] = useState<Status>('Active');
+  const [kind, setKind] = useState<Kind>(initialKind ?? 'diagnoses'), [status, setStatus] = useState<Status>('Active');
   const [search, setSearch] = useState(''), [query, setQuery] = useState(''), [page, setPage] = useState(1), [size, setSize] = useState(20);
   const [data, setData] = useState<Page | null>(null), [loading, setLoading] = useState(false), [error, setError] = useState<string>(), [revision, setRevision] = useState(0);
   const [editing, setEditing] = useState<{ entry?: Entry } | null>(null), [formError, setFormError] = useState<ApiError>();
