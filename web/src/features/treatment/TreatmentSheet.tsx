@@ -1,6 +1,6 @@
 import { usePermissions } from '../authentication/usePermissions';
 import { Alert, Button, Dropdown, Input, Modal, Pagination, Skeleton, Tooltip } from 'antd';
-import { ToolOutlined } from '@ant-design/icons';
+import { ExperimentOutlined, ToolOutlined } from '@ant-design/icons';
 import { useEffect, useRef, useState } from 'react';
 import PatientImageGallery from '../clinical-documents/PatientImageGallery';
 import { Link } from 'react-router-dom';
@@ -10,6 +10,7 @@ import { money } from './types';
 import TreatmentSheetDraftRow, { type SheetActualPreview } from './TreatmentSheetDraftForms';
 import DossierFinancialPanel from './DossierFinancialPanel';
 import ApplyItemPlanModal from './ApplyItemPlanModal';
+import LabOrderModal, { type LabOrderSummary } from './LabOrderModal';
 import MaterialNotePicker, { mergeMaterialUses, type MaterialUse } from './MaterialNotePicker';
 import type { ActivityPage, PaymentContext, SheetActivity, SheetContext } from './sheetTypes';
 
@@ -41,6 +42,7 @@ export default function TreatmentSheet({ patientId, dossierId, dossierVersion, o
   const noteKey = useRef<{ text: string; key: string; version: number } | null>(null);
   const refresh = () => setReload(v => v + 1);
   const [materialFor, setMaterialFor] = useState<SheetActivity | null>(null);
+  const [labFor, setLabFor] = useState<SheetActivity | null>(null), [labOrders, setLabOrders] = useState<LabOrderSummary[]>([]);
   const materialKey = useRef<{ payload: string; key: string } | null>(null);
   async function load() {
     const [value, ctx, rows] = await Promise.all([api<TreatmentDossier>(`/api/dossiers/${dossierId}`),
@@ -54,6 +56,7 @@ export default function TreatmentSheet({ patientId, dossierId, dossierVersion, o
     if (!noteDirty.current) { setNote(value.note ?? ''); noteSaved.current = value.note ?? ''; }
   }
   useEffect(() => { let live = true; setError(undefined); void load().then(v => { if (live) accept(v); }).catch(e => { if (live) setError(e.message); }); return () => { live = false; }; }, [dossierId, dossierVersion, reload, patientId]);
+  useEffect(() => { let live = true; void api<LabOrderSummary[]>(`/api/dossiers/${dossierId}/lab-orders`).then(v => { if (live) setLabOrders(v); }).catch(() => undefined); return () => { live = false; }; }, [dossierId, reload]);
   useEffect(() => {
     let live = true; setActivityError(undefined);
     void api<ActivityPage>(`/api/dossiers/${dossierId}/activities?page=${page}&pageSize=20`).then(v => { if (live) setActivities(v); }).catch(e => { if (live) setActivityError(e.message); });
@@ -170,8 +173,8 @@ export default function TreatmentSheet({ patientId, dossierId, dossierVersion, o
   async function saveMaterials(activity: SheetActivity, note: string, picked: MaterialUse[]) {
     if (!dossier) throw new Error('Chưa tải được phiếu.');
     // The server replaces the activity's usage lines, so send the lines already deducted plus the newly picked ones.
-    const existing = await api<{ items: { materialId: string; quantity: number }[] }>(`/api/system-settings/material-usage?activityId=${activity.id}&pageSize=100`);
-    const materials = mergeMaterialUses(existing.items.map(x => ({ materialId: x.materialId, quantity: x.quantity })), picked);
+    const existing = await api<MaterialUse[]>(`/api/dossiers/${dossierId}/sheet-activities/${activity.id}/materials`);
+    const materials = mergeMaterialUses(existing, picked);
     const row = { ...activityRow(activity), note, materials };
     const payload = JSON.stringify({ id: activity.id, note, materials });
     if (materialKey.current?.payload !== payload) materialKey.current = { payload, key: crypto.randomUUID() };
@@ -269,7 +272,9 @@ export default function TreatmentSheet({ patientId, dossierId, dossierVersion, o
         {activities?.items.filter(a => a.id !== editor?.activity?.id).map(a => <tr key={a.id}><td>{date(a.performedAt)}</td><td>{a.region || '—'}</td><td>{a.serviceNameSnapshot ?? dossier.items.find(i => i.id === a.itemId)?.serviceName ?? context.services.find(s => s.id === a.serviceId)?.name ?? 'Dịch vụ đã lưu'}</td><td><div className="treatment-sheet-note-input"><span>{a.outcome || '—'}</span>
             <Tooltip title="Chọn vật liệu dùng"><Button className="material-note-trigger" type="text" size="small" icon={<ToolOutlined />} aria-label={`Chọn vật liệu dùng cho ${a.serviceNameSnapshot ?? 'điều trị'}`}
               disabled={!has('treatment.actuals.update') || !canWrite || busy || !!editor} onClick={() => setMaterialFor(a)} /></Tooltip></div></td>
-          <td>{member(a.performerId)}<small>{member(a.assistantId)}</small></td><td>{a.labWorkSnapshot || '—'}</td><td>{money(Math.round(a.quantity*a.priceSnapshotVnd))}<small>{fees[a.feeStatus] ?? a.feeStatus}</small></td><td>{money(a.discountSnapshotVnd ?? 0)}</td>
+          <td>{member(a.performerId)}<small>{member(a.assistantId)}</small></td><td><div className="treatment-sheet-lab-cell"><span>{(() => { const lab = labOrders.find(o => o.activityId === a.id); return lab ? <>{lab.workName}{lab.dueOn && <small>Hẹn {date(lab.dueOn)}</small>}</> : a.labWorkSnapshot || '—'; })()}</span>
+            <Tooltip title="Phiếu labo"><Button className="lab-order-trigger" type="text" size="small" icon={<ExperimentOutlined />} aria-label={`Phiếu labo cho ${a.serviceNameSnapshot ?? 'điều trị'}`}
+              disabled={!has('treatment.read') || busy || !!editor} onClick={() => setLabFor(a)} /></Tooltip></div></td><td>{money(Math.round(a.quantity*a.priceSnapshotVnd))}<small>{fees[a.feeStatus] ?? a.feeStatus}</small></td><td>{money(a.discountSnapshotVnd ?? 0)}</td>
           <td>{money(payments?.lines.find(l => l.activityId === a.id)?.paidVnd ?? 0)}</td>
           <td><div className="treatment-sheet-edit-actions"><Button size="small" title="Sửa" aria-label={`Sửa quá trình ${a.serviceNameSnapshot ?? 'điều trị'}`} disabled={!has('treatment.actuals.update') || !canWrite || busy || !!editor} onClick={() => editActivity(a)}>✎</Button>
             <Button size="small" title="Xóa" aria-label={`Xóa quá trình ${a.serviceNameSnapshot ?? 'điều trị'}`} disabled={!has('treatment.actuals.delete') || !canWrite || busy || !!editor} onClick={() => { setError(undefined); setDeletingActivity(a); }}>×</Button></div></td></tr>)}
@@ -290,6 +295,8 @@ export default function TreatmentSheet({ patientId, dossierId, dossierVersion, o
       <p>{deleting?.serviceName}</p>{error && <Alert type="error" message={error} />}</Modal>
     {materialFor && <MaterialNotePicker note={materialFor.outcome ?? ''} onCancel={() => { materialKey.current = null; setMaterialFor(null); }}
       onApply={(value, uses) => saveMaterials(materialFor, value, uses)} />}
+    {labFor && <LabOrderModal dossierId={dossierId} activityId={labFor.id} serviceName={labFor.serviceNameSnapshot ?? 'điều trị'} canEdit={has('treatment.lab.manage') && canWrite}
+      onClose={() => setLabFor(null)} onSaved={() => { setLabFor(null); refresh(); }} />}
     {selectPlan && <ApplyItemPlanModal branchId={dossier.branchId} dossierId={dossierId} version={dossier.version} onReload={reloadSource} onClose={() => setSelectPlan(false)} onApplied={() => { setSelectPlan(false); refresh(); }} />}
     <Modal open={!!deletingActivity} title="Bạn có muốn xóa dòng này không?" okText="Đồng ý" cancelText="Không đồng ý" confirmLoading={busy}
       closable={!busy} cancelButtonProps={{disabled:busy}} onCancel={() => setDeletingActivity(null)} onOk={() => { if (deletingActivity) void deleteActivity(deletingActivity).then(ok => { if (ok) setDeletingActivity(null); }); }}>

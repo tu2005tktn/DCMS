@@ -7,6 +7,14 @@ namespace DCMS.Infrastructure.Persistence;
 
 internal static class TreatmentModel
 {
+    private static Microsoft.EntityFrameworkCore.Storage.ValueConversion.ValueConverter<T, string> JsonConv<T>() where T : class =>
+        new(v => System.Text.Json.JsonSerializer.Serialize(v, (System.Text.Json.JsonSerializerOptions?)null),
+            v => System.Text.Json.JsonSerializer.Deserialize<T>(v, (System.Text.Json.JsonSerializerOptions?)null) ?? (T)(object)(typeof(T).IsArray ? Array.CreateInstance(typeof(T).GetElementType()!, 0) : Activator.CreateInstance(typeof(T))!));
+    private static Microsoft.EntityFrameworkCore.ChangeTracking.ValueComparer<T> JsonCompare<T>() where T : class =>
+        new((a, b) => System.Text.Json.JsonSerializer.Serialize(a, (System.Text.Json.JsonSerializerOptions?)null) == System.Text.Json.JsonSerializer.Serialize(b, (System.Text.Json.JsonSerializerOptions?)null),
+            v => System.Text.Json.JsonSerializer.Serialize(v, (System.Text.Json.JsonSerializerOptions?)null).GetHashCode(),
+            v => System.Text.Json.JsonSerializer.Deserialize<T>(System.Text.Json.JsonSerializer.Serialize(v, (System.Text.Json.JsonSerializerOptions?)null), (System.Text.Json.JsonSerializerOptions?)null)!);
+
     public static void Configure(ModelBuilder model)
     {
         model.Entity<TreatmentDossier>(b =>
@@ -209,6 +217,51 @@ internal static class TreatmentModel
             b.HasIndex(x => x.ActivityId);
             b.HasOne<ClinicalActivity>().WithMany().HasForeignKey(x => x.ActivityId).OnDelete(DeleteBehavior.Restrict);
             b.ToTable(t => t.HasCheckConstraint("CK_DOSSIER_PAYMENT_LINE_AMOUNT", "\"AmountVnd\" > 0"));
+        });
+        model.Entity<DossierPayOsOrder>(b =>
+        {
+            b.ToTable("TREATMENT_PAYOS_ORDER"); b.HasKey(x => x.Id);
+            b.HasIndex(x => x.OrderCode).IsUnique();
+            b.HasIndex(x => x.RequestKey).IsUnique();
+            b.HasIndex(x => x.PaymentLinkId).IsUnique().HasFilter("\"PaymentLinkId\" IS NOT NULL");
+            b.HasIndex(x => x.DossierId).IsUnique().HasDatabaseName("IX_TREATMENT_PAYOS_ORDER_ActiveDossier")
+                .HasFilter("\"State\" IN ('Creating','Pending','Review')");
+            b.Property(x => x.Fingerprint).HasMaxLength(64);
+            b.Property(x => x.State).HasMaxLength(20);
+            b.Property(x => x.PaymentLinkId).HasMaxLength(100);
+            b.Property(x => x.BankBin).HasMaxLength(12);
+            b.Property(x => x.AccountNumber).HasMaxLength(40);
+            b.Property(x => x.AccountName).HasMaxLength(160);
+            b.Property(x => x.BankReference).HasMaxLength(100);
+            b.Property(x => x.Note).HasMaxLength(1000);
+            b.HasOne<TreatmentDossier>().WithMany().HasForeignKey(x => x.DossierId).OnDelete(DeleteBehavior.Restrict);
+            b.HasMany(x => x.Lines).WithOne().HasForeignKey(x => x.OrderId).OnDelete(DeleteBehavior.Cascade);
+            b.HasOne<DossierPayment>().WithMany().HasForeignKey(x => x.PaymentId).OnDelete(DeleteBehavior.Restrict);
+            b.ToTable(t => t.HasCheckConstraint("CK_TREATMENT_PAYOS_ORDER_AMOUNT", "\"AmountVnd\" > 0"));
+        });
+        model.Entity<DossierPayOsOrderLine>(b =>
+        {
+            b.ToTable("TREATMENT_PAYOS_ORDER_LINE"); b.HasKey(x => new { x.OrderId, x.ActivityId });
+            b.HasOne<ClinicalActivity>().WithMany().HasForeignKey(x => x.ActivityId).OnDelete(DeleteBehavior.Restrict);
+            b.ToTable(t => t.HasCheckConstraint("CK_TREATMENT_PAYOS_ORDER_LINE_AMOUNT", "\"AmountVnd\" > 0"));
+        });
+        model.Entity<LabOrder>(b =>
+        {
+            b.ToTable("LAB_ORDER"); b.HasKey(x => x.Id);
+            b.Property(x => x.Code).HasMaxLength(40); b.Property(x => x.WorkName).HasMaxLength(160);
+            b.Property(x => x.MarginOuter).HasMaxLength(20); b.Property(x => x.MarginInner).HasMaxLength(20); b.Property(x => x.MarginSide).HasMaxLength(20);
+            b.Property(x => x.BridgeShapes).HasColumnType("jsonb").HasConversion(JsonConv<string[]>(), JsonCompare<string[]>());
+            b.Property(x => x.Teeth).HasColumnType("jsonb").HasConversion(JsonConv<string[]>(), JsonCompare<string[]>());
+            b.Property(x => x.Shade).HasColumnType("jsonb").HasConversion(JsonConv<Dictionary<string, string>>(), JsonCompare<Dictionary<string, string>>());
+            b.Property(x => x.Note).HasMaxLength(1000); b.Property(x => x.Material).HasMaxLength(100); b.Property(x => x.Warranty).HasMaxLength(100);
+            b.HasIndex(x => x.ActivityId).IsUnique(); b.HasIndex(x => x.DossierId);
+            b.HasIndex(x => new { x.BranchId, x.Code }).IsUnique().HasFilter("\"Code\" IS NOT NULL");
+            b.HasOne<ClinicalActivity>().WithMany().HasForeignKey(x => x.ActivityId).OnDelete(DeleteBehavior.Cascade);
+            b.ToTable(t =>
+            {
+                t.HasCheckConstraint("CK_LAB_ORDER_FEES", "\"TotalFeeVnd\" >= 0 AND \"PaidVnd\" >= 0 AND \"PaidVnd\" <= \"TotalFeeVnd\"");
+                t.HasCheckConstraint("CK_LAB_ORDER_QUANTITY", "\"Quantity\" BETWEEN 1 AND 999");
+            });
         });
         model.Entity<TreatmentProgressionReceipt>(b =>
         {

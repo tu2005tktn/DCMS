@@ -26,6 +26,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+builder.Logging.AddDebug();
 
 builder.Services.AddInfrastructure(builder.Configuration, builder.Environment);
 builder.Services.AddOpenApi();
@@ -138,6 +141,16 @@ if (args.Contains("--migrate") || args.Contains("--seed-demo"))
     return;
 }
 
+if (args.Contains("--seed-clinic-catalog"))
+{
+    if (!app.Environment.IsDevelopment()) throw new InvalidOperationException("Development database commands require Development environment.");
+    using var catalogScope = app.Services.CreateScope();
+    Console.WriteLine(await catalogScope.ServiceProvider.GetRequiredService<DCMS.Infrastructure.Features.Treatment.DevelopmentTreatmentCatalogSeeder>().SeedAsync(args.Contains("--refresh")));
+    Console.WriteLine(await catalogScope.ServiceProvider.GetRequiredService<DCMS.Infrastructure.Features.SystemSettings.DevelopmentMaterialSeeder>().SeedAsync());
+    Console.WriteLine(await catalogScope.ServiceProvider.GetRequiredService<DCMS.Infrastructure.Features.SystemSettings.DevelopmentLabSeeder>().SeedAsync());
+    return;
+}
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi().AllowAnonymous();
@@ -165,6 +178,12 @@ app.MapPatientLinkEndpoints();
 DCMS.Api.Features.FamilyMembers.FamilyMemberEndpoints.MapFamilyMemberEndpoints(app);
 app.MapPatientEndpoints();
 app.MapTreatmentEndpoints();
+app.MapPost("/api/payments/payos/webhook", async (System.Text.Json.JsonElement payload,
+    DCMS.Application.Features.Treatment.IPayOsOrderService service, CancellationToken ct) =>
+{
+    await service.ReceiveWebhookAsync(payload, ct);
+    return Results.Ok(new { code = "00", desc = "success" });
+}).AllowAnonymous();
 DCMS.Api.Features.Treatment.ItemPlanEndpoints.MapItemPlanEndpoints(app);
 DCMS.Api.Features.SystemSettings.SystemSettingsEndpoints.MapSystemSettingsEndpoints(app);
 app.MapClinicalWorkEndpoints();

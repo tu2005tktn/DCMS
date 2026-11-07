@@ -71,10 +71,14 @@ public static class DependencyInjection
         services.AddScoped<DevelopmentPatientLinkSeeder>();
         services.AddScoped<IPatientService, PatientService>();
         services.AddScoped<ITreatmentDossierService, TreatmentDossierService>();
+        services.AddScoped<PayOsGateway>();
+        services.AddScoped<IPayOsOrderService, PayOsOrderService>();
+        if (!string.IsNullOrWhiteSpace(configuration["PayOs:ClientId"])) services.AddHostedService<PayOsOrderWorker>();
         services.AddScoped<IServicePriceService, ServicePriceService>();
         services.AddScoped<Features.Finance.FinanceService>();
         services.AddScoped<DCMS.Application.Features.Finance.IExaminationFeeService,Features.Finance.ExaminationFeeService>();
         services.AddScoped<DCMS.Application.Features.Finance.IFinanceService>(sp=>sp.GetRequiredService<Features.Finance.FinanceService>());
+        services.AddScoped<DCMS.Application.Features.Finance.IRevenueService, Features.Finance.RevenueService>();
         services.AddScoped<DCMS.Application.Features.Prescriptions.IPrescriptionService, Features.Prescriptions.PrescriptionService>();
         services.AddScoped<ITreatmentFinancialSummaryPort, Features.Finance.TreatmentFinancialSummaryPort>();
         services.AddScoped<ITreatmentFinancialWorkspace, TreatmentFinancialWorkspace>();
@@ -116,6 +120,9 @@ public static class DependencyInjection
         services.AddScoped<FollowUpAppointmentPort>();
         services.AddScoped<IFollowUpAppointmentChangePort>(sp => sp.GetRequiredService<FollowUpAppointmentPort>());
         services.AddScoped<DevelopmentAppointmentSeeder>();
+        services.AddScoped<Features.Treatment.DevelopmentTreatmentCatalogSeeder>();
+        services.AddScoped<Features.SystemSettings.DevelopmentMaterialSeeder>();
+        services.AddScoped<Features.SystemSettings.DevelopmentLabSeeder>();
         services.AddScoped<IFollowUpBookingPort>(sp => sp.GetRequiredService<FollowUpAppointmentPort>());
         services.AddScoped<IAppointmentNotificationDispatcher, AppointmentNotificationDispatcher>();
         services.AddScoped<IExternalNotificationAdapter, UnavailableExternalNotificationAdapter>();

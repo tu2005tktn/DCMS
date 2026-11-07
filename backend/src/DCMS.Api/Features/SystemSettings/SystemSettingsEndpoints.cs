@@ -33,7 +33,7 @@ public static class SystemSettingsEndpoints
         items.MapPost("/", async (HttpContext c, CreateMaterialRequest r, ISystemCatalogService s, CancellationToken ct) => { var result = await s.CreateMaterialAsync(AuthenticationEndpoints.AccountId(c.User), r, ct); return Results.Created($"/api/system-settings/materials/{result.Id}", result); });
         items.MapPut("/{id:guid}", async (HttpContext c, Guid id, UpdateMaterialRequest r, ISystemCatalogService s, CancellationToken ct) => Results.Ok(await s.UpdateMaterialAsync(AuthenticationEndpoints.AccountId(c.User), id, r, ct)));
         items.MapDelete("/{id:guid}", async (HttpContext c, Guid id, [FromBody] DeleteCatalogRequest r, ISystemCatalogService s, CancellationToken ct) => Results.Ok(await s.DeleteMaterialAsync(AuthenticationEndpoints.AccountId(c.User), id, r, ct)));
-        // Purchase log (docs/specs/MATERIAL-PURCHASES.md); the service checks the catalog.materials.* permission per command.
+        // Purchase log (docs/specs/MATERIAL-PURCHASES.md); the service checks materials.purchases.* per command.
         var purchases = app.MapGroup("/api/system-settings/material-purchases").RequireAuthorization().WithTags("System settings");
         purchases.MapGet("/", async (HttpContext c, string? q, DateOnly? from, DateOnly? to, string? payment, int? page, int? pageSize, IMaterialPurchaseService s, CancellationToken ct) =>
             Results.Ok(await s.ListAsync(AuthenticationEndpoints.AccountId(c.User), q, from, to, payment, page ?? 1, pageSize ?? 20, ct)));
@@ -41,10 +41,10 @@ public static class SystemSettingsEndpoints
         purchases.MapPost("/", async (HttpContext c, CreateMaterialPurchaseRequest r, IMaterialPurchaseService s, CancellationToken ct) => { var result = await s.CreateAsync(AuthenticationEndpoints.AccountId(c.User), r, ct); return Results.Created($"/api/system-settings/material-purchases/{result.Id}", result); });
         purchases.MapPut("/{id:guid}", async (HttpContext c, Guid id, UpdateMaterialPurchaseRequest r, IMaterialPurchaseService s, CancellationToken ct) => Results.Ok(await s.UpdateAsync(AuthenticationEndpoints.AccountId(c.User), id, r, ct)));
         purchases.MapDelete("/{id:guid}", async (HttpContext c, Guid id, [FromBody] DeleteCatalogRequest r, IMaterialPurchaseService s, CancellationToken ct) => Results.Ok(await s.DeleteAsync(AuthenticationEndpoints.AccountId(c.User), id, r, ct)));
-        // Work/service statistics (docs/specs/WORK-SERVICE-STATISTICS.md); finance.read is checked by the service.
+        // Work/service statistics (docs/specs/WORK-SERVICE-STATISTICS.md); finance.work-statistics.read is checked by the service.
         app.MapGet("/api/work-statistics", async (HttpContext c, DateOnly? from, DateOnly? to, int? branchId, string? q, int? page, int? pageSize, DCMS.Application.Features.Treatment.IWorkStatisticsService s, CancellationToken ct) =>
             Results.Ok(await s.ListAsync(AuthenticationEndpoints.AccountId(c.User), from, to, branchId, q, page ?? 1, pageSize ?? 20, ct))).RequireAuthorization().WithTags("Work statistics");
-        // Stock and usage history (docs/specs/MATERIAL-STOCK.md); read-only, catalog.materials.read.
+        // Stock/history use materials.stock.read / materials.usage.read; the available picker keeps catalog.materials.read.
         app.MapGet("/api/system-settings/material-stock", async (HttpContext c, string? q, int? page, int? pageSize, IMaterialStockService s, CancellationToken ct) =>
             Results.Ok(await s.StockAsync(AuthenticationEndpoints.AccountId(c.User), q, page ?? 1, pageSize ?? 20, ct))).RequireAuthorization().WithTags("System settings");
         app.MapGet("/api/system-settings/material-stock/available", async (HttpContext c, string? q, int? page, int? pageSize, IMaterialStockService s, CancellationToken ct) =>

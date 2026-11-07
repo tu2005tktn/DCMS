@@ -244,6 +244,17 @@ public sealed record PatientPrescriptionDto(
 
 public sealed record PatientPrescriptionDetailDto(PatientPrescriptionDto Prescription, PrescriptionPrintDto Print);
 
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record SavePatientPrescription(Guid RequestKey, int ExpectedVersion, int BranchId, DateOnly PrescribedOn,
+    string Diagnosis, string? OtherDiagnosis, string? Advice, SavePatientPrescriptionItem[] Items);
+public sealed record SavePatientPrescriptionItem(Guid MedicineId, int Quantity, string? Instructions);
+public sealed record PatientPrescriptionItemDto(Guid Id, Guid MedicineId, string MedicineCode, string MedicineName,
+    string? Strength, string? DosageForm, string Unit, int Quantity, string Instructions);
+public sealed record PatientPrescriptionDto(Guid Id, int PatientId, int BranchId, DateOnly PrescribedOn, string Diagnosis,
+    string? OtherDiagnosis, string? Advice, int PrescriberEmployeeId, string PrescriberName, int Version,
+    PatientPrescriptionItemDto[] Items);
+public sealed record PatientPrescriptionContext(int[] BranchIds, string PrescriberName);
+
 public interface IPrescriptionService
 {
     Task<PrescriptionMedicineOption[]> OptionsAsync(int actor, int? branchId, string? search, CancellationToken ct);

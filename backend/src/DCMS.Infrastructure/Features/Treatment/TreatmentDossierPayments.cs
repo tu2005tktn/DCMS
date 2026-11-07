@@ -38,6 +38,12 @@ public sealed partial class TreatmentDossierService
         var performerIds = activities.Select(x => x.PerformerId).Distinct().ToArray();
         var names = await db.Employees.AsNoTracking().Where(x => performerIds.Contains(x.Id))
             .ToDictionaryAsync(x => x.Id, x => x.FullName, ct);
+        var activityIds = activities.Select(x => x.Id).ToArray();
+        var usages = await db.MaterialUsages.AsNoTracking().Where(x => activityIds.Contains(x.ActivityId))
+            .Select(x => new { x.ActivityId, x.MaterialName, x.Quantity, x.UsageUnit }).ToListAsync(ct);
+        var materials = usages.GroupBy(x => x.ActivityId).ToDictionary(x => x.Key,
+            x => (IReadOnlyList<DossierPaymentMaterial>)x.Select(m =>
+                new DossierPaymentMaterial(m.MaterialName, m.Quantity, m.UsageUnit)).ToList());
         var lines = activities.OrderBy(x => x.PerformedAt).ThenBy(x => x.Id).Select(x =>
         {
             var cost = ActivityCost(x);
@@ -45,7 +51,8 @@ public sealed partial class TreatmentDossierService
             var paid = paidByActivity.GetValueOrDefault(x.Id);
             var due = x.ChargingBasis == "Included" ? 0 : Math.Max(0, cost - discount - paid);
             return new DossierPaymentContextLine(x.Id, x.PerformedAt, names.GetValueOrDefault(x.PerformerId) ?? "—",
-                x.ServiceNameSnapshot, cost, discount, paid, due);
+                x.ServiceNameSnapshot, cost, discount, paid, due,
+                materials.GetValueOrDefault(x.Id) ?? []);
         }).ToList();
         return (lines, paidByActivity.Values.Sum());
     }
@@ -60,7 +67,9 @@ public sealed partial class TreatmentDossierService
             orderby staff.FullName
             select new DossierPaymentCollector(staff.Id, staff.FullName)).ToListAsync(ct);
         var self = await db.Employees.AsNoTracking().Where(x => x.AccountId == actorId).Select(x => (int?)x.Id).SingleOrDefaultAsync(ct);
-        return new(paid, lines, collectors, collectors.Any(x => x.Id == self) ? self : null);
+        var patientName = await db.Patients.AsNoTracking().Where(x => x.Id == dossier.PatientId)
+            .Select(x => x.FullName).SingleAsync(ct);
+        return new(paid, lines, collectors, collectors.Any(x => x.Id == self) ? self : null, dossier.Code, patientName);
     }
 
     public async Task<IReadOnlyList<DossierPaymentDto>> PaymentsAsync(int actorId, Guid dossierId, CancellationToken ct)
@@ -82,7 +91,7 @@ public sealed partial class TreatmentDossierService
 
     public Task<DossierPaymentDto> CreatePaymentAsync(int actorId, Guid dossierId, CreateDossierPaymentRequest request, CancellationToken ct)
     {
-        if (request.Lines is not { Count: > 0 and <= 500 } || request.Method is not ("Cash" or "Transfer")
+        if (request.Lines is not { Count: > 0 and <= 500 } || request.Method != "Cash"
             || request.Note?.Length > 1000 || request.CollectorId < 1
             || request.Lines.Any(x => x.AmountVnd <= 0 || x.AmountVnd > MaxPaymentVnd)
             || request.Lines.Select(x => x.ActivityId).Distinct().Count() != request.Lines.Count)
@@ -95,6 +104,9 @@ public sealed partial class TreatmentDossierService
                 join staff in db.Employees.AsNoTracking() on member.EmployeeId equals staff.Id
                 where member.BranchId == dossier.BranchId && member.Active && staff.Id == request.CollectorId
                 select staff.FullName).FirstOrDefaultAsync(ct) ?? throw Error("MSG04");
+            if (await db.DossierPayOsOrders.AnyAsync(x => x.DossierId == dossierId
+                && (x.State == "Creating" || x.State == "Pending" || x.State == "Review"), ct))
+                throw Error("MSG111", 409);
             var (lines, _) = await PaymentLinesAsync(actorId, dossierId, ct);
             var byActivity = lines.ToDictionary(x => x.ActivityId);
             foreach (var line in request.Lines)

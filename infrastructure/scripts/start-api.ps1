@@ -1,10 +1,12 @@
-param([switch]$Migrate, [switch]$SeedDemo, [switch]$Lan)
+param([switch]$Migrate, [switch]$SeedDemo, [switch]$SeedClinicCatalog, [switch]$Lan)
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'import-development-env.ps1')
 $runArguments = @('run', '--project', (Join-Path $repositoryRoot 'backend\src\DCMS.Api'), '--launch-profile', 'http')
 $appArguments = @()
 if ($Migrate) { $appArguments += '--migrate' }
 if ($SeedDemo) { $appArguments += '--seed-demo' }
+# Sample services, treatment plans and instrument/material stock (needs -SeedDemo first). Development only.
+if ($SeedClinicCatalog) { $appArguments += '--seed-clinic-catalog' }
 # -Lan listens on all interfaces so a phone on the same Wi-Fi (Expo Go) can reach the API. Development only.
 if ($Lan) { $appArguments += @('--urls', 'http://0.0.0.0:5080') }
 if ($appArguments.Count -gt 0) { $runArguments += @('--') + $appArguments }

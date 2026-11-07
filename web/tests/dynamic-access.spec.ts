@@ -7,7 +7,31 @@ const options:GrantOption[]=[
   ...['create','update','archive'].map((key,index)=>({key:'patients.'+key,label:['Thêm hồ sơ bệnh nhân','Sửa hồ sơ bệnh nhân','Ngừng sử dụng / khôi phục hồ sơ bệnh nhân'][index],parent:'patients.read',requiredRole:'ClinicAssistant',allowedBaseRoles:['ClinicAssistant']})),
   {key:'examinations.read',label:'Xem khám lâm sàng',parent:null,requiredRole:null,allowedBaseRoles:['Dentist','ClinicAssistant']},
   {key:'examinations.manage',label:'Ghi và xác nhận khám',parent:'examinations.read',requiredRole:'Dentist',allowedBaseRoles:['Dentist']},
+  {key:'finance.read',label:'Xem phí và thanh toán',parent:null,requiredRole:null,allowedBaseRoles:['ClinicAssistant','Dentist','Admin']},
+  {key:'finance.payments.create',label:'Lập phiếu thu',parent:'finance.read',requiredRole:null,allowedBaseRoles:['ClinicAssistant']},
+  {key:'finance.payos.create',label:'Tạo QR chuyển khoản PayOS',parent:'finance.payments.create',requiredRole:null,allowedBaseRoles:['ClinicAssistant']},
+  {key:'finance.revenue.read',label:'Xem doanh thu đã thu',parent:'finance.read',requiredRole:null,allowedBaseRoles:['ClinicAssistant','Dentist','Admin']},
+  {key:'finance.work-statistics.read',label:'Xem thống kê công việc / dịch vụ',parent:'finance.read',requiredRole:null,allowedBaseRoles:['ClinicAssistant','Dentist','Admin']},
 ];
+
+test('new PayOS and report grants save independently with their full parent chain', async ({ page }) => {
+  const state = await prepare(page);
+  await page.getByRole('button', { name: 'Thêm nhóm quyền', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel('Tên phân quyền', { exact: true }).fill('SYNTHETIC thu ngân QR');
+  await dialog.getByLabel('Mã phân quyền', { exact: true }).fill('SYN-QR');
+  await dialog.getByRole('checkbox', { name: 'Tạo QR chuyển khoản PayOS', exact: true }).check();
+  await expect(dialog.getByRole('checkbox', { name: 'Lập phiếu thu', exact: true })).toBeChecked();
+  await expect(dialog.getByRole('checkbox', { name: 'Xem phí và thanh toán', exact: true })).toBeChecked();
+  await expect(dialog.getByRole('checkbox', { name: 'Xem doanh thu đã thu', exact: true })).not.toBeChecked();
+  await dialog.getByLabel('Tìm quyền', { exact: true }).fill('doanh thu');
+  await dialog.getByRole('checkbox', { name: 'Xem phí và thanh toán', exact: true }).uncheck();
+  await dialog.getByRole('checkbox', { name: 'Xem doanh thu đã thu', exact: true }).check();
+  await dialog.getByRole('button', { name: 'Lưu phân quyền', exact: true }).click();
+  await expect(dialog).toBeHidden();
+  const write = state.requests.find(request => request.method === 'POST' && !request.path.endsWith('/preview'))!;
+  expect(write.body.entry.grants.sort()).toEqual(['finance.read', 'finance.revenue.read']);
+});
 async function prepare(page:Page,readOnly=false){
   const state={groups:[{id:groupId,code:'RECEPTION',name:'SYNTHETIC lễ tân',baseRole:'ClinicAssistant',description:null,active:true,version:3,grants:['patients.read','patients.manage'],assignedCount:1},
     {id:'22222222-2222-4222-8222-222222222222',code:'DENTIST',name:'SYNTHETIC nha sĩ',baseRole:'Dentist',description:null,active:true,version:1,grants:['examinations.read'],assignedCount:0},

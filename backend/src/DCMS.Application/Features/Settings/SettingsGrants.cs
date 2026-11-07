@@ -81,6 +81,7 @@ public static class SettingsGrants
         (!IsSettings(x.Key) || ScreenGrants.LegacySettings(x.Key, roles))
         && x.Key != "finance.receipt-sequence.manage"
         && (!x.Key.StartsWith("finance.costs.") || roles.Contains(AccountRoles.ClinicOwner))
-        && (x.Key != "finance.read" || roles.Any(role => role is AccountRoles.ClinicOwner or AccountRoles.Dentist or AccountRoles.ClinicAssistant))
+        && (x.Key is not ("finance.read" or "finance.revenue.read" or "finance.work-statistics.read") || roles.Any(role => role is AccountRoles.ClinicOwner or AccountRoles.Dentist or AccountRoles.ClinicAssistant))
+        && (!x.Key.StartsWith("materials.") || roles.Any(role => role is AccountRoles.ClinicOwner or AccountRoles.Dentist))
         && RoleAllows(x.Key, roles)).Select(x => x.Key));
 }

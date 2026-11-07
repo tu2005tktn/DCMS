@@ -41,7 +41,7 @@ async function allMaterials() {
 
 export default function MaterialPurchasesPanel() {
   const { user } = useAuth();
-  const canCreate = user?.permissions.includes('catalog.materials.create'), canUpdate = user?.permissions.includes('catalog.materials.update'), canDelete = user?.permissions.includes('catalog.materials.deactivate');
+  const canCreate = user?.permissions.includes('materials.purchases.create'), canUpdate = user?.permissions.includes('materials.purchases.update'), canDelete = user?.permissions.includes('materials.purchases.delete');
   const [query, setQuery] = useState(''), [search, setSearch] = useState(''), [from, setFrom] = useState(''), [to, setTo] = useState('');
   const [payment, setPayment] = useState<string>(), [page, setPage] = useState(1), [size, setSize] = useState(20), [revision, setRevision] = useState(0);
   const [data, setData] = useState<PurchasePage | null>(null), [loading, setLoading] = useState(false), [error, setError] = useState<string>();
@@ -106,7 +106,7 @@ export default function MaterialPurchasesPanel() {
     setDialog({ row });
   }
   async function save(values: Values) {
-    if (!dialog || guard.current) return;
+    if (!dialog || guard.current || !(dialog.row ? canUpdate : canCreate)) return;
     guard.current = true; setBusy(true); setFormError(undefined);
     const body = { enteredOn: values.enteredOn, receivedOn: values.receivedOn || null, expiresOn: values.expiresOn || null, lotNumber: (values.lotNumber ?? '').trim() || null, materialId: values.materialId, quantity: values.quantity,
       unit: (values.unit ?? '').trim(), conversionFactor: usageUnit ? (values.conversionFactor ?? 1) : 1, supplierId: values.supplierId ?? null, unitPriceVnd: values.unitPriceVnd ?? 0, paidVnd: values.paidVnd ?? 0, ...(dialog.row ? { expectedVersion: dialog.row.version } : {}) };
@@ -132,7 +132,7 @@ export default function MaterialPurchasesPanel() {
     finally { guard.current = false; setBusy(false); }
   }
   async function remove() {
-    if (!deleting || guard.current) return;
+    if (!deleting || guard.current || !canDelete) return;
     guard.current = true; setBusy(true); setDeleteError(undefined);
     const body = JSON.stringify({ id: deleting.id, version: deleting.version });
     if (deletePending.current?.body !== body) deletePending.current = { body, key: crypto.randomUUID() };
@@ -183,11 +183,11 @@ export default function MaterialPurchasesPanel() {
             <Button type="text" size="small" icon={<EditOutlined />} disabled={!canUpdate} aria-label={`Sửa nhập hàng ${r.materialName}`}onClick={() => open(r)} />
             <Button type="text" danger size="small" icon={<DeleteOutlined />} disabled={!canDelete} aria-label={`Xóa nhập hàng ${r.materialName}`}onClick={() => { setDeleting(r); setDeleteError(undefined); deletePending.current = null; }} /></Space> },
       ]} />
-    <Modal forceRender width={640} open={!!dialog} title={`${dialog?.row ? 'Sửa' : 'Thêm'} lần nhập hàng`} okText="Lưu" okButtonProps={{ 'aria-label': 'Lưu' }} cancelText="Hủy" confirmLoading={busy}
+    <Modal forceRender width={640} open={!!dialog} title={`${dialog?.row ? 'Sửa' : 'Thêm'} lần nhập hàng`} okText="Lưu" okButtonProps={{ 'aria-label': 'Lưu', disabled: !(dialog?.row ? canUpdate : canCreate) }} cancelText="Hủy" confirmLoading={busy}
       closable={!busy} cancelButtonProps={{ disabled: busy }} onCancel={() => { if (!busy) setDialog(null); }} onOk={() => form.submit()}>
       {formError && <Alert type="error" showIcon message={formError} />}
       {formError && dialog?.row && <Button disabled={busy} onClick={() => void readVersion()}>Đọc lại phiên bản, giữ nội dung</Button>}
-      <Form form={form} layout="vertical" disabled={busy} onFinish={v => void save(v)}>
+      <Form form={form} layout="vertical" disabled={busy || !(dialog?.row ? canUpdate : canCreate)} onFinish={v => void save(v)}>
         <Space align="start" wrap>
           <Form.Item name="enteredOn" label="Ngày nhập" rules={[{ required: true, message: 'Vui lòng nhập Ngày nhập.' }]}><Input type="date" aria-label="Ngày nhập" max={clinicToday()} /></Form.Item>
           <Form.Item name="receivedOn" label="Ngày nhận"><Input type="date" aria-label="Ngày nhận" max={clinicToday()} /></Form.Item>
@@ -245,7 +245,7 @@ export default function MaterialPurchasesPanel() {
           <Input aria-label="Tên công ty" maxLength={160} autoComplete="off" /></Form.Item>
       </Form>
     </Modal>
-    <Modal open={!!deleting} title="Bạn có muốn xóa lần nhập hàng này không?" okText="Đồng ý" okButtonProps={{ 'aria-label': 'Đồng ý' }} cancelText="Không đồng ý" confirmLoading={busy}
+    <Modal open={!!deleting} title="Bạn có muốn xóa lần nhập hàng này không?" okText="Đồng ý" okButtonProps={{ 'aria-label': 'Đồng ý', disabled: !canDelete }} cancelText="Không đồng ý" confirmLoading={busy}
       closable={!busy} cancelButtonProps={{ disabled: busy }} onCancel={() => { if (!busy) setDeleting(null); }} onOk={() => void remove()}>
       <p>{deleting && `${deleting.materialName} · ${formatDate(deleting.enteredOn)} · ${vnd(deleting.totalVnd)}`}</p>{deleteError && <Alert type="error" showIcon message={deleteError} />}
       {deleteError && <Button disabled={busy} onClick={() => void readVersion(true)}>Đọc lại phiên bản</Button>}
