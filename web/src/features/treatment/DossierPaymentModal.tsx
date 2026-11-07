@@ -57,7 +57,7 @@ export default function DossierPaymentModal({ dossierId, open, onClose, onSaved 
     let rest = Math.min(Math.max(value, 0), totalDue);
     setAmounts(Object.fromEntries((ctx?.lines ?? []).map(l => { const part = Math.min(l.dueVnd, rest); rest -= part; return [l.activityId, part]; })));
   }
-  const canSave = has('finance.payments.create') && !!ctx && !busy && total > 0 && !!collectorId && !!paidOn && paidOn <= today();
+  const canSave = has('finance.payments.create') && (method === 'Cash' || has('finance.payos.create')) && !!ctx && !busy && total > 0 && !!collectorId && !!paidOn && paidOn <= today();
   function payload() { return { paidOn, method, collectorId, note: note.trim() || null,
     lines: Object.entries(amounts).filter(([, amount]) => amount > 0).map(([activityId, amountVnd]) => ({ activityId, amountVnd })) }; }
   async function prepareBill() {
@@ -149,7 +149,7 @@ export default function DossierPaymentModal({ dossierId, open, onClose, onSaved 
       </div>}
       <div className="dossier-payment-row"><label htmlFor="payment-method">Thanh toán bằng</label>
         <Select id="payment-method" value={method} onChange={setMethod} disabled={busy}
-          options={[{ value: 'Cash', label: 'Tiền mặt' }, { value: 'Transfer', label: 'Chuyển khoản' }]} /></div>
+          options={[{ value: 'Cash', label: 'Tiền mặt' }, { value: 'Transfer', label: 'Chuyển khoản', disabled: !has('finance.payos.create') }]} /></div>
       <div className="dossier-payment-row"><label htmlFor="payment-collector">Người thu tiền</label>
         <Select id="payment-collector" value={collectorId} onChange={setCollectorId} disabled={busy} placeholder="Chọn người thu tiền" showSearch optionFilterProp="label"
           options={(ctx?.collectors ?? []).map(c => ({ value: c.id, label: c.name }))} /></div>

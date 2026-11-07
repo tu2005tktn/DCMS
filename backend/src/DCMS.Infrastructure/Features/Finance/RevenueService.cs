@@ -17,7 +17,7 @@ public sealed class RevenueService(DcmsDbContext db, ISettingsAccess access, Tim
     public async Task<RevenueReport> GetAsync(int actor, DateOnly? from, DateOnly? to, int? branchId,
         int page, int pageSize, CancellationToken ct)
     {
-        var scope = await access.RequireAsync(actor, "finance.read", ct);
+        var scope = await access.RequireAsync(actor, "finance.revenue.read", ct);
         if (branchId.HasValue && !scope.BranchIds.Contains(branchId.Value)) throw Error("MSG06", 403);
         var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(clock.GetUtcNow(), ClinicZone).DateTime);
         var start = from ?? new DateOnly(today.Year, today.Month, 1);

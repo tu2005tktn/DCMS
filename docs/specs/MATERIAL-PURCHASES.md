@@ -73,7 +73,7 @@ Số lượng và Hệ số quy đổi trong modal hiển thị số thường (
 
 ## Quyền
 
-Dùng quyền danh mục hiện có (`catalog.materials.read/create/update/deactivate`), tức Dentist hiệu lực như tab Dụng cụ / Vật liệu. Không thêm khóa quyền mới. Ghi chú: người xem được sổ nhập cũng thấy giá và số tiền đã trả; nếu cần tách quyền tài chính thì thêm khóa quyền riêng sau.
+Cập nhật 07/11/2026: dùng `materials.purchases.read/create/update/delete`; quyền đọc phụ thuộc `catalog.materials.read`, các quyền ghi phụ thuộc `materials.purchases.read`. Quyền sửa danh mục vật liệu không cấp quyền sửa sổ nhập. Giữ giới hạn vai trò danh mục vật liệu; người được xem sổ nhập thấy giá và số tiền đã trả. Menu `/materials` và tab Nhập hàng kiểm quyền đọc mới; các nút ghi và API kiểm từng quyền mới. Xem `ALL-SCREENS-DYNAMIC-PERMISSIONS.vi.md` về tương thích và thu hồi.
 
 ## API
 
@@ -95,7 +95,7 @@ Bảng `MATERIAL_PURCHASE`: Id, MaterialId (FK Restrict tới `MATERIAL_CATALOG_
 
 ## UI (web)
 
-**Vị trí (cập nhật 04/11/2026):** Dụng cụ - vật liệu là chức năng chính, có mục riêng **Dụng cụ - vật liệu** (nhóm "Chuyên môn") trên thanh chức năng chính, đường dẫn `/materials`, hiện khi có quyền `catalog.materials.read`. Trang chỉ chứa **sổ nhập hàng** (không có tab). Danh mục dụng cụ/vật liệu và Danh mục (nhóm) vẫn nằm trong Thiết lập hệ thống → Dụng cụ / Vật liệu như cũ. API, quyền và dữ liệu giữ nguyên.
+**Vị trí (cập nhật 07/11/2026):** Dụng cụ - vật liệu là chức năng chính, có mục riêng **Dụng cụ - vật liệu** (nhóm "Chuyên môn"), đường dẫn `/materials`, hiện khi có ít nhất một quyền `materials.purchases.read`, `materials.stock.read`, `materials.usage.read`. Trang chỉ hiển thị các tab Nhập hàng, Tồn kho, Lịch sử xuất dùng được cấp. Danh mục dụng cụ/vật liệu và Danh mục (nhóm) vẫn nằm trong Thiết lập hệ thống → Dụng cụ / Vật liệu.
 
 - Bố cục phẳng, gọn như sổ nhập/mua hiện dùng: không đóng trong thẻ/hộp. Hàng lọc ở trên cùng (Từ ngày, Đến ngày, ô tìm tên, lọc thanh toán, nút làm mới), dòng tóm tắt "Tổng cộng / Đã trả / Còn lại" theo bộ lọc, rồi bảng viền mỏng; nút "+" xanh ở đầu cột Thao tác để thêm mới, mỗi hàng có biểu tượng sửa/xóa; chân bảng ghi "Có N kết quả.". Các mô tả dưới đây về cột và modal giữ nguyên (không còn hàng tổng cộng trong bảng).
 - Bảng: STT, Ngày nhập, Ngày nhận (trống hiện "Chưa nhận"), Hạn dùng (trống hiện "—", kèm nhãn Hết hạn/Sắp hết hạn), Tên dụng cụ/vật liệu (kèm danh mục nhỏ bên dưới), Số lượng (kèm đơn vị), Đơn giá, Tổng, Đã thanh toán, Còn nợ (kèm nhãn), Thao tác Sửa/Xóa. Số tiền căn phải, định dạng VND; hàng tổng cộng phía dưới (Tổng, Đã thanh toán, Còn nợ) theo bộ lọc.

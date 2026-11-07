@@ -1,5 +1,7 @@
 # Phiếu labo trong Quá trình điều trị/dịch vụ
 
+Cập nhật phân quyền 07/11/2026: đọc phiếu theo `treatment.read`; tạo/sửa/xóa phiếu cần `treatment.lab.manage`, phụ thuộc `treatment.actuals.update`. API, dịch vụ và form kiểm cùng quyền; thu hồi khi đang mở form khóa thao tác ghi và giữ bản nhập. Vai trò chuyên môn/phạm vi hồ sơ giữ nguyên.
+
 Ngày: 06/11/2026. Liên quan: [S21-S43-TREATMENT-DOSSIER.md](S21-S43-TREATMENT-DOSSIER.md), [SYSTEM-SETTINGS-MATERIAL-CATALOG.md](SYSTEM-SETTINGS-MATERIAL-CATALOG.md), nghiên cứu `docs/research/LABO-NHA-KHOA.vi.md`.
 
 ## Mục tiêu

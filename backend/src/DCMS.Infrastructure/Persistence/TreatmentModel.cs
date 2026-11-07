@@ -244,6 +244,7 @@ internal static class TreatmentModel
             b.ToTable("TREATMENT_PAYOS_ORDER_LINE"); b.HasKey(x => new { x.OrderId, x.ActivityId });
             b.HasOne<ClinicalActivity>().WithMany().HasForeignKey(x => x.ActivityId).OnDelete(DeleteBehavior.Restrict);
             b.ToTable(t => t.HasCheckConstraint("CK_TREATMENT_PAYOS_ORDER_LINE_AMOUNT", "\"AmountVnd\" > 0"));
+        });
         model.Entity<LabOrder>(b =>
         {
             b.ToTable("LAB_ORDER"); b.HasKey(x => x.Id);

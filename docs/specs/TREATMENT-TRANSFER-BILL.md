@@ -18,8 +18,12 @@
 
 ## API và dữ liệu
 
+Cập nhật phân quyền 07/11/2026: tạo lệnh cần `finance.payos.create`, quyền con của `finance.payments.create`; API/dịch vụ kiểm quyền mới, form chỉ cho tạo QR khi được cấp. Tiền mặt tiếp tục dùng quyền lập phiếu thu. Đọc lệnh và đối soát vẫn dùng `finance.read`; webhook/worker giữ contract hiện có. Nhóm hạn chế phải được cấp quyền mới rõ ràng.
+
+Inventory endpoint ghi nhận `POST /api/payments/payos/webhook` là baseline của nhà cung cấp, không phải grant nhân viên. Endpoint vẫn bắt buộc xác minh chữ ký HMAC ở dịch vụ trước khi nhận dữ liệu.
+
 - `GET /api/dossiers/{id}/payments/context` bổ sung `dossierCode`, `patientName`, `materials: [{name,quantity,unit}]` cho mỗi dòng. Chỉ activity đã Posted và chưa xóa khỏi phiếu; không trả giá vốn.
-- `POST /api/dossiers/{id}/payos-orders` nhận `{paidOn,collectorId,note,lines:[{activityId,amountVnd}],requestKey}`. `GET /api/dossiers/{id}/payos-orders/active` và `GET /api/dossiers/{id}/payos-orders/{orderId}` trả trạng thái, QR, tài khoản nhận và phân bổ. Quyền tạo `finance.payments.create`, đọc `finance.read`, vẫn cần quyền nha sĩ với dossier đúng chi nhánh.
+- `POST /api/dossiers/{id}/payos-orders` nhận `{paidOn,collectorId,note,lines:[{activityId,amountVnd}],requestKey}`. `GET /api/dossiers/{id}/payos-orders/active` và `GET /api/dossiers/{id}/payos-orders/{orderId}` trả trạng thái, QR, tài khoản nhận và phân bổ. Quyền tạo `finance.payos.create`, đọc `finance.read`, vẫn cần quyền nha sĩ với dossier đúng chi nhánh.
 - `GET /api/dossiers/{id}/payos-orders/active` trả JSON literal `null` với `Content-Type: application/json` khi không có lệnh đang hoạt động; không trả 200 với body rỗng. Modal thanh toán phải mở bình thường trong trường hợp này.
 - Khi PayOS không kết nối được, `POST /api/dossiers/{id}/payos-orders` trả lỗi JSON có mã `PAYOS_UNAVAILABLE` và HTTP 503 để giao diện hiện nguyên nhân; lỗi ghi log của môi trường không được làm đứt phản hồi API. Chạy API trên Windows bằng console/debug logging, không phụ thuộc quyền ghi Windows Event Log.
 - `PAYOS_WEB_BASE_URL` là tùy chọn: nếu không khai báo, backend lấy origin đầu tiên trong `Cors:AllowedOrigins` làm URL quay lại cho PayOS. Biến này không phải endpoint API PayOS và không quyết định kết nối tới PayOS; môi trường chạy backend cần có quyền kết nối HTTPS ra `api-merchant.payos.vn:443`.

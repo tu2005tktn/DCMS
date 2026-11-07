@@ -13,7 +13,7 @@ const item = { id: itemId, serviceId: 3, serviceName: 'Trám răng', region: '25
   material: null, note: 'Ghi chú kế hoạch', discount: null, responsibleDentistId: 7 };
 async function prepare(page: Page, withItem = true, withFinance = false) {
   const user = { id: 7, userName: 'synthetic.dentist', fullName: 'Bác sĩ thử nghiệm', accountType: 'Staff',
-    roles: ['Dentist'], effectiveRoles: ['Dentist'], permissions: ['patients.read', 'treatment.read', 'treatment.dossiers.create', 'treatment.dossiers.update', 'treatment.dossiers.delete', 'treatment.items.create', 'treatment.items.update', 'treatment.items.delete', 'treatment.items.price', 'treatment.actuals.create', 'treatment.actuals.update', 'treatment.actuals.delete', 'treatment.templates.read', 'finance.read', 'finance.payments.create', 'documents.read', 'documents.upload'] };
+    roles: ['Dentist'], effectiveRoles: ['Dentist'], permissions: ['patients.read', 'treatment.read', 'treatment.dossiers.create', 'treatment.dossiers.update', 'treatment.dossiers.delete', 'treatment.items.create', 'treatment.items.update', 'treatment.items.delete', 'treatment.items.price', 'treatment.actuals.create', 'treatment.actuals.update', 'treatment.actuals.delete', 'treatment.templates.read', 'finance.read', 'finance.payments.create', 'finance.payos.create', 'treatment.lab.manage', 'documents.read', 'documents.upload'] };
   const state = { version: 1, items: (withItem ? [{ ...item }] : []) as any[], drafts: new Map<string, any>(),
     activities: [] as any[], activityEdits: new Map<string, any>(), conflict: false, notes: '', payments: [] as any[], requests: [] as any[], materialReads: [] as {q:string;page:number}[], labOrder: null as any, labPuts: [] as any[], labFail: false, failMaterialOnce: false,
     materials: [
@@ -33,7 +33,7 @@ async function prepare(page: Page, withItem = true, withFinance = false) {
     if (path === '/api/auth/me') return ok(user);
     if (path === '/api/auth/sign-in') return ok({ accessToken: 'synthetic', user });
     // Usage lines already deducted for an activity (docs/specs/MATERIAL-STOCK.md); none in these scenarios.
-    if (path === '/api/system-settings/material-usage') return ok({ items: [], total: 0, page: 1, pageSize: 100 });
+    if (path.endsWith('/materials') && path.includes('/sheet-activities/')) return ok([]);
     if (path === '/api/system-settings/material-stock/available') {
       const q = url.searchParams.get('q') ?? '', number = Number(url.searchParams.get('page') ?? 1);
       state.materialReads.push({q,page:number});
