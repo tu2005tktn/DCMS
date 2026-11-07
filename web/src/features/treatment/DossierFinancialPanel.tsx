@@ -1,5 +1,5 @@
 import { usePermissions } from '../authentication/usePermissions';
-import { Alert, Button, Drawer, Skeleton, Space, Table } from 'antd';
+import { Alert, Button, Drawer, Skeleton, Space, Table, Tooltip, Typography } from 'antd';
 import { useState } from 'react';
 import { api } from '../../services/api';
 import DossierPaymentModal from './DossierPaymentModal';
@@ -23,7 +23,10 @@ export default function DossierFinancialPanel({ dossierId, onChanged }: { dossie
 
   return <Space wrap>
     <Button disabled={!has('finance.read')} onClick={() => void openHistory()}>LỊCH SỬ</Button>
-    <Button disabled={!has('finance.payments.create')} className="treatment-sheet-create" onClick={() => setPaying(true)}>TRẢ TIỀN...</Button>
+    <Tooltip title={!has('finance.payments.create') ? 'Tài khoản cần quyền Lập phiếu thu để tạo thanh toán.' : undefined}>
+      <span><Button disabled={!has('finance.payments.create')} className="treatment-sheet-create" onClick={() => setPaying(true)}>TRẢ TIỀN...</Button></span>
+    </Tooltip>
+    {!has('finance.payments.create') && <Typography.Text type="secondary">Chỉ xem: tài khoản chưa có quyền Lập phiếu thu.</Typography.Text>}
     <DossierPaymentModal dossierId={dossierId} open={paying} onClose={() => setPaying(false)} onSaved={onChanged} />
     <Drawer open={historyOpen} width={720} title="Lịch sử thanh toán" onClose={() => setHistoryOpen(false)}>
       {error && <Alert role="alert" type="error" showIcon message={error}

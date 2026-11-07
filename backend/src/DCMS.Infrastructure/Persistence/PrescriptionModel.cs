@@ -1,6 +1,9 @@
 using DCMS.Domain.Features.Prescriptions;
 using DCMS.Domain.Features.SystemSettings;
 using DCMS.Domain.Features.Visits;
+using DCMS.Domain.Features.Patients;
+using DCMS.Domain.Features.Accounts;
+using DCMS.Domain.Features.Scheduling;
 using DCMS.Infrastructure.Features.Accounts;
 using Microsoft.EntityFrameworkCore;
 

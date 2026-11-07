@@ -15,7 +15,7 @@ async function prepare(page: Page, withItem = true, withFinance = false) {
   const user = { id: 7, userName: 'synthetic.dentist', fullName: 'Bác sĩ thử nghiệm', accountType: 'Staff',
     roles: ['Dentist'], effectiveRoles: ['Dentist'], permissions: ['patients.read', 'treatment.read', 'treatment.dossiers.create', 'treatment.dossiers.update', 'treatment.dossiers.delete', 'treatment.items.create', 'treatment.items.update', 'treatment.items.delete', 'treatment.items.price', 'treatment.actuals.create', 'treatment.actuals.update', 'treatment.actuals.delete', 'treatment.templates.read', 'finance.read', 'finance.payments.create', 'documents.read', 'documents.upload'] };
   const state = { version: 1, items: (withItem ? [{ ...item }] : []) as any[], drafts: new Map<string, any>(),
-    activities: [] as any[], activityEdits: new Map<string, any>(), conflict: false, notes: '', payments: [] as any[], requests: [] as any[], materialReads: [] as {q:string;page:number}[], failMaterialOnce: false,
+    activities: [] as any[], activityEdits: new Map<string, any>(), conflict: false, notes: '', payments: [] as any[], requests: [] as any[], materialReads: [] as {q:string;page:number}[], labOrder: null as any, labPuts: [] as any[], labFail: false, failMaterialOnce: false,
     materials: [
       { id:'mat-1', name:'Composite A2', categoryId:'group-1', categoryName:'Vật liệu trám', version:1 },
       { id:'mat-2', name:'Gương khám', categoryId:'group-2', categoryName:'Dụng cụ khám', version:1 },
@@ -84,6 +84,17 @@ async function prepare(page: Page, withItem = true, withFinance = false) {
       if (body.planTransfer) state.items.find(i => i.id === draft.row.sourceItemId).displayCompleted = true;
       state.activities.push(activity); state.drafts.delete(id); state.version++; return ok({ dossier: detail(), activity });
     }
+    if (path.endsWith('/lab-orders')) return ok(state.labOrder ? [{ activityId: state.labOrder.activityId, workName: state.labOrder.workName, dueOn: state.labOrder.dueOn, deliveredOn: null }] : []);
+    if (path.endsWith('/lab-order')) {
+      const activityId = path.split('/').at(-2)!;
+      if (r.method() === 'GET') return ok({ order: state.labOrder, patient: { name: 'Bệnh nhân thử nghiệm', code: 'SYNTHETIC-123', age: 30, gender: 'Male' },
+        options: { labs: [{ id: 'lab-1', name: 'Xưởng An Phú' }], workTypes: [{ id: 'wt-1', name: 'Mão sứ Zirconia', providerId: 'lab-1', referencePrice: 1500000, warranty: '7 năm' }],
+          dentists: [{ id: 7, name: 'Bác sĩ thử nghiệm' }], defaultDentistId: 7 } });
+      if (r.method() === 'DELETE') { state.labOrder = null; return route.fulfill({ status: 204 }); }
+      const body = r.postDataJSON(); state.labPuts.push(body);
+      if (state.labFail) return route.fulfill({ status: 400, json: { code: 'MSG04', message: 'Dữ liệu labo không hợp lệ thử nghiệm.' } });
+      state.labOrder = { id: 'lab-order-1', activityId, ...body, version: (state.labOrder?.version ?? 0) + 1 }; return ok(state.labOrder);
+    }
     if (path.includes('/sheet-activities/')) {
       const id = path.split('/').at(-1)!, before = { ...state.activities.find(a => a.id === id), ...state.activityEdits.get(id) }, body = r.postDataJSON();
       state.requests.push({ ...body, command: 'activity', method: r.method() });
@@ -113,9 +124,21 @@ async function prepare(page: Page, withItem = true, withFinance = false) {
       const lines = state.activities.map(a => { const cost = Math.round(a.quantity * a.priceSnapshotVnd), discount = a.discountSnapshotVnd ?? 0,
         paid = state.payments.flatMap(p => p.lines).filter(l => l.activityId === a.id).reduce((s, l) => s + l.amountVnd, 0);
         return { activityId: a.id, performedAt: a.performedAt, dentistName: user.fullName, serviceName: a.serviceNameSnapshot ?? 'Trám răng',
-          costVnd: cost, discountVnd: discount, paidVnd: paid, dueVnd: Math.max(0, cost - discount - paid) }; });
-      return ok({ paidVnd: lines.reduce((s, l) => s + l.paidVnd, 0), lines, collectors: [{ id: 7, name: user.fullName }], defaultCollectorId: 7 });
+          costVnd: cost, discountVnd: discount, paidVnd: paid, dueVnd: Math.max(0, cost - discount - paid), materials: a.materials ?? [] }; });
+      return ok({ paidVnd: lines.reduce((s, l) => s + l.paidVnd, 0), lines, collectors: [{ id: 7, name: user.fullName }], defaultCollectorId: 7,
+        dossierCode: 'DT-SYNTHETIC', patientName: 'Khách hàng thử nghiệm' });
     }
+    if (path.endsWith('/payos-orders') && r.method() === 'POST') {
+      const body = r.postDataJSON(); state.requests.push({ command: 'payos-order', ...body });
+      return ok({ id: 'payos-order-1', orderCode: 12345678, state: 'Pending', amountVnd: body.lines.reduce((s: number, l: any) => s + l.amountVnd, 0),
+        paidOn: body.paidOn, qrCode: '000201010212PAYOS-SYNTHETIC', bankBin: '970415', accountNumber: '1234567890',
+        accountName: 'PHONG KHAM TEST', expiresAt: '2026-11-06T12:00:00Z', paymentId: null, lines: body.lines });
+    }
+    if (path.endsWith('/payos-orders/active')) return ok(null);
+    if (path.endsWith('/payos-orders/payos-order-1')) return ok({ id: 'payos-order-1', orderCode: 12345678,
+      state: (state as any).payosPaid ? 'Paid' : 'Pending', amountVnd: 120000, paidOn: '2026-11-06', qrCode: '000201010212PAYOS-SYNTHETIC',
+      bankBin: '970415', accountNumber: '1234567890', accountName: 'PHONG KHAM TEST', expiresAt: '2026-11-06T12:00:00Z', paymentId: null,
+      lines: [{ activityId: 'transfer-activity', amountVnd: 120000 }] });
     if (path.endsWith('/payments') && r.method() === 'POST') {
       const body = r.postDataJSON(); state.requests.push({ command: 'payment', ...body });
       const saved = { id: `payment-${state.payments.length + 1}`, paidOn: body.paidOn, method: body.method, collectorId: body.collectorId, collectorName: user.fullName, note: body.note,
@@ -365,6 +388,38 @@ test('form Tạo thanh toán mới điền sẵn việc đã làm, tự cộng t
   await expect(page.locator('.treatment-sheet-payment')).toContainText(/Còn nợ: [\d.]+ ₫/);
 });
 
+test('chuyển khoản mở bill với dịch vụ và vật liệu trong ngày, quay lại giữ số tiền', async ({ page }) => {
+  const state = await prepare(page);
+  const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date());
+  state.activities.push({ id: 'transfer-activity', visitId, dossierId, itemId, planVersion: 1, serviceId: 3,
+    region: '25', quantity: 1, unit: 'răng', performerId: 7, performedAt: `${today}T02:00:00Z`,
+    outcome: 'Điều trị hôm nay', feeStatus: 'Pending', priceSnapshotVnd: 300000, serviceNameSnapshot: 'Trám răng',
+    materials: [{ name: 'Composite', quantity: 2.5, unit: 'g' }] });
+  await page.reload(); await page.getByRole('tab', { name: 'Điều trị & Thanh toán' }).click();
+  await page.getByRole('button', { name: 'TRẢ TIỀN...' }).click();
+  const form = page.getByRole('dialog', { name: 'Tạo thanh toán mới' });
+  await form.getByLabel('Tổng tiền thanh toán (đ)').fill('120000');
+  await form.getByLabel('Tổng tiền thanh toán (đ)').blur();
+  await form.getByRole('combobox', { name: 'Thanh toán bằng' }).press('ArrowDown');
+  await page.locator('.ant-select-dropdown:visible').getByText('Chuyển khoản', { exact: true }).click();
+  await form.getByRole('button', { name: 'TẠO QR VÀ XEM BILL' }).click();
+  const bill = page.getByRole('dialog', { name: 'Bill chuyển khoản PayOS' });
+  await expect(bill).toContainText('Trám răng');
+  await expect(bill).toContainText('Composite (2.5 g)');
+  await expect(bill).toContainText('120.000 ₫');
+  await expect(page).toHaveURL(/\/patients\/123$/);
+  await expect(bill.getByLabel('Mã VietQR chuyển 120.000 ₫')).toBeVisible();
+  await expect(bill).toContainText('Chờ thanh toán');
+  expect(state.requests.filter(x => x.command === 'payos-order')).toHaveLength(1);
+  expect(state.requests.filter(x => x.command === 'payment')).toHaveLength(0);
+  await bill.getByRole('button', { name: 'QUAY LẠI' }).click();
+  await expect(form.getByLabel('Tổng tiền thanh toán (đ)')).toHaveValue('120.000');
+  await form.getByRole('button', { name: 'TẠO QR VÀ XEM BILL' }).click();
+  (state as any).payosPaid = true;
+  await expect(page.getByRole('dialog', { name: 'Bill chuyển khoản PayOS' })).toContainText('Đã thanh toán', { timeout: 8000 });
+  expect(state.requests.filter(x => x.command === 'payment')).toHaveLength(0);
+});
+
 test('ghi chú chỉ lưu bằng nút xác nhận, bàn phím và responsive không tràn viewport', async ({ page }) => {
   const state = await prepare(page);
   await page.getByLabel('Ghi chú hồ sơ', { exact: true }).fill('Ghi chú được giữ');
@@ -594,4 +649,46 @@ test('Sao chép đang gửi khóa bấm lặp, lần sao chép mới sau thành 
   await expect(page.locator('.treatment-sheet-plan-table tbody > tr')).toHaveCount(2);
   await page.getByRole('button',{name:'Chức năng Trám răng',exact:true}).first().click();await page.getByRole('menuitem',{name:'Sao chép',exact:true}).click();
   await expect(page.locator('.treatment-sheet-plan-table tbody > tr')).toHaveCount(3);expect(new Set(state.items.map(i=>i.id)).size).toBe(3);expect(state.activities).toHaveLength(0);
+});
+
+test('phiếu labo: nút cạnh Ghi chú mở form, điền sẵn theo loại công việc, chọn răng/màu, lưu và hiện ở cột Labo', async ({ page }) => {
+  const state = await prepare(page, false);
+  await page.getByRole('button', { name: 'Thêm quá trình điều trị' }).click();
+  await page.getByRole('combobox', { name: 'Điều trị/dịch vụ', exact: true }).focus(); await page.keyboard.press('ArrowDown'); await page.keyboard.press('Enter');
+  await page.getByLabel('Ghi chú việc đã làm').fill('Lấy dấu mão');
+  await page.getByRole('button', { name: 'Đồng ý', exact: true }).click();
+  await page.getByRole('button', { name: 'Phiếu labo cho Trám răng', exact: true }).click();
+  const form = page.locator('.lab-order-modal');
+  await expect(form.getByRole('heading', { name: 'PHIẾU LABO' })).toBeVisible();
+  await expect(form.getByText('MSKH: SYNTHETIC-123')).toBeVisible();
+  // Thiếu Công việc labo: báo lỗi dưới ô, chưa gửi.
+  await form.getByRole('button', { name: 'LƯU LẠI' }).click();
+  await expect(form.getByText('Vui lòng nhập Công việc labo.')).toBeVisible();
+  expect(state.labPuts).toHaveLength(0);
+  // Chọn loại công việc: điền sẵn tên, công ty, tổng phí, bảo hành.
+  await form.locator('div.ant-select[aria-label="Loại công việc labo"]').click();
+  await page.locator('.ant-select-item-option', { hasText: 'Mão sứ Zirconia' }).click();
+  await expect(form.getByLabel('Công việc labo', { exact: true })).toHaveValue('Mão sứ Zirconia');
+  await expect(form.getByLabel('Bảo hành')).toHaveValue('7 năm');
+  await expect(form.getByLabel('Tổng phí')).toHaveValue('1.500.000');
+  await form.getByRole('button', { name: 'Răng 36', exact: true }).click();
+  await form.getByRole('button', { name: 'Răng 37', exact: true }).click();
+  await form.getByLabel('Màu vùng 1').fill('A2');
+  await form.getByLabel('Hẹn', { exact: true }).fill('2030-01-15');
+  await form.getByRole('checkbox', { name: 'Hình trứng' }).check();
+  state.labFail = true;
+  await form.getByRole('button', { name: 'LƯU LẠI' }).click();
+  await expect(form.getByText('Dữ liệu labo không hợp lệ thử nghiệm.')).toBeVisible();
+  state.labFail = false;
+  await form.getByRole('button', { name: 'LƯU LẠI' }).click();
+  await expect(form).toHaveCount(0);
+  const sent = state.labPuts.at(-1);
+  expect(sent).toMatchObject({ workName: 'Mão sứ Zirconia', dentistId: 7, labProviderId: 'lab-1', teeth: ['36', '37'], shade: { '1': 'A2' }, bridgeShapes: ['ovoid'], totalFeeVnd: 1500000, dueOn: '2030-01-15', expectedVersion: null });
+  await expect(page.getByRole('cell', { name: /Mão sứ Zirconia/ })).toContainText('Hẹn');
+  // Mở lại: dữ liệu đã lưu hiện đúng; đổi sang trẻ em xóa răng đã chọn.
+  await page.getByRole('button', { name: 'Phiếu labo cho Trám răng', exact: true }).click();
+  await expect(form.getByRole('button', { name: 'Răng 36', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await form.getByRole('checkbox', { name: 'Trẻ em' }).check();
+  await expect(form.getByRole('button', { name: 'Răng 55', exact: true })).toBeVisible();
+  await expect(form.getByRole('button', { name: 'Răng 36', exact: true })).toHaveCount(0);
 });

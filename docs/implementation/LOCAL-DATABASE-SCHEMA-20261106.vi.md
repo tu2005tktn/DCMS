@@ -1,0 +1,6 @@
+# Khôi phục môi trường local sau lệch schema — 06/11/2026
+
+- Ảnh lỗi trang Bệnh nhân tương ứng nhiều API trả 503 do database `dcms_dev` có lịch sử migration của nhánh schema cũ. Bảng `PAYMENT_RECEIPT` đã tồn tại trước migration `ClinicalServiceBilling`, trong khi `CLINIC_SETTINGS_VERSION` và `TREATMENT_PAYOS_ORDER` chưa tồn tại. `/health` chỉ chứng minh kết nối, không chứng minh schema tương thích.
+- Không chỉnh sửa, xóa hoặc ghi đè `dcms_dev`. Tạo database local riêng `dcms_schema_check_20261106`, áp toàn bộ migration hiện hành thành công. Dùng database này cho API local và seed tài khoản/dữ liệu demo; hồ sơ cũ vẫn nằm trong `dcms_dev` và không tự động xuất hiện ở database mới.
+- Có thể hoàn tác đổi database local bằng cách đặt `POSTGRES_DB=dcms_dev` trong `.env`. Chuyển hồ sơ thật từ schema cũ sang schema mới cần kế hoạch migration dữ liệu riêng; không copy bảng thủ công.
+- Đã đổi `POSTGRES_DB` trong `.env` local sang database mới, giữ bản sao cấu hình `.env.before-schema-switch` ngoài Git, chạy `--seed-demo` và khởi động API bình thường. Thử `owner.demo`: đăng nhập 200; `GET /api/patients`, `/api/patients/form-policy`, `/api/system-settings/reference-options?kind=patient-sources` và `/api/finance/revenue` đều trả 200. `/health` trả 200.
