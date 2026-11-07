@@ -1,6 +1,8 @@
 import { Alert, Button, Descriptions, Drawer, Empty, Input, Select, Space, Table, Tag, Typography } from 'antd';
+import type { ColumnType } from 'antd/es/table';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import './examinations.css';
 import { api } from '../../services/api';
 import { arrivalClock, visitLabels } from '../reception/types';
 import { diagnosisText, dispositionLabels, findingText, type ExaminationContent, type PatientExamination } from './types';
@@ -51,7 +53,6 @@ export default function PatientExaminationsTab({ patientId, active, refreshKey =
   const detail = rows?.find(row => row.visitId === selected);
   return <section aria-label="Phiếu khám của bệnh nhân">
     <Typography.Title level={4}>Lịch sử khám</Typography.Title>
-    <Typography.Paragraph type="secondary">Mỗi lượt khám được tự động lưu vào hồ sơ của bệnh nhân. Chọn Xem để đọc nội dung khám; mở phiếu gốc để xem tài liệu, cận lâm sàng và đơn thuốc.</Typography.Paragraph>
     <Space wrap style={{ marginBottom: 16 }}>
       <Input aria-label="Tìm phiếu khám" placeholder="Lịch hẹn, bác sĩ hoặc chẩn đoán" value={keyword} onChange={e => setKeyword(e.target.value)} />
       <Select aria-label="Trạng thái phiếu khám" allowClear placeholder="Tất cả phiếu" style={{ width: 210 }} value={state} onChange={setState}
@@ -60,8 +61,8 @@ export default function PatientExaminationsTab({ patientId, active, refreshKey =
       <Link to="/reception">Mở hàng chờ tiếp nhận</Link>
     </Space>
     {error ? <Alert type="error" showIcon message={error} action={<Button onClick={() => setRevision(r => r + 1)}>Thử lại</Button>} /> :
-      <Table rowKey="visitId" loading={!rows} dataSource={visible} pagination={{ defaultPageSize: 10, showSizeChanger: true }}
-        locale={{ emptyText: <Empty description="Chưa có lượt khám trong các chi nhánh được cấp quyền." /> }} scroll={{ x: 1050 }} columns={[
+      <Table rowKey="visitId" className="exam-history-table" loading={!rows} dataSource={visible} pagination={{ defaultPageSize: 10, showSizeChanger: true }}
+        locale={{ emptyText: <Empty description="Chưa có lượt khám trong các chi nhánh được cấp quyền." /> }} columns={([
           { title: 'Nội dung', width: 90, render: (_, r: PatientExamination) => r.examination && <Button size="small"
             aria-label={`Xem nội dung phiếu ${r.appointmentCode}`} onClick={() => setSelected(r.visitId)}>Xem</Button> },
           { title: 'Ngày đến / lịch hẹn', render: (_, r: PatientExamination) => <>{arrivalClock(r.arrivalAt)}<br />{r.appointmentCode}</> },
@@ -71,7 +72,7 @@ export default function PatientExaminationsTab({ patientId, active, refreshKey =
           { title: 'Lượt đến / kết thúc', render: (_, r: PatientExamination) => <><Tag color={r.visitStatus === 'Completed' ? 'green' : undefined}>{r.visitStatus === 'Completed' ? 'Đã kết thúc lượt khám' : visitLabels[r.visitStatus] ?? r.visitStatus}</Tag>
             {r.visitStatus === 'Completed' && <div>{r.completedAt ? arrivalClock(r.completedAt) : 'Chưa ghi thời điểm kết thúc'}</div>}</> },
           { title: 'Thao tác', render: (_, r: PatientExamination) => <Link to={`/visits/${r.visitId}`}>{r.visitStatus === 'Queued' ? 'Mở khám' : 'Xem phiếu khám'}</Link> },
-        ]} />}
+        ] as ColumnType<PatientExamination>[]).map(c => ({ ...c, onCell: () => ({ 'data-label': String(c.title ?? '') } as object) }))} />}
     <Drawer title={`Nội dung khám · ${detail?.appointmentCode ?? ''}`} open={!!detail?.examination} onClose={() => setSelected(undefined)}
       width="min(720px, 100vw)">
       {detail?.examination && <><Typography.Paragraph>{detail.dentistName} · {detail.branchName}<br />{arrivalClock(detail.arrivalAt)}</Typography.Paragraph>

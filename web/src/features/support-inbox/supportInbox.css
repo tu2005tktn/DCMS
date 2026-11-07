@@ -1,0 +1,20 @@
+.support-inbox-table .ant-table-cell { overflow-wrap:anywhere; }
+.support-inbox-table table { width:100% !important; table-layout:auto !important; }
+@media screen and (max-width:1000px) {
+  .support-inbox-table .ant-table-thead, .support-inbox-table .ant-table-measure-row { display:none; }
+  .support-inbox-table table, .support-inbox-table tbody, .support-inbox-table tr.ant-table-row { display:block; width:100%; }
+  .support-inbox-table tr.ant-table-row { margin:0 0 8px; padding:2px 8px; border:1px solid #e4e7ec; background:#fff; }
+  .support-inbox-table td.ant-table-cell { display:grid; grid-template-columns:minmax(110px,40%) minmax(0,1fr); gap:8px; padding:6px 0!important; border:0!important; border-bottom:1px dashed #eceff3!important; text-align:left!important; }
+  .support-inbox-table td.ant-table-cell::before { content:attr(data-label); color:#475467; font-weight:700; }
+}
+
+/* Bảng có viền (08/11/2026), chỉ khi hiển thị dạng bảng */
+@media screen and (min-width:1001px) {
+  .support-inbox-table .ant-table { border:1px solid #d0d5dd; border-radius:8px; overflow:hidden; }
+  .support-inbox-table .ant-table-thead > tr > th { border-bottom:1px solid #d0d5dd; border-inline-end:1px solid #e4e7ec; }
+  .support-inbox-table .ant-table-tbody > tr > td { border-bottom:1px solid #e4e7ec; border-inline-end:1px solid #eceff3; }
+  .support-inbox-table .ant-table-thead > tr > th:last-child, .support-inbox-table .ant-table-tbody > tr > td:last-child { border-inline-end:0; }
+  .support-inbox-table .ant-table-tbody > tr:last-child > td { border-bottom:0; }
+  .support-inbox-table .ant-table-placeholder > td { border-inline-end:0; }
+  .support-inbox-table th:nth-child(3), .support-inbox-table td:nth-child(3) { min-width:160px; }
+}

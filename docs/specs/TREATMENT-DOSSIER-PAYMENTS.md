@@ -33,3 +33,17 @@ Ghi nhận tiền khách trả cho các việc đã làm trong **QUÁ TRÌNH ĐI
 
 ## Giao diện
 Xem mục "Form Tạo thanh toán mới" trong [PATIENT-TREATMENT-PAYMENT-UI.md](PATIENT-TREATMENT-PAYMENT-UI.md).
+
+## Bỏ dòng thông báo thiếu quyền Lập phiếu thu (07/11/2026)
+
+Khu vực thanh toán của phiếu điều trị không còn hiện dòng "Chỉ xem: tài khoản chưa có quyền Lập phiếu thu." khi tài khoản thiếu `finance.payments.create`. Nút "Trả tiền" vẫn bị khóa hoặc ẩn theo quyền như cũ; quyền ở máy chủ không đổi.
+
+
+## Thanh tiêu đề màn Thanh toán gọn hơn (08/11/2026)
+
+Thanh tiêu đề "Danh sách cần thu" (tiêu đề, nút Tải lại thanh toán, liên kết Danh mục dịch vụ) căn trái, khoảng cách cố định 16px giữa các mục, không đệm thêm quanh từng mục, nút giữ đệm ngang 16px. Ô chọn chi nhánh nằm ngay dưới thanh, cách 12px.
+
+
+## Bảng có đường viền (08/11/2026)
+
+Các bảng trong nhóm màn Thanh toán/Doanh thu/Dịch vụ cận lâm sàng/Thống kê (vùng `.finance-page`) có viền ngoài và đường kẻ giữa các ô, tiêu đề cột nền nhạt. Dữ liệu không đổi.

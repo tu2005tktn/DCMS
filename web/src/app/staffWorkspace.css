@@ -44,8 +44,7 @@
 .staff-patient-page .page-heading .ant-typography { margin-bottom: 4px; }
 .staff-patient-page .page-heading p { color: #667085; max-width: 760px; }
 .staff-patient-page .page-heading > .ant-btn { min-height: 44px; }
-.staff-patient-page .staff-patient-filter-panel { margin-bottom: 20px; }
-.staff-patient-page .staff-patient-filter-panel .ant-card-body { padding: 20px; }
+.staff-patient-page .staff-patient-filter-panel { padding: 20px 20px 4px; }
 .staff-patient-page .patient-filters { grid-template-columns: minmax(180px, 1fr) 155px; gap: 16px; margin: 0; }
 .staff-patient-page .patient-filters .ant-input, .staff-patient-page .patient-filters .ant-input-affix-wrapper { min-height: 40px; }
 .staff-patient-page .patient-filters .ant-input-affix-wrapper .ant-input { min-height: 0; }
@@ -54,7 +53,7 @@
 .staff-patient-page .patient-filters .link-filter-actions { grid-column: auto; justify-self: end; }
 .staff-patient-page .patient-filters .ant-btn { min-height: 40px; }
 .staff-patient-page .staff-patient-table-panel .ant-card-body { padding: 0; }
-.staff-patient-table-heading { display: flex; align-items: center; gap: 12px; padding: 22px 20px; border-bottom: 1px solid #e4eaf2; }
+.staff-patient-table-heading { display: flex; align-items: center; gap: 12px; padding: 12px 20px 0; }
 .staff-patient-table-heading strong { font-size: 16px; }
 .staff-patient-table-panel .ant-table-tbody > tr > td { padding: 18px 16px; }
 .staff-patient-table-panel .ant-table-pagination { padding: 0 20px 8px; }
@@ -93,7 +92,7 @@
   .staff-patient-page .page-heading { align-items: flex-start; }
   .staff-patient-page .patient-filters { grid-template-columns: minmax(0,1fr); }
   .staff-patient-page .patient-filters .link-filter-actions { justify-self: start; flex-wrap: wrap; }
-  .staff-patient-page .staff-patient-filter-panel .ant-card-body { padding: 16px; }
+  .staff-patient-page .staff-patient-filter-panel { padding: 16px; }
   .staff-workspace .treatment-sheet-card-top { grid-template-columns: minmax(0,1fr); }
   .staff-workspace .treatment-sheet-card-actions { grid-column: 1; justify-content: flex-end; flex-wrap: wrap; }
 }

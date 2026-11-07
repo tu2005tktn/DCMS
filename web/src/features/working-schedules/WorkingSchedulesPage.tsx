@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { api, ApiError } from '../../services/api';
 import type { Affected, Availability, Options, Period } from './contracts';
+import './workingSchedules.css';
 import { validateAvailabilityDuration, validateSchedulePeriods } from './validation';
 
 type BranchPeriod = Period & { branchId: number };
@@ -141,7 +142,6 @@ export default function WorkingSchedulesPage() {
   const revision = kind === 'Template' ? saved?.template : saved?.exception;
   return <Space direction="vertical" size="middle" style={{ width: '100%' }}>
     <Typography.Title level={2}>S09 · Lịch làm việc tuần</Typography.Title>
-    <Typography.Paragraph>Mẫu lặp từ Thứ 2 đến Chủ nhật · Mỗi ngày một chi nhánh hoặc không làm việc · Ngoại lệ chỉ thay thế ngày được chọn · Giờ phòng khám (UTC+7).</Typography.Paragraph>
     {error && <Alert type="error" showIcon message={`${error.status === 403 ? 'Không có quyền truy cập' : error.status === 409 ? 'Xung đột · Cần kiểm tra lại' : error.status === 400 ? 'Dữ liệu chưa hợp lệ' : 'Lỗi kết nối hoặc dịch vụ'} · ${error.code}`} description={<div style={{ whiteSpace: 'pre-line' }}>{error.message}</div>} action={<Button disabled={busy} onClick={() => { if (discardOkay()) void (options ? load() : loadOptions()); }}>Tải lại</Button>} />}
     {success && <Alert type="success" message={success} showIcon />}
     <Space wrap>
@@ -156,8 +156,7 @@ export default function WorkingSchedulesPage() {
       {saved.legacyWeek.length > 0 && <Alert type="info" message="Có lịch tuần cũ được giữ lại" description="Lịch cũ chỉ áp dụng đúng tuần đã lưu khi chưa có mẫu hoặc ngoại lệ có hiệu lực. Hãy nhập mẫu lặp mới để dùng cho các tuần sau." />}
       {!!saved.futureChanges.length && <Card size="small" title="Thay đổi đã công bố trong tương lai">{saved.futureChanges.map(r => <div key={r.id}>{r.date} · {r.kind === 'Template' ? 'Mẫu lặp' : 'Ngoại lệ'} · Version {r.version}{r.reason ? ` · ${r.reason}` : ''}</div>)}</Card>}
       {kind === 'Exception' && <label>Lý do ngoại lệ <Input aria-label="Lý do ngoại lệ" value={reason} maxLength={500} disabled={!has('working-schedules.manage') || busy} onChange={e => { setReason(e.target.value); clearResults(); }} /></label>}
-      <Typography.Text>Chọn chi nhánh để thêm giờ 08:00–17:00. Giờ làm/nghỉ theo bước 30 phút; slot đặt lịch vẫn theo đơn vị 15 phút. Nghỉ và Block cần lý do, nằm trọn trong giờ làm.</Typography.Text>
-      <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(330px, 1fr))' }}>
+      <div className="working-day-grid" style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(330px, 1fr))' }}>
         {Array.from({ length: 7 }, (_, day) => day).filter(day => kind === 'Template' || day === weekday(date)).map(day => {
           const dayBranch = periods.find(p => p.day === day)?.branchId;
           return <Card key={day} title={dayName(day)}>
