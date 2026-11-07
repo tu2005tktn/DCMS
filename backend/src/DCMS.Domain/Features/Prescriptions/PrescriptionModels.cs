@@ -48,7 +48,7 @@ public sealed class ExternalPrescriptionLine
     public int PatientId { get; set; }
     public int BranchId { get; set; }
     public int PrescribedByDoctorId { get; set; }
-    public Guid MedicineId { get; set; }
+    public Guid? MedicineId { get; set; }
     public string MedicineCode { get; set; } = "";
     public string MedicineName { get; set; } = "";
     public string? ActiveIngredient { get; set; }

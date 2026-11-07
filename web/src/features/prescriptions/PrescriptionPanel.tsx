@@ -11,7 +11,9 @@ import {
 } from './types';
 
 type FormValues = {
-  medicineId: string;
+  medicineId?: string;
+  customMedicineName?: string;
+  customUnit?: string;
   route: string;
   morningDose: string;
   noonDose: string;
@@ -79,10 +81,14 @@ export default function PrescriptionPanel({
   const [printModalOpen, setPrintModalOpen] = useState(false);
   const [correctionOpen, setCorrectionOpen] = useState(false);
   const [correctionReason, setCorrectionReason] = useState('');
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [safetyWarnings, setSafetyWarnings] = useState<ClinicalAllergyWarning[]>([]);
 
   const [form] = Form.useForm<FormValues>();
+  const [quickAddForm] = Form.useForm<{ name: string; unit: string; instructions?: string }>();
   const watchedMedicineId = Form.useWatch('medicineId', form);
+  const watchedCustomName = Form.useWatch('customMedicineName', form);
+  const watchedCustomUnit = Form.useWatch('customUnit', form);
   const generation = useRef(0);
   const saving = useRef(false);
   // One requestKey per distinct command payload so network retries replay instead of duplicating.
@@ -214,7 +220,10 @@ export default function PrescriptionPanel({
     setSaveError(undefined);
     setDirty(false);
     form.setFieldsValue({
-      medicineId: line.medicineId, route: line.route, morningDose: line.morningDose, noonDose: line.noonDose,
+      medicineId: line.medicineId ?? undefined,
+      customMedicineName: line.medicineId ? undefined : line.medicineName,
+      customUnit: line.medicineId ? undefined : line.unit,
+      route: line.route, morningDose: line.morningDose, noonDose: line.noonDose,
       afternoonDose: line.afternoonDose, eveningDose: line.eveningDose, mealTiming: line.mealTiming,
       days: line.days, quantity: line.quantity, instructions: line.instructions,
     });
@@ -242,7 +251,9 @@ export default function PrescriptionPanel({
     if (!canEditDraft || lines == null || loadError) return;
     const body = {
       expectedVersion: editing?.version ?? 0,
-      medicineId: values.medicineId,
+      medicineId: values.medicineId || null,
+      customMedicineName: values.medicineId ? null : values.customMedicineName,
+      customUnit: values.medicineId ? null : values.customUnit,
       route: values.route || '',
       morningDose: values.morningDose || '0',
       noonDose: values.noonDose || '0',
@@ -317,7 +328,7 @@ export default function PrescriptionPanel({
   };
 
   const selectedOptions = [...options];
-  if (editing && !selectedOptions.some(o => o.id === editing.medicineId)) {
+  if (editing?.medicineId && !selectedOptions.some(o => o.id === editing.medicineId)) {
     selectedOptions.push({
       id: editing.medicineId, code: editing.medicineCode, name: editing.medicineName, strength: editing.strength,
       dosageForm: editing.dosageForm, baseUnit: editing.unit, route: editing.route,
@@ -480,24 +491,37 @@ export default function PrescriptionPanel({
                   }}
                   onFinish={save}
                 >
-                  <Form.Item name="medicineId" label="Thuốc" rules={[{ required: true, message: 'Chọn thuốc cần kê.' }]}>
-                    <Select
-                      showSearch
-                      filterOption={false}
-                      loading={optionsLoading}
-                      onSearch={value => setQuery(value.slice(0, 100))}
-                      placeholder="Tìm theo mã, tên biệt dược hoặc hoạt chất..."
-                      notFoundContent={optionsLoading ? <Spin size="small" /> : 'Không có thuốc phù hợp'}
-                      options={selectedOptions.map(o => ({
-                        value: o.id,
-                        label: [o.code, o.name, o.activeIngredient, o.strength, o.dosageForm].filter(Boolean).join(' · '),
-                      }))}
-                      onChange={medicineId => {
-                        const opt = options.find(item => item.id === medicineId);
-                        if (opt && !editing) form.setFieldsValue({ route: opt.route || '', instructions: opt.defaultInstructions ?? '' });
-                      }}
-                    />
-                  </Form.Item>
+                  <Row gutter={8} align="bottom">
+                    <Col flex="auto">
+                      <Form.Item name="medicineId" label="Tên thuốc" rules={[{ validator: (_, value) => value || form.getFieldValue('customMedicineName') ? Promise.resolve() : Promise.reject(new Error('Chọn thuốc hoặc nhập thuốc tùy chỉnh.')) }]}>
+                        <Select
+                          showSearch
+                          filterOption={false}
+                          loading={optionsLoading}
+                          onSearch={value => setQuery(value.slice(0, 100))}
+                          placeholder="Tìm theo mã, tên biệt dược hoặc hoạt chất..."
+                          notFoundContent={optionsLoading ? <Spin size="small" /> : 'Không có thuốc phù hợp'}
+                          options={selectedOptions.map(o => ({
+                            value: o.id,
+                            label: [o.code, o.name, o.activeIngredient, o.strength, o.dosageForm].filter(Boolean).join(' · '),
+                          }))}
+                          onChange={medicineId => {
+                            const opt = options.find(item => item.id === medicineId);
+                            form.setFieldsValue({ customMedicineName: undefined, customUnit: undefined });
+                            if (opt) form.setFieldsValue({ route: opt.route || '', instructions: opt.defaultInstructions ?? '' });
+                          }}
+                        />
+                      </Form.Item>
+                    </Col>
+                    <Col>
+                      <Button size="small" shape="circle" aria-label="Thêm thuốc tùy chỉnh" title="Thêm thuốc tùy chỉnh" disabled={busy || disabled} onClick={() => { quickAddForm.setFieldsValue({ name: watchedCustomName || '', unit: watchedCustomUnit || 'viên', instructions: form.getFieldValue('instructions') || '' }); setQuickAddOpen(true); }}>+</Button>
+                    </Col>
+                  </Row>
+                  <Form.Item name="customMedicineName" hidden><Input /></Form.Item>
+                  <Form.Item name="customUnit" hidden><Input /></Form.Item>
+                  {!watchedMedicineId && watchedCustomName && (
+                    <Alert type="warning" showIcon message={`Thuốc tùy chỉnh: ${watchedCustomName} (${watchedCustomUnit || 'đơn vị'})`} description="Tên thuốc này chỉ được lưu trong đơn hiện tại, không thêm vào danh mục thuốc." style={{ marginBottom: 12 }} />
+                  )}
                   {selectedMedicine?.allergyWarnings && (
                     <Alert type="warning" showIcon style={{ marginBottom: 12 }} message="Cảnh báo dị ứng của thuốc" description={selectedMedicine.allergyWarnings} />
                   )}
@@ -528,7 +552,7 @@ export default function PrescriptionPanel({
                     <Col xs={12} sm={6}>
                       <Form.Item name="quantity" label="Tổng số lượng" tooltip="Tự tính từ liều số × số ngày; có thể sửa tay."
                         rules={[{ required: true, message: 'Nhập số lượng.' }, { type: 'integer', min: 1, max: 10000, message: '1–10.000' }]}>
-                        <InputNumber min={1} max={10000} precision={0} style={{ width: '100%' }} addonAfter={selectedMedicine?.baseUnit} />
+                        <InputNumber min={1} max={10000} precision={0} style={{ width: '100%' }} addonAfter={selectedMedicine?.baseUnit ?? (watchedCustomName ? watchedCustomUnit : undefined)} />
                       </Form.Item>
                     </Col>
                   </Row>
@@ -548,7 +572,7 @@ export default function PrescriptionPanel({
                   </Form.Item>
 
                   <Space wrap>
-                    <Button type="primary" htmlType="submit" loading={busy} disabled={busy || disabled}>{editing ? 'Lưu thay đổi' : 'Thêm vào đơn'}</Button>
+                    <Button type="primary" size="large" htmlType="submit" loading={busy} disabled={busy || disabled}>{editing ? 'Lưu thay đổi' : '+ THÊM'}</Button>
                     {(editing || dirty) && <Button disabled={busy || disabled} onClick={resetLineForm}>{editing ? 'Hủy sửa' : 'Bỏ phần nhập'}</Button>}
                   </Space>
                 </Form>
@@ -584,6 +608,33 @@ export default function PrescriptionPanel({
 
       <PrescriptionTemplateModal open={templateModalOpen} onClose={() => setTemplateModalOpen(false)} onApply={applyTemplate} />
       <PrescriptionPrintModal visitId={visitId} open={printModalOpen} onClose={() => setPrintModalOpen(false)} />
+      <Modal
+        open={quickAddOpen}
+        title="Thêm thuốc tùy chỉnh vào dòng kê"
+        okText="Dùng thuốc này"
+        cancelText="Hủy"
+        confirmLoading={busy}
+        onCancel={() => setQuickAddOpen(false)}
+        onOk={async () => {
+          const values = await quickAddForm.validateFields();
+          form.setFieldsValue({ medicineId: '', customMedicineName: values.name.trim(), customUnit: values.unit.trim(), instructions: values.instructions?.trim() || '' });
+          setDirty(true);
+          setQuickAddOpen(false);
+          form.submit();
+        }}
+      >
+        <Form form={quickAddForm} layout="vertical" initialValues={{ unit: 'viên' }}>
+          <Form.Item name="name" label="Tên thuốc tùy chỉnh" rules={[{ required: true, whitespace: true, message: 'Nhập tên thuốc.' }, { max: 200, message: 'Tối đa 200 ký tự.' }]}>
+            <Input autoFocus maxLength={200} placeholder="Nhập tên thuốc" />
+          </Form.Item>
+          <Form.Item name="unit" label="Đơn vị" rules={[{ required: true, whitespace: true, message: 'Nhập đơn vị tính.' }, { max: 100, message: 'Tối đa 100 ký tự.' }]}>
+            <Input maxLength={100} placeholder="Ví dụ: viên, gói, ml" />
+          </Form.Item>
+          <Form.Item name="instructions" label="Hướng dẫn / ghi chú riêng cho thuốc này" rules={[{ max: 1000, message: 'Tối đa 1.000 ký tự.' }]}>
+            <Input.TextArea rows={3} maxLength={1000} placeholder="Ví dụ: Uống sau khi ăn no; dùng khi đau nhiều." />
+          </Form.Item>
+        </Form>
+      </Modal>
       <Modal
         open={correctionOpen}
         title="Tạo bản điều chỉnh đơn thuốc"

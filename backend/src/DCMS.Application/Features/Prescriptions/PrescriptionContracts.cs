@@ -25,7 +25,7 @@ public sealed record PrescriptionLineDto(
     int BranchId,
     int PrescribedByDoctorId,
     string? DoctorName,
-    Guid MedicineId,
+    Guid? MedicineId,
     string MedicineCode,
     string MedicineName,
     string? ActiveIngredient,
@@ -82,7 +82,7 @@ public sealed record ApplyTemplateResult(PrescriptionDto Prescription, int Skipp
 public sealed record SavePrescriptionLine(
     Guid RequestKey,
     int ExpectedVersion,
-    Guid MedicineId,
+    Guid? MedicineId,
     int Quantity,
     string? Route,
     string? MorningDose,
@@ -91,7 +91,9 @@ public sealed record SavePrescriptionLine(
     string? EveningDose,
     string? MealTiming,
     int? Days,
-    string? Instructions);
+    string? Instructions,
+    string? CustomMedicineName = null,
+    string? CustomUnit = null);
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record SavePrescriptionAdvice(Guid RequestKey, int ExpectedVersion, string? GeneralAdvice);

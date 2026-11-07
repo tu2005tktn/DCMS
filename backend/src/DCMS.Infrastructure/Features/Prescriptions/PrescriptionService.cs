@@ -191,6 +191,26 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
         line.Instructions = v.Instructions ?? medicine.Instructions ?? "";
     }
 
+    private static void ApplyCustom(ExternalPrescriptionLine line, string name, string unit, LineValues v)
+    {
+        line.MedicineId = null;
+        line.MedicineCode = "";
+        line.MedicineName = name.Trim();
+        line.ActiveIngredient = null;
+        line.Strength = null;
+        line.DosageForm = null;
+        line.Unit = unit.Trim();
+        line.Route = v.Route.Length > 0 ? v.Route : "Uống";
+        line.MorningDose = v.Morning;
+        line.NoonDose = v.Noon;
+        line.AfternoonDose = v.Afternoon;
+        line.EveningDose = v.Evening;
+        line.MealTiming = v.Meal;
+        line.Days = v.Days;
+        line.Quantity = v.Quantity;
+        line.Instructions = v.Instructions ?? "";
+    }
+
     private Task<CatalogMedicine?> PrescribableAsync(Guid id, CancellationToken ct) =>
         db.Set<CatalogMedicine>().AsNoTracking().SingleOrDefaultAsync(x => x.Id == id && x.IsActive && x.PrescriptionEligible, ct);
 
@@ -248,7 +268,7 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
             patient?.IntakeHistoryOther
         }.Where(x => !string.IsNullOrWhiteSpace(x))));
 
-        var medicineIds = lines.Select(l => l.MedicineId).Distinct().ToArray();
+        var medicineIds = lines.Where(l => l.MedicineId.HasValue).Select(l => l.MedicineId!.Value).Distinct().ToArray();
         var catalog = await db.Set<CatalogMedicine>().AsNoTracking().Where(m => medicineIds.Contains(m.Id)).ToDictionaryAsync(m => m.Id, ct);
         var warnings = new List<ClinicalAllergyWarning>();
 
@@ -261,11 +281,11 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
                     warnings.Add(new(line.MedicineName, line.ActiveIngredient, "Allergy", $"Tiền sử dị ứng của bệnh nhân có ghi nhận hoạt chất \"{hit}\" trong thuốc {line.MedicineName}."));
                 else if (allergyText.Contains(Fold(line.MedicineName)))
                     warnings.Add(new(line.MedicineName, line.ActiveIngredient, "Allergy", $"Tiền sử dị ứng của bệnh nhân có ghi nhận thuốc {line.MedicineName}."));
-                else if (catalog.GetValueOrDefault(line.MedicineId)?.AllergyWarnings is { } groups
+                else if (line.MedicineId is { } medicineId && catalog.GetValueOrDefault(medicineId)?.AllergyWarnings is { } groups
                     && Keywords(groups).FirstOrDefault(k => allergyText.Contains(k)) is { } group)
                     warnings.Add(new(line.MedicineName, line.ActiveIngredient, "Allergy", $"Thuốc {line.MedicineName} thuộc nhóm cảnh báo dị ứng \"{group}\" trùng với tiền sử dị ứng của bệnh nhân."));
             }
-            if (catalog.GetValueOrDefault(line.MedicineId)?.Contraindications is { Length: > 0 } contra)
+            if (line.MedicineId is { } contraMedicineId && catalog.GetValueOrDefault(contraMedicineId)?.Contraindications is { Length: > 0 } contra)
                 warnings.Add(new(line.MedicineName, line.ActiveIngredient, "Contraindication", $"Chống chỉ định của {line.MedicineName}: {contra}"));
         }
 
@@ -318,6 +338,12 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
     public async Task<PrescriptionLineDto> SaveLineAsync(int actor, Guid visitId, Guid? lineId, SavePrescriptionLine c, CancellationToken ct)
     {
         if (c.RequestKey == Guid.Empty) throw Fail("MSG04", field: "requestKey");
+        var catalogMedicine = c.MedicineId is { } medicineId && medicineId != Guid.Empty;
+        var customMedicine = !string.IsNullOrWhiteSpace(c.CustomMedicineName);
+        var hasCustomPayload = c.CustomMedicineName is not null || c.CustomUnit is not null;
+        if (catalogMedicine == customMedicine || (catalogMedicine && hasCustomPayload)) throw Fail("MSG04", field: "medicineId", label: "Thuốc");
+        if (customMedicine && (c.CustomMedicineName!.Trim().Length > 200 || string.IsNullOrWhiteSpace(c.CustomUnit) || c.CustomUnit.Trim().Length > 100))
+            throw Fail("MSG04", field: string.IsNullOrWhiteSpace(c.CustomUnit) ? "customUnit" : "customMedicineName", label: "Thuốc tùy chỉnh");
         var values = Validate(c.Route, c.MorningDose, c.NoonDose, c.AfternoonDose, c.EveningDose, c.MealTiming, c.Days, c.Quantity, c.Instructions);
         var hash = Hash(new { op = "line.save", visitId, lineId, c });
 
@@ -336,10 +362,14 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
             EnsureEditable(visit, rx);
             if (line.Version != c.ExpectedVersion) throw Fail("MSG111", 409, currentVersion: line.Version);
             before = JsonSerializer.Serialize(LineDto(line, null), Json);
-            var medicine = line.MedicineId == c.MedicineId
-                ? await db.Set<CatalogMedicine>().AsNoTracking().SingleOrDefaultAsync(x => x.Id == c.MedicineId, ct)
-                : await PrescribableAsync(c.MedicineId, ct);
-            Apply(line, medicine ?? throw Fail("MSG113", 404, "medicineId"), values);
+            if (customMedicine) ApplyCustom(line, c.CustomMedicineName!, c.CustomUnit!, values);
+            else
+            {
+                var medicine = line.MedicineId == c.MedicineId
+                    ? await db.Set<CatalogMedicine>().AsNoTracking().SingleOrDefaultAsync(x => x.Id == c.MedicineId, ct)
+                    : await PrescribableAsync(c.MedicineId!.Value, ct);
+                Apply(line, medicine ?? throw Fail("MSG113", 404, "medicineId"), values);
+            }
             line.Version++;
         }
         else
@@ -348,14 +378,18 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
             var current = await CurrentAsync(visitId, ct);
             EnsureEditable(visit, current);
             rx = current ?? NewDraft(visit, actor, 1);
-            var medicine = await PrescribableAsync(c.MedicineId, ct) ?? throw Fail("MSG113", 404, "medicineId");
             var now = clock.GetUtcNow();
             line = new ExternalPrescriptionLine
             {
                 PrescriptionId = rx.Id, VisitId = visit.Id, PatientId = visit.PatientId, BranchId = visit.BranchId,
                 PrescribedByDoctorId = actor, CreatedBy = actor, CreatedAt = now, Status = PrescriptionStatuses.Draft, Version = 1
             };
-            Apply(line, medicine, values);
+            if (customMedicine) ApplyCustom(line, c.CustomMedicineName!, c.CustomUnit!, values);
+            else
+            {
+                var medicine = await PrescribableAsync(c.MedicineId!.Value, ct) ?? throw Fail("MSG113", 404, "medicineId");
+                Apply(line, medicine, values);
+            }
             db.Add(line);
         }
         line.UpdatedBy = actor;

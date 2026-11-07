@@ -2564,7 +2564,7 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)");
 
-                    b.Property<Guid>("MedicineId")
+                    b.Property<Guid?>("MedicineId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("MedicineName")
@@ -7183,8 +7183,7 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasOne("DCMS.Domain.Features.SystemSettings.CatalogMedicine", null)
                         .WithMany()
                         .HasForeignKey("MedicineId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("DCMS.Domain.Features.Prescriptions.ExternalPrescription", null)
                         .WithMany()
