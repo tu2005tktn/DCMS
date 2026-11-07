@@ -56,3 +56,7 @@ Phần đầu form (Khách hàng, MSKH, tuổi, giới tính) chỉ đọc, lấ
 ## Ngoài phạm vi (làm sau)
 
 Trạng thái theo dõi xưởng (gửi, nhận, làm lại), tệp đính kèm, công nợ xưởng, báo cáo, danh sách phiếu labo riêng, thông báo nhắc hạn.
+
+# Kiểm tra ánh xạ EF khi chạy dự án
+
+Ánh xạ `DossierPayOsOrderLine` và `LabOrder` trong `TreatmentModel` là hai cấu hình entity độc lập. Mỗi khối `model.Entity` phải đóng đầy đủ để backend biên dịch và API khởi động được.
