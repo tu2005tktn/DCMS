@@ -147,10 +147,14 @@ export default function MedicalRecordDetailScreen() {
           ))}
       </Card>
 
+      <Card title="Đơn thuốc">
+        <Text style={styles.muted}>Đơn thuốc theo từng lượt khám nằm ở mục Đơn thuốc của tôi.</Text>
+        <Button title="Xem đơn thuốc" variant="secondary" onPress={() => router.push('/(account)/prescriptions')} />
+      </Card>
+
       <Card title="Nguồn chưa kết nối">
         <Text style={styles.muted}>
           • Kết quả/diagnosis/chẩn đoán chính thức (DCMS-93/96/99){'\n'}
-          • Đơn thuốc & dặn dò đã duyệt (DCMS-103){'\n'}
           • Ảnh/tài liệu ở trạng thái Ready — chỉ tải qua endpoint được cấp quyền (S20 / DCMS-95){'\n'}
           • Lịch sử phiên bản/sửa đổi/đồng bộ chi tiết (DCMS-95){'\n'}
           • Hóa đơn thanh toán (S42 — màn đã có thì chỉ hiển thị link)

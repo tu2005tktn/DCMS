@@ -1,30 +1,12 @@
-import {
-  Alert,
-  Button,
-  Card,
-  Col,
-  Drawer,
-  Form,
-  Input,
-  InputNumber,
-  Modal,
-  Popconfirm,
-  Row,
-  Select,
-  Space,
-  Switch,
-  Table,
-  Tag,
-  Typography,
-} from 'antd';
+import { Alert, Button, Card, Col, Drawer, Form, Input, InputNumber, Modal, Row, Segmented, Select, Space, Table, Tag, Typography } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { api, ApiError } from '../../services/api';
 import { usePermissions } from '../authentication/usePermissions';
-import type { MedicineOption, PrescriptionTemplate, PrescriptionTemplateLine } from './types';
+import { doseSummary, mealLabel, type MedicineOption, type PrescriptionTemplate, type PrescriptionTemplateLine } from './types';
 
 type LineFormValues = {
   medicineId: string;
-  route: string;
+  route?: string;
   morningDose: string;
   noonDose: string;
   afternoonDose: string;
@@ -35,13 +17,15 @@ type LineFormValues = {
   instructions?: string;
 };
 
-type TemplateFormValues = {
-  code: string;
-  name: string;
-  diagnosisKind?: string;
-  description?: string;
+type TemplateFormValues = { code: string; name: string; diagnosisKind?: string; description?: string };
+type StatusFilter = 'Active' | 'Inactive' | 'All';
+
+const numericDose = (value?: string) => {
+  const n = Number((value ?? '').replace(',', '.').trim());
+  return Number.isFinite(n) && n >= 0 ? n : NaN;
 };
 
+// Global master data (docs/specs/PRESCRIPTION-MANAGEMENT.md §2.2): not tied to the selected branch.
 export default function PrescriptionTemplatesPage() {
   const has = usePermissions();
   const canManage = has('prescriptions.manage');
@@ -50,32 +34,39 @@ export default function PrescriptionTemplatesPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>();
   const [search, setSearch] = useState('');
-  const [diagnosisFilter, setDiagnosisFilter] = useState<string>();
+  const [diagnosis, setDiagnosis] = useState('');
+  const [status, setStatus] = useState<StatusFilter>('Active');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
-  // Drawer edit/create
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<PrescriptionTemplate | null>(null);
   const [templateLines, setTemplateLines] = useState<PrescriptionTemplateLine[]>([]);
+  const [drawerDirty, setDrawerDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<ApiError>();
 
-  // Line form inside drawer
+  const [stateTarget, setStateTarget] = useState<PrescriptionTemplate>();
+  const [stateReason, setStateReason] = useState('');
+  const [stateBusy, setStateBusy] = useState(false);
+  const [stateError, setStateError] = useState<string>();
+
   const [medicineOptions, setMedicineOptions] = useState<MedicineOption[]>([]);
   const [medicineQuery, setMedicineQuery] = useState('');
   const [medicineLoading, setMedicineLoading] = useState(false);
   const [templateForm] = Form.useForm<TemplateFormValues>();
   const [lineForm] = Form.useForm<LineFormValues>();
   const pending = useRef<{ fingerprint: string; key: string } | null>(null);
+  const savingRef = useRef(false);
 
   const loadTemplates = async () => {
     setLoading(true);
     setError(undefined);
     try {
-      const query = new URLSearchParams();
-      if (search) query.set('search', search);
-      if (diagnosisFilter) query.set('diagnosis', diagnosisFilter);
-      const rows = await api<PrescriptionTemplate[]>(`/api/prescriptions/templates?${query}`);
-      setTemplates(rows);
+      const query = new URLSearchParams({ status, page: String(page), pageSize: String(pageSize) });
+      if (search.trim()) query.set('search', search.trim());
+      if (diagnosis.trim()) query.set('diagnosis', diagnosis.trim());
+      setTemplates(await api<PrescriptionTemplate[]>(`/api/prescriptions/templates?${query}`));
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -83,75 +74,61 @@ export default function PrescriptionTemplatesPage() {
     }
   };
 
-  useEffect(() => {
-    void loadTemplates();
-  }, [search, diagnosisFilter]);
+  useEffect(() => { void loadTemplates(); }, [search, diagnosis, status, page, pageSize]);
 
-  // Load medicine options
   useEffect(() => {
     if (!drawerOpen) return;
     let active = true;
     setMedicineLoading(true);
-    const timer = setTimeout(() => {
-      void api<MedicineOption[]>(`/api/prescriptions/medicine-options?branchId=1&q=${medicineQuery}`)
+    const timer = window.setTimeout(() => {
+      void api<MedicineOption[]>(`/api/prescriptions/medicine-options?${new URLSearchParams({ q: medicineQuery })}`)
         .then(rows => { if (active) setMedicineOptions(rows); })
         .catch(() => { if (active) setMedicineOptions([]); })
         .finally(() => { if (active) setMedicineLoading(false); });
     }, 250);
-    return () => { active = false; clearTimeout(timer); };
+    return () => { active = false; window.clearTimeout(timer); };
   }, [drawerOpen, medicineQuery]);
 
-  const openCreate = () => {
-    setEditingTemplate(null);
-    setTemplateLines([]);
-    templateForm.resetFields();
-    lineForm.resetFields();
-    setSaveError(undefined);
-    setDrawerOpen(true);
-  };
-
-  const openEdit = (t: PrescriptionTemplate) => {
+  const openDrawer = (t: PrescriptionTemplate | null) => {
     setEditingTemplate(t);
-    setTemplateLines([...t.lines]);
-    templateForm.setFieldsValue({
-      code: t.code,
-      name: t.name,
-      diagnosisKind: t.diagnosisKind,
-      description: t.description,
-    });
+    setTemplateLines(t ? [...t.lines] : []);
+    templateForm.resetFields();
+    if (t) templateForm.setFieldsValue({ code: t.code, name: t.name, diagnosisKind: t.diagnosisKind, description: t.description });
     lineForm.resetFields();
     setSaveError(undefined);
+    setDrawerDirty(false);
+    pending.current = null;
     setDrawerOpen(true);
   };
 
-  const handleLineDoseChange = () => {
-    const values = lineForm.getFieldsValue();
-    const m = parseFloat(values.morningDose) || 0;
-    const n = parseFloat(values.noonDose) || 0;
-    const a = parseFloat(values.afternoonDose) || 0;
-    const e = parseFloat(values.eveningDose) || 0;
-    const days = values.days || 1;
-    const daily = m + n + a + e;
-    if (daily > 0) {
-      lineForm.setFieldValue('quantity', Math.ceil(daily * days));
-    }
+  const closeDrawer = () => {
+    if (saving) return;
+    if (drawerDirty && !window.confirm('Đóng và bỏ các thay đổi chưa lưu của mẫu đơn?')) return;
+    setDrawerOpen(false);
+  };
+
+  const recalculate = () => {
+    const v = lineForm.getFieldsValue();
+    const doses = [v.morningDose, v.noonDose, v.afternoonDose, v.eveningDose].map(numericDose);
+    if (doses.some(Number.isNaN)) return;
+    const daily = doses.reduce((a, b) => a + b, 0);
+    if (daily > 0 && v.days > 0) lineForm.setFieldValue('quantity', Math.min(10000, Math.ceil(daily * v.days)));
   };
 
   const addLineToTemplate = (values: LineFormValues) => {
     const med = medicineOptions.find(o => o.id === values.medicineId);
     if (!med) return;
-
-    const newLine: PrescriptionTemplateLine = {
+    setTemplateLines(current => [...current, {
       id: crypto.randomUUID(),
       templateId: editingTemplate?.id ?? '',
       medicineId: med.id,
-      medicineCode: med.Code ?? med.code,
-      medicineName: med.Name ?? med.name,
-      activeIngredient: med.ActiveIngredient ?? med.activeIngredient,
-      strength: med.Strength ?? med.strength,
-      dosageForm: med.DosageForm ?? med.dosageForm,
-      unit: med.BaseUnit ?? med.baseUnit,
-      route: values.route || 'Uống',
+      medicineCode: med.code,
+      medicineName: med.name,
+      activeIngredient: med.activeIngredient,
+      strength: med.strength,
+      dosageForm: med.dosageForm,
+      unit: med.baseUnit,
+      route: values.route || med.route || 'Uống',
       morningDose: values.morningDose || '0',
       noonDose: values.noonDose || '0',
       afternoonDose: values.afternoonDose || '0',
@@ -160,400 +137,300 @@ export default function PrescriptionTemplatesPage() {
       days: values.days || 1,
       quantity: values.quantity,
       instructions: values.instructions ?? med.defaultInstructions ?? '',
-      sortOrder: templateLines.length + 1,
-    };
-
-    setTemplateLines(current => [...current, newLine]);
+      sortOrder: current.length,
+    }]);
+    setDrawerDirty(true);
     lineForm.resetFields();
   };
 
-  const removeLineFromTemplate = (lineId: string) => {
-    setTemplateLines(current => current.filter(l => l.id !== lineId));
+  const moveLine = (index: number, delta: number) => {
+    setTemplateLines(current => {
+      const next = [...current];
+      const target = index + delta;
+      if (target < 0 || target >= next.length) return current;
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+    setDrawerDirty(true);
   };
 
   const saveTemplate = async (values: TemplateFormValues) => {
+    if (savingRef.current) return;
     if (templateLines.length === 0) {
-      Modal.error({ title: 'Thiếu dòng thuốc', content: 'Mẫu đơn thuốc cần có ít nhất một loại thuốc.' });
+      setSaveError(new ApiError(400, 'MSG02', 'Mẫu đơn thuốc cần ít nhất một thuốc.'));
       return;
     }
-
-    setSaving(true);
-    setSaveError(undefined);
     const body = {
       expectedVersion: editingTemplate?.version ?? 0,
-      code: values.code,
-      name: values.name,
-      diagnosisKind: values.diagnosisKind,
-      description: values.description,
+      code: values.code.trim(),
+      name: values.name.trim(),
+      diagnosisKind: values.diagnosisKind?.trim() || null,
+      description: values.description?.trim() || null,
       lines: templateLines.map((l, i) => ({
-        medicineId: l.medicineId,
-        route: l.route,
-        morningDose: l.morningDose,
-        noonDose: l.noonDose,
-        afternoonDose: l.afternoonDose,
-        eveningDose: l.eveningDose,
-        mealTiming: l.mealTiming,
-        days: l.days,
-        quantity: l.quantity,
-        instructions: l.instructions,
-        sortOrder: i + 1,
+        medicineId: l.medicineId, route: l.route, morningDose: l.morningDose, noonDose: l.noonDose,
+        afternoonDose: l.afternoonDose, eveningDose: l.eveningDose, mealTiming: l.mealTiming,
+        days: l.days, quantity: l.quantity, instructions: l.instructions, sortOrder: i,
       })),
     };
-
     const target = editingTemplate ? `/api/prescriptions/templates/${editingTemplate.id}` : '/api/prescriptions/templates';
     const fingerprint = JSON.stringify({ target, ...body });
-    if (pending.current?.fingerprint !== fingerprint) {
-      pending.current = { fingerprint, key: crypto.randomUUID() };
-    }
+    if (pending.current?.fingerprint !== fingerprint) pending.current = { fingerprint, key: crypto.randomUUID() };
 
+    savingRef.current = true;
+    setSaving(true);
+    setSaveError(undefined);
     try {
-      await api(target, {
-        method: editingTemplate ? 'PUT' : 'POST',
-        body: JSON.stringify({ ...body, requestKey: pending.current.key }),
-      });
+      await api(target, { method: editingTemplate ? 'PUT' : 'POST', body: JSON.stringify({ ...body, requestKey: pending.current.key }) });
+      pending.current = null;
+      setDrawerDirty(false);
       setDrawerOpen(false);
       void loadTemplates();
     } catch (e) {
       setSaveError(e as ApiError);
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   };
 
-  const toggleState = async (t: PrescriptionTemplate, active: boolean) => {
+  const changeState = async () => {
+    if (!stateTarget || stateBusy) return;
+    const active = !stateTarget.isActive;
+    if (!active && !stateReason.trim()) return;
+    setStateBusy(true);
+    setStateError(undefined);
     try {
-      await api(`/api/prescriptions/templates/${t.id}/state`, {
+      await api(`/api/prescriptions/templates/${stateTarget.id}/state`, {
         method: 'POST',
-        body: JSON.stringify({
-          requestKey: crypto.randomUUID(),
-          expectedVersion: t.version,
-          active,
-          reason: active ? 'Kích hoạt lại mẫu' : 'Ngừng sử dụng mẫu',
-        }),
+        body: JSON.stringify({ requestKey: crypto.randomUUID(), expectedVersion: stateTarget.version, active, reason: stateReason.trim() || null }),
       });
+      setStateTarget(undefined);
+      setStateReason('');
       void loadTemplates();
     } catch (e) {
-      Modal.error({ title: 'Lỗi cập nhật trạng thái', content: (e as Error).message });
+      const err = e as ApiError;
+      setStateError(err.code === 'MSG111' ? 'Mẫu vừa được thay đổi ở nơi khác. Đóng hộp thoại và tải lại danh sách.' : err.message);
+    } finally {
+      setStateBusy(false);
     }
   };
+
+  const total = (page - 1) * pageSize + templates.length + (templates.length === pageSize ? 1 : 0);
 
   return (
     <main className="page">
       <Space wrap style={{ marginBottom: 16, justifyContent: 'space-between', width: '100%' }}>
         <div>
-          <Typography.Title level={2} style={{ margin: 0 }}>
-            Mẫu đơn thuốc chuẩn (Prescription Templates)
-          </Typography.Title>
-          <Typography.Text type="secondary">
-            Thiết lập sẵn danh sách thuốc, liều dùng theo chẩn đoán (Nhổ răng, Viêm quanh cuống, Cấy ghép Implant...)
-          </Typography.Text>
+          <Typography.Title level={2} style={{ margin: 0 }}>Mẫu đơn thuốc</Typography.Title>
+          <Typography.Text type="secondary">Danh sách thuốc, liều dùng gợi ý theo chẩn đoán thường gặp; dùng chung cho mọi chi nhánh.</Typography.Text>
         </div>
-        {canManage && (
-          <Button type="primary" onClick={openCreate}>
-            Tạo mẫu đơn thuốc mới
-          </Button>
-        )}
+        {canManage && <Button type="primary" onClick={() => openDrawer(null)}>Tạo mẫu đơn thuốc</Button>}
       </Space>
 
       <Card style={{ marginBottom: 16 }}>
-        <Row gutter={16}>
-          <Col xs={24} sm={12} md={8}>
-            <Input.Search
-              placeholder="Tìm theo tên mẫu hoặc mã..."
-              allowClear
-              onSearch={setSearch}
-            />
+        <Row gutter={[16, 12]}>
+          <Col xs={24} md={8}>
+            <Input.Search placeholder="Tìm theo mã hoặc tên mẫu..." allowClear maxLength={100} onSearch={v => { setPage(1); setSearch(v); }} />
           </Col>
-          <Col xs={24} sm={12} md={8}>
-            <Select
-              allowClear
-              placeholder="Lọc theo chẩn đoán..."
-              style={{ width: '100%' }}
-              onChange={setDiagnosisFilter}
-              options={[
-                { value: 'Nhổ răng', label: 'Nhổ răng khôn / răng ngầm' },
-                { value: 'Viêm quanh cuống', label: 'Viêm quanh cuống / tủy' },
-                { value: 'Cấy ghép Implant', label: 'Cấy ghép Implant' },
-                { value: 'Viêm nướu', label: 'Viêm nướu / nha chu' },
-              ]}
-            />
+          <Col xs={24} md={8}>
+            <Input.Search placeholder="Lọc theo chẩn đoán gợi ý..." allowClear maxLength={100} onSearch={v => { setPage(1); setDiagnosis(v); }} />
+          </Col>
+          <Col xs={24} md={8}>
+            <Segmented value={status} onChange={v => { setPage(1); setStatus(v as StatusFilter); }}
+              options={[{ value: 'Active', label: 'Đang dùng' }, { value: 'Inactive', label: 'Ngừng dùng' }, { value: 'All', label: 'Tất cả' }]} />
           </Col>
         </Row>
       </Card>
 
-      {error && <Alert type="error" showIcon message={error} style={{ marginBottom: 16 }} />}
+      {error && <Alert type="error" showIcon message={error} style={{ marginBottom: 16 }} action={<Button onClick={() => void loadTemplates()}>Tải lại</Button>} />}
 
       <Table
         loading={loading}
         rowKey="id"
         dataSource={templates}
+        scroll={{ x: 720 }}
+        pagination={{
+          current: page, pageSize, total, showSizeChanger: true, pageSizeOptions: [20, 50, 100], simple: false,
+          onChange: (p, size) => { setPage(size !== pageSize ? 1 : p); setPageSize(size); },
+        }}
         columns={[
-          {
-            title: 'Mã mẫu',
-            dataIndex: 'code',
-            width: 120,
-            render: v => <code>{v}</code>,
-          },
+          { title: 'Mã mẫu', dataIndex: 'code', width: 130, render: v => <code>{v}</code> },
           {
             title: 'Tên mẫu đơn thuốc',
             dataIndex: 'name',
             render: (v, r) => (
               <div>
                 <strong>{v}</strong>
-                {r.diagnosisKind && (
-                  <Tag color="magenta" style={{ marginLeft: 8 }}>
-                    {r.diagnosisKind}
-                  </Tag>
-                )}
+                {r.diagnosisKind && <Tag color="magenta" style={{ marginLeft: 8 }}>{r.diagnosisKind}</Tag>}
                 {r.description && <div style={{ fontSize: 12, color: '#666' }}>{r.description}</div>}
               </div>
             ),
           },
-          {
-            title: 'Số loại thuốc',
-            width: 120,
-            align: 'center',
-            render: (_, r) => <Tag color="blue">{r.lines.length} loại</Tag>,
-          },
-          {
-            title: 'Trạng thái',
-            width: 140,
-            render: (_, r) => (
-              <Switch
-                checked={r.isActive}
-                disabled={!canManage}
-                checkedChildren="Đang dùng"
-                unCheckedChildren="Ngừng dùng"
-                onChange={checked => void toggleState(r, checked)}
-              />
-            ),
-          },
+          { title: 'Số thuốc', width: 100, align: 'center', render: (_, r) => r.lines.length },
+          { title: 'Trạng thái', width: 120, render: (_, r) => (r.isActive ? <Tag color="success">Đang dùng</Tag> : <Tag>Ngừng dùng</Tag>) },
           ...(canManage
-            ? [
-                {
-                  title: 'Thao tác',
-                  width: 120,
-                  render: (_: unknown, r: PrescriptionTemplate) => (
-                    <Button size="small" onClick={() => openEdit(r)}>
-                      Chỉnh sửa
+            ? [{
+                title: 'Thao tác',
+                width: 200,
+                render: (_: unknown, r: PrescriptionTemplate) => (
+                  <Space>
+                    <Button size="small" onClick={() => openDrawer(r)}>Sửa</Button>
+                    <Button size="small" danger={r.isActive} onClick={() => { setStateTarget(r); setStateReason(''); setStateError(undefined); }}>
+                      {r.isActive ? 'Ngừng dùng' : 'Khôi phục'}
                     </Button>
-                  ),
-                },
-              ]
+                  </Space>
+                ),
+              }]
             : []),
         ]}
       />
 
-      {/* Drawer Create / Edit */}
+      <Modal
+        open={!!stateTarget}
+        title={stateTarget?.isActive ? `Ngừng dùng mẫu "${stateTarget?.name}"` : `Khôi phục mẫu "${stateTarget?.name}"`}
+        okText={stateTarget?.isActive ? 'Ngừng dùng' : 'Khôi phục'}
+        okButtonProps={{ danger: stateTarget?.isActive, disabled: !!stateTarget?.isActive && !stateReason.trim() }}
+        confirmLoading={stateBusy}
+        onOk={() => void changeState()}
+        onCancel={() => { if (!stateBusy) setStateTarget(undefined); }}
+      >
+        <Typography.Paragraph>
+          {stateTarget?.isActive
+            ? 'Mẫu sẽ không còn hiện khi kê đơn. Đơn đã kê từ mẫu này giữ nguyên.'
+            : 'Mẫu sẽ hiện lại trong danh sách chọn khi kê đơn.'}
+        </Typography.Paragraph>
+        {stateError && <Alert type="error" showIcon message={stateError} style={{ marginBottom: 12 }} />}
+        <Input.TextArea rows={2} maxLength={500} showCount value={stateReason} onChange={e => setStateReason(e.target.value)}
+          placeholder={stateTarget?.isActive ? 'Lý do (bắt buộc)' : 'Lý do (không bắt buộc)'} aria-label="Lý do" />
+      </Modal>
+
       <Drawer
         open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        width={760}
-        title={editingTemplate ? `Sửa mẫu đơn thuốc: ${editingTemplate.name}` : 'Tạo mẫu đơn thuốc mới'}
-        extra={
-          <Button type="primary" onClick={() => templateForm.submit()} loading={saving}>
-            Lưu mẫu đơn thuốc
-          </Button>
-        }
+        onClose={closeDrawer}
+        width={780}
+        title={editingTemplate ? `Sửa mẫu: ${editingTemplate.name}` : 'Tạo mẫu đơn thuốc'}
+        extra={<Button type="primary" onClick={() => templateForm.submit()} loading={saving} disabled={saving}>Lưu mẫu</Button>}
       >
         {saveError && (
-          <Alert
-            type="error"
-            showIcon
-            message={saveError.message}
-            style={{ marginBottom: 16 }}
-          />
+          <Alert type="error" showIcon style={{ marginBottom: 16 }}
+            message={saveError.code === 'MSG111' ? 'Mẫu đã được thay đổi ở nơi khác. Nội dung bạn nhập vẫn được giữ; đóng và mở lại để xem bản mới trước khi lưu.' : saveError.message} />
         )}
 
-        <Form
-          form={templateForm}
-          layout="vertical"
-          onFinish={saveTemplate}
-          initialValues={{ code: `RX-TMP-${Math.floor(100 + Math.random() * 900)}` }}
-        >
+        <Form form={templateForm} layout="vertical" onFinish={values => void saveTemplate(values)} onValuesChange={() => setDrawerDirty(true)} disabled={saving}>
           <Row gutter={12}>
-            <Col span={8}>
-              <Form.Item name="code" label="Mã mẫu" rules={[{ required: true, message: 'Nhập mã.' }]}>
-                <Input disabled={!!editingTemplate} />
+            <Col xs={24} sm={8}>
+              <Form.Item name="code" label="Mã mẫu" rules={[{ required: true, whitespace: true, message: 'Nhập mã mẫu.' }, { max: 40, message: 'Tối đa 40 ký tự.' }]}>
+                <Input disabled={!!editingTemplate} placeholder="VD: RX-NHO-RANG-KHON" />
               </Form.Item>
             </Col>
-            <Col span={16}>
-              <Form.Item name="name" label="Tên mẫu đơn thuốc" rules={[{ required: true, message: 'Nhập tên mẫu.' }]}>
-                <Input placeholder="Ví dụ: Đơn thuốc sau nhổ răng khôn" />
+            <Col xs={24} sm={16}>
+              <Form.Item name="name" label="Tên mẫu" rules={[{ required: true, whitespace: true, message: 'Nhập tên mẫu.' }, { max: 200, message: 'Tối đa 200 ký tự.' }]}>
+                <Input placeholder="VD: Đơn thuốc sau nhổ răng khôn" />
               </Form.Item>
             </Col>
           </Row>
-
-          <Form.Item name="diagnosisKind" label="Chẩn đoán lâm sàng gợi ý">
-            <Input placeholder="Ví dụ: Sau nhổ răng số 8, Cấy Implant, Viêm tủy..." />
+          <Form.Item name="diagnosisKind" label="Chẩn đoán gợi ý" rules={[{ max: 100, message: 'Tối đa 100 ký tự.' }]}>
+            <Input placeholder="VD: Sau nhổ răng số 8, Viêm quanh cuống, Cấy ghép Implant" />
           </Form.Item>
-
-          <Form.Item name="description" label="Ghi chú lâm sàng cho mẫu">
-            <Input.TextArea rows={2} placeholder="Mô tả trường hợp áp dụng hoặc lưu ý lâm sàng..." />
+          <Form.Item name="description" label="Ghi chú lâm sàng" rules={[{ max: 1000, message: 'Tối đa 1.000 ký tự.' }]}>
+            <Input.TextArea rows={2} placeholder="Trường hợp áp dụng, lưu ý khi dùng mẫu..." />
           </Form.Item>
         </Form>
 
-        <Typography.Title level={5} style={{ marginTop: 24, marginBottom: 12 }}>
-          Danh sách thuốc trong mẫu ({templateLines.length})
-        </Typography.Title>
-
+        <Typography.Title level={5} style={{ marginTop: 16 }}>Thuốc trong mẫu ({templateLines.length}/30)</Typography.Title>
         <Table
           size="small"
           pagination={false}
           rowKey="id"
           dataSource={templateLines}
+          scroll={{ x: 620 }}
           columns={[
             {
               title: 'Thuốc',
               render: (_, l) => (
                 <div>
                   <strong>{l.medicineName}</strong>
-                  <div style={{ fontSize: 12, color: '#666' }}>
-                    {[l.medicineCode, l.strength, l.dosageForm].filter(Boolean).join(' · ')}
-                  </div>
+                  <div style={{ fontSize: 12, color: '#666' }}>{[l.medicineCode, l.strength, l.dosageForm, l.route].filter(Boolean).join(' · ')}</div>
                 </div>
               ),
             },
             {
               title: 'Liều dùng',
               render: (_, l) => (
-                <div>
-                  {[
-                    l.morningDose !== '0' ? `Sáng ${l.morningDose}` : null,
-                    l.noonDose !== '0' ? `Trưa ${l.noonDose}` : null,
-                    l.afternoonDose !== '0' ? `Chiều ${l.afternoonDose}` : null,
-                    l.eveningDose !== '0' ? `Tối ${l.eveningDose}` : null,
-                  ].filter(Boolean).join(', ') || 'Chỉ dẫn'}
-                  <div>
-                    <Tag>{l.mealTiming === 'BeforeMeal' ? 'Trước ăn' : l.mealTiming === 'WithMeal' ? 'Trong ăn' : 'Sau ăn'}</Tag>
-                    <Tag>{l.days} ngày</Tag>
-                  </div>
-                </div>
+                <div>{doseSummary(l)}<div><Tag>{mealLabel(l.mealTiming)}</Tag><Tag>{l.days} ngày</Tag></div></div>
               ),
             },
-            {
-              title: 'Số lượng',
-              render: (_, l) => <strong>{l.quantity} {l.unit}</strong>,
-            },
+            { title: 'Số lượng', width: 100, render: (_, l) => <strong>{l.quantity} {l.unit}</strong> },
             {
               title: '',
-              width: 60,
-              render: (_, l) => (
-                <Button size="small" danger onClick={() => removeLineFromTemplate(l.id)}>
-                  Xóa
-                </Button>
+              width: 150,
+              render: (_, l, index) => (
+                <Space size={4}>
+                  <Button size="small" disabled={saving || index === 0} onClick={() => moveLine(index, -1)} aria-label="Lên">↑</Button>
+                  <Button size="small" disabled={saving || index === templateLines.length - 1} onClick={() => moveLine(index, 1)} aria-label="Xuống">↓</Button>
+                  <Button size="small" danger disabled={saving} onClick={() => { setTemplateLines(c => c.filter(x => x.id !== l.id)); setDrawerDirty(true); }}>Xóa</Button>
+                </Space>
               ),
             },
           ]}
         />
 
-        {/* Add Line Form */}
         <Card size="small" title="Thêm thuốc vào mẫu" style={{ marginTop: 16 }}>
           <Form
             form={lineForm}
             layout="vertical"
-            initialValues={{
-              route: 'Uống',
-              morningDose: '1',
-              noonDose: '0',
-              afternoonDose: '0',
-              eveningDose: '1',
-              mealTiming: 'AfterMeal',
-              days: 5,
-              quantity: 10,
-            }}
-            onValuesChange={handleLineDoseChange}
+            disabled={saving || templateLines.length >= 30}
+            initialValues={{ morningDose: '1', noonDose: '0', afternoonDose: '0', eveningDose: '1', mealTiming: 'AfterMeal', days: 5, quantity: 10 }}
+            onValuesChange={changed => { if (['morningDose', 'noonDose', 'afternoonDose', 'eveningDose', 'days'].some(k => k in changed)) recalculate(); }}
             onFinish={addLineToTemplate}
           >
-            <Form.Item name="medicineId" label="Chọn thuốc" rules={[{ required: true, message: 'Chọn thuốc.' }]}>
+            <Form.Item name="medicineId" label="Thuốc" rules={[{ required: true, message: 'Chọn thuốc.' }]}>
               <Select
                 showSearch
                 filterOption={false}
                 loading={medicineLoading}
-                onSearch={setMedicineQuery}
-                placeholder="Tìm mã hoặc tên thuốc..."
-                options={medicineOptions.map(o => ({
-                  value: o.id,
-                  label: [o.code, o.name, o.strength, o.dosageForm].filter(Boolean).join(' · '),
-                }))}
+                onSearch={v => setMedicineQuery(v.slice(0, 100))}
+                placeholder="Tìm mã, tên biệt dược hoặc hoạt chất..."
+                options={medicineOptions.map(o => ({ value: o.id, label: [o.code, o.name, o.activeIngredient, o.strength, o.dosageForm].filter(Boolean).join(' · ') }))}
                 onChange={id => {
                   const opt = medicineOptions.find(o => o.id === id);
-                  if (opt) {
-                    lineForm.setFieldsValue({
-                      route: opt.route || 'Uống',
-                      instructions: opt.defaultInstructions ?? '',
-                    });
-                  }
+                  if (opt) lineForm.setFieldsValue({ route: opt.route || undefined, instructions: opt.defaultInstructions ?? '' });
                 }}
               />
             </Form.Item>
-
             <Row gutter={12}>
-              <Col span={6}>
+              <Col xs={12} sm={6}>
                 <Form.Item name="route" label="Đường dùng">
-                  <Select
-                    options={[
-                      { value: 'Uống', label: 'Uống' },
-                      { value: 'Bôi', label: 'Bôi' },
-                      { value: 'Súc miệng', label: 'Súc miệng' },
-                      { value: 'Ngậm', label: 'Ngậm' },
-                    ]}
-                  />
+                  <Select allowClear placeholder="Theo danh mục" options={['Uống', 'Bôi', 'Súc miệng', 'Ngậm', 'Nhỏ', 'Đặt'].map(value => ({ value, label: value }))} />
                 </Form.Item>
               </Col>
-              <Col span={6}>
+              <Col xs={12} sm={6}>
                 <Form.Item name="mealTiming" label="Thời điểm">
-                  <Select
-                    options={[
-                      { value: 'AfterMeal', label: 'Sau ăn' },
-                      { value: 'BeforeMeal', label: 'Trước ăn' },
-                      { value: 'WithMeal', label: 'Trong ăn' },
-                    ]}
-                  />
+                  <Select options={[{ value: 'AfterMeal', label: 'Sau ăn' }, { value: 'BeforeMeal', label: 'Trước ăn' }, { value: 'WithMeal', label: 'Trong bữa ăn' }]} />
                 </Form.Item>
               </Col>
-              <Col span={6}>
-                <Form.Item name="days" label="Số ngày">
-                  <InputNumber min={1} max={30} style={{ width: '100%' }} />
+              <Col xs={12} sm={6}>
+                <Form.Item name="days" label="Số ngày" rules={[{ required: true, message: 'Nhập số ngày.' }]}>
+                  <InputNumber min={1} max={365} precision={0} style={{ width: '100%' }} />
                 </Form.Item>
               </Col>
-              <Col span={6}>
-                <Form.Item name="quantity" label="Tổng SL">
-                  <InputNumber min={1} max={1000} style={{ width: '100%' }} />
+              <Col xs={12} sm={6}>
+                <Form.Item name="quantity" label="Tổng số lượng" rules={[{ required: true, message: 'Nhập số lượng.' }]}>
+                  <InputNumber min={1} max={10000} precision={0} style={{ width: '100%' }} />
                 </Form.Item>
               </Col>
             </Row>
-
             <Row gutter={12}>
-              <Col span={6}>
-                <Form.Item name="morningDose" label="Sáng">
-                  <Input placeholder="1 viên" />
-                </Form.Item>
-              </Col>
-              <Col span={6}>
-                <Form.Item name="noonDose" label="Trưa">
-                  <Input placeholder="0" />
-                </Form.Item>
-              </Col>
-              <Col span={6}>
-                <Form.Item name="afternoonDose" label="Chiều">
-                  <Input placeholder="0" />
-                </Form.Item>
-              </Col>
-              <Col span={6}>
-                <Form.Item name="eveningDose" label="Tối">
-                  <Input placeholder="1 viên" />
-                </Form.Item>
-              </Col>
+              {([['morningDose', 'Sáng'], ['noonDose', 'Trưa'], ['afternoonDose', 'Chiều'], ['eveningDose', 'Tối']] as const).map(([name, label]) => (
+                <Col xs={12} sm={6} key={name}>
+                  <Form.Item name={name} label={label} rules={[{ max: 20, message: 'Tối đa 20 ký tự.' }]}><Input placeholder="0" /></Form.Item>
+                </Col>
+              ))}
             </Row>
-
-            <Form.Item name="instructions" label="Lời dặn mặc định">
+            <Form.Item name="instructions" label="Lời dặn" rules={[{ max: 1000, message: 'Tối đa 1.000 ký tự.' }]}>
               <Input.TextArea rows={2} placeholder="Lời dặn dùng thuốc..." />
             </Form.Item>
-
-            <Button type="dashed" htmlType="submit" block>
-              + Thêm thuốc này vào danh sách mẫu
-            </Button>
+            <Button type="dashed" htmlType="submit" block>Thêm thuốc vào mẫu</Button>
           </Form>
         </Card>
       </Drawer>

@@ -1,7 +1,7 @@
-import { Alert, Button, Card, Empty, Form, Input, Modal, Result, Select, Space, Table, Tabs, Typography } from 'antd';
+import { Alert, Button, Card, Form, Input, Modal, Result, Select, Space, Table, Tabs, Typography } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { api, ApiError } from '../../services/api';
+import { api } from '../../services/api';
 import { useAuth } from '../authentication/AuthContext';
 import GeneralSettingsPanel from './GeneralSettingsPanel';
 import ReferenceCatalogPanel from './ReferenceCatalogPanel';
@@ -31,7 +31,7 @@ async function allCategories() {
 export default function SystemSettingsPage() {
   const { user } = useAuth();
   const { section } = useParams<{ section?: string }>();
-  const [search, setSearch] = useSearchParams();
+  const [search] = useSearchParams();
   const navigate = useNavigate();
   const [modal, modalContext] = Modal.useModal();
 
@@ -211,18 +211,27 @@ function MaterialCatalog() {
   }
   if (!allowed) return <Result status="403" title="Bạn không có quyền xem danh mục này." />;
   return <div>
-    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-      <Space>
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
+      <Space wrap>
         <Button type={kind === 'materials' ? 'primary' : 'default'} onClick={() => tab('materials')}>Dụng cụ / Vật liệu</Button>
         <Button type={kind === 'material-categories' ? 'primary' : 'default'} onClick={() => tab('material-categories')}>Nhóm dụng cụ / vật liệu</Button>
       </Space>
-      {canCreate && <Button type="primary" onClick={() => open()}>+ Thêm mới</Button>}
+      <Space wrap>
+        <Input.Search allowClear maxLength={100} placeholder="Tìm theo tên..." value={search} style={{ width: 240 }}
+          onChange={e => setSearch(e.target.value)} onSearch={v => { setQuery(v.trim()); setPage(1); }} />
+        {kind === 'materials' && <Select allowClear placeholder="Lọc theo nhóm" style={{ width: 200 }} value={categoryId}
+          onChange={v => { setCategoryId(v); setPage(1); }} options={categories?.map(c => ({ value: c.id, label: c.name }))} />}
+        {canCreate && <Button type="primary" onClick={() => open()}>+ Thêm mới</Button>}
+      </Space>
     </div>
     {error && <Alert type="error" showIcon message={error} style={{ marginBottom: 16 }} />}
+    {categoryError && <Alert type="warning" showIcon message={`Không tải được nhóm vật liệu: ${categoryError}`} style={{ marginBottom: 16 }} />}
     <Table
       loading={loading}
       dataSource={data?.items}
       rowKey="id"
+      pagination={{ current: page, pageSize: size, total: data?.total ?? 0, showSizeChanger: true, pageSizeOptions: [20, 50, 100],
+        onChange: (p, s) => { setPage(s !== size ? 1 : p); setSize(s); } }}
       columns={[
         { title: 'Tên', dataIndex: 'name' },
         ...(kind === 'materials' ? [{ title: 'Nhóm', dataIndex: 'categoryName' }, { title: 'Đơn vị sử dụng', dataIndex: 'usageUnit' }] : []),
@@ -246,6 +255,11 @@ function MaterialCatalog() {
           </>
         )}
       </Form>
+    </Modal>
+    <Modal open={deleting !== null} title={`Ngừng dùng "${deleting?.row.name ?? ''}"?`} okText="Ngừng dùng" okButtonProps={{ danger: true }}
+      confirmLoading={busy} onOk={() => void remove()} onCancel={() => { if (!busy) { setDeleting(null); setDeleteError(undefined); } }}>
+      {deleteError && <Alert type="error" showIcon message={deleteError} style={{ marginBottom: 12 }} />}
+      <Typography.Paragraph>Mục sẽ không còn được chọn cho giao dịch mới; dữ liệu đã ghi nhận vẫn giữ nguyên.</Typography.Paragraph>
     </Modal>
   </div>;
 }

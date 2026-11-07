@@ -55,6 +55,14 @@ public static class SupplyCatalogPermissions
         "medicines" => "catalog.medicines.read",
         _ => throw new ArgumentException(resource)
     };
+    // Role baseline from before dynamic access groups: owner manages every supply catalog, a dentist only the clinical-supply ones.
+    public static bool CanManage(string resource, IEnumerable<string> roles)
+    {
+        var set = roles.ToArray();
+        if (set.Contains("ClinicOwner")) return resource is "providers" or "lab-work-types" or "materials" or "material-categories" or "units" or "medicines";
+        return set.Contains("Dentist") && resource is "providers" or "lab-work-types" or "materials" or "material-categories" or "units";
+    }
+
     public static string Manage(string resource) => resource switch
     {
         "providers" => "catalog.material-suppliers.manage",

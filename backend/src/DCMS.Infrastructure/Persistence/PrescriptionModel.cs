@@ -10,10 +10,34 @@ public static class PrescriptionModel
 {
     public static void Configure(ModelBuilder model)
     {
+        model.Entity<ExternalPrescription>(b =>
+        {
+            b.ToTable("EXTERNAL_PRESCRIPTION", t =>
+            {
+                t.HasCheckConstraint("CK_EXTERNAL_PRESCRIPTION_STATUS", "\"Status\" IN ('Draft','Finalized','Superseded')");
+                t.HasCheckConstraint("CK_EXTERNAL_PRESCRIPTION_REVISION", "\"Revision\" >= 1");
+            });
+            b.HasKey(x => x.Id);
+            b.Property(x => x.Version).IsConcurrencyToken();
+            b.Property(x => x.Status).HasMaxLength(20);
+            b.Property(x => x.GeneralAdvice).HasMaxLength(1000);
+            b.Property(x => x.Diagnosis).HasMaxLength(1000);
+            b.Property(x => x.CorrectionReason).HasMaxLength(500);
+            b.Property(x => x.VerificationCode).HasMaxLength(16);
+            b.HasIndex(x => new { x.VisitId, x.Revision }).IsUnique();
+            b.HasIndex(x => new { x.PatientId, x.Status });
+            b.HasOne<Visit>().WithMany().HasForeignKey(x => x.VisitId).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<ExternalPrescription>().WithMany().HasForeignKey(x => x.SupersedesId).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.PrescribedByDoctorId).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.FinalizedBy).OnDelete(DeleteBehavior.Restrict);
+        });
+
         model.Entity<ExternalPrescriptionLine>(b =>
         {
             b.ToTable("EXTERNAL_PRESCRIPTION_LINE", t => t.HasCheckConstraint("CK_EXTERNAL_PRESCRIPTION_QUANTITY", "\"Quantity\" > 0"));
             b.HasKey(x => x.Id);
+            b.HasIndex(x => x.PrescriptionId);
+            b.HasOne<ExternalPrescription>().WithMany().HasForeignKey(x => x.PrescriptionId).OnDelete(DeleteBehavior.Restrict);
             b.Property(x => x.Version).IsConcurrencyToken();
             b.Property(x => x.MedicineCode).HasMaxLength(40);
             b.Property(x => x.MedicineName).HasMaxLength(200);

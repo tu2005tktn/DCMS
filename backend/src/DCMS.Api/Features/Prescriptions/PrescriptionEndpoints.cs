@@ -1,8 +1,10 @@
 using DCMS.Api.Features.Authentication;
+using DCMS.Api.Features.PatientLinks;
 using DCMS.Application.Features.Prescriptions;
 
 namespace DCMS.Api.Features.Prescriptions;
 
+// docs/specs/PRESCRIPTION-MANAGEMENT.md §5
 public static class PrescriptionEndpoints
 {
     public static void MapPrescriptionEndpoints(this IEndpointRouteBuilder app)
@@ -11,9 +13,14 @@ public static class PrescriptionEndpoints
 
         var g = app.MapGroup("/api/prescriptions").RequireAuthorization().WithTags("External prescriptions");
 
-        // Medicines & Lines
-        g.MapGet("/medicine-options", async (HttpContext c, int branchId, string? q, IPrescriptionService s, CancellationToken ct) =>
+        g.MapGet("/medicine-options", async (HttpContext c, int? branchId, string? q, IPrescriptionService s, CancellationToken ct) =>
             Results.Ok(await s.OptionsAsync(Actor(c), branchId, q, ct)));
+
+        g.MapGet("/visits/{visitId:guid}/prescription", async (HttpContext c, Guid visitId, IPrescriptionService s, CancellationToken ct) =>
+            Results.Ok(await s.PrescriptionAsync(Actor(c), visitId, ct)));
+
+        g.MapPut("/visits/{visitId:guid}/prescription", async (HttpContext c, Guid visitId, SavePrescriptionAdvice command, IPrescriptionService s, CancellationToken ct) =>
+            Results.Ok(await s.SaveAdviceAsync(Actor(c), visitId, command, ct)));
 
         g.MapGet("/visits/{visitId:guid}/lines", async (HttpContext c, Guid visitId, IPrescriptionService s, CancellationToken ct) =>
             Results.Ok(await s.LinesAsync(Actor(c), visitId, ct)));
@@ -39,12 +46,14 @@ public static class PrescriptionEndpoints
         g.MapPost("/visits/{visitId:guid}/finalize", async (HttpContext c, Guid visitId, FinalizePrescriptionCommand command, IPrescriptionService s, CancellationToken ct) =>
             Results.Ok(await s.FinalizeAsync(Actor(c), visitId, command, ct)));
 
+        g.MapPost("/visits/{visitId:guid}/corrections", async (HttpContext c, Guid visitId, CreatePrescriptionCorrection command, IPrescriptionService s, CancellationToken ct) =>
+            Results.Ok(await s.CreateCorrectionAsync(Actor(c), visitId, command, ct)));
+
         g.MapGet("/visits/{visitId:guid}/print", async (HttpContext c, Guid visitId, IPrescriptionService s, CancellationToken ct) =>
             Results.Ok(await s.PrintDataAsync(Actor(c), visitId, ct)));
 
-        // Templates
-        g.MapGet("/templates", async (HttpContext c, string? search, string? diagnosis, int? page, int? pageSize, IPrescriptionService s, CancellationToken ct) =>
-            Results.Ok(await s.TemplatesAsync(Actor(c), search, diagnosis, page ?? 1, pageSize ?? 20, ct)));
+        g.MapGet("/templates", async (HttpContext c, string? search, string? diagnosis, string? status, int? page, int? pageSize, IPrescriptionService s, CancellationToken ct) =>
+            Results.Ok(await s.TemplatesAsync(Actor(c), search, diagnosis, status, page ?? 1, pageSize ?? 20, ct)));
 
         g.MapGet("/templates/{id:guid}", async (HttpContext c, Guid id, IPrescriptionService s, CancellationToken ct) =>
             Results.Ok(await s.TemplateAsync(Actor(c), id, ct)));
@@ -56,10 +65,10 @@ public static class PrescriptionEndpoints
             Results.Ok(await s.SaveTemplateAsync(Actor(c), id, command, ct)));
 
         g.MapPost("/templates/{id:guid}/state", async (HttpContext c, Guid id, TemplateStateCommand command, IPrescriptionService s, CancellationToken ct) =>
-            Results.Ok(await s.SetTemplateStateAsync(Actor(c), id, command.RequestKey, command.ExpectedVersion, command.Active, command.Reason, ct)));
+            Results.Ok(await s.SetTemplateStateAsync(Actor(c), id, command, ct)));
 
-        // Patient Self-service (Mobile Patient App)
-        var p = app.MapGroup("/api/patients/me/prescriptions").RequireAuthorization().WithTags("Patient prescriptions");
+        // Patient self-service: only finalized revisions of visits of verified linked profiles.
+        var p = app.MapGroup("/api/patients/me/prescriptions").RequireAuthorization(PatientLinkEndpoints.PublicAccountPolicy).WithTags("Patient prescriptions");
         p.MapGet("/", async (HttpContext c, IPrescriptionService s, CancellationToken ct) =>
             Results.Ok(await s.PatientPrescriptionsAsync(Actor(c), ct)));
 
@@ -67,5 +76,3 @@ public static class PrescriptionEndpoints
             Results.Ok(await s.PatientPrescriptionAsync(Actor(c), visitId, ct)));
     }
 }
-
-public sealed record TemplateStateCommand(Guid RequestKey, int ExpectedVersion, bool Active, string Reason);

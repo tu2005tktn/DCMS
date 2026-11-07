@@ -90,6 +90,18 @@ public sealed class BranchProfile
     public int Version { get; set; } = 1;
 }
 
+// Logo image stored outside Git and the web root; only verified PNG/JPEG/WebP bytes with metadata removed.
+public sealed class BranchAsset
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public int BranchId { get; set; }
+    public string ContentType { get; set; } = "";
+    public long SizeBytes { get; set; }
+    public string Sha256 { get; set; } = "";
+    public int UploadedBy { get; set; }
+    public DateTimeOffset UploadedAt { get; set; }
+}
+
 public sealed class BranchChair
 {
     public int Id { get; set; }

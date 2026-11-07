@@ -45,8 +45,6 @@ public abstract partial class SupplyCatalog<TEntity, TInput, TDto>(DcmsDbContext
         await access.RequireAsync(actorId, $"catalog.{Resource}.read", CancellationToken.None);
     }
 
-    private static bool CanManage(string resource, IList<string> roles) =>
-        SupplyCatalogPermissions.CanManage(resource, roles);
 
     protected IQueryable<TEntity> Search(string? q, string? status, string? type)
     {
@@ -144,7 +142,9 @@ public abstract partial class SupplyCatalog<TEntity, TInput, TDto>(DcmsDbContext
     private async Task<TDto> Command(int actorId, Guid key, string command, object request,
         Func<DateTimeOffset, Task<(TEntity Row, Change Change)>> apply, CancellationToken ct)
     {
-        await AuthorizeAsync(actorId);
+        // Write grants are enforced here too, not only by the route middleware (docs/specs/S58-BRANCHES-AND-CHAIRS.md §2.2).
+        var action = command.Split(':')[^1] switch { "create" => "create", "update" => "update", _ => "deactivate" };
+        await access.RequireAsync(actorId, $"catalog.{Resource}.{action}", ct);
         if (key == Guid.Empty) throw Error("MSG04", label: "Mã yêu cầu", field: "requestKey");
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         await db.Database.ExecuteSqlRawAsync("SELECT pg_advisory_xact_lock(6462362060)", ct);

@@ -69,6 +69,39 @@ Tài liệu liên quan: [S58-SYSTEM-SETTINGS.vi.md](S58-SYSTEM-SETTINGS.vi.md), 
   - Trả HTTP `503` với mã lỗi `MSG144`.
 - Mọi thao tác cập nhật chi nhánh/ghế đều ghi `expectedVersion`, `requestKey`, đồng thời lưu vào `SettingsAudit` và `CommandReceipt` trong cùng một transaction.
 
+### 1.5. Quy tắc triển khai (bản 07/11/2026)
+
+**Lưu trữ & khóa chính**
+- `BRANCH_PROFILE.Id` = `SCHEDULING_BRANCH.Id` (khóa chung, FK, không tự sinh). `BRANCH_CHAIR.Id` = `SCHEDULING_CHAIR.Id` (khóa chung, FK). Bảng `SCHEDULING_*` vẫn là nguồn cho lịch/đặt hẹn; profile giữ thông tin hành chính, mã, logo, tài khoản ngân hàng và `Version`.
+- Tạo chi nhánh: tạo `SCHEDULING_BRANCH` trước rồi tạo profile cùng Id trong cùng transaction. Tạo ghế tương tự với `SCHEDULING_CHAIR`.
+- Chi nhánh/ghế cũ chưa có profile hiển thị `Version = 1`, mã sinh `BR-{id:00}` / `CHAIR-{id:00}`; lần lưu đầu tiên (expectedVersion = 1) tạo profile với `Version = 2`.
+- Migration `20261107050902_PrescriptionsAndBranchProfiles` tạo `BRANCH_PROFILE`, `BRANCH_CHAIR`, `BRANCH_ASSET` (không seed; dữ liệu cũ dùng giá trị sinh như trên).
+
+**Validation (400 MSG02/MSG04, có `field`)**
+- `code` 1–40 ký tự `[A-Za-z0-9_-]`, `name` 1–160, `address` ≤1000, `phone` ≤20, `email` ≤254 đúng định dạng, `website` ≤255 http/https, `timeZoneId` phải là IANA timezone hợp lệ, `bankCode` ≤20, `accountNumber` ≤50 chỉ chữ số, `payeeName` ≤160. Ba trường ngân hàng nhập đủ cả ba hoặc để trống cả ba.
+- Ghế: `openMinute`/`closeMinute` trong 0–1440, bội số 15, mở < đóng. Mã ghế unique trong chi nhánh cả khi tạo và khi đổi mã (`409 MSG201`). Chi nhánh ngừng hoạt động không nhận ghế mới (`409 MSG205`).
+- `logoAssetId` phải là asset đã upload cho đúng chi nhánh đó (`404 MSG113` nếu không).
+
+**Kiểm tra tác động (blockers)**
+- Chi nhánh — kiểm trong cùng transaction với lệnh đổi trạng thái (sau khóa advisory):
+  1. Lịch hẹn tương lai còn hiệu lực: `StartAt >= now` và trạng thái không thuộc `Cancelled | NoShow | Withdrawn` → `Appointments`.
+  2. Lượt khám chưa đóng: `Queued | InProgress` → `Visits`.
+  3. Giữ chỗ tài nguyên `Confirmed` chưa kết thúc (`End > now`) → `Reservations`.
+  4. Tài chính: phiếu thu `Pending` và khoản phí còn số dư chưa phân bổ từ phiếu thu `Posted` → `Finance`.
+  5. Tồn kho: hiện tồn kho vật tư là toàn hệ thống (không có cột `BranchId` trên `MATERIAL_PURCHASE`) nên không có nghĩa vụ tồn kho theo chi nhánh; bước này không phát sinh blocker cho đến khi có kho theo chi nhánh.
+  6. Labo: qua port `IBranchLabObligationPort`. Bản hiện tại chưa có module phiếu Labo nên adapter trả `Available = false` → lệnh ngừng chi nhánh trả **`503 MSG144`** và không đổi dữ liệu (đúng quy tắc "module phụ thuộc chưa có adapter").
+- Ghế: lịch hẹn tương lai còn hiệu lực trên ghế, lượt khám chưa đóng đang dùng ghế (theo lịch hẹn nguồn), giữ chỗ `Confirmed` chưa kết thúc.
+- Kích hoạt lại (Restore) không có blocker, nhưng khôi phục ghế khi chi nhánh đang ngừng → `409 MSG205`.
+- Có blocker → `409` với body `{ code: "MSG205", message, blockers: [{ kind, message, count, navigationUrl }] }`. `state-preview` trả `200 { allowed, blockers, impact }` cho cùng dữ liệu. Không tự hủy/dời lịch.
+
+**Upload logo**
+- Lưu dưới thư mục cấu hình `BranchAssets:StoragePath` (đường dẫn tuyệt đối, ngoài repository Git; thiếu/sai → `503 MSG144`), tên tệp là `assetId` không có phần mở rộng do người dùng gửi.
+- Kiểm tra: kích thước 1 byte–2 MiB, magic bytes PNG/JPEG/WebP, khai báo `Content-Type` phải khớp loại thực tế; mọi định dạng khác (SVG, HTML, script...) → `400 MSG04`.
+- Strip metadata trước khi lưu: PNG bỏ chunk `tEXt/zTXt/iTXt/eXIf/tIME`; JPEG bỏ segment `APP1–APP15` và `COM`; WebP bỏ chunk `EXIF`/`XMP ` và xóa cờ tương ứng trong `VP8X`. Tệp hỏng cấu trúc → `400 MSG04`.
+- Ghi bản ghi `BRANCH_ASSET { Id, BranchId, ContentType, SizeBytes, Sha256, UploadedBy, UploadedAt }` + `SettingsAudit` (`LogoUpload`). Trả `{ assetId, fileName, sizeBytes, contentType }`.
+- Đọc logo: `GET /api/settings/branches/{id}/logo/{assetId}` (`branches.read`) trả ảnh với `Content-Type` đã kiểm, `X-Content-Type-Options: nosniff`, `Cache-Control: private`. Web tải bằng request có token rồi hiển thị qua object URL (không đặt token vào URL).
+- Bản in đơn thuốc nhận logo dạng `data:` URL trong DTO in (đọc server-side từ asset đã kiểm), để bác sĩ chỉ có `prescriptions.read` và bệnh nhân trên app vẫn thấy logo mà không cần quyền thiết lập.
+
 ---
 
 ## 2. DCMS-120: Giao diện Thiết lập hệ thống 11 nhóm & Deep link (`/settings`)

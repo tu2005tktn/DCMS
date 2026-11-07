@@ -19,6 +19,7 @@ public sealed record PrescriptionMedicineOption(
 
 public sealed record PrescriptionLineDto(
     Guid Id,
+    Guid PrescriptionId,
     Guid VisitId,
     int PatientId,
     int BranchId,
@@ -44,6 +45,39 @@ public sealed record PrescriptionLineDto(
     DateTimeOffset? FinalizedAt,
     int Version);
 
+public sealed record PrescriptionDto(
+    Guid Id,
+    Guid VisitId,
+    int PatientId,
+    int BranchId,
+    int PrescribedByDoctorId,
+    string? DoctorName,
+    int Revision,
+    string Status,
+    string GeneralAdvice,
+    string? Diagnosis,
+    string? CorrectionReason,
+    Guid? SupersedesId,
+    DateTimeOffset? FinalizedAt,
+    string? FinalizedByName,
+    string? VerificationCode,
+    int Version,
+    PrescriptionLineDto[] Lines);
+
+public sealed record PrescriptionSummaryDto(
+    Guid Id,
+    int Revision,
+    string Status,
+    string? DoctorName,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset? FinalizedAt,
+    string? CorrectionReason,
+    int LineCount);
+
+public sealed record VisitPrescriptionDto(PrescriptionDto? Current, PrescriptionSummaryDto[] History);
+
+public sealed record ApplyTemplateResult(PrescriptionDto Prescription, int SkippedLines);
+
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record SavePrescriptionLine(
     Guid RequestKey,
@@ -59,17 +93,23 @@ public sealed record SavePrescriptionLine(
     int? Days,
     string? Instructions);
 
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record SavePrescriptionAdvice(Guid RequestKey, int ExpectedVersion, string? GeneralAdvice);
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record CreatePrescriptionCorrection(Guid RequestKey, int ExpectedVersion, string Reason);
+
 public sealed record TemplateLineInput(
     Guid MedicineId,
-    string Route,
-    string MorningDose,
-    string NoonDose,
-    string AfternoonDose,
-    string EveningDose,
-    string MealTiming,
+    string? Route,
+    string? MorningDose,
+    string? NoonDose,
+    string? AfternoonDose,
+    string? EveningDose,
+    string? MealTiming,
     int Days,
     int Quantity,
-    string Instructions,
+    string? Instructions,
     int SortOrder);
 
 public sealed record PrescriptionTemplateLineDto(
@@ -118,6 +158,9 @@ public sealed record SavePrescriptionTemplate(
     TemplateLineInput[] Lines);
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record TemplateStateCommand(Guid RequestKey, int ExpectedVersion, bool Active, string? Reason);
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record ApplyPrescriptionTemplateCommand(
     Guid RequestKey,
     int ExpectedVersion,
@@ -142,18 +185,21 @@ public sealed record PrescriptionPrintItem(
     string? Strength,
     string? DosageForm,
     int Quantity,
+    string QuantityInWords,
     string Unit,
     string Route,
     string DosageInstruction,
-    string FullInstruction);
+    string Instructions);
 
 public sealed record PrescriptionPrintDto(
+    Guid PrescriptionId,
     Guid VisitId,
-    string ClinicName,
+    int Revision,
+    bool IsDraft,
     string BranchName,
-    string BranchAddress,
-    string BranchPhone,
-    string? LogoUrl,
+    string? BranchAddress,
+    string? BranchPhone,
+    string? LogoDataUrl,
     string DoctorName,
     string? DoctorLicenseNumber,
     string PatientCode,
@@ -165,7 +211,8 @@ public sealed record PrescriptionPrintDto(
     DateTimeOffset PrescribedAt,
     PrescriptionPrintItem[] Items,
     string GeneralAdvice,
-    string VerificationQrData);
+    string? VerificationCode,
+    string? VerificationQrData);
 
 public sealed record PatientPrescriptionMedicineDto(
     string MedicineName,
@@ -184,30 +231,38 @@ public sealed record PatientPrescriptionMedicineDto(
 
 public sealed record PatientPrescriptionDto(
     Guid VisitId,
+    Guid PrescriptionId,
+    int Revision,
+    bool IsCorrection,
     string BranchName,
     string DoctorName,
     string Diagnosis,
     DateTimeOffset PrescribedAt,
-    string Status,
     string GeneralAdvice,
+    string ExternalPurchaseNotice,
     PatientPrescriptionMedicineDto[] Medicines);
+
+public sealed record PatientPrescriptionDetailDto(PatientPrescriptionDto Prescription, PrescriptionPrintDto Print);
 
 public interface IPrescriptionService
 {
-    Task<PrescriptionMedicineOption[]> OptionsAsync(int actor, int branchId, string? search, CancellationToken ct);
+    Task<PrescriptionMedicineOption[]> OptionsAsync(int actor, int? branchId, string? search, CancellationToken ct);
+    Task<VisitPrescriptionDto> PrescriptionAsync(int actor, Guid visitId, CancellationToken ct);
     Task<PrescriptionLineDto[]> LinesAsync(int actor, Guid visitId, CancellationToken ct);
     Task<ClinicalAllergyWarning[]> CheckSafetyAsync(int actor, Guid visitId, CancellationToken ct);
     Task<PrescriptionLineDto> SaveLineAsync(int actor, Guid visitId, Guid? lineId, SavePrescriptionLine command, CancellationToken ct);
     Task DeleteLineAsync(int actor, Guid visitId, Guid lineId, Guid requestKey, int expectedVersion, CancellationToken ct);
-    Task<PrescriptionLineDto[]> ApplyTemplateAsync(int actor, Guid visitId, ApplyPrescriptionTemplateCommand command, CancellationToken ct);
-    Task<PrescriptionLineDto[]> FinalizeAsync(int actor, Guid visitId, FinalizePrescriptionCommand command, CancellationToken ct);
+    Task<PrescriptionDto> SaveAdviceAsync(int actor, Guid visitId, SavePrescriptionAdvice command, CancellationToken ct);
+    Task<ApplyTemplateResult> ApplyTemplateAsync(int actor, Guid visitId, ApplyPrescriptionTemplateCommand command, CancellationToken ct);
+    Task<PrescriptionDto> FinalizeAsync(int actor, Guid visitId, FinalizePrescriptionCommand command, CancellationToken ct);
+    Task<PrescriptionDto> CreateCorrectionAsync(int actor, Guid visitId, CreatePrescriptionCorrection command, CancellationToken ct);
     Task<PrescriptionPrintDto> PrintDataAsync(int actor, Guid visitId, CancellationToken ct);
 
-    Task<PrescriptionTemplateDto[]> TemplatesAsync(int actor, string? search, string? diagnosis, int page, int pageSize, CancellationToken ct);
+    Task<PrescriptionTemplateDto[]> TemplatesAsync(int actor, string? search, string? diagnosis, string? status, int page, int pageSize, CancellationToken ct);
     Task<PrescriptionTemplateDto> TemplateAsync(int actor, Guid id, CancellationToken ct);
     Task<PrescriptionTemplateDto> SaveTemplateAsync(int actor, Guid? id, SavePrescriptionTemplate command, CancellationToken ct);
-    Task<PrescriptionTemplateDto> SetTemplateStateAsync(int actor, Guid id, Guid requestKey, int expectedVersion, bool active, string reason, CancellationToken ct);
+    Task<PrescriptionTemplateDto> SetTemplateStateAsync(int actor, Guid id, TemplateStateCommand command, CancellationToken ct);
 
     Task<PatientPrescriptionDto[]> PatientPrescriptionsAsync(int actor, CancellationToken ct);
-    Task<PatientPrescriptionDto> PatientPrescriptionAsync(int actor, Guid visitId, CancellationToken ct);
+    Task<PatientPrescriptionDetailDto> PatientPrescriptionAsync(int actor, Guid visitId, CancellationToken ct);
 }

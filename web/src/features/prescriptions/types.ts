@@ -14,8 +14,11 @@ export type MedicineOption = {
   referencePrice?: number;
 };
 
+export type PrescriptionStatus = 'Draft' | 'Finalized' | 'Superseded';
+
 export type PrescriptionLine = {
   id: string;
+  prescriptionId: string;
   visitId: string;
   patientId: number;
   branchId: number;
@@ -37,10 +40,45 @@ export type PrescriptionLine = {
   days: number;
   quantity: number;
   instructions: string;
-  status: 'Draft' | 'Finalized';
+  status: PrescriptionStatus;
   finalizedAt?: string;
   version: number;
 };
+
+export type Prescription = {
+  id: string;
+  visitId: string;
+  patientId: number;
+  branchId: number;
+  prescribedByDoctorId: number;
+  doctorName?: string;
+  revision: number;
+  status: PrescriptionStatus;
+  generalAdvice: string;
+  diagnosis?: string;
+  correctionReason?: string;
+  supersedesId?: string;
+  finalizedAt?: string;
+  finalizedByName?: string;
+  verificationCode?: string;
+  version: number;
+  lines: PrescriptionLine[];
+};
+
+export type PrescriptionSummary = {
+  id: string;
+  revision: number;
+  status: PrescriptionStatus;
+  doctorName?: string;
+  createdAt: string;
+  finalizedAt?: string;
+  correctionReason?: string;
+  lineCount: number;
+};
+
+export type VisitPrescription = { current: Prescription | null; history: PrescriptionSummary[] };
+
+export type ApplyTemplateResult = { prescription: Prescription; skippedLines: number };
 
 export type PrescriptionTemplateLine = {
   id: string;
@@ -89,19 +127,22 @@ export type PrescriptionPrintItem = {
   strength?: string;
   dosageForm?: string;
   quantity: number;
+  quantityInWords: string;
   unit: string;
   route: string;
   dosageInstruction: string;
-  fullInstruction: string;
+  instructions: string;
 };
 
 export type PrescriptionPrintDto = {
+  prescriptionId: string;
   visitId: string;
-  clinicName: string;
+  revision: number;
+  isDraft: boolean;
   branchName: string;
-  branchAddress: string;
-  branchPhone: string;
-  logoUrl?: string;
+  branchAddress?: string;
+  branchPhone?: string;
+  logoDataUrl?: string;
   doctorName: string;
   doctorLicenseNumber?: string;
   patientCode: string;
@@ -113,5 +154,16 @@ export type PrescriptionPrintDto = {
   prescribedAt: string;
   items: PrescriptionPrintItem[];
   generalAdvice: string;
-  verificationQrData: string;
+  verificationCode?: string;
+  verificationQrData?: string;
 };
+
+export const mealLabel = (value: string) => (value === 'BeforeMeal' ? 'Trước ăn' : value === 'WithMeal' ? 'Trong bữa ăn' : 'Sau ăn');
+
+export const doseSummary = (x: { morningDose: string; noonDose: string; afternoonDose: string; eveningDose: string }) =>
+  [
+    x.morningDose !== '0' ? `Sáng ${x.morningDose}` : null,
+    x.noonDose !== '0' ? `Trưa ${x.noonDose}` : null,
+    x.afternoonDose !== '0' ? `Chiều ${x.afternoonDose}` : null,
+    x.eveningDose !== '0' ? `Tối ${x.eveningDose}` : null,
+  ].filter(Boolean).join(', ') || 'Theo chỉ dẫn';

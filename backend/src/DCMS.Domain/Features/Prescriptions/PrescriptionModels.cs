@@ -1,8 +1,49 @@
 namespace DCMS.Domain.Features.Prescriptions;
 
+public static class PrescriptionStatuses
+{
+    public const string Draft = "Draft";
+    public const string Finalized = "Finalized";
+    public const string Superseded = "Superseded";
+}
+
+public static class PrescriptionRules
+{
+    public static readonly string[] MealTimings = ["BeforeMeal", "AfterMeal", "WithMeal"];
+    public const int MaxQuantity = 10_000;
+    public const int MaxDays = 365;
+    public const int MaxDoseLength = 20;
+    public const int MaxTemplateLines = 30;
+}
+
+// One signed (or draft) revision of the external prescription of a visit; finalized revisions are immutable.
+public sealed class ExternalPrescription
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid VisitId { get; set; }
+    public int PatientId { get; set; }
+    public int BranchId { get; set; }
+    public int PrescribedByDoctorId { get; set; }
+    public int Revision { get; set; } = 1;
+    public string Status { get; set; } = PrescriptionStatuses.Draft;
+    public string GeneralAdvice { get; set; } = "";
+    public string? Diagnosis { get; set; }
+    public string? CorrectionReason { get; set; }
+    public Guid? SupersedesId { get; set; }
+    public DateTimeOffset? FinalizedAt { get; set; }
+    public int? FinalizedBy { get; set; }
+    public string? VerificationCode { get; set; }
+    public int Version { get; set; } = 1;
+    public int CreatedBy { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+    public int UpdatedBy { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; }
+}
+
 public sealed class ExternalPrescriptionLine
 {
     public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid PrescriptionId { get; set; }
     public Guid VisitId { get; set; }
     public int PatientId { get; set; }
     public int BranchId { get; set; }
@@ -78,7 +119,7 @@ public sealed class PrescriptionAudit
     public int BranchId { get; set; }
     public Guid? VisitId { get; set; }
     public Guid? TemplateId { get; set; }
-    public string Action { get; set; } = ""; // LineCreate, LineUpdate, LineDelete, TemplateApply, Finalize, TemplateCreate, TemplateUpdate, TemplateState
+    public string Action { get; set; } = ""; // LineCreate, LineUpdate, LineDelete, TemplateApply, AdviceUpdate, Finalize, CorrectionCreate, TemplateCreate, TemplateUpdate, TemplateState
     public string Reason { get; set; } = "";
     public string BeforeJson { get; set; } = "{}";
     public string AfterJson { get; set; } = "{}";

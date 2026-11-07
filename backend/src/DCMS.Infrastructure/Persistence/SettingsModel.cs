@@ -1,3 +1,4 @@
+using DCMS.Domain.Features.Scheduling;
 using DCMS.Domain.Features.Settings;
 using DCMS.Infrastructure.Features.Accounts;
 using Microsoft.EntityFrameworkCore;
@@ -47,6 +48,8 @@ public static class SettingsModel
         model.Entity<BranchProfile>(b => {
             b.ToTable("BRANCH_PROFILE");
             b.HasKey(x => x.Id);
+            b.Property(x => x.Id).ValueGeneratedNever();
+            b.HasOne<SchedulingBranch>().WithOne().HasForeignKey<BranchProfile>(x => x.Id).OnDelete(DeleteBehavior.Restrict);
             b.Property(x => x.Code).HasMaxLength(40);
             b.HasIndex(x => x.Code).IsUnique();
             b.Property(x => x.Name).HasMaxLength(160);
@@ -63,10 +66,22 @@ public static class SettingsModel
         model.Entity<BranchChair>(b => {
             b.ToTable("BRANCH_CHAIR");
             b.HasKey(x => x.Id);
+            b.Property(x => x.Id).ValueGeneratedNever();
             b.Property(x => x.Code).HasMaxLength(40);
             b.Property(x => x.Name).HasMaxLength(160);
             b.Property(x => x.Version).IsConcurrencyToken();
             b.HasIndex(x => new { x.BranchId, x.Code }).IsUnique();
+            b.HasOne<SchedulingChair>().WithOne().HasForeignKey<BranchChair>(x => x.Id).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<SchedulingBranch>().WithMany().HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Restrict);
+        });
+        model.Entity<BranchAsset>(b => {
+            b.ToTable("BRANCH_ASSET");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.ContentType).HasMaxLength(40);
+            b.Property(x => x.Sha256).HasMaxLength(64);
+            b.HasIndex(x => x.BranchId);
+            b.HasOne<SchedulingBranch>().WithMany().HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.UploadedBy).OnDelete(DeleteBehavior.Restrict);
         });
     }
 }

@@ -250,10 +250,14 @@ export default function MedicalRecordsScreen() {
         </Text>
       </Card>
 
+      <Card title="Đơn thuốc">
+        <Text style={styles.muted}>Đơn thuốc mua ngoài bác sĩ đã hoàn tất, kèm liều dùng và lời dặn.</Text>
+        <Button title="Xem đơn thuốc" variant="secondary" onPress={() => router.push('/(account)/prescriptions')} />
+      </Card>
+
       <Card title="Nguồn chưa kết nối">
         <Text style={styles.muted}>
           • Kết quả/chẩn đoán lâm sàng (DCMS-93/96/99){'\n'}
-          • Đơn thuốc & dặn dò đã duyệt (DCMS-103){'\n'}
           • Ảnh/tài liệu ở trạng thái Ready (S20 / DCMS-95){'\n'}
           • Lịch sử phiên bản, đồng bộ chi tiết và hóa đơn (DCMS-95 / S42)
         </Text>

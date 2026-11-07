@@ -1,7 +1,7 @@
-import { Alert, Button, Empty, Modal, Select, Space, Spin, Table, Tag, Typography } from 'antd';
+import { Alert, Button, Empty, Input, Modal, Select, Spin, Table, Tag, Typography } from 'antd';
 import { useEffect, useState } from 'react';
 import { api } from '../../services/api';
-import type { PrescriptionTemplate } from './types';
+import { doseSummary, mealLabel, type PrescriptionTemplate } from './types';
 
 export default function PrescriptionTemplateModal({
   open,
@@ -18,18 +18,25 @@ export default function PrescriptionTemplateModal({
   const [selectedId, setSelectedId] = useState<string>();
   const [applying, setApplying] = useState(false);
 
+  const [search, setSearch] = useState('');
+
   useEffect(() => {
     if (!open) return;
+    let active = true;
     setLoading(true);
     setError(undefined);
-    api<PrescriptionTemplate[]>('/api/prescriptions/templates')
-      .then(rows => {
-        setTemplates(rows);
-        if (rows.length > 0 && !selectedId) setSelectedId(rows[0].id);
-      })
-      .catch((e: Error) => setError(e.message))
-      .finally(() => setLoading(false));
-  }, [open]);
+    const timer = window.setTimeout(() => {
+      api<PrescriptionTemplate[]>(`/api/prescriptions/templates?${new URLSearchParams({ search: search.trim(), status: 'Active', pageSize: '100' })}`)
+        .then(rows => {
+          if (!active) return;
+          setTemplates(rows);
+          setSelectedId(current => (current && rows.some(r => r.id === current) ? current : rows[0]?.id));
+        })
+        .catch((e: Error) => { if (active) setError(e.message); })
+        .finally(() => { if (active) setLoading(false); });
+    }, 250);
+    return () => { active = false; window.clearTimeout(timer); };
+  }, [open, search]);
 
   const selectedTemplate = templates.find(t => t.id === selectedId);
 
@@ -72,6 +79,15 @@ export default function PrescriptionTemplateModal({
       </Typography.Paragraph>
 
       {error && <Alert type="error" showIcon message={error} style={{ marginBottom: 12 }} />}
+
+      <Input.Search
+        allowClear
+        maxLength={100}
+        placeholder="Tìm theo mã hoặc tên mẫu..."
+        value={search}
+        onChange={e => setSearch(e.target.value)}
+        style={{ marginBottom: 12 }}
+      />
 
       {loading ? (
         <div style={{ textAlign: 'center', padding: 30 }}><Spin /></div>
@@ -124,16 +140,9 @@ export default function PrescriptionTemplateModal({
                     title: 'Liều dùng / ngày',
                     render: (_, r) => (
                       <div>
-                        {[
-                          r.morningDose !== '0' ? `Sáng ${r.morningDose}` : null,
-                          r.noonDose !== '0' ? `Trưa ${r.noonDose}` : null,
-                          r.afternoonDose !== '0' ? `Chiều ${r.afternoonDose}` : null,
-                          r.eveningDose !== '0' ? `Tối ${r.eveningDose}` : null,
-                        ].filter(Boolean).join(', ') || 'Theo chỉ dẫn'}
+                        {doseSummary(r)}
                         <div>
-                          <Tag color="cyan">
-                            {r.mealTiming === 'BeforeMeal' ? 'Trước ăn' : r.mealTiming === 'WithMeal' ? 'Trong ăn' : 'Sau ăn'}
-                          </Tag>
+                          <Tag color="cyan">{mealLabel(r.mealTiming)}</Tag>
                           <Tag>{r.days} ngày</Tag>
                         </div>
                       </div>
@@ -154,7 +163,7 @@ export default function PrescriptionTemplateModal({
               />
             </div>
           ) : (
-            <Empty description="Chưa có mẫu đơn thuốc nào được chọn." />
+            <Empty description={templates.length ? 'Chọn một mẫu đơn thuốc.' : 'Không có mẫu đơn thuốc đang dùng phù hợp.'} />
           )}
         </>
       )}

@@ -61,11 +61,19 @@ public static class SettingsEndpoints
 
             branchGroup.MapPost("/{id:int}/logo", async (HttpContext c, int id, IFormFile file, IBranchManagementService s, CancellationToken ct) =>
             {
-                if (file == null || file.Length == 0) return Results.BadRequest(new { code = "MSG02", message = "Thiếu tệp hình ảnh logo." });
+                if (file == null || file.Length == 0) return Results.BadRequest(DCMS.Application.Common.SystemMessages.Get("MSG02", "Tệp logo") with { Field = "file" });
                 await using var stream = file.OpenReadStream();
                 var result = await s.UploadLogoAsync(Actor(c), id, stream, file.FileName, file.ContentType, file.Length, ct);
                 return Results.Ok(result);
             }).DisableAntiforgery();
+
+            branchGroup.MapGet("/{id:int}/logo/{assetId:guid}", async (HttpContext c, int id, Guid assetId, IBranchManagementService s, CancellationToken ct) =>
+            {
+                var logo = await s.LogoAsync(Actor(c), id, assetId, ct);
+                c.Response.Headers.XContentTypeOptions = "nosniff";
+                c.Response.Headers.CacheControl = "private, max-age=300";
+                return Results.File(logo.Bytes, logo.ContentType);
+            });
 
             // Chairs
             branchGroup.MapGet("/{id:int}/chairs", async (HttpContext c, int id, IBranchManagementService s, CancellationToken ct) =>

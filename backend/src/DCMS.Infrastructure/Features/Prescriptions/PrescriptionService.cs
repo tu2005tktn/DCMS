@@ -1,9 +1,12 @@
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using DCMS.Application.Common;
+using DCMS.Application.Features.Examinations;
 using DCMS.Application.Features.Prescriptions;
 using DCMS.Application.Features.Settings;
+using DCMS.Domain.Features.Accounts;
 using DCMS.Domain.Features.Examinations;
 using DCMS.Domain.Features.PatientLinks;
 using DCMS.Domain.Features.Patients;
@@ -13,17 +16,59 @@ using DCMS.Domain.Features.Settings;
 using DCMS.Domain.Features.SystemSettings;
 using DCMS.Domain.Features.Visits;
 using DCMS.Infrastructure.Features.Accounts;
+using DCMS.Infrastructure.Features.Examinations;
+using DCMS.Infrastructure.Features.Settings;
 using DCMS.Infrastructure.Features.SystemSettings;
 using DCMS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
-using static DCMS.Infrastructure.Features.Settings.SettingsAccess;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace DCMS.Infrastructure.Features.Prescriptions;
 
-public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access, TimeProvider clock) : IPrescriptionService
+// docs/specs/PRESCRIPTION-MANAGEMENT.md: external (buy-outside) prescriptions with immutable signed revisions.
+public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access, BranchAssetStore assets, TimeProvider clock) : IPrescriptionService
 {
-    private static PrescriptionLineDto LineDto(ExternalPrescriptionLine x, string? doctorName = null) => new(
-        x.Id, x.VisitId, x.PatientId, x.BranchId, x.PrescribedByDoctorId, doctorName,
+    private const string Lock = "SELECT pg_advisory_xact_lock(6462362088)";
+    private const string ExternalPurchaseNotice = "Đơn thuốc mua ngoài tại hiệu thuốc. Phòng khám không bán thuốc tại chỗ.";
+    private static readonly JsonSerializerOptions Json = ClinicSettingsStore.Json;
+
+    private static BusinessException Fail(string code, int status = 400, string? field = null, string label = "Thông tin", int? currentVersion = null) =>
+        new(status, SystemMessages.Get(code, label) with { Field = field, CurrentVersion = currentVersion });
+
+    private static string Hash(object payload) => Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(payload, Json)));
+
+    private async Task<IDbContextTransaction> BeginAsync(CancellationToken ct)
+    {
+        var tx = await db.Database.BeginTransactionAsync(ct);
+        await db.Database.ExecuteSqlRawAsync(Lock, ct);
+        return tx;
+    }
+
+    private async Task<(bool Found, T? Result)> ReplayAsync<T>(int actor, Guid key, string hash, CancellationToken ct)
+    {
+        var prior = await db.Set<PrescriptionCommandReceipt>().AsNoTracking()
+            .SingleOrDefaultAsync(x => x.ActorId == actor && x.RequestKey == key, ct);
+        if (prior == null) return (false, default);
+        if (prior.Fingerprint != hash) throw Fail("MSG111", 409);
+        return (true, JsonSerializer.Deserialize<T>(prior.ResultJson, Json));
+    }
+
+    private void Record(int actor, Visit? visit, Guid? templateId, string action, string reason, string before, object after, Guid key, string hash, object result)
+    {
+        var now = clock.GetUtcNow();
+        db.Add(new PrescriptionAudit
+        {
+            ActorId = actor, BranchId = visit?.BranchId ?? 0, VisitId = visit?.Id, TemplateId = templateId,
+            Action = action, Reason = reason.Length > 500 ? reason[..500] : reason,
+            BeforeJson = before, AfterJson = JsonSerializer.Serialize(after, Json), At = now
+        });
+        db.Add(new PrescriptionCommandReceipt { ActorId = actor, RequestKey = key, Fingerprint = hash, ResultJson = JsonSerializer.Serialize(result, Json) });
+    }
+
+    // ---------- mapping ----------
+
+    private static PrescriptionLineDto LineDto(ExternalPrescriptionLine x, string? doctorName) => new(
+        x.Id, x.PrescriptionId, x.VisitId, x.PatientId, x.BranchId, x.PrescribedByDoctorId, doctorName,
         x.MedicineId, x.MedicineCode, x.MedicineName, x.ActiveIngredient, x.Strength,
         x.DosageForm, x.Unit, x.Route, x.MorningDose, x.NoonDose, x.AfternoonDose, x.EveningDose,
         x.MealTiming, x.Days, x.Quantity, x.Instructions, x.Status, x.FinalizedAt, x.Version);
@@ -38,135 +83,96 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
         x.CreatedBy, x.CreatedAt, x.UpdatedBy, x.UpdatedAt,
         x.Lines.OrderBy(l => l.SortOrder).Select(TemplateLineDto).ToArray());
 
-    private async Task<Visit> Visit(int actor, Guid id, CancellationToken ct, string permission = "prescriptions.read")
+    private async Task<Dictionary<int, string>> NamesAsync(IEnumerable<int> ids, CancellationToken ct)
     {
-        var visit = await db.Set<Visit>().SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw Error("MSG113", 404);
-        await access.OperationalAsync(actor, permission, visit.BranchId, ct);
+        var set = ids.Distinct().ToArray();
+        return await db.Set<ApplicationUser>().AsNoTracking().Where(u => set.Contains(u.Id)).ToDictionaryAsync(u => u.Id, u => u.FullName, ct);
+    }
+
+    private async Task<PrescriptionDto> DtoAsync(ExternalPrescription rx, IEnumerable<ExternalPrescriptionLine> lines, CancellationToken ct)
+    {
+        var rows = lines.OrderBy(x => x.CreatedAt).ThenBy(x => x.Id).ToArray();
+        var names = await NamesAsync(rows.Select(x => x.PrescribedByDoctorId).Append(rx.PrescribedByDoctorId)
+            .Concat(rx.FinalizedBy.HasValue ? new[] { rx.FinalizedBy.Value } : Array.Empty<int>()), ct);
+        return new PrescriptionDto(rx.Id, rx.VisitId, rx.PatientId, rx.BranchId, rx.PrescribedByDoctorId,
+            names.GetValueOrDefault(rx.PrescribedByDoctorId), rx.Revision, rx.Status, rx.GeneralAdvice, rx.Diagnosis,
+            rx.CorrectionReason, rx.SupersedesId, rx.FinalizedAt, rx.FinalizedBy is { } by ? names.GetValueOrDefault(by) : null,
+            rx.VerificationCode, rx.Version, rows.Select(l => LineDto(l, names.GetValueOrDefault(l.PrescribedByDoctorId))).ToArray());
+    }
+
+    // ---------- access & state guards ----------
+
+    private async Task<Visit> ReadableVisitAsync(int actor, Guid id, CancellationToken ct)
+    {
+        var visit = await db.Set<Visit>().AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw Fail("MSG113", 404);
+        await access.OperationalAsync(actor, "prescriptions.read", visit.BranchId, ct);
         return visit;
     }
 
-    public async Task<PrescriptionMedicineOption[]> OptionsAsync(int actor, int branchId, string? search, CancellationToken ct)
+    // Writes need the grant, the visit's branch scope and a prescriber (Dentist) role; the UI is never trusted.
+    private async Task<Visit> WritableVisitAsync(int actor, Guid id, CancellationToken ct)
     {
-        await access.OperationalAsync(actor, "prescriptions.manage", branchId, ct);
-        if (search?.Length > 100) throw Error("MSG04");
-        var q = search?.Trim().ToUpperInvariant() ?? "";
-        return await db.Set<CatalogMedicine>().AsNoTracking()
-            .Where(x => x.IsActive && x.PrescriptionEligible &&
-                (q == "" || x.NormalizedName.Contains(q) || x.Code.Contains(q) || (x.ActiveIngredient != null && x.ActiveIngredient.ToUpper().Contains(q))))
-            .OrderBy(x => x.NormalizedName).Take(50)
-            .Select(x => new PrescriptionMedicineOption(
-                x.Id, x.Code, x.Name, x.ActiveIngredient, x.Strength, x.DosageForm,
-                x.BaseUnit, x.Route, x.Packaging, x.Contraindications, x.AllergyWarnings,
-                x.Instructions, x.ReferencePrice))
-            .ToArrayAsync(ct);
+        var visit = await db.Set<Visit>().AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw Fail("MSG113", 404);
+        var state = await access.ResolveAsync(actor, ct);
+        if (!state.Permissions.Contains("prescriptions.manage") || !state.BranchIds.Contains(visit.BranchId) || !state.Roles.Contains(AccountRoles.Dentist))
+            throw Fail("MSG06", 403);
+        return visit;
     }
 
-    public async Task<PrescriptionLineDto[]> LinesAsync(int actor, Guid visitId, CancellationToken ct)
+    private static void EnsureEditable(Visit visit, ExternalPrescription? rx)
     {
-        await Visit(actor, visitId, ct);
-        var lines = await db.Set<ExternalPrescriptionLine>().AsNoTracking()
-            .Where(x => x.VisitId == visitId).OrderBy(x => x.CreatedAt).ToArrayAsync(ct);
-        var doctorIds = lines.Select(x => x.PrescribedByDoctorId).Distinct().ToArray();
-        var doctors = await db.Set<ApplicationUser>().AsNoTracking()
-            .Where(u => doctorIds.Contains(u.Id)).ToDictionaryAsync(u => u.Id, u => u.FullName, ct);
-
-        return lines.Select(l => LineDto(l, doctors.GetValueOrDefault(l.PrescribedByDoctorId))).ToArray();
+        if (rx != null && rx.Status != PrescriptionStatuses.Draft) throw Fail("MSG205", 409, "status", "Đơn thuốc");
+        var revision = rx?.Revision ?? 1;
+        var visitOpen = visit.Status == VisitStatuses.InProgress || (revision > 1 && visit.Status == VisitStatuses.Completed);
+        if (!visitOpen) throw Fail("MSG205", 409, "visit", "Lượt khám");
     }
 
-    public async Task<ClinicalAllergyWarning[]> CheckSafetyAsync(int actor, Guid visitId, CancellationToken ct)
+    private Task<ExternalPrescription?> CurrentAsync(Guid visitId, CancellationToken ct) =>
+        db.Set<ExternalPrescription>().Where(x => x.VisitId == visitId).OrderByDescending(x => x.Revision).FirstOrDefaultAsync(ct);
+
+    private ExternalPrescription NewDraft(Visit visit, int actor, int revision)
     {
-        var visit = await Visit(actor, visitId, ct);
-        var patient = await db.Set<PatientProfile>().AsNoTracking().SingleOrDefaultAsync(p => p.Id == visit.PatientId, ct);
-        var lines = await db.Set<ExternalPrescriptionLine>().AsNoTracking().Where(x => x.VisitId == visitId).ToArrayAsync(ct);
-
-        var warnings = new List<ClinicalAllergyWarning>();
-        var allergyText = $"{patient?.IntakeHistoryOther} {patient?.Note}".ToLowerInvariant();
-
-        // 1. Check allergy against patient history
-        foreach (var line in lines)
+        var now = clock.GetUtcNow();
+        var rx = new ExternalPrescription
         {
-            var medName = line.MedicineName.ToLowerInvariant();
-            var activeIng = (line.ActiveIngredient ?? "").ToLowerInvariant();
-
-            if (!string.IsNullOrWhiteSpace(activeIng) && allergyText.Contains(activeIng))
-            {
-                warnings.Add(new ClinicalAllergyWarning(line.MedicineName, line.ActiveIngredient, "Allergy",
-                    $"Bệnh nhân có tiền sử ghi nhận liên quan đến hoạt chất: {line.ActiveIngredient}"));
-            }
-            else if (allergyText.Contains(medName))
-            {
-                warnings.Add(new ClinicalAllergyWarning(line.MedicineName, line.ActiveIngredient, "Allergy",
-                    $"Bệnh nhân có tiền sử ghi nhận liên quan đến thuốc: {line.MedicineName}"));
-            }
-        }
-
-        // 2. Check duplicate active ingredients
-        var ingredientGroups = lines.Where(l => !string.IsNullOrWhiteSpace(l.ActiveIngredient))
-            .GroupBy(l => l.ActiveIngredient!.Trim().ToLowerInvariant())
-            .Where(g => g.Count() > 1);
-
-        foreach (var group in ingredientGroups)
-        {
-            var medNames = string.Join(", ", group.Select(x => x.MedicineName).Distinct());
-            warnings.Add(new ClinicalAllergyWarning(medNames, group.Key, "DuplicateIngredient",
-                $"Phát hiện trùng lặp hoạt chất '{group.Key}' giữa các thuốc: {medNames}. Vui lòng kiểm tra tổng liều để tránh quá liều."));
-        }
-
-        return warnings.ToArray();
+            VisitId = visit.Id, PatientId = visit.PatientId, BranchId = visit.BranchId, PrescribedByDoctorId = actor,
+            Revision = revision, Status = PrescriptionStatuses.Draft, CreatedBy = actor, CreatedAt = now, UpdatedBy = actor, UpdatedAt = now
+        };
+        db.Add(rx);
+        return rx;
     }
 
-    public async Task<PrescriptionLineDto> SaveLineAsync(int actor, Guid visitId, Guid? lineId, SavePrescriptionLine c, CancellationToken ct)
+    private void Touch(ExternalPrescription rx, int actor)
     {
-        var visit = await Visit(actor, visitId, ct, "prescriptions.manage");
-        if (c.RequestKey == Guid.Empty || c.Quantity is < 1 or > 10_000 || c.Instructions?.Length > 1000)
-            throw Error("MSG04");
+        rx.Version++;
+        rx.UpdatedBy = actor;
+        rx.UpdatedAt = clock.GetUtcNow();
+    }
 
-        await using var tx = await db.Database.BeginTransactionAsync(ct);
-        await db.Database.ExecuteSqlRawAsync("SELECT pg_advisory_xact_lock(6462362088)", ct);
+    private sealed record LineValues(string Route, string Morning, string Noon, string Afternoon, string Evening, string Meal, int Days, int Quantity, string? Instructions);
 
-        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { visitId, lineId, c }, ClinicSettingsStore.Json))));
-        var prior = await db.Set<PrescriptionCommandReceipt>().AsNoTracking()
-            .SingleOrDefaultAsync(x => x.ActorId == actor && x.RequestKey == c.RequestKey, ct);
-        if (prior != null)
+    private static LineValues Validate(string? route, string? morning, string? noon, string? afternoon, string? evening, string? meal, int? days, int quantity, string? instructions)
+    {
+        static string Dose(string? value, string field)
         {
-            if (prior.Fingerprint != hash) throw Error("MSG111", 409);
-            return JsonSerializer.Deserialize<PrescriptionLineDto>(prior.ResultJson, ClinicSettingsStore.Json)!;
+            var v = string.IsNullOrWhiteSpace(value) ? "0" : value.Trim();
+            if (v.Length > PrescriptionRules.MaxDoseLength) throw Fail("MSG04", field: field, label: "Liều dùng");
+            return v;
         }
+        if (quantity is < 1 or > PrescriptionRules.MaxQuantity) throw Fail("MSG04", field: "quantity", label: "Số lượng");
+        var d = days ?? 1;
+        if (d is < 1 or > PrescriptionRules.MaxDays) throw Fail("MSG04", field: "days", label: "Số ngày dùng");
+        var mealTiming = string.IsNullOrWhiteSpace(meal) ? "AfterMeal" : meal.Trim();
+        if (!PrescriptionRules.MealTimings.Contains(mealTiming)) throw Fail("MSG04", field: "mealTiming", label: "Thời điểm dùng");
+        var r = route?.Trim() ?? "";
+        if (r.Length > 40) throw Fail("MSG04", field: "route", label: "Đường dùng");
+        if (instructions?.Length > 1000) throw Fail("MSG04", field: "instructions", label: "Lời dặn");
+        return new(r, Dose(morning, "morningDose"), Dose(noon, "noonDose"), Dose(afternoon, "afternoonDose"), Dose(evening, "eveningDose"),
+            mealTiming, d, quantity, string.IsNullOrWhiteSpace(instructions) ? null : instructions.Trim());
+    }
 
-        var medicine = await db.Set<CatalogMedicine>().AsNoTracking()
-            .SingleOrDefaultAsync(x => x.Id == c.MedicineId && x.IsActive && x.PrescriptionEligible, ct)
-            ?? throw Error("MSG113", 404);
-
-        ExternalPrescriptionLine line;
-        string beforeJson = "{}";
-        if (lineId.HasValue)
-        {
-            line = await db.Set<ExternalPrescriptionLine>().SingleOrDefaultAsync(x => x.Id == lineId && x.VisitId == visitId, ct)
-                ?? throw Error("MSG113", 404);
-            if (line.Status == "Finalized")
-                throw Error("MSG205", 409); // Cannot directly modify finalized prescription line
-            if (line.Version != c.ExpectedVersion)
-                throw Error("MSG111", 409);
-
-            beforeJson = JsonSerializer.Serialize(line, ClinicSettingsStore.Json);
-            line.Version++;
-        }
-        else
-        {
-            if (c.ExpectedVersion != 0) throw Error("MSG111", 409);
-            line = new ExternalPrescriptionLine
-            {
-                VisitId = visit.Id,
-                PatientId = visit.PatientId,
-                BranchId = visit.BranchId,
-                PrescribedByDoctorId = actor,
-                CreatedBy = actor,
-                CreatedAt = clock.GetUtcNow(),
-                Status = "Draft"
-            };
-            db.Add(line);
-        }
-
+    private static void Apply(ExternalPrescriptionLine line, CatalogMedicine medicine, LineValues v)
+    {
         line.MedicineId = medicine.Id;
         line.MedicineCode = medicine.Code;
         line.MedicineName = medicine.Name;
@@ -174,42 +180,191 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
         line.Strength = medicine.Strength;
         line.DosageForm = medicine.DosageForm;
         line.Unit = medicine.BaseUnit;
-        line.Route = string.IsNullOrWhiteSpace(c.Route) ? (medicine.Route ?? "Uống") : c.Route.Trim();
-        line.MorningDose = c.MorningDose ?? "0";
-        line.NoonDose = c.NoonDose ?? "0";
-        line.AfternoonDose = c.AfternoonDose ?? "0";
-        line.EveningDose = c.EveningDose ?? "0";
-        line.MealTiming = c.MealTiming ?? "AfterMeal";
-        line.Days = c.Days.GetValueOrDefault(1);
-        line.Quantity = c.Quantity;
-        line.Instructions = string.IsNullOrWhiteSpace(c.Instructions) ? (medicine.Instructions ?? "") : c.Instructions.Trim();
+        line.Route = v.Route.Length > 0 ? v.Route : string.IsNullOrWhiteSpace(medicine.Route) ? "Uống" : medicine.Route;
+        line.MorningDose = v.Morning;
+        line.NoonDose = v.Noon;
+        line.AfternoonDose = v.Afternoon;
+        line.EveningDose = v.Evening;
+        line.MealTiming = v.Meal;
+        line.Days = v.Days;
+        line.Quantity = v.Quantity;
+        line.Instructions = v.Instructions ?? medicine.Instructions ?? "";
+    }
+
+    private Task<CatalogMedicine?> PrescribableAsync(Guid id, CancellationToken ct) =>
+        db.Set<CatalogMedicine>().AsNoTracking().SingleOrDefaultAsync(x => x.Id == id && x.IsActive && x.PrescriptionEligible, ct);
+
+    // ---------- staff reads ----------
+
+    // With a branch: prescribing at a visit (branch scope). Without: global template management.
+    public async Task<PrescriptionMedicineOption[]> OptionsAsync(int actor, int? branchId, string? search, CancellationToken ct)
+    {
+        if (branchId is { } branch) await access.OperationalAsync(actor, "prescriptions.manage", branch, ct);
+        else await access.RequireAsync(actor, "prescriptions.manage", ct);
+        if (search?.Length > 100) throw Fail("MSG04", field: "q", label: "Từ khóa");
+        var q = search?.Trim().ToUpperInvariant() ?? "";
+        return await db.Set<CatalogMedicine>().AsNoTracking()
+            .Where(x => x.IsActive && x.PrescriptionEligible &&
+                (q == "" || x.NormalizedName.Contains(q) || x.Code.ToUpper().Contains(q) || (x.ActiveIngredient != null && x.ActiveIngredient.ToUpper().Contains(q))))
+            .OrderBy(x => x.NormalizedName).ThenBy(x => x.Id).Take(50)
+            .Select(x => new PrescriptionMedicineOption(
+                x.Id, x.Code, x.Name, x.ActiveIngredient, x.Strength, x.DosageForm,
+                x.BaseUnit, x.Route ?? "Uống", x.Packaging, x.Contraindications, x.AllergyWarnings,
+                x.Instructions, x.ReferencePrice))
+            .ToArrayAsync(ct);
+    }
+
+    public async Task<VisitPrescriptionDto> PrescriptionAsync(int actor, Guid visitId, CancellationToken ct)
+    {
+        await ReadableVisitAsync(actor, visitId, ct);
+        var revisions = await db.Set<ExternalPrescription>().AsNoTracking().Where(x => x.VisitId == visitId)
+            .OrderByDescending(x => x.Revision).ToArrayAsync(ct);
+        if (revisions.Length == 0) return new(null, []);
+        var ids = revisions.Select(x => x.Id).ToArray();
+        var lines = await db.Set<ExternalPrescriptionLine>().AsNoTracking().Where(x => ids.Contains(x.PrescriptionId)).ToArrayAsync(ct);
+        var names = await NamesAsync(revisions.Select(x => x.PrescribedByDoctorId), ct);
+        var current = revisions[0];
+        var history = revisions.Select(x => new PrescriptionSummaryDto(x.Id, x.Revision, x.Status, names.GetValueOrDefault(x.PrescribedByDoctorId),
+            x.CreatedAt, x.FinalizedAt, x.CorrectionReason, lines.Count(l => l.PrescriptionId == x.Id))).ToArray();
+        return new(await DtoAsync(current, lines.Where(l => l.PrescriptionId == current.Id), ct), history);
+    }
+
+    public async Task<PrescriptionLineDto[]> LinesAsync(int actor, Guid visitId, CancellationToken ct) =>
+        (await PrescriptionAsync(actor, visitId, ct)).Current?.Lines ?? [];
+
+    public async Task<ClinicalAllergyWarning[]> CheckSafetyAsync(int actor, Guid visitId, CancellationToken ct)
+    {
+        var visit = await ReadableVisitAsync(actor, visitId, ct);
+        var current = await db.Set<ExternalPrescription>().AsNoTracking().Where(x => x.VisitId == visitId).OrderByDescending(x => x.Revision).FirstOrDefaultAsync(ct);
+        if (current == null) return [];
+        var lines = await db.Set<ExternalPrescriptionLine>().AsNoTracking().Where(x => x.PrescriptionId == current.Id).ToArrayAsync(ct);
+        if (lines.Length == 0) return [];
+
+        var patient = await db.Set<PatientProfile>().AsNoTracking().SingleOrDefaultAsync(p => p.Id == visit.PatientId, ct);
+        var content = await ExaminationAsync(visitId, ct);
+        var allergyText = Fold(string.Join(" ", new[]
+        {
+            content?.Allergies is { State: "Present" } a ? a.Detail : null,
+            patient?.IntakeHistoryOther
+        }.Where(x => !string.IsNullOrWhiteSpace(x))));
+
+        var medicineIds = lines.Select(l => l.MedicineId).Distinct().ToArray();
+        var catalog = await db.Set<CatalogMedicine>().AsNoTracking().Where(m => medicineIds.Contains(m.Id)).ToDictionaryAsync(m => m.Id, ct);
+        var warnings = new List<ClinicalAllergyWarning>();
+
+        foreach (var line in lines)
+        {
+            if (allergyText.Length > 0)
+            {
+                var hit = Ingredients(line.ActiveIngredient).FirstOrDefault(i => allergyText.Contains(i));
+                if (hit != null)
+                    warnings.Add(new(line.MedicineName, line.ActiveIngredient, "Allergy", $"Tiền sử dị ứng của bệnh nhân có ghi nhận hoạt chất \"{hit}\" trong thuốc {line.MedicineName}."));
+                else if (allergyText.Contains(Fold(line.MedicineName)))
+                    warnings.Add(new(line.MedicineName, line.ActiveIngredient, "Allergy", $"Tiền sử dị ứng của bệnh nhân có ghi nhận thuốc {line.MedicineName}."));
+                else if (catalog.GetValueOrDefault(line.MedicineId)?.AllergyWarnings is { } groups
+                    && Keywords(groups).FirstOrDefault(k => allergyText.Contains(k)) is { } group)
+                    warnings.Add(new(line.MedicineName, line.ActiveIngredient, "Allergy", $"Thuốc {line.MedicineName} thuộc nhóm cảnh báo dị ứng \"{group}\" trùng với tiền sử dị ứng của bệnh nhân."));
+            }
+            if (catalog.GetValueOrDefault(line.MedicineId)?.Contraindications is { Length: > 0 } contra)
+                warnings.Add(new(line.MedicineName, line.ActiveIngredient, "Contraindication", $"Chống chỉ định của {line.MedicineName}: {contra}"));
+        }
+
+        foreach (var group in lines.SelectMany(l => Ingredients(l.ActiveIngredient).Distinct().Select(i => (Ingredient: i, Line: l)))
+                     .GroupBy(x => x.Ingredient).Where(g => g.Select(x => x.Line.Id).Distinct().Count() > 1))
+        {
+            var names = string.Join(", ", group.Select(x => x.Line.MedicineName).Distinct());
+            warnings.Add(new(names, group.Key, "DuplicateIngredient",
+                $"Trùng hoạt chất \"{group.Key}\" giữa các thuốc: {names}. Kiểm tra tổng liều để tránh quá liều."));
+        }
+        return warnings.ToArray();
+    }
+
+    private static string Fold(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return "";
+        var decomposed = text.Normalize(NormalizationForm.FormD);
+        var sb = new StringBuilder(decomposed.Length);
+        foreach (var ch in decomposed)
+            if (CharUnicodeInfo.GetUnicodeCategory(ch) != UnicodeCategory.NonSpacingMark) sb.Append(ch == 'đ' || ch == 'Đ' ? 'd' : char.ToLowerInvariant(ch));
+        return sb.ToString();
+    }
+
+    private static IEnumerable<string> Ingredients(string? activeIngredient) =>
+        (activeIngredient ?? "").Split([',', '+', '/', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(Fold).Where(x => x.Length >= 3);
+
+    private static IEnumerable<string> Keywords(string text) =>
+        text.Split([',', ';', '\n', '.'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(Fold).Where(x => x.Length >= 3);
+
+    private async Task<ExaminationContent?> ExaminationAsync(Guid visitId, CancellationToken ct)
+    {
+        var exam = await db.Set<VisitExamination>().AsNoTracking().SingleOrDefaultAsync(x => x.VisitId == visitId, ct);
+        if (exam == null || string.IsNullOrWhiteSpace(exam.ContentJson)) return null;
+        try { return JsonSerializer.Deserialize<ExaminationContent>(exam.ContentJson, ExaminationService.Json); }
+        catch (JsonException) { return null; }
+    }
+
+    private static string DiagnosisText(ExaminationContent? content)
+    {
+        if (content == null) return "";
+        var list = (content.Diagnoses ?? []).Where(x => !string.IsNullOrWhiteSpace(x)).ToList();
+        if (list.Count == 0 && !string.IsNullOrWhiteSpace(content.Diagnosis)) list.Add(content.Diagnosis.Trim());
+        var text = string.Join("; ", list);
+        return text.Length > 1000 ? text[..1000] : text;
+    }
+
+    // ---------- staff writes ----------
+
+    public async Task<PrescriptionLineDto> SaveLineAsync(int actor, Guid visitId, Guid? lineId, SavePrescriptionLine c, CancellationToken ct)
+    {
+        if (c.RequestKey == Guid.Empty) throw Fail("MSG04", field: "requestKey");
+        var values = Validate(c.Route, c.MorningDose, c.NoonDose, c.AfternoonDose, c.EveningDose, c.MealTiming, c.Days, c.Quantity, c.Instructions);
+        var hash = Hash(new { op = "line.save", visitId, lineId, c });
+
+        await using var tx = await BeginAsync(ct);
+        var replay = await ReplayAsync<PrescriptionLineDto>(actor, c.RequestKey, hash, ct);
+        if (replay.Found) return replay.Result!;
+
+        var visit = await WritableVisitAsync(actor, visitId, ct);
+        ExternalPrescription rx;
+        ExternalPrescriptionLine line;
+        var before = "{}";
+        if (lineId is { } id)
+        {
+            line = await db.Set<ExternalPrescriptionLine>().SingleOrDefaultAsync(x => x.Id == id && x.VisitId == visitId, ct) ?? throw Fail("MSG113", 404);
+            rx = await db.Set<ExternalPrescription>().SingleAsync(x => x.Id == line.PrescriptionId, ct);
+            EnsureEditable(visit, rx);
+            if (line.Version != c.ExpectedVersion) throw Fail("MSG111", 409, currentVersion: line.Version);
+            before = JsonSerializer.Serialize(LineDto(line, null), Json);
+            var medicine = line.MedicineId == c.MedicineId
+                ? await db.Set<CatalogMedicine>().AsNoTracking().SingleOrDefaultAsync(x => x.Id == c.MedicineId, ct)
+                : await PrescribableAsync(c.MedicineId, ct);
+            Apply(line, medicine ?? throw Fail("MSG113", 404, "medicineId"), values);
+            line.Version++;
+        }
+        else
+        {
+            if (c.ExpectedVersion != 0) throw Fail("MSG111", 409, currentVersion: 0);
+            var current = await CurrentAsync(visitId, ct);
+            EnsureEditable(visit, current);
+            rx = current ?? NewDraft(visit, actor, 1);
+            var medicine = await PrescribableAsync(c.MedicineId, ct) ?? throw Fail("MSG113", 404, "medicineId");
+            var now = clock.GetUtcNow();
+            line = new ExternalPrescriptionLine
+            {
+                PrescriptionId = rx.Id, VisitId = visit.Id, PatientId = visit.PatientId, BranchId = visit.BranchId,
+                PrescribedByDoctorId = actor, CreatedBy = actor, CreatedAt = now, Status = PrescriptionStatuses.Draft, Version = 1
+            };
+            Apply(line, medicine, values);
+            db.Add(line);
+        }
         line.UpdatedBy = actor;
         line.UpdatedAt = clock.GetUtcNow();
+        Touch(rx, actor);
 
-        var doctor = await db.Set<ApplicationUser>().AsNoTracking().SingleOrDefaultAsync(u => u.Id == actor, ct);
-        var result = LineDto(line, doctor?.FullName);
-        var afterJson = JsonSerializer.Serialize(line, ClinicSettingsStore.Json);
-
-        db.Add(new PrescriptionAudit
-        {
-            ActorId = actor,
-            BranchId = visit.BranchId,
-            VisitId = visit.Id,
-            Action = lineId.HasValue ? "LineUpdate" : "LineCreate",
-            Reason = "Kê đơn thuốc tại lượt khám",
-            BeforeJson = beforeJson,
-            AfterJson = afterJson,
-            At = clock.GetUtcNow()
-        });
-
-        db.Add(new PrescriptionCommandReceipt
-        {
-            ActorId = actor,
-            RequestKey = c.RequestKey,
-            Fingerprint = hash,
-            ResultJson = JsonSerializer.Serialize(result, ClinicSettingsStore.Json)
-        });
-
+        var names = await NamesAsync([line.PrescribedByDoctorId], ct);
+        var result = LineDto(line, names.GetValueOrDefault(line.PrescribedByDoctorId));
+        Record(actor, visit, null, lineId.HasValue ? "LineUpdate" : "LineCreate", "Kê đơn thuốc tại lượt khám", before, result, c.RequestKey, hash, result);
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
         return result;
@@ -217,519 +372,416 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
 
     public async Task DeleteLineAsync(int actor, Guid visitId, Guid lineId, Guid requestKey, int expectedVersion, CancellationToken ct)
     {
-        var visit = await Visit(actor, visitId, ct, "prescriptions.manage");
-        await using var tx = await db.Database.BeginTransactionAsync(ct);
-        await db.Database.ExecuteSqlRawAsync("SELECT pg_advisory_xact_lock(6462362088)", ct);
+        if (requestKey == Guid.Empty) throw Fail("MSG04", field: "requestKey");
+        var hash = Hash(new { op = "line.delete", visitId, lineId, expectedVersion });
 
-        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { visitId, lineId, requestKey, expectedVersion }, ClinicSettingsStore.Json))));
-        var prior = await db.Set<PrescriptionCommandReceipt>().AsNoTracking()
-            .SingleOrDefaultAsync(x => x.ActorId == actor && x.RequestKey == requestKey, ct);
-        if (prior != null) return;
+        await using var tx = await BeginAsync(ct);
+        if ((await ReplayAsync<JsonElement>(actor, requestKey, hash, ct)).Found) return;
 
-        var line = await db.Set<ExternalPrescriptionLine>().SingleOrDefaultAsync(x => x.Id == lineId && x.VisitId == visitId, ct)
-            ?? throw Error("MSG113", 404);
-        if (line.Status == "Finalized") throw Error("MSG205", 409);
-        if (line.Version != expectedVersion) throw Error("MSG111", 409);
+        var visit = await WritableVisitAsync(actor, visitId, ct);
+        var line = await db.Set<ExternalPrescriptionLine>().SingleOrDefaultAsync(x => x.Id == lineId && x.VisitId == visitId, ct) ?? throw Fail("MSG113", 404);
+        var rx = await db.Set<ExternalPrescription>().SingleAsync(x => x.Id == line.PrescriptionId, ct);
+        EnsureEditable(visit, rx);
+        if (line.Version != expectedVersion) throw Fail("MSG111", 409, currentVersion: line.Version);
 
-        var beforeJson = JsonSerializer.Serialize(line, ClinicSettingsStore.Json);
+        var before = JsonSerializer.Serialize(LineDto(line, null), Json);
         db.Remove(line);
-
-        db.Add(new PrescriptionAudit
-        {
-            ActorId = actor,
-            BranchId = visit.BranchId,
-            VisitId = visit.Id,
-            Action = "LineDelete",
-            Reason = "Xóa dòng thuốc khỏi đơn nháp",
-            BeforeJson = beforeJson,
-            AfterJson = "{}",
-            At = clock.GetUtcNow()
-        });
-
-        db.Add(new PrescriptionCommandReceipt
-        {
-            ActorId = actor,
-            RequestKey = requestKey,
-            Fingerprint = hash,
-            ResultJson = "{}"
-        });
-
+        Touch(rx, actor);
+        Record(actor, visit, null, "LineDelete", "Xóa dòng thuốc khỏi đơn nháp", before, new { }, requestKey, hash, new { });
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
     }
 
-    public async Task<PrescriptionLineDto[]> ApplyTemplateAsync(int actor, Guid visitId, ApplyPrescriptionTemplateCommand command, CancellationToken ct)
+    public async Task<PrescriptionDto> SaveAdviceAsync(int actor, Guid visitId, SavePrescriptionAdvice c, CancellationToken ct)
     {
-        var visit = await Visit(actor, visitId, ct, "prescriptions.manage");
-        await using var tx = await db.Database.BeginTransactionAsync(ct);
-        await db.Database.ExecuteSqlRawAsync("SELECT pg_advisory_xact_lock(6462362088)", ct);
+        if (c.RequestKey == Guid.Empty) throw Fail("MSG04", field: "requestKey");
+        var advice = c.GeneralAdvice?.Trim() ?? "";
+        if (advice.Length > 1000) throw Fail("MSG04", field: "generalAdvice", label: "Lời dặn chung");
+        var hash = Hash(new { op = "advice", visitId, c });
 
-        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { visitId, command }, ClinicSettingsStore.Json))));
-        var prior = await db.Set<PrescriptionCommandReceipt>().AsNoTracking()
-            .SingleOrDefaultAsync(x => x.ActorId == actor && x.RequestKey == command.RequestKey, ct);
-        if (prior != null)
-        {
-            if (prior.Fingerprint != hash) throw Error("MSG111", 409);
-            return JsonSerializer.Deserialize<PrescriptionLineDto[]>(prior.ResultJson, ClinicSettingsStore.Json)!;
-        }
+        await using var tx = await BeginAsync(ct);
+        var replay = await ReplayAsync<PrescriptionDto>(actor, c.RequestKey, hash, ct);
+        if (replay.Found) return replay.Result!;
 
-        var template = await db.Set<PrescriptionTemplate>().Include(t => t.Lines)
-            .AsNoTracking().SingleOrDefaultAsync(t => t.Id == command.TemplateId && t.IsActive, ct)
-            ?? throw Error("MSG113", 404);
+        var visit = await WritableVisitAsync(actor, visitId, ct);
+        var rx = await CurrentAsync(visitId, ct);
+        if ((rx?.Version ?? 0) != c.ExpectedVersion) throw Fail("MSG111", 409, currentVersion: rx?.Version ?? 0);
+        EnsureEditable(visit, rx);
+        rx ??= NewDraft(visit, actor, 1);
+        var before = JsonSerializer.Serialize(new { rx.GeneralAdvice }, Json);
+        rx.GeneralAdvice = advice;
+        Touch(rx, actor);
 
-        var now = clock.GetUtcNow();
-        var doctor = await db.Set<ApplicationUser>().AsNoTracking().SingleOrDefaultAsync(u => u.Id == actor, ct);
-        var createdLines = new List<ExternalPrescriptionLine>();
-
-        foreach (var tLine in template.Lines.OrderBy(l => l.SortOrder))
-        {
-            var line = new ExternalPrescriptionLine
-            {
-                VisitId = visit.Id,
-                PatientId = visit.PatientId,
-                BranchId = visit.BranchId,
-                PrescribedByDoctorId = actor,
-                MedicineId = tLine.MedicineId,
-                MedicineCode = tLine.MedicineCode,
-                MedicineName = tLine.MedicineName,
-                ActiveIngredient = tLine.ActiveIngredient,
-                Strength = tLine.Strength,
-                DosageForm = tLine.DosageForm,
-                Unit = tLine.Unit,
-                Route = tLine.Route,
-                MorningDose = tLine.MorningDose,
-                NoonDose = tLine.NoonDose,
-                AfternoonDose = tLine.AfternoonDose,
-                EveningDose = tLine.EveningDose,
-                MealTiming = tLine.MealTiming,
-                Days = tLine.Days,
-                Quantity = tLine.Quantity,
-                Instructions = tLine.Instructions,
-                Status = "Draft",
-                CreatedBy = actor,
-                CreatedAt = now,
-                UpdatedBy = actor,
-                UpdatedAt = now,
-                Version = 1
-            };
-            db.Add(line);
-            createdLines.Add(line);
-        }
-
-        var result = createdLines.Select(l => LineDto(l, doctor?.FullName)).ToArray();
-
-        db.Add(new PrescriptionAudit
-        {
-            ActorId = actor,
-            BranchId = visit.BranchId,
-            VisitId = visit.Id,
-            TemplateId = template.Id,
-            Action = "TemplateApply",
-            Reason = $"Áp dụng mẫu đơn thuốc: {template.Name}",
-            BeforeJson = "{}",
-            AfterJson = JsonSerializer.Serialize(result, ClinicSettingsStore.Json),
-            At = now
-        });
-
-        db.Add(new PrescriptionCommandReceipt
-        {
-            ActorId = actor,
-            RequestKey = command.RequestKey,
-            Fingerprint = hash,
-            ResultJson = JsonSerializer.Serialize(result, ClinicSettingsStore.Json)
-        });
-
+        var lines = await db.Set<ExternalPrescriptionLine>().Where(x => x.PrescriptionId == rx.Id).ToArrayAsync(ct);
+        var result = await DtoAsync(rx, lines, ct);
+        Record(actor, visit, null, "AdviceUpdate", "Cập nhật lời dặn chung", before, new { rx.GeneralAdvice }, c.RequestKey, hash, result);
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
         return result;
     }
 
-    public async Task<PrescriptionLineDto[]> FinalizeAsync(int actor, Guid visitId, FinalizePrescriptionCommand command, CancellationToken ct)
+    public async Task<ApplyTemplateResult> ApplyTemplateAsync(int actor, Guid visitId, ApplyPrescriptionTemplateCommand c, CancellationToken ct)
     {
-        var visit = await Visit(actor, visitId, ct, "prescriptions.manage");
-        await using var tx = await db.Database.BeginTransactionAsync(ct);
-        await db.Database.ExecuteSqlRawAsync("SELECT pg_advisory_xact_lock(6462362088)", ct);
+        if (c.RequestKey == Guid.Empty) throw Fail("MSG04", field: "requestKey");
+        var hash = Hash(new { op = "template.apply", visitId, c });
 
-        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { visitId, command }, ClinicSettingsStore.Json))));
-        var prior = await db.Set<PrescriptionCommandReceipt>().AsNoTracking()
-            .SingleOrDefaultAsync(x => x.ActorId == actor && x.RequestKey == command.RequestKey, ct);
-        if (prior != null)
+        await using var tx = await BeginAsync(ct);
+        var replay = await ReplayAsync<ApplyTemplateResult>(actor, c.RequestKey, hash, ct);
+        if (replay.Found) return replay.Result!;
+
+        var visit = await WritableVisitAsync(actor, visitId, ct);
+        var template = await db.Set<PrescriptionTemplate>().AsNoTracking().Include(t => t.Lines)
+            .SingleOrDefaultAsync(t => t.Id == c.TemplateId && t.IsActive, ct) ?? throw Fail("MSG113", 404, "templateId");
+        var current = await CurrentAsync(visitId, ct);
+        if ((current?.Version ?? 0) != c.ExpectedVersion) throw Fail("MSG111", 409, currentVersion: current?.Version ?? 0);
+        EnsureEditable(visit, current);
+        var rx = current ?? NewDraft(visit, actor, 1);
+
+        var medicineIds = template.Lines.Select(l => l.MedicineId).Distinct().ToArray();
+        var medicines = await db.Set<CatalogMedicine>().AsNoTracking()
+            .Where(m => medicineIds.Contains(m.Id) && m.IsActive && m.PrescriptionEligible).ToDictionaryAsync(m => m.Id, ct);
+        var now = clock.GetUtcNow();
+        var skipped = 0;
+        var offset = 0;
+        foreach (var t in template.Lines.OrderBy(l => l.SortOrder))
         {
-            if (prior.Fingerprint != hash) throw Error("MSG111", 409);
-            return JsonSerializer.Deserialize<PrescriptionLineDto[]>(prior.ResultJson, ClinicSettingsStore.Json)!;
+            if (!medicines.TryGetValue(t.MedicineId, out var medicine)) { skipped++; continue; }
+            var line = new ExternalPrescriptionLine
+            {
+                PrescriptionId = rx.Id, VisitId = visit.Id, PatientId = visit.PatientId, BranchId = visit.BranchId,
+                PrescribedByDoctorId = actor, Status = PrescriptionStatuses.Draft, Version = 1,
+                CreatedBy = actor, CreatedAt = now.AddTicks(offset++), UpdatedBy = actor, UpdatedAt = now
+            };
+            Apply(line, medicine, new LineValues(t.Route, t.MorningDose, t.NoonDose, t.AfternoonDose, t.EveningDose, t.MealTiming, t.Days, t.Quantity,
+                string.IsNullOrWhiteSpace(t.Instructions) ? null : t.Instructions));
+            db.Add(line);
         }
+        Touch(rx, actor);
 
-        var lines = await db.Set<ExternalPrescriptionLine>().Where(x => x.VisitId == visitId).ToArrayAsync(ct);
-        if (lines.Length == 0) throw Error("MSG04"); // Cannot finalize empty prescription
+        await db.SaveChangesAsync(ct);
+        var lines = await db.Set<ExternalPrescriptionLine>().Where(x => x.PrescriptionId == rx.Id).ToArrayAsync(ct);
+        var result = new ApplyTemplateResult(await DtoAsync(rx, lines, ct), skipped);
+        Record(actor, visit, template.Id, "TemplateApply", $"Áp dụng mẫu đơn thuốc: {template.Name}", "{}", result.Prescription, c.RequestKey, hash, result);
+        await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
+        return result;
+    }
+
+    public async Task<PrescriptionDto> FinalizeAsync(int actor, Guid visitId, FinalizePrescriptionCommand c, CancellationToken ct)
+    {
+        if (c.RequestKey == Guid.Empty) throw Fail("MSG04", field: "requestKey");
+        if (c.ClinicalNote?.Length > 500) throw Fail("MSG04", field: "clinicalNote", label: "Ghi chú");
+        var hash = Hash(new { op = "finalize", visitId, c });
+
+        await using var tx = await BeginAsync(ct);
+        var replay = await ReplayAsync<PrescriptionDto>(actor, c.RequestKey, hash, ct);
+        if (replay.Found) return replay.Result!;
+
+        var visit = await WritableVisitAsync(actor, visitId, ct);
+        var rx = await CurrentAsync(visitId, ct) ?? throw Fail("MSG113", 404);
+        if (rx.Version != c.ExpectedVersion) throw Fail("MSG111", 409, currentVersion: rx.Version);
+        EnsureEditable(visit, rx);
+        var lines = await db.Set<ExternalPrescriptionLine>().Where(x => x.PrescriptionId == rx.Id).ToArrayAsync(ct);
+        if (lines.Length == 0) throw Fail("MSG04", field: "lines", label: "Danh sách thuốc");
 
         var now = clock.GetUtcNow();
+        rx.Diagnosis = DiagnosisText(await ExaminationAsync(visitId, ct));
+        rx.Status = PrescriptionStatuses.Finalized;
+        rx.FinalizedAt = now;
+        rx.FinalizedBy = actor;
         foreach (var line in lines)
         {
-            line.Status = "Finalized";
+            line.Status = PrescriptionStatuses.Finalized;
             line.FinalizedAt = now;
             line.UpdatedBy = actor;
             line.UpdatedAt = now;
             line.Version++;
         }
-
-        var doctor = await db.Set<ApplicationUser>().AsNoTracking().SingleOrDefaultAsync(u => u.Id == actor, ct);
-        var result = lines.Select(l => LineDto(l, doctor?.FullName)).ToArray();
-
-        db.Add(new PrescriptionAudit
+        rx.VerificationCode = Hash(new
         {
-            ActorId = actor,
-            BranchId = visit.BranchId,
-            VisitId = visit.Id,
-            Action = "Finalize",
-            Reason = command.ClinicalNote ?? "Hoàn tất và ký số đơn thuốc",
-            BeforeJson = "{}",
-            AfterJson = JsonSerializer.Serialize(result, ClinicSettingsStore.Json),
-            At = now
-        });
-
-        db.Add(new PrescriptionCommandReceipt
+            rx.Id, rx.Revision, rx.PatientId, rx.BranchId, rx.GeneralAdvice, rx.Diagnosis, at = now,
+            lines = lines.OrderBy(l => l.CreatedAt).Select(l => new { l.MedicineCode, l.Quantity, l.MorningDose, l.NoonDose, l.AfternoonDose, l.EveningDose, l.MealTiming, l.Days, l.Instructions })
+        })[..16];
+        Touch(rx, actor);
+        if (rx.SupersedesId is { } previousId)
         {
-            ActorId = actor,
-            RequestKey = command.RequestKey,
-            Fingerprint = hash,
-            ResultJson = JsonSerializer.Serialize(result, ClinicSettingsStore.Json)
-        });
+            var previous = await db.Set<ExternalPrescription>().SingleAsync(x => x.Id == previousId, ct);
+            previous.Status = PrescriptionStatuses.Superseded;
+            previous.Version++;
+            var previousLines = await db.Set<ExternalPrescriptionLine>().Where(x => x.PrescriptionId == previousId).ToArrayAsync(ct);
+            foreach (var l in previousLines) { l.Status = PrescriptionStatuses.Superseded; l.Version++; }
+        }
 
+        var result = await DtoAsync(rx, lines, ct);
+        Record(actor, visit, null, "Finalize", string.IsNullOrWhiteSpace(c.ClinicalNote) ? "Hoàn tất kê đơn" : c.ClinicalNote.Trim(), "{}", result, c.RequestKey, hash, result);
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
         return result;
     }
 
-    public async Task<PrescriptionPrintDto> PrintDataAsync(int actor, Guid visitId, CancellationToken ct)
+    public async Task<PrescriptionDto> CreateCorrectionAsync(int actor, Guid visitId, CreatePrescriptionCorrection c, CancellationToken ct)
     {
-        var visit = await Visit(actor, visitId, ct);
-        var patient = await db.Set<PatientProfile>().AsNoTracking().SingleOrDefaultAsync(p => p.Id == visit.PatientId, ct)
-            ?? throw Error("MSG113", 404);
-        var branch = await db.Set<SchedulingBranch>().AsNoTracking().SingleOrDefaultAsync(b => b.Id == visit.BranchId, ct);
-        var branchProfile = await db.Set<BranchProfile>().AsNoTracking().SingleOrDefaultAsync(b => b.Id == visit.BranchId, ct);
-        var doctor = await db.Set<ApplicationUser>().AsNoTracking().SingleOrDefaultAsync(u => u.Id == visit.DentistId, ct);
-        var employee = await db.Set<EmployeeProfile>().AsNoTracking().SingleOrDefaultAsync(e => e.AccountId == visit.DentistId, ct);
+        if (c.RequestKey == Guid.Empty) throw Fail("MSG04", field: "requestKey");
+        var reason = c.Reason?.Trim() ?? "";
+        if (reason.Length == 0) throw Fail("MSG02", field: "reason", label: "Lý do điều chỉnh");
+        if (reason.Length > 500) throw Fail("MSG04", field: "reason", label: "Lý do điều chỉnh");
+        var hash = Hash(new { op = "correction", visitId, c });
 
-        // Get clinical examination diagnosis
-        var exam = await db.Set<VisitExamination>().AsNoTracking().SingleOrDefaultAsync(x => x.VisitId == visitId, ct);
-        string diagnosis = "Khám răng miệng định kỳ";
-        if (exam != null && !string.IsNullOrWhiteSpace(exam.ContentJson))
+        await using var tx = await BeginAsync(ct);
+        var replay = await ReplayAsync<PrescriptionDto>(actor, c.RequestKey, hash, ct);
+        if (replay.Found) return replay.Result!;
+
+        var visit = await WritableVisitAsync(actor, visitId, ct);
+        var signed = await CurrentAsync(visitId, ct) ?? throw Fail("MSG113", 404);
+        if (signed.Version != c.ExpectedVersion) throw Fail("MSG111", 409, currentVersion: signed.Version);
+        if (signed.Status != PrescriptionStatuses.Finalized) throw Fail("MSG205", 409, "status", "Đơn thuốc");
+        if (visit.Status is not (VisitStatuses.InProgress or VisitStatuses.Completed)) throw Fail("MSG205", 409, "visit", "Lượt khám");
+
+        var draft = NewDraft(visit, actor, signed.Revision + 1);
+        draft.SupersedesId = signed.Id;
+        draft.CorrectionReason = reason;
+        draft.GeneralAdvice = signed.GeneralAdvice;
+        var source = await db.Set<ExternalPrescriptionLine>().AsNoTracking().Where(x => x.PrescriptionId == signed.Id).OrderBy(x => x.CreatedAt).ToArrayAsync(ct);
+        var now = clock.GetUtcNow();
+        var copies = source.Select((s, i) => new ExternalPrescriptionLine
         {
-            try
-            {
-                using var doc = JsonDocument.Parse(exam.ContentJson);
-                if (doc.RootElement.TryGetProperty("diagnosis", out var diagProp))
-                    diagnosis = diagProp.GetString() ?? diagnosis;
-                else if (doc.RootElement.TryGetProperty("summary", out var sumProp))
-                    diagnosis = sumProp.GetString() ?? diagnosis;
-            }
-            catch { }
-        }
-
-        var lines = await db.Set<ExternalPrescriptionLine>().AsNoTracking()
-            .Where(x => x.VisitId == visitId).OrderBy(x => x.CreatedAt).ToArrayAsync(ct);
-
-        var items = lines.Select((l, i) =>
-        {
-            var doseParts = new List<string>();
-            if (l.MorningDose != "0") doseParts.Add($"Sáng {l.MorningDose} {l.Unit}");
-            if (l.NoonDose != "0") doseParts.Add($"Trưa {l.NoonDose} {l.Unit}");
-            if (l.AfternoonDose != "0") doseParts.Add($"Chiều {l.AfternoonDose} {l.Unit}");
-            if (l.EveningDose != "0") doseParts.Add($"Tối {l.EveningDose} {l.Unit}");
-            var doseStr = doseParts.Count > 0 ? string.Join(", ", doseParts) : $"{l.Quantity} {l.Unit}";
-            var meal = l.MealTiming == "BeforeMeal" ? "trước ăn" : l.MealTiming == "WithMeal" ? "trong bữa ăn" : "sau ăn";
-
-            return new PrescriptionPrintItem(
-                i + 1,
-                l.MedicineName,
-                l.ActiveIngredient,
-                l.Strength,
-                l.DosageForm,
-                l.Quantity,
-                l.Unit,
-                l.Route,
-                $"{doseStr} ({meal}) x {l.Days} ngày",
-                $"{l.Route}. {doseStr} ({meal}) x {l.Days} ngày. {l.Instructions}".Trim());
+            PrescriptionId = draft.Id, VisitId = s.VisitId, PatientId = s.PatientId, BranchId = s.BranchId, PrescribedByDoctorId = actor,
+            MedicineId = s.MedicineId, MedicineCode = s.MedicineCode, MedicineName = s.MedicineName, ActiveIngredient = s.ActiveIngredient,
+            Strength = s.Strength, DosageForm = s.DosageForm, Unit = s.Unit, Route = s.Route, MorningDose = s.MorningDose, NoonDose = s.NoonDose,
+            AfternoonDose = s.AfternoonDose, EveningDose = s.EveningDose, MealTiming = s.MealTiming, Days = s.Days, Quantity = s.Quantity,
+            Instructions = s.Instructions, Status = PrescriptionStatuses.Draft, Version = 1,
+            CreatedBy = actor, CreatedAt = now.AddTicks(i), UpdatedBy = actor, UpdatedAt = now
         }).ToArray();
+        db.AddRange(copies);
 
-        var printTime = lines.FirstOrDefault()?.FinalizedAt ?? clock.GetUtcNow();
-        var qrData = $"ODENTAL-RX:{visit.Id}:{patient.PatientCode}:{printTime:yyyyMMddHHmmss}";
-
-        return new PrescriptionPrintDto(
-            visit.Id,
-            "HỆ THỐNG NHA KHOA KỸ THUẬT CAO ODENTAL",
-            branchProfile?.Name ?? branch?.Name ?? "Chi nhánh trung tâm",
-            branchProfile?.Address ?? "Hà Nội, Việt Nam",
-            branchProfile?.Phone ?? "1900 6868",
-            branchProfile?.LogoAssetId.HasValue == true ? $"/api/assets/{branchProfile.LogoAssetId}" : null,
-            doctor?.FullName ?? "Bác sĩ điều trị",
-            employee?.LicenseNumber ?? "012345/BYT-CCHN",
-            patient.PatientCode,
-            patient.FullName,
-            patient.BirthDate?.Year,
-            patient.Gender == "MALE" ? "Nam" : patient.Gender == "FEMALE" ? "Nữ" : "Khác",
-            patient.Address ?? "Chưa cập nhật",
-            diagnosis,
-            printTime,
-            items,
-            "Uống thuốc đúng liều lượng chỉ dẫn. Mang theo đơn thuốc khi tái khám. Liên hệ hotline nếu có phản ứng bất thường.",
-            qrData);
+        var result = await DtoAsync(draft, copies, ct);
+        Record(actor, visit, null, "CorrectionCreate", reason, JsonSerializer.Serialize(new { signed.Id, signed.Revision }, Json), result, c.RequestKey, hash, result);
+        await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
+        return result;
     }
 
-    public async Task<PrescriptionTemplateDto[]> TemplatesAsync(int actor, string? search, string? diagnosis, int page, int pageSize, CancellationToken ct)
+    // ---------- print ----------
+
+    public async Task<PrescriptionPrintDto> PrintDataAsync(int actor, Guid visitId, CancellationToken ct)
+    {
+        var visit = await ReadableVisitAsync(actor, visitId, ct);
+        var rx = await db.Set<ExternalPrescription>().AsNoTracking().Where(x => x.VisitId == visitId).OrderByDescending(x => x.Revision).FirstOrDefaultAsync(ct)
+            ?? throw Fail("MSG113", 404);
+        return await PrintAsync(rx, visit, ct);
+    }
+
+    private async Task<PrescriptionPrintDto> PrintAsync(ExternalPrescription rx, Visit visit, CancellationToken ct)
+    {
+        var patient = await db.Set<PatientProfile>().AsNoTracking().SingleOrDefaultAsync(p => p.Id == rx.PatientId, ct) ?? throw Fail("MSG113", 404);
+        var branch = await db.Set<SchedulingBranch>().AsNoTracking().SingleOrDefaultAsync(b => b.Id == rx.BranchId, ct);
+        var profile = await db.Set<BranchProfile>().AsNoTracking().SingleOrDefaultAsync(b => b.Id == rx.BranchId, ct);
+        var doctorId = rx.FinalizedBy ?? rx.PrescribedByDoctorId;
+        var doctor = (await NamesAsync([doctorId], ct)).GetValueOrDefault(doctorId);
+        var lines = await db.Set<ExternalPrescriptionLine>().AsNoTracking().Where(x => x.PrescriptionId == rx.Id)
+            .OrderBy(x => x.CreatedAt).ThenBy(x => x.Id).ToArrayAsync(ct);
+        var diagnosis = rx.Diagnosis ?? DiagnosisText(await ExaminationAsync(visit.Id, ct));
+
+        var items = lines.Select((l, i) => new PrescriptionPrintItem(i + 1, l.MedicineName, l.ActiveIngredient, l.Strength, l.DosageForm,
+            l.Quantity, VietnameseNumberWords.ToWords(l.Quantity), l.Unit, l.Route, Dosage(l), l.Instructions)).ToArray();
+        var signed = rx.Status != PrescriptionStatuses.Draft;
+        return new PrescriptionPrintDto(rx.Id, rx.VisitId, rx.Revision, !signed,
+            profile?.Name ?? branch?.Name ?? "", profile?.Address, profile?.Phone,
+            await assets.DataUrlAsync(rx.BranchId, profile?.LogoAssetId, ct),
+            doctor ?? "", null, patient.PatientCode, patient.FullName, patient.BirthDate?.Year,
+            patient.Gender switch { PatientGenders.Male => "Nam", "FEMALE" => "Nữ", null => null, _ => "Khác" },
+            patient.Address, diagnosis, rx.FinalizedAt ?? rx.UpdatedAt, items, rx.GeneralAdvice,
+            signed ? rx.VerificationCode : null,
+            signed ? $"ODENTAL-RX|{rx.Id:N}|R{rx.Revision}|{rx.VerificationCode}" : null);
+    }
+
+    private static string Dosage(ExternalPrescriptionLine l)
+    {
+        var parts = new List<string>();
+        if (l.MorningDose != "0") parts.Add($"Sáng {l.MorningDose}");
+        if (l.NoonDose != "0") parts.Add($"Trưa {l.NoonDose}");
+        if (l.AfternoonDose != "0") parts.Add($"Chiều {l.AfternoonDose}");
+        if (l.EveningDose != "0") parts.Add($"Tối {l.EveningDose}");
+        var meal = l.MealTiming switch { "BeforeMeal" => "trước ăn", "WithMeal" => "trong bữa ăn", _ => "sau ăn" };
+        var doses = parts.Count > 0 ? string.Join(", ", parts) : "Theo chỉ dẫn";
+        return $"{l.Route}. {doses} ({l.Unit}, {meal}) × {l.Days} ngày";
+    }
+
+    // ---------- templates ----------
+
+    public async Task<PrescriptionTemplateDto[]> TemplatesAsync(int actor, string? search, string? diagnosis, string? status, int page, int pageSize, CancellationToken ct)
     {
         await access.RequireAsync(actor, "prescriptions.manage", ct);
-        var q = search?.Trim().ToUpperInvariant() ?? "";
-        var d = diagnosis?.Trim().ToUpperInvariant() ?? "";
+        if (search?.Length > 100) throw Fail("MSG04", field: "search", label: "Từ khóa");
+        if (diagnosis?.Length > 100) throw Fail("MSG04", field: "diagnosis", label: "Chẩn đoán");
+        if (page < 1) throw Fail("MSG04", field: "page");
+        if (pageSize is not (20 or 50 or 100)) throw Fail("MSG04", field: "pageSize");
+        var q = search?.Trim().ToUpper() ?? "";
+        var d = diagnosis?.Trim().ToUpper() ?? "";
 
-        var query = db.Set<PrescriptionTemplate>().Include(t => t.Lines)
-            .AsNoTracking().Where(t => t.IsActive);
-
-        if (!string.IsNullOrEmpty(q))
-            query = query.Where(t => t.Name.ToUpper().Contains(q) || t.Code.ToUpper().Contains(q));
-        if (!string.IsNullOrEmpty(d))
-            query = query.Where(t => t.DiagnosisKind != null && t.DiagnosisKind.ToUpper().Contains(d));
-
-        var items = await query.OrderBy(t => t.Name).Skip((page - 1) * pageSize).Take(pageSize).ToArrayAsync(ct);
+        var query = db.Set<PrescriptionTemplate>().AsNoTracking().Include(t => t.Lines).AsQueryable();
+        query = (status ?? "Active") switch
+        {
+            "Active" => query.Where(t => t.IsActive),
+            "Inactive" => query.Where(t => !t.IsActive),
+            "All" => query,
+            _ => throw Fail("MSG04", field: "status", label: "Trạng thái")
+        };
+        if (q.Length > 0) query = query.Where(t => t.Name.ToUpper().Contains(q) || t.Code.ToUpper().Contains(q));
+        if (d.Length > 0) query = query.Where(t => t.DiagnosisKind != null && t.DiagnosisKind.ToUpper().Contains(d));
+        var items = await query.OrderBy(t => t.Name).ThenBy(t => t.Id).Skip((page - 1) * pageSize).Take(pageSize).ToArrayAsync(ct);
         return items.Select(TemplateDto).ToArray();
     }
 
     public async Task<PrescriptionTemplateDto> TemplateAsync(int actor, Guid id, CancellationToken ct)
     {
         await access.RequireAsync(actor, "prescriptions.manage", ct);
-        var template = await db.Set<PrescriptionTemplate>().Include(t => t.Lines)
-            .AsNoTracking().SingleOrDefaultAsync(t => t.Id == id, ct)
-            ?? throw Error("MSG113", 404);
+        var template = await db.Set<PrescriptionTemplate>().AsNoTracking().Include(t => t.Lines).SingleOrDefaultAsync(t => t.Id == id, ct)
+            ?? throw Fail("MSG113", 404);
         return TemplateDto(template);
     }
 
-    public async Task<PrescriptionTemplateDto> SaveTemplateAsync(int actor, Guid? id, SavePrescriptionTemplate command, CancellationToken ct)
+    public async Task<PrescriptionTemplateDto> SaveTemplateAsync(int actor, Guid? id, SavePrescriptionTemplate c, CancellationToken ct)
     {
         await access.RequireAsync(actor, "prescriptions.manage", ct);
-        if (command.RequestKey == Guid.Empty || string.IsNullOrWhiteSpace(command.Name) || command.Lines == null || command.Lines.Length == 0)
-            throw Error("MSG04");
+        if (c.RequestKey == Guid.Empty) throw Fail("MSG04", field: "requestKey");
+        var code = c.Code?.Trim() ?? "";
+        var name = c.Name?.Trim() ?? "";
+        if (code.Length == 0) throw Fail("MSG02", field: "code", label: "Mã mẫu");
+        if (code.Length > 40) throw Fail("MSG04", field: "code", label: "Mã mẫu");
+        if (name.Length == 0) throw Fail("MSG02", field: "name", label: "Tên mẫu");
+        if (name.Length > 200) throw Fail("MSG04", field: "name", label: "Tên mẫu");
+        if (c.DiagnosisKind?.Trim().Length > 100) throw Fail("MSG04", field: "diagnosisKind", label: "Chẩn đoán gợi ý");
+        if (c.Description?.Trim().Length > 1000) throw Fail("MSG04", field: "description", label: "Mô tả");
+        if (c.Lines is not { Length: > 0 }) throw Fail("MSG02", field: "lines", label: "Danh sách thuốc");
+        if (c.Lines.Length > PrescriptionRules.MaxTemplateLines) throw Fail("MSG04", field: "lines", label: "Danh sách thuốc");
+        var values = c.Lines.Select(l => Validate(l.Route, l.MorningDose, l.NoonDose, l.AfternoonDose, l.EveningDose, l.MealTiming, l.Days, l.Quantity, l.Instructions)).ToArray();
+        var hash = Hash(new { op = "template.save", id, c });
 
-        await using var tx = await db.Database.BeginTransactionAsync(ct);
-        await db.Database.ExecuteSqlRawAsync("SELECT pg_advisory_xact_lock(6462362088)", ct);
-
-        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { id, command }, ClinicSettingsStore.Json))));
-        var prior = await db.Set<PrescriptionCommandReceipt>().AsNoTracking()
-            .SingleOrDefaultAsync(x => x.ActorId == actor && x.RequestKey == command.RequestKey, ct);
-        if (prior != null)
-        {
-            if (prior.Fingerprint != hash) throw Error("MSG111", 409);
-            return JsonSerializer.Deserialize<PrescriptionTemplateDto>(prior.ResultJson, ClinicSettingsStore.Json)!;
-        }
+        await using var tx = await BeginAsync(ct);
+        var replay = await ReplayAsync<PrescriptionTemplateDto>(actor, c.RequestKey, hash, ct);
+        if (replay.Found) return replay.Result!;
 
         PrescriptionTemplate template;
-        string beforeJson = "{}";
+        var before = "{}";
         var now = clock.GetUtcNow();
-
         if (id.HasValue)
         {
-            template = await db.Set<PrescriptionTemplate>().Include(t => t.Lines)
-                .SingleOrDefaultAsync(t => t.Id == id, ct) ?? throw Error("MSG113", 404);
-            if (template.Version != command.ExpectedVersion) throw Error("MSG111", 409);
-
-            beforeJson = JsonSerializer.Serialize(TemplateDto(template), ClinicSettingsStore.Json);
+            template = await db.Set<PrescriptionTemplate>().Include(t => t.Lines).SingleOrDefaultAsync(t => t.Id == id, ct) ?? throw Fail("MSG113", 404);
+            if (template.Version != c.ExpectedVersion) throw Fail("MSG111", 409, currentVersion: template.Version);
+            if (!string.Equals(template.Code, code, StringComparison.Ordinal)) throw Fail("MSG04", field: "code", label: "Mã mẫu");
+            before = JsonSerializer.Serialize(TemplateDto(template), Json);
             template.Lines.Clear();
             template.Version++;
         }
         else
         {
-            if (command.ExpectedVersion != 0) throw Error("MSG111", 409);
-            var exists = await db.Set<PrescriptionTemplate>().AnyAsync(t => t.Code == command.Code, ct);
-            if (exists) throw Error("MSG201", 409); // Unique code constraint
-
-            template = new PrescriptionTemplate
-            {
-                Code = command.Code.Trim(),
-                CreatedBy = actor,
-                CreatedAt = now,
-                IsActive = true
-            };
+            if (c.ExpectedVersion != 0) throw Fail("MSG111", 409, currentVersion: 0);
+            if (await db.Set<PrescriptionTemplate>().AnyAsync(t => t.Code.ToUpper() == code.ToUpper(), ct)) throw Fail("MSG201", 409, "code", "mẫu đơn thuốc");
+            template = new PrescriptionTemplate { Code = code, CreatedBy = actor, CreatedAt = now, IsActive = true, Version = 1 };
             db.Add(template);
         }
-
-        template.Name = command.Name.Trim();
-        template.DiagnosisKind = command.DiagnosisKind?.Trim();
-        template.Description = command.Description?.Trim();
+        template.Name = name;
+        template.DiagnosisKind = string.IsNullOrWhiteSpace(c.DiagnosisKind) ? null : c.DiagnosisKind.Trim();
+        template.Description = string.IsNullOrWhiteSpace(c.Description) ? null : c.Description.Trim();
         template.UpdatedBy = actor;
         template.UpdatedAt = now;
 
-        var medicineIds = command.Lines.Select(l => l.MedicineId).Distinct().ToArray();
+        var medicineIds = c.Lines.Select(l => l.MedicineId).Distinct().ToArray();
         var medicines = await db.Set<CatalogMedicine>().AsNoTracking()
-            .Where(m => medicineIds.Contains(m.Id) && m.IsActive).ToDictionaryAsync(m => m.Id, ct);
-
-        foreach (var lineInput in command.Lines)
+            .Where(m => medicineIds.Contains(m.Id) && m.IsActive && m.PrescriptionEligible).ToDictionaryAsync(m => m.Id, ct);
+        for (var i = 0; i < c.Lines.Length; i++)
         {
-            if (!medicines.TryGetValue(lineInput.MedicineId, out var med))
-                throw Error("MSG113", 404);
-
+            var input = c.Lines[i];
+            var v = values[i];
+            if (!medicines.TryGetValue(input.MedicineId, out var med)) throw Fail("MSG113", 404, $"lines[{i}].medicineId");
             template.Lines.Add(new PrescriptionTemplateLine
             {
-                TemplateId = template.Id,
-                MedicineId = med.Id,
-                MedicineCode = med.Code,
-                MedicineName = med.Name,
-                ActiveIngredient = med.ActiveIngredient,
-                Strength = med.Strength,
-                DosageForm = med.DosageForm,
-                Unit = med.BaseUnit,
-                Route = lineInput.Route,
-                MorningDose = lineInput.MorningDose,
-                NoonDose = lineInput.NoonDose,
-                AfternoonDose = lineInput.AfternoonDose,
-                EveningDose = lineInput.EveningDose,
-                MealTiming = lineInput.MealTiming,
-                Days = lineInput.Days,
-                Quantity = lineInput.Quantity,
-                Instructions = string.IsNullOrWhiteSpace(lineInput.Instructions) ? (med.Instructions ?? "") : lineInput.Instructions,
-                SortOrder = lineInput.SortOrder
+                TemplateId = template.Id, MedicineId = med.Id, MedicineCode = med.Code, MedicineName = med.Name,
+                ActiveIngredient = med.ActiveIngredient, Strength = med.Strength, DosageForm = med.DosageForm, Unit = med.BaseUnit,
+                Route = v.Route.Length > 0 ? v.Route : string.IsNullOrWhiteSpace(med.Route) ? "Uống" : med.Route,
+                MorningDose = v.Morning, NoonDose = v.Noon, AfternoonDose = v.Afternoon, EveningDose = v.Evening, MealTiming = v.Meal,
+                Days = v.Days, Quantity = v.Quantity, Instructions = v.Instructions ?? med.Instructions ?? "", SortOrder = i
             });
         }
 
         var result = TemplateDto(template);
-        var afterJson = JsonSerializer.Serialize(result, ClinicSettingsStore.Json);
-
-        db.Add(new PrescriptionAudit
-        {
-            ActorId = actor,
-            TemplateId = template.Id,
-            Action = id.HasValue ? "TemplateUpdate" : "TemplateCreate",
-            Reason = id.HasValue ? "Cập nhật mẫu đơn thuốc" : "Tạo mẫu đơn thuốc mới",
-            BeforeJson = beforeJson,
-            AfterJson = afterJson,
-            At = now
-        });
-
-        db.Add(new PrescriptionCommandReceipt
-        {
-            ActorId = actor,
-            RequestKey = command.RequestKey,
-            Fingerprint = hash,
-            ResultJson = afterJson
-        });
-
+        Record(actor, null, template.Id, id.HasValue ? "TemplateUpdate" : "TemplateCreate", id.HasValue ? "Cập nhật mẫu đơn thuốc" : "Tạo mẫu đơn thuốc",
+            before, result, c.RequestKey, hash, result);
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
         return result;
     }
 
-    public async Task<PrescriptionTemplateDto> SetTemplateStateAsync(int actor, Guid id, Guid requestKey, int expectedVersion, bool active, string reason, CancellationToken ct)
+    public async Task<PrescriptionTemplateDto> SetTemplateStateAsync(int actor, Guid id, TemplateStateCommand c, CancellationToken ct)
     {
         await access.RequireAsync(actor, "prescriptions.manage", ct);
-        await using var tx = await db.Database.BeginTransactionAsync(ct);
-        await db.Database.ExecuteSqlRawAsync("SELECT pg_advisory_xact_lock(6462362088)", ct);
+        if (c.RequestKey == Guid.Empty) throw Fail("MSG04", field: "requestKey");
+        var reason = c.Reason?.Trim() ?? "";
+        if (!c.Active && reason.Length == 0) throw Fail("MSG02", field: "reason", label: "Lý do");
+        if (reason.Length > 500) throw Fail("MSG04", field: "reason", label: "Lý do");
+        var hash = Hash(new { op = "template.state", id, c });
 
-        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { id, requestKey, expectedVersion, active, reason }, ClinicSettingsStore.Json))));
-        var prior = await db.Set<PrescriptionCommandReceipt>().AsNoTracking()
-            .SingleOrDefaultAsync(x => x.ActorId == actor && x.RequestKey == requestKey, ct);
-        if (prior != null)
-        {
-            if (prior.Fingerprint != hash) throw Error("MSG111", 409);
-            return JsonSerializer.Deserialize<PrescriptionTemplateDto>(prior.ResultJson, ClinicSettingsStore.Json)!;
-        }
+        await using var tx = await BeginAsync(ct);
+        var replay = await ReplayAsync<PrescriptionTemplateDto>(actor, c.RequestKey, hash, ct);
+        if (replay.Found) return replay.Result!;
 
-        var template = await db.Set<PrescriptionTemplate>().Include(t => t.Lines)
-            .SingleOrDefaultAsync(t => t.Id == id, ct) ?? throw Error("MSG113", 404);
-        if (template.Version != expectedVersion) throw Error("MSG111", 409);
-
-        var beforeJson = JsonSerializer.Serialize(TemplateDto(template), ClinicSettingsStore.Json);
-        template.IsActive = active;
+        var template = await db.Set<PrescriptionTemplate>().Include(t => t.Lines).SingleOrDefaultAsync(t => t.Id == id, ct) ?? throw Fail("MSG113", 404);
+        if (template.Version != c.ExpectedVersion) throw Fail("MSG111", 409, currentVersion: template.Version);
+        var before = JsonSerializer.Serialize(TemplateDto(template), Json);
+        template.IsActive = c.Active;
         template.Version++;
         template.UpdatedBy = actor;
         template.UpdatedAt = clock.GetUtcNow();
 
         var result = TemplateDto(template);
-        var afterJson = JsonSerializer.Serialize(result, ClinicSettingsStore.Json);
-
-        db.Add(new PrescriptionAudit
-        {
-            ActorId = actor,
-            TemplateId = template.Id,
-            Action = "TemplateState",
-            Reason = reason,
-            BeforeJson = beforeJson,
-            AfterJson = afterJson,
-            At = clock.GetUtcNow()
-        });
-
-        db.Add(new PrescriptionCommandReceipt
-        {
-            ActorId = actor,
-            RequestKey = requestKey,
-            Fingerprint = hash,
-            ResultJson = afterJson
-        });
-
+        Record(actor, null, template.Id, "TemplateState", reason.Length > 0 ? reason : "Khôi phục mẫu đơn thuốc", before, result, c.RequestKey, hash, result);
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
         return result;
     }
 
+    // ---------- patient self-service ----------
+
+    private IQueryable<int> LinkedPatients(int actor) => db.Set<PatientAccountLink>().AsNoTracking()
+        .Where(x => x.AccountId == actor && x.Status == PatientLinkStatus.Verified && x.PatientId != null).Select(x => x.PatientId!.Value);
+
     public async Task<PatientPrescriptionDto[]> PatientPrescriptionsAsync(int actor, CancellationToken ct)
     {
-        // 1. Verify patient link
-        var link = await db.Set<PatientAccountLink>().AsNoTracking()
-            .SingleOrDefaultAsync(x => x.AccountId == actor && x.Status == PatientLinkStatus.Verified, ct)
-            ?? throw Error("MSG06", 403);
-
-        if (!link.PatientId.HasValue) return [];
-
-        var visits = await db.Set<Visit>().AsNoTracking()
-            .Where(v => v.PatientId == link.PatientId.Value).Select(v => v.Id).ToArrayAsync(ct);
-
-        var finalizedLines = await db.Set<ExternalPrescriptionLine>().AsNoTracking()
-            .Where(l => visits.Contains(l.VisitId) && l.Status == "Finalized")
-            .OrderByDescending(l => l.FinalizedAt).ToArrayAsync(ct);
-
-        if (finalizedLines.Length == 0) return [];
-
-        var visitGroups = finalizedLines.GroupBy(l => l.VisitId);
-        var result = new List<PatientPrescriptionDto>();
-
-        foreach (var group in visitGroups)
-        {
-            var first = group.First();
-            var visit = await db.Set<Visit>().AsNoTracking().SingleOrDefaultAsync(v => v.Id == group.Key, ct);
-            var branch = await db.Set<SchedulingBranch>().AsNoTracking().SingleOrDefaultAsync(b => b.Id == first.BranchId, ct);
-            var doctor = await db.Set<ApplicationUser>().AsNoTracking().SingleOrDefaultAsync(u => u.Id == first.PrescribedByDoctorId, ct);
-
-            var exam = await db.Set<VisitExamination>().AsNoTracking().SingleOrDefaultAsync(x => x.VisitId == group.Key, ct);
-            string diag = "Khám răng định kỳ";
-            if (exam != null && !string.IsNullOrWhiteSpace(exam.ContentJson))
-            {
-                try
-                {
-                    using var doc = JsonDocument.Parse(exam.ContentJson);
-                    if (doc.RootElement.TryGetProperty("diagnosis", out var diagProp)) diag = diagProp.GetString() ?? diag;
-                }
-                catch { }
-            }
-
-            var meds = group.Select(l => new PatientPrescriptionMedicineDto(
-                l.MedicineName, l.Strength, l.DosageForm, l.Quantity, l.Unit, l.Route,
-                l.MorningDose, l.NoonDose, l.AfternoonDose, l.EveningDose, l.MealTiming,
-                l.Days, l.Instructions)).ToArray();
-
-            result.Add(new PatientPrescriptionDto(
-                group.Key,
-                branch?.Name ?? "Chi nhánh cơ sở",
-                doctor?.FullName ?? "Bác sĩ phụ trách",
-                diag,
-                first.FinalizedAt ?? first.CreatedAt,
-                first.Status,
-                "Đơn thuốc chỉ định mua ngoài tại các hiệu thuốc tư nhân hoặc nhà thuốc bệnh viện. Phòng khám không bán thuốc tại chỗ.",
-                meds));
-        }
-
-        return result.ToArray();
+        var patients = LinkedPatients(actor);
+        var signed = await db.Set<ExternalPrescription>().AsNoTracking()
+            .Where(x => x.Status == PrescriptionStatuses.Finalized && patients.Contains(x.PatientId))
+            .OrderByDescending(x => x.FinalizedAt).ThenByDescending(x => x.Id).Take(200).ToArrayAsync(ct);
+        return await PatientDtosAsync(signed, ct);
     }
 
-    public async Task<PatientPrescriptionDto> PatientPrescriptionAsync(int actor, Guid visitId, CancellationToken ct)
+    public async Task<PatientPrescriptionDetailDto> PatientPrescriptionAsync(int actor, Guid visitId, CancellationToken ct)
     {
-        var list = await PatientPrescriptionsAsync(actor, ct);
-        return list.FirstOrDefault(x => x.VisitId == visitId) ?? throw Error("MSG113", 404);
+        var patients = LinkedPatients(actor);
+        var rx = await db.Set<ExternalPrescription>().AsNoTracking()
+            .SingleOrDefaultAsync(x => x.VisitId == visitId && x.Status == PrescriptionStatuses.Finalized && patients.Contains(x.PatientId), ct)
+            ?? throw Fail("MSG113", 404);
+        var visit = await db.Set<Visit>().AsNoTracking().SingleAsync(x => x.Id == visitId, ct);
+        var dto = (await PatientDtosAsync([rx], ct))[0];
+        return new PatientPrescriptionDetailDto(dto, await PrintAsync(rx, visit, ct));
+    }
+
+    private async Task<PatientPrescriptionDto[]> PatientDtosAsync(ExternalPrescription[] rows, CancellationToken ct)
+    {
+        if (rows.Length == 0) return [];
+        var ids = rows.Select(x => x.Id).ToArray();
+        var lines = await db.Set<ExternalPrescriptionLine>().AsNoTracking().Where(x => ids.Contains(x.PrescriptionId))
+            .OrderBy(x => x.CreatedAt).ThenBy(x => x.Id).ToArrayAsync(ct);
+        var branchIds = rows.Select(x => x.BranchId).Distinct().ToArray();
+        var profiles = await db.Set<BranchProfile>().AsNoTracking().Where(x => branchIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.Name, ct);
+        var branches = await db.Set<SchedulingBranch>().AsNoTracking().Where(x => branchIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.Name, ct);
+        var names = await NamesAsync(rows.Select(x => x.FinalizedBy ?? x.PrescribedByDoctorId), ct);
+        return rows.Select(rx => new PatientPrescriptionDto(rx.VisitId, rx.Id, rx.Revision, rx.Revision > 1,
+            profiles.GetValueOrDefault(rx.BranchId) ?? branches.GetValueOrDefault(rx.BranchId) ?? "",
+            names.GetValueOrDefault(rx.FinalizedBy ?? rx.PrescribedByDoctorId) ?? "",
+            rx.Diagnosis ?? "", rx.FinalizedAt ?? rx.UpdatedAt, rx.GeneralAdvice, ExternalPurchaseNotice,
+            lines.Where(l => l.PrescriptionId == rx.Id).Select(l => new PatientPrescriptionMedicineDto(
+                l.MedicineName, l.Strength, l.DosageForm, l.Quantity, l.Unit, l.Route,
+                l.MorningDose, l.NoonDose, l.AfternoonDose, l.EveningDose, l.MealTiming, l.Days, l.Instructions)).ToArray())).ToArray();
     }
 }

@@ -1,196 +1,137 @@
 # Phân hệ Quản lý & Kê đơn thuốc (Prescription Management)
 
-Ngày cập nhật: 07/11/2026. Trạng thái: Đặc tả kiến trúc và thiết kế kỹ thuật chuẩn oDental.
+Ngày cập nhật: 07/11/2026 (bản 2 — header đơn thuốc, phiên bản điều chỉnh, migration, mobile). Trạng thái: đặc tả triển khai.
 Tài liệu liên quan: [S19-OPTIONAL-PRESCRIPTION.vi.md](S19-OPTIONAL-PRESCRIPTION.vi.md), [S58-SUPPLY-CATALOGS.md](S58-SUPPLY-CATALOGS.md), [S41-MOBILE-MEDICAL-RECORDS.md](S41-MOBILE-MEDICAL-RECORDS.md).
 
 ---
 
-## 1. Nguyên tắc cốt lõi & Quy chuẩn nghiệp vụ oDental
+## 1. Nguyên tắc cốt lõi
 
-1. **Đơn thuốc mua ngoài (External Prescription Only)**:
-   - Phòng khám nha khoa không bán lẻ thuốc tại cơ sở.
-   - Mọi đơn thuốc bác sĩ kê đều là **Đơn thuốc mua ngoài** để bệnh nhân mang ra hiệu thuốc tư nhân hoặc nhà thuốc bệnh viện mua.
-   - **Nghiêm cấm tuyệt đối**: Không có nút "Nhận thuốc tại kho phòng khám", không có luồng "Thanh toán tiền thuốc tại quầy thu ngân", không hạch toán tiền thuốc vào viện phí hay công nợ bệnh nhân.
+1. **Đơn thuốc mua ngoài (External Prescription Only)**
+   - Phòng khám không bán thuốc. Mọi đơn là **đơn mua ngoài**; bệnh nhân mang ra hiệu thuốc.
+   - Nghiêm cấm: nút "Nhận thuốc tại kho phòng khám", luồng "Thanh toán tiền thuốc tại quầy", hạch toán tiền thuốc vào viện phí/công nợ. Đơn thuốc không tạo `FINANCE_CHARGE`, không trừ tồn kho.
+   - `ReferencePrice` của danh mục thuốc chỉ để tham khảo, không hiển thị trên bản in/app bệnh nhân.
 
-2. **Phân cấp dữ liệu Global Master vs Branch-Scoped**:
-   - **Global Master Data**: Danh mục dược phẩm (`CatalogMedicine`), Mẫu đơn thuốc chuẩn (`PrescriptionTemplate`). Dùng chung toàn hệ thống, không phụ thuộc chi nhánh.
-   - **Operational Data (Branch-Scoped)**: Đơn thuốc phát sinh theo lượt khám (`Prescription` / `ExternalPrescriptionLine`) gắn chặt với `VisitId`, `PatientId`, `PrescribedByDoctorId` và `BranchId`.
+2. **Global Master vs Branch-Scoped**
+   - Global: danh mục thuốc `CATALOG_MEDICINE` (quản lý tại `/settings/medicines`, xem [S58-SUPPLY-CATALOGS.md](S58-SUPPLY-CATALOGS.md)), mẫu đơn `PRESCRIPTION_TEMPLATE`.
+   - Branch-scoped: đơn theo lượt khám `EXTERNAL_PRESCRIPTION` + `EXTERNAL_PRESCRIPTION_LINE`, gắn `VisitId`, `PatientId`, `BranchId`, `PrescribedByDoctorId`. Mọi thao tác đọc/ghi đơn của staff kiểm quyền và phạm vi chi nhánh của **Visit** ở server (`prescriptions.read` / `prescriptions.manage` + branch scope), không tin `branchId` từ UI. Lệnh ghi trên đơn của lượt khám còn yêu cầu tài khoản có vai trò **Dentist** (bác sĩ được kê đơn); quản lý mẫu đơn chỉ cần `prescriptions.manage`.
 
-3. **Tính toàn vẹn lâm sàng & Concurrency / Idempotency**:
-   - Mọi thao tác ghi (tạo/sửa dòng thuốc, áp dụng mẫu, hoàn tất đơn) bắt buộc có `expectedVersion` và `requestKey` (UUID).
-   - Ghi dữ liệu nghiệp vụ, `PrescriptionAudit` và `PrescriptionCommandReceipt` trong cùng một Database Transaction nguyên tử.
-   - Khi retry cùng `requestKey` và fingerprint payload, trả kết quả đã lưu từ `PrescriptionCommandReceipt`, không ghi đè hay sinh trùng lặp.
-   - Trạng thái đơn thuốc: `Draft` (Đang kê nháp) -> `Finalized` (Đã hoàn tất/ký xác nhận). Đơn đã `Finalized` là bất biến (immutable), không được sửa trực tiếp; muốn thay đổi phải tạo bản bổ sung (Addendum) có lý do lâm sàng.
+3. **Concurrency / Idempotency**
+   - Mọi lệnh ghi có `requestKey` (UUID, khác `Guid.Empty`) và `expectedVersion`.
+   - Dữ liệu nghiệp vụ + `PRESCRIPTION_AUDIT` + `PRESCRIPTION_COMMAND_RECEIPT` ghi trong **một transaction** (khóa advisory chung của phân hệ).
+   - Retry cùng `requestKey` + cùng fingerprint payload trả lại kết quả đã lưu; cùng `requestKey` nhưng payload khác trả `409 MSG111`. Áp dụng cho cả lệnh xóa dòng.
+   - Lệnh trên dòng thuốc kiểm `expectedVersion` của **dòng**; lệnh trên cả đơn (áp dụng mẫu, sửa lời dặn chung, hoàn tất, tạo bản điều chỉnh) kiểm `expectedVersion` của **đơn**. Mọi thay đổi dòng cũng tăng `Version` của đơn để lệnh hoàn tất luôn ký đúng nội dung bác sĩ vừa xem. Sai version → `409 MSG111` kèm `currentVersion`.
 
----
-
-## 2. Mô hình dữ liệu & Quan hệ thực thể
-
-### 2.1. Danh mục Thuốc dùng chung (`CatalogMedicine`)
-Kế thừa và chuẩn hóa từ `CATALOG_MEDICINE`:
-- `Id`: `Guid` (PK)
-- `Code`: `string(40)` (Unique, mã thuốc theo quy chuẩn hoặc mã nội bộ)
-- `Name`: `string(200)` (Tên biệt dược)
-- `ActiveIngredient`: `string(200)` (Hoạt chất chính)
-- `Strength`: `string(200)` (Hàm lượng, ví dụ: 500mg, 100ml)
-- `DosageForm`: `string(200)` (Dạng bào chế: Viên nén, viên nang, hỗn dịch, mỡ bôi...)
-- `BaseUnit`: `string(40)` (Đơn vị tính: viên, gói, chai, tuýp...)
-- `Route`: `string(40)` (Đường dùng: Uống, Bôi, Súc miệng, Đặt, Nhỏ...)
-- `Packaging`: `string(160)` (Quy cách đóng gói)
-- `Contraindications`: `string(1000)` (Chống chỉ định)
-- `AllergyWarnings`: `string(1000)` (Cảnh báo dị ứng, nhóm hoạt chất cảnh báo)
-- `Instructions`: `string(1000)` (Hướng dẫn sử dụng gợi ý mặc định)
-- `ReferencePrice`: `long?` (Giá tham khảo nếu có)
-- `PrescriptionEligible`: `bool` (Được phép kê đơn, mặc định `true`)
-- `IsActive`: `bool` (Trạng thái sử dụng)
-- `Version`: `int` (Concurrency token)
-
-### 2.2. Mẫu đơn thuốc chuẩn (`PrescriptionTemplate` & `PrescriptionTemplateLine`)
-Bảng `PRESCRIPTION_TEMPLATE`:
-- `Id`: `Guid` (PK)
-- `Code`: `string(40)` (Unique)
-- `Name`: `string(200)` (Ví dụ: "Đơn thuốc sau nhổ răng khôn", "Đơn thuốc viêm quanh cuống", "Đơn thuốc sau cấy ghép Implant", "Đơn thuốc viêm nướu hoại tử lở loét")
-- `DiagnosisKind`: `string(100)` (Loại chẩn đoán gợi ý)
-- `Description`: `string(1000)` (Mô tả, ghi chú lâm sàng cho mẫu)
-- `IsActive`: `bool` (Mặc định `true`)
-- `Version`: `int` (Concurrency token)
-- `CreatedBy`: `int` (FK `USER_ACCOUNT`)
-- `CreatedAt`: `DateTimeOffset`
-- `UpdatedBy`: `int`
-- `UpdatedAt`: `DateTimeOffset`
-
-Bảng `PRESCRIPTION_TEMPLATE_LINE`:
-- `Id`: `Guid` (PK)
-- `TemplateId`: `Guid` (FK `PRESCRIPTION_TEMPLATE`)
-- `MedicineId`: `Guid` (FK `CATALOG_MEDICINE`)
-- `MedicineCode`: `string(40)`
-- `MedicineName`: `string(200)`
-- `ActiveIngredient`: `string(200)`
-- `Strength`: `string(200)`
-- `DosageForm`: `string(200)`
-- `Unit`: `string(40)`
-- `Route`: `string(40)`
-- `MorningDose`: `string(20)` (Liều sáng: ví dụ "1 viên", "0")
-- `NoonDose`: `string(20)` (Liều trưa: ví dụ "1 viên", "0")
-- `AfternoonDose`: `string(20)` (Liều chiều)
-- `EveningDose`: `string(20)` (Liều tối: ví dụ "1 viên")
-- `MealTiming`: `string(30)` (`BeforeMeal` - Trước ăn, `AfterMeal` - Sau ăn, `WithMeal` - Trong ăn)
-- `Days`: `int` (Số ngày uống gợi ý, ví dụ 5 ngày, 7 ngày)
-- `Quantity`: `int` (Tổng số lượng = tổng liều/ngày * số ngày)
-- `Instructions`: `string(1000)` (Cách dùng chi tiết)
-- `SortOrder`: `int`
-
-### 2.3. Đơn thuốc theo Lượt khám (`ExternalPrescription` & `ExternalPrescriptionLine`)
-Bảng `EXTERNAL_PRESCRIPTION_LINE`:
-- `Id`: `Guid` (PK)
-- `VisitId`: `Guid` (FK `VISIT`)
-- `PatientId`: `int` (FK `PATIENT_PROFILE`)
-- `BranchId`: `int` (FK `SCHEDULING_BRANCH`)
-- `PrescribedByDoctorId`: `int` (FK `USER_ACCOUNT`)
-- `MedicineId`: `Guid` (FK `CATALOG_MEDICINE`)
-- `MedicineCode`: `string(40)`
-- `MedicineName`: `string(200)`
-- `ActiveIngredient`: `string(200)`
-- `Strength`: `string(200)`
-- `DosageForm`: `string(200)`
-- `Unit`: `string(100)`
-- `Route`: `string(40)`
-- `MorningDose`: `string(20)`
-- `NoonDose`: `string(20)`
-- `AfternoonDose`: `string(20)`
-- `EveningDose`: `string(20)`
-- `MealTiming`: `string(30)`
-- `Days`: `int`
-- `Quantity`: `int`
-- `Instructions`: `string(1000)`
-- `Status`: `string(20)` (`Draft` | `Finalized`)
-- `FinalizedAt`: `DateTimeOffset?`
-- `Version`: `int`
-- `CreatedBy`: `int`
-- `CreatedAt`: `DateTimeOffset`
-- `UpdatedBy`: `int`
-- `UpdatedAt`: `DateTimeOffset`
-
-Bảng `PRESCRIPTION_COMMAND_RECEIPT`:
-- `ActorId`: `int` (PK 1)
-- `RequestKey`: `Guid` (PK 2)
-- `Fingerprint`: `string(64)` (SHA-256)
-- `ResultJson`: `jsonb`
+4. **Vòng đời & bất biến**
+   - Mỗi lượt khám có chuỗi phiên bản đơn `Revision = 1, 2, ...`. Tại một thời điểm có tối đa một phiên bản `Draft`.
+   - `Draft` → `Finalized` (bác sĩ bấm "Hoàn tất kê đơn"). Phiên bản `Finalized` **bất biến**: không thêm/sửa/xóa dòng, không áp dụng mẫu, không sửa lời dặn (`409 MSG205`).
+   - Muốn thay đổi đơn đã ký: tạo **bản điều chỉnh** (correction/addendum) với lý do lâm sàng bắt buộc (1–500 ký tự). Bản điều chỉnh là `Draft` mới `Revision = n+1`, sao chép dòng và lời dặn của bản đã ký, `SupersedesId` trỏ về bản cũ. Khi bản điều chỉnh được hoàn tất, bản cũ chuyển `Superseded` (vẫn đọc được trong lịch sử, không bao giờ bị xóa).
+   - Đơn `Draft` rỗng (chưa có dòng) không thể hoàn tất (`400 MSG04`).
+   - Điều kiện lượt khám: Revision 1 chỉ ghi được khi Visit `InProgress`. Bản điều chỉnh (Revision > 1) được tạo/sửa/hoàn tất khi Visit `InProgress` hoặc `Completed`. Visit `Queued`/`Cancelled` không cho ghi (`409 MSG205`).
+   - Không hard-delete đơn đã ký. Xóa dòng chỉ áp dụng cho dòng thuộc bản `Draft`.
 
 ---
 
-## 3. Quy trình & Giao diện Kê đơn tại Lượt khám (Staff Web / Doctor UI)
+## 2. Mô hình dữ liệu
 
-1. **Ngữ cảnh kê đơn**:
-   - Tích hợp trực tiếp trong màn hình Lượt khám (`VisitPage` / `PrescriptionPanel`) hoặc trang kê đơn riêng (`/visits/{visitId}/prescription`).
-   - Tự động nhận `VisitId`, `PatientId`, `BranchId`, và Bác sĩ kê đơn từ phiên làm việc (`PrescribedByDoctorId`).
+### 2.1. `CATALOG_MEDICINE` (đã có, S58)
+`Code`, `Name`, `ActiveIngredient`, `Strength`, `DosageForm`, `BaseUnit`, `Route`, `Packaging`, `Contraindications`, `AllergyWarnings`, `Instructions`, `ReferencePrice`, `PrescriptionEligible`, `IsActive`, `Version`. Ngừng dùng/khôi phục, không xóa cứng. Chỉ thuốc `IsActive && PrescriptionEligible` mới chọn được khi kê/lập mẫu.
 
-2. **Điền nhanh từ Mẫu đơn thuốc (Prescription Templates)**:
-   - Nút "Chọn mẫu đơn thuốc" mở Modal danh sách mẫu (`PrescriptionTemplateSelectModal`).
-   - Lọc nhanh theo chẩn đoán của lượt khám hoặc tìm kiếm từ khóa.
-   - Bấm "Áp dụng": Tự động nạp toàn bộ các dòng thuốc trong mẫu vào đơn của lượt khám hiện tại. Bác sĩ có thể chỉnh sửa liều lượng, số ngày hoặc xóa bớt dòng tùy tình trạng bệnh nhân.
+### 2.2. `PRESCRIPTION_TEMPLATE` / `PRESCRIPTION_TEMPLATE_LINE`
+- Template: `Id`, `Code` (unique, 1–40), `Name` (1–200), `DiagnosisKind` (≤100), `Description` (≤1000), `IsActive`, `Version`, `CreatedBy/At`, `UpdatedBy/At`.
+- Line: `TemplateId`, `MedicineId` + snapshot thuốc (`MedicineCode`, `MedicineName`, `ActiveIngredient`, `Strength`, `DosageForm`, `Unit`), `Route`, `MorningDose`, `NoonDose`, `AfternoonDose`, `EveningDose` (≤20 ký tự, `"0"` = không dùng buổi đó), `MealTiming` (`BeforeMeal|AfterMeal|WithMeal`), `Days` (1–365), `Quantity` (1–10.000), `Instructions` (≤1000), `SortOrder`.
+- Mẫu cần ít nhất 1 dòng, tối đa 30 dòng. Mã trùng → `409 MSG201`. Ngừng dùng/khôi phục qua `/state` kèm lý do; mẫu ngừng dùng không xuất hiện khi kê nhưng vẫn đọc được trong trang quản lý (lọc `status=Active|Inactive|All`).
 
-3. **Cảnh báo an toàn lâm sàng (Clinical Safety Warnings)**:
-   - Kiểm tra tiền sử dị ứng: So khớp tên hoạt chất (`ActiveIngredient`) và tên thuốc với tiền sử dị ứng trong hồ sơ bệnh nhân (`PatientProfile.MedicalHistory` / `AllergyHistory`).
-   - Cảnh báo trùng lặp: Nếu trong cùng đơn có 2 thuốc chứa cùng hoạt chất, cảnh báo màu cam/đỏ.
-   - Cảnh báo tương tác/chống chỉ định: Hiển thị ngay dưới ô chọn thuốc trước khi bấm lưu.
+### 2.3. `EXTERNAL_PRESCRIPTION` (header — mới)
+- `Id` (Guid), `VisitId`, `PatientId`, `BranchId`, `PrescribedByDoctorId`
+- `Revision` (int ≥ 1; unique `(VisitId, Revision)`)
+- `Status`: `Draft | Finalized | Superseded`
+- `GeneralAdvice` (≤1000) — lời dặn chung của bác sĩ
+- `Diagnosis` (≤1000) — snapshot chẩn đoán từ phiếu khám lúc hoàn tất
+- `CorrectionReason` (≤500, bắt buộc khi Revision > 1), `SupersedesId` (Guid?)
+- `FinalizedAt`, `FinalizedBy`, `VerificationCode` (16 ký tự hex, sinh lúc hoàn tất từ SHA-256 nội dung đơn)
+- `Version`, `CreatedBy/At`, `UpdatedBy/At`
 
-4. **Ký / Hoàn tất đơn thuốc (Finalize)**:
-   - Nút "Hoàn tất kê đơn (Ký số/Xác nhận)" chuyển trạng thái đơn sang `Finalized`.
-   - Đơn đã hoàn tất sẽ khóa sửa trực tiếp để bảo vệ tính pháp lý của hồ sơ bệnh án.
+### 2.4. `EXTERNAL_PRESCRIPTION_LINE`
+Như S19 + các cột liều: `PrescriptionId` (FK header, bắt buộc), `ActiveIngredient`, `Route`, `MorningDose`, `NoonDose`, `AfternoonDose`, `EveningDose`, `MealTiming`, `Days`, `Status` (đồng bộ với header), `FinalizedAt`, `PrescribedByDoctorId`, `Version`. Validation: `Quantity` 1–10.000; `Days` 1–365; mỗi liều ≤20 ký tự; `MealTiming` thuộc enum; `Route` ≤40; `Instructions` ≤1000 → sai trả `400 MSG04` kèm `field`.
 
-5. **In đơn thuốc quy chuẩn Bộ Y Tế**:
-   - Nút "In đơn thuốc" hỗ trợ khổ A4 và A5.
-   - Nội dung in bao gồm:
-     - Tên cơ sở khám chữa bệnh / Chi nhánh, địa chỉ, số hotline, logo.
-     - Họ tên bác sĩ kê đơn, chức danh, số Chứng chỉ hành nghề (CCHN).
-     - Thông tin bệnh nhân: Họ tên, Năm sinh/Tuổi, Giới tính, Địa chỉ, Mã bệnh nhân (`PatientCode`).
-     - Chẩn đoán lâm sàng / Chẩn đoán ICD-10.
-     - Bảng danh sách thuốc: Đánh số 1, 2, 3... Tên biệt dược, hàm lượng, số lượng (ghi số và chữ), đường dùng, liều dùng cụ thể (Sáng/Trưa/Chiều/Tối, Trước/Sau ăn), số ngày.
-     - Lời dặn chung của bác sĩ (ví dụ: Tái khám khi có dấu hiệu bất thường, uống nhiều nước...).
-     - Ngày tháng năm kê đơn, chữ ký bác sĩ.
-     - Mã QR Code xác thực mã đơn thuốc để quét kiểm tra tính nguyên bản.
+### 2.5. `PRESCRIPTION_AUDIT`, `PRESCRIPTION_COMMAND_RECEIPT`
+- Audit: `ActorId`, `BranchId`, `VisitId?`, `TemplateId?`, `Action` (`LineCreate|LineUpdate|LineDelete|TemplateApply|AdviceUpdate|Finalize|CorrectionCreate|TemplateCreate|TemplateUpdate|TemplateState`), `Reason`, `BeforeJson`, `AfterJson`, `At`.
+- Receipt: PK `(ActorId, RequestKey)`, `Fingerprint` (SHA-256 hex), `ResultJson`.
 
----
-
-## 4. Bệnh nhân xem đơn thuốc trên Mobile App (Patient App - React Native / Expo)
-
-1. **Phạm vi hiển thị**:
-   - Chỉ hiển thị các đơn thuốc ở trạng thái **`Finalized`** của lượt khám thuộc hồ sơ bệnh nhân đã được liên kết và xác minh (`Verified`).
-   - Hiển thị theo từng đợt khám / lượt khám trong mục "Hồ sơ sức khỏe / Đơn thuốc".
-
-2. **Giao diện thân thiện, dễ đọc**:
-   - Thẻ đơn thuốc hiển thị: Ngày kê đơn, Chi nhánh khám, Bác sĩ kê đơn, Chẩn đoán.
-   - Danh sách thuốc dạng thẻ trực quan:
-     - Tên thuốc, nồng độ/hàm lượng, dạng dùng.
-     - Số lượng và đơn vị.
-     - Bảng phân chia liều uống trong ngày có icon rõ ràng: Sáng, Trưa, Chiều, Tối kèm hướng dẫn Uống trước ăn hay Sau ăn.
-   - Lời dặn dò của bác sĩ được đóng khung nổi bật.
-   - Ghi chú minh bạch: "Đơn thuốc chỉ định mua tại hiệu thuốc ngoài. Phòng khám không bán thuốc tại chỗ."
-
-3. **Tính năng tiện ích**:
-   - Nút "Xem bản in đơn thuốc có chữ ký" / "Tải PDF đơn thuốc" để bệnh nhân lưu về máy hoặc mang ra quầy thuốc ngoài mua dễ dàng.
+### 2.6. Migration
+Migration `20261107050902_PrescriptionsAndBranchProfiles` (dùng chung với S58 chi nhánh; Up/Down viết tay, Designer + snapshot sinh bằng `dotnet ef`):
+- Thêm cột liều/đường dùng/hoạt chất/trạng thái vào `EXTERNAL_PRESCRIPTION_LINE` với default an toàn cho dòng cũ.
+- Tạo `EXTERNAL_PRESCRIPTION`, `PRESCRIPTION_TEMPLATE`, `PRESCRIPTION_TEMPLATE_LINE`, `PRESCRIPTION_AUDIT`.
+- Backfill: mỗi `VisitId` đã có dòng cũ sinh một header `Revision 1, Status Draft`, gắn `PrescriptionId` cho các dòng rồi đặt cột `NOT NULL`. Không tạo dữ liệu demo.
 
 ---
 
-## 5. Danh mục API Contracts
+## 3. Kê đơn tại lượt khám (Staff Web)
 
-### 5.1. Danh mục Mẫu đơn thuốc (Prescription Templates)
-- `GET /api/prescriptions/templates?search=&diagnosis=&page=1&pageSize=20` -> Danh sách mẫu paged
-- `GET /api/prescriptions/templates/{id}` -> Chi tiết mẫu kèm danh sách thuốc
-- `POST /api/prescriptions/templates` -> `{ requestKey, code, name, diagnosisKind, description, lines: [...] }`
-- `PUT /api/prescriptions/templates/{id}` -> `{ expectedVersion, requestKey, name, diagnosisKind, description, lines: [...] }`
-- `POST /api/prescriptions/templates/{id}/state` -> `{ expectedVersion, requestKey, active, reason }`
+1. **Ngữ cảnh**: khối `PrescriptionPanel` trong Tổng kết khám (S19) và trang riêng `/visits/{visitId}/prescription`. `VisitId`, `PatientId`, `BranchId` lấy từ Visit ở server; bác sĩ kê đơn = tài khoản đang thao tác (`PrescribedByDoctorId`).
+2. **Chọn mẫu đơn**: nút "Chọn mẫu đơn thuốc" mở modal, tìm theo từ khóa/chẩn đoán, xem trước dòng thuốc, bấm "Áp dụng" → server thêm các dòng của mẫu vào bản `Draft` hiện tại (bỏ qua dòng có thuốc đã ngừng dùng và báo số dòng bỏ qua). Bác sĩ chỉnh liều/số ngày/xóa dòng sau đó.
+3. **Từng dòng thuốc**: chọn thuốc bằng Select có tìm kiếm server (`q` theo mã, biệt dược, hoạt chất); đường dùng; liều Sáng/Trưa/Chiều/Tối; trước/sau/trong ăn; số ngày; tổng số lượng tự tính `ceil(tổng liều số/ngày × số ngày)` khi liều là số, vẫn cho chỉnh tay; lời dặn từng dòng.
+4. **Lời dặn chung**: ô "Lời dặn của bác sĩ" cho cả đơn, lưu bằng `PUT .../prescription` (Draft).
+5. **Cảnh báo an toàn lâm sàng** (`GET .../safety-check`, không chặn lưu):
+   - Dị ứng: so khớp hoạt chất/tên thuốc với `Allergies.Detail` của phiếu khám lượt này (khi `State = Present`) và tiền sử hành chính `IntakeHistoryOther` của hồ sơ bệnh nhân → cảnh báo đỏ.
+   - Nhóm dị ứng: so khớp từ khóa trong `AllergyWarnings` của thuốc với tiền sử dị ứng → cảnh báo đỏ.
+   - Trùng hoạt chất trong cùng đơn → cảnh báo cam.
+   - Có `Contraindications` → hiển thị lưu ý chống chỉ định (vàng) để bác sĩ đối chiếu.
+6. **Hoàn tất kê đơn**: xác nhận → `POST .../finalize` với `expectedVersion` của đơn. Sau khi hoàn tất, UI khóa sửa, hiện nút "In đơn thuốc" và "Tạo bản điều chỉnh".
+7. **Bản điều chỉnh**: modal nhập lý do lâm sàng bắt buộc → `POST .../corrections`. Panel hiển thị bản nháp điều chỉnh + lý do; lịch sử các phiên bản (ngày ký, bác sĩ, trạng thái) đọc được.
+8. **Xung đột 409 MSG111**: giữ nguyên form đang nhập, tải lại đơn để bác sĩ so sánh rồi lưu lại.
+9. **In đơn** (A5 mặc định, chọn A4): tên chi nhánh, địa chỉ, điện thoại, logo (nếu chi nhánh có logo đã upload), bác sĩ kê đơn (CCHN để trống dòng ký nếu hồ sơ nhân sự chưa có dữ liệu — không in giá trị giả), thông tin bệnh nhân (mã BN, họ tên, năm sinh, giới tính, địa chỉ), chẩn đoán, bảng thuốc đánh số (tên, hàm lượng, số lượng bằng số và chữ, đường dùng, liều cụ thể, số ngày), lời dặn chung, ngày kê, chữ ký bác sĩ, dòng "Đơn thuốc mua ngoài — phòng khám không bán thuốc", mã QR xác thực. Bản nháp in có watermark "BẢN NHÁP — CHƯA CÓ GIÁ TRỊ".
+   - QR chứa `ODENTAL-RX|{prescriptionId}|R{revision}|{verificationCode}`; `verificationCode` là 16 ký tự đầu SHA-256 của nội dung đơn đã ký.
 
-### 5.2. Kê đơn theo Lượt khám (Staff / Doctor API)
-- `GET /api/prescriptions/visits/{visitId}/lines` -> Danh sách dòng thuốc của lượt khám
-- `POST /api/prescriptions/visits/{visitId}/lines` -> Thêm dòng thuốc mới vào đơn
-- `PUT /api/prescriptions/visits/{visitId}/lines/{lineId}` -> Sửa dòng thuốc
-- `DELETE /api/prescriptions/visits/{visitId}/lines/{lineId}` -> Xóa dòng thuốc khỏi đơn nháp
-- `POST /api/prescriptions/visits/{visitId}/apply-template` -> Áp dụng cả mẫu đơn thuốc vào lượt khám
-- `POST /api/prescriptions/visits/{visitId}/finalize` -> Hoàn tất/ký đơn thuốc
-- `GET /api/prescriptions/visits/{visitId}/print` -> Dữ liệu chuẩn phục vụ in ấn đơn thuốc (kèm QR code & thông tin chi nhánh)
+---
 
-### 5.3. Bệnh nhân xem đơn thuốc (Patient App API)
-- `GET /api/patients/me/prescriptions` -> Danh sách đơn thuốc chính thức của bệnh nhân
-- `GET /api/patients/me/visits/{visitId}/prescription` -> Chi tiết đơn thuốc chính thức theo lượt khám
+## 4. Bệnh nhân xem đơn thuốc (Mobile — Expo)
+
+1. **Phạm vi**: chỉ đơn `Finalized` (không gồm `Draft`, `Superseded`) của lượt khám thuộc **mọi** hồ sơ bệnh nhân mà tài khoản đã liên kết `Verified`. Không có liên kết Verified → danh sách rỗng kèm hướng dẫn liên kết (không lộ thông tin). Đơn của hồ sơ khác → `404 MSG113`. Thu hồi liên kết → mất quyền ngay; app xóa dữ liệu đơn đang hiển thị khi phiên/liên kết đổi.
+2. **Danh sách** (Hồ sơ y tế → "Đơn thuốc", route `/(account)/prescriptions`): ngày kê, chi nhánh, bác sĩ, chẩn đoán, số thuốc, nhãn "Bản điều chỉnh" nếu Revision > 1.
+3. **Chi tiết**: thẻ từng thuốc (tên, hàm lượng, dạng dùng, số lượng + đơn vị, đường dùng), bảng liều Sáng/Trưa/Chiều/Tối, trước/sau/trong ăn, số ngày, lời dặn từng thuốc; lời dặn chung đóng khung nổi bật; ghi chú cố định "Đơn thuốc mua ngoài. Phòng khám không bán thuốc tại chỗ."
+4. **Không có** nút nhận thuốc tại kho/thanh toán tiền thuốc.
+5. **"Xem bản in đơn thuốc"**: màn hình bản in (bố cục như bản in web: chi nhánh, logo, bác sĩ, bệnh nhân, chẩn đoán, bảng thuốc, lời dặn, ngày kê) kèm **mã xác thực** dạng chữ để bệnh nhân đưa cho hiệu thuốc hoặc chụp màn hình. App hiện chưa có thư viện QR/PDF (`expo-print`, `react-native-svg`) nên QR và tải PDF chỉ có trên bản in web; khi bổ sung các gói này, màn bản in dùng cùng DTO `print` để sinh QR/PDF mà không đổi API.
+6. Không hiển thị ghi chú nội bộ, giá tham khảo, lý do điều chỉnh nội bộ (chỉ hiển thị nhãn "Bản điều chỉnh").
+
+---
+
+## 5. API Contracts
+
+Lỗi theo chuẩn `{ code, message, field?, currentVersion?, blockers? }`.
+
+### 5.1. Mẫu đơn thuốc (`prescriptions.manage`)
+- `GET /api/prescriptions/templates?search=&diagnosis=&status=Active|Inactive|All&page=1&pageSize=20|50|100` → mảng mẫu (search ≤100 ký tự).
+- `GET /api/prescriptions/templates/{id}`
+- `POST /api/prescriptions/templates` → `{ requestKey, expectedVersion: 0, code, name, diagnosisKind, description, lines: [...] }`
+- `PUT /api/prescriptions/templates/{id}` → `{ requestKey, expectedVersion, code, name, diagnosisKind, description, lines }` (mã không đổi sau khi tạo)
+- `POST /api/prescriptions/templates/{id}/state` → `{ requestKey, expectedVersion, active, reason }`
+
+### 5.2. Kê đơn theo lượt khám
+- `GET /api/prescriptions/medicine-options?branchId=&q=` (`prescriptions.manage`; có `branchId` thì kiểm phạm vi chi nhánh khi kê tại lượt khám, bỏ `branchId` khi lập mẫu đơn toàn hệ thống)
+- `GET /api/prescriptions/visits/{visitId}/prescription` → `{ current: PrescriptionDto | null, history: PrescriptionSummaryDto[] }`; `PrescriptionDto` gồm header + `lines`.
+- `GET /api/prescriptions/visits/{visitId}/lines` → dòng của phiên bản hiện hành (tương thích S19).
+- `PUT /api/prescriptions/visits/{visitId}/prescription` → `{ requestKey, expectedVersion, generalAdvice }`
+- `POST /api/prescriptions/visits/{visitId}/lines` → `{ requestKey, expectedVersion: 0, medicineId, route, morningDose, noonDose, afternoonDose, eveningDose, mealTiming, days, quantity, instructions }` (tạo header Draft Revision 1 nếu chưa có)
+- `PUT /api/prescriptions/visits/{visitId}/lines/{lineId}` → cùng body, `expectedVersion` của dòng
+- `DELETE /api/prescriptions/visits/{visitId}/lines/{lineId}?requestKey=&expectedVersion=`
+- `POST /api/prescriptions/visits/{visitId}/apply-template` → `{ requestKey, expectedVersion (đơn; 0 khi chưa có đơn), templateId }` → `PrescriptionDto` + `skippedLines`
+- `POST /api/prescriptions/visits/{visitId}/finalize` → `{ requestKey, expectedVersion, clinicalNote? }` → `PrescriptionDto`
+- `POST /api/prescriptions/visits/{visitId}/corrections` → `{ requestKey, expectedVersion (bản đã ký), reason }` → `PrescriptionDto` (Draft mới)
+- `GET /api/prescriptions/visits/{visitId}/safety-check`
+- `GET /api/prescriptions/visits/{visitId}/print` → dữ liệu in của phiên bản hiện hành (Draft có cờ `isDraft`)
+
+### 5.3. Bệnh nhân (tài khoản công khai đã liên kết Verified)
+- `GET /api/patients/me/prescriptions` → `PatientPrescriptionDto[]` mới nhất trước
+- `GET /api/patients/me/prescriptions/visits/{visitId}` → chi tiết bản `Finalized` hiện hành của lượt khám, gồm dữ liệu bản in (`verificationCode`, `qrData`, thông tin chi nhánh)
+
+### 5.4. Mã lỗi
+| Tình huống | Mã |
+| --- | --- |
+| Thiếu `requestKey`, sai enum/range/độ dài, đơn rỗng khi hoàn tất, thiếu lý do điều chỉnh | `400 MSG04` / `MSG02` |
+| Không có quyền / ngoài phạm vi chi nhánh / tài khoản chưa liên kết Verified khi xem chi tiết | `403 MSG06` |
+| Visit, dòng, mẫu, thuốc không tồn tại hoặc thuốc đã ngừng dùng | `404 MSG113` |
+| Mã mẫu trùng | `409 MSG201` |
+| Sửa đơn đã ký, Visit không ở trạng thái cho phép, tạo điều chỉnh khi còn bản nháp | `409 MSG205` |
+| Sai version / requestKey dùng lại với payload khác | `409 MSG111` (+ `currentVersion`) |
