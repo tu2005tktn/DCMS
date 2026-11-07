@@ -84,6 +84,8 @@ public static class TreatmentEndpoints
                 AuthenticationEndpoints.AccountId(context.User), dossierId, rowId, request, ct)));
         dossier.MapGet("/lab-orders", async (HttpContext context, Guid dossierId, ITreatmentDossierService service, CancellationToken ct) =>
             Results.Ok(await service.LabOrdersAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, ct)));
+        dossier.MapGet("/sheet-activities/{activityId:guid}/materials", async (HttpContext context, Guid dossierId, Guid activityId, ITreatmentDossierService service, CancellationToken ct) =>
+            Results.Ok(await service.ActivityMaterialsAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, activityId, ct)));
         dossier.MapGet("/sheet-activities/{activityId:guid}/lab-order", async (HttpContext context, Guid dossierId, Guid activityId, ITreatmentDossierService service, CancellationToken ct) =>
             Results.Ok(await service.LabOrderContextAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, activityId, ct)));
         dossier.MapPut("/sheet-activities/{activityId:guid}/lab-order", async (HttpContext context, Guid dossierId, Guid activityId, SaveLabOrderRequest request, ITreatmentDossierService service, CancellationToken ct) =>

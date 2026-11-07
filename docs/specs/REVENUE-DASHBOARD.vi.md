@@ -2,7 +2,7 @@
 
 ## Mục đích và nguồn
 
-- Màn **Doanh thu** cho người có `finance.read` xem tiền thực nhận theo ngày Việt Nam và chi nhánh được cấp quyền. Mặc định tháng hiện tại; có hôm nay, tuần, tháng, khoảng tùy chọn và tất cả. Không cho chọn chi nhánh ngoài phạm vi tài khoản.
+- Màn **Doanh thu** cho người có `finance.revenue.read` (cha `finance.read`, cập nhật 07/11/2026) xem tiền thực nhận theo ngày Việt Nam và chi nhánh được cấp quyền. Mặc định tháng hiện tại; có hôm nay, tuần, tháng, khoảng tùy chọn và tất cả. Không cho chọn chi nhánh ngoài phạm vi tài khoản.
 - Nguồn 1: `PAYMENT_RECEIPT` theo lượt khám hoặc ledger dossier, chỉ `State=Posted`; ngày thực nhận là `ConfirmedAt` (tiền mặt cũng được post ngay). Nguồn 2: `TREATMENT_DOSSIER_PAYMENT` của form TRẢ TIỀN, gồm tiền mặt và chuyển khoản PayOS đã xác nhận; ngày thực nhận là `CreatedAt`. Hai nguồn là hai loại chứng từ riêng, không nhân đôi từ các dòng phân bổ.
 - `PAYMENT_RECEIPT` Transfer `Pending` và `TREATMENT_PAYOS_ORDER` Pending/Creating/Review không tính doanh thu. Tổng đang chờ chỉ gồm receipt Pending và PayOS order Pending, không xem Review là tiền đã thu.
 - Số trên màn là **tiền đã thu**, không phải doanh thu dồn tích/kế toán, lợi nhuận hoặc giá vốn. Vật liệu trên bill không tạo doanh thu riêng. Không cộng chi phí, kế hoạch điều trị hay đơn thuốc vào tiền đã thu.

@@ -1,5 +1,7 @@
 namespace DCMS.Application.Features.Treatment;
 
+public sealed record SheetActivityMaterial(Guid MaterialId, decimal Quantity);
+
 public sealed record ImportItemPlanRequest(Guid ItemPlanId, int ExpectedItemPlanVersion, int ExpectedVersion, Guid RequestKey);
 public sealed record ImportItemPlanResult(TreatmentDossierDto Dossier, Guid[] CreatedItemIds, Guid ItemPlanId, int ItemPlanVersion);
 

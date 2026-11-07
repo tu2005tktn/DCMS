@@ -93,6 +93,12 @@ public sealed class SettingsApiTests(ReceptionFixture fixture) : IClassFixture<R
         Assert.Contains(AccountRoles.Admin,options.Single(x=>x.Key=="settings.general.manage").AllowedBaseRoles);
         Assert.Equal(new[]{AccountRoles.ClinicAssistant},options.Single(x=>x.Key=="patients.create").AllowedBaseRoles);
         Assert.Equal(new[]{AccountRoles.Dentist},options.Single(x=>x.Key=="examinations.manage").AllowedBaseRoles);
+        foreach (var permission in new[] { "finance.revenue.read", "finance.work-statistics.read", "finance.payos.create", "treatment.lab.manage", "materials.purchases.read", "materials.purchases.create", "materials.purchases.update", "materials.purchases.delete", "materials.stock.read", "materials.usage.read" })
+            Assert.Contains(options, x => x.Key == permission && x.Parent != null);
+        Assert.Equal(new[]{AccountRoles.ClinicAssistant}, options.Single(x=>x.Key=="finance.payos.create").AllowedBaseRoles);
+        Assert.Equal(new[]{AccountRoles.Dentist}, options.Single(x=>x.Key=="treatment.lab.manage").AllowedBaseRoles);
+        Assert.Contains(AccountRoles.Admin, options.Single(x=>x.Key=="materials.purchases.read").AllowedBaseRoles);
+        Assert.DoesNotContain(AccountRoles.ClinicAssistant, options.Single(x=>x.Key=="materials.purchases.read").AllowedBaseRoles);
         var metadata=(await owner.GetFromJsonAsync<StaffAccessDto[]>("/api/system-settings/access-groups/staff"))!.Single(x=>x.EmployeeId==staff.EmployeeId);
         Assert.Contains(AccountRoles.ClinicAssistant,metadata.Roles!);Assert.Equal(staff.BranchIds,metadata.MembershipBranchIds);
         Assert.Null(metadata.GroupId);

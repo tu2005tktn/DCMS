@@ -26,17 +26,17 @@ Các cột **Ngày, MSKH, Khách hàng, Lịch hẹn tiếp theo, Bác sĩ & ph�
 
 ## API
 
-`GET /api/work-statistics?from=&to=&branchId=&q=&page=&pageSize=` — quyền `finance.read`.
+`GET /api/work-statistics?from=&to=&branchId=&q=&page=&pageSize=` — quyền `finance.work-statistics.read` (cha `finance.read`, cập nhật 07/11/2026). Menu/route dùng cùng quyền; dữ liệu chỉ gồm chi nhánh được cấp và chi nhánh yêu cầu ngoài phạm vi trả 403.
 
 - `from`/`to`: lọc theo **ngày tạo phiếu** (`yyyy-MM-dd`, gồm cả hai đầu); `from > to` → MSG04.
-- `branchId`: chi nhánh của phiếu; không truyền = mọi chi nhánh.
+- `branchId`: chi nhánh của phiếu; không truyền = mọi chi nhánh được cấp quyền.
 - `q`: tìm theo MSKH, tên khách hàng hoặc tên dịch vụ của phiếu (không phân biệt hoa thường), tối đa 160 ký tự; phiếu khớp thì hiện đủ các dòng.
 - `pageSize` ∈ {20, 50, 100}; **phân trang theo phiếu**, sắp ngày tạo giảm dần rồi `CreatedAt` giảm dần rồi id; trong phiếu, các dòng theo ngày thực hiện tăng dần.
 - Trả `{ items: [{ dossierId, dossierCode, startedOn, patientId, patientCode, patientName, nextAppointmentAt, dentistName, assistantNames, costVnd, paidVnd, dueVnd, lines: [{ activityId, serviceName, costVnd, paidVnd, dueVnd }] }], total, page, pageSize, totals: { costVnd, paidVnd, dueVnd } }`; `total` là số phiếu; `totals` tính trên toàn bộ tập đã lọc.
 
 ## Giao diện
 
-Menu "Thống kê công việc/dịch vụ" (nhóm Quản trị) hiện khi có `finance.read`. Bộ lọc: khoảng ngày, chi nhánh, ô tìm kiếm. Bảng 9 cột (Ngày, MSKH, Khách hàng, Lịch hẹn tiếp theo, Điều trị/dịch vụ, Bác sĩ & phụ tá, Chi phí, Đã trả, Còn lại), tiền căn phải định dạng VND, hàng tổng cộng phía dưới theo bộ lọc, phân trang 20/50/100. Trạng thái: đang tải, trống ("Chưa có công việc nào"), lỗi kèm "Thử lại".
+Menu "Thống kê công việc/dịch vụ" (nhóm Quản trị) hiện khi có `finance.work-statistics.read`. Bộ lọc: khoảng ngày, chi nhánh, ô tìm kiếm. Bảng 9 cột (Ngày, MSKH, Khách hàng, Lịch hẹn tiếp theo, Điều trị/dịch vụ, Bác sĩ & phụ tá, Chi phí, Đã trả, Còn lại), tiền căn phải định dạng VND, hàng tổng cộng phía dưới theo bộ lọc, phân trang 20/50/100. Trạng thái: đang tải, trống ("Chưa có công việc nào"), lỗi kèm "Thử lại".
 
 ## Giới hạn
 
