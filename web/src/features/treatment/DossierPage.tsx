@@ -2,15 +2,20 @@ import { Alert, Button, Card, Descriptions, Empty, Form, Input, InputNumber, Mod
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { api, type ApiError } from '../../services/api';
-import type { TreatmentChange, TreatmentDossier, TreatmentItem } from './types';
-import { decisionLabel, money, stateLabel } from './types';
+import type { AppointmentOptions, TreatmentChange, TreatmentDossier, TreatmentItem } from './types';
+import { closureOutcomeLabel, decisionLabel, money, progressLabel, stateLabel } from './types';
 import './treatment.css';
 
 const eventLabels: Record<string, string> = {
   DossierCreated: 'Tạo đợt điều trị', PlanDraftSaved: 'Lưu nháp kế hoạch',
   PlanCommitted: 'Chốt kế hoạch', DossierClosed: 'Kết thúc đợt điều trị',
   DossierReopened: 'Mở lại đợt điều trị', WarrantyConfirmed: 'Xác nhận bảo hành',
-  PlanRevised: 'Điều chỉnh kế hoạch điều trị',
+  PlanRevised: 'Điều chỉnh kế hoạch điều trị', ExaminationSourceCaptured: 'Ghi nhận nguồn từ phiếu khám',
+  PlanReferencesCarriedForward: 'Chuyển tham chiếu sang kế hoạch mới', DossierNoteUpdated: 'Cập nhật ghi chú phiếu',
+  DossierDeleted: 'Xóa phiếu', DossierActualRecorded: 'Ghi việc đã làm', ActualConfirmed: 'Xác nhận việc đã làm',
+  SheetItemPerformed: 'Thực hiện hạng mục', SheetItemEdited: 'Sửa hạng mục trên phiếu', SheetItemDeleted: 'Xóa hạng mục khỏi phiếu',
+  SheetItemMarked: 'Đổi dấu hoàn tất hạng mục', SheetActivityEdited: 'Sửa việc đã làm', SheetActivityDeleted: 'Xóa việc đã làm',
+  ItemScheduleNoteChanged: 'Đổi ghi chú lịch của hạng mục', DiscountDecision: 'Quyết định giảm giá', DepositException: 'Duyệt ngoại lệ không cọc',
 };
 const displayTime = (value: string) => new Intl.DateTimeFormat('vi-VN', {
   dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Ho_Chi_Minh',
@@ -23,6 +28,8 @@ export default function DossierPage() {
   const selectedItemId = search.get('item');
   const revisionNotice = (location.state as { revisionNotice?: string } | null)?.revisionNotice;
   const [dossier, setDossier] = useState<TreatmentDossier | null>(null);
+  const [options, setOptions] = useState<AppointmentOptions | null>(null);
+  const [optionsFailed, setOptionsFailed] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
   const [revision, setRevision] = useState(0);
   const [action, setAction] = useState<'close' | 'reopen' | null>(null);
@@ -46,6 +53,14 @@ export default function DossierPage() {
       .catch(failure => { if (active) setError(failure as ApiError); });
     return () => { active = false; };
   }, [dossierId, revision]);
+  // Branch and dentist names for display only; the dossier itself carries ids.
+  useEffect(() => {
+    let active = true;
+    api<AppointmentOptions>('/api/appointments/options')
+      .then(result => { if (active) setOptions(result); })
+      .catch(() => { if (active) setOptionsFailed(true); });
+    return () => { active = false; };
+  }, []);
   useEffect(() => {
     if (!dossier || !selectedItemId) return;
     const frame = requestAnimationFrame(() => document.querySelector('.treatment-selected-item')
@@ -58,6 +73,8 @@ export default function DossierPage() {
       <Link to={`/patients/${id}`}>Về hồ sơ bệnh nhân</Link></Space>} />;
   if (!dossier) return <Card><Skeleton active /></Card>;
   const unresolved = dossier.items.filter(item => item.decision === 'Agreed' && item.progress !== 'Completed');
+  const nameOf = (list: { id: number; name: string }[] | undefined, value: number) =>
+    list?.find(x => x.id === value)?.name ?? (optionsFailed ? 'Không tải được tên' : options ? '—' : 'Đang tải…');
 
   async function submit(values: { outcome: string; reason?: string; dispositions: { itemId: string; reason: string }[] }) {
     if (!dossier || busy) return;
@@ -111,12 +128,12 @@ export default function DossierPage() {
       <Link to={`/patients/${id}/dossiers/${dossier.id}/plan`}><Button type="primary">Mở kế hoạch S21</Button></Link>
     </Space>}>
       <Descriptions column={{ xs: 1, md: 2 }} items={[
-        { label: 'Bệnh nhân', children: <Link to={`/patients/${id}`}>Hồ sơ #{dossier.patientId}</Link> },
-        { label: 'Chi nhánh', children: dossier.branchId },
-        { label: 'Bác sĩ phụ trách', children: dossier.dentistId },
+        { label: 'Bệnh nhân', children: <Link to={`/patients/${id}`}>Mở hồ sơ bệnh nhân</Link> },
+        { label: 'Chi nhánh', children: nameOf(options?.branches, dossier.branchId) },
+        { label: 'Bác sĩ phụ trách', children: nameOf(options?.dentists, dossier.dentistId) },
         { label: 'Ngày bắt đầu', children: dossier.startedOn },
         { label: 'Trạng thái lâm sàng', children: stateLabel[dossier.state] },
-        { label: 'Kết quả đóng', children: dossier.closureOutcome ?? 'Chưa đóng' },
+        { label: 'Kết quả đóng', children: dossier.closureOutcome ? closureOutcomeLabel[dossier.closureOutcome] ?? dossier.closureOutcome : 'Chưa đóng' },
         { label: 'Phiên bản', children: dossier.version },
         { label: 'Kế hoạch', children: dossier.planVersion ? `Phiên bản ${dossier.planVersion}` : 'Chưa chốt' },
       ]} />
@@ -133,7 +150,7 @@ export default function DossierPage() {
                 {item.warrantyExclusions ? ` · Loại trừ: ${item.warrantyExclusions}` : ''}
                 {item.warrantyEndsOn ? ` · Đến ${item.warrantyEndsOn}` : ''}</div>}
               {item.expectedServiceLifeMonths && <div className="treatment-muted">Tuổi thọ dự kiến: {item.expectedServiceLifeMonths} tháng (khác thời hạn bảo hành)</div>}</div>
-              <div><Tag>{decisionLabel[item.decision]}</Tag><Tag>{item.progress}</Tag>
+              <div><Tag>{decisionLabel[item.decision]}</Tag><Tag>{progressLabel[item.progress] ?? item.progress}</Tag>
                 {dossier.planState === 'Committed' && dossier.state === 'Open' &&
                   <Link to={`/patients/${id}/dossiers/${dossier.id}/plan/revise/${item.id}?from=dossier`}>
                     <Button size="small">Điều chỉnh kế hoạch</Button></Link>}
@@ -179,8 +196,8 @@ export default function DossierPage() {
         onFinish={values => void submit(values)}>
         {action === 'close' && <><Form.Item name="outcome" label="Kết quả lâm sàng" rules={[{ required: true }]}>
           <Select options={[
-            { value: 'CompletedAsAgreed', label: 'Hoàn tất đúng phần đã đồng ý', disabled: unresolved.length > 0 },
-            { value: 'StoppedIncomplete', label: 'Dừng khi còn phần chưa thực hiện' },
+            { value: 'CompletedAsAgreed', label: closureOutcomeLabel.CompletedAsAgreed, disabled: unresolved.length > 0 },
+            { value: 'StoppedIncomplete', label: closureOutcomeLabel.StoppedIncomplete },
           ]} /></Form.Item>
           {unresolved.map((item, index) => <div key={item.id}>
             <Typography.Text strong>{item.serviceName} · {item.region ?? 'Chưa chọn vùng'}</Typography.Text>
