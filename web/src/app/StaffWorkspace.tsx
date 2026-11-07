@@ -34,6 +34,7 @@ export default function StaffWorkspace() {
     { key:'/clinical-services', title:'Dịch vụ cận lâm sàng', icon:<ExperimentOutlined />, group:'Chuyên môn', visible:has('services.read') },
     { key:'/payments', title:'Thanh toán', icon:<CreditCardOutlined />, group:'Quản trị', visible:has('finance.read') },
     { key:'/work-statistics', title:'Thống kê công việc/dịch vụ', icon:<BarChartOutlined />, group:'Quản trị', visible:has('finance.read') },
+    { key:'/revenue', title:'Doanh thu', icon:<BarChartOutlined />, group:'Quản trị', visible:has('finance.read') },
     { key:'/accounts', title:'Quản lý tài khoản', icon:<AuditOutlined />, group:'Quản trị', visible:has('accounts.read') },
     { key:'/system-settings', title:'Thiết lập hệ thống', icon:<SettingOutlined />, group:'Quản trị', visible:has('settings.read') },
     { key:'/booking-settings', title:'Cài đặt đặt lịch', icon:<ScheduleOutlined />, group:'Quản trị', visible:has('booking-settings.read') },

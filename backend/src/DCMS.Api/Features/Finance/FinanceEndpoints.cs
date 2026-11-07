@@ -8,6 +8,8 @@ public static class FinanceEndpoints
     {
         static int Actor(HttpContext c) => AuthenticationEndpoints.AccountId(c.User);
         var g = endpoints.MapGroup("/api/finance").RequireAuthorization().WithTags("Clinical service billing");
+        g.MapGet("/revenue", async (HttpContext c, DateOnly? from, DateOnly? to, int? branchId, int? page, int? pageSize,
+            IRevenueService s, CancellationToken ct) => Results.Ok(await s.GetAsync(Actor(c), from, to, branchId, page ?? 1, pageSize ?? 20, ct)));
         g.MapGet("/examination-services",async(HttpContext c,int branchId,IExaminationFeeService s,CancellationToken ct)=>Results.Ok(await s.ServicesAsync(Actor(c),branchId,ct)));
   g.MapPost("/examination-services",async(HttpContext c,SaveExaminationService command,IExaminationFeeService s,CancellationToken ct)=>Results.Ok(await s.SaveServiceAsync(Actor(c),null,command,ct)));
   g.MapPut("/examination-services/{id:int}",async(HttpContext c,int id,SaveExaminationService command,IExaminationFeeService s,CancellationToken ct)=>Results.Ok(await s.SaveServiceAsync(Actor(c),id,command,ct)));

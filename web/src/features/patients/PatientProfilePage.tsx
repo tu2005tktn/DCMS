@@ -1,5 +1,6 @@
 import PatientImageGallery from '../clinical-documents/PatientImageGallery';
 import PatientExaminationsTab from '../examinations/PatientExaminationsTab';
+import PatientPrescriptionsTab from '../prescriptions/PatientPrescriptionsTab';
 import ExaminationTreatmentHandoff from '../examinations/ExaminationTreatmentHandoff';
 import { Alert, Button, Card, Descriptions, Empty, Form, Input, message, Modal, Result, Skeleton, Space, Tabs, Tag, Timeline, Typography } from 'antd';
 import { useEffect, useRef, useState } from 'react';
@@ -19,11 +20,6 @@ const empty = <Typography.Text type="secondary">—</Typography.Text>;
 
 // Tabs whose source features are not built yet.
 const reference = (value: PatientReference | null) => value ? `${value.name}${value.active ? '' : ' (ngừng dùng)'}` : '—';
-
-function Pending({ feature }: { feature: string }) {
-  return <Alert type="info" showIcon message="Chức năng chưa triển khai"
-    description={`Dữ liệu ${feature} sẽ hiển thị tại đây khi chức năng tương ứng được triển khai. Hiện chưa có dữ liệu để hiển thị.`} />;
-}
 
 // S06 Patient Profile and History (UC-08, UC-09, UC-38). Route IDs are never trusted: the server rechecks every request.
 export default function PatientProfilePage() {
@@ -191,7 +187,7 @@ export default function PatientProfilePage() {
         ...(canReadTreatment ? [{ key: 'treatment', label: 'Điều trị & Thanh toán', children: sourceExaminationVisitId ? <ExaminationTreatmentHandoff patientId={patient.id} visitId={sourceExaminationVisitId} version={search.get('examinationVersion')}/> : <DossierList patientId={patient.id} visitId={visitId} patientName={patient.fullName} patientCode={patient.patientCode} patientAge={age} /> }] : []),
         ...(canReadDocuments ? [{ key: 'files', label: 'Hình ảnh', children: <PatientImageGallery patientId={patient.id} /> }] : []),
         ...(canReadAppointments ? [{ key: 'appointments', label: 'Lịch hẹn', children: <PatientAppointmentsTab key={patient.id} patientId={patient.id} patientName={patient.fullName} patientPhone={patient.phone} active={tab === 'appointments'} revision={revision} /> }] : []),
-        ...(canReadPrescriptions ? [{ key: 'prescriptions', label: 'Đơn thuốc', children: <Pending feature="đơn thuốc (S23)" /> }] : []),
+        ...(canReadPrescriptions ? [{ key: 'prescriptions', label: 'Đơn thuốc', children: <PatientPrescriptionsTab patient={patient} active={tab === 'prescriptions'} /> }] : []),
       ]} />
     <PatientFormDrawer open={editing} patient={patient} onClose={() => setEditing(false)} onSaved={change => { setEditing(false); saved(change); }} />
     <ArchiveModal patient={patient} open={archiving} onClose={() => setArchiving(false)} onSaved={change => { setArchiving(false); saved(change); }} />

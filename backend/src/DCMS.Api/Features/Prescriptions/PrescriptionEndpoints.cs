@@ -13,5 +13,10 @@ public static class PrescriptionEndpoints
         g.MapGet("/visits/{visitId:guid}/lines", async (HttpContext c, Guid visitId, IPrescriptionService s, CancellationToken ct) => Results.Ok(await s.LinesAsync(Actor(c), visitId, ct)));
         g.MapPost("/visits/{visitId:guid}/lines", async (HttpContext c, Guid visitId, SavePrescriptionLine command, IPrescriptionService s, CancellationToken ct) => Results.Ok(await s.SaveLineAsync(Actor(c), visitId, null, command, ct)));
         g.MapPut("/visits/{visitId:guid}/lines/{lineId:guid}", async (HttpContext c, Guid visitId, Guid lineId, SavePrescriptionLine command, IPrescriptionService s, CancellationToken ct) => Results.Ok(await s.SaveLineAsync(Actor(c), visitId, lineId, command, ct)));
+        g.MapGet("/patients/{patientId:int}", async (HttpContext c, int patientId, IPrescriptionService s, CancellationToken ct) => Results.Ok(await s.PatientListAsync(Actor(c), patientId, ct)));
+        g.MapGet("/patients/{patientId:int}/context", async (HttpContext c, int patientId, IPrescriptionService s, CancellationToken ct) => Results.Ok(await s.PatientContextAsync(Actor(c), patientId, ct)));
+        g.MapGet("/patients/{patientId:int}/{id:guid}", async (HttpContext c, int patientId, Guid id, IPrescriptionService s, CancellationToken ct) => Results.Ok(await s.PatientDetailAsync(Actor(c), patientId, id, ct)));
+        g.MapPost("/patients/{patientId:int}", async (HttpContext c, int patientId, SavePatientPrescription command, IPrescriptionService s, CancellationToken ct) => Results.Ok(await s.SavePatientAsync(Actor(c), patientId, null, command, ct)));
+        g.MapPut("/patients/{patientId:int}/{id:guid}", async (HttpContext c, int patientId, Guid id, SavePatientPrescription command, IPrescriptionService s, CancellationToken ct) => Results.Ok(await s.SavePatientAsync(Actor(c), patientId, id, command, ct)));
     }
 }
