@@ -68,6 +68,8 @@ public interface IClinicalDocumentService
     Task<IReadOnlyList<DocumentHistoryDto>> HistoryAsync(int actorId, Guid documentId, CancellationToken ct);
     Task<UploadBatchResult> UploadAsync(int actorId, DocumentMetadata metadata, IReadOnlyList<DocumentUpload> files, CancellationToken ct);
     Task<DocumentContent> ContentAsync(int actorId, Guid documentId, bool inline, CancellationToken ct);
+    // Patient app: the caller already resolved patientId from a VERIFIED self link (IOwnClinicalRecordService).
+    Task<DocumentContent> PatientContentAsync(int patientId, int accountId, Guid documentId, CancellationToken ct);
     Task<DocumentDto> ReviewAsync(int actorId, Guid documentId, ReviewDocument request, CancellationToken ct);
     Task ScanPendingAsync(CancellationToken ct);
 }

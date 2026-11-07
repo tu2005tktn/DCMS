@@ -2,6 +2,7 @@ using DCMS.Api.Features.Authentication;
 using DCMS.Api.Features.PatientLinks;
 using DCMS.Application.Features.Patients;
 using DCMS.Application.Features.Appointments;
+using DCMS.Application.Features.Examinations;
 
 namespace DCMS.Api.Features.Patients;
 
@@ -22,6 +23,19 @@ public static class PatientEndpoints
             Results.Ok(await service.OwnAsync(AuthenticationEndpoints.AccountId(context.User), ct)));
         own.MapPut("/", async (HttpContext context, UpdateOwnPatientRequest request, IPatientService service, CancellationToken ct) =>
             Results.Ok(await service.UpdateOwnAsync(AuthenticationEndpoints.AccountId(context.User), request, ct)));
+        // docs/specs/MOBILE-PATIENT-VISIT-RESULTS.vi.md §3: official visit results, Ready documents and their content.
+        own.MapGet("/visits", async (HttpContext context, int? page, int? pageSize, IOwnClinicalRecordService service, CancellationToken ct) =>
+            Results.Ok(await service.VisitsAsync(AuthenticationEndpoints.AccountId(context.User), page ?? 1, pageSize ?? 20, ct)));
+        own.MapGet("/visits/{visitId:guid}", async (HttpContext context, Guid visitId, IOwnClinicalRecordService service, CancellationToken ct) =>
+            Results.Ok(await service.VisitAsync(AuthenticationEndpoints.AccountId(context.User), visitId, ct)));
+        own.MapGet("/documents", async (HttpContext context, Guid? visitId, int? page, int? pageSize, IOwnClinicalRecordService service, CancellationToken ct) =>
+            Results.Ok(await service.DocumentsAsync(AuthenticationEndpoints.AccountId(context.User), visitId, page ?? 1, pageSize ?? 20, ct)));
+        own.MapGet("/documents/{documentId:guid}/content", async (HttpContext context, Guid documentId, IOwnClinicalRecordService service, CancellationToken ct) =>
+        {
+            var file = await service.DocumentContentAsync(AuthenticationEndpoints.AccountId(context.User), documentId, ct);
+            context.Response.Headers.CacheControl = "no-store";
+            return Results.File(file.Bytes, file.ContentType);
+        });
 
         // S05/S06: read for Clinic Assistant and Dentist (Owner via effective Dentist); writes for Clinic Assistant only.
         var group = endpoints.MapGroup("/api/patients").RequireAuthorization(ReadPolicy).WithTags("UC-08/09/38 S05/S06 Patients");

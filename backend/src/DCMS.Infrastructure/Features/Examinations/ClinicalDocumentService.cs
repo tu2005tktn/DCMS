@@ -177,6 +177,15 @@ public sealed class ClinicalDocumentService(DcmsDbContext db, ClinicalAccess acc
         Audit(d.Id, actorId, inline ? "Viewed" : "Downloaded"); await db.SaveChangesAsync(ct);
         return new(bytes, d.ContentType, d.FileName);
     }
+    public async Task<DocumentContent> PatientContentAsync(int patientId, int accountId, Guid documentId, CancellationToken ct)
+    {
+        var d = await db.Set<ClinicalDocument>().SingleOrDefaultAsync(x => x.Id == documentId && x.PatientId == patientId, ct) ?? throw Error("MSG113", 404);
+        if (d.FileState != "Ready") throw Error("MSG42", 409);
+        byte[] bytes; try { bytes = await File.ReadAllBytesAsync(PathFor(d.Id), ct); } catch (IOException) { throw Error("MSG144", 503); }
+        if (Convert.ToHexString(SHA256.HashData(bytes)) != d.Sha256) throw Error("MSG42", 409);
+        Audit(d.Id, accountId, "PatientViewed"); await db.SaveChangesAsync(ct);
+        return new(bytes, d.ContentType, d.FileName);
+    }
     public async Task<DocumentDto> ReviewAsync(int actorId, Guid documentId, ReviewDocument r, CancellationToken ct)
     {
         if (r.RequestKey == Guid.Empty || r.ExpectedVersion <= 0) throw Error("MSG04");
