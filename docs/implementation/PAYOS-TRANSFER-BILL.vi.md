@@ -25,3 +25,10 @@
 - Trong sandbox, kết nối TCP tới `api-merchant.payos.vn:443` bị chặn; cùng máy, kiểm tra ngoài sandbox trả thành công. Backend chạy ngoài sandbox đã gọi PayOS thật và tạo lệnh thử 50.000đ, trạng thái `Pending`, có QR và thông tin tài khoản nhận. API hỏi trạng thái và active order đều trả `Pending`; khoản 50.000đ vẫn chưa được ghi nhận thanh toán.
 - Backend build và 2 unit test PayOS đạt; web build đạt. Chưa kiểm tra chuyển tiền thật hoặc webhook Paid vì chưa thực hiện giao dịch ngân hàng.
 - Vật liệu trên bill không phải doanh thu vật liệu riêng và không có giá vốn. Trạng thái Review không tự ghi thanh toán; cần đối soát thủ công trước khi xử lý số tiền đã chuyển.
+
+## Sửa lỗi build sau tích hợp PR #46 — 07/11/2026
+
+- Mapping EF của `DossierPayOsOrderLine` phải kết thúc trước khi khai báo mapping `LabOrder`. Bổ sung dấu đóng `});` bị thiếu sau tích hợp để hai entity được cấu hình độc lập và backend biên dịch được.
+- Bản sửa chỉ khôi phục cấu trúc khai báo model; giữ nguyên bảng, khóa, ràng buộc và API PayOS/labo hiện có, không thêm migration hoặc thay đổi dữ liệu.
+- Kiểm tra yêu cầu: restore/build solution bằng .NET 10, chạy unit test (gồm model snapshot và PayOS) và các test model điều trị hiện có.
+- Kết quả sau sửa: restore/build solution đạt (0 lỗi); toàn bộ 87 unit test đạt; 4 test trong `TreatmentModelTests` và `AppointmentModelTests` đạt. Các test model xác nhận snapshot không lệch mapping hiện tại và không kết nối database. Chưa chạy hai migration PayOS/đơn thuốc mới hoặc kiểm thử giao dịch PayOS thật trong lần sửa này.
