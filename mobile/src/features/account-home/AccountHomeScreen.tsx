@@ -123,6 +123,18 @@ export default function AccountHomeScreen() {
         </View>
       )}
 
+      {user.accountType === 'Public' && (
+        <View style={styles.linkSection}>
+          <Text style={styles.linkDescription}>Xem hồ sơ y tế chính thức: kế hoạch điều trị, lịch khám và bảo hành.</Text>
+          <PrimaryButton
+            label="Hồ sơ y tế của tôi"
+            onPress={() => router.push('/(account)/medical-records')}
+            disabled={signingOut}
+            testID="open-medical-records"
+          />
+        </View>
+      )}
+
       {/* Sign out */}
       <View style={styles.footer}>
         <Pressable

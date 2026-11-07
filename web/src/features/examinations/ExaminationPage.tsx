@@ -277,6 +277,7 @@ export default function ExaminationPage() {
         </Form>
         {user?.permissions.includes('prescriptions.read')&&<PrescriptionPanel key={visitId} visitId={visitId!} branchId={v.branchId}
           readOnly={!user.permissions.includes('prescriptions.manage')||v.status!=='InProgress'||!w.allowedActions.includes('prescribe')}
+          correctionAllowed={user.permissions.includes('prescriptions.manage')&&(v.status==='InProgress'||v.status==='Completed')}
           disabled={clinicalBusy} onDirtyChange={setPrescriptionDirty} onBusyChange={setPrescriptionBusy}/>}
         {amending && <Form.Item label="Lý do đính chính" required><Input.TextArea aria-label="Lý do đính chính" disabled={busy} maxLength={1000} value={amendReason} onChange={e => { setAmendReason(e.target.value); pendingCommand.current = undefined; }} /></Form.Item>}
         {(validationIssues.length > 0 || error) && <div ref={summaryFeedback} tabIndex={-1} className="examination-completion-feedback">
