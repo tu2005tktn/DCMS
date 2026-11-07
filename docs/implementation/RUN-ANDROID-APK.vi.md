@@ -29,6 +29,13 @@
 
 ## Build và xác minh
 
+### Menu native nhận thao tác nhấn (07/11/2026)
+
+- Khi kiểm tra APK trên LDPlayer, ứng dụng mở được nhưng các thẻ menu trung tâm không điều hướng trên Android: `Link asChild` đang bọc `View`, trong khi phần tử con cần xử lý `onPress`.
+- Menu dùng `Pressable` cho toàn bộ thẻ, giữ route, bộ lọc theo phiên, nội dung và kích thước vùng nhấn hiện có. Chạm thẻ phải mở đúng màn hình trên Android; nút Back trở về menu.
+- Sửa này không đổi API hay dữ liệu. Xác minh TypeScript, bundle Android và APK thực tế: mở màn đăng nhập và khôi phục từ menu. Kiểm tra kết nối backend bằng màn đặt lịch công khai, chỉ tải danh mục, không gửi yêu cầu đặt lịch hoặc khôi phục mật khẩu.
+- Theo [hướng dẫn Expo Router](https://docs.expo.dev/router/basics/navigation/), phần tử con của `Link asChild` phải nhận `onPress`/`onClick`, ví dụ `Pressable`.
+
 1. Kiểm tra TypeScript và dependency từ lockfile trong bản sao build riêng nếu môi trường cài đặt hiện tại khác phiên bản.
 2. Expo Build: profile internal/preview với `android.buildType=apk`, cấu hình URL API trong môi trường build; lưu lại build ID để không gửi trùng khi mất kết nối.
 3. Hoặc build native trên máy: Expo prebuild Android rồi Gradle `:app:assembleRelease`; cần JDK và Android SDK. Chỉ dùng chữ ký demo cho APK nội bộ, không coi đây là bản phát hành Play Store.
