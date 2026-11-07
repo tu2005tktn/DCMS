@@ -41,6 +41,7 @@ public sealed class ExaminationFeeService(DcmsDbContext db,ISettingsAccess acces
   if(id==null){if(choice?.AmountVnd!=null)throw Invalid("Chọn dịch vụ khám hợp lệ trước khi ghi phí.");Audit(actor,visit,"PendingExaminationFee",new{fee.VisitId},ct);return;}
   var service=await LockedService(visit.BranchId,id.Value,ct);
   if(choice!=null&&service.PriceVersion!=choice.ExpectedPriceVersion)throw Error("MSG111",409);
+  if(service.ReferenceUnitPriceVnd==null&&choice?.AmountVnd!=null)throw Invalid("Dịch vụ khám chưa được thiết lập giá. Hãy cập nhật giá khám trong danh mục trước khi chốt phí.");
   var amount=choice?.AmountVnd??service.ReferenceUnitPriceVnd;
   if(amount==null){fee.ServiceId=service.Id;fee.ServiceName=service.Name;Audit(actor,visit,"PendingExaminationFee",new{fee.VisitId,service.Id},ct);return;}
   var state=await access.ResolveAsync(actor,ct);var isOverride=amount!=service.ReferenceUnitPriceVnd;
@@ -65,12 +66,15 @@ public sealed class ExaminationFeeService(DcmsDbContext db,ISettingsAccess acces
   var fee=await db.Set<ExaminationFee>().SingleOrDefaultAsync(x=>x.VisitId==visit,ct);if((fee?.Version??0)!=c.ExpectedVersion)throw Error("MSG111",409);if(fee?.State=="Posted")throw Invalid("Phí khám đã ghi sổ; không thể đổi hoặc ghi thêm lần nữa.",409);
   if(c.Fee.ServiceId==null||c.Fee.AmountVnd==null)throw Invalid("Chọn dịch vụ và nhập phí khám hoặc số 0 nếu miễn phí.");
   var service=await LockedService(v.BranchId,c.Fee.ServiceId.Value,ct);if(service.PriceVersion!=c.Fee.ExpectedPriceVersion)throw Error("MSG111",409);
+  if(service.ReferenceUnitPriceVnd==null)throw Invalid("Dịch vụ khám chưa được thiết lập giá. Hãy cập nhật giá khám trong danh mục trước khi chốt phí.");
   var isOverride=c.Fee.AmountVnd!=service.ReferenceUnitPriceVnd;if(isOverride&&(!state.Permissions.Contains("finance.quotes.manage")||!await Own(actor,v,state,ct)))throw Error("MSG06",403);
   var legacy=fee==null;if(fee==null){fee=new(){VisitId=visit,CreatedBy=actor,CreatedAt=clock.GetUtcNow()};db.Add(fee);}else fee.Version++;
   await Post(actor,v,fee,service,c.Fee.AmountVnd.Value,c.Fee.Reason,isOverride,legacy,ct);db.Add(new FinanceCommandReceipt{ActorId=actor,RequestKey=c.RequestKey,Fingerprint=fingerprint,ResultJson="{}"});await db.SaveChangesAsync(ct);await tx.CommitAsync(ct);return await GetAsync(actor,visit,ct);
  }
  public async Task<ExaminationServiceOption> SaveServiceAsync(int actor,int? id,SaveExaminationService c,CancellationToken ct){
-  await access.OperationalAsync(actor,"services.manage",c.BranchId,ct);Money(c.PriceVnd);if(c.RequestKey==Guid.Empty||string.IsNullOrWhiteSpace(c.Name)||c.Name.Trim().Length>160)throw Error("MSG04");
+  await access.OperationalAsync(actor,"services.manage",c.BranchId,ct);
+  if(c.PriceVnd==null)throw new BusinessException(400,SystemMessages.Get("MSG02","Giá khám") with {Field="priceVnd"});
+  Money(c.PriceVnd);if(c.RequestKey==Guid.Empty||string.IsNullOrWhiteSpace(c.Name)||c.Name.Trim().Length>160)throw Error("MSG04");
   await using var tx=await db.Database.BeginTransactionAsync(ct);await db.Database.ExecuteSqlRawAsync($"SELECT pg_advisory_xact_lock({WorkingScheduleService.TransactionLock})",ct);await access.OperationalAsync(actor,"services.manage",c.BranchId,ct);
   var hash=ExaminationService.Hash(new{action="SaveExaminationService",id,c});var receipt=await db.Set<FinanceCommandReceipt>().SingleOrDefaultAsync(x=>x.ActorId==actor&&x.RequestKey==c.RequestKey,ct);if(receipt!=null){if(receipt.Fingerprint!=hash)throw Error("MSG111",409);await tx.CommitAsync(ct);return JsonSerializer.Deserialize<ExaminationServiceOption>(receipt.ResultJson,ExaminationService.Json)!;}
   SchedulingService service;

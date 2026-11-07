@@ -64,6 +64,33 @@ public sealed class ExaminationApiTests(ExaminationFixture fixture) : IClassFixt
         return await c.PostAsync("/api/clinical-documents", form);
     }
 
+
+    [Fact] public async Task DossierImagesWithoutVisitAreSharedScopedAndIdempotent()
+    {
+        var setup = await reception.Prepare();
+        using var dentist = await reception.Login("dentist.demo");
+        var dossierResult = await dentist.PostAsJsonAsync($"/api/patients/{setup.PatientId}/dossiers",
+            new DCMS.Application.Features.Treatment.CreateDossierRequest(setup.BranchId, setup.DentistId, "SYNTHETIC", null, null, Guid.NewGuid()));
+        var dossier = (await Ok<DCMS.Application.Features.Treatment.TreatmentChange>(dossierResult)).Dossier;
+        fixture.Services.GetRequiredService<ExaminationTestScanner>().State = "Ready";
+        var metadata = new DocumentMetadata(setup.PatientId, null, dossier.Id, null, null, null, "Other", "Clinic",
+            DateOnly.FromDateTime(fixture.Clock.Now.ToOffset(TimeSpan.FromHours(7)).DateTime), "SYNTHETIC image", Guid.NewGuid());
+        var png = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aZ9sAAAAASUVORK5CYII=");
+        var uploaded = (await Ok<UploadBatchResult>(await Upload(dentist, metadata, png, "photo.png", "image/png"))).Document!;
+        Assert.Null(uploaded.Context.VisitId); Assert.Equal(dossier.Id, uploaded.Context.DossierId);
+        var replay = (await Ok<UploadBatchResult>(await Upload(dentist, metadata, png, "photo.png", "image/png"))).Document!;
+        Assert.Equal(uploaded.DocumentId, replay.DocumentId);
+        foreach (var suffix in new[] { "", $"&dossierId={dossier.Id}" }) {
+            var list = await Ok<DocumentPage>(await dentist.GetAsync($"/api/clinical-documents?patientId={setup.PatientId}&imagesOnly=true{suffix}"));
+            Assert.Single(list.Items); Assert.Equal(uploaded.DocumentId, list.Items[0].DocumentId);
+        }
+        var content = await dentist.GetAsync($"/api/clinical-documents/{uploaded.DocumentId}/content?disposition=inline");
+        Assert.Equal(png, await content.Content.ReadAsByteArrayAsync());
+        Assert.Equal(HttpStatusCode.NotFound, (await Upload(dentist, metadata with { PatientId = setup.PatientId + 999999, RequestKey = Guid.NewGuid() }, png, "photo.png", "image/png")).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await Upload(dentist, metadata with { DossierId = null, RequestKey = Guid.NewGuid() }, png, "photo.png", "image/png")).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await Upload(dentist, metadata with { Description = "changed" }, png, "photo.png", "image/png")).StatusCode);
+    }
+
     private static string Inv(Guid visitId, Guid? orderId = null, string? action = null) => $"/api/visits/{visitId}/investigations" + (orderId.HasValue ? $"/{orderId}/{action}" : "");
     private static CreateInvestigation Order(VisitResult v, bool required = true) => new(v.PatientId,v.VisitVersion,Guid.NewGuid(),"XRay","SYNTHETIC phim cận chóp","31–33","SYNTHETIC đánh giá xương",required);
     [Fact] public async Task InvestigationWaitReceiveReadAndConfirmAreSeparateIdempotentActions()
@@ -399,17 +426,25 @@ public sealed class ExaminationApiTests(ExaminationFixture fixture) : IClassFixt
             Assert.Equal(1, confirmed.Examination!.Version); Assert.Equal(v.VisitId, confirmed.Examination.Id);
             var list = await c.GetFromJsonAsync<PatientExamination[]>($"/api/patients/{v.PatientId}/examinations");
             Assert.Contains(list!, x => x.VisitId == v.VisitId && x.Examination!.Version == 1);
+            Assert.Null(Assert.Single(list!).CompletedAt);
             Assert.Equal(HttpStatusCode.Conflict, (await c.PostAsJsonAsync($"/api/visits/{v.VisitId}/complete", close)).StatusCode);
             close = close with { ExpectedVersion = confirmed.Visit.VisitVersion };
             Assert.Equal(HttpStatusCode.Conflict, (await c.PostAsJsonAsync($"/api/visits/{v.VisitId}/complete", close with { WorkReviewed = false })).StatusCode);
             var closed = await Ok<ExaminationWorkspace>(await c.PostAsJsonAsync($"/api/visits/{v.VisitId}/complete", close));
             Assert.Equal("Completed", closed.Visit.Status); Assert.Equal("Completed", closed.Visit.AppointmentStatus);
             Assert.True((await Ok<ExaminationWorkspace>(await c.PostAsJsonAsync($"/api/visits/{v.VisitId}/complete",close))).Replayed);
+            var history = Assert.Single((await c.GetFromJsonAsync<PatientExamination[]>($"/api/patients/{v.PatientId}/examinations"))!);
+            Assert.Equal(v.VisitId, history.VisitId); Assert.Equal("Completed", history.VisitStatus);
+            Assert.NotNull(history.CompletedAt); Assert.True(history.Examination!.Confirmed);
+            Assert.Equal(Content(true).Advice, history.Examination.Content.Advice);
             Assert.Equal(HttpStatusCode.Conflict, (await c.GetAsync($"/api/visits/{v.VisitId}/clinical-handoff")).StatusCode);
             var amendment = new AmendExamination(v.PatientId,closed.Visit.VisitVersion,Guid.NewGuid(),Content(true) with { Conclusion = "SYNTHETIC đính chính" },"SYNTHETIC bổ sung kết luận");
             Assert.Equal(HttpStatusCode.BadRequest, (await c.PostAsJsonAsync(Exam(v.VisitId)+"/amend",amendment with { Reason = " " })).StatusCode);
             var amended = await Ok<ExaminationWorkspace>(await c.PostAsJsonAsync(Exam(v.VisitId)+"/amend",amendment));
             Assert.Equal("Completed", amended.Visit.Status); Assert.Equal(2,amended.Examination!.Version);
+            var amendedHistory = Assert.Single((await c.GetFromJsonAsync<PatientExamination[]>($"/api/patients/{v.PatientId}/examinations"))!);
+            Assert.Equal(history.CompletedAt, amendedHistory.CompletedAt); Assert.Equal(2, amendedHistory.Examination!.Version);
+            Assert.Equal(amendment.Content.Conclusion, amendedHistory.Examination.Content.Conclusion);
             Assert.True((await Ok<ExaminationWorkspace>(await c.PostAsJsonAsync(Exam(v.VisitId)+"/amend",amendment))).Replayed);
             var versions = await c.GetFromJsonAsync<ExaminationVersion[]>(Exam(v.VisitId)+"/versions");
             Assert.Equal(2,versions!.Length); Assert.Equal("SYNTHETIC đính chính",versions[0].Content.Conclusion);
@@ -418,6 +453,11 @@ public sealed class ExaminationApiTests(ExaminationFixture fixture) : IClassFixt
             Assert.False(await db.ClinicalActivities.AnyAsync(x => x.VisitId == v.VisitId));
             Assert.False(await db.TreatmentDossiers.AnyAsync(x => x.PatientId == v.PatientId));
             Assert.Equal(1,await db.Set<DCMS.Domain.Features.Visits.VisitAudit>().CountAsync(x=>x.VisitId==v.VisitId && x.Action=="CompleteVisit"));
+            Assert.Equal(history.CompletedAt, (await db.Set<DCMS.Domain.Features.Visits.VisitAudit>().SingleAsync(x=>x.VisitId==v.VisitId && x.Action=="CompleteVisit")).OccurredAt);
+            var other = new DCMS.Domain.Features.Patients.PatientProfile { PatientCode = "HISTORY-" + Guid.NewGuid().ToString("N"),
+                FullName = "SYNTHETIC bệnh nhân khác", Phone = "0912345678", CreatedAt = fixture.Clock.Now, UpdatedAt = fixture.Clock.Now };
+            db.Add(other); await db.SaveChangesAsync();
+            Assert.Empty((await c.GetFromJsonAsync<PatientExamination[]>($"/api/patients/{other.Id}/examinations"))!);
         }
     }
     [Theory] [InlineData("FollowUp")] [InlineData("Referral")]

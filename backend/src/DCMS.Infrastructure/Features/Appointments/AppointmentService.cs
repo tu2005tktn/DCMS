@@ -38,7 +38,10 @@ public sealed class AppointmentService(DcmsDbContext db, IAvailabilityService av
         var staff = account?.AccountType == "Staff";
         if (staff)
         {
-            if (!await users.IsInRoleAsync(account!, AccountRoles.ClinicAssistant)) throw Error("MSG06", 403);
+            // Counter booking is for assistants; a dentist may only book a treatment follow-up of their own plan.
+            var treatmentFollowUp = request.FollowUpId.HasValue
+                && AccountRoles.Effective(await users.GetRolesAsync(account!)).Contains(AccountRoles.Dentist);
+            if (!treatmentFollowUp && !await users.IsInRoleAsync(account!, AccountRoles.ClinicAssistant)) throw Error("MSG06", 403);
             var employee = await db.Employees.AsNoTracking().SingleOrDefaultAsync(x => x.AccountId == accountId, ct);
             if (employee == null || !await db.Set<SchedulingMember>().AsNoTracking().AnyAsync(x =>
                     x.BranchId == request.BranchId && x.EmployeeId == employee.Id && x.Active, ct)) throw Error("MSG06", 403);

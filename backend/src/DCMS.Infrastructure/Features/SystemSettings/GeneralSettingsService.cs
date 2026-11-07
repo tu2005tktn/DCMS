@@ -74,33 +74,28 @@ public sealed partial class GeneralSettingsService(DcmsDbContext db, UserManager
         return user;
     }
 
-    // No explicit grant store exists yet, so settings.general.* belongs to an assigned ClinicOwner only (AT90).
-    private async Task AuthorizeAsync(int actorId)
+    private async Task AuthorizeAsync(int actorId, string permission = "settings.general.manage")
     {
-        if (!(await users.GetRolesAsync(await StaffAsync(actorId))).Contains(AccountRoles.ClinicOwner)) throw Error("MSG06", 403);
+        await access.RequireAsync(actorId, permission, CancellationToken.None);
     }
 
     public async Task<SettingsCapabilities> CapabilitiesAsync(int actorId, CancellationToken ct)
     {
-        var roles = await users.GetRolesAsync(await StaffAsync(actorId));
-        var owner = roles.Contains(AccountRoles.ClinicOwner);
-        // DCMS-132 / SET-AT-01: catalog tabs follow catalog.{kind}.read grants; customer groups have no grant and stay owner-only.
-        string[] granted;
-        try { granted = owner ? [] : (await access.ResolveAsync(actorId, ct)).Permissions; }
-        catch (BusinessException ex) when (ex.Status == 403) { granted = []; }
-        string[] kinds = owner ? ReferenceKinds.All
-            : ReferenceKinds.All.Where(kind => granted.Contains($"catalog.{kind}.read")).ToArray();
+        var state = await access.ResolveAsync(actorId, ct);
         var sections = new List<SettingsSection>();
-        if (owner) sections.Add(new("general", true));
+        if (state.Permissions.Contains("settings.general.read")) sections.Add(new("general", state.Permissions.Contains("settings.general.manage")));
+        // DCMS-132 / SET-AT-01: catalog tabs follow catalog.{kind}.read grants.
+        string[] kinds = ReferenceKinds.All.Where(kind => state.Owner || state.Permissions.Contains($"catalog.{kind}.read")).ToArray();
         if (kinds.Length > 0) sections.Add(new("catalogs", true));
-        if (AccountRoles.Effective(roles).Contains(AccountRoles.Dentist)) { sections.Add(new("materials", true)); sections.Add(new("supplies", true)); }
-        if (owner || granted.Contains("settings.audit.read")) sections.Add(new("audit", false));
+        if (state.Permissions.Contains("catalog.materials.read")) sections.Add(new("materials", state.Permissions.Contains("catalog.materials.update")));
+        if (new[]{"providers","lab-work-types","medicines"}.Any(kind => state.Permissions.Contains($"catalog.{kind}.read"))) sections.Add(new("supplies", true));
+        if (state.Owner || state.Permissions.Contains("settings.audit.read")) sections.Add(new("audit", false));
         return new(sections, kinds);
     }
 
     public async Task<GeneralSettingsDto> GetAsync(int actorId, CancellationToken ct)
     {
-        await AuthorizeAsync(actorId);
+        await AuthorizeAsync(actorId, "settings.general.read");
         var (version, settings, row) = await ClinicSettingsStore.CurrentAsync(db, ct);
         return new(version, row?.EffectiveAt, row == null ? null : await ActorName(row.ActorId, ct), row?.Reason, settings);
     }
@@ -131,7 +126,7 @@ public sealed partial class GeneralSettingsService(DcmsDbContext db, UserManager
 
     public async Task<GeneralHistoryPage> HistoryAsync(int actorId, int page, int pageSize, CancellationToken ct)
     {
-        await AuthorizeAsync(actorId);
+        await AuthorizeAsync(actorId, "settings.general.read");
         if (page < 1 || !PageSizes.Contains(pageSize) || page > int.MaxValue / pageSize) throw Error("MSG04", label: "Phân trang");
         var total = await db.ClinicSettingsVersions.CountAsync(ct);
         var rows = await (from row in db.ClinicSettingsVersions.AsNoTracking()
@@ -235,7 +230,7 @@ public sealed partial class GeneralSettingsService(DcmsDbContext db, UserManager
 
     public async Task<PatientCodeSequenceDto> SequenceAsync(int actorId, CancellationToken ct)
     {
-        await AuthorizeAsync(actorId);
+        await AuthorizeAsync(actorId, "settings.general.read");
         return await SequenceDtoAsync(ct);
     }
 

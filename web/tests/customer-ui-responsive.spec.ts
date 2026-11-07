@@ -55,6 +55,8 @@ for (const width of [320, 390, 768, 1440]) {
     await page.keyboard.press('Escape');
     await expect(page.locator('.ant-select-dropdown:visible')).toHaveCount(0);
     await expect(page.getByRole('group', { name: 'Khung giờ buổi sáng' }).getByRole('button')).toBeVisible();
+    await expect(page.getByText(/Ngày đã chọn:/)).toBeVisible();
+    if (width <= 680) await expect(page.getByRole('progressbar', { name: 'Tiến độ đặt lịch' })).toBeVisible();
     await expectNoHorizontalOverflow(page);
     await page.screenshot({ path: test.info().outputPath(`booking-${width}.png`), fullPage: true });
 

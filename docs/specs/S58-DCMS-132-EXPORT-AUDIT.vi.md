@@ -61,7 +61,14 @@ Khôi phục (SET-AT-31) dùng restore đã có của Thiết lập chung: tạo
 
 ## 4. Excel theo quyền (SET-AT-30)
 
-Thêm grant (cha là `settings.read`; Owner có sẵn): `settings.export.services`, `settings.export.materials`, `settings.export.medicines`.
+Grant export theo quy ước `catalog.{loại}.export` của lớp kiểm quyền endpoint (`ScreenEndpointPermissions`) trên `main` (Owner có sẵn):
+- `catalog.services.export`: grant mới, cha là `settings.read`.
+- `catalog.materials.export`: grant mới, cha là `catalog.materials.read`.
+- `catalog.medicines.export`: đã có trên `main`.
+
+Vai trò Nha sĩ có sẵn các grant `catalog.{materials|providers|lab-work-types|medicines}.*` theo `ScreenGrants`, gồm cả grant export. Nhân viên khác cần được giao grant export qua nhóm quyền.
+
+Cập nhật 08/11/2026 khi merge `main`: tên cũ `settings.export.*` của bản đầu DCMS-132 được bỏ, không giữ hai bộ grant song song. Route `GET /materials/export` được khai báo riêng trong `ScreenEndpointPermissions` (cần `catalog.materials.export`), không rơi vào quyền đọc chung của `/material*`.
 
 | Route | Quyền xem danh sách | Bộ lọc | Cột |
 | --- | --- | --- | --- |

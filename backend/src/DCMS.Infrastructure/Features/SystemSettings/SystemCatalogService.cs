@@ -12,14 +12,13 @@ using Microsoft.EntityFrameworkCore;
 
 namespace DCMS.Infrastructure.Features.SystemSettings;
 
-public sealed class SystemCatalogService(DcmsDbContext db, UserManager<ApplicationUser> users, TimeProvider clock) : ISystemCatalogService
+public sealed class SystemCatalogService(DcmsDbContext db, UserManager<ApplicationUser> users, TimeProvider clock, DCMS.Application.Features.Settings.ISettingsAccess access) : ISystemCatalogService
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     private static BusinessException Error(string code, int status = 400, string? field = null) => new(status, SystemMessages.Get(code) with { Field = field });
     private async Task AuthorizeAsync(int actorId)
     {
-        var user = await users.FindByIdAsync(actorId.ToString());
-        if (user is not { IsActive: true, AccountType: "Staff" } || !AccountRoles.Effective(await users.GetRolesAsync(user)).Contains(AccountRoles.Dentist)) throw Error("MSG06", 403);
+        await access.RequireAsync(actorId, "catalog.materials.read", CancellationToken.None);
     }
     private static string Name(string? value)
     {
@@ -32,13 +31,20 @@ public sealed class SystemCatalogService(DcmsDbContext db, UserManager<Applicati
         if (pageSize is not (20 or 50 or 100) || page < 1 || page > int.MaxValue / pageSize || q?.Length > 160) throw Error("MSG04");
         return q?.Trim().Normalize(NormalizationForm.FormC).ToUpperInvariant() ?? "";
     }
+    private static string? UsageUnit(string? value)
+    {
+        var unit = value?.Trim().Normalize(NormalizationForm.FormC);
+        if (string.IsNullOrEmpty(unit)) return null;
+        if (unit.Length > 40) throw Error("MSG04", field: "usageUnit");
+        return unit;
+    }
     private static void Version(int actual, int expected) { if (actual != expected) throw Error("MSG111", 409); }
     private async Task<MaterialCategory> CategoryRow(Guid id, CancellationToken ct) =>
         await db.MaterialCategories.SingleOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct) ?? throw Error("MSG113", 404);
     private async Task<MaterialCategoryDto> CategoryResult(Guid id, CancellationToken ct) => await db.MaterialCategories.AsNoTracking().Where(x => x.Id == id)
         .Select(x => new MaterialCategoryDto(x.Id, x.Name, db.MaterialCatalogItems.Count(i => i.CategoryId == x.Id && !i.IsDeleted), x.Version)).SingleAsync(ct);
     private async Task<MaterialDto> MaterialResult(Guid id, CancellationToken ct) => await db.MaterialCatalogItems.AsNoTracking().Where(x => x.Id == id)
-        .Select(x => new MaterialDto(x.Id, x.Name, x.CategoryId, x.Category.Name, x.Version)).SingleAsync(ct);
+        .Select(x => new MaterialDto(x.Id, x.Name, x.CategoryId, x.Category.Name, x.Version, x.UsageUnit)).SingleAsync(ct);
     private async Task<MaterialCatalogItem> MaterialRow(Guid id, CancellationToken ct) => await db.MaterialCatalogItems.SingleOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct) ?? throw Error("MSG113", 404);
     private async Task UniqueCategory(string name, Guid? except, CancellationToken ct)
     {
@@ -85,7 +91,7 @@ public sealed class SystemCatalogService(DcmsDbContext db, UserManager<Applicati
         var query = db.MaterialCatalogItems.AsNoTracking().Where(x => !x.IsDeleted && !x.Category.IsDeleted && x.NormalizedName.Contains(search) && (!categoryId.HasValue || x.CategoryId == categoryId));
         var total = await query.CountAsync(ct);
         var items = await query.OrderBy(x => x.NormalizedName).ThenBy(x => x.Id).Skip((page-1)*pageSize).Take(pageSize)
-            .Select(x => new MaterialDto(x.Id, x.Name, x.CategoryId, x.Category.Name, x.Version)).ToArrayAsync(ct);
+            .Select(x => new MaterialDto(x.Id, x.Name, x.CategoryId, x.Category.Name, x.Version, x.UsageUnit)).ToArrayAsync(ct);
         return new(items, total, page, pageSize);
     }
     // DCMS-132: same filter as the list, read-only, at most 10 000 rows; the export grant is checked by the caller.
@@ -121,13 +127,13 @@ public sealed class SystemCatalogService(DcmsDbContext db, UserManager<Applicati
     }, ct);
     public Task<MaterialDto> CreateMaterialAsync(int actorId, CreateMaterialRequest request, CancellationToken ct) => Command(actorId, request.RequestKey, "MaterialCreate", request, async () => {
         var name = Name(request.Name); await CategoryRow(request.CategoryId, ct); await UniqueMaterial(request.CategoryId, name, null, ct);
-        var row = new MaterialCatalogItem { Name = name, NormalizedName = name.ToUpperInvariant(), CategoryId = request.CategoryId, CreatedAt = clock.GetUtcNow(), UpdatedAt = clock.GetUtcNow() };
+        var row = new MaterialCatalogItem { Name = name, NormalizedName = name.ToUpperInvariant(), CategoryId = request.CategoryId, UsageUnit = UsageUnit(request.UsageUnit), CreatedAt = clock.GetUtcNow(), UpdatedAt = clock.GetUtcNow() };
         db.MaterialCatalogItems.Add(row); await db.SaveChangesAsync(ct); return new Change<MaterialDto>(row.Id, null, await MaterialResult(row.Id, ct));
     }, ct);
     public Task<MaterialDto> UpdateMaterialAsync(int actorId, Guid id, UpdateMaterialRequest request, CancellationToken ct) => Command(actorId, request.RequestKey, "MaterialUpdate", new { id, request }, async () => {
         var row = await MaterialRow(id, ct); Version(row.Version, request.ExpectedVersion); var before = await MaterialResult(id, ct);
         var name = Name(request.Name); await CategoryRow(request.CategoryId, ct); await UniqueMaterial(request.CategoryId, name, id, ct);
-        row.Name = name; row.NormalizedName = name.ToUpperInvariant(); row.CategoryId = request.CategoryId; row.Version++; row.UpdatedAt = clock.GetUtcNow();
+        row.Name = name; row.NormalizedName = name.ToUpperInvariant(); row.CategoryId = request.CategoryId; row.UsageUnit = UsageUnit(request.UsageUnit); row.Version++; row.UpdatedAt = clock.GetUtcNow();
         await db.SaveChangesAsync(ct); return new Change<MaterialDto>(id, before, await MaterialResult(id, ct));
     }, ct);
     public Task<MaterialDto> DeleteMaterialAsync(int actorId, Guid id, DeleteCatalogRequest request, CancellationToken ct) => Command(actorId, request.RequestKey, "MaterialDelete", new { id, request }, async () => {

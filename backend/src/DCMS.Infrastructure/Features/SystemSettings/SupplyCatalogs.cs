@@ -17,7 +17,7 @@ using Npgsql;
 namespace DCMS.Infrastructure.Features.SystemSettings;
 
 // S58 đợt 4 (docs/specs/S58-SUPPLY-CATALOGS.md): shared command/audit/version flow; each catalog only validates and maps its own fields.
-public abstract partial class SupplyCatalog<TEntity, TInput, TDto>(DcmsDbContext db, UserManager<ApplicationUser> users, TimeProvider clock)
+public abstract partial class SupplyCatalog<TEntity, TInput, TDto>(DcmsDbContext db, UserManager<ApplicationUser> users, TimeProvider clock, DCMS.Application.Features.Settings.ISettingsAccess access)
     : ISupplyCatalog<TInput, TDto> where TEntity : SupplyEntity where TInput : class where TDto : class
 {
     private const long MaxPrice = 1_000_000_000_000;
@@ -42,13 +42,9 @@ public abstract partial class SupplyCatalog<TEntity, TInput, TDto>(DcmsDbContext
     // Same rule as the other S58 sections: an assigned ClinicOwner until an explicit grant store exists.
     protected async Task AuthorizeAsync(int actorId)
     {
-        var user = await users.FindByIdAsync(actorId.ToString());
-        if (user is not { IsActive: true, AccountType: "Staff" } || !CanManage(Resource, await users.GetRolesAsync(user)))
-            throw Error("MSG06", 403);
+        await access.RequireAsync(actorId, $"catalog.{Resource}.read", CancellationToken.None);
     }
 
-    private static bool CanManage(string resource, IList<string> roles) =>
-        SupplyCatalogPermissions.CanManage(resource, roles);
 
     protected IQueryable<TEntity> Search(string? q, string? status, string? type)
     {
@@ -146,7 +142,9 @@ public abstract partial class SupplyCatalog<TEntity, TInput, TDto>(DcmsDbContext
     private async Task<TDto> Command(int actorId, Guid key, string command, object request,
         Func<DateTimeOffset, Task<(TEntity Row, Change Change)>> apply, CancellationToken ct)
     {
-        await AuthorizeAsync(actorId);
+        // Write grants are enforced here too, not only by the route middleware (docs/specs/S58-BRANCHES-AND-CHAIRS.md §2.2).
+        var action = command.Split(':')[^1] switch { "create" => "create", "update" => "update", _ => "deactivate" };
+        await access.RequireAsync(actorId, $"catalog.{Resource}.{action}", ct);
         if (key == Guid.Empty) throw Error("MSG04", label: "Mã yêu cầu", field: "requestKey");
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         await db.Database.ExecuteSqlRawAsync("SELECT pg_advisory_xact_lock(6462362060)", ct);
@@ -234,8 +232,8 @@ public abstract partial class SupplyCatalog<TEntity, TInput, TDto>(DcmsDbContext
     private static partial Regex CodePattern();
 }
 
-public sealed partial class ProviderCatalog(DcmsDbContext db, UserManager<ApplicationUser> users, TimeProvider clock)
-    : SupplyCatalog<CatalogProvider, ProviderInput, ProviderDto>(db, users, clock)
+public sealed partial class ProviderCatalog(DcmsDbContext db, UserManager<ApplicationUser> users, TimeProvider clock, DCMS.Application.Features.Settings.ISettingsAccess access)
+    : SupplyCatalog<CatalogProvider, ProviderInput, ProviderDto>(db, users, clock, access)
 {
     protected override string Resource => "providers";
     protected override DbSet<CatalogProvider> Set => Db.CatalogProviders;
@@ -289,8 +287,8 @@ public sealed partial class ProviderCatalog(DcmsDbContext db, UserManager<Applic
     private static partial Regex PhonePattern();
 }
 
-public sealed class LabWorkTypeCatalog(DcmsDbContext db, UserManager<ApplicationUser> users, TimeProvider clock)
-    : SupplyCatalog<LabWorkType, LabWorkTypeInput, LabWorkTypeDto>(db, users, clock)
+public sealed class LabWorkTypeCatalog(DcmsDbContext db, UserManager<ApplicationUser> users, TimeProvider clock, DCMS.Application.Features.Settings.ISettingsAccess access)
+    : SupplyCatalog<LabWorkType, LabWorkTypeInput, LabWorkTypeDto>(db, users, clock, access)
 {
     protected override string Resource => "lab-work-types";
     protected override DbSet<LabWorkType> Set => Db.LabWorkTypes;
@@ -332,8 +330,8 @@ public sealed class LabWorkTypeCatalog(DcmsDbContext db, UserManager<Application
     }
 }
 
-public sealed class MedicineCatalog(DcmsDbContext db, UserManager<ApplicationUser> users, TimeProvider clock)
-    : SupplyCatalog<CatalogMedicine, MedicineInput, MedicineDto>(db, users, clock), IMedicineCatalog
+public sealed class MedicineCatalog(DcmsDbContext db, UserManager<ApplicationUser> users, TimeProvider clock, DCMS.Application.Features.Settings.ISettingsAccess access)
+    : SupplyCatalog<CatalogMedicine, MedicineInput, MedicineDto>(db, users, clock, access), IMedicineCatalog
 {
     protected override string Resource => "medicines";
     protected override DbSet<CatalogMedicine> Set => Db.CatalogMedicines;
@@ -347,7 +345,10 @@ public sealed class MedicineCatalog(DcmsDbContext db, UserManager<ApplicationUse
         row.Strength = Text(input.Strength, "Hàm lượng", "strength", 200);
         row.DosageForm = Text(input.DosageForm, "Dạng bào chế", "dosageForm", 200);
         row.BaseUnit = Text(input.BaseUnit, "Đơn vị gốc", "baseUnit", 40) ?? throw Error("MSG02", label: "Đơn vị gốc", field: "baseUnit");
+        row.Route = Text(input.Route, "Đường dùng", "route", 40) ?? "Uống";
         row.Packaging = Text(input.Packaging, "Quy cách đóng gói", "packaging", 160);
+        row.Contraindications = Text(input.Contraindications, "Chống chỉ định", "contraindications", 1000);
+        row.AllergyWarnings = Text(input.AllergyWarnings, "Cảnh báo dị ứng", "allergyWarnings", 1000);
         row.Instructions = Text(input.Instructions, "Hướng dẫn sử dụng", "instructions", 1000);
         row.ReferencePrice = Price(input.ReferencePrice);
         row.PrescriptionEligible = input.PrescriptionEligible;
@@ -356,19 +357,22 @@ public sealed class MedicineCatalog(DcmsDbContext db, UserManager<ApplicationUse
     }
 
     protected override bool SameContent(CatalogMedicine a, CatalogMedicine b) => a.Code == b.Code && a.Name == b.Name && a.ActiveIngredient == b.ActiveIngredient
-        && a.Strength == b.Strength && a.DosageForm == b.DosageForm && a.BaseUnit == b.BaseUnit && a.Packaging == b.Packaging
+        && a.Strength == b.Strength && a.DosageForm == b.DosageForm && a.BaseUnit == b.BaseUnit && a.Route == b.Route && a.Packaging == b.Packaging
+        && a.Contraindications == b.Contraindications && a.AllergyWarnings == b.AllergyWarnings
         && a.Instructions == b.Instructions && a.ReferencePrice == b.ReferencePrice && a.PrescriptionEligible == b.PrescriptionEligible
         && a.InternalStockTracked == b.InternalStockTracked;
 
     protected override void Copy(CatalogMedicine from, CatalogMedicine to)
     {
         to.ActiveIngredient = from.ActiveIngredient; to.Strength = from.Strength; to.DosageForm = from.DosageForm; to.BaseUnit = from.BaseUnit;
-        to.Packaging = from.Packaging; to.Instructions = from.Instructions; to.ReferencePrice = from.ReferencePrice;
+        to.Route = from.Route; to.Packaging = from.Packaging; to.Contraindications = from.Contraindications; to.AllergyWarnings = from.AllergyWarnings;
+        to.Instructions = from.Instructions; to.ReferencePrice = from.ReferencePrice;
         to.PrescriptionEligible = from.PrescriptionEligible; to.InternalStockTracked = from.InternalStockTracked;
     }
 
     protected override Task<MedicineDto[]> MapAsync(IReadOnlyList<CatalogMedicine> rows, Func<int, string> actor, CancellationToken ct) =>
-        Task.FromResult(rows.Select(x => new MedicineDto(x.Id, x.Code, x.Name, x.ActiveIngredient, x.Strength, x.DosageForm, x.BaseUnit, x.Packaging,
+        Task.FromResult(rows.Select(x => new MedicineDto(x.Id, x.Code, x.Name, x.ActiveIngredient, x.Strength, x.DosageForm, x.BaseUnit,
+            x.Route, x.Packaging, x.Contraindications, x.AllergyWarnings,
             x.Instructions, x.ReferencePrice, x.PrescriptionEligible, x.InternalStockTracked, x.IsActive, x.Version,
             x.CreatedAt, actor(x.CreatedBy), x.UpdatedAt, actor(x.UpdatedBy))).ToArray());
 

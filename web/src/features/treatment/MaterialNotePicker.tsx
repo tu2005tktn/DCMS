@@ -4,10 +4,18 @@ import { useEffect, useRef, useState } from 'react';
 import { api } from '../../services/api';
 import './materialNotePicker.css';
 
-type Material = { id: string; name: string; categoryId: string; categoryName: string; version: number };
+type Material = { id: string; name: string; categoryId: string; categoryName: string; version: number; usageUnit?: string | null; stock?: number };
+export type MaterialUse = { materialId: string; quantity: number };
+// Adds picked lines to existing ones (same material → quantities add up). Used before replacing an activity's usage lines.
+export function mergeMaterialUses(current: MaterialUse[], added: MaterialUse[]): MaterialUse[] {
+  const sums = new Map<string, number>();
+  for (const u of [...current, ...added]) sums.set(u.materialId, Math.round(((sums.get(u.materialId) ?? 0) + u.quantity) * 1000) / 1000);
+  return [...sums].map(([materialId, quantity]) => ({ materialId, quantity }));
+}
 type MaterialPage = { items: Material[]; total: number; page: number; pageSize: number };
 type Line = { key: string; material?: Material; quantity: string | null };
 const label = (m: Material) => `${m.name} (${m.categoryName})`;
+const stockLabel = (m: Material) => m.stock == null ? label(m) : `${label(m)} · tồn ${m.stock.toLocaleString('vi-VN', { maximumFractionDigits: 3 })}${m.usageUnit ? ` ${m.usageUnit}` : ''}`;
 const blank = (): Line => ({ key: crypto.randomUUID(), quantity: '1' });
 
 function MaterialSelect({ value, disabledIds, index, onChange }: {
@@ -23,7 +31,8 @@ function MaterialSelect({ value, disabledIds, index, onChange }: {
     inFlight.current = true; setLoading(true); setError(undefined);
     try {
       const params = new URLSearchParams({q:query.trim(),page:String(nextPage),pageSize:'20'});
-      const result = await api<MaterialPage>(`/api/system-settings/materials?${params}`);
+      const raw = await api<{ items: { materialId: string; name: string; categoryName: string; usageUnit: string | null; stock: number }[]; total: number; page: number; pageSize: number }>(`/api/system-settings/material-stock/available?${params}`);
+      const result: MaterialPage = { ...raw, items: raw.items.map(m => ({ id: m.materialId, name: m.name, categoryId: '', categoryName: m.categoryName, version: 0, usageUnit: m.usageUnit, stock: m.stock })) };
       if (generation.current !== token) return;
       setItems(previous => [...new Map([...(nextPage === 1 ? [] : previous), ...result.items].map(m => [m.id,m])).values()]);
       setPage(result.page); setTotal(result.total);
@@ -42,9 +51,9 @@ function MaterialSelect({ value, disabledIds, index, onChange }: {
     <Select aria-label={`Tên dụng cụ/vật liệu ${index+1}`} value={value?.id} virtual={false} showSearch filterOption={false}
       placeholder="Tìm tên dụng cụ/vật liệu" loading={loading} onSearch={setQuery} onDropdownVisibleChange={setOpen}
       popupMatchSelectWidth={false} popupClassName="material-note-select-popup" dropdownStyle={{width:420,maxWidth:'calc(100vw - 32px)'}}
-      options={options.map(m => ({value:m.id,label:label(m),title:label(m),disabled:disabledIds.includes(m.id)}))}
+      options={options.map(m => ({value:m.id,label:stockLabel(m),title:stockLabel(m),disabled:disabledIds.includes(m.id)}))}
       onChange={id => { const m = options.find(o => o.id === id); if (m) onChange(m); setQuery(''); }}
-      notFoundContent={loading ? <Spin size="small" /> : error ? 'Không tải được danh mục.' : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Không có dụng cụ/vật liệu phù hợp." />}
+      notFoundContent={loading ? <Spin size="small" /> : error ? 'Không tải được danh mục.' : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Kho chưa có vật liệu nào phù hợp." />}
       onPopupScroll={e => { const el = e.currentTarget; if (!loading && !error && more && el.scrollTop+el.clientHeight >= el.scrollHeight-24) void load(page+1,generation.current); }}
       dropdownRender={menu => <>{menu}{page > 0 && <div className="material-note-select-footer">
         {error ? <Alert type="error" message={error} action={<Button size="small" onMouseDown={e=>e.preventDefault()} onClick={()=>void load(failedPage,generation.current)}>Thử lại danh mục</Button>} /> : loading ? <Spin size="small" /> : more ? <Button type="link" size="small" onMouseDown={e=>e.preventDefault()} onClick={()=>void load(page+1,generation.current)}>Tải thêm vật liệu</Button> : null}
@@ -61,7 +70,7 @@ function quantityText(value: string | null) {
 }
 
 export default function MaterialNotePicker({ note, onApply, onCancel }: {
-  note: string; onApply: (note: string) => void; onCancel: () => void;
+  note: string; onApply: (note: string, materials: MaterialUse[]) => void | Promise<void>; onCancel: () => void;
 }) {
   const [lines, setLines] = useState<Line[]>(() => [blank()]);
   const [error, setError] = useState<string>(), [errors, setErrors] = useState<Record<string,string>>({});
@@ -84,7 +93,10 @@ export default function MaterialNotePicker({ note, onApply, onCancel }: {
     const block = `Vật liệu dùng: ${lines.map(v => `${label(v.material!)} × ${quantityText(v.quantity)}`).join('; ')}.`;
     const combined = note ? `${note}\n\n${block}` : block;
     if (combined.length > 1000) { setError(`Ghi chú sau khi thêm có ${combined.length} ký tự, vượt giới hạn 1.000. Vui lòng giảm nội dung hoặc số vật liệu.`); return; }
-    applied.current = true; onApply(combined);
+    applied.current = true;
+    // Async apply (saved rows) keeps the Modal and selection open on failure so the user can retry.
+    const uses = lines.map(v => ({ materialId: v.material!.id, quantity: Number(v.quantity) }));
+    void Promise.resolve(onApply(combined, uses)).catch((e: unknown) => { applied.current = false; setError(e instanceof Error ? e.message : 'Không lưu được vật liệu.'); });
   }
   return <Modal open title="Vật liệu dùng" width={760} className="material-note-modal" okText="Lưu" cancelText="Hủy"
     okButtonProps={{'aria-label':'Lưu vật liệu'}} onOk={submit} onCancel={onCancel} destroyOnClose>

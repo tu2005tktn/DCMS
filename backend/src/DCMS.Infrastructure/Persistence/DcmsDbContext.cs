@@ -16,12 +16,23 @@ public sealed class DcmsDbContext(DbContextOptions<DcmsDbContext> options)
 {
     public DbSet<DCMS.Domain.Features.SystemSettings.MaterialCategory> MaterialCategories => Set<DCMS.Domain.Features.SystemSettings.MaterialCategory>();
     public DbSet<DCMS.Domain.Features.SystemSettings.MaterialCatalogItem> MaterialCatalogItems => Set<DCMS.Domain.Features.SystemSettings.MaterialCatalogItem>();
+    public DbSet<DCMS.Domain.Features.SystemSettings.MaterialUsage> MaterialUsages => Set<DCMS.Domain.Features.SystemSettings.MaterialUsage>();
+    public DbSet<DCMS.Domain.Features.SystemSettings.MaterialPurchase> MaterialPurchases => Set<DCMS.Domain.Features.SystemSettings.MaterialPurchase>();
     public DbSet<DCMS.Domain.Features.SystemSettings.SystemCatalogChange> SystemCatalogChanges => Set<DCMS.Domain.Features.SystemSettings.SystemCatalogChange>();
     public DbSet<DCMS.Domain.Features.SystemSettings.ClinicSettingsVersion> ClinicSettingsVersions => Set<DCMS.Domain.Features.SystemSettings.ClinicSettingsVersion>();
     public DbSet<DCMS.Domain.Features.SystemSettings.ReferenceEntry> ReferenceEntries => Set<DCMS.Domain.Features.SystemSettings.ReferenceEntry>();
     public DbSet<DCMS.Domain.Features.SystemSettings.CatalogProvider> CatalogProviders => Set<DCMS.Domain.Features.SystemSettings.CatalogProvider>();
     public DbSet<DCMS.Domain.Features.SystemSettings.LabWorkType> LabWorkTypes => Set<DCMS.Domain.Features.SystemSettings.LabWorkType>();
     public DbSet<DCMS.Domain.Features.SystemSettings.CatalogMedicine> CatalogMedicines => Set<DCMS.Domain.Features.SystemSettings.CatalogMedicine>();
+    public DbSet<DCMS.Domain.Features.Prescriptions.ExternalPrescription> ExternalPrescriptions => Set<DCMS.Domain.Features.Prescriptions.ExternalPrescription>();
+    public DbSet<DCMS.Domain.Features.Prescriptions.ExternalPrescriptionLine> ExternalPrescriptionLines => Set<DCMS.Domain.Features.Prescriptions.ExternalPrescriptionLine>();
+    public DbSet<DCMS.Domain.Features.Prescriptions.PrescriptionTemplate> PrescriptionTemplates => Set<DCMS.Domain.Features.Prescriptions.PrescriptionTemplate>();
+    public DbSet<DCMS.Domain.Features.Prescriptions.PrescriptionTemplateLine> PrescriptionTemplateLines => Set<DCMS.Domain.Features.Prescriptions.PrescriptionTemplateLine>();
+    public DbSet<DCMS.Domain.Features.Prescriptions.PrescriptionAudit> PrescriptionAudits => Set<DCMS.Domain.Features.Prescriptions.PrescriptionAudit>();
+    public DbSet<DCMS.Domain.Features.Prescriptions.PrescriptionCommandReceipt> PrescriptionCommandReceipts => Set<DCMS.Domain.Features.Prescriptions.PrescriptionCommandReceipt>();
+    public DbSet<DCMS.Domain.Features.Settings.BranchProfile> BranchProfiles => Set<DCMS.Domain.Features.Settings.BranchProfile>();
+    public DbSet<DCMS.Domain.Features.Settings.BranchChair> BranchChairs => Set<DCMS.Domain.Features.Settings.BranchChair>();
+    public DbSet<DCMS.Domain.Features.Settings.BranchAsset> BranchAssets => Set<DCMS.Domain.Features.Settings.BranchAsset>();
     public DbSet<EmployeeProfile> Employees => Set<EmployeeProfile>();
     public DbSet<AuthSession> AuthSessions => Set<AuthSession>();
     public DbSet<AuthRefreshToken> AuthRefreshTokens => Set<AuthRefreshToken>();
@@ -53,6 +64,11 @@ public sealed class DcmsDbContext(DbContextOptions<DcmsDbContext> options)
     public DbSet<TreatmentEvent> TreatmentEvents => Set<TreatmentEvent>();
     public DbSet<TreatmentReceipt> TreatmentReceipts => Set<TreatmentReceipt>();
     public DbSet<TreatmentSheetDraft> TreatmentSheetDrafts => Set<TreatmentSheetDraft>();
+    public DbSet<LabOrder> LabOrders => Set<LabOrder>();
+    public DbSet<DossierPayment> DossierPayments => Set<DossierPayment>();
+    public DbSet<DossierPaymentLine> DossierPaymentLines => Set<DossierPaymentLine>();
+    public DbSet<DossierPayOsOrder> DossierPayOsOrders => Set<DossierPayOsOrder>();
+    public DbSet<DossierPayOsOrderLine> DossierPayOsOrderLines => Set<DossierPayOsOrderLine>();
     public DbSet<TreatmentRevisionDraft> TreatmentRevisionDrafts => Set<TreatmentRevisionDraft>();
     public DbSet<TreatmentTemplate> TreatmentTemplates => Set<TreatmentTemplate>();
     public DbSet<TreatmentTemplateVersion> TreatmentTemplateVersions => Set<TreatmentTemplateVersion>();
@@ -70,6 +86,7 @@ public sealed class DcmsDbContext(DbContextOptions<DcmsDbContext> options)
 
     protected override void OnModelCreating(ModelBuilder model)
     {
+        FamilyMemberModel.Configure(model);
         base.OnModelCreating(model);
         SchedulingModel.Configure(model);
         AppointmentModel.Configure(model);

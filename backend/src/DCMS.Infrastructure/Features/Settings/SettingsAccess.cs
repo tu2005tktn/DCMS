@@ -34,7 +34,7 @@ public sealed class SettingsAccess(DcmsDbContext db, UserManager<ApplicationUser
                 ? group.Grants.Where(x => SettingsGrants.RoleAllows(x.Permission,roles)).Select(x => x.Permission).ToArray() : [];
             branches = branches.Intersect(assignment.BranchIds).ToArray();
         }
-        return new(owner,assignment != null,roles,permissions,branches);
+        return new(owner,assignment != null,roles,ScreenGrants.Expand(permissions),branches);
     }
     public async Task<PermissionState> RequireAsync(int actorId, string permission, CancellationToken ct)
     {

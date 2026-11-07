@@ -36,13 +36,14 @@ function useRequestKey() {
 // DCMS-127: kinds stored on the patient master show how many active records use each entry.
 const patientKinds: Kind[] = ['customer-groups', 'patient-sources', 'occupations', 'intake-history'];
 
-// DCMS-132 / SET-AT-01: only the kinds the server allows (capabilities.catalogKinds); actions follow catalog.{kind}.* grants.
-export default function ReferenceCatalogPanel({ allowedKinds }: { allowedKinds?: string[] }) {
+export default function ReferenceCatalogPanel({ initialKind }: { initialKind?: Kind } = {}) {
   const { user } = useAuth();
-  const visibleKinds = kinds.filter(x => !allowedKinds || allowedKinds.includes(x.key));
+  const owner = user?.effectiveRoles.includes('ClinicOwner') ?? false;
+  const can = (kind: Kind, action: string) => owner || (user?.permissions.includes(`catalog.${kind}.${action}`) ?? false);
+  const allowedKinds = kinds.filter(kind => can(kind.key, 'read'));
   // Static message does not render under React 19 + antd 5 (errors were silently lost); use the hook instance.
   const [toast, toastContext] = message.useMessage();
-  const [kind, setKind] = useState<Kind>(visibleKinds[0]?.key ?? 'diagnoses'), [status, setStatus] = useState<Status>('Active');
+  const [kind, setKind] = useState<Kind>(initialKind ?? 'diagnoses'), [status, setStatus] = useState<Status>('Active');
   const [search, setSearch] = useState(''), [query, setQuery] = useState(''), [page, setPage] = useState(1), [size, setSize] = useState(20);
   const [data, setData] = useState<Page | null>(null), [loading, setLoading] = useState(false), [error, setError] = useState<string>(), [revision, setRevision] = useState(0);
   const [editing, setEditing] = useState<{ entry?: Entry } | null>(null), [formError, setFormError] = useState<ApiError>();
@@ -52,11 +53,10 @@ export default function ReferenceCatalogPanel({ allowedKinds }: { allowedKinds?:
   const saveKey = useRequestKey(), stateKey = useRequestKey();
   const [form] = Form.useForm<Values>();
   const meta = kinds.find(x => x.key === kind)!;
-  // Customer groups have no grant yet and stay with the clinic owner (docs/specs/S58-SETTINGS-MERGE.vi.md).
-  const can = (action: 'create' | 'update' | 'deactivate') => kind === 'customer-groups'
-    ? !!user?.roles?.includes('ClinicOwner') : !!user?.permissions.includes(`catalog.${kind}.${action}`);
+  useEffect(() => { if (!allowedKinds.some(item => item.key === kind) && allowedKinds.length) setKind(allowedKinds[0].key); }, [kind, user]);
 
   useEffect(() => {
+    if (!allowedKinds.some(item => item.key === kind)) return;
     let live = true; setLoading(true); setError(undefined);
     const params = new URLSearchParams({ q: query, status, page: String(page), pageSize: String(size) });
     void api<Page>(`${base}/${kind}?${params}`).then(v => {
@@ -65,7 +65,7 @@ export default function ReferenceCatalogPanel({ allowedKinds }: { allowedKinds?:
       setData(v);
     }).catch(e => { if (live) { setError((e as Error).message); setData(null); } }).finally(() => { if (live) setLoading(false); });
     return () => { live = false; };
-  }, [kind, status, query, page, size, revision]);
+  }, [kind, status, query, page, size, revision, user]);
 
   function selectKind(next: Kind) { setKind(next); setPage(1); setSearch(''); setQuery(''); setData(null); }
   function open(entry?: Entry) {
@@ -123,7 +123,7 @@ export default function ReferenceCatalogPanel({ allowedKinds }: { allowedKinds?:
   return <div className="reference-catalogs">
     {toastContext}
     <Menu className="reference-catalogs-menu" mode="inline" selectedKeys={[kind]} onClick={e => selectKind(e.key as Kind)}
-      items={visibleKinds.map(x => ({ key: x.key, label: x.label }))} />
+      items={allowedKinds.map(x => ({ key: x.key, label: x.label }))} />
     <div className="reference-catalogs-body">
       <Typography.Title level={4}>{meta.label}</Typography.Title>
       {meta.help && <Typography.Paragraph type="secondary">{meta.help}</Typography.Paragraph>}
@@ -132,7 +132,7 @@ export default function ReferenceCatalogPanel({ allowedKinds }: { allowedKinds?:
           onChange={e => { setSearch(e.target.value); if (!e.target.value) { setQuery(''); setPage(1); } }} onSearch={v => { setQuery(v.trim()); setPage(1); }} />
         <Segmented<Status> value={status} onChange={v => { setStatus(v); setPage(1); }}
           options={[{ value: 'Active', label: 'Đang dùng' }, { value: 'Inactive', label: 'Ngừng dùng' }, { value: 'All', label: 'Tất cả' }]} />
-        {can('create') && <Button type="primary" onClick={() => open()}>Thêm mới</Button>}
+        {can(kind, 'create') && <Button type="primary" onClick={() => open()}>Thêm mới</Button>}
       </div>
       {error && <Alert type="error" showIcon message={error} action={<Button onClick={() => setRevision(v => v + 1)}>Thử lại</Button>} />}
       <Table<Entry> rowKey="id" loading={loading} dataSource={data?.items ?? []} scroll={{ x: 760 }}
@@ -146,8 +146,8 @@ export default function ReferenceCatalogPanel({ allowedKinds }: { allowedKinds?:
           ...(patientKinds.includes(kind) ? [{ title: 'Số hồ sơ', dataIndex: 'patientCount', width: 100, align: 'right' as const }] : []),
           { title: 'Trạng thái', dataIndex: 'active', width: 120, render: (v: boolean) => v ? <Tag color="green">Đang dùng</Tag> : <Tag>Ngừng dùng</Tag> },
           { title: 'Thao tác', key: 'actions', width: 250, render: (_, row) => <Space wrap>
-            {can('update') && <Button size="small" aria-label={`Sửa ${row.name}`} onClick={() => open(row)}>Sửa</Button>}
-            {can('deactivate') && !(row.reserved && row.active) && <Button size="small" danger={row.active} disabled={busy} onClick={() => void previewState(row)}>{row.active ? 'Ngừng dùng' : 'Khôi phục'}</Button>}
+            {can(kind, 'update') && <Button size="small" aria-label={`Sửa ${row.name}`} onClick={() => open(row)}>Sửa</Button>}
+            {can(kind, 'deactivate') && !(row.reserved && row.active) && <Button size="small" danger={row.active} disabled={busy} onClick={() => void previewState(row)}>{row.active ? 'Ngừng dùng' : 'Khôi phục'}</Button>}
             <Button size="small" type="link" onClick={() => void openHistory(row)}>Lịch sử</Button>
           </Space> },
         ]} />

@@ -143,7 +143,9 @@ body:has(.patient-treatment-shell) .workspace-content { width: 100%; max-width: 
 .treatment-sheet-notes > div { padding-left: 1px; font-size: 12px; }
 .treatment-sheet-notes p { margin: 4px 0; color: #667085; }
 .treatment-sheet-note-hint { color: #98a2b3; font-size: 11px; }
-.treatment-sheet-create-row { display: flex; justify-content: center; padding: 13px 0 30px; }
+.treatment-sheet-create-row { display: flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content: center; padding: 13px 0 30px; min-width:0; }
+.treatment-sheet-create-row > label { display:flex; flex-wrap:wrap; gap:8px; align-items:center; max-width:100%; }
+.treatment-sheet-create-row > .ant-alert { width:100%; min-width:0; }
 .treatment-sheet-create.ant-btn { min-width: 146px; min-height: 35px; padding: 5px 14px; color: #fff; background: var(--sheet-green); border-color: var(--sheet-green); border-radius: 1px; font-size: 12px; font-weight: 600; }
 .treatment-sheet-draft-notice { margin-bottom: 18px; }
 .treatment-sheet-body .treatment-sheet-images { margin-top: -44px; }
@@ -222,3 +224,50 @@ body:has(.patient-treatment-shell) .workspace-content { width: 100%; max-width: 
 .treatment-sheet-row-completed > td:not(:last-child),
 .treatment-sheet-row-completed > td:not(:last-child) small { text-decoration: line-through; }
 .treatment-sheet-payment > p { margin: 0; min-height: 23px; font-size: 12px; }
+
+/* Tab Lịch hẹn: hạng mục kế tiếp cần hẹn. */
+.next-visit { margin-bottom: 16px; }
+.next-visit-main { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.next-visit-main .ant-btn { min-height: 44px; min-width: 120px; }
+.next-visit-meta { color: #475467; font-size: 13px; margin-top: 2px; }
+.next-visit-rest { margin-top: 10px; }
+.next-visit-rest ul { margin: 4px 0 0; padding-left: 18px; font-size: 13px; }
+.next-visit-sync { display: flex; flex-direction: column; gap: 10px; }
+.next-visit-sync .ant-checkbox-wrapper { min-height: 44px; align-items: center; }
+.next-visit-deviation { display: block; margin: 6px 0; font-size: 13px; }
+.booking-slots .ant-btn { min-height: 44px; }
+
+/* Hộp thoại Tạo thanh toán mới: Modal được render ngoài cây của phiếu nên dùng lớp riêng. */
+.dossier-payment-form { display: grid; gap: 12px; }
+.dossier-payment-row { display: grid; grid-template-columns: 170px minmax(0, 1fr); align-items: center; gap: 12px; }
+.dossier-payment-row label { font-weight: 600; color: #17233d; }
+.dossier-payment-row textarea { resize: vertical; }
+.dossier-payment-hint { margin: 0; padding: 6px 8px; background: #fff7b8; color: #3b3200; font-size: 13px; line-height: 1.45; }
+.dossier-payment-total.ant-input-number { width: 100%; }
+.dossier-payment-total .ant-input-number-input { text-align: right; font-weight: 700; font-size: 15px; }
+.dossier-payment-help { grid-column: 2; color: #475467; }
+@media (max-width: 560px) { .dossier-payment-help { grid-column: 1; } }
+.dossier-payment-table-scroll { overflow-x: auto; }
+.dossier-payment-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.dossier-payment-table th, .dossier-payment-table td { padding: 6px 8px; border-bottom: 1px solid #e4e7ec; text-align: left; vertical-align: top; }
+.dossier-payment-table th:last-child, .dossier-payment-table td:last-child { text-align: right; width: 150px; }
+.dossier-payment-table small { display: block; color: #475467; margin-top: 2px; }
+.dossier-payment-amount.ant-input-number { width: 130px; }
+.dossier-payment-amount .ant-input-number-input { text-align: right; }
+.dossier-payment-footer { display: flex; justify-content: space-between; gap: 8px; }
+.dossier-payment-save.ant-btn-primary:not(:disabled) { background: #28a745; border-color: #28a745; }
+.transfer-bill { display: grid; gap: 16px; }
+.transfer-bill h3 { margin: 4px 0 0; font-size: 16px; }
+.transfer-bill-scroll { overflow-x: auto; }
+.transfer-bill-table { width: 100%; min-width: 690px; border-collapse: collapse; font-size: 13px; }
+.transfer-bill-table th, .transfer-bill-table td { padding: 10px 8px; border-bottom: 1px solid #e4e7ec; text-align: right; vertical-align: top; }
+.transfer-bill-table th:first-child, .transfer-bill-table td:first-child { text-align: left; min-width: 240px; }
+.transfer-bill-table small { display: block; color: #667085; }
+.transfer-bill-materials { margin-top: 4px; color: #475467; }
+.transfer-bill-pay { display: flex; justify-content: space-between; align-items: center; gap: 24px; padding: 18px; border: 1px solid #d0d5dd; border-radius: 8px; }
+.transfer-bill-pay strong { display: block; font-size: 26px; color: #175cd3; }
+.transfer-bill-pay p { margin: 10px 0 0; }
+.transfer-bill-pay .ant-qrcode { flex: 0 0 auto; }
+.transfer-bill-footnote { margin: 0; color: #667085; font-size: 12px; }
+@media (max-width: 560px) { .transfer-bill-pay { flex-direction: column; align-items: stretch; } .transfer-bill-pay .ant-qrcode { align-self: center; } }
+@media (max-width: 560px) { .dossier-payment-row { grid-template-columns: 1fr; gap: 4px; } }

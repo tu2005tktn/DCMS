@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
+using DCMS.Application.Common;
 using DCMS.Application.Features.Authentication;
 using DCMS.Domain.Features.Accounts;
 using DCMS.Infrastructure.Persistence;
@@ -82,7 +83,7 @@ public sealed class GoogleApiTests(GoogleApiFixture fixture) : IClassFixture<Goo
     }
 
     [Fact]
-    public async Task ExistingLocalEmailCreatesSeparateGoogleAccount()
+    public async Task ExistingLocalEmailRejectsNewGoogleAccount()
     {
         using var client = fixture.CreateClient();
         var email = Email();
@@ -90,34 +91,75 @@ public sealed class GoogleApiTests(GoogleApiFixture fixture) : IClassFixture<Goo
         var registration = await client.PostAsJsonAsync("/api/auth/register",
             new RegisterRequest("Tài khoản cũ", phone, email, fixture.Password, fixture.Password));
         Assert.Equal(HttpStatusCode.Created, registration.StatusCode);
-        var token = Token(Guid.NewGuid().ToString("N"), email);
+        var googleSubject = Guid.NewGuid().ToString("N");
+        var token = Token(googleSubject, email);
         var passwordSignIn = await client.PostAsJsonAsync("/api/auth/sign-in", new SignInRequest(phone, fixture.Password));
         Assert.Equal(HttpStatusCode.OK, passwordSignIn.StatusCode);
         var local = (await passwordSignIn.Content.ReadFromJsonAsync<SignInResponse>())!;
 
         var googleSignIn = await client.PostAsJsonAsync("/api/auth/google/sign-in", new GoogleSignInRequest(token));
-        Assert.Equal(HttpStatusCode.OK, googleSignIn.StatusCode);
-        var google = (await googleSignIn.Content.ReadFromJsonAsync<SignInResponse>())!;
-        Assert.NotEqual(local.User.Id, google.User.Id);
-        Assert.Equal("Public", google.User.AccountType);
-        Assert.Equal([AccountRoles.Guest], google.User.Roles);
-        Assert.False(google.User.HasVerifiedPatientLink);
-        Assert.Empty(google.User.Permissions);
+        Assert.Equal(HttpStatusCode.Conflict, googleSignIn.StatusCode);
+        Assert.Equal("GOOGLE_EMAIL_EXISTS", (await googleSignIn.Content.ReadFromJsonAsync<SystemMessage>())!.Code);
 
         var repeat = await client.PostAsJsonAsync("/api/auth/google/sign-in", new GoogleSignInRequest(token));
-        Assert.Equal(HttpStatusCode.OK, repeat.StatusCode);
-        Assert.Equal(google.User.Id, (await repeat.Content.ReadFromJsonAsync<SignInResponse>())!.User.Id);
+        Assert.Equal(HttpStatusCode.Conflict, repeat.StatusCode);
 
         var localAgain = await client.PostAsJsonAsync("/api/auth/sign-in", new SignInRequest(phone, fixture.Password));
         Assert.Equal(local.User.Id, (await localAgain.Content.ReadFromJsonAsync<SignInResponse>())!.User.Id);
 
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
-        Assert.Equal(2, await db.Users.CountAsync(x => x.NormalizedEmail == email.ToUpperInvariant()));
+        Assert.Equal(1, await db.Users.CountAsync(x => x.NormalizedEmail == email.ToUpperInvariant()));
         Assert.False((await db.Users.SingleAsync(x => x.Id == local.User.Id)).EmailConfirmed);
-        Assert.True((await db.Users.SingleAsync(x => x.Id == google.User.Id)).EmailConfirmed);
-        Assert.False(await db.PatientAccountLinks.AnyAsync(x => x.AccountId == google.User.Id));
+        Assert.False(await db.UserLogins.AnyAsync(x => x.LoginProvider == "Google" && x.ProviderKey == googleSubject));
         await fixture.AssertPatientUnchangedAsync();
+    }
+
+    [Fact]
+    public async Task DifferentGoogleIdentityCannotUseExistingGoogleEmail()
+    {
+        using var client = fixture.CreateClient();
+        var email = Email();
+        var firstToken = Token(Guid.NewGuid().ToString("N"), email);
+        var first = await client.PostAsJsonAsync("/api/auth/google/sign-in", new GoogleSignInRequest(firstToken));
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        var firstAccount = (await first.Content.ReadFromJsonAsync<SignInResponse>())!;
+
+        var otherToken = Token(Guid.NewGuid().ToString("N"), email.ToUpperInvariant());
+        var duplicate = await client.PostAsJsonAsync("/api/auth/google/sign-in", new GoogleSignInRequest(otherToken));
+        Assert.Equal(HttpStatusCode.Conflict, duplicate.StatusCode);
+        Assert.Equal("GOOGLE_EMAIL_EXISTS", (await duplicate.Content.ReadFromJsonAsync<SystemMessage>())!.Code);
+
+        var again = await client.PostAsJsonAsync("/api/auth/google/sign-in", new GoogleSignInRequest(firstToken));
+        Assert.Equal(HttpStatusCode.OK, again.StatusCode);
+        Assert.Equal(firstAccount.User.Id, (await again.Content.ReadFromJsonAsync<SignInResponse>())!.User.Id);
+
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
+        Assert.Equal(1, await db.Users.CountAsync(x => x.NormalizedEmail == email.ToUpperInvariant()));
+    }
+
+    [Fact]
+    public async Task ExistingGoogleIdentityCanSignInAfterLegacyDuplicateEmailIsCleared()
+    {
+        using var client = fixture.CreateClient();
+        var token = Token(Guid.NewGuid().ToString("N"), Email());
+        var first = await client.PostAsJsonAsync("/api/auth/google/sign-in", new GoogleSignInRequest(token));
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        var accountId = (await first.Content.ReadFromJsonAsync<SignInResponse>())!.User.Id;
+
+        using (var scope = fixture.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
+            await db.Users.Where(x => x.Id == accountId).ExecuteUpdateAsync(setters => setters
+                .SetProperty(x => x.Email, (string?)null)
+                .SetProperty(x => x.NormalizedEmail, (string?)null)
+                .SetProperty(x => x.EmailConfirmed, false));
+        }
+
+        var again = await client.PostAsJsonAsync("/api/auth/google/sign-in", new GoogleSignInRequest(token));
+        Assert.Equal(HttpStatusCode.OK, again.StatusCode);
+        Assert.Equal(accountId, (await again.Content.ReadFromJsonAsync<SignInResponse>())!.User.Id);
     }
 
     [Fact]

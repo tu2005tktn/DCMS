@@ -1,6 +1,6 @@
 import { Alert, Avatar, Button, Drawer, Layout, Menu, Typography } from 'antd';
 import type { MenuProps } from 'antd';
-import { CalendarOutlined, TeamOutlined, ScheduleOutlined, MedicineBoxOutlined, ExperimentOutlined,
+import { CalendarOutlined, TeamOutlined, ScheduleOutlined, MedicineBoxOutlined, ExperimentOutlined, BarChartOutlined,
   CreditCardOutlined, SettingOutlined, UserOutlined, FileTextOutlined, AuditOutlined, InboxOutlined,
   LinkOutlined, MenuOutlined, LogoutOutlined, CloseOutlined } from '@ant-design/icons';
 import { useEffect, useState, type ReactNode } from 'react';
@@ -22,21 +22,24 @@ export default function StaffWorkspace() {
   }
   const user = auth.user;
   const has = (p: string) => user?.permissions.includes(p) ?? false;
-  const role = (...roles: string[]) => user?.effectiveRoles.some(r => roles.includes(r)) ?? false;
   const links: { key: string; title: string; icon: ReactNode; group: string; visible: boolean }[] = [
-    { key:'/appointments', title:'Lịch hẹn', icon:<CalendarOutlined />, group:'Vận hành', visible:role('ClinicAssistant','Dentist','ClinicOwner') },
+    { key:'/appointments', title:'Lịch hẹn', icon:<CalendarOutlined />, group:'Vận hành', visible:has('appointments.read') },
     { key:'/reception', title:'Tiếp nhận và hàng chờ', icon:<ScheduleOutlined />, group:'Vận hành', visible:has('reception.read') },
     { key:'/patients', title:'Bệnh nhân', icon:<TeamOutlined />, group:'Vận hành', visible:has('patients.read') },
-    { key:'/working-schedules', title:'Lịch làm việc', icon:<CalendarOutlined />, group:'Vận hành', visible:user?.accountType==='Staff' },
+    { key:'/working-schedules', title:'Lịch làm việc', icon:<CalendarOutlined />, group:'Vận hành', visible:has('working-schedules.read') },
     { key:'/support-inbox', title:'Hộp thư hỗ trợ', icon:<InboxOutlined />, group:'Vận hành', visible:has('appointments.support.handle') },
-    { key:'/treatment-templates', title:'Mẫu điều trị', icon:<FileTextOutlined />, group:'Chuyên môn', visible:role('Dentist') },
-    { key:'/commercial/treatment', title:'Giá và duyệt điều trị', icon:<MedicineBoxOutlined />, group:'Chuyên môn', visible:role('Admin','ClinicOwner','Dentist') },
+    { key:'/treatment-templates', title:'Kế hoạch điều trị', icon:<FileTextOutlined />, group:'Chuyên môn', visible:has('treatment.templates.read') },
+    { key:'/prescriptions/templates', title:'Mẫu đơn thuốc', icon:<MedicineBoxOutlined />, group:'Chuyên môn', visible:has('prescriptions.manage') },
+    { key:'/commercial/treatment', title:'Giá và duyệt điều trị', icon:<MedicineBoxOutlined />, group:'Chuyên môn', visible:has('treatment.prices.read')||has('treatment.commercial.read') },
+    { key:'/materials', title:'Dụng cụ - vật liệu', icon:<ExperimentOutlined />, group:'Chuyên môn', visible:['materials.purchases.read', 'materials.stock.read', 'materials.usage.read'].some(has) },
     { key:'/clinical-services', title:'Dịch vụ cận lâm sàng', icon:<ExperimentOutlined />, group:'Chuyên môn', visible:has('services.read') },
     { key:'/payments', title:'Thanh toán', icon:<CreditCardOutlined />, group:'Quản trị', visible:has('finance.read') },
-    { key:'/accounts', title:'Quản lý tài khoản', icon:<AuditOutlined />, group:'Quản trị', visible:has('accounts.manage') },
-    { key:'/system-settings', title:'Thiết lập hệ thống', icon:<SettingOutlined />, group:'Quản trị', visible:role('Dentist')||has('settings.read') },
-    { key:'/booking-settings', title:'Cài đặt đặt lịch', icon:<ScheduleOutlined />, group:'Quản trị', visible:user?.accountType==='Staff' },
-    { key:'/link-verification', title:'Xác minh liên kết hồ sơ', icon:<LinkOutlined />, group:'Quản trị', visible:has('patient-links.verify') },
+    { key:'/work-statistics', title:'Thống kê công việc/dịch vụ', icon:<BarChartOutlined />, group:'Quản trị', visible:has('finance.work-statistics.read') },
+    { key:'/revenue', title:'Doanh thu', icon:<BarChartOutlined />, group:'Quản trị', visible:has('finance.revenue.read') },
+    { key:'/accounts', title:'Quản lý tài khoản', icon:<AuditOutlined />, group:'Quản trị', visible:has('accounts.read') },
+    { key:'/settings', title:'Thiết lập hệ thống', icon:<SettingOutlined />, group:'Quản trị', visible:has('settings.read') },
+    { key:'/booking-settings', title:'Cài đặt đặt lịch', icon:<ScheduleOutlined />, group:'Quản trị', visible:has('booking-settings.read') },
+    { key:'/link-verification', title:'Xác minh liên kết hồ sơ', icon:<LinkOutlined />, group:'Quản trị', visible:has('patient-links.read') },
   ];
   const visible = links.filter(x=>x.visible);
   const path = location.pathname;

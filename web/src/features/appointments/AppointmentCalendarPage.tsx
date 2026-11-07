@@ -1,10 +1,11 @@
+import { usePermissions } from '../authentication/usePermissions';
 import { Alert, Button, Card, Empty, Radio, Select, Space, Spin, Tag, Typography, message } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../services/api';
 import { useNavigate } from 'react-router-dom';
 import BookingDrawer, { type BookingPrefill } from './BookingDrawer';
 import {
-  addDays, clinicToday, clock, formatDate, localDate, localMinute, mondayOf, statusColors, statusLabels, weekday,
+  addDays, clinicToday, clock, formatDate, localDate, localMinute, mondayOf, sourceLabels, statusColors, statusLabels, weekday,
   type AppointmentOptions, type AppointmentStatus, type CalendarPeriod, type CalendarView,
 } from './types';
 
@@ -20,6 +21,7 @@ function cellKind(periods: CalendarPeriod[], minute: number) {
 
 // S10 Appointment calendar (UC-05). Scope is decided by the server; filters only narrow what the server allows.
 export default function AppointmentCalendarPage() {
+  const has = usePermissions();
   const navigate = useNavigate();
   const [toast, toastContext] = message.useMessage();
   const [options, setOptions] = useState<AppointmentOptions | null>(null);
@@ -90,7 +92,7 @@ export default function AppointmentCalendarPage() {
     <div className="page-heading"><div><Typography.Title level={2}>Lịch hẹn</Typography.Title>
       <Typography.Paragraph>Lưới 15 phút theo giờ phòng khám. Bấm ô trống trong giờ làm để đặt lịch tại quầy; bấm lịch để xem chi tiết.
         {options.ownScheduleOnly && ' Bạn chỉ thấy lịch của chính mình.'}</Typography.Paragraph></div>
-      <Button type="primary" onClick={() => setBooking({ branchId: branchId!, dentistId: mode === 'WEEK' ? weekDentist : dentistId, date })}>Đặt lịch</Button></div>
+      <Button type="primary" disabled={!has('appointments.create')} onClick={() => setBooking({ branchId: branchId!, dentistId: mode === 'WEEK' ? weekDentist : dentistId, date })}>Đặt lịch</Button></div>
     <Card>
       <div className="calendar-toolbar">
         <Space wrap>
@@ -131,14 +133,14 @@ export default function AppointmentCalendarPage() {
                     const kind = cellKind(periods, m);
                     return <div key={m} className={`calendar-cell ${kind}${m % 60 === 0 ? ' hour' : ''}`} style={{ height: ROW }}
                       title={kind === 'work' ? `Đặt lịch ${clock(m)}` : kind === 'blocked' ? periods.find(p => p.kind !== 'Work' && p.startMinute <= m && m < p.endMinute)?.reason ?? 'Nghỉ' : 'Ngoài lịch làm việc'}
-                      onClick={() => { if (kind === 'work') setBooking({ branchId: branchId!, dentistId: c.dentistId, date: c.date, minute: m }); }} />;
+                      onClick={() => { if (kind === 'work' && has('appointments.create')) setBooking({ branchId: branchId!, dentistId: c.dentistId, date: c.date, minute: m }); }} />;
                   })}
                   {items.map(a => {
                     const top = (localMinute(a.startAt) - startMinute) / SLOT * ROW;
                     return <button type="button" key={a.id} className={`calendar-event status-${a.status}`} style={{ top, height: Math.max(ROW, a.durationMinutes / SLOT * ROW) - 2 }}
                       onClick={() => navigate(`/appointments/${a.id}`)} aria-label={`Lịch ${a.code}`}>
                       <strong>{clock(localMinute(a.startAt))}–{clock(localMinute(a.endAt))}</strong> {a.attendeeName}
-                      <span>{a.serviceName ?? ''}{a.chairName ? ` · ${a.chairName}` : ''}</span>
+                      <span>{a.code}{a.source ? ` · ${sourceLabels[a.source] ?? a.source}` : ''}{a.serviceName ? ` · ${a.serviceName}` : ''}{a.chairName ? ` · ${a.chairName}` : ''}</span>
                       <Tag color={statusColors[a.status]}>{statusLabels[a.status]}</Tag>
                     </button>;
                   })}

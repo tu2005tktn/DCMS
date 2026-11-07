@@ -3,11 +3,15 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../services/api';
 import { formatClock, formatDate, localDate, statusColors, statusLabels, type AppointmentListItem } from '../appointments/types';
+import NextVisitPanel from './NextVisitPanel';
 
 type AppointmentPage = { items: AppointmentListItem[]; total: number; page: number; pageSize: number };
 
-export default function PatientAppointmentsTab({ patientId, active, revision }: { patientId: number; active: boolean; revision: number }) {
+export default function PatientAppointmentsTab({ patientId, patientName, patientPhone, active, revision }: {
+  patientId: number; patientName: string; patientPhone: string | null; active: boolean; revision: number;
+}) {
   const [scope, setScope] = useState('ALL');
+  const [reload, setReload] = useState(0);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [retry, setRetry] = useState(0);
@@ -24,8 +28,10 @@ export default function PatientAppointmentsTab({ patientId, active, revision }: 
       .catch(failure => { if (current) setError((failure as Error).message); })
       .finally(() => { if (current) setLoading(false); });
     return () => { current = false; };
-  }, [patientId, active, revision, scope, page, pageSize, retry]);
+  }, [patientId, active, revision, scope, page, pageSize, retry, reload]);
   return <>
+    <NextVisitPanel patient={{ id: patientId, fullName: patientName, phone: patientPhone }} active={active} revision={revision + reload}
+      onBooked={() => setReload(value => value + 1)} />
     <Space className="patient-actions" wrap>
       <Select aria-label="Nhóm lịch hẹn" value={scope} style={{ width: 180 }}
         options={[{ value: 'ALL', label: 'Tất cả' }, { value: 'UPCOMING', label: 'Sắp tới' }, { value: 'HISTORY', label: 'Lịch sử' }]}

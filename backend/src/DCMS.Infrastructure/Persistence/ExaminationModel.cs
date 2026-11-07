@@ -36,7 +36,10 @@ internal static class ExaminationModel
             b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.CancelledBy).OnDelete(DeleteBehavior.Restrict);
         });
         model.Entity<ClinicalDocument>(b => {
-            b.ToTable("CLINICAL_DOCUMENT", t => t.HasCheckConstraint("CK_CLINICAL_DOCUMENT_State", "\"FileState\" IN ('PendingScan','Ready','Rejected')"));
+            b.ToTable("CLINICAL_DOCUMENT", t => {
+                t.HasCheckConstraint("CK_CLINICAL_DOCUMENT_State", "\"FileState\" IN ('PendingScan','Ready','Rejected')");
+                t.HasCheckConstraint("CK_CLINICAL_DOCUMENT_Context", "\"VisitId\" IS NOT NULL OR \"DossierId\" IS NOT NULL");
+            });
             b.Property(x => x.FileName).HasMaxLength(255); b.Property(x => x.ContentType).HasMaxLength(64);
             b.Property(x => x.Sha256).HasMaxLength(64); b.Property(x => x.DocumentType).HasMaxLength(24);
             b.Property(x => x.Source).HasMaxLength(16); b.Property(x => x.FileState).HasMaxLength(16);

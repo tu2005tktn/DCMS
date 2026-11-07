@@ -13,7 +13,7 @@ public sealed class ServiceCatalogExport(DcmsDbContext db, ISettingsAccess acces
 {
     public async Task<byte[]> ExportAsync(int actorId, string? q, string? status, CancellationToken ct)
     {
-        var state = await access.RequireAsync(actorId, "settings.export.services", ct);
+        var state = await access.RequireAsync(actorId, "catalog.services.export", ct);
         if (q?.Length > 100) throw new BusinessException(400, SystemMessages.Get("MSG03", "Từ khóa", 100) with { Field = "q" });
         var term = q?.Trim().Normalize(NormalizationForm.FormC).ToUpperInvariant() ?? "";
         var rows = from s in db.Set<SchedulingService>().AsNoTracking()

@@ -1,3 +1,4 @@
+import { usePermissions } from '../authentication/usePermissions';
 import { Alert, AutoComplete, Button, Card, Checkbox, Collapse, Drawer, Empty, Form, Input, InputNumber, Modal, Result, Select, Skeleton, Space, Table, Tabs, Tag, Typography } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
@@ -40,6 +41,7 @@ const quantityOptions = [...Array.from({ length: 10 }, (_, index) => ({ label: S
   { label: 'Số khác', value: 'other' as const }];
 
 export default function PlanPage() {
+  const has = usePermissions();
   const { id, dossierId } = useParams();
   const [search] = useSearchParams();
   const location = useLocation();
@@ -133,7 +135,7 @@ export default function PlanPage() {
     title={error.message} extra={<Space><Button onClick={() => setRevision(x => x + 1)}>Thử lại</Button>
       <Link to={`/patients/${id}/dossiers/${dossierId}`}>Về đợt điều trị</Link></Space>} />;
   if (!dossier) return <Card><Skeleton active /></Card>;
-  const editable = dossier.state === 'Open' && dossier.planState !== 'Committed';
+  const editable = has('treatment.plan.manage') && dossier.state === 'Open' && dossier.planState !== 'Committed';
   const editedItem = items[scopeEditing ?? items.length];
 
   function openScope(index: number) {
@@ -226,7 +228,7 @@ export default function PlanPage() {
     </Card>
     <Tabs activeKey={tab} onChange={setTab} items={[
       { key: 'items', label: `Hạng mục (${items.length})`, children: <Card title="Hạng mục điều trị"
-        extra={editable && <Button type="primary" onClick={() => openScope(items.length)}>Thêm hạng mục</Button>}>
+        extra={editable && has('treatment.items.create') && <Button type="primary" onClick={() => openScope(items.length)}>Thêm hạng mục</Button>}>
         {items.length === 0 ? <Empty description="Chưa có hạng mục. Hãy chọn dịch vụ và vùng điều trị." />
           : <Table rowKey={(item: ItemDraft, index: number | undefined) => item.id || String(index)} pagination={false}
               rowClassName={item => item.id === selectedItemId ? 'treatment-selected-item' : ''}
@@ -257,8 +259,8 @@ export default function PlanPage() {
                 { title: 'Thao tác', render: (_: unknown, _item: ItemDraft, index: number) => editable
                   ? <Space wrap><Button onClick={() => openScope(index)}>Sửa hạng mục</Button>
                     <Button onClick={() => openDecision(index)}>Ghi quyết định</Button></Space>
-                  : <Link to={`/patients/${id}/dossiers/${dossier.id}/plan/revise/${_item.id}?from=plan`}>
-                    <Button>Điều chỉnh kế hoạch</Button></Link> },
+                  : has('treatment.revisions.manage') ? <Link to={`/patients/${id}/dossiers/${dossier.id}/plan/revise/${_item.id}?from=plan`}>
+                    <Button>Điều chỉnh kế hoạch</Button></Link> : null },
               ]} />}
         {pricePreview && <div className="treatment-price-summary" aria-live="polite">
           <span>Tổng giá thỏa thuận: {money(pricePreview.grossVnd)}</span>
@@ -379,7 +381,7 @@ export default function PlanPage() {
         <Form.Item name="agreedUnitPriceVnd" label="Giá thỏa thuận mỗi đơn vị (VND)"
           extra="Giá này là dự kiến đã thỏa thuận, chưa tạo khoản phải thu."
           rules={[{ required: true, message: 'Nhập giá đã thỏa thuận.' }]}>
-          <InputNumber min={0} precision={0} className="treatment-number-full" /></Form.Item>
+          <InputNumber disabled={!!editedItem?.id && !has('treatment.items.price')} min={0} precision={0} className="treatment-number-full" /></Form.Item>
         <Alert type="info" showIcon className="treatment-section-note"
           message={referencePrice?.referenceUnitPriceVnd == null
             ? 'Dịch vụ chưa có giá tham chiếu' : `Giá tham chiếu hiện tại: ${money(referencePrice.referenceUnitPriceVnd)}`}
@@ -424,18 +426,18 @@ export default function PlanPage() {
           </Space></> }]}/>
         <Collapse ghost items={[{ key: 'discount', label: 'Đề xuất giảm trừ (nếu có)', children: <>
           <Typography.Paragraph type="secondary">Bác sĩ trong chi nhánh được phân công có thể tự duyệt giảm trừ ở mục “Giá và duyệt giảm trừ” trước khi chốt. Giảm trừ không tạo khoản thu.</Typography.Paragraph>
-          <Form.Item name="discountType" label="Loại giảm trừ"><Select allowClear options={[
+          <Form.Item name="discountType" label="Loại giảm trừ"><Select disabled={!!editedItem?.id && !has('treatment.items.price')} allowClear options={[
             { value: 'Fixed', label: 'Số tiền VND' }, { value: 'Percent', label: 'Phần trăm' },
           ]} /></Form.Item>
-          <Form.Item name="discountValue" label="Mức giảm"><InputNumber min={0}
+          <Form.Item name="discountValue" label="Mức giảm"><InputNumber disabled={!!editedItem?.id && !has('treatment.items.price')} min={0}
             max={discountType === 'Percent' ? 100 : undefined}
             precision={discountType === 'Fixed' ? 0 : 2} className="treatment-number-full" /></Form.Item>
-          <Form.Item name="discountReason" label="Lý do"><Input.TextArea rows={2} maxLength={1000} /></Form.Item>
+          <Form.Item name="discountReason" label="Lý do"><Input.TextArea disabled={!!editedItem?.id && !has('treatment.items.price')} rows={2} maxLength={1000} /></Form.Item>
           <Form.Item name="discountQualifyingItemId" label="Hạng mục cần có để được giảm (nếu có)">
             <Select allowClear options={items.filter(x => x.id && x.id !== editedItem?.id).map(x => ({
               value: x.id!, label: `${options?.services.find(s => s.id === x.serviceId)?.name ?? x.serviceId} · ${x.region ?? 'Chưa chọn vùng'}`,
             }))} /></Form.Item>
-          {editedItem?.discount && <Form.Item name="clearDiscount" valuePropName="checked"><Checkbox>Bỏ đề xuất giảm trừ</Checkbox></Form.Item>}
+          {editedItem?.discount && <Form.Item name="clearDiscount" valuePropName="checked"><Checkbox disabled={!has('treatment.items.price')}>Bỏ đề xuất giảm trừ</Checkbox></Form.Item>}
         </> }]} />
       </Form>
     </Drawer>

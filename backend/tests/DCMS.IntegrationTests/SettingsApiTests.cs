@@ -86,6 +86,57 @@ public sealed class SettingsApiTests(ReceptionFixture fixture) : IClassFixture<R
         Assert.Equal(HttpStatusCode.Forbidden,(await user.GetAsync("/api/support-requests")).StatusCode);
         using var scope=fixture.Services.CreateScope();var db=scope.ServiceProvider.GetRequiredService<DcmsDbContext>();Assert.Single(await db.Set<ReferenceEntry>().Where(x=>x.Id==created.Id).ToArrayAsync());
     }
+    [Fact] public async Task GrantOptionsDescribeSupportedRolesAndStaffMembershipWithoutChangingAccess() {
+        var setup=await reception.Prepare();using var owner=await Owner();var staff=await NewStaff(setup.BranchId);
+        var options=(await owner.GetFromJsonAsync<GrantOption[]>("/api/system-settings/access-groups/grant-options"))!;
+        Assert.DoesNotContain(options,x=>x.Key=="patients.manage" || x.Key=="accounts.manage");
+        Assert.Contains(AccountRoles.Admin,options.Single(x=>x.Key=="settings.general.manage").AllowedBaseRoles);
+        Assert.Equal(new[]{AccountRoles.ClinicAssistant},options.Single(x=>x.Key=="patients.create").AllowedBaseRoles);
+        Assert.Equal(new[]{AccountRoles.Dentist},options.Single(x=>x.Key=="examinations.manage").AllowedBaseRoles);
+        foreach (var permission in new[] { "finance.revenue.read", "finance.work-statistics.read", "finance.payos.create", "treatment.lab.manage", "materials.purchases.read", "materials.purchases.create", "materials.purchases.update", "materials.purchases.delete", "materials.stock.read", "materials.usage.read" })
+            Assert.Contains(options, x => x.Key == permission && x.Parent != null);
+        Assert.Equal(new[]{AccountRoles.ClinicAssistant}, options.Single(x=>x.Key=="finance.payos.create").AllowedBaseRoles);
+        Assert.Equal(new[]{AccountRoles.Dentist}, options.Single(x=>x.Key=="treatment.lab.manage").AllowedBaseRoles);
+        Assert.Contains(AccountRoles.Admin, options.Single(x=>x.Key=="materials.purchases.read").AllowedBaseRoles);
+        Assert.DoesNotContain(AccountRoles.ClinicAssistant, options.Single(x=>x.Key=="materials.purchases.read").AllowedBaseRoles);
+        var metadata=(await owner.GetFromJsonAsync<StaffAccessDto[]>("/api/system-settings/access-groups/staff"))!.Single(x=>x.EmployeeId==staff.EmployeeId);
+        Assert.Contains(AccountRoles.ClinicAssistant,metadata.Roles!);Assert.Equal(staff.BranchIds,metadata.MembershipBranchIds);
+        Assert.Null(metadata.GroupId);
+        using var dentist=await reception.Login("dentist.demo");
+        Assert.Equal(HttpStatusCode.Forbidden,(await dentist.GetAsync("/api/system-settings/access-groups/grant-options")).StatusCode);
+    }
+    [Theory] [InlineData("create")] [InlineData("update")] [InlineData("archive")]
+    public async Task PatientActionsCanBeGrantedSeparatelyAndRevokedWithoutReplacingTheToken(string action) {
+        var setup=await reception.Prepare();using var owner=await Owner();var staff=await NewStaff(setup.BranchId);using var user=await reception.Login(staff.Name);
+        var group=await CreateGroup(owner,["patients.read","patients."+action]);await Ok<StaffAccessDto>(await Assign(owner,staff,group));
+        var patient=(await user.GetFromJsonAsync<DCMS.Application.Features.Patients.PatientDetail>($"/api/patients/{setup.PatientId}"))!;
+        var create=new DCMS.Application.Features.Patients.CreatePatientRequest(null,"SYNTHETIC quyền riêng "+Guid.NewGuid().ToString("N"),null,null,null,null,null,null,null,null,true);
+        var update=new DCMS.Application.Features.Patients.UpdatePatientRequest(patient.Version,patient.FullName+" sửa",patient.BirthDate,patient.Gender,patient.Phone,patient.Address,null,null,null,null,true);
+        var created=await user.PostAsJsonAsync("/api/patients",create);
+        Assert.Equal(action=="create"?HttpStatusCode.Created:HttpStatusCode.Forbidden,created.StatusCode);
+        var updated=await user.PutAsJsonAsync($"/api/patients/{patient.Id}",update);
+        Assert.Equal(action=="update"?HttpStatusCode.OK:HttpStatusCode.Forbidden,updated.StatusCode);
+        patient=(await user.GetFromJsonAsync<DCMS.Application.Features.Patients.PatientDetail>($"/api/patients/{patient.Id}"))!;
+        var archived=await user.PostAsJsonAsync($"/api/patients/{patient.Id}/archive",new DCMS.Application.Features.Patients.ArchivePatientRequest(patient.Version,"SYNTHETIC thử quyền"));
+        Assert.Equal(action=="archive"?HttpStatusCode.OK:HttpStatusCode.Forbidden,archived.StatusCode);
+        if(action=="archive") {
+            var change=(await archived.Content.ReadFromJsonAsync<DCMS.Application.Features.Patients.PatientChange>())!;
+            await Ok<DCMS.Application.Features.Patients.PatientChange>(await user.PostAsJsonAsync($"/api/patients/{patient.Id}/restore",new DCMS.Application.Features.Patients.ArchivePatientRequest(change.Patient.Version,"SYNTHETIC khôi phục")));
+        }
+        await EditGroup(owner,group,["patients.read"]);
+        var me=(await user.GetFromJsonAsync<CurrentUser>("/api/auth/me"))!;Assert.DoesNotContain("patients."+action,me.Permissions);
+        Assert.Equal(HttpStatusCode.Forbidden,(await user.PostAsJsonAsync("/api/patients",create)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden,(await user.PutAsJsonAsync($"/api/patients/{patient.Id}",update)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden,(await user.PostAsJsonAsync($"/api/patients/{patient.Id}/archive",new DCMS.Application.Features.Patients.ArchivePatientRequest(patient.Version,"SYNTHETIC đã thu hồi"))).StatusCode);
+    }
+    [Fact] public async Task ExistingAggregatePatientGrantStillAllowsAllAdministrativeActions() {
+        var setup=await reception.Prepare();using var owner=await Owner();var staff=await NewStaff(setup.BranchId);using var user=await reception.Login(staff.Name);
+        var group=await CreateGroup(owner,["patients.read","patients.manage"]);await Ok<StaffAccessDto>(await Assign(owner,staff,group));
+        var created=await Ok<DCMS.Application.Features.Patients.PatientChange>(await user.PostAsJsonAsync("/api/patients",new DCMS.Application.Features.Patients.CreatePatientRequest(null,"SYNTHETIC quyền cũ "+Guid.NewGuid().ToString("N"),null,null,null,null,null,null,null,null,true)));
+        var patient=created.Patient;
+        var updated=await Ok<DCMS.Application.Features.Patients.PatientChange>(await user.PutAsJsonAsync($"/api/patients/{patient.Id}",new DCMS.Application.Features.Patients.UpdatePatientRequest(patient.Version,patient.FullName+" sửa",null,null,null,null,null,null,null,null,true)));
+        await Ok<DCMS.Application.Features.Patients.PatientChange>(await user.PostAsJsonAsync($"/api/patients/{patient.Id}/archive",new DCMS.Application.Features.Patients.ArchivePatientRequest(updated.Patient.Version,"SYNTHETIC ngừng")));
+    }
     [Fact] public async Task RoleGatesSelfAssignmentAndUnknownGrantsAreRejected() {
         var setup=await reception.Prepare();using var owner=await Owner();
         Assert.Equal(HttpStatusCode.Forbidden,(await owner.PostAsJsonAsync("/api/system-settings/access-groups/",NewGroup(["examinations.read","examinations.manage"])) ).StatusCode);

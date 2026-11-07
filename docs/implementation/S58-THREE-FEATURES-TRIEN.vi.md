@@ -43,3 +43,9 @@ của code Trien cũ.
   retry không cấp lại, tắt hiển thị vẫn sinh số.
 
 Bằng chứng phải tách integration PostgreSQL, browser thật và browser mock.
+
+## Nối vào kết luận khám — 02/11/2026
+
+Luồng kê đơn mua ngoài được nhúng trong Tổng kết khám theo [S19-OPTIONAL-PRESCRIPTION.vi.md](../specs/S19-OPTIONAL-PRESCRIPTION.vi.md). Component dùng chung với `/visits/:visitId/prescription`, lưu bằng API đã có `/api/prescriptions/medicine-options` và `/api/prescriptions/visits/{visitId}/lines`. Kê đơn là optional, không đổi `ExaminationContent`, không cần tồn, không ghi phí hoặc phiếu thu. Mở/chọn thuốc không tự ghi; chỉ thao tác lưu từng dòng mới ghi đơn.
+
+Kết quả kiểm tra 02/11/2026: web build, browser mock 14/14 và browser API/PostgreSQL thật 3/3 đạt; xem [báo cáo tích hợp](S19-OPTIONAL-PRESCRIPTION-20261102.vi.md) để phân biệt phạm vi mock/thật và hồi quy.

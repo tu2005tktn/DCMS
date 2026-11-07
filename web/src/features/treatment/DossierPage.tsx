@@ -1,9 +1,11 @@
+import { usePermissions } from '../authentication/usePermissions';
 import { Alert, Button, Card, Descriptions, Empty, Form, Input, InputNumber, Modal, Result, Select, Skeleton, Space, Tag, Timeline, Typography } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { api, type ApiError } from '../../services/api';
 import type { AppointmentOptions, TreatmentChange, TreatmentDossier, TreatmentItem } from './types';
 import { closureOutcomeLabel, decisionLabel, money, progressLabel, stateLabel } from './types';
+import FollowUpPanel from '../follow-ups/FollowUpPanel';
 import './treatment.css';
 
 const eventLabels: Record<string, string> = {
@@ -22,6 +24,7 @@ const displayTime = (value: string) => new Intl.DateTimeFormat('vi-VN', {
 }).format(new Date(value));
 
 export default function DossierPage() {
+  const has = usePermissions();
   const { id, dossierId } = useParams();
   const [search] = useSearchParams();
   const location = useLocation();
@@ -116,15 +119,15 @@ export default function DossierPage() {
     <Typography.Paragraph><Link to={`/patients/${id}`}>← Hồ sơ bệnh nhân</Link></Typography.Paragraph>
     <div className="treatment-page-heading"><div>
       <Typography.Title level={2}>Đợt điều trị {dossier.code}</Typography.Title>
-      <Typography.Paragraph>{dossier.diagnosis}</Typography.Paragraph>
+      <Typography.Paragraph>{dossier.diagnosis || 'Chưa ghi nhận'}</Typography.Paragraph>
     </div><Tag>{stateLabel[dossier.state]}</Tag></div>
     {(notice || revisionNotice) && <Alert type="success" showIcon className="form-alert"
       message={notice || revisionNotice} />}
     <Card title="Thông tin đợt điều trị" extra={<Space wrap>
-      {dossier.state === 'Open' ? <Button onClick={() => { setActionError(null); actionKey.current = crypto.randomUUID(); setAction('close');
+      {dossier.state === 'Open' ? <Button disabled={!has('treatment.dossiers.update')} onClick={() => { setActionError(null); actionKey.current = crypto.randomUUID(); setAction('close');
         form.setFieldsValue({ outcome: unresolved.length ? 'StoppedIncomplete' : 'CompletedAsAgreed',
           dispositions: unresolved.map(item => ({ itemId: item.id, reason: '' })) }); }}>Kết thúc đợt</Button>
-        : <Button onClick={() => { setActionError(null); actionKey.current = crypto.randomUUID(); setAction('reopen'); }}>Mở lại</Button>}
+        : <Button disabled={!has('treatment.dossiers.update')} onClick={() => { setActionError(null); actionKey.current = crypto.randomUUID(); setAction('reopen'); }}>Mở lại</Button>}
       <Link to={`/patients/${id}/dossiers/${dossier.id}/plan`}><Button type="primary">Mở kế hoạch S21</Button></Link>
     </Space>}>
       <Descriptions column={{ xs: 1, md: 2 }} items={[
@@ -153,8 +156,8 @@ export default function DossierPage() {
               <div><Tag>{decisionLabel[item.decision]}</Tag><Tag>{progressLabel[item.progress] ?? item.progress}</Tag>
                 {dossier.planState === 'Committed' && dossier.state === 'Open' &&
                   <Link to={`/patients/${id}/dossiers/${dossier.id}/plan/revise/${item.id}?from=dossier`}>
-                    <Button size="small">Điều chỉnh kế hoạch</Button></Link>}
-                {item.progress === 'Completed' && !item.warrantyConfirmedAt && <Button size="small" onClick={() => {
+                    <Button size="small" disabled={!has('treatment.revisions.manage')}>Điều chỉnh kế hoạch</Button></Link>}
+                {item.progress === 'Completed' && !item.warrantyConfirmedAt && <Button disabled={!has('treatment.progress.manage')} size="small" onClick={() => {
                   warrantyKey.current = crypto.randomUUID(); setWarrantyError(null); setWarrantyItem(item);
                   warrantyForm.setFieldsValue({ activationOn: new Intl.DateTimeFormat('sv-SE', {
                     timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit',
@@ -180,6 +183,7 @@ export default function DossierPage() {
         {dossier.depositExceptionReason && <Typography.Paragraph>Đã duyệt ngoại lệ không cọc: {dossier.depositExceptionReason}</Typography.Paragraph>}
       </Card>
     </div>
+    <FollowUpPanel dossier={dossier} />
     <Card title="Dòng thời gian" className="treatment-timeline">
       {dossier.timeline.length === 0 ? <Empty description="Chưa có sự kiện chính thức." />
         : <Timeline items={dossier.timeline.map(event => ({ key: event.id,

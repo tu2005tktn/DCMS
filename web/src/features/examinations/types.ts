@@ -12,7 +12,7 @@ export type ExaminationPatient = { id: number; patientCode: string; fullName: st
 export type Workspace = { visit: VisitResult; examination: Examination | null; initialContent: ExaminationContent; allowedActions: string[]; patient: ExaminationPatient; investigations?: Investigation[] };
 export type History = { visitId: string; arrivalAt: string; examination: Examination };
 export type ExaminationVersion = { version: number; content: ExaminationContent; confirmed: boolean; actorId: number; recordedAt: string; reason?: string | null };
-export type PatientExamination = { visitId: string; appointmentCode: string; branchId: number; branchName: string; dentistName: string; arrivalAt: string; visitStatus: string; examination: Examination | null };
+export type PatientExamination = { visitId: string; appointmentCode: string; branchId: number; branchName: string; dentistName: string; arrivalAt: string; visitStatus: string; examination: Examination | null; completedAt?: string | null };
 export const dispositionLabels: Record<string, string> = { ConsultationOnly: 'Tư vấn, chưa điều trị', FollowUp: 'Theo dõi / cần quay lại', Referral: 'Chuyển khám', DeferredDecision: 'Hoãn quyết định điều trị', ProceedToTreatment: 'Tiếp tục điều trị' };
 
 export const unscopedDiagnoses = (content: ExaminationContent): string[] => content.unscopedDiagnoses ?? content.diagnoses ?? (content.diagnosis?.trim() ? [content.diagnosis] : []);

@@ -112,8 +112,12 @@ public sealed class RegistrationApiTests(ApiFixture fixture) : IClassFixture<Api
         Assert.Equal(HttpStatusCode.Created, first.StatusCode);
         await AssertMessage(await client.PostAsJsonAsync("/api/auth/register", request), HttpStatusCode.Conflict, "MSG139");
 
+        var duplicateEmail = request with { PhoneNumber = NewPhone(), Email = request.Email!.ToUpperInvariant() };
+        await AssertMessage(await client.PostAsJsonAsync("/api/auth/register", duplicateEmail),
+            HttpStatusCode.Conflict, "MSG139");
+
         var concurrentPhone = NewPhone();
-        var concurrentRequest = request with { PhoneNumber = concurrentPhone };
+        var concurrentRequest = request with { PhoneNumber = concurrentPhone, Email = NewEmail(concurrentPhone) };
         var responses = await Task.WhenAll(
             client.PostAsJsonAsync("/api/auth/register", concurrentRequest),
             client.PostAsJsonAsync("/api/auth/register", concurrentRequest));
@@ -124,7 +128,7 @@ public sealed class RegistrationApiTests(ApiFixture fixture) : IClassFixture<Api
         var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
         Assert.Equal(1, await db.Users.CountAsync(x => x.UserName == phone));
         Assert.Equal(1, await db.Users.CountAsync(x => x.UserName == concurrentPhone));
-        Assert.Equal(2, await db.Users.CountAsync(x => x.Email == request.Email));
+        Assert.Equal(1, await db.Users.CountAsync(x => x.NormalizedEmail == request.Email!.ToUpperInvariant()));
     }
 
     [Fact]

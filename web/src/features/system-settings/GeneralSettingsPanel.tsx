@@ -1,6 +1,7 @@
 import { Alert, Button, Card, Checkbox, Descriptions, Form, Input, List, Modal, Radio, Select, Skeleton, Space, Table, Tag, Typography, message } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { api, ApiError } from '../../services/api';
+import { usePermissions } from '../authentication/usePermissions';
 import PatientCodeSequenceCard from './PatientCodeSequenceCard';
 import { codeExample, codeModes, idleChoices, receiptFields, requiredFieldOptions, type GeneralHistoryItem, type GeneralHistoryPage,
   type GeneralPreview, type GeneralSettings, type GeneralSettingsDto } from './generalSettings';
@@ -11,6 +12,7 @@ type Pending = { kind: 'save' | 'restore'; preview: GeneralPreview; body: Record
 
 // S58 Thiết lập chung: explicit preview + reason + save; nothing is written on tick (UC-51 step 2–5).
 export default function GeneralSettingsPanel({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => void }) {
+  const has = usePermissions(), canManage = has('settings.general.manage');
   const [form] = Form.useForm<GeneralSettings>();
   const [data, setData] = useState<GeneralSettingsDto | null>(null), [loading, setLoading] = useState(true), [loadError, setLoadError] = useState<string>();
   const [dirty, setDirty] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState<ApiError>();
@@ -108,7 +110,7 @@ export default function GeneralSettingsPanel({ onDirtyChange }: { onDirtyChange:
     ]} />
     {error && <Alert type="error" showIcon message={error.message}
       action={error.code === 'MSG111' ? <Button onClick={() => void load(true)}>Tải phiên bản mới</Button> : undefined} />}
-    <Form<GeneralSettings> form={form} layout="vertical" disabled={busy} onValuesChange={() => markDirty(true)}>
+    <Form<GeneralSettings> form={form} layout="vertical" disabled={busy || !canManage} onValuesChange={() => markDirty(true)}>
       <Card size="small" title="Tự đăng xuất">
         <Form.Item name="staffIdleTimeoutMinutes" label="Tự đăng xuất khi không thao tác sau" extra="Chỉ áp dụng cho phiên nhân viên trên web; ứng dụng bệnh nhân có chính sách riêng.">
           <Select style={{ maxWidth: 240 }} options={idleChoices.map(value => ({ value, label: `${value} phút` }))} />
@@ -121,7 +123,7 @@ export default function GeneralSettingsPanel({ onDirtyChange }: { onDirtyChange:
           {requiredFieldOptions.map(([field, label, available]) =>
             <Form.Item key={field} name={['requiredFields', field]} valuePropName="checked"
               extra={available ? undefined : 'Hồ sơ bệnh nhân chưa có trường này.'}>
-              <Checkbox disabled={!available}>{label}</Checkbox>
+              <Checkbox disabled={!available || !canManage}>{label}</Checkbox>
             </Form.Item>)}
         </div>
       </Card>
@@ -146,7 +148,7 @@ export default function GeneralSettingsPanel({ onDirtyChange }: { onDirtyChange:
       </Card>
     </Form>
     <Space className="general-settings-actions">
-      <Button type="primary" loading={busy} disabled={!dirty} onClick={() => void previewSave()}>Xem trước và lưu</Button>
+      <Button type="primary" loading={busy} disabled={!canManage || !dirty} onClick={() => void previewSave()}>Xem trước và lưu</Button>
       <Button disabled={!dirty || busy} onClick={() => modal.confirm({ title: 'Bỏ thay đổi chưa lưu?', okText: 'Bỏ thay đổi', cancelText: 'Tiếp tục sửa',
         onOk: () => { form.setFieldsValue(data.settings); markDirty(false); setError(undefined); } })}>Hoàn tác</Button>
     </Space>
@@ -163,13 +165,13 @@ export default function GeneralSettingsPanel({ onDirtyChange }: { onDirtyChange:
           { title: 'Người lưu', dataIndex: 'actorName' },
           { title: 'Lý do', dataIndex: 'reason' },
           { title: 'Thao tác', key: 'actions', width: 120, render: (_, row) => row.version === data.version ? <Tag color="green">Hiện hành</Tag>
-            : <Button size="small" disabled={busy || dirty} onClick={() => void previewRestore(row)}>Khôi phục</Button> },
+            : <Button size="small" disabled={!canManage || busy || dirty} onClick={() => void previewRestore(row)}>Khôi phục</Button> },
         ]} />
     </Card>
 
     <Modal open={!!pending} title={pending?.kind === 'restore' ? `Khôi phục nội dung phiên bản ${pending.sourceVersion}` : 'Xem trước thay đổi'}
       okText="Lưu" cancelText="Hủy" confirmLoading={busy} closable={!busy} cancelButtonProps={{ disabled: busy }}
-      okButtonProps={{ disabled: pending?.preview.stale || pending?.preview.changes.length === 0 }}
+      okButtonProps={{ disabled: !canManage || pending?.preview.stale || pending?.preview.changes.length === 0 }}
       onCancel={() => { if (!busy) setPending(null); }} onOk={() => void commit()}>
       {pending?.preview.stale && <Alert type="warning" showIcon message="Thiết lập vừa được người khác lưu. Tải phiên bản mới rồi xem trước lại; bản nhập của bạn được giữ."
         action={<Button onClick={() => { setPending(null); void load(true); }}>Tải phiên bản mới</Button>} />}

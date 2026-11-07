@@ -1,4 +1,6 @@
+import PatientImageGallery from '../clinical-documents/PatientImageGallery';
 import PatientExaminationsTab from '../examinations/PatientExaminationsTab';
+import PatientPrescriptionsTab from '../prescriptions/PatientPrescriptionsTab';
 import ExaminationTreatmentHandoff from '../examinations/ExaminationTreatmentHandoff';
 import { Alert, Button, Card, Descriptions, Empty, Form, Input, message, Modal, Result, Skeleton, Space, Tabs, Tag, Timeline, Typography } from 'antd';
 import { useEffect, useRef, useState } from 'react';
@@ -19,11 +21,6 @@ const empty = <Typography.Text type="secondary">—</Typography.Text>;
 // Tabs whose source features are not built yet.
 const reference = (value: PatientReference | null) => value ? `${value.name}${value.active ? '' : ' (ngừng dùng)'}` : '—';
 
-function Pending({ feature }: { feature: string }) {
-  return <Alert type="info" showIcon message="Chức năng chưa triển khai"
-    description={`Dữ liệu ${feature} sẽ hiển thị tại đây khi chức năng tương ứng được triển khai. Hiện chưa có dữ liệu để hiển thị.`} />;
-}
-
 // S06 Patient Profile and History (UC-08, UC-09, UC-38). Route IDs are never trusted: the server rechecks every request.
 export default function PatientProfilePage() {
   const { id } = useParams();
@@ -31,7 +28,13 @@ export default function PatientProfilePage() {
   const navigate = useNavigate();
   const location = useLocation();
   const [search] = useSearchParams();
-  const canManage = auth.user?.permissions.includes('patients.manage') ?? false;
+  const canUpdate = auth.user?.permissions.some(p => p === 'patients.manage' || p === 'patients.update') ?? false;
+  const canArchive = auth.user?.permissions.some(p => p === 'patients.manage' || p === 'patients.archive') ?? false;
+  const canReadExaminations = auth.user?.permissions.includes('examinations.read') ?? false;
+  const canReadDocuments = auth.user?.permissions.includes('documents.read') ?? false;
+  const canReadPrescriptions = auth.user?.permissions.includes('prescriptions.read') ?? false;
+  const canReadTreatment = auth.user?.permissions.some(key => key === 'treatment.read' || key === 'finance.read') ?? false;
+  const canReadAppointments = auth.user?.permissions.includes('appointments.read') ?? false;
   const [toast, toastContext] = message.useMessage();
   const [patient, setPatient] = useState<PatientDetail | null>(null);
   const [failure, setFailure] = useState<ApiError | null>(null);
@@ -119,7 +122,7 @@ export default function PatientProfilePage() {
 
   return <main className="patient-treatment-shell">
     {toastContext}
-    <Tabs className="patient-treatment-tabs" activeKey={tab} onChange={setTab}
+    <Tabs className="patient-treatment-tabs" activeKey={(!canReadExaminations && tab === 'examinations' || !canReadDocuments && tab === 'files' || !canReadPrescriptions && tab === 'prescriptions' || !canReadTreatment && tab === 'treatment' || !canReadAppointments && tab === 'appointments') ? 'basic' : tab} onChange={setTab}
       tabBarExtraContent={{
         left: <div className="patient-treatment-toolbar">
           <Button type="text" onClick={() => navigate(-1)} aria-label="Quay lại">←</Button>
@@ -130,9 +133,9 @@ export default function PatientProfilePage() {
         { key: 'basic', label: 'Thông tin cơ bản', children: <>
           {patientBanner}
           <Card className="patient-basic-card">
-          {canManage && <Space className="patient-actions">
-            <Button type="primary" disabled={patient.isArchived} onClick={() => setEditing(true)}>Sửa thông tin</Button>
-            <Button danger={!patient.isArchived} onClick={() => setArchiving(true)}>{patient.isArchived ? 'Khôi phục hồ sơ' : 'Ngừng sử dụng'}</Button>
+          {(canUpdate || canArchive) && <Space className="patient-actions">
+            {canUpdate && <Button type="primary" disabled={patient.isArchived} onClick={() => setEditing(true)}>Sửa thông tin</Button>}
+            {canArchive && <Button danger={!patient.isArchived} onClick={() => setArchiving(true)}>{patient.isArchived ? 'Khôi phục hồ sơ' : 'Ngừng sử dụng'}</Button>}
           </Space>}
           <Descriptions bordered column={{ xs: 1, md: 2 }} size="small" items={[
             { label: 'Mã bệnh nhân', children: patient.patientCode },
@@ -180,11 +183,11 @@ export default function PatientProfilePage() {
           </section>}
           </Card>
         </> },
-        { key:'examinations',label:'Khám',children:<PatientExaminationsTab key={patient.id} patientId={patient.id} active={tab==='examinations'}/> },
-        { key: 'treatment', label: 'Điều trị & Thanh toán', children: sourceExaminationVisitId ? <ExaminationTreatmentHandoff patientId={patient.id} visitId={sourceExaminationVisitId} version={search.get('examinationVersion')} patientName={patient.fullName} patientCode={patient.patientCode} patientAge={age}/> : <DossierList patientId={patient.id} visitId={visitId} patientName={patient.fullName} patientCode={patient.patientCode} patientAge={age} /> },
-        { key: 'files', label: 'Hình ảnh', children: <Link to={`/patients/${patient.id}/documents`}>Mở hình ảnh và tài liệu của bệnh nhân</Link> },
-        { key: 'appointments', label: 'Lịch hẹn', children: <PatientAppointmentsTab key={patient.id} patientId={patient.id} active={tab === 'appointments'} revision={revision} /> },
-        { key: 'prescriptions', label: 'Đơn thuốc', children: <Pending feature="đơn thuốc (S23)" /> },
+        ...(canReadExaminations ? [{ key:'examinations',label:'Khám',children:<>{patientBanner}<PatientExaminationsTab key={patient.id} patientId={patient.id} active={tab==='examinations'} refreshKey={revision}/></> }] : []),
+        ...(canReadTreatment ? [{ key: 'treatment', label: 'Điều trị & Thanh toán', children: sourceExaminationVisitId ? <ExaminationTreatmentHandoff patientId={patient.id} visitId={sourceExaminationVisitId} version={search.get('examinationVersion')} patientName={patient.fullName} patientCode={patient.patientCode} patientAge={age}/> : <DossierList patientId={patient.id} visitId={visitId} patientName={patient.fullName} patientCode={patient.patientCode} patientAge={age} /> }] : []),
+        ...(canReadDocuments ? [{ key: 'files', label: 'Hình ảnh', children: <PatientImageGallery patientId={patient.id} /> }] : []),
+        ...(canReadAppointments ? [{ key: 'appointments', label: 'Lịch hẹn', children: <PatientAppointmentsTab key={patient.id} patientId={patient.id} patientName={patient.fullName} patientPhone={patient.phone} active={tab === 'appointments'} revision={revision} /> }] : []),
+        ...(canReadPrescriptions ? [{ key: 'prescriptions', label: 'Đơn thuốc', children: <PatientPrescriptionsTab patient={patient} active={tab === 'prescriptions'} /> }] : []),
       ]} />
     <PatientFormDrawer open={editing} patient={patient} onClose={() => setEditing(false)} onSaved={change => { setEditing(false); saved(change); }} />
     <ArchiveModal patient={patient} open={archiving} onClose={() => setArchiving(false)} onSaved={change => { setArchiving(false); saved(change); }} />

@@ -2,9 +2,11 @@
 
 Bổ sung S19/S20 và INVESTIGATION-BILLING. Luồng: hoàn tất phiếu → kết thúc lượt khám → chốt phí khám + CLS đã thực hiện → thu ngân thu tiền; kế hoạch/actual điều trị tách riêng.
 
+Quyết định 02/11/2026: [giá khám/CLS thiết lập sẵn](CLINICAL-PRESET-PRICES.vi.md) yêu cầu một giá cụ thể khi lưu danh mục; không chỉnh phần điều trị.
+
 Làm rõ UI ngày 28/10/2026: liên kết từ phiếu khám sang thanh toán có tên Chuyển thu ngân, chỉ hiện sau khi Visit Completed. Phí đã chốt ở modal kết thúc được hiển thị chỉ đọc kèm thông báo không cần nhập lại tại màn thu ngân. Hộp thu tiền dùng nhãn Số tiền thu lần này cho từng dịch vụ, tự điền số còn phải thu và giải thích chỉ sửa khi thu một phần; đây là phân bổ khoản thu, không phải thay giá dịch vụ hoặc xác nhận lại phí. Chỉ khoản Pending/chưa xác định mới có thao tác xác nhận phí. Cận lâm sàng đang khám vẫn có thể thu qua màn Thanh toán độc lập. Không đổi API hoặc tự ghi nhận đã nhận tiền khi chốt phí.
 
-- Dùng SchedulingService canonical IsInitialExamination theo chi nhánh, cùng giá ReferenceUnitPriceVnd/PriceVersion. Có màn cấu hình dịch vụ khám, giá có thể NULL (chưa cấu hình) hoặc 0 (miễn phí rõ theo bảng giá). Không seed giá thực tế.
+- Dùng SchedulingService canonical IsInitialExamination theo chi nhánh, cùng giá ReferenceUnitPriceVnd/PriceVersion. Lệnh lưu danh mục yêu cầu giá cụ thể, 0 là miễn phí theo bảng. NULL chỉ còn để đọc dữ liệu cũ chưa cấu hình, phải thiết lập giá trước khi chốt phí. Không seed giá thực tế.
 - Khi Complete thành công, cùng transaction/lifecycle lock: tạo ExaminationFee một lần theo Visit. Dùng dịch vụ Khám đã đặt khi hợp lệ; nếu không, chỉ tự chọn canonical active duy nhất trong branch. Chốt giá hiện hành và snapshot; tạo một FinanceCharge SourceKind=Examination, SourceId=VisitId, quantity=1. Không ghi lúc check-in, lưu nháp, xác nhận phiếu hoặc đính chính. Không tự thu tiền.
 - Không có giá/dịch vụ xác định: tạo fee Pending, không tạo charge tiền 0, không chặn kết thúc khám. Hàng chờ thu ngân thể hiện khoản chưa xác định ngoài tổng các phí đã ghi. Nhân viên được cấp quyền có thể áp dụng giá bảng sau; giá thỏa thuận/miễn giảm khác bảng cần finance.quotes.manage (Dentist phụ trách hoặc Owner) và lý do. Thu ngân chỉ áp dụng đúng giá bảng; không tự override.
 - Modal kết thúc cho xem/chọn phí khám trước khi ghi. Giá/miễn phí khác bảng cần lý do. Cần version giá để tránh ghi giá đã thay đổi sau khi bác sĩ xem. Có thể để trống số tiền để chuyển xác định phí sau. Thiếu quyền tài chính không ngăn bác sĩ kết thúc lâm sàng, server vẫn áp dụng chính sách bảng giá hoặc Pending.

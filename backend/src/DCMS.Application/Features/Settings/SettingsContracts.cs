@@ -44,12 +44,13 @@ public sealed record GroupDto(Guid Id, string Code, string Name, string BaseRole
 public sealed record AssignGroup(Guid GroupId, int ExpectedVersion, int GroupVersion, Guid RequestKey,
     int[] BranchIds, string Reason);
 public sealed record StaffAccessDto(int EmployeeId, int AccountId, string Name, bool Active, int AccountVersion,
-    Guid? GroupId, int AssignmentVersion, int[] BranchIds);
+    Guid? GroupId, int AssignmentVersion, int[] BranchIds, string[]? Roles = null, int[]? MembershipBranchIds = null);
 public sealed record SectionCapability(string Key, string Label, string Path, string[] Actions);
 public sealed record ScopeBranch(int Id, string Name);
 public sealed record SettingsCapabilities(string ClinicScope, SectionCapability[] Sections, string[] Permissions,
     int[] BranchIds, bool Owner, ScopeBranch[] Branches);
 public sealed record GrantDefinition(string Key, string Label, string? RequiredRole, string? Parent);
+public sealed record GrantOption(string Key, string Label, string? RequiredRole, string? Parent, string[] AllowedBaseRoles);
 public sealed record PermissionState(bool Owner, bool Assigned, string[] Roles, string[] Permissions, int[] BranchIds);
 
 public interface ISettingsAccess

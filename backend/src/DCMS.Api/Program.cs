@@ -26,6 +26,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+builder.Logging.AddDebug();
 
 builder.Services.AddInfrastructure(builder.Configuration, builder.Environment);
 builder.Services.AddOpenApi();
@@ -88,14 +91,17 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
 });
 builder.Services.AddAuthorizationBuilder()
     .SetFallbackPolicy(new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build())
-    .AddPolicy("ManageAccounts", policy => policy.RequireRole(AccountRoles.Admin).RequireClaim("permission","accounts.manage"))
+    .AddPolicy("ManageAccounts", policy => policy.RequireRole(AccountRoles.Admin))
     // Guest is effective for every public account (Patient inherits it) and never for staff.
     .AddPolicy(PatientLinkEndpoints.PublicAccountPolicy, policy => policy.RequireRole(AccountRoles.Guest))
     // Admin, Dentist and Clinic Owner do not inherit link verification.
-    .AddPolicy(PatientLinkEndpoints.VerifyPolicy, policy => policy.RequireRole(AccountRoles.ClinicAssistant).RequireClaim("permission","patient-links.verify"))
+    .AddPolicy(PatientLinkEndpoints.VerifyPolicy, policy => policy.RequireRole(AccountRoles.ClinicAssistant).RequireAssertion(c => c.User.HasClaim("permission","patient-links.read") || c.User.HasClaim("permission","patient-links.verify")))
     // S05/S06: Admin has no patient access (GBR-026); Clinic Owner reads through effective Dentist.
     .AddPolicy(PatientEndpoints.ReadPolicy, policy => policy.RequireRole(AccountRoles.ClinicAssistant, AccountRoles.Dentist).RequireClaim("permission","patients.read"))
     .AddPolicy(PatientEndpoints.ManagePolicy, policy => policy.RequireRole(AccountRoles.ClinicAssistant).RequireClaim("permission","patients.manage"))
+    .AddPolicy(PatientEndpoints.CreatePolicy, policy => policy.RequireRole(AccountRoles.ClinicAssistant).RequireAssertion(c => c.User.HasClaim("permission","patients.manage") || c.User.HasClaim("permission","patients.create")))
+    .AddPolicy(PatientEndpoints.UpdatePolicy, policy => policy.RequireRole(AccountRoles.ClinicAssistant).RequireAssertion(c => c.User.HasClaim("permission","patients.manage") || c.User.HasClaim("permission","patients.update")))
+    .AddPolicy(PatientEndpoints.ArchivePolicy, policy => policy.RequireRole(AccountRoles.ClinicAssistant).RequireAssertion(c => c.User.HasClaim("permission","patients.manage") || c.User.HasClaim("permission","patients.archive")))
     .AddPolicy(TreatmentEndpoints.DentistPolicy, policy => policy.RequireRole(AccountRoles.Dentist));
 
 var webOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
@@ -109,6 +115,7 @@ builder.Services.AddSignalR(options =>
 });
 builder.Services.AddScoped<INotificationStore, EfNotificationStore>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<DCMS.Api.Features.Settings.ScreenPermissionScope>();
 builder.Services.AddSingleton<IRealtimeNotifier, SignalRRealtimeNotifier>();
 builder.Services.AddHostedService<AppointmentNotificationWorker>();
 
@@ -134,6 +141,16 @@ if (args.Contains("--migrate") || args.Contains("--seed-demo"))
     return;
 }
 
+if (args.Contains("--seed-clinic-catalog"))
+{
+    if (!app.Environment.IsDevelopment()) throw new InvalidOperationException("Development database commands require Development environment.");
+    using var catalogScope = app.Services.CreateScope();
+    Console.WriteLine(await catalogScope.ServiceProvider.GetRequiredService<DCMS.Infrastructure.Features.Treatment.DevelopmentTreatmentCatalogSeeder>().SeedAsync(args.Contains("--refresh")));
+    Console.WriteLine(await catalogScope.ServiceProvider.GetRequiredService<DCMS.Infrastructure.Features.SystemSettings.DevelopmentMaterialSeeder>().SeedAsync());
+    Console.WriteLine(await catalogScope.ServiceProvider.GetRequiredService<DCMS.Infrastructure.Features.SystemSettings.DevelopmentLabSeeder>().SeedAsync());
+    return;
+}
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi().AllowAnonymous();
@@ -148,6 +165,7 @@ app.Use(async (context, next) =>
 });
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseMiddleware<DCMS.Api.Features.Settings.ScreenPermissionMiddleware>();
 app.MapHealthEndpoints();
 app.MapAuthenticationEndpoints();
 app.MapRecoveryEndpoints();
@@ -157,8 +175,16 @@ DCMS.Api.Features.Settings.SettingsEndpoints.MapSettingsEndpoints(app);
 DCMS.Api.Features.Finance.FinanceEndpoints.MapFinanceEndpoints(app);
 DCMS.Api.Features.Prescriptions.PrescriptionEndpoints.MapPrescriptionEndpoints(app);
 app.MapPatientLinkEndpoints();
+DCMS.Api.Features.FamilyMembers.FamilyMemberEndpoints.MapFamilyMemberEndpoints(app);
 app.MapPatientEndpoints();
 app.MapTreatmentEndpoints();
+app.MapPost("/api/payments/payos/webhook", async (System.Text.Json.JsonElement payload,
+    DCMS.Application.Features.Treatment.IPayOsOrderService service, CancellationToken ct) =>
+{
+    await service.ReceiveWebhookAsync(payload, ct);
+    return Results.Ok(new { code = "00", desc = "success" });
+}).AllowAnonymous();
+DCMS.Api.Features.Treatment.ItemPlanEndpoints.MapItemPlanEndpoints(app);
 DCMS.Api.Features.SystemSettings.SystemSettingsEndpoints.MapSystemSettingsEndpoints(app);
 app.MapClinicalWorkEndpoints();
 app.MapSchedulingEndpoints();

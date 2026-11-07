@@ -2,6 +2,7 @@ using System.Text.Json;
 using DCMS.Application.Common;
 using DCMS.Application.Features.Finance;
 using DCMS.Application.Features.Settings;
+using DCMS.Application.Features.Treatment;
 using DCMS.Domain.Features.Finance;
 using DCMS.Domain.Features.Examinations;
 using DCMS.Domain.Features.Patients;
@@ -9,6 +10,7 @@ using DCMS.Domain.Features.Scheduling;
 using DCMS.Domain.Features.Settings;
 using DCMS.Domain.Features.SystemSettings;
 using DCMS.Domain.Features.Visits;
+using DCMS.Domain.Features.Treatment;
 using DCMS.Infrastructure.Features.Examinations;
 using DCMS.Infrastructure.Features.Scheduling;
 using DCMS.Infrastructure.Persistence;
@@ -25,6 +27,7 @@ public sealed class FinanceService(DcmsDbContext db, ISettingsAccess access, Tim
     static string Text(string? s, int max) { if (string.IsNullOrWhiteSpace(s) || s.Trim().Length > max) throw Error("MSG04"); return s.Trim(); }
     static void Money(long n) { if (n < 0 || n > MaxAmount) throw Invalid("Số tiền vượt giới hạn cho phép."); }
     async Task<Visit> Visit(int actor, Guid id, string grant, CancellationToken ct) { var v = await db.Set<Visit>().SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw Error("MSG113", 404); await access.OperationalAsync(actor, grant, v.BranchId, ct); return v; }
+    async Task<TreatmentDossier> Dossier(int actor, Guid id, string grant, CancellationToken ct) { var d = await db.TreatmentDossiers.SingleOrDefaultAsync(x => x.Id == id && x.State != "Deleted", ct) ?? throw Error("MSG113", 404); await access.OperationalAsync(actor, grant, d.BranchId, ct); return d; }
     async Task Own(int actor, Visit v, CancellationToken ct) { var s = await access.ResolveAsync(actor, ct); if (!s.Owner && s.Roles.Contains("Dentist") && !await db.Employees.AnyAsync(x => x.Id == v.DentistId && x.AccountId == actor, ct)) throw Error("MSG06", 403); }
     async Task<T> Run<T>(int actor, Guid key, string action, string target, object payload, int branch, Guid? visit, Func<Task<T>> mutate, CancellationToken ct)
     {
@@ -48,7 +51,9 @@ public sealed class FinanceService(DcmsDbContext db, ISettingsAccess access, Tim
         return await Run(actor, c.RequestKey, "SaveService", id?.ToString() ?? "new", c, c.BranchId, null, async () =>
         {
             await access.OperationalAsync(actor, "services.manage", c.BranchId, ct);
-            var name = Text(c.Name, 160); var unit = Text(c.Unit, 40); if (!Kinds.Contains(c.Kind)) throw Error("MSG04"); if (c.PriceVnd.HasValue) Money(c.PriceVnd.Value);
+            var name = Text(c.Name, 160); var unit = Text(c.Unit, 40); if (!Kinds.Contains(c.Kind)) throw Error("MSG04");
+            if (c.PriceVnd == null) throw new BusinessException(400, SystemMessages.Get("MSG02", "Đơn giá cận lâm sàng") with { Field = "priceVnd" });
+            Money(c.PriceVnd.Value);
             SchedulingService row;
             if (id.HasValue) { await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock({(long)id.Value + 905000L})", ct); row = await db.Set<SchedulingService>().SingleOrDefaultAsync(x => x.Id == id && x.BranchId == c.BranchId && x.IsInvestigationService, ct) ?? throw Error("MSG113", 404); if (row.PriceVersion != c.ExpectedVersion) throw Error("MSG111", 409); row.PriceVersion++; }
             else { if (c.ExpectedVersion != 0) throw Error("MSG111", 409); row = new() { BranchId = c.BranchId, IsInvestigationService = true, PublicBookable = false }; db.Add(row); }
@@ -84,8 +89,9 @@ public sealed class FinanceService(DcmsDbContext db, ISettingsAccess access, Tim
                 await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock({(long)c.ServiceId.Value + 905000L})", ct);
                 var service = await db.Set<SchedulingService>().SingleOrDefaultAsync(x => x.Id == c.ServiceId && x.BranchId == v.BranchId && x.Active && x.IsInvestigationService, ct) ?? throw Invalid("Chọn dịch vụ cận lâm sàng đang hoạt động.");
                 if (service.InvestigationKind != o.Kind) throw Invalid("Nhóm dịch vụ không khớp chỉ định."); if (service.PriceVersion != c.ExpectedPriceVersion) throw Error("MSG111", 409);
-                var price = c.AgreedUnitPriceVnd ?? service.ReferenceUnitPriceVnd ?? throw Invalid("Dịch vụ chưa có giá. Hãy ghi giá thỏa thuận và căn cứ."); Money(price); Money(checked(price * c.Quantity));
-                if (price == 0 || service.ReferenceUnitPriceVnd != price) o.QuoteEvidence = Text(c.Evidence, 1000); else if (c.Evidence != null) o.QuoteEvidence = Text(c.Evidence, 1000);
+                if (service.ReferenceUnitPriceVnd == null) throw Invalid("Dịch vụ chưa được thiết lập giá. Hãy cập nhật đơn giá trong danh mục trước khi lập phí.");
+                var price = c.AgreedUnitPriceVnd ?? service.ReferenceUnitPriceVnd.Value; Money(price); Money(checked(price * c.Quantity));
+                if (service.ReferenceUnitPriceVnd != price) o.QuoteEvidence = Text(c.Evidence, 1000); else if (c.Evidence != null) o.QuoteEvidence = Text(c.Evidence, 1000);
                 o.ServiceId = service.Id; o.ServiceNameSnapshot = service.Name; o.UnitSnapshot = service.BillingUnit; o.Quantity = c.Quantity; o.UnitPriceSnapshotVnd = price; o.PriceVersionSnapshot = service.PriceVersion;
                 if (c.Mode == "OutsourcedClinic")
                 {
@@ -116,7 +122,18 @@ public sealed class FinanceService(DcmsDbContext db, ISettingsAccess access, Tim
     async Task<FinancialAccount> Account(int patient, int branch, CancellationToken ct) { var a = await db.Set<FinancialAccount>().SingleOrDefaultAsync(x => x.PatientId == patient && x.BranchId == branch, ct); if (a != null) return a; a = new() { PatientId = patient, BranchId = branch, Version = 0 }; db.Add(a); return a; }
     async Task Touch(int patient, int branch, CancellationToken ct) { var a = await Account(patient, branch, ct); a.Version++; }
     async Task<int> Version(int patient, int branch, CancellationToken ct) => await db.Set<FinancialAccount>().Where(x => x.PatientId == patient && x.BranchId == branch).Select(x => x.Version).SingleOrDefaultAsync(ct);
-    async Task<ChargeDto[]> Charges(Guid visit, CancellationToken ct) { var rows = await db.Set<FinanceCharge>().Where(x => x.VisitId == visit).OrderBy(x => x.PostedAt).ToArrayAsync(ct); var paid = await (from a in db.Set<PaymentAllocation>() join p in db.Set<PaymentReceipt>() on a.PaymentId equals p.Id where p.VisitId == visit && p.State == "Posted" group a by a.ChargeId into g select new { Id = g.Key, Amount = g.Sum(x => x.AmountVnd) }).ToDictionaryAsync(x => x.Id, x => x.Amount, ct); return rows.Select(x => new ChargeDto(x.Id, x.VisitId, x.SourceKind, x.SourceId, x.Name, x.Unit, x.Quantity, x.UnitPriceVnd, x.AmountVnd, paid.GetValueOrDefault(x.Id), x.AmountVnd - paid.GetValueOrDefault(x.Id), x.PostedAt)).ToArray(); }
+    async Task<ChargeDto[]> Charges(Guid visit, CancellationToken ct) { var rows = await db.Set<FinanceCharge>().Where(x => x.VisitId == visit).OrderBy(x => x.PostedAt).ToArrayAsync(ct); var paid = await (from a in db.Set<PaymentAllocation>() join p in db.Set<PaymentReceipt>() on a.PaymentId equals p.Id where p.VisitId == visit && p.State == "Posted" group a by a.ChargeId into g select new { Id = g.Key, Amount = g.Sum(x => x.AmountVnd) }).ToDictionaryAsync(x => x.Id, x => x.Amount, ct); return rows.Select(x => new ChargeDto(x.Id, x.VisitId!.Value, x.SourceKind, x.SourceId, x.Name, x.Unit, x.Quantity, x.UnitPriceVnd, x.AmountVnd, paid.GetValueOrDefault(x.Id), x.AmountVnd - paid.GetValueOrDefault(x.Id), x.PostedAt)).ToArray(); }
+    async Task<DossierChargeDto[]> DossierCharges(Guid dossierId, CancellationToken ct)
+    {
+        var rows = await db.Set<FinanceCharge>().Where(x => x.DossierId == dossierId).OrderBy(x => x.PostedAt).ToArrayAsync(ct);
+        var ids = rows.Select(x => x.Id).ToArray();
+        var paid = await (from a in db.Set<PaymentAllocation>() join p in db.Set<PaymentReceipt>() on a.PaymentId equals p.Id
+            where ids.Contains(a.ChargeId) && p.State == "Posted" group a by a.ChargeId into g
+            select new { Id = g.Key, Amount = g.Sum(x => x.AmountVnd) }).ToDictionaryAsync(x => x.Id, x => x.Amount, ct);
+        return rows.Select(x => new DossierChargeDto(x.Id, x.ActivityId!.Value, x.Name, x.Unit, x.Quantity,
+            checked((long)(x.Quantity * x.UnitPriceVnd)), checked((long)(x.Quantity * x.UnitPriceVnd)) - x.AmountVnd,
+            x.AmountVnd, paid.GetValueOrDefault(x.Id), x.AmountVnd - paid.GetValueOrDefault(x.Id), x.PostedAt)).ToArray();
+    }
     async Task<PaymentDto> Payment(PaymentReceipt p,CancellationToken ct)
     {
         var names=await db.Users.Where(x=>x.Id==p.CreatedBy||x.Id==p.ConfirmedBy).Select(x=>new{x.Id,x.FullName}).ToDictionaryAsync(x=>x.Id,x=>x.FullName,ct);
@@ -129,6 +146,56 @@ public sealed class FinanceService(DcmsDbContext db, ISettingsAccess access, Tim
         var ids = charges.Select(x => x.Id).ToArray(); var costs = caps.Permissions.Contains("finance.costs.read") ? await db.Set<ProviderPayable>().Where(x => ids.Contains(x.ChargeId)).Select(x => new PayableDto(x.Id, x.ChargeId, x.ProviderName, x.AmountVnd)).ToArrayAsync(ct) : null;
         return new(v.Id, v.PatientId, patient.FullName, v.BranchId, branch.Name, await Version(v.PatientId, v.BranchId, ct), charges.Sum(x => x.AmountVnd), charges.Sum(x => x.PaidVnd), charges.Sum(x => x.RemainingVnd), charges, (await MapPayments(payments,ct)), costs, settings.ReceiptPrint.DefaultPayerToPatient ? patient.FullName : null, caps.Permissions.Where(x => x.StartsWith("finance.payments.")).ToArray(), await db.Set<InvestigationOrder>().Where(x => x.VisitId == visitId).OrderBy(x => x.CreatedAt).Select(x => new BillInvestigation(x.Id, x.Name, x.Kind, x.State, x.BillingMode, x.PerformedAt)).ToArrayAsync(ct));
     }
+    public async Task<DossierBillDto> DossierBillAsync(int actor, Guid dossierId, CancellationToken ct)
+    {
+        var d = await Dossier(actor, dossierId, "finance.read", ct);
+        var caps = await access.ResolveAsync(actor, ct);
+        var charges = await DossierCharges(dossierId, ct);
+        var payments = await db.Set<PaymentReceipt>().Include(x => x.Allocations).Where(x => x.DossierId == dossierId).OrderByDescending(x => x.CreatedAt).ToArrayAsync(ct);
+        var patient = await db.Set<PatientProfile>().SingleAsync(x => x.Id == d.PatientId, ct);
+        var branch = await db.Set<SchedulingBranch>().SingleAsync(x => x.Id == d.BranchId, ct);
+        return new(d.Id, d.PatientId, patient.FullName, d.BranchId, branch.Name, await Version(d.PatientId, d.BranchId, ct),
+            charges.Sum(x => x.AmountVnd), charges.Sum(x => x.PaidVnd), charges.Sum(x => x.RemainingVnd), charges,
+            await MapPayments(payments, ct), patient.FullName, caps.Permissions.Where(x => x.StartsWith("finance.payments.")).ToArray());
+    }
+    static TreatmentFinanceReceipt TreatmentReceipt(PaymentDto p) => new(p.Id, p.Version, p.Number ?? $"PENDING-{p.Id}",
+        p.ConfirmedAt ?? p.CreatedAt, p.CreatedAt, p.AmountVnd, p.Method,
+        p.ConfirmedByName ?? p.CreatedByName, p.Payer, p.Note,
+        p.State == "Posted" ? "Confirmed" : p.State, p.Allocations, 0);
+    public async Task<TreatmentFinanceSnapshot> TreatmentSnapshotAsync(int actor, Guid dossierId, CancellationToken ct)
+    {
+        var bill = await DossierBillAsync(actor, dossierId, ct);
+        var ids = bill.Charges.Select(x => x.ActivityId).ToArray();
+        var performers = await (from activity in db.ClinicalActivities.AsNoTracking()
+            join employee in db.Employees.AsNoTracking() on activity.PerformerId equals employee.Id
+            where ids.Contains(activity.Id) select new { activity.Id, employee.FullName })
+            .ToDictionaryAsync(x => x.Id, x => x.FullName, ct);
+        return new(true, bill.AccountVersion.ToString(), clock.GetUtcNow(),
+            bill.AllowedActions.Where(x => x is "finance.payments.create" or "finance.payments.confirm")
+                .SelectMany(x => x == "finance.payments.create"
+                    ? bill.RemainingVnd > 0 ? new[] { "Collect", "Cancel" } : new[] { "Cancel" }
+                    : new[] { "Confirm" }).ToArray(),
+            bill.Charges.Select(x => new TreatmentFinanceCharge(x.Id, 1, $"clinical:{x.ActivityId}", x.PostedAt,
+                x.Name, performers.GetValueOrDefault(x.ActivityId, ""), x.AmountVnd, x.PaidVnd, x.RemainingVnd)).ToArray(),
+            bill.Payments.Select(TreatmentReceipt).ToArray(), 0);
+    }
+    public async Task<TreatmentFinanceReceipt> CollectTreatmentAsync(int actor, Guid dossierId,
+        ConfirmCollectionRequest c, CancellationToken ct)
+    {
+        var bill = await DossierBillAsync(actor, dossierId, ct);
+        if (c.DossierId != dossierId || c.AcknowledgedAdvanceVnd != 0 || c.ReceivedVnd <= 0
+            || c.ReceivedVnd > MaxAmount || c.Allocations == null
+            || c.Allocations.Length == 0 || c.Allocations.Any(x => x.ExpectedChargeVersion != 1)
+            || !int.TryParse(c.ExpectedSourceVersion, out var expectedVersion)
+            || c.ReceivedVnd != c.Allocations.Sum(x => (decimal)x.AmountVnd)) throw Error("MSG04");
+        var replay = await db.Set<FinanceCommandReceipt>().AnyAsync(x => x.ActorId == actor && x.RequestKey == c.RequestKey, ct);
+        if (!replay && (c.ReceivedAt - clock.GetUtcNow()).Duration() > TimeSpan.FromMinutes(5))
+            throw Invalid("Ngày nhận phải gần thời điểm xác nhận hiện tại.");
+        var payment = await CollectDossierAsync(actor, dossierId, new CollectPayment(bill.PatientId, expectedVersion,
+            c.RequestKey, c.Method, string.IsNullOrWhiteSpace(c.Payer) ? bill.PatientName : c.Payer,
+            c.Allocations.Select(x => new AllocationInput(x.ChargeId, x.AmountVnd)).ToArray(), c.Note), ct);
+        return TreatmentReceipt(payment);
+    }
     public async Task<QueueBill[]> QueueAsync(int actor,int branchId,CancellationToken ct)
     {
         await access.OperationalAsync(actor,"finance.read",branchId,ct);
@@ -136,7 +203,7 @@ public sealed class FinanceService(DcmsDbContext db, ISettingsAccess access, Tim
             where v.BranchId==branchId && v.Status=="InProgress" && o.State!="Cancelled" && o.PerformedAt==null
                 && (o.BillingMode==null || o.BillingMode=="Clinic" || o.BillingMode=="OutsourcedClinic") select o.VisitId;
         var feeVisits=db.Set<ExaminationFee>().Where(x=>x.State=="Pending").Join(db.Visits.Where(x=>x.BranchId==branchId),x=>x.VisitId,x=>x.Id,(f,v)=>v.Id);
-        var visits=await db.Set<FinanceCharge>().Where(x=>x.BranchId==branchId).Select(x=>x.VisitId).Union(pendingOrders).Union(feeVisits).ToArrayAsync(ct);
+        var visits=await db.Set<FinanceCharge>().Where(x=>x.BranchId==branchId && x.VisitId.HasValue).Select(x=>x.VisitId!.Value).Union(pendingOrders).Union(feeVisits).ToArrayAsync(ct);
         var list=new List<QueueBill>();
         foreach(var id in visits){
             var b=await BillAsync(actor,id,ct);var pending=b.Payments.Count(x=>x.State=="Pending");
@@ -147,6 +214,13 @@ public sealed class FinanceService(DcmsDbContext db, ISettingsAccess access, Tim
         return list.ToArray();
     }
     async Task ValidateAllocations(Guid visit, IReadOnlyList<AllocationInput> items, CancellationToken ct) { if (items == null || items.Count == 0 || items.Count > 100 || items.Select(x => x.ChargeId).Distinct().Count() != items.Count) throw Error("MSG04"); var charges = await Charges(visit, ct); foreach (var i in items) { Money(i.AmountVnd); if (i.AmountVnd == 0 || !charges.Any(x => x.Id == i.ChargeId && x.RemainingVnd >= i.AmountVnd)) throw Invalid("Khoản phân bổ vượt số còn phải thu hoặc không thuộc lượt này.", 409); } Money(items.Sum(x => x.AmountVnd)); }
+    async Task ValidateDossierAllocations(Guid dossierId, IReadOnlyList<AllocationInput> items, CancellationToken ct)
+    {
+        if (items == null || items.Count == 0 || items.Count > 100 || items.Select(x => x.ChargeId).Distinct().Count() != items.Count) throw Error("MSG04");
+        var charges = await DossierCharges(dossierId, ct);
+        foreach (var i in items) { Money(i.AmountVnd); if (i.AmountVnd == 0 || !charges.Any(x => x.Id == i.ChargeId && x.RemainingVnd >= i.AmountVnd)) throw Invalid("Khoản phân bổ không thuộc phiếu điều trị hoặc vượt số còn phải thu.", 409); }
+        Money(checked(items.Sum(x => x.AmountVnd)));
+    }
     async Task Post(PaymentReceipt p, int actor, CancellationToken ct) { var seq = await db.Set<BranchReceiptSequence>().SingleOrDefaultAsync(x => x.BranchId == p.BranchId, ct); if (seq == null) { seq = new() { BranchId = p.BranchId }; db.Add(seq); } p.Number = $"PT-{p.BranchId}-{seq.NextNumber++:D8}"; p.State = "Posted"; p.ConfirmedBy = actor; p.ConfirmedAt = clock.GetUtcNow(); }
     public async Task<PaymentDto> CollectAsync(int actor, Guid visitId, CollectPayment c, CancellationToken ct)
     {
@@ -157,16 +231,40 @@ public sealed class FinanceService(DcmsDbContext db, ISettingsAccess access, Tim
             p.Allocations = c.Allocations.Select(x => new PaymentAllocation { PaymentId = p.Id, ChargeId = x.ChargeId, AmountVnd = x.AmountVnd }).ToList(); db.Add(p); if (c.Method == "Cash") await Post(p, actor, ct); await Touch(v.PatientId, v.BranchId, ct); return await Payment(p,ct);
         }, ct);
     }
+    public async Task<PaymentDto> CollectDossierAsync(int actor, Guid dossierId, CollectPayment c, CancellationToken ct)
+    {
+        var d = await Dossier(actor, dossierId, "finance.payments.create", ct);
+        return await Run(actor, c.RequestKey, "CollectDossier", dossierId.ToString(), c, d.BranchId, null, async () =>
+        {
+            await access.OperationalAsync(actor, "finance.payments.create", d.BranchId, ct);
+            if (d.PatientId != c.PatientId) throw Error("MSG113", 404);
+            if (await Version(d.PatientId, d.BranchId, ct) != c.ExpectedAccountVersion) throw Error("MSG111", 409);
+            if (c.Method is not ("Cash" or "Transfer") || c.Note?.Length > 1000 || c.DeclaredReference?.Length > 100) throw Error("MSG04");
+            await ValidateDossierAllocations(d.Id, c.Allocations, ct);
+            var p = new PaymentReceipt { DossierId = d.Id, PatientId = d.PatientId, BranchId = d.BranchId,
+                PatientName = await db.Set<PatientProfile>().Where(x => x.Id == d.PatientId).Select(x => x.FullName).SingleAsync(ct),
+                BranchName = await db.Set<SchedulingBranch>().Where(x => x.Id == d.BranchId).Select(x => x.Name).SingleAsync(ct),
+                Method = c.Method, Payer = Text(c.Payer, 160), Note = c.Note?.Trim(),
+                DeclaredReference = string.IsNullOrWhiteSpace(c.DeclaredReference) ? null : c.DeclaredReference.Trim(),
+                AmountVnd = checked(c.Allocations.Sum(x => x.AmountVnd)), CreatedBy = actor, CreatedAt = clock.GetUtcNow() };
+            p.Allocations = c.Allocations.Select(x => new PaymentAllocation { PaymentId = p.Id, ChargeId = x.ChargeId, AmountVnd = x.AmountVnd }).ToList();
+            db.Add(p); if (c.Method == "Cash") await Post(p, actor, ct); await Touch(d.PatientId, d.BranchId, ct);
+            return await Payment(p, ct);
+        }, ct);
+    }
     public async Task<PaymentDto> ConfirmAsync(int actor, Guid id, ConfirmPayment c, CancellationToken ct)
     {
         var p = await db.Set<PaymentReceipt>().Include(x => x.Allocations).SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw Error("MSG113", 404); await access.OperationalAsync(actor, "finance.payments.confirm", p.BranchId, ct); return await Run(actor, c.RequestKey, "ConfirmPayment", id.ToString(), c, p.BranchId, p.VisitId, async () =>
         {
             await access.OperationalAsync(actor, "finance.payments.confirm", p.BranchId, ct); await db.Entry(p).ReloadAsync(ct); if (p.Version != c.ExpectedVersion || await Version(p.PatientId, p.BranchId, ct) != c.ExpectedAccountVersion) throw Error("MSG111", 409); if (p.State != "Pending" || p.Method != "Transfer") throw Error("MSG42", 409);
             var reference = Text(c.BankReference, 100); var normalized = reference.ToUpperInvariant(); if (p.DeclaredReference != null && p.DeclaredReference.ToUpperInvariant() != normalized) throw Invalid("Mã giao dịch không khớp thông tin chuyển khoản đã khai báo.", 409); if (await db.Set<PaymentReceipt>().AnyAsync(x => x.BranchId == p.BranchId && x.NormalizedBankReference == normalized, ct)) throw Invalid("Mã giao dịch đã được thu tiền.", 409);
-            p.ConfirmationNote = Text(c.Note, 1000); await ValidateAllocations(p.VisitId, p.Allocations.Select(x => new AllocationInput(x.ChargeId, x.AmountVnd)).ToArray(), ct); p.BankReference = reference; p.NormalizedBankReference = normalized; await Post(p, actor, ct); p.Version++; await Touch(p.PatientId, p.BranchId, ct); return await Payment(p,ct);
+            p.ConfirmationNote = Text(c.Note, 1000); var allocations = p.Allocations.Select(x => new AllocationInput(x.ChargeId, x.AmountVnd)).ToArray();
+            if (p.DossierId.HasValue) await ValidateDossierAllocations(p.DossierId.Value, allocations, ct);
+            else await ValidateAllocations(p.VisitId!.Value, allocations, ct);
+            p.BankReference = reference; p.NormalizedBankReference = normalized; await Post(p, actor, ct); p.Version++; await Touch(p.PatientId, p.BranchId, ct); return await Payment(p,ct);
         }, ct);
     }
-    public async Task<PaymentDto> CancelAsync(int actor, Guid id, CancelPayment c, CancellationToken ct) { var p = await db.Set<PaymentReceipt>().Include(x => x.Allocations).SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw Error("MSG113", 404); await access.OperationalAsync(actor, "finance.payments.create", p.BranchId, ct); return await Run(actor, c.RequestKey, "CancelPayment", id.ToString(), c, p.BranchId, p.VisitId, async () => { await access.OperationalAsync(actor, "finance.payments.create", p.BranchId, ct); await db.Entry(p).ReloadAsync(ct); if (p.Version != c.ExpectedVersion) throw Error("MSG111", 409); if (p.State != "Pending") throw Error("MSG42", 409); p.CancellationReason = Text(c.Reason, 1000); p.State = "Cancelled"; p.Version++; await Touch(p.PatientId, p.BranchId, ct); return await Payment(p,ct); }, ct); }
+    public async Task<PaymentDto> CancelAsync(int actor, Guid id, CancelPayment c, CancellationToken ct) { var p = await db.Set<PaymentReceipt>().Include(x => x.Allocations).SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw Error("MSG113", 404); await access.OperationalAsync(actor, "finance.payments.cancel", p.BranchId, ct); return await Run(actor, c.RequestKey, "CancelPayment", id.ToString(), c, p.BranchId, p.VisitId, async () => { await access.OperationalAsync(actor, "finance.payments.cancel", p.BranchId, ct); await db.Entry(p).ReloadAsync(ct); if (p.Version != c.ExpectedVersion) throw Error("MSG111", 409); if (p.State != "Pending") throw Error("MSG42", 409); p.CancellationReason = Text(c.Reason, 1000); p.State = "Cancelled"; p.Version++; await Touch(p.PatientId, p.BranchId, ct); return await Payment(p,ct); }, ct); }
 
     async Task<(int Version, DCMS.Application.Features.SystemSettings.ReceiptPrintSettings Settings)> PrintSettings(CancellationToken ct)
     {
@@ -183,8 +281,8 @@ public sealed class FinanceService(DcmsDbContext db, ISettingsAccess access, Tim
             "NGUYỄN VĂN A", "NHÂN VIÊN THU NGÂN", "Bản xem trước không phát hành phiếu", clock.GetUtcNow(), settingsVersion, settings);
         if (p.State != "Posted" || p.ConfirmedAt == null || p.Number == null) throw Error("MSG42", 409);
         var issuedAt = p.ConfirmedAt.Value;
-        var total = await db.Set<FinanceCharge>().Where(x => x.VisitId == p.VisitId && x.PostedAt <= issuedAt).SumAsync(x => x.AmountVnd, ct);
-        var paidBefore = await db.Set<PaymentReceipt>().Where(x => x.VisitId == p.VisitId && x.State == "Posted" && x.ConfirmedAt < issuedAt).SumAsync(x => x.AmountVnd, ct);
+        var total = await db.Set<FinanceCharge>().Where(x => (p.DossierId.HasValue ? x.DossierId == p.DossierId : x.VisitId == p.VisitId) && x.PostedAt <= issuedAt).SumAsync(x => x.AmountVnd, ct);
+        var paidBefore = await db.Set<PaymentReceipt>().Where(x => (p.DossierId.HasValue ? x.DossierId == p.DossierId : x.VisitId == p.VisitId) && x.State == "Posted" && x.ConfirmedAt < issuedAt).SumAsync(x => x.AmountVnd, ct);
         var collector = await db.Users.Where(x => x.Id == p.ConfirmedBy).Select(x => x.FullName).SingleAsync(ct);
         return new(p.Id, false, settings.ShowReceiptNumber ? p.Number : null, p.PatientName, p.BranchName, p.Method,
             p.AmountVnd, paidBefore, Math.Max(0, total - paidBefore - p.AmountVnd), p.Payer, collector, p.Note,
@@ -217,17 +315,17 @@ public sealed class FinanceService(DcmsDbContext db, ISettingsAccess access, Tim
     }
     public async Task<ReceiptSequenceDto> ReceiptSequenceAsync(int actor, int branchId, CancellationToken ct)
     {
-        await access.OperationalAsync(actor, "settings.general.manage", branchId, ct);
+        await access.OperationalAsync(actor, "finance.receipt-sequence.manage", branchId, ct);
         var row = await db.Set<BranchReceiptSequence>().SingleOrDefaultAsync(x => x.BranchId == branchId, ct);
         return new(branchId, row?.NextNumber ?? 1, Math.Max(0, (row?.NextNumber ?? 1) - 1), row?.Version ?? 0);
     }
     public async Task<ReceiptSequenceDto> UpdateReceiptSequenceAsync(int actor, int branchId, UpdateReceiptSequence c, CancellationToken ct)
     {
-        await access.OperationalAsync(actor, "settings.general.manage", branchId, ct);
+        await access.OperationalAsync(actor, "finance.receipt-sequence.manage", branchId, ct);
         if (c.NextNumber < 1 || string.IsNullOrWhiteSpace(c.Reason) || c.Reason.Length > 500) throw Error("MSG04");
         return await Run(actor, c.RequestKey, "UpdateReceiptSequence", branchId.ToString(), c, branchId, null, async () =>
         {
-            await access.OperationalAsync(actor, "settings.general.manage", branchId, ct);
+            await access.OperationalAsync(actor, "finance.receipt-sequence.manage", branchId, ct);
             var row = await db.Set<BranchReceiptSequence>().SingleOrDefaultAsync(x => x.BranchId == branchId, ct);
             if (row == null) { if (c.ExpectedVersion != 0) throw Error("MSG111", 409); row = new() { BranchId = branchId, NextNumber = 1, Version = 0 }; db.Add(row); }
             if (row.Version != c.ExpectedVersion) throw Error("MSG111", 409);

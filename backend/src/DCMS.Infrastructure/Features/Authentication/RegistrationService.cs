@@ -38,6 +38,8 @@ public sealed partial class RegistrationService(DcmsDbContext db, UserManager<Ap
             throw new BusinessException(503, SystemMessages.Get("MSG144"));
         if (await users.FindByNameAsync(phone) != null)
             throw new BusinessException(409, SystemMessages.Get("MSG139"));
+        if (await users.FindByEmailAsync(email) != null)
+            throw new BusinessException(409, SystemMessages.Get("MSG139"));
 
         var now = DateTimeOffset.UtcNow;
         var user = new ApplicationUser
