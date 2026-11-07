@@ -20,7 +20,9 @@ Mở rộng `MATERIAL-PURCHASES.md` (nhập hàng) và `TREATMENT-ITEM-PLANS.md`
 
 ## API
 
-Quyền đọc dùng lại `catalog.materials.read`; không thêm quyền mới.
+Cập nhật 07/11/2026: tồn kho dùng `materials.stock.read`, lịch sử xuất dùng dùng `materials.usage.read`; cả hai phụ thuộc `catalog.materials.read`. Tab/menu và API kiểm quyền mới. Picker `material-stock/available` trong điều trị tiếp tục dùng `catalog.materials.read`, không đòi quyền xem toàn bộ kho.
+
+Form sửa vật liệu đã dùng trên phiếu gọi `GET /api/dossiers/{dossierId}/sheet-activities/{activityId}/materials`, trả `[{materialId,quantity}]` và cần `treatment.actuals.update`. Dịch vụ kiểm phiếu/hoạt động đúng nhau, vai trò nha sĩ và chi nhánh được cấp. API này chỉ cung cấp lượng vật liệu của đúng hoạt động để cập nhật, không cấp quyền đọc toàn bộ lịch sử xuất dùng.
 
 - Các request ghi nhận/chỉnh hoạt động trên phiếu điều trị nhận thêm `materials?: [{ materialId, quantity }]`.
 - `GET /api/system-settings/material-stock?q=&page=&pageSize=` → từng **lần nhập đã nhận** (một dòng = một lô): `{ items: [{ purchaseId, materialId, name, categoryName, usageUnit, supplierName, receivedOn, expiresOn, received, used, remaining }], total, page, pageSize }`, sắp theo tên vật liệu rồi hạn dùng gần nhất trước.

@@ -15,7 +15,7 @@ public sealed class MaterialStockService(DcmsDbContext db, DCMS.Application.Feat
 
     public async Task<MaterialStockPage> StockAsync(int actorId, string? q, int page, int pageSize, CancellationToken ct)
     {
-        await access.RequireAsync(actorId, "catalog.materials.read", ct);
+        await access.RequireAsync(actorId, "materials.stock.read", ct);
         if (pageSize is not (20 or 50 or 100) || page < 1 || page > int.MaxValue / pageSize || q?.Length > 160) throw Bad();
         var search = Search(q);
         var query = db.MaterialPurchases.AsNoTracking().Where(x => !x.IsDeleted && x.ReceivedOn != null);
@@ -56,7 +56,7 @@ public sealed class MaterialStockService(DcmsDbContext db, DCMS.Application.Feat
 
     public async Task<MaterialUsagePage> UsageAsync(int actorId, Guid? materialId, Guid? activityId, string? q, DateOnly? from, DateOnly? to, int page, int pageSize, CancellationToken ct)
     {
-        await access.RequireAsync(actorId, "catalog.materials.read", ct);
+        await access.RequireAsync(actorId, "materials.usage.read", ct);
         if (pageSize is not (20 or 50 or 100) || page < 1 || page > int.MaxValue / pageSize || q?.Length > 160 || from > to) throw Bad();
         var search = Search(q);
         var query = db.MaterialUsages.AsNoTracking().AsQueryable();

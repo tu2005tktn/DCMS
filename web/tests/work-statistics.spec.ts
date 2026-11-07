@@ -5,7 +5,7 @@ const dossier = { dossierId: 'd-1', dossierCode: 'HS-001', startedOn: '2026-11-0
   lines: [{ activityId: 'a-1', serviceName: 'Trám răng', costVnd: 300000, paidVnd: 100000, dueVnd: 200000 }, { activityId: 'a-2', serviceName: 'Nhổ răng', costVnd: 50000, paidVnd: 0, dueVnd: 50000 }] };
 
 async function prepare(page: Page) {
-  const user = { id: 7, userName: 'synthetic', fullName: 'SYNTHETIC Owner', accountType: 'Staff', roles: ['ClinicOwner'], effectiveRoles: ['ClinicOwner'], permissions: ['finance.read'] };
+  const user = { id: 7, userName: 'synthetic', fullName: 'SYNTHETIC Owner', accountType: 'Staff', roles: ['ClinicOwner'], effectiveRoles: ['ClinicOwner'], permissions: ['finance.read', 'finance.work-statistics.read'] };
   const state = { queries: [] as URLSearchParams[], fail: true };
   await page.route('**/api/**', async route => {
     const url = new URL(route.request().url()), path = url.pathname, ok = (json: unknown) => route.fulfill({ json });

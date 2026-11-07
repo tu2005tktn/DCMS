@@ -67,15 +67,11 @@ export default function App() {
       <Route index element={<Home />} />
     </Route>
     <Route element={<Protected><Workspace /></Protected>}>
-      <Route path="settings" element={<Protected permission="settings.read"><SystemSettingsPage /></Protected>} />
-      <Route path="settings/:section" element={<Protected permission="settings.read"><SystemSettingsPage /></Protected>} />
-      <Route path="system-settings" element={<Navigate to="/settings" replace />} />
-      <Route path="system-settings/:section" element={<Navigate to="/settings" replace />} />
-      <Route path="prescriptions/templates" element={<Protected permission="prescriptions.manage"><PrescriptionTemplatesPage /></Protected>} />
-      <Route path="materials" element={<Protected permission="catalog.materials.read"><MaterialsPage /></Protected>} />
+      <Route path="system-settings" element={<Protected permission="settings.read"><SystemSettingsPage /></Protected>} />
+      <Route path="materials" element={<Protected permission={['materials.purchases.read', 'materials.stock.read', 'materials.usage.read']}><MaterialsPage /></Protected>} />
       <Route path="payments" element={<Protected permission="finance.read"><PaymentsPage /></Protected>} />
-      <Route path="work-statistics" element={<Protected permission="finance.read"><WorkStatisticsPage /></Protected>} />
-      <Route path="revenue" element={<Protected permission="finance.read"><RevenuePage /></Protected>} />
+      <Route path="work-statistics" element={<Protected permission="finance.work-statistics.read"><WorkStatisticsPage /></Protected>} />
+      <Route path="revenue" element={<Protected permission="finance.revenue.read"><RevenuePage /></Protected>} />
       <Route path="visits/:visitId/payments" element={<Protected permission="finance.read"><PaymentsPage /></Protected>} />
       <Route path="visits/:visitId/prescription" element={<Protected permission="prescriptions.read"><PrescriptionPage /></Protected>} />
       <Route path="payments/:id/print" element={<Protected permission="finance.receipts.print"><ReceiptPrintPage /></Protected>} />

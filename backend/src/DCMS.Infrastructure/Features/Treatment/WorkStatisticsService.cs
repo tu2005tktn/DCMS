@@ -18,9 +18,11 @@ public sealed class WorkStatisticsService(DcmsDbContext db, TimeProvider clock, 
 
     public async Task<WorkStatisticsPage> ListAsync(int actorId, DateOnly? from, DateOnly? to, int? branchId, string? q, int page, int pageSize, CancellationToken ct)
     {
-        await access.RequireAsync(actorId, "finance.read", ct);
+        var scope = await access.RequireAsync(actorId, "finance.work-statistics.read", ct);
+        if (branchId.HasValue && !scope.BranchIds.Contains(branchId.Value))
+            throw new BusinessException(403, SystemMessages.Get("MSG06"));
         if (pageSize is not (20 or 50 or 100) || page < 1 || page > int.MaxValue / pageSize || q?.Length > 160 || from > to) throw Bad();
-        var dossierQuery = db.TreatmentDossiers.AsNoTracking().Where(d => d.State != "Deleted");
+        var dossierQuery = db.TreatmentDossiers.AsNoTracking().Where(d => d.State != "Deleted" && scope.BranchIds.Contains(d.BranchId));
         if (branchId.HasValue) dossierQuery = dossierQuery.Where(d => d.BranchId == branchId);
         if (from.HasValue) dossierQuery = dossierQuery.Where(d => d.StartedOn >= from);
         if (to.HasValue) dossierQuery = dossierQuery.Where(d => d.StartedOn <= to);
