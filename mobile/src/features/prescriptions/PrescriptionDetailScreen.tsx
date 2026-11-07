@@ -6,7 +6,7 @@
 
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { Banner, Button, Card, palette } from '@/features/patient-link/components/LinkUi';
 import { patientLinkApi } from '@/features/patient-link/patient-link.api';
 import { useSession } from '@/features/auth/session/useSession';
@@ -116,11 +116,39 @@ export default function PrescriptionDetailScreen() {
   if (!detail) return null;
 
   const rx = detail.prescription;
+  const sharePrescription = async () => {
+    const medicineDetails = rx.medicines.map((medicine, index) => {
+      const schedule = doseSlots(medicine)
+        .filter(slot => slot.value !== '0')
+        .map(slot => `${slot.label}: ${slot.value}`)
+        .join(', ');
+      return `${index + 1}. ${medicine.medicineName}${medicine.strength ? ` ${medicine.strength}` : ''}\n`
+        + `Số lượng: ${medicine.quantity} ${medicine.unit} · ${medicine.days} ngày\n`
+        + `${schedule}${schedule ? ' · ' : ''}${mealLabel(medicine.mealTiming)}${medicine.route ? ` · ${medicine.route}` : ''}`
+        + `${medicine.instructions ? `\nLời dặn: ${medicine.instructions}` : ''}`;
+    }).join('\n\n');
+    const message = [
+      'ĐƠN THUỐC MUA NGOÀI',
+      `Ngày kê: ${formatDate(rx.prescribedAt)}`,
+      `Phòng khám: ${rx.branchName}`,
+      `Bác sĩ: ${rx.doctorName}`,
+      rx.diagnosis ? `Chẩn đoán: ${rx.diagnosis}` : null,
+      '',
+      medicineDetails,
+      rx.generalAdvice ? `\nLời dặn của bác sĩ: ${rx.generalAdvice}` : null,
+      detail.print.verificationCode ? `\nMã xác thực: ${detail.print.verificationCode}` : null,
+      '',
+      rx.externalPurchaseNotice,
+    ].filter(Boolean).join('\n');
+    await Share.share({ title: 'Đơn thuốc của tôi', message });
+  };
+
   if (showPrint) {
     return (
       <ScrollView contentContainerStyle={styles.container}>
         <PrintView print={detail.print} />
         <Text style={styles.note}>Đưa màn hình này cho hiệu thuốc hoặc chụp màn hình để lưu lại. Mã xác thực giúp phòng khám đối chiếu đơn gốc.</Text>
+        <Button title="Chia sẻ đơn thuốc" onPress={() => void sharePrescription()} />
         <Button title="Quay lại chi tiết đơn" variant="secondary" onPress={() => setShowPrint(false)} />
       </ScrollView>
     );
@@ -166,6 +194,7 @@ export default function PrescriptionDetailScreen() {
       ) : null}
 
       <Button title="Xem bản in đơn thuốc" onPress={() => setShowPrint(true)} />
+      <Button title="Chia sẻ đơn thuốc" variant="secondary" onPress={() => void sharePrescription()} />
       <Button title="Quay lại danh sách" variant="secondary" onPress={() => router.back()} />
     </ScrollView>
   );

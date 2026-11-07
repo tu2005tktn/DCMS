@@ -124,6 +124,24 @@ export default function AccountHomeScreen() {
       )}
 
       {user.accountType === 'Public' && (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Đơn thuốc của tôi. Xem danh sách thuốc và hướng dẫn sử dụng từ bác sĩ."
+          onPress={() => router.push('/(account)/prescriptions')}
+          disabled={signingOut}
+          style={({ pressed }) => [styles.prescriptionCard, pressed && styles.quickActionPressed]}
+          testID="open-prescriptions"
+        >
+          <View style={styles.prescriptionIcon}><Text style={styles.prescriptionIconText}>💊</Text></View>
+          <View style={styles.prescriptionCopy}>
+            <Text style={styles.prescriptionTitle}>Đơn thuốc của tôi</Text>
+            <Text style={styles.prescriptionDescription}>Xem danh sách thuốc và hướng dẫn sử dụng từ bác sĩ</Text>
+          </View>
+          <Text style={styles.prescriptionChevron}>›</Text>
+        </Pressable>
+      )}
+
+      {user.accountType === 'Public' && (
         <View style={styles.linkSection}>
           <Text style={styles.linkDescription}>Xem hồ sơ y tế chính thức: kế hoạch điều trị, lịch khám và bảo hành.</Text>
           <PrimaryButton
@@ -239,6 +257,21 @@ const styles = StyleSheet.create({
   linkSection: { gap: spacing.sm, marginTop: spacing.sm },
   bookingSection: { gap: spacing.sm, padding: spacing.md, backgroundColor: colors.surface,
     borderRadius: 12, borderWidth: 1, borderColor: colors.border },
+  prescriptionCard: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+    backgroundColor: colors.surface, borderRadius: 12, padding: spacing.md,
+    borderWidth: 1, borderColor: colors.border, marginTop: spacing.sm, minHeight: 88,
+  },
+  quickActionPressed: { opacity: 0.75, backgroundColor: colors.infoSoft },
+  prescriptionIcon: {
+    width: 48, height: 48, borderRadius: 12, backgroundColor: colors.infoSoft,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  prescriptionIconText: { fontSize: 24 },
+  prescriptionCopy: { flex: 1, gap: 4 },
+  prescriptionTitle: { fontSize: typography.body, fontWeight: '700', color: colors.text },
+  prescriptionDescription: { fontSize: typography.caption, lineHeight: 18, color: colors.muted },
+  prescriptionChevron: { fontSize: 28, color: colors.muted, paddingHorizontal: spacing.xs },
   bookingTitle: { fontSize: typography.body + 2, fontWeight: '700', color: colors.text },
   linkDescription: { color: colors.muted, fontSize: typography.body - 2 },
   row: {

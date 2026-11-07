@@ -95,6 +95,14 @@ Migration `20261107050902_PrescriptionsAndBranchProfiles` (dùng chung với S58
 5. **"Xem bản in đơn thuốc"**: màn hình bản in (bố cục như bản in web: chi nhánh, logo, bác sĩ, bệnh nhân, chẩn đoán, bảng thuốc, lời dặn, ngày kê) kèm **mã xác thực** dạng chữ để bệnh nhân đưa cho hiệu thuốc hoặc chụp màn hình. App hiện chưa có thư viện QR/PDF (`expo-print`, `react-native-svg`) nên QR và tải PDF chỉ có trên bản in web; khi bổ sung các gói này, màn bản in dùng cùng DTO `print` để sinh QR/PDF mà không đổi API.
 6. Không hiển thị ghi chú nội bộ, giá tham khảo, lý do điều chỉnh nội bộ (chỉ hiển thị nhãn "Bản điều chỉnh").
 
+### 4.1 Truy cập nhanh, danh sách và chia sẻ trên mobile
+
+- Trang chủ tài khoản Public có card truy cập nhanh **Đơn thuốc của tôi**, mô tả ngắn rằng người bệnh có thể xem thuốc và hướng dẫn của bác sĩ; chọn card mở `/(account)/prescriptions`. Card không tự tải danh sách riêng để đếm badge.
+- Danh sách sắp xếp mới nhất trước (theo API), mỗi mục hiển thị ngày kê, chi nhánh, bác sĩ, chẩn đoán, số thuốc và nhãn bản điều chỉnh khi có. Không tự tạo mã đơn để trình bày khi API không cung cấp mã đó.
+- Chỉ hiển thị badge số đơn mới nếu API cung cấp trạng thái chưa xem; hiện chưa có trường/API này nên không hiển thị số giả.
+- Chi tiết giữ thông tin chi nhánh, bác sĩ, ngày kê, chẩn đoán, từng thuốc, liều/lượng và lời dặn nổi bật như mục 3 ở trên.
+- Bản in hiện hiển thị trong app để người bệnh lưu/chụp màn hình. Bổ sung nút **Chia sẻ đơn thuốc** dùng native share sheet, chia sẻ nội dung văn bản tối thiểu (ngày kê, chi nhánh, bác sĩ, thuốc/liều/lời dặn và mã xác thực nếu có). Không chia sẻ thông tin hồ sơ ngoài dữ liệu của đơn. Chưa tạo hoặc tải PDF trên mobile; PDF vẫn thuộc bản in web cho đến khi tích hợp thư viện tạo/tải PDF.
+
 ---
 
 ## 5. API Contracts
