@@ -15,7 +15,7 @@ async function prepare(page: Page, withItem = true, withFinance = false) {
   const user = { id: 7, userName: 'synthetic.dentist', fullName: 'Bác sĩ thử nghiệm', accountType: 'Staff',
     roles: ['Dentist'], effectiveRoles: ['Dentist'], permissions: ['patients.read', 'treatment.read', 'treatment.dossiers.create', 'treatment.dossiers.update', 'treatment.dossiers.delete', 'treatment.items.create', 'treatment.items.update', 'treatment.items.delete', 'treatment.items.price', 'treatment.actuals.create', 'treatment.actuals.update', 'treatment.actuals.delete', 'treatment.templates.read', 'finance.read', 'finance.payments.create', 'documents.read', 'documents.upload'] };
   const state = { version: 1, items: (withItem ? [{ ...item }] : []) as any[], drafts: new Map<string, any>(),
-    activities: [] as any[], activityEdits: new Map<string, any>(), conflict: false, notes: '', payments: [] as any[], requests: [] as any[], materialReads: [] as {q:string;page:number}[], failMaterialOnce: false,
+    activities: [] as any[], activityEdits: new Map<string, any>(), conflict: false, notes: '', payments: [] as any[], requests: [] as any[], materialReads: [] as {q:string;page:number}[], labOrder: null as any, labPuts: [] as any[], labFail: false, failMaterialOnce: false,
     materials: [
       { id:'mat-1', name:'Composite A2', categoryId:'group-1', categoryName:'Vật liệu trám', version:1 },
       { id:'mat-2', name:'Gương khám', categoryId:'group-2', categoryName:'Dụng cụ khám', version:1 },
@@ -83,6 +83,17 @@ async function prepare(page: Page, withItem = true, withFinance = false) {
         unit: 'răng', performerId: 7, performedAt: '2026-10-27T02:00:00Z', outcome: draft.row.note, labWorkSnapshot: draft.row.labWork, sourceKind: 'Dossier', serviceNameSnapshot: draft.row.serviceName, feeStatus: 'Pending', priceSnapshotVnd: draft.row.unitPriceVnd, discountSnapshotVnd: 0 };
       if (body.planTransfer) state.items.find(i => i.id === draft.row.sourceItemId).displayCompleted = true;
       state.activities.push(activity); state.drafts.delete(id); state.version++; return ok({ dossier: detail(), activity });
+    }
+    if (path.endsWith('/lab-orders')) return ok(state.labOrder ? [{ activityId: state.labOrder.activityId, workName: state.labOrder.workName, dueOn: state.labOrder.dueOn, deliveredOn: null }] : []);
+    if (path.endsWith('/lab-order')) {
+      const activityId = path.split('/').at(-2)!;
+      if (r.method() === 'GET') return ok({ order: state.labOrder, patient: { name: 'Bệnh nhân thử nghiệm', code: 'SYNTHETIC-123', age: 30, gender: 'Male' },
+        options: { labs: [{ id: 'lab-1', name: 'Xưởng An Phú' }], workTypes: [{ id: 'wt-1', name: 'Mão sứ Zirconia', providerId: 'lab-1', referencePrice: 1500000, warranty: '7 năm' }],
+          dentists: [{ id: 7, name: 'Bác sĩ thử nghiệm' }], defaultDentistId: 7 } });
+      if (r.method() === 'DELETE') { state.labOrder = null; return route.fulfill({ status: 204 }); }
+      const body = r.postDataJSON(); state.labPuts.push(body);
+      if (state.labFail) return route.fulfill({ status: 400, json: { code: 'MSG04', message: 'Dữ liệu labo không hợp lệ thử nghiệm.' } });
+      state.labOrder = { id: 'lab-order-1', activityId, ...body, version: (state.labOrder?.version ?? 0) + 1 }; return ok(state.labOrder);
     }
     if (path.includes('/sheet-activities/')) {
       const id = path.split('/').at(-1)!, before = { ...state.activities.find(a => a.id === id), ...state.activityEdits.get(id) }, body = r.postDataJSON();
@@ -638,4 +649,46 @@ test('Sao chép đang gửi khóa bấm lặp, lần sao chép mới sau thành 
   await expect(page.locator('.treatment-sheet-plan-table tbody > tr')).toHaveCount(2);
   await page.getByRole('button',{name:'Chức năng Trám răng',exact:true}).first().click();await page.getByRole('menuitem',{name:'Sao chép',exact:true}).click();
   await expect(page.locator('.treatment-sheet-plan-table tbody > tr')).toHaveCount(3);expect(new Set(state.items.map(i=>i.id)).size).toBe(3);expect(state.activities).toHaveLength(0);
+});
+
+test('phiếu labo: nút cạnh Ghi chú mở form, điền sẵn theo loại công việc, chọn răng/màu, lưu và hiện ở cột Labo', async ({ page }) => {
+  const state = await prepare(page, false);
+  await page.getByRole('button', { name: 'Thêm quá trình điều trị' }).click();
+  await page.getByRole('combobox', { name: 'Điều trị/dịch vụ', exact: true }).focus(); await page.keyboard.press('ArrowDown'); await page.keyboard.press('Enter');
+  await page.getByLabel('Ghi chú việc đã làm').fill('Lấy dấu mão');
+  await page.getByRole('button', { name: 'Đồng ý', exact: true }).click();
+  await page.getByRole('button', { name: 'Phiếu labo cho Trám răng', exact: true }).click();
+  const form = page.locator('.lab-order-modal');
+  await expect(form.getByRole('heading', { name: 'PHIẾU LABO' })).toBeVisible();
+  await expect(form.getByText('MSKH: SYNTHETIC-123')).toBeVisible();
+  // Thiếu Công việc labo: báo lỗi dưới ô, chưa gửi.
+  await form.getByRole('button', { name: 'LƯU LẠI' }).click();
+  await expect(form.getByText('Vui lòng nhập Công việc labo.')).toBeVisible();
+  expect(state.labPuts).toHaveLength(0);
+  // Chọn loại công việc: điền sẵn tên, công ty, tổng phí, bảo hành.
+  await form.locator('div.ant-select[aria-label="Loại công việc labo"]').click();
+  await page.locator('.ant-select-item-option', { hasText: 'Mão sứ Zirconia' }).click();
+  await expect(form.getByLabel('Công việc labo', { exact: true })).toHaveValue('Mão sứ Zirconia');
+  await expect(form.getByLabel('Bảo hành')).toHaveValue('7 năm');
+  await expect(form.getByLabel('Tổng phí')).toHaveValue('1.500.000');
+  await form.getByRole('button', { name: 'Răng 36', exact: true }).click();
+  await form.getByRole('button', { name: 'Răng 37', exact: true }).click();
+  await form.getByLabel('Màu vùng 1').fill('A2');
+  await form.getByLabel('Hẹn', { exact: true }).fill('2030-01-15');
+  await form.getByRole('checkbox', { name: 'Hình trứng' }).check();
+  state.labFail = true;
+  await form.getByRole('button', { name: 'LƯU LẠI' }).click();
+  await expect(form.getByText('Dữ liệu labo không hợp lệ thử nghiệm.')).toBeVisible();
+  state.labFail = false;
+  await form.getByRole('button', { name: 'LƯU LẠI' }).click();
+  await expect(form).toHaveCount(0);
+  const sent = state.labPuts.at(-1);
+  expect(sent).toMatchObject({ workName: 'Mão sứ Zirconia', dentistId: 7, labProviderId: 'lab-1', teeth: ['36', '37'], shade: { '1': 'A2' }, bridgeShapes: ['ovoid'], totalFeeVnd: 1500000, dueOn: '2030-01-15', expectedVersion: null });
+  await expect(page.getByRole('cell', { name: /Mão sứ Zirconia/ })).toContainText('Hẹn');
+  // Mở lại: dữ liệu đã lưu hiện đúng; đổi sang trẻ em xóa răng đã chọn.
+  await page.getByRole('button', { name: 'Phiếu labo cho Trám răng', exact: true }).click();
+  await expect(form.getByRole('button', { name: 'Răng 36', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await form.getByRole('checkbox', { name: 'Trẻ em' }).check();
+  await expect(form.getByRole('button', { name: 'Răng 55', exact: true })).toBeVisible();
+  await expect(form.getByRole('button', { name: 'Răng 36', exact: true })).toHaveCount(0);
 });
