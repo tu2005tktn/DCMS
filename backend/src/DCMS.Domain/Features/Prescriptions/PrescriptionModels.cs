@@ -9,6 +9,7 @@ public sealed class PatientPrescription
     public string Diagnosis { get; set; } = "";
     public string? OtherDiagnosis { get; set; }
     public string? Advice { get; set; }
+    public bool RequiresExternalPurchase { get; set; }
     public int PrescriberEmployeeId { get; set; }
     public int Version { get; set; } = 1;
     public DateTimeOffset CreatedAt { get; set; }
@@ -27,6 +28,7 @@ public sealed class PatientPrescriptionItem
     public string? DosageForm { get; set; }
     public string Unit { get; set; } = "";
     public int Quantity { get; set; }
+    public bool IsExternalPurchase { get; set; }
     public string Instructions { get; set; } = "";
     public int Position { get; set; }
 }

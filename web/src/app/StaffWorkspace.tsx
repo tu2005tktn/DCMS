@@ -32,6 +32,7 @@ export default function StaffWorkspace() {
     { key:'/commercial/treatment', title:'Giá và duyệt điều trị', icon:<MedicineBoxOutlined />, group:'Chuyên môn', visible:has('treatment.prices.read')||has('treatment.commercial.read') },
     { key:'/materials', title:'Dụng cụ - vật liệu', icon:<ExperimentOutlined />, group:'Chuyên môn', visible:has('catalog.materials.read') },
     { key:'/clinical-services', title:'Dịch vụ cận lâm sàng', icon:<ExperimentOutlined />, group:'Chuyên môn', visible:has('services.read') },
+    { key:'/medicines', title:'Quản lý thuốc', icon:<MedicineBoxOutlined />, group:'Quản trị', visible:has('catalog.medicines.read') },
     { key:'/payments', title:'Thanh toán', icon:<CreditCardOutlined />, group:'Quản trị', visible:has('finance.read') },
     { key:'/work-statistics', title:'Thống kê công việc/dịch vụ', icon:<BarChartOutlined />, group:'Quản trị', visible:has('finance.read') },
     { key:'/revenue', title:'Doanh thu', icon:<BarChartOutlined />, group:'Quản trị', visible:has('finance.read') },

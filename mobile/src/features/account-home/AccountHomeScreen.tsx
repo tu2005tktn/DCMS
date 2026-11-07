@@ -123,6 +123,13 @@ export default function AccountHomeScreen() {
         </View>
       )}
 
+      {user.accountType === 'Public' && (
+        <View style={styles.linkSection}>
+          <Text style={styles.linkDescription}>Xem thuốc và lời dặn do nha sĩ kê cho hồ sơ đã xác minh.</Text>
+          <PrimaryButton label="Đơn thuốc của tôi" onPress={() => router.push('/(account)/prescriptions')} disabled={signingOut} testID="open-prescriptions" />
+        </View>
+      )}
+
       {/* Sign out */}
       <View style={styles.footer}>
         <Pressable

@@ -2530,6 +2530,9 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<int>("PrescriberEmployeeId")
                         .HasColumnType("integer");
 
+                    b.Property<bool>("RequiresExternalPurchase")
+                        .HasColumnType("boolean");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -2562,6 +2565,9 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
+
+                    b.Property<bool>("IsExternalPurchase")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("MedicineCode")
                         .IsRequired()

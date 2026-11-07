@@ -24,6 +24,7 @@
 
 /* S58 danh mục tham chiếu */
 .reference-catalogs { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 24px; }
+.reference-catalogs--single { grid-template-columns: minmax(0, 1fr); }
 .reference-catalogs-menu { border-inline-end: none !important; }
 .reference-catalogs-body { min-width: 0; }
 @media (max-width: 768px) { .reference-catalogs { grid-template-columns: minmax(0, 1fr); } }

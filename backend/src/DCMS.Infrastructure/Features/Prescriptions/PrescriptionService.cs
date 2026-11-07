@@ -30,10 +30,10 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
     async Task<PatientPrescriptionDto> PatientDto(PatientPrescription x, CancellationToken ct)
     {
         var name = await db.Employees.AsNoTracking().Where(e => e.Id == x.PrescriberEmployeeId).Select(e => e.FullName).SingleAsync(ct);
-        return new(x.Id, x.PatientId, x.BranchId, x.PrescribedOn, x.Diagnosis, x.OtherDiagnosis, x.Advice,
+        return new(x.Id, x.PatientId, x.BranchId, x.PrescribedOn, x.Diagnosis, x.OtherDiagnosis, x.Advice, x.RequiresExternalPurchase,
             x.PrescriberEmployeeId, name, x.Version, x.Items.OrderBy(i => i.Position).Select(i =>
                 new PatientPrescriptionItemDto(i.Id, i.MedicineId, i.MedicineCode, i.MedicineName, i.Strength,
-                    i.DosageForm, i.Unit, i.Quantity, i.Instructions)).ToArray());
+                    i.DosageForm, i.Unit, i.Quantity, i.Instructions, i.IsExternalPurchase)).ToArray());
     }
     public async Task<PatientPrescriptionDto[]> PatientListAsync(int actor, int patientId, CancellationToken ct)
     {
@@ -58,7 +58,8 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
         if (c.RequestKey == Guid.Empty || c.BranchId <= 0 || c.PrescribedOn == default ||
             string.IsNullOrWhiteSpace(c.Diagnosis) || c.Diagnosis.Length > 1000 || c.OtherDiagnosis?.Length > 1000 ||
             c.Advice?.Length > 4000 || c.Items is not { Length: >= 1 and <= 50 } ||
-            c.Items.Any(i => i.MedicineId == Guid.Empty || i.Quantity is < 1 or > 10_000 || i.Instructions?.Length > 1000)) throw Error("MSG04");
+            c.Items.Any(i => i.MedicineId == Guid.Empty || i.Quantity is < 1 or > 10_000 || i.Instructions?.Length > 1000)
+            || c.RequiresExternalPurchase != c.Items.Any(i => i.IsExternalPurchase)) throw Error("MSG04");
         await access.OperationalAsync(actor, "prescriptions.manage", c.BranchId, ct);
         if (!await db.Patients.AnyAsync(x => x.Id == patientId && !x.IsArchived, ct)) throw Error("MSG113", 404);
         var employee = await db.Employees.AsNoTracking().SingleOrDefaultAsync(x => x.AccountId == actor, ct) ?? throw Error("MSG06", 403);
@@ -75,11 +76,11 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
         PatientPrescription doc;
         if (id.HasValue)
         {
-            doc = await db.Set<PatientPrescription>().Include(x => x.Items).SingleOrDefaultAsync(x => x.Id == id && x.PatientId == patientId, ct) ?? throw Error("MSG113", 404);
+            doc = await db.Set<PatientPrescription>().SingleOrDefaultAsync(x => x.Id == id && x.PatientId == patientId, ct) ?? throw Error("MSG113", 404);
             await access.OperationalAsync(actor, "prescriptions.manage", doc.BranchId, ct);
             if (doc.Version != c.ExpectedVersion) throw Error("MSG111", 409);
             doc.Version++;
-            db.RemoveRange(doc.Items); doc.Items.Clear();
+            await db.Set<PatientPrescriptionItem>().Where(x => x.PrescriptionId == doc.Id).ExecuteDeleteAsync(ct);
         }
         else
         {
@@ -89,15 +90,18 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
         var ids = c.Items.Select(x => x.MedicineId).Distinct().ToArray();
         var medicines = await db.Set<CatalogMedicine>().AsNoTracking().Where(x => ids.Contains(x.Id) && x.IsActive && x.PrescriptionEligible).ToDictionaryAsync(x => x.Id, ct);
         if (medicines.Count != ids.Length) throw Error("MSG113", 404);
+        if (c.Items.Any(i => medicines[i.MedicineId].InternalStockTracked == i.IsExternalPurchase)) throw Error("MSG04");
         doc.BranchId = c.BranchId; doc.PrescribedOn = c.PrescribedOn; doc.Diagnosis = c.Diagnosis.Trim();
-        doc.OtherDiagnosis = c.OtherDiagnosis?.Trim(); doc.Advice = c.Advice?.Trim(); doc.PrescriberEmployeeId = employee.Id;
+        doc.OtherDiagnosis = c.OtherDiagnosis?.Trim(); doc.Advice = c.Advice?.Trim(); doc.RequiresExternalPurchase = c.RequiresExternalPurchase;
+        doc.PrescriberEmployeeId = employee.Id;
         doc.UpdatedAt = clock.GetUtcNow();
         for (var n = 0; n < c.Items.Length; n++)
         {
             var item = c.Items[n]; var medicine = medicines[item.MedicineId];
-            doc.Items.Add(new PatientPrescriptionItem { MedicineId = medicine.Id, MedicineCode = medicine.Code,
+            db.Set<PatientPrescriptionItem>().Add(new PatientPrescriptionItem { PrescriptionId = doc.Id,
+                MedicineId = medicine.Id, MedicineCode = medicine.Code,
                 MedicineName = medicine.Name, Strength = medicine.Strength, DosageForm = medicine.DosageForm,
-                Unit = medicine.BaseUnit, Quantity = item.Quantity,
+                Unit = medicine.BaseUnit, Quantity = item.Quantity, IsExternalPurchase = item.IsExternalPurchase,
                 Instructions = string.IsNullOrWhiteSpace(item.Instructions) ? medicine.Instructions ?? "" : item.Instructions.Trim(), Position = n });
         }
         db.Add(new PatientPrescriptionReceipt { ActorId = actor, RequestKey = c.RequestKey, Fingerprint = hash, PrescriptionId = doc.Id });
@@ -112,15 +116,17 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
         await access.OperationalAsync(actor, permission, visit.BranchId, ct);
         return visit;
     }
-    public async Task<PrescriptionMedicineOption[]> OptionsAsync(int actor, int branchId, string? search, CancellationToken ct)
+    public async Task<PrescriptionMedicineOption[]> OptionsAsync(int actor, int branchId, string? search, string? source, CancellationToken ct)
     {
         await access.OperationalAsync(actor, "prescriptions.manage", branchId, ct);
         if (search?.Length > 100) throw Error("MSG04");
+        if (source is not (null or "Clinic" or "External")) throw Error("MSG04");
         var q = search?.Trim().ToUpperInvariant() ?? "";
         return await db.Set<CatalogMedicine>().AsNoTracking().Where(x => x.IsActive && x.PrescriptionEligible &&
+            (source == null || x.InternalStockTracked == (source == "Clinic")) &&
             (q == "" || x.NormalizedName.Contains(q) || x.Code.Contains(q))).OrderBy(x => x.NormalizedName).Take(50)
             .Select(x => new PrescriptionMedicineOption(x.Id, x.Code, x.Name, x.ActiveIngredient, x.Strength,
-                x.DosageForm, x.BaseUnit, x.Packaging, x.Instructions)).ToArrayAsync(ct);
+                x.DosageForm, x.BaseUnit, x.Packaging, x.Instructions, x.InternalStockTracked)).ToArrayAsync(ct);
     }
     public async Task<PrescriptionLineDto[]> LinesAsync(int actor, Guid visitId, CancellationToken ct)
     {

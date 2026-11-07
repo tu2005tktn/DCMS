@@ -77,6 +77,7 @@ public static class DependencyInjection
         services.AddScoped<DCMS.Application.Features.Finance.IFinanceService>(sp=>sp.GetRequiredService<Features.Finance.FinanceService>());
         services.AddScoped<DCMS.Application.Features.Finance.IRevenueService, Features.Finance.RevenueService>();
         services.AddScoped<DCMS.Application.Features.Prescriptions.IPrescriptionService, Features.Prescriptions.PrescriptionService>();
+        services.AddScoped<DCMS.Application.Features.Prescriptions.ICustomerPrescriptionService, Features.Prescriptions.CustomerPrescriptionService>();
         services.AddScoped<ITreatmentFinancialSummaryPort, Features.Finance.TreatmentFinancialSummaryPort>();
         services.AddScoped<ITreatmentFinancialWorkspace, TreatmentFinancialWorkspace>();
         services.AddScoped<ITreatmentRevisionService, TreatmentRevisionService>();

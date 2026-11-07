@@ -10,6 +10,7 @@ type Page = { items: Row[]; total: number; page: number; pageSize: number };
 type StatePreview = { entry: Row; allowed: boolean; blockers: string[]; impact: string };
 type HistoryItem = { occurredAt: string; actorName: string; command: string; reason: string | null; before: Row | null; after: Row };
 type Status = 'Active' | 'Inactive' | 'All';
+type MedicineType = 'All' | 'Clinic' | 'External';
 type Option = { id: string; code: string | null; name: string };
 type SectionKey = 'suppliers' | 'labs' | 'lab-work-types' | 'medicines';
 
@@ -57,9 +58,10 @@ const sections: Section[] = [
         <InputNumber style={{ width: '100%' }} min={0} step={1000} precision={0} /></Form.Item>
       <Form.Item name="warranty" label="Bảo hành" rules={[{ max: 1000, message: 'Bảo hành tối đa 1000 ký tự.' }]}><Input.TextArea rows={2} maxLength={1000} /></Form.Item>
     </> },
-  { key: 'medicines', title: 'Thuốc', resource: 'medicines', nameMax: 200, exportable: true, defaults: { prescriptionEligible: true, internalStockTracked: false },
+  { key: 'medicines', title: 'Thuốc phòng khám & mua ngoài', resource: 'medicines', nameMax: 200, exportable: true, defaults: { prescriptionEligible: true, internalStockTracked: false },
     help: 'Thuốc kê mua ngoài không cần theo dõi tồn và không trừ kho. Lời dặn là mặc định cho dòng đơn mới; nha sĩ sửa theo từng bệnh nhân.',
     columns: [
+      { title: 'Nhóm', dataIndex: 'internalStockTracked', width: 145, render: v => v ? <Tag color="green">Phòng khám</Tag> : <Tag color="blue">Mua ngoài</Tag> },
       { title: 'Hoạt chất', dataIndex: 'activeIngredient', ellipsis: true, render: text },
       { title: 'Đơn vị', dataIndex: 'baseUnit', width: 90 },
       { title: 'Giá tham khảo', dataIndex: 'referencePrice', width: 140, align: 'right', render: vnd },
@@ -78,24 +80,26 @@ const sections: Section[] = [
       <Form.Item name="referencePrice" label="Giá tham khảo (VND)" extra="Để trống nếu chưa xác định." rules={[priceRule]}>
         <InputNumber style={{ width: '100%' }} min={0} step={1000} precision={0} /></Form.Item>
       <Form.Item name="prescriptionEligible" valuePropName="checked"><Checkbox>Dùng để kê đơn</Checkbox></Form.Item>
-      <Form.Item name="internalStockTracked" valuePropName="checked"><Checkbox>Theo dõi tồn kho nội bộ</Checkbox></Form.Item>
+      <Form.Item name="internalStockTracked" valuePropName="checked" extra="Bật cho thuốc dùng tại phòng khám; tắt cho thuốc bệnh nhân mua ngoài."><Checkbox>Thuốc dùng tại phòng khám</Checkbox></Form.Item>
     </> },
 ];
 const base = '/api/system-settings/settings/catalogs';
 const commandLabels: Record<string, string> = { create: 'Tạo mới', update: 'Sửa', state: 'Đổi trạng thái' };
 
-export default function SupplyCatalogPanel() {
+export default function SupplyCatalogPanel({ onlyMedicines = false }: { onlyMedicines?: boolean }) {
   // Static message does not render under React 19 + antd 5 (errors were silently lost); use the hook instance.
   const [toast, toastContext] = message.useMessage();
   const { user } = useAuth();
   const can = (resource: string, action: string) => user?.permissions.includes(`catalog.${resource}.${action}`) ?? false;
-  const visibleSections = sections.filter(s => can(s.resource, 'read'));
-  const [key, setKey] = useState<SectionKey>('suppliers'), [status, setStatus] = useState<Status>('Active');
+  const visibleSections = sections.filter(s => (!onlyMedicines || s.key === 'medicines') && can(s.resource, 'read'));
+  const [key, setKey] = useState<SectionKey>(onlyMedicines ? 'medicines' : 'suppliers'), [status, setStatus] = useState<Status>('Active');
+  const [medicineType, setMedicineType] = useState<MedicineType>('Clinic');
   const [search, setSearch] = useState(''), [query, setQuery] = useState(''), [page, setPage] = useState(1), [size, setSize] = useState(20);
   const [data, setData] = useState<Page | null>(null), [loading, setLoading] = useState(false), [error, setError] = useState<string>(), [revision, setRevision] = useState(0);
   const [editing, setEditing] = useState<{ row?: Row } | null>(null), [formError, setFormError] = useState<ApiError>();
   const [stateTarget, setStateTarget] = useState<StatePreview | null>(null), [stateReason, setStateReason] = useState(''), [stateError, setStateError] = useState<string>();
   const [history, setHistory] = useState<{ row: Row; items: HistoryItem[] | null; error?: string } | null>(null);
+  const [viewed, setViewed] = useState<Row | null>(null);
   const [labProviders, setLabProviders] = useState<Option[]>([]);
   const [busy, setBusy] = useState(false), guard = useRef(false), requestKey = useRef<{ fingerprint: string; key: string } | null>(null);
   const [form] = Form.useForm<Record<string, unknown>>();
@@ -109,14 +113,15 @@ export default function SupplyCatalogPanel() {
   useEffect(() => {
     if (!can(section.resource, 'read')) return;
     let live = true; setLoading(true); setError(undefined);
-    const params = new URLSearchParams({ q: query, status, page: String(page), pageSize: String(size), ...(section.type ? { type: section.type } : {}) });
+    const params = new URLSearchParams({ q: query, status, page: String(page), pageSize: String(size),
+      ...(section.type ? { type: section.type } : {}), ...(section.key === 'medicines' && medicineType !== 'All' ? { type: medicineType } : {}) });
     void api<Page>(`${base}/${section.resource}?${params}`).then(v => {
       if (!live) return;
       if (!v.items.length && v.total && page > 1) { setPage(Math.max(1, Math.ceil(v.total / size))); return; }
       setData(v);
     }).catch(e => { if (live) { setError((e as Error).message); setData(null); } }).finally(() => { if (live) setLoading(false); });
     return () => { live = false; };
-  }, [key, status, query, page, size, revision, user]);
+  }, [key, status, medicineType, query, page, size, revision, user]);
 
   function select(next: SectionKey) { setKey(next); setPage(1); setSearch(''); setQuery(''); setData(null); }
   async function run<T>(action: () => Promise<T>, onError: (e: ApiError) => void) {
@@ -126,7 +131,8 @@ export default function SupplyCatalogPanel() {
   }
   function open(row?: Row) {
     requestKey.current = null; setFormError(undefined); form.resetFields();
-    form.setFieldsValue((row ? { ...row, reason: '' } : { ...section.defaults }) as Record<string, never>);
+    form.setFieldsValue((row ? { ...row, reason: '' } : { ...section.defaults,
+      ...(section.key === 'medicines' ? { internalStockTracked: medicineType === 'Clinic' } : {}) }) as Record<string, never>);
     if (section.key === 'lab-work-types') void api<Option[]>('/api/system-settings/reference-options?kind=lab-providers').then(setLabProviders).catch(() => setLabProviders([]));
     setEditing({ row });
   }
@@ -176,6 +182,10 @@ export default function SupplyCatalogPanel() {
     try { setHistory({ row, items: await api<HistoryItem[]>(`${base}/${section.resource}/${row.id}/history`) }); }
     catch (e) { setHistory({ row, items: [], error: (e as Error).message }); }
   }
+  async function viewMedicine(row: Row) {
+    try { setViewed(await api<Row>(`${base}/medicines/${row.id}`)); }
+    catch (e) { void toast.error((e as Error).message); }
+  }
   // The file is fetched with the bearer token, so a plain link would not be authorized.
   async function exportExcel() {
     await run(async () => {
@@ -189,9 +199,9 @@ export default function SupplyCatalogPanel() {
     }, failure => void toast.error(failure.message));
   }
 
-  return <div className="reference-catalogs">
+  return <div className={`reference-catalogs${onlyMedicines ? ' reference-catalogs--single' : ''}`}>
     {toastContext}
-    <Menu className="reference-catalogs-menu" mode="inline" selectedKeys={[key]} onClick={e => select(e.key as SectionKey)} items={visibleSections.map(x => ({ key: x.key, label: x.title }))} />
+    {!onlyMedicines && <Menu className="reference-catalogs-menu" mode="inline" selectedKeys={[key]} onClick={e => select(e.key as SectionKey)} items={visibleSections.map(x => ({ key: x.key, label: x.title }))} />}
     <div className="reference-catalogs-body">
       <Typography.Title level={4}>{section.title}</Typography.Title>
       {section.help && <Typography.Paragraph type="secondary">{section.help}</Typography.Paragraph>}
@@ -200,6 +210,8 @@ export default function SupplyCatalogPanel() {
           onChange={e => { setSearch(e.target.value); if (!e.target.value) { setQuery(''); setPage(1); } }} onSearch={v => { setQuery(v.trim()); setPage(1); }} />
         <Segmented<Status> value={status} onChange={v => { setStatus(v); setPage(1); }}
           options={[{ value: 'Active', label: 'Đang dùng' }, { value: 'Inactive', label: 'Ngừng dùng' }, { value: 'All', label: 'Tất cả' }]} />
+        {section.key === 'medicines' && <Segmented<MedicineType> value={medicineType} onChange={v => { setMedicineType(v); setPage(1); }}
+          options={[{ value: 'All', label: 'Tất cả thuốc' }, { value: 'Clinic', label: 'Thuốc phòng khám' }, { value: 'External', label: 'Thuốc mua ngoài' }]} />}
         {can(section.resource, 'create') && <Button type="primary" onClick={() => open()}>Thêm mới</Button>}
         {section.exportable && can(section.resource, 'export') && <Button disabled={busy} onClick={() => void exportExcel()}>Xuất Excel</Button>}
       </div>
@@ -214,6 +226,7 @@ export default function SupplyCatalogPanel() {
           ...section.columns,
           { title: 'Trạng thái', dataIndex: 'active', width: 110, render: (v: boolean) => v ? <Tag color="green">Đang dùng</Tag> : <Tag>Ngừng dùng</Tag> },
           { title: 'Thao tác', key: 'actions', width: 240, fixed: 'right', render: (_, row) => <Space wrap>
+            {section.key === 'medicines' && <Button size="small" onClick={() => void viewMedicine(row)}>Xem</Button>}
             {can(section.resource, 'update') && <Button size="small" aria-label={`Sửa ${row.name}`} onClick={() => open(row)}>Sửa</Button>}
             {can(section.resource, 'deactivate') && <Button size="small" danger={row.active} disabled={busy} onClick={() => void previewState(row)}>{row.active ? 'Ngừng dùng' : 'Khôi phục'}</Button>}
             <Button size="small" type="link" onClick={() => void openHistory(row)}>Lịch sử</Button>
@@ -235,6 +248,21 @@ export default function SupplyCatalogPanel() {
         {editing?.row && <Form.Item name="reason" label="Lý do sửa" rules={[{ required: true, whitespace: true, message: 'Vui lòng nhập Lý do.' }, { max: 500, message: 'Lý do tối đa 500 ký tự.' }]}>
           <Input.TextArea rows={2} maxLength={500} showCount /></Form.Item>}
       </Form>
+    </Drawer>
+
+    <Drawer open={!!viewed} width={480} title={`Thuốc · ${viewed?.name ?? ''}`} onClose={() => setViewed(null)}>
+      {viewed && <Space direction="vertical" size="middle">
+        <Typography.Text><b>Mã:</b> {viewed.code}</Typography.Text>
+        <Typography.Text><b>Nhóm:</b> {viewed.internalStockTracked ? 'Thuốc phòng khám' : 'Thuốc mua ngoài'}</Typography.Text>
+        <Typography.Text><b>Hoạt chất:</b> {text(viewed.activeIngredient)}</Typography.Text>
+        <Typography.Text><b>Hàm lượng:</b> {text(viewed.strength)}</Typography.Text>
+        <Typography.Text><b>Dạng bào chế:</b> {text(viewed.dosageForm)}</Typography.Text>
+        <Typography.Text><b>Đơn vị:</b> {text(viewed.baseUnit)}</Typography.Text>
+        <Typography.Text><b>Đóng gói:</b> {text(viewed.packaging)}</Typography.Text>
+        <Typography.Text><b>Hướng dẫn mặc định:</b> {text(viewed.instructions)}</Typography.Text>
+        <Typography.Text><b>Giá tham khảo:</b> {vnd(viewed.referencePrice)}</Typography.Text>
+        <Typography.Text><b>Trạng thái:</b> {viewed.active ? 'Đang dùng' : 'Ngừng dùng'}</Typography.Text>
+      </Space>}
     </Drawer>
 
     <Modal open={!!stateTarget} title={stateTarget?.entry.active ? `Ngừng dùng "${stateTarget.entry.name}"?` : `Khôi phục "${stateTarget?.entry.name}"?`}

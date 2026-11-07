@@ -11,6 +11,7 @@ import { Link, Navigate, Route, Routes } from 'react-router-dom';
 import { useAuth } from '../features/authentication/AuthContext';
 import SignInPage from '../features/authentication/SignInPage';
 import SystemSettingsPage from '../features/system-settings/SystemSettingsPage';
+import MedicineManagementPage from '../features/system-settings/MedicineManagementPage';
 import MaterialsPage from '../features/system-settings/MaterialsPage';
 import WorkStatisticsPage from '../features/finance/WorkStatisticsPage';
 import RevenuePage from '../features/finance/RevenuePage';
@@ -34,6 +35,7 @@ import { useCustomerAuth } from '../features/customer-auth/CustomerAuthContext';
 import CustomerBookingPage from '../features/customer-booking/CustomerBookingPage';
 import CustomerPatientLinkPage from '../features/customer-patient-link/CustomerPatientLinkPage';
 import CustomerAppointmentsPage from '../features/customer-appointments/CustomerAppointmentsPage';
+import { CustomerPrescriptionsPage, CustomerPrescriptionDetailPage } from '../features/customer-prescriptions/CustomerPrescriptionsPage';
 import CustomerAppointmentDetailPage from '../features/customer-appointments/CustomerAppointmentDetailPage';
 import DossierPage from '../features/treatment/DossierPage';
 import PlanPage from '../features/treatment/PlanPage';
@@ -58,6 +60,8 @@ export default function App() {
       <Route path="patient-link" element={<CustomerPatientLinkPage />} />
       <Route path="appointments" element={<CustomerAppointmentsPage />} />
       <Route path="appointments/:code" element={<CustomerAppointmentDetailPage />} />
+      <Route path="prescriptions" element={<CustomerPrescriptionsPage />} />
+      <Route path="prescriptions/:id" element={<CustomerPrescriptionDetailPage />} />
     </Route>
     <Route path="/customer/*" element={<Result status="404" title="Không tìm thấy trang" extra={<Link to="/customer/home">Về trang chủ</Link>} />} />
     <Route path="/recover" element={<RecoverAccountPage />} />
@@ -67,6 +71,7 @@ export default function App() {
     </Route>
     <Route element={<Protected><Workspace /></Protected>}>
       <Route path="system-settings" element={<Protected permission="settings.read"><SystemSettingsPage /></Protected>} />
+      <Route path="medicines" element={<Protected permission="catalog.medicines.read"><MedicineManagementPage /></Protected>} />
       <Route path="materials" element={<Protected permission="catalog.materials.read"><MaterialsPage /></Protected>} />
       <Route path="payments" element={<Protected permission="finance.read"><PaymentsPage /></Protected>} />
       <Route path="work-statistics" element={<Protected permission="finance.read"><WorkStatisticsPage /></Protected>} />
