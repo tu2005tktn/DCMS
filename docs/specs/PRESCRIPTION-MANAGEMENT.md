@@ -87,12 +87,13 @@ Migration `20261107050902_PrescriptionsAndBranchProfiles` (dùng chung với S58
 9. **In đơn** (A5 mặc định, chọn A4): tên chi nhánh, địa chỉ, điện thoại, logo (nếu chi nhánh có logo đã upload), bác sĩ kê đơn (CCHN để trống dòng ký nếu hồ sơ nhân sự chưa có dữ liệu — không in giá trị giả), thông tin bệnh nhân (mã BN, họ tên, năm sinh, giới tính, địa chỉ), chẩn đoán, bảng thuốc đánh số (tên, hàm lượng, số lượng bằng số và chữ, đường dùng, liều cụ thể, số ngày), lời dặn chung, ngày kê, chữ ký bác sĩ, dòng "Đơn thuốc mua ngoài — phòng khám không bán thuốc", mã QR xác thực. Bản nháp in có watermark "BẢN NHÁP — CHƯA CÓ GIÁ TRỊ".
    - QR chứa `ODENTAL-RX|{prescriptionId}|R{revision}|{verificationCode}`; `verificationCode` là 16 ký tự đầu SHA-256 của nội dung đơn đã ký.
 
-### 3.1 Nhập nhanh thuốc tùy chỉnh
+### 3.1 Thêm thuốc vào danh mục ngay khi kê đơn
 
-- Nút `+` nhỏ nằm cạnh ô chọn thuốc trong khối **CHỈ ĐỊNH** mở popup tại chỗ; nhập tên thuốc tùy chỉnh, đơn vị và hướng dẫn riêng. Xác nhận nạp dữ liệu vào dòng kê đơn hiện tại và lưu dòng đó vào danh sách, sử dụng liều/lịch dùng đang có trên form; bác sĩ có thể sửa dòng sau khi thêm.
-- Nút thêm dòng lớn màu xanh tiếp tục giữ nguyên. Lời dặn chung, bác sĩ kê đơn, ngày kê, chọn mẫu, cảnh báo lâm sàng, sửa/xóa dòng và hoàn tất đơn không đổi.
-- Thuốc tùy chỉnh chỉ là snapshot của đơn đang kê; không xuất hiện trong danh mục chọn thuốc/mẫu đơn và không được phép ghi vào mẫu.
-- Bản in và app bệnh nhân hiển thị snapshot tên/đơn vị/liều/hướng dẫn giống thuốc danh mục.
+- Nút `+` nhỏ cạnh ô chọn thuốc mở popup tạo thuốc theo luồng Odental: tên, mã thuốc/mã sản phẩm, hoạt chất/biệt dược, hàm lượng, dạng bào chế, đơn vị gốc, quy cách đóng gói, giá tham khảo và hướng dẫn sử dụng mặc định.
+- Lưu qua API danh mục thuốc hiện có (`catalog.medicines.manage`), không tạo một dòng thuốc chỉ thuộc đơn hiện tại. Thuốc mới mặc định được bật `prescriptionEligible=true`, `internalStockTracked=false`; thao tác không tạo tồn kho, xuất kho hay phí. Kiểm tra trùng mã/tên và lỗi quyền theo contract danh mục; không tiếp tục kê nếu API báo lỗi.
+- Khi tạo thành công, thêm thuốc mới vào lựa chọn, chọn ngay cho dòng kê hiện tại, điền đơn vị và hướng dẫn mặc định vào dòng; bác sĩ tiếp tục nhập liều, số ngày, số lượng và có thể sửa lời dặn riêng trước khi thêm vào đơn.
+- Người chỉ có quyền kê đơn nhưng không có quyền quản lý danh mục không được tạo thuốc qua nút này. Thuốc tùy chỉnh chỉ dùng cho đơn hiện tại tiếp tục là luồng riêng, không đưa vào danh mục.
+- Nút thêm dòng lớn màu xanh, lời dặn chung, bác sĩ kê đơn, ngày kê, chọn mẫu, cảnh báo lâm sàng, sửa/xóa dòng và hoàn tất đơn giữ nguyên. Bản in và app bệnh nhân hiển thị snapshot tên/đơn vị/liều/hướng dẫn.
 
 ---
 

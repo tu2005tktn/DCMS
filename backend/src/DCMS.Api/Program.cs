@@ -141,6 +141,14 @@ if (args.Contains("--migrate") || args.Contains("--seed-demo"))
     return;
 }
 
+if (args.Contains("--seed-clinic-medicines"))
+{
+    if (!app.Environment.IsDevelopment()) throw new InvalidOperationException("Development database commands require Development environment.");
+    using var medicineScope = app.Services.CreateScope();
+    Console.WriteLine(await medicineScope.ServiceProvider.GetRequiredService<DCMS.Infrastructure.Features.SystemSettings.DevelopmentMedicineSeeder>().SeedAsync());
+    return;
+}
+
 if (args.Contains("--seed-clinic-catalog"))
 {
     if (!app.Environment.IsDevelopment()) throw new InvalidOperationException("Development database commands require Development environment.");
@@ -148,6 +156,7 @@ if (args.Contains("--seed-clinic-catalog"))
     Console.WriteLine(await catalogScope.ServiceProvider.GetRequiredService<DCMS.Infrastructure.Features.Treatment.DevelopmentTreatmentCatalogSeeder>().SeedAsync(args.Contains("--refresh")));
     Console.WriteLine(await catalogScope.ServiceProvider.GetRequiredService<DCMS.Infrastructure.Features.SystemSettings.DevelopmentMaterialSeeder>().SeedAsync());
     Console.WriteLine(await catalogScope.ServiceProvider.GetRequiredService<DCMS.Infrastructure.Features.SystemSettings.DevelopmentLabSeeder>().SeedAsync());
+    Console.WriteLine(await catalogScope.ServiceProvider.GetRequiredService<DCMS.Infrastructure.Features.SystemSettings.DevelopmentMedicineSeeder>().SeedAsync());
     return;
 }
 

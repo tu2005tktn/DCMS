@@ -27,6 +27,8 @@ Tab "Công ty cung cấp vật liệu" lọc `type ∈ {Supplier, Both}`; tab "C
 
 `code` (bắt buộc ≤40, unique), `name` (bắt buộc 1–200, unique), `activeIngredient?` ≤200, `strength?` ≤200, `dosageForm?` ≤200, `baseUnit` (bắt buộc ≤40, ví dụ viên), `packaging?` ≤160 (nhãn đóng gói, ví dụ hộp 10 vỉ × 10 viên), `instructions?` ≤1000 (lời dặn mặc định cho dòng đơn mới), `referencePrice?` (số nguyên VND ≥0), `prescriptionEligible`, `internalStockTracked` (độc lập). Không lô/FEFO; chưa có module kho nên chưa khóa đổi đơn vị gốc theo movement.
 
+Development starter catalog (gọi tường minh qua `--seed-clinic-medicines`) chỉ thêm tên/mã/đơn vị của một số thuốc thông dụng để bác sĩ có dữ liệu chọn kê. Không điền liều, hướng dẫn sử dụng, giá hoặc tồn kho; không seed đơn thuốc gắn bệnh nhân. Cơ sở phải xác nhận và hoàn thiện danh mục trước khi dùng lâm sàng.
+
 ## Quy tắc chung
 
 - SET-03: tên giữ dấu, trim + FormC; so trùng chữ hoa; code chữ hoa, mẫu `^[A-Z0-9][A-Z0-9._-]*$`. Trùng → 409 MSG201 kèm `field` (`code`/`name`), dùng chung câu chữ đợt 2. Unique tính cả mục đã ngừng dùng.
@@ -58,6 +60,8 @@ DTO trả kèm `version`, `active`, `createdAt/ByName`, `updatedAt/ByName`; lab 
 ## UI web
 
 Tab **Vật tư, labo & thuốc** trong `/system-settings` (Owner) với 4 mục: Công ty cung cấp vật liệu, Công ty labo, Loại công việc labo, Thuốc. Mỗi mục: tìm kiếm, lọc trạng thái, bảng, phân trang 20/50/100, Thêm/Sửa (Drawer form, Lý do khi sửa), Ngừng dùng/Khôi phục có preview + lý do, Lịch sử. Thuốc có nút "Xuất Excel". Giá nhập số nguyên, hiển thị định dạng VND; để trống = chưa xác định.
+
+Trong form kê đơn, người có quyền `catalog.medicines.manage` có thể mở popup **Thêm thuốc vào danh mục** cạnh ô chọn thuốc. Popup dùng cùng contract và ràng buộc tạo mới của danh mục này; sau khi tạo thành công, thuốc đủ điều kiện kê được chọn ngay trong dòng đơn hiện tại. Không tạo tồn kho hoặc khoản thu từ thao tác này.
 
 ## Nghiệm thu
 

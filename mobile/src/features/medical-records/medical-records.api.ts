@@ -32,6 +32,7 @@ export const medicalRecordsApi = {
     call<VisitPage>(`/api/me/appointments?scope=${scope}&page=1&pageSize=50`, token),
   // Đơn thuốc mua ngoài đã hoàn tất (docs/specs/PRESCRIPTION-MANAGEMENT.md §4).
   prescriptions: (token: string) => call<PatientPrescription[]>('/api/patients/me/prescriptions', token),
-  prescription: (token: string, visitId: string) =>
-    call<PatientPrescriptionDetail>(`/api/patients/me/prescriptions/visits/${encodeURIComponent(visitId)}`, token),
+  prescription: (token: string, visitId: string) => {
+    return call<PatientPrescriptionDetail>(`/api/patients/me/prescriptions/visits/${encodeURIComponent(visitId)}`, token);
+  },
 };
