@@ -84,13 +84,13 @@ const sections: Section[] = [
 const base = '/api/system-settings/settings/catalogs';
 const commandLabels: Record<string, string> = { create: 'Tạo mới', update: 'Sửa', state: 'Đổi trạng thái' };
 
-export default function SupplyCatalogPanel() {
+export default function SupplyCatalogPanel({ initialKey }: { initialKey?: SectionKey } = {}) {
   // Static message does not render under React 19 + antd 5 (errors were silently lost); use the hook instance.
   const [toast, toastContext] = message.useMessage();
   const { user } = useAuth();
   const can = (resource: string, action: string) => user?.permissions.includes(`catalog.${resource}.${action}`) ?? false;
   const visibleSections = sections.filter(s => can(s.resource, 'read'));
-  const [key, setKey] = useState<SectionKey>('suppliers'), [status, setStatus] = useState<Status>('Active');
+  const [key, setKey] = useState<SectionKey>(initialKey ?? 'suppliers'), [status, setStatus] = useState<Status>('Active');
   const [search, setSearch] = useState(''), [query, setQuery] = useState(''), [page, setPage] = useState(1), [size, setSize] = useState(20);
   const [data, setData] = useState<Page | null>(null), [loading, setLoading] = useState(false), [error, setError] = useState<string>(), [revision, setRevision] = useState(0);
   const [editing, setEditing] = useState<{ row?: Row } | null>(null), [formError, setFormError] = useState<ApiError>();

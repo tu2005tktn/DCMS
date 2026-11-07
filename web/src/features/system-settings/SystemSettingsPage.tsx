@@ -1,12 +1,14 @@
-import { Alert, Button, Card, Empty, Form, Input, Modal, Result, Select, Space, Table, Tabs, Typography } from 'antd';
+import { Alert, Button, Card, Form, Input, Modal, Result, Select, Space, Table, Tabs, Typography } from 'antd';
 import { useEffect, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
-import { api, ApiError } from '../../services/api';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { api } from '../../services/api';
 import { useAuth } from '../authentication/AuthContext';
 import GeneralSettingsPanel from './GeneralSettingsPanel';
 import ReferenceCatalogPanel from './ReferenceCatalogPanel';
 import SupplyCatalogPanel from './SupplyCatalogPanel';
 import AccessGroupsPanel from './AccessGroupsPanel';
+import BranchesPanel from './BranchesPanel';
+import ClinicalServicesPage from '../finance/ClinicalServicesPage';
 import type { SettingsCapabilities } from './generalSettings';
 import './systemSettings.css';
 
@@ -24,40 +26,126 @@ async function allCategories() {
     if (!batch.items.length || result.length >= batch.total) return result;
   }
 }
-// S58 shell: one tab per section the server allows (GET /api/system-settings/settings/capabilities); each API rechecks access.
+
+// S58 shell (DCMS-120): 11 standard groups in exact order, deep link /settings/{section}.
 export default function SystemSettingsPage() {
   const { user } = useAuth();
+  const { section } = useParams<{ section?: string }>();
+  const [search] = useSearchParams();
+  const navigate = useNavigate();
   const [modal, modalContext] = Modal.useModal();
-  const [search, setSearch] = useSearchParams();
-  const [capabilities, setCapabilities] = useState<SettingsCapabilities | null>(null), [error, setError] = useState<string>(), [revision, setRevision] = useState(0);
+
+  const [capabilities, setCapabilities] = useState<SettingsCapabilities | null>(null);
+  const [error, setError] = useState<string>();
+  const [revision, setRevision] = useState(0);
   const dirty = useRef(false);
+
+  const owner = user?.effectiveRoles.includes('ClinicOwner') ?? false;
+  const has = (p: string) => owner || (user?.permissions.includes(p) ?? false);
+
   useEffect(() => {
-    let live = true; setError(undefined);
-    void api<SettingsCapabilities>('/api/system-settings/settings/capabilities').then(v => { if (live) setCapabilities(v); })
+    let live = true;
+    setError(undefined);
+    void api<SettingsCapabilities>('/api/system-settings/settings/capabilities')
+      .then(v => { if (live) setCapabilities(v); })
       .catch(e => { if (live) setError((e as Error).message); });
     return () => { live = false; };
   }, [revision]);
+
   if (error) return <Alert type="error" showIcon message={error} action={<Button onClick={() => setRevision(v => v + 1)}>Thử lại</Button>} />;
   if (!capabilities) return <Card loading />;
+
+  // 11 standard groups in exact order
   const tabs = [
-    ...(capabilities.sections.some(x => x.key === 'general') ? [{ key: 'general', label: 'Thiết lập chung', children: <GeneralSettingsPanel onDirtyChange={v => { dirty.current = v; }} /> }] : []),
-    ...(capabilities.sections.some(x => x.key === 'catalogs') || user?.permissions.some(p => p.startsWith('catalog.') && p.endsWith('.read')) ? [{ key: 'catalogs', label: 'Danh mục hồ sơ/nghiệp vụ', children: <ReferenceCatalogPanel /> }] : []),
-    ...(capabilities.sections.some(x => x.key === 'supplies') ? [{ key: 'supplies', label: 'Vật tư, labo & thuốc', children: <SupplyCatalogPanel /> }] : []),
-    ...(capabilities.sections.some(x => x.key === 'materials') ? [{ key: 'materials', label: 'Dụng cụ / Vật liệu', children: <MaterialCatalog /> }] : []),
-    ...(user?.permissions.includes('access-groups.read') ? [{ key: 'access-groups', label: 'Phân quyền', children: <AccessGroupsPanel /> }] : []),
+    // 1. general
+    ...(capabilities.sections.some(x => x.key === 'general') || has('settings.general.read')
+      ? [{ key: 'general', label: '1. Thiết lập chung', children: <GeneralSettingsPanel onDirtyChange={v => { dirty.current = v; }} /> }]
+      : []),
+
+    // 2. diagnoses
+    ...(has('catalog.diagnoses.read') || has('settings.read')
+      ? [{ key: 'diagnoses', label: '2. Chẩn đoán / Tên bệnh', children: <ReferenceCatalogPanel initialKind="diagnoses" /> }]
+      : []),
+
+    // 3. services
+    ...(has('services.read')
+      ? [{ key: 'services', label: '3. Dịch vụ, sản phẩm & giá', children: <ClinicalServicesPage /> }]
+      : []),
+
+    // 4. material-suppliers
+    ...(has('catalog.material-suppliers.read')
+      ? [{ key: 'material-suppliers', label: '4. Công ty cung cấp vật liệu', children: <SupplyCatalogPanel initialKey="suppliers" /> }]
+      : []),
+
+    // 5. materials
+    ...(has('catalog.materials.read')
+      ? [{ key: 'materials', label: '5. Loại dụng cụ / Vật liệu', children: <MaterialCatalog /> }]
+      : []),
+
+    // 6. lab-providers
+    ...(has('catalog.lab-work-types.read') || has('catalog.material-suppliers.read')
+      ? [{ key: 'lab-providers', label: '6. Công ty labo', children: <SupplyCatalogPanel initialKey="labs" /> }]
+      : []),
+
+    // 7. lab-work-types
+    ...(has('catalog.lab-work-types.read')
+      ? [{ key: 'lab-work-types', label: '7. Loại công việc labo', children: <SupplyCatalogPanel initialKey="lab-work-types" /> }]
+      : []),
+
+    // 8. customer-groups
+    ...(has('catalog.customer-groups.read') || owner
+      ? [{ key: 'customer-groups', label: '8. Nhóm khách hàng', children: <ReferenceCatalogPanel initialKind="customer-groups" /> }]
+      : []),
+
+    // 9. medicines
+    ...(has('catalog.medicines.read')
+      ? [{ key: 'medicines', label: '9. Thuốc / Dược phẩm', children: <SupplyCatalogPanel initialKey="medicines" /> }]
+      : []),
+
+    // 10. access-groups
+    ...(user?.permissions.includes('access-groups.read') || owner
+      ? [{ key: 'access-groups', label: '10. Phân quyền truy cập', children: <AccessGroupsPanel /> }]
+      : []),
+
+    // 11. branches
+    ...(has('branches.read') || owner
+      ? [{ key: 'branches', label: '11. Chi nhánh & Ghế điều trị', children: <BranchesPanel /> }]
+      : []),
   ];
-  if (!tabs.length) return <Result status="403" title="Bạn không có quyền thực hiện thao tác này." extra={<Link to="/">Về trang chủ</Link>} />;
-  const active = tabs.some(x => x.key === search.get('tab')) ? search.get('tab')! : tabs[0].key;
-  function change(key: string) {
-    const go = () => { dirty.current = false; setSearch({ tab: key }, { replace: true }); };
-    if (!dirty.current) { go(); return; }
-    modal.confirm({ title: 'Bỏ thay đổi chưa lưu?', content: 'Thiết lập vừa sửa sẽ không được lưu.', okText: 'Bỏ thay đổi', cancelText: 'Tiếp tục sửa', onOk: go });
+
+  if (!tabs.length) {
+    return <Result status="403" title="Bạn không có quyền thực hiện thao tác này (403 MSG06)." extra={<Link to="/">Về trang chủ</Link>} />;
   }
-  return <div className="system-settings-page">
-    {modalContext}
-    <Typography.Title level={2}>Thiết lập hệ thống</Typography.Title>
-    <Tabs activeKey={active} onChange={change} destroyInactiveTabPane items={tabs} />
-  </div>;
+
+  // Current active section resolution: from route param :section, or ?tab= query param, or first available tab
+  const requestedKey = section || search.get('tab');
+  const active = tabs.some(x => x.key === requestedKey) ? requestedKey! : tabs[0].key;
+
+  function change(key: string) {
+    const go = () => {
+      dirty.current = false;
+      navigate(`/settings/${key}`, { replace: true });
+    };
+    if (!dirty.current) {
+      go();
+      return;
+    }
+    modal.confirm({
+      title: 'Bỏ thay đổi chưa lưu?',
+      content: 'Thiết lập hoặc bản nhập vừa sửa sẽ không được lưu nếu bạn chuyển mục.',
+      okText: 'Bỏ thay đổi',
+      cancelText: 'Tiếp tục sửa',
+      onOk: go,
+    });
+  }
+
+  return (
+    <div className="system-settings-page">
+      {modalContext}
+      <Typography.Title level={2}>Thiết lập hệ thống (oDental System Settings)</Typography.Title>
+      <Tabs activeKey={active} onChange={change} destroyInactiveTabPane items={tabs} />
+    </div>
+  );
 }
 
 function MaterialCatalog() {
@@ -98,79 +186,80 @@ function MaterialCatalog() {
     form.setFieldsValue({ name: row?.name ?? '', categoryId: row?.categoryId, usageUnit: row?.usageUnit ?? undefined }); setDialog({kind, row});
   }
   async function save(values: Values) {
-    if (!dialog || guard.current) return;
+    if (guard.current) return;
+    const body = JSON.stringify(values);
+    if (pending.current?.body !== body) pending.current = { body, key: crypto.randomUUID() };
     guard.current = true; setBusy(true); setFormError(undefined);
-    const body = { name: values.name.trim(), ...(dialog.kind === 'materials' ? { categoryId: values.categoryId, usageUnit: values.usageUnit?.trim() || null } : {}), ...(dialog.row ? { expectedVersion: dialog.row.version } : {}) };
-    const fingerprint = JSON.stringify({kind:dialog.kind,id:dialog.row?.id,body});
-    if (pending.current?.body !== fingerprint) pending.current = {body:fingerprint,key:crypto.randomUUID()};
+    const isEdit = dialog?.row !== undefined;
+    const path = isEdit ? `${base}/${dialog!.kind}/${dialog!.row!.id}` : `${base}/${dialog!.kind}`;
     try {
-      await api(`${base}/${dialog.kind}${dialog.row ? `/${dialog.row.id}` : ''}`, { method: dialog.row ? 'PUT' : 'POST', body: JSON.stringify({...body,requestKey:pending.current.key}) });
-      setDialog(null); form.resetFields(); pending.current = null; setRevision(v => v+1);
-    } catch (e) {
-      const failure = e as ApiError; setFormError(failure.message);
-      if (failure.field === 'name' || failure.field === 'usageUnit') form.setFields([{name:failure.field,errors:[failure.message]}]);
-    } finally { guard.current = false; setBusy(false); }
-  }
-  async function readVersion(deletion = false) {
-    const target = deletion ? deleting : dialog;
-    if (!target?.row || guard.current) return;
-    guard.current = true; setBusy(true);
-    try {
-      const latest = await api<Row>(`${base}/${target.kind}/${target.row.id}`);
-      if (deletion) { setDeleting({kind:target.kind,row:latest}); deletePending.current = null; setDeleteError(undefined); }
-      else { setDialog({kind:target.kind,row:latest}); pending.current = null; setFormError(undefined); }
-    } catch (e) { if (deletion) setDeleteError((e as Error).message); else setFormError((e as Error).message); }
+      await api(path, { method: isEdit ? 'PUT' : 'POST', body: JSON.stringify({ ...values, requestKey: pending.current.key, expectedVersion: dialog?.row?.version ?? 0 }) });
+      setDialog(null); setRevision(v => v + 1);
+    } catch (e) { setFormError((e as Error).message); }
     finally { guard.current = false; setBusy(false); }
   }
   async function remove() {
     if (!deleting || guard.current) return;
+    const body = JSON.stringify({ reason: 'Xóa danh mục' });
+    if (deletePending.current?.body !== body) deletePending.current = { body, key: crypto.randomUUID() };
     guard.current = true; setBusy(true); setDeleteError(undefined);
-    const body = JSON.stringify({kind:deleting.kind,id:deleting.row.id,version:deleting.row.version});
-    if (deletePending.current?.body !== body) deletePending.current = {body,key:crypto.randomUUID()};
     try {
-      await api(`${base}/${deleting.kind}/${deleting.row.id}`, {method:'DELETE',body:JSON.stringify({expectedVersion:deleting.row.version,requestKey:deletePending.current.key})});
-      setDeleting(null); deletePending.current = null; setRevision(v => v+1);
+      await api(`${base}/${deleting.kind}/${deleting.row.id}`, { method: 'DELETE', body: JSON.stringify({ requestKey: deletePending.current.key, expectedVersion: deleting.row.version }) });
+      setDeleting(null); setRevision(v => v + 1);
     } catch (e) { setDeleteError((e as Error).message); }
     finally { guard.current = false; setBusy(false); }
   }
-  if (!allowed) return <Result status="403" title="Bạn không có quyền thực hiện thao tác này." extra={<Link to="/">Về trang chủ</Link>} />;
-  const options = categories?.map(c => ({value:c.id,label:c.name})) ?? [];
-  const itemMode = kind === 'materials';
-  const tabItems = [{key:'materials',label:'Dụng cụ / Vật liệu'},{key:'material-categories',label:'Danh mục'}];
+  if (!allowed) return <Result status="403" title="Bạn không có quyền xem danh mục này." />;
   return <div>
-    <Card><Tabs activeKey={kind} onChange={tab} items={tabItems} />
-      <div className="system-settings-toolbar">
-        <Input.Search aria-label="Tìm kiếm theo tên" placeholder="Tìm kiếm theo tên" maxLength={160} allowClear value={search}
-          onChange={e => { setSearch(e.target.value); if (!e.target.value) {setQuery('');setPage(1);} }} onSearch={v => {setQuery(v.trim());setPage(1);}} />
-        {itemMode && <Select aria-label="Lọc danh mục" placeholder="Tất cả danh mục" allowClear showSearch optionFilterProp="label" value={categoryId} loading={!categories && !categoryError} options={options} onChange={v => {setCategoryId(v);setPage(1);}} />}
-        <Button type="primary" onClick={() => open()} disabled={!canCreate || itemMode && (!categories || !categories.length)}>Thêm mới</Button>
-      </div>
-      {categoryError && <Alert type="error" showIcon message={categoryError} action={<Button onClick={() => setRevision(v=>v+1)}>Thử lại danh mục</Button>} />}
-      {itemMode && categories?.length === 0 && <Alert type="info" showIcon message="Chưa có danh mục. Hãy tạo danh mục trước khi thêm dụng cụ/vật liệu." action={<Button onClick={() => tab('material-categories')}>Tạo danh mục</Button>} />}
-      {error && <Alert type="error" showIcon message={error} action={<Button onClick={() => setRevision(v=>v+1)}>Thử lại</Button>} />}
-      <Table<Row> rowKey="id" loading={loading} dataSource={data?.items ?? []} scroll={{x:650}}
-        locale={{emptyText:<Empty description={itemMode ? 'Chưa có dụng cụ/vật liệu.' : 'Chưa có danh mục.'} />}}
-        pagination={{current:page,pageSize:size,total:data?.total ?? 0,showSizeChanger:true,pageSizeOptions:[20,50,100],onChange:(p,s)=>{setPage(s!==size ? 1 : p);setSize(s);}}}
-        columns={[{title:'STT',key:'ordinal',width:65,render:(_v,_r,index)=>(page-1)*size+index+1},
-          {title:itemMode ? 'Tên' : 'Tên danh mục',dataIndex:'name'},
-          itemMode ? {title:'Thuộc danh mục',dataIndex:'categoryName'} : {title:'Số mục đang thuộc nhóm',dataIndex:'itemCount',width:200},
-          ...(itemMode ? [{title:'Đơn vị dùng',dataIndex:'usageUnit',width:130,render:(v:string|null)=>v ?? <span style={{color:'#667085'}}>—</span>}] : []),
-          {title:'Thao tác',key:'actions',width:150,render:(_v,row)=><Space><Button size="small" disabled={!canUpdate} aria-label={`Sửa ${row.name}`} onClick={()=>open(row)}>Sửa</Button><Button danger size="small" disabled={!canDelete} aria-label={`Xóa ${row.name}`} onClick={()=>{setDeleting({kind,row});setDeleteError(undefined);deletePending.current=null;}}>Xóa</Button></Space>}]} />
-    </Card>
-    <Modal forceRender open={!!dialog} title={`${dialog?.row ? 'Sửa' : 'Thêm'} ${dialog?.kind === 'materials' ? 'dụng cụ/vật liệu' : 'danh mục'}`} okText="Lưu" okButtonProps={{'aria-label':'Lưu'}} cancelText="Hủy" confirmLoading={busy}
-      closable={!busy} cancelButtonProps={{disabled:busy}} onCancel={()=>{if(!busy)setDialog(null);}} onOk={()=>form.submit()}>
-      {formError && <Alert type="error" showIcon message={formError} />}
-      {formError && dialog?.row && <Button disabled={busy} onClick={()=>void readVersion()}>Đọc lại phiên bản, giữ nội dung</Button>}
-      <Form form={form} layout="vertical" disabled={busy} onFinish={v=>void save(v)}>
-        <Form.Item name="name" label={dialog?.kind === 'materials' ? 'Tên' : 'Tên danh mục'} rules={[{required:true,whitespace:true,message:'Vui lòng nhập tên.'},{max:160,message:'Tên tối đa 160 ký tự.'}]}><Input aria-label={dialog?.kind === 'materials' ? 'Tên' : 'Tên danh mục'} maxLength={160} autoComplete="off" /></Form.Item>
-        {dialog?.kind === 'materials' && <Form.Item name="categoryId" label="Thuộc danh mục" rules={[{required:true,message:'Vui lòng chọn danh mục.'}]}><Select aria-label="Thuộc danh mục" showSearch optionFilterProp="label" placeholder="Chọn danh mục" loading={!categories} options={options} /></Form.Item>}
-        {dialog?.kind === 'materials' && <Form.Item name="usageUnit" label="Đơn vị dùng" rules={[{max:40,message:'Tối đa 40 ký tự.'}]}><Input aria-label="Đơn vị dùng" maxLength={40} autoComplete="off" placeholder="Ví dụ: sợi, g, cái" /></Form.Item>}
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
+      <Space wrap>
+        <Button type={kind === 'materials' ? 'primary' : 'default'} onClick={() => tab('materials')}>Dụng cụ / Vật liệu</Button>
+        <Button type={kind === 'material-categories' ? 'primary' : 'default'} onClick={() => tab('material-categories')}>Nhóm dụng cụ / vật liệu</Button>
+      </Space>
+      <Space wrap>
+        <Input.Search allowClear maxLength={100} placeholder="Tìm theo tên..." value={search} style={{ width: 240 }}
+          onChange={e => setSearch(e.target.value)} onSearch={v => { setQuery(v.trim()); setPage(1); }} />
+        {kind === 'materials' && <Select allowClear placeholder="Lọc theo nhóm" style={{ width: 200 }} value={categoryId}
+          onChange={v => { setCategoryId(v); setPage(1); }} options={categories?.map(c => ({ value: c.id, label: c.name }))} />}
+        {canCreate && <Button type="primary" onClick={() => open()}>+ Thêm mới</Button>}
+      </Space>
+    </div>
+    {error && <Alert type="error" showIcon message={error} style={{ marginBottom: 16 }} />}
+    {categoryError && <Alert type="warning" showIcon message={`Không tải được nhóm vật liệu: ${categoryError}`} style={{ marginBottom: 16 }} />}
+    <Table
+      loading={loading}
+      dataSource={data?.items}
+      rowKey="id"
+      pagination={{ current: page, pageSize: size, total: data?.total ?? 0, showSizeChanger: true, pageSizeOptions: [20, 50, 100],
+        onChange: (p, s) => { setPage(s !== size ? 1 : p); setSize(s); } }}
+      columns={[
+        { title: 'Tên', dataIndex: 'name' },
+        ...(kind === 'materials' ? [{ title: 'Nhóm', dataIndex: 'categoryName' }, { title: 'Đơn vị sử dụng', dataIndex: 'usageUnit' }] : []),
+        ...(canUpdate || canDelete ? [{
+          title: 'Thao tác',
+          render: (_: any, r: Row) => <Space>
+            {canUpdate && <Button size="small" onClick={() => open(r)}>Sửa</Button>}
+            {canDelete && <Button size="small" danger onClick={() => setDeleting({ kind, row: r })}>Ngừng dùng</Button>}
+          </Space>
+        }] : [])
+      ]}
+    />
+    <Modal open={dialog !== null} title={dialog?.row ? 'Sửa' : 'Thêm mới'} onCancel={() => setDialog(null)} onOk={() => form.submit()} confirmLoading={busy}>
+      {formError && <Alert type="error" showIcon message={formError} style={{ marginBottom: 12 }} />}
+      <Form form={form} layout="vertical" onFinish={save}>
+        <Form.Item name="name" label="Tên" rules={[{ required: true, message: 'Vui lòng nhập tên.' }]}><Input /></Form.Item>
+        {dialog?.kind === 'materials' && (
+          <>
+            <Form.Item name="categoryId" label="Nhóm"><Select allowClear options={categories?.map(c => ({ value: c.id, label: c.name }))} /></Form.Item>
+            <Form.Item name="usageUnit" label="Đơn vị sử dụng"><Input placeholder="cái, hộp, ống..." /></Form.Item>
+          </>
+        )}
       </Form>
     </Modal>
-    <Modal open={!!deleting} title={deleting?.kind === 'materials' ? 'Bạn có muốn xóa dụng cụ/vật liệu này không?' : 'Bạn có muốn xóa danh mục này không?'} okText="Đồng ý" okButtonProps={{'aria-label':'Đồng ý'}} cancelText="Không đồng ý" confirmLoading={busy}
-      closable={!busy} cancelButtonProps={{disabled:busy}} onCancel={()=>{if(!busy)setDeleting(null);}} onOk={()=>void remove()}>
-      <p>{deleting?.row.name}</p>{deleteError && <Alert type="error" showIcon message={deleteError} />}
-      {deleteError && <Button disabled={busy} onClick={()=>void readVersion(true)}>Đọc lại phiên bản</Button>}
+    <Modal open={deleting !== null} title={`Ngừng dùng "${deleting?.row.name ?? ''}"?`} okText="Ngừng dùng" okButtonProps={{ danger: true }}
+      confirmLoading={busy} onOk={() => void remove()} onCancel={() => { if (!busy) { setDeleting(null); setDeleteError(undefined); } }}>
+      {deleteError && <Alert type="error" showIcon message={deleteError} style={{ marginBottom: 12 }} />}
+      <Typography.Paragraph>Mục sẽ không còn được chọn cho giao dịch mới; dữ liệu đã ghi nhận vẫn giữ nguyên.</Typography.Paragraph>
     </Modal>
   </div>;
 }

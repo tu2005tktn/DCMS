@@ -28,8 +28,9 @@ type LoadState =
  * từ booker & attendee. Tương đương màn hình S12 trên mobile nhưng phù hợp quy
  * trình desktop (bảng, drawer, command bar).
  *
- * Tới khi backend TV5 triển khai, trang đọc/ghi qua `supportInboxMockRepo` (in-memory).
- * Khi chuyển sang HTTP thật, chỉ thay implementation repo — UI không đổi.
+ * Trang đọc/ghi qua API thật (`supportInbox.api.ts` → `GET/POST /api/support-requests/...`, xem
+ * docs/implementation/S26-Staff-Support-Inbox.md §API) và tự cập nhật qua realtime SignalR;
+ * `supportInbox.mock.ts` chỉ là repo in-memory dành cho phát triển offline, trang này không dùng nó.
  */
 export default function SupportInboxPage() {
   const auth = useAuth();

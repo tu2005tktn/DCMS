@@ -2,11 +2,13 @@ import { Alert, Space, Spin, Typography } from 'antd';
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../../services/api';
+import { usePermissions } from '../authentication/usePermissions';
 import type { Workspace } from '../examinations/types';
 import PrescriptionPanel from './PrescriptionPanel';
 
 export default function PrescriptionPage() {
   const {visitId}=useParams();
+  const has=usePermissions();
   const [workspace,setWorkspace]=useState<Workspace>(),[error,setError]=useState<string>();
   const [dirty,setDirty]=useState(false),[busy,setBusy]=useState(false);
   useEffect(()=>{
@@ -23,7 +25,8 @@ export default function PrescriptionPage() {
   if(error)return <Alert type="error" message={error}/>;
   if(!workspace||workspace.visit.visitId!==visitId)return <Spin/>;
   const readOnly=workspace.visit.status!=='InProgress'||!workspace.allowedActions.includes('prescribe');
+  const correctionAllowed=has('prescriptions.manage')&&(workspace.visit.status==='InProgress'||workspace.visit.status==='Completed');
   return <main className="page"><Space wrap><Typography.Title level={2}>Đơn thuốc mua ngoài</Typography.Title><Link to={`/visits/${visitId}`}>Về lượt khám</Link></Space>
-    <PrescriptionPanel key={visitId} visitId={visitId!} branchId={workspace.visit.branchId} readOnly={readOnly} initiallyExpanded onDirtyChange={setDirty} onBusyChange={setBusy}/>
+    <PrescriptionPanel key={visitId} visitId={visitId!} branchId={workspace.visit.branchId} readOnly={readOnly} correctionAllowed={correctionAllowed} initiallyExpanded onDirtyChange={setDirty} onBusyChange={setBusy}/>
   </main>;
 }

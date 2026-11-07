@@ -39,7 +39,10 @@ public sealed class CatalogMedicine : SupplyEntity
     public string? Strength { get; set; }
     public string? DosageForm { get; set; }
     public string BaseUnit { get; set; } = "";
+    public string Route { get; set; } = "Uống";
     public string? Packaging { get; set; }
+    public string? Contraindications { get; set; }
+    public string? AllergyWarnings { get; set; }
     public string? Instructions { get; set; }
     public long? ReferencePrice { get; set; }
     public bool PrescriptionEligible { get; set; }

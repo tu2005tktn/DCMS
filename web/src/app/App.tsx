@@ -4,6 +4,7 @@ import VisitPage from '../features/examinations/ExaminationPage';
 import PaymentsPage from '../features/finance/PaymentsPage';
 import ReceiptPrintPage from '../features/finance/ReceiptPrintPage';
 import PrescriptionPage from '../features/prescriptions/PrescriptionPage';
+import PrescriptionTemplatesPage from '../features/prescriptions/PrescriptionTemplatesPage';
 import ClinicalServicesPage from '../features/finance/ClinicalServicesPage';
 import { Alert, Button, Card, Result, Space, Tag, Typography } from 'antd';
 import { useState, type ReactNode } from 'react';
@@ -66,7 +67,11 @@ export default function App() {
       <Route index element={<Home />} />
     </Route>
     <Route element={<Protected><Workspace /></Protected>}>
-      <Route path="system-settings" element={<Protected permission="settings.read"><SystemSettingsPage /></Protected>} />
+      <Route path="settings" element={<Protected permission="settings.read"><SystemSettingsPage /></Protected>} />
+      <Route path="settings/:section" element={<Protected permission="settings.read"><SystemSettingsPage /></Protected>} />
+      <Route path="system-settings" element={<Navigate to="/settings" replace />} />
+      <Route path="system-settings/:section" element={<Navigate to="/settings" replace />} />
+      <Route path="prescriptions/templates" element={<Protected permission="prescriptions.manage"><PrescriptionTemplatesPage /></Protected>} />
       <Route path="materials" element={<Protected permission="catalog.materials.read"><MaterialsPage /></Protected>} />
       <Route path="payments" element={<Protected permission="finance.read"><PaymentsPage /></Protected>} />
       <Route path="work-statistics" element={<Protected permission="finance.read"><WorkStatisticsPage /></Protected>} />
