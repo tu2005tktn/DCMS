@@ -13,10 +13,12 @@
  */
 
 
-export type SystemMessage = { code: string; message: string; field?: string };
+export type Blocker = { kind: string; message: string; count: number; navigationUrl: string };
+export type SystemMessage = { code: string; message: string; field?: string; currentVersion?: number; blockers?: Blocker[] };
 
 export class ApiError extends Error {
-  constructor(public status: number, public code: string, message: string, public field?: string) { super(message); }
+  constructor(public status: number, public code: string, message: string, public field?: string,
+    public currentVersion?: number, public blockers?: Blocker[]) { super(message); }
 }
 
 const base = (import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5080').replace(/\/$/, '');
@@ -113,7 +115,7 @@ export async function api<T>(path: string, init: RequestInit = {}, authenticated
   }
   const requestToken = accessToken;
   const headers = new Headers(init.headers);
-  if (init.body) headers.set('Content-Type', 'application/json');
+  if (init.body && !(init.body instanceof FormData)) headers.set('Content-Type', 'application/json');
   if (authenticated && accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
   let response: Response;
   try { response = await fetch(base + path, { ...init, headers, cache: 'no-store' }); }
@@ -121,7 +123,7 @@ export async function api<T>(path: string, init: RequestInit = {}, authenticated
   if (!response.ok) {
     const fallback = { code: 'MSG144', message: 'Không thể hoàn tất thao tác. Vui lòng kiểm tra kết nối và thử lại.' };
     const body = await response.json().catch(() => fallback) as SystemMessage;
-    const error = new ApiError(response.status, body.code ?? fallback.code, body.message ?? fallback.message, body.field);
+    const error = new ApiError(response.status, body.code ?? fallback.code, body.message ?? fallback.message, body.field, body.currentVersion, body.blockers);
     if (response.status === 401 && authenticated && requestToken === accessToken) {
       // S26+ — token invalid/expired → xoá khỏi storage, gọi sessionLost callback.
       setAccessToken(null);
@@ -130,4 +132,19 @@ export async function api<T>(path: string, init: RequestInit = {}, authenticated
     throw error;
   }
   return response.status === 204 ? undefined as T : await response.json() as T;
+}
+
+/** Authenticated binary download shown through a temporary blob: URL (never a token in the URL). */
+export async function apiBlob(path: string): Promise<Blob> {
+  await renewSession();
+  const headers = new Headers();
+  if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
+  let response: Response;
+  try { response = await fetch(base + path, { headers, cache: 'no-store' }); }
+  catch { throw new ApiError(0, 'MSG144', 'Không thể hoàn tất thao tác. Vui lòng kiểm tra kết nối và thử lại.'); }
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({})) as Partial<SystemMessage>;
+    throw new ApiError(response.status, body.code ?? 'MSG144', body.message ?? 'Không tải được tệp.', body.field);
+  }
+  return await response.blob();
 }

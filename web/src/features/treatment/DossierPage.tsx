@@ -5,6 +5,7 @@ import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom'
 import { api, type ApiError } from '../../services/api';
 import type { TreatmentChange, TreatmentDossier, TreatmentItem } from './types';
 import { decisionLabel, money, stateLabel } from './types';
+import FollowUpPanel from '../follow-ups/FollowUpPanel';
 import './treatment.css';
 
 const eventLabels: Record<string, string> = {
@@ -165,6 +166,7 @@ export default function DossierPage() {
         {dossier.depositExceptionReason && <Typography.Paragraph>Đã duyệt ngoại lệ không cọc: {dossier.depositExceptionReason}</Typography.Paragraph>}
       </Card>
     </div>
+    <FollowUpPanel dossier={dossier} />
     <Card title="Dòng thời gian" className="treatment-timeline">
       {dossier.timeline.length === 0 ? <Empty description="Chưa có sự kiện chính thức." />
         : <Timeline items={dossier.timeline.map(event => ({ key: event.id,

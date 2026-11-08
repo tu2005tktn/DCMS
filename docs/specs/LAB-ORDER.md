@@ -58,3 +58,6 @@ Phần đầu form (Khách hàng, MSKH, tuổi, giới tính) chỉ đọc, lấ
 ## Ngoài phạm vi (làm sau)
 
 Trạng thái theo dõi xưởng (gửi, nhận, làm lại), tệp đính kèm, công nợ xưởng, báo cáo, danh sách phiếu labo riêng, thông báo nhắc hạn.
+
+
+Cập nhật 08/11/2026: danh sách phiếu labo riêng và theo dõi trạng thái xưởng (gửi, nhận, làm lại) đã chuyển sang [LAB-ORDER-MANAGEMENT.md](LAB-ORDER-MANAGEMENT.md). Phiếu mới có trạng thái mặc định `NotSent`.

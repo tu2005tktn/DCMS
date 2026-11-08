@@ -1,109 +1,612 @@
-import { Alert, Button, Card, Empty, Form, Input, InputNumber, Select, Space, Spin, Table, Typography } from 'antd';
+import { Alert, Button, Card, Col, Empty, Form, Input, InputNumber, Modal, Row, Select, Space, Spin, Table, Tag, Timeline, Typography } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { api, ApiError } from '../../services/api';
 import { usePermissions } from '../authentication/usePermissions';
+import PrescriptionPrintModal from './PrescriptionPrintModal';
+import PrescriptionTemplateModal from './PrescriptionTemplateModal';
+import {
+  doseSummary, mealLabel,
+  type ApplyTemplateResult, type ClinicalAllergyWarning, type MedicineOption, type Prescription, type PrescriptionLine,
+  type PrescriptionSummary, type VisitPrescription,
+} from './types';
 
-type MedicineOption = { id:string; code:string; name:string; strength?:string; dosageForm?:string; baseUnit:string; defaultInstructions?:string };
-type PrescriptionLine = { id:string; medicineId:string; medicineCode:string; medicineName:string; strength?:string; dosageForm?:string; unit:string; instructions:string; quantity:number; version:number };
-type Values = { medicineId:string; quantity:number; instructions?:string };
-type Props = { visitId:string; branchId:number; readOnly?:boolean; disabled?:boolean; initiallyExpanded?:boolean;
-  onDirtyChange?:(dirty:boolean)=>void; onBusyChange?:(busy:boolean)=>void };
+type FormValues = {
+  medicineId: string;
+  route: string;
+  morningDose: string;
+  noonDose: string;
+  afternoonDose: string;
+  eveningDose: string;
+  mealTiming: string;
+  days: number;
+  quantity: number;
+  instructions?: string;
+};
 
-export default function PrescriptionPanel({ visitId, branchId, readOnly=false, disabled=false, initiallyExpanded=false, onDirtyChange, onBusyChange }:Props) {
+type Props = {
+  visitId: string;
+  branchId: number;
+  readOnly?: boolean;
+  /** Signed prescriptions may be corrected while the visit is InProgress or Completed (docs/specs/PRESCRIPTION-MANAGEMENT.md §1.4). */
+  correctionAllowed?: boolean;
+  disabled?: boolean;
+  initiallyExpanded?: boolean;
+  onDirtyChange?: (dirty: boolean) => void;
+  onBusyChange?: (busy: boolean) => void;
+};
+
+const statusTag = (status: string) =>
+  status === 'Finalized' ? <Tag color="success">ĐÃ HOÀN TẤT</Tag>
+    : status === 'Superseded' ? <Tag>ĐÃ ĐƯỢC THAY THẾ</Tag>
+    : <Tag color="processing">BẢN NHÁP</Tag>;
+
+const numericDose = (value?: string) => {
+  const n = Number((value ?? '').replace(',', '.').trim());
+  return Number.isFinite(n) && n >= 0 ? n : NaN;
+};
+
+export default function PrescriptionPanel({
+  visitId,
+  branchId,
+  readOnly = false,
+  correctionAllowed = false,
+  disabled = false,
+  initiallyExpanded = false,
+  onDirtyChange,
+  onBusyChange,
+}: Props) {
   const has = usePermissions();
-  readOnly = readOnly || !has('prescriptions.manage');
-  const [lines,setLines]=useState<PrescriptionLine[]|null>(null),[loadError,setLoadError]=useState<string>();
-  const [expanded,setExpanded]=useState(initiallyExpanded),[options,setOptions]=useState<MedicineOption[]>([]),[query,setQuery]=useState('');
-  const [optionsLoading,setOptionsLoading]=useState(false),[optionsError,setOptionsError]=useState<string>(),[optionRevision,setOptionRevision]=useState(0);
-  const [editing,setEditing]=useState<PrescriptionLine>(),[saveError,setSaveError]=useState<ApiError>(),[busy,setBusy]=useState(false),[dirty,setDirty]=useState(false);
-  const [form]=Form.useForm<Values>();
-  const generation=useRef(0),saving=useRef(false),pending=useRef<{fingerprint:string;key:string}|undefined>(undefined);
-  const path=`/api/prescriptions/visits/${visitId}/lines`;
+  const canManage = has('prescriptions.manage');
 
-  useEffect(()=>{onDirtyChange?.(dirty);},[dirty,onDirtyChange]);
-  useEffect(()=>()=>{onDirtyChange?.(false);},[onDirtyChange]);
-  useEffect(()=>{onBusyChange?.(busy);},[busy,onBusyChange]);
-  useEffect(()=>()=>{onBusyChange?.(false);},[onBusyChange]);
-  async function loadLines(token=generation.current) {
+  const [rx, setRx] = useState<Prescription | null>();
+  const [history, setHistory] = useState<PrescriptionSummary[]>([]);
+  const [loadError, setLoadError] = useState<string>();
+  const [expanded, setExpanded] = useState(initiallyExpanded);
+  const [options, setOptions] = useState<MedicineOption[]>([]);
+  const [query, setQuery] = useState('');
+  const [optionsLoading, setOptionsLoading] = useState(false);
+  const [optionsError, setOptionsError] = useState<string>();
+
+  const [editing, setEditing] = useState<PrescriptionLine>();
+  const [saveError, setSaveError] = useState<ApiError>();
+  const [notice, setNotice] = useState<string>();
+  const [busy, setBusy] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const [advice, setAdvice] = useState('');
+  const [adviceDirty, setAdviceDirty] = useState(false);
+
+  const [templateModalOpen, setTemplateModalOpen] = useState(false);
+  const [printModalOpen, setPrintModalOpen] = useState(false);
+  const [correctionOpen, setCorrectionOpen] = useState(false);
+  const [correctionReason, setCorrectionReason] = useState('');
+  const [safetyWarnings, setSafetyWarnings] = useState<ClinicalAllergyWarning[]>([]);
+
+  const [form] = Form.useForm<FormValues>();
+  const watchedMedicineId = Form.useWatch('medicineId', form);
+  const generation = useRef(0);
+  const saving = useRef(false);
+  // One requestKey per distinct command payload so network retries replay instead of duplicating.
+  const pending = useRef<{ fingerprint: string; key: string } | undefined>(undefined);
+  const base = `/api/prescriptions/visits/${visitId}`;
+
+  // undefined = loading, null = no prescription yet (first line creates the draft).
+  const lines = rx === undefined ? null : rx?.lines ?? [];
+  const isDraft = rx == null || rx.status === 'Draft';
+  const canEditDraft = canManage && isDraft && (!readOnly || (correctionAllowed && (rx?.revision ?? 1) > 1));
+  const canCorrect = canManage && correctionAllowed && rx?.status === 'Finalized';
+  const anyDirty = dirty || adviceDirty;
+
+  useEffect(() => { onDirtyChange?.(anyDirty); }, [anyDirty, onDirtyChange]);
+  useEffect(() => () => { onDirtyChange?.(false); }, [onDirtyChange]);
+  useEffect(() => { onBusyChange?.(busy); }, [busy, onBusyChange]);
+  useEffect(() => () => { onBusyChange?.(false); }, [onBusyChange]);
+
+  const keyFor = (fingerprint: string) => {
+    if (pending.current?.fingerprint !== fingerprint) pending.current = { fingerprint, key: crypto.randomUUID() };
+    return pending.current.key;
+  };
+
+  const checkSafety = async (token = generation.current) => {
+    try {
+      const warnings = await api<ClinicalAllergyWarning[]>(`${base}/safety-check`);
+      if (token === generation.current) setSafetyWarnings(warnings);
+    } catch {
+      // Warnings support the doctor's review; a failed check never blocks prescribing.
+    }
+  };
+
+  const load = async (token = generation.current, keepAdvice = false) => {
     setLoadError(undefined);
     try {
-      const rows=await api<PrescriptionLine[]>(path);
-      if(token!==generation.current)return;
-      setLines(rows);setExpanded(value=>value||rows.length>0);return rows;
-    } catch(e) {if(token===generation.current)setLoadError((e as Error).message);}
-  }
-  useEffect(()=>{
-    const token=++generation.current;setLines(null);setEditing(undefined);setDirty(false);setBusy(false);saving.current=false;
-    pending.current=undefined;setSaveError(undefined);setExpanded(initiallyExpanded);setQuery('');setOptions([]);form.resetFields();
-    void loadLines(token);return ()=>{generation.current++;};
-  },[visitId,branchId]);
-  useEffect(()=>{if(readOnly){setEditing(undefined);setDirty(false);pending.current=undefined;form.resetFields();}},[readOnly,form]);
-  useEffect(()=>{
-    if(!expanded||readOnly)return;
-    let active=true;setOptionsLoading(true);setOptionsError(undefined);
-    const timer=window.setTimeout(()=>{
-      void api<MedicineOption[]>(`/api/prescriptions/medicine-options?${new URLSearchParams({branchId:String(branchId),q:query})}`)
-        .then(rows=>{if(active)setOptions(rows);})
-        .catch(e=>{if(active){setOptions([]);setOptionsError((e as Error).message);}})
-        .finally(()=>{if(active)setOptionsLoading(false);});
-    },250);
-    return ()=>{active=false;window.clearTimeout(timer);};
-  },[expanded,readOnly,branchId,visitId,query,optionRevision]);
-  function reset() {form.resetFields();setEditing(undefined);setDirty(false);setSaveError(undefined);pending.current=undefined;}
-  function edit(line:PrescriptionLine) {
-    if(dirty&&!window.confirm('Bỏ phần kê đơn chưa lưu để sửa dòng thuốc này?'))return;
-    setExpanded(true);setEditing(line);setSaveError(undefined);setDirty(false);pending.current=undefined;
-    form.setFieldsValue({medicineId:line.medicineId,quantity:line.quantity,instructions:line.instructions});
-  }
-  async function readLatest() {
-    const rows=await loadLines();
-    if(rows&&editing){const latest=rows.find(line=>line.id===editing.id);if(latest){setEditing(latest);setSaveError(undefined);pending.current=undefined;}}
-  }
-  async function save(values:Values) {
-    if(readOnly||disabled||saving.current||lines==null||loadError)return;
-    const token=generation.current;
-    const body={expectedVersion:editing?.version??0,medicineId:values.medicineId,quantity:values.quantity,instructions:values.instructions??''};
-    const target=editing?`${path}/${editing.id}`:path,fingerprint=JSON.stringify({target,...body});
-    if(pending.current?.fingerprint!==fingerprint)pending.current={fingerprint,key:crypto.randomUUID()};
-    saving.current=true;setBusy(true);setSaveError(undefined);
+      const value = await api<VisitPrescription>(`${base}/prescription`);
+      if (token !== generation.current) return;
+      setRx(value.current);
+      setHistory(value.history);
+      if (!keepAdvice) { setAdvice(value.current?.generalAdvice ?? ''); setAdviceDirty(false); }
+      setExpanded(v => v || (value.current?.lines.length ?? 0) > 0);
+      void checkSafety(token);
+    } catch (e) {
+      if (token === generation.current) setLoadError((e as Error).message);
+    }
+  };
+
+  useEffect(() => {
+    const token = ++generation.current;
+    setRx(undefined);
+    setHistory([]);
+    setEditing(undefined);
+    setDirty(false);
+    setAdviceDirty(false);
+    setBusy(false);
+    saving.current = false;
+    pending.current = undefined;
+    setSaveError(undefined);
+    setNotice(undefined);
+    setExpanded(initiallyExpanded);
+    setQuery('');
+    setOptions([]);
+    setSafetyWarnings([]);
+    form.resetFields();
+    void load(token);
+    return () => { generation.current++; };
+  }, [visitId, branchId]);
+
+  useEffect(() => {
+    if (!canEditDraft) {
+      setEditing(undefined);
+      setDirty(false);
+      form.resetFields();
+    }
+  }, [canEditDraft, form]);
+
+  useEffect(() => {
+    if (!expanded || !canEditDraft) return;
+    let active = true;
+    setOptionsLoading(true);
+    setOptionsError(undefined);
+    const timer = window.setTimeout(() => {
+      void api<MedicineOption[]>(`/api/prescriptions/medicine-options?${new URLSearchParams({ branchId: String(branchId), q: query })}`)
+        .then(rows => { if (active) setOptions(rows); })
+        .catch(e => { if (active) { setOptions([]); setOptionsError((e as Error).message); } })
+        .finally(() => { if (active) setOptionsLoading(false); });
+    }, 250);
+    return () => { active = false; window.clearTimeout(timer); };
+  }, [expanded, canEditDraft, branchId, visitId, query]);
+
+  // Runs one write; on MSG111 the form stays as typed and the server copy is reloaded for comparison.
+  const run = async <T,>(work: () => Promise<T>, onDone: (value: T) => void | Promise<void>) => {
+    if (saving.current || disabled) return;
+    const token = generation.current;
+    saving.current = true;
+    setBusy(true);
+    setSaveError(undefined);
+    setNotice(undefined);
     try {
-      const saved=await api<PrescriptionLine>(target,{method:editing?'PUT':'POST',body:JSON.stringify({...body,requestKey:pending.current.key})});
-      if(token!==generation.current)return;
-      setLines(current=>current?.some(line=>line.id===saved.id)?current.map(line=>line.id===saved.id?saved:line):[...(current??[]),saved]);reset();
-    } catch(e) {if(token===generation.current)setSaveError(e as ApiError);}
-    finally {if(token===generation.current){saving.current=false;setBusy(false);}}
+      const value = await work();
+      if (token !== generation.current) return;
+      pending.current = undefined;
+      await onDone(value);
+    } catch (e) {
+      if (token !== generation.current) return;
+      const error = e as ApiError;
+      setSaveError(error);
+      if (error.code === 'MSG111' || error.code === 'MSG205') void load(token, true);
+    } finally {
+      if (token === generation.current) {
+        saving.current = false;
+        setBusy(false);
+      }
+    }
+  };
+
+  const resetLineForm = () => {
+    form.resetFields();
+    setEditing(undefined);
+    setDirty(false);
+    setSaveError(undefined);
+  };
+
+  const edit = (line: PrescriptionLine) => {
+    if (!canEditDraft) return;
+    if (dirty && !window.confirm('Bỏ phần kê đơn chưa lưu để sửa dòng thuốc này?')) return;
+    setExpanded(true);
+    setEditing(line);
+    setSaveError(undefined);
+    setDirty(false);
+    form.setFieldsValue({
+      medicineId: line.medicineId, route: line.route, morningDose: line.morningDose, noonDose: line.noonDose,
+      afternoonDose: line.afternoonDose, eveningDose: line.eveningDose, mealTiming: line.mealTiming,
+      days: line.days, quantity: line.quantity, instructions: line.instructions,
+    });
+  };
+
+  const deleteLine = (line: PrescriptionLine) => {
+    if (!canEditDraft || !window.confirm(`Xóa thuốc "${line.medicineName}" khỏi đơn nháp?`)) return;
+    const key = keyFor(JSON.stringify({ op: 'delete', id: line.id, version: line.version }));
+    void run(
+      () => api(`${base}/lines/${line.id}?${new URLSearchParams({ requestKey: key, expectedVersion: String(line.version) })}`, { method: 'DELETE' }),
+      async () => { if (editing?.id === line.id) resetLineForm(); await load(generation.current, adviceDirty); },
+    );
+  };
+
+  // Total = ceil(sum of numeric doses per day × days); non-numeric doses ("1/2 gói") leave the quantity to the doctor.
+  const recalculate = () => {
+    const v = form.getFieldsValue();
+    const doses = [v.morningDose, v.noonDose, v.afternoonDose, v.eveningDose].map(numericDose);
+    if (doses.some(Number.isNaN)) return;
+    const daily = doses.reduce((a, b) => a + b, 0);
+    if (daily > 0 && v.days > 0) form.setFieldValue('quantity', Math.min(10000, Math.ceil(daily * v.days)));
+  };
+
+  const save = (values: FormValues) => {
+    if (!canEditDraft || lines == null || loadError) return;
+    const body = {
+      expectedVersion: editing?.version ?? 0,
+      medicineId: values.medicineId,
+      route: values.route || '',
+      morningDose: values.morningDose || '0',
+      noonDose: values.noonDose || '0',
+      afternoonDose: values.afternoonDose || '0',
+      eveningDose: values.eveningDose || '0',
+      mealTiming: values.mealTiming || 'AfterMeal',
+      days: values.days || 1,
+      quantity: values.quantity,
+      instructions: values.instructions ?? '',
+    };
+    const target = editing ? `${base}/lines/${editing.id}` : `${base}/lines`;
+    const key = keyFor(JSON.stringify({ target, ...body }));
+    void run(
+      () => api<PrescriptionLine>(target, { method: editing ? 'PUT' : 'POST', body: JSON.stringify({ ...body, requestKey: key }) }),
+      async () => { resetLineForm(); await load(generation.current, adviceDirty); },
+    );
+  };
+
+  const saveAdvice = () => {
+    if (!canEditDraft) return;
+    const body = { expectedVersion: rx?.version ?? 0, generalAdvice: advice.trim() };
+    const key = keyFor(JSON.stringify({ op: 'advice', ...body }));
+    void run(
+      () => api<Prescription>(`${base}/prescription`, { method: 'PUT', body: JSON.stringify({ ...body, requestKey: key }) }),
+      async value => { setAdviceDirty(false); setRx(value); await load(generation.current); },
+    );
+  };
+
+  const applyTemplate = async (templateId: string) => {
+    const body = { expectedVersion: rx?.version ?? 0, templateId };
+    const key = keyFor(JSON.stringify({ op: 'template', ...body }));
+    await run(
+      () => api<ApplyTemplateResult>(`${base}/apply-template`, { method: 'POST', body: JSON.stringify({ ...body, requestKey: key }) }),
+      async result => {
+        if (result.skippedLines > 0) setNotice(`Đã bỏ qua ${result.skippedLines} thuốc trong mẫu vì đã ngừng dùng hoặc không còn được kê đơn.`);
+        setExpanded(true);
+        await load(generation.current, adviceDirty);
+      },
+    );
+  };
+
+  const finalizePrescription = () => {
+    if (!rx || rx.lines.length === 0) return;
+    if (adviceDirty) { Modal.warning({ title: 'Lời dặn chung chưa lưu', content: 'Lưu hoặc hoàn tác lời dặn chung trước khi hoàn tất kê đơn.' }); return; }
+    if (dirty) { Modal.warning({ title: 'Dòng thuốc chưa lưu', content: 'Lưu hoặc hủy dòng thuốc đang nhập trước khi hoàn tất kê đơn.' }); return; }
+    Modal.confirm({
+      title: 'Hoàn tất kê đơn?',
+      content: 'Đơn đã hoàn tất sẽ bị khóa sửa, bệnh nhân xem được trên ứng dụng. Muốn thay đổi sau đó phải tạo bản điều chỉnh có lý do.',
+      okText: 'Hoàn tất kê đơn',
+      cancelText: 'Quay lại',
+      onOk: () => {
+        const body = { expectedVersion: rx.version, clinicalNote: null };
+        const key = keyFor(JSON.stringify({ op: 'finalize', ...body }));
+        return run(
+          () => api<Prescription>(`${base}/finalize`, { method: 'POST', body: JSON.stringify({ ...body, requestKey: key }) }),
+          async () => { setNotice('Đã hoàn tất kê đơn. Có thể in đơn hoặc để bệnh nhân xem trên ứng dụng.'); await load(generation.current); },
+        );
+      },
+    });
+  };
+
+  const createCorrection = () => {
+    if (!rx) return;
+    const reason = correctionReason.trim();
+    if (!reason) return;
+    const body = { expectedVersion: rx.version, reason };
+    const key = keyFor(JSON.stringify({ op: 'correction', ...body }));
+    void run(
+      () => api<Prescription>(`${base}/corrections`, { method: 'POST', body: JSON.stringify({ ...body, requestKey: key }) }),
+      async () => { setCorrectionOpen(false); setCorrectionReason(''); setExpanded(true); await load(generation.current); },
+    );
+  };
+
+  const selectedOptions = [...options];
+  if (editing && !selectedOptions.some(o => o.id === editing.medicineId)) {
+    selectedOptions.push({
+      id: editing.medicineId, code: editing.medicineCode, name: editing.medicineName, strength: editing.strength,
+      dosageForm: editing.dosageForm, baseUnit: editing.unit, route: editing.route,
+    });
   }
-  const selectedOptions=[...options];
-  if(editing&&!selectedOptions.some(option=>option.id===editing.medicineId))selectedOptions.push({id:editing.medicineId,code:editing.medicineCode,name:editing.medicineName,strength:editing.strength,dosageForm:editing.dosageForm,baseUnit:editing.unit});
-  return <section aria-label="Đơn thuốc khám">
-    <Card size="small" title="Đơn thuốc (không bắt buộc)" style={{margin:'16px 0'}} extra={lines&&!loadError&&(lines.length>0||!readOnly)?
-      <Button type="link" disabled={busy} aria-expanded={expanded} onClick={()=>setExpanded(value=>!value)}>{expanded?'Thu gọn':lines.length?'Xem đơn thuốc':'Kê đơn thuốc'}</Button>:undefined}>
-      <Typography.Paragraph type="secondary">Kê đơn mua ngoài khi cần; có thể hoàn tất khám mà không kê đơn.</Typography.Paragraph>
-      {loadError?<Alert type="error" showIcon message="Không tải được đơn thuốc" description={loadError} action={<Button onClick={()=>void loadLines()}>Thử tải đơn thuốc</Button>}/>:lines==null?<Spin/>:
-        !expanded?<Typography.Text type="secondary">{lines.length?`Đã kê ${lines.length} dòng thuốc.`:'Chưa kê thuốc cho lượt khám này.'}</Typography.Text>:<>
-          {lines.length>0?<Table size="small" rowKey="id" pagination={false} dataSource={lines} scroll={{x:520}} columns={[
-            {title:'Thuốc',render:(_,line:PrescriptionLine)=><><strong>{line.medicineName}</strong><div>{[line.medicineCode,line.strength,line.dosageForm].filter(Boolean).join(' · ')}</div></>},
-            {title:'Số lượng',render:(_,line:PrescriptionLine)=>`${line.quantity} ${line.unit}`},{title:'Lời dặn',dataIndex:'instructions'},
-            ...(!readOnly?[{title:'',render:(_:unknown,line:PrescriptionLine)=><Button disabled={busy||disabled} aria-label={`Sửa thuốc ${line.medicineName}`} onClick={()=>edit(line)}>Sửa</Button>}]:[]),
-          ]}/>:<Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Chưa có thuốc trong đơn"/>}
-          {!readOnly&&<>
-            {optionsError&&<Alert type="error" message="Không tải được danh mục thuốc" description={optionsError} action={<Button onClick={()=>setOptionRevision(v=>v+1)}>Thử tải thuốc</Button>}/>}
-            {!optionsLoading&&!optionsError&&options.length===0&&<Typography.Paragraph type="secondary">Chưa tìm thấy thuốc phù hợp. Có thể tìm tên khác hoặc hoàn tất khám không kê đơn.</Typography.Paragraph>}
-            {saveError&&<Alert role="alert" type="error" showIcon message={saveError.code==='MSG111'?'Đơn thuốc đã thay đổi. Phần nhập được giữ; đọc lại phiên bản dòng thuốc trước khi lưu tiếp.':saveError.message}
-              action={saveError.code==='MSG111'?<Button disabled={busy||disabled} onClick={()=>void readLatest()}>Đọc lại dòng thuốc</Button>:undefined}/>}
-            <Form form={form} name={`prescription-${visitId}`} layout="vertical" initialValues={{quantity:1}} disabled={busy||disabled} onValuesChange={()=>setDirty(true)} onFinish={values=>void save(values)}>
-              <Form.Item name="medicineId" label="Thuốc kê đơn" rules={[{required:true,message:'Chọn thuốc cần kê.'}]}>
-                <Select aria-label="Thuốc kê đơn" showSearch filterOption={false} loading={optionsLoading} onSearch={setQuery} placeholder="Tìm mã hoặc tên thuốc" options={selectedOptions.map(option=>({value:option.id,label:[option.code,option.name,option.strength,option.dosageForm].filter(Boolean).join(' · ')}))}
-                  onChange={medicineId=>{const option=options.find(item=>item.id===medicineId);if(option&&!editing)form.setFieldValue('instructions',option.defaultInstructions??'');}}/>
-              </Form.Item>
-              <Form.Item name="quantity" label="Số lượng thuốc" rules={[{required:true,message:'Nhập số lượng.'},{type:'integer',min:1,max:10000,message:'Số lượng là số nguyên từ 1 đến 10.000.'}]}><InputNumber aria-label="Số lượng thuốc" min={1} max={10000} precision={0}/></Form.Item>
-              <Form.Item name="instructions" label="Lời dặn dùng thuốc" rules={[{max:1000,message:'Lời dặn tối đa 1.000 ký tự.'}]}><Input.TextArea aria-label="Lời dặn dùng thuốc" rows={2} maxLength={1000}/></Form.Item>
-              <Space wrap><Button type="primary" htmlType="submit" aria-label={editing?'Lưu thay đổi thuốc':'Thêm vào đơn'} loading={busy} disabled={busy||disabled||!!optionsError}>{editing?'Lưu thay đổi thuốc':'Thêm vào đơn'}</Button>
-                <Button disabled={busy||disabled} onClick={reset}>Bỏ phần nhập thuốc</Button></Space>
-            </Form>
-            <Typography.Paragraph type="secondary" style={{marginTop:8}}>Lưu từng thuốc vào đơn bằng nút trên. Hoàn tất khám không tự lưu phần thuốc đang nhập.</Typography.Paragraph>
-          </>}
-        </>}
-    </Card>
-  </section>;
+  const selectedMedicine = selectedOptions.find(o => o.id === watchedMedicineId);
+
+  const errorMessage = (e: ApiError) =>
+    e.code === 'MSG111' ? 'Đơn thuốc vừa được thay đổi ở nơi khác. Phần bạn đang nhập vẫn được giữ; đơn trên máy chủ đã được tải lại để so sánh trước khi lưu tiếp.'
+      : e.code === 'MSG205' ? 'Đơn thuốc đã hoàn tất hoặc lượt khám không còn cho phép sửa. Dữ liệu đã được tải lại.'
+      : e.message;
+
+  return (
+    <section aria-label="Đơn thuốc khám">
+      <Card
+        size="small"
+        title={
+          <Space wrap>
+            <span>Đơn thuốc (mua ngoài)</span>
+            {rx && statusTag(rx.status)}
+            {rx && rx.revision > 1 && <Tag color="orange">Bản điều chỉnh {rx.revision - 1}</Tag>}
+          </Space>
+        }
+        style={{ margin: '16px 0', borderColor: rx?.status === 'Finalized' ? '#52c41a' : undefined }}
+        extra={
+          lines && !loadError ? (
+            <Space wrap>
+              {lines.length > 0 && <Button size="small" onClick={() => setPrintModalOpen(true)}>In đơn thuốc</Button>}
+              {canEditDraft && <Button size="small" disabled={busy || disabled} onClick={() => setTemplateModalOpen(true)}>Chọn mẫu đơn thuốc</Button>}
+              {canEditDraft && lines.length > 0 && (
+                <Button size="small" type="primary" onClick={finalizePrescription} loading={busy} disabled={disabled}>Hoàn tất kê đơn</Button>
+              )}
+              {canCorrect && <Button size="small" disabled={busy || disabled} onClick={() => setCorrectionOpen(true)}>Tạo bản điều chỉnh</Button>}
+              <Button type="link" size="small" disabled={busy} aria-expanded={expanded} onClick={() => setExpanded(v => !v)}>
+                {expanded ? 'Thu gọn' : lines.length ? 'Xem đơn thuốc' : canEditDraft ? 'Kê đơn thuốc' : 'Xem'}
+              </Button>
+            </Space>
+          ) : undefined
+        }
+      >
+        <Typography.Paragraph type="secondary" style={{ marginBottom: 8 }}>
+          Đơn thuốc mua ngoài tại hiệu thuốc. Phòng khám không bán thuốc tại chỗ.
+        </Typography.Paragraph>
+
+        {rx?.correctionReason && (
+          <Alert type="info" showIcon style={{ marginBottom: 12 }} message="Lý do điều chỉnh" description={rx.correctionReason} />
+        )}
+
+        {safetyWarnings.map((w, idx) => (
+          <Alert
+            key={idx}
+            type={w.warningType === 'Allergy' ? 'error' : 'warning'}
+            showIcon
+            message={w.warningType === 'Allergy' ? 'Cảnh báo dị ứng' : w.warningType === 'DuplicateIngredient' ? 'Trùng hoạt chất' : 'Chống chỉ định cần đối chiếu'}
+            description={w.message}
+            style={{ marginBottom: 8 }}
+          />
+        ))}
+
+        {notice && <Alert type="success" showIcon closable onClose={() => setNotice(undefined)} message={notice} style={{ marginBottom: 12 }} />}
+        {saveError && <Alert role="alert" type="error" showIcon message={errorMessage(saveError)} style={{ marginBottom: 12 }} />}
+
+        {loadError ? (
+          <Alert type="error" showIcon message="Không tải được đơn thuốc" description={loadError}
+            action={<Button onClick={() => void load()}>Thử tải lại</Button>} />
+        ) : lines == null ? (
+          <Spin />
+        ) : !expanded ? (
+          <Typography.Text type="secondary">{lines.length ? `Đã kê ${lines.length} thuốc.` : 'Chưa kê thuốc cho lượt khám này.'}</Typography.Text>
+        ) : (
+          <>
+            {lines.length > 0 ? (
+              <Table
+                size="small"
+                rowKey="id"
+                pagination={false}
+                dataSource={lines}
+                scroll={{ x: 760 }}
+                columns={[
+                  { title: 'STT', width: 50, render: (_, __, idx) => idx + 1 },
+                  {
+                    title: 'Thuốc',
+                    render: (_, line: PrescriptionLine) => (
+                      <>
+                        <strong>{line.medicineName}</strong>
+                        <div>{[line.medicineCode, line.activeIngredient, line.strength, line.dosageForm, line.route].filter(Boolean).join(' · ')}</div>
+                      </>
+                    ),
+                  },
+                  {
+                    title: 'Liều dùng',
+                    render: (_, line: PrescriptionLine) => (
+                      <div>
+                        {doseSummary(line)}
+                        <div><Tag color="blue">{mealLabel(line.mealTiming)}</Tag><Tag>{line.days} ngày</Tag></div>
+                      </div>
+                    ),
+                  },
+                  { title: 'Số lượng', width: 110, render: (_, line: PrescriptionLine) => <strong>{line.quantity} {line.unit}</strong> },
+                  { title: 'Lời dặn', dataIndex: 'instructions' },
+                  ...(canEditDraft
+                    ? [{
+                        title: 'Thao tác',
+                        width: 130,
+                        render: (_: unknown, line: PrescriptionLine) => (
+                          <Space size="small">
+                            <Button size="small" disabled={busy || disabled} onClick={() => edit(line)}>Sửa</Button>
+                            <Button size="small" danger disabled={busy || disabled} onClick={() => deleteLine(line)}>Xóa</Button>
+                          </Space>
+                        ),
+                      }]
+                    : []),
+                ]}
+              />
+            ) : (
+              <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Chưa có thuốc trong đơn" />
+            )}
+
+            <div style={{ marginTop: 16 }}>
+              <Typography.Text strong>Lời dặn chung của bác sĩ</Typography.Text>
+              {canEditDraft ? (
+                <>
+                  <Input.TextArea
+                    aria-label="Lời dặn chung của bác sĩ"
+                    rows={2}
+                    maxLength={1000}
+                    showCount
+                    disabled={busy || disabled}
+                    value={advice}
+                    placeholder="Ví dụ: Uống nhiều nước, không uống rượu bia trong thời gian dùng thuốc. Tái khám nếu sưng đau tăng."
+                    onChange={e => { setAdvice(e.target.value); setAdviceDirty(true); }}
+                    style={{ marginTop: 4 }}
+                  />
+                  {adviceDirty && (
+                    <Space style={{ marginTop: 6 }}>
+                      <Button size="small" type="primary" loading={busy} disabled={disabled} onClick={saveAdvice}>Lưu lời dặn</Button>
+                      <Button size="small" disabled={busy} onClick={() => { setAdvice(rx?.generalAdvice ?? ''); setAdviceDirty(false); }}>Hoàn tác</Button>
+                    </Space>
+                  )}
+                </>
+              ) : (
+                <Typography.Paragraph style={{ whiteSpace: 'pre-wrap', marginTop: 4 }}>{rx?.generalAdvice || '—'}</Typography.Paragraph>
+              )}
+            </div>
+
+            {canEditDraft && (
+              <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid #f0f0f0' }}>
+                <Typography.Title level={5}>{editing ? `Sửa dòng thuốc: ${editing.medicineName}` : 'Thêm thuốc vào đơn'}</Typography.Title>
+                {optionsError && <Alert type="error" message="Không tải được danh mục thuốc" description={optionsError} style={{ marginBottom: 12 }} />}
+
+                <Form
+                  form={form}
+                  name={`prescription-${visitId}`}
+                  layout="vertical"
+                  initialValues={{ route: '', morningDose: '1', noonDose: '0', afternoonDose: '0', eveningDose: '1', mealTiming: 'AfterMeal', days: 5, quantity: 10 }}
+                  disabled={busy || disabled}
+                  onValuesChange={changed => {
+                    setDirty(true);
+                    if (['morningDose', 'noonDose', 'afternoonDose', 'eveningDose', 'days'].some(k => k in changed)) recalculate();
+                  }}
+                  onFinish={save}
+                >
+                  <Form.Item name="medicineId" label="Thuốc" rules={[{ required: true, message: 'Chọn thuốc cần kê.' }]}>
+                    <Select
+                      showSearch
+                      filterOption={false}
+                      loading={optionsLoading}
+                      onSearch={value => setQuery(value.slice(0, 100))}
+                      placeholder="Tìm theo mã, tên biệt dược hoặc hoạt chất..."
+                      notFoundContent={optionsLoading ? <Spin size="small" /> : 'Không có thuốc phù hợp'}
+                      options={selectedOptions.map(o => ({
+                        value: o.id,
+                        label: [o.code, o.name, o.activeIngredient, o.strength, o.dosageForm].filter(Boolean).join(' · '),
+                      }))}
+                      onChange={medicineId => {
+                        const opt = options.find(item => item.id === medicineId);
+                        if (opt && !editing) form.setFieldsValue({ route: opt.route || '', instructions: opt.defaultInstructions ?? '' });
+                      }}
+                    />
+                  </Form.Item>
+                  {selectedMedicine?.allergyWarnings && (
+                    <Alert type="warning" showIcon style={{ marginBottom: 12 }} message="Cảnh báo dị ứng của thuốc" description={selectedMedicine.allergyWarnings} />
+                  )}
+                  {selectedMedicine?.contraindications && (
+                    <Alert type="warning" showIcon style={{ marginBottom: 12 }} message="Chống chỉ định" description={selectedMedicine.contraindications} />
+                  )}
+
+                  <Row gutter={12}>
+                    <Col xs={12} sm={6}>
+                      <Form.Item name="route" label="Đường dùng" rules={[{ max: 40, message: 'Tối đa 40 ký tự.' }]}>
+                        <Select
+                          allowClear
+                          placeholder="Theo danh mục"
+                          options={['Uống', 'Bôi', 'Súc miệng', 'Ngậm', 'Nhỏ', 'Đặt'].map(value => ({ value, label: value }))}
+                        />
+                      </Form.Item>
+                    </Col>
+                    <Col xs={12} sm={6}>
+                      <Form.Item name="mealTiming" label="Thời điểm dùng">
+                        <Select options={[{ value: 'AfterMeal', label: 'Sau ăn' }, { value: 'BeforeMeal', label: 'Trước ăn' }, { value: 'WithMeal', label: 'Trong bữa ăn' }]} />
+                      </Form.Item>
+                    </Col>
+                    <Col xs={12} sm={6}>
+                      <Form.Item name="days" label="Số ngày dùng" rules={[{ required: true, message: 'Nhập số ngày.' }]}>
+                        <InputNumber min={1} max={365} precision={0} style={{ width: '100%' }} />
+                      </Form.Item>
+                    </Col>
+                    <Col xs={12} sm={6}>
+                      <Form.Item name="quantity" label="Tổng số lượng" tooltip="Tự tính từ liều số × số ngày; có thể sửa tay."
+                        rules={[{ required: true, message: 'Nhập số lượng.' }, { type: 'integer', min: 1, max: 10000, message: '1–10.000' }]}>
+                        <InputNumber min={1} max={10000} precision={0} style={{ width: '100%' }} addonAfter={selectedMedicine?.baseUnit} />
+                      </Form.Item>
+                    </Col>
+                  </Row>
+
+                  <Row gutter={12}>
+                    {([['morningDose', 'Sáng'], ['noonDose', 'Trưa'], ['afternoonDose', 'Chiều'], ['eveningDose', 'Tối']] as const).map(([name, label]) => (
+                      <Col xs={12} sm={6} key={name}>
+                        <Form.Item name={name} label={label} rules={[{ max: 20, message: 'Tối đa 20 ký tự.' }]}>
+                          <Input placeholder="0" />
+                        </Form.Item>
+                      </Col>
+                    ))}
+                  </Row>
+
+                  <Form.Item name="instructions" label="Lời dặn cho thuốc này" rules={[{ max: 1000, message: 'Tối đa 1.000 ký tự.' }]}>
+                    <Input.TextArea rows={2} maxLength={1000} placeholder="Ví dụ: Uống với nhiều nước; ngừng thuốc và báo bác sĩ nếu nổi mẩn." />
+                  </Form.Item>
+
+                  <Space wrap>
+                    <Button type="primary" htmlType="submit" loading={busy} disabled={busy || disabled}>{editing ? 'Lưu thay đổi' : 'Thêm vào đơn'}</Button>
+                    {(editing || dirty) && <Button disabled={busy || disabled} onClick={resetLineForm}>{editing ? 'Hủy sửa' : 'Bỏ phần nhập'}</Button>}
+                  </Space>
+                </Form>
+              </div>
+            )}
+
+            {history.length > 1 && (
+              <div style={{ marginTop: 16 }}>
+                <Typography.Text strong>Lịch sử phiên bản đơn</Typography.Text>
+                <Timeline
+                  style={{ marginTop: 8 }}
+                  items={history.map(h => ({
+                    color: h.status === 'Finalized' ? 'green' : h.status === 'Draft' ? 'blue' : 'gray',
+                    children: (
+                      <div>
+                        <Space wrap>
+                          <span>Phiên bản {h.revision}</span>
+                          {statusTag(h.status)}
+                          <span>{h.lineCount} thuốc</span>
+                          {h.doctorName && <span>· {h.doctorName}</span>}
+                          <span>· {new Date(h.finalizedAt ?? h.createdAt).toLocaleString('vi-VN')}</span>
+                        </Space>
+                        {h.correctionReason && <div><Typography.Text type="secondary">Lý do: {h.correctionReason}</Typography.Text></div>}
+                      </div>
+                    ),
+                  }))}
+                />
+              </div>
+            )}
+          </>
+        )}
+      </Card>
+
+      <PrescriptionTemplateModal open={templateModalOpen} onClose={() => setTemplateModalOpen(false)} onApply={applyTemplate} />
+      <PrescriptionPrintModal visitId={visitId} open={printModalOpen} onClose={() => setPrintModalOpen(false)} />
+      <Modal
+        open={correctionOpen}
+        title="Tạo bản điều chỉnh đơn thuốc"
+        okText="Tạo bản điều chỉnh"
+        cancelText="Hủy"
+        confirmLoading={busy}
+        okButtonProps={{ disabled: !correctionReason.trim() }}
+        onOk={createCorrection}
+        onCancel={() => { if (!busy) setCorrectionOpen(false); }}
+      >
+        <Typography.Paragraph>
+          Đơn đã hoàn tất không được sửa trực tiếp. Bản điều chỉnh sao chép đơn hiện tại thành bản nháp mới; khi hoàn tất, bản cũ được đánh dấu đã thay thế và vẫn lưu trong lịch sử.
+        </Typography.Paragraph>
+        <Input.TextArea
+          aria-label="Lý do lâm sàng"
+          rows={3}
+          maxLength={500}
+          showCount
+          value={correctionReason}
+          placeholder="Lý do lâm sàng (bắt buộc), ví dụ: Bệnh nhân báo dị ứng amoxicillin sau khi kê đơn."
+          onChange={e => setCorrectionReason(e.target.value)}
+        />
+      </Modal>
+    </section>
+  );
 }

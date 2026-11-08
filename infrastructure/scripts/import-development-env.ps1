@@ -21,6 +21,7 @@ $connection['Username'] = $settings['POSTGRES_USER']
 $connection['Password'] = $settings['POSTGRES_PASSWORD']
 $env:ConnectionStrings__DefaultConnection = $connection.ConnectionString
 $env:ClinicalDocuments__StoragePath = if ($settings['CLINICAL_DOCUMENTS_STORAGE_PATH']) { $settings['CLINICAL_DOCUMENTS_STORAGE_PATH'] } else { Join-Path $env:LOCALAPPDATA 'DCMS\clinical-documents' }
+$env:BranchAssets__StoragePath = if ($settings['BRANCH_ASSETS_STORAGE_PATH']) { $settings['BRANCH_ASSETS_STORAGE_PATH'] } else { Join-Path $env:LOCALAPPDATA 'DCMS\branch-assets' }
 if ($settings['CLAMAV_HOST']) { $env:ClinicalDocuments__ClamAvHost = $settings['CLAMAV_HOST'] }
 if ($settings['CLAMAV_PORT']) { $env:ClinicalDocuments__ClamAvPort = $settings['CLAMAV_PORT'] }
 if ($settings['JWT_SIGNING_KEY']) { $env:Jwt__SigningKey = $settings['JWT_SIGNING_KEY'] }

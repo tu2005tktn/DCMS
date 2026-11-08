@@ -106,3 +106,18 @@ S26 đặc tả hai mảng nghiệp vụ gắn với luồng đặt lịch:
 - **TV5**: resolve/reject support request, notification + reminder service, event-dispatch contract.
 - **Tư (infrastructure)**: schema in-app notification, outbox/dispatcher, reminder scheduler; chốt hợp đồng event/transaction hook sớm với TV2/TV4.
 - **PR & kiểm thử nghiệp vụ** thuộc UI + API thật + dữ liệu/migration. Mock DTO chung dùng để làm song song; không đợi task khác hoàn tất mới bắt đầu UI.
+
+
+## Hộp thư hỗ trợ: bỏ mô tả và nhãn trạng thái (07/11/2026)
+
+Màn "Hộp thư hỗ trợ" (web) không còn đoạn mô tả dưới tiêu đề và nhãn "Tự động cập nhật"/trạng thái kết nối realtime. Nút "Tải lại" và việc tự cập nhật nền giữ nguyên.
+
+
+## Hộp thư hỗ trợ: bảng không cuộn ngang (07/11/2026)
+
+Bảng danh sách yêu cầu không còn thanh cuộn ngang; chữ trong ô tự xuống dòng, cột Lý do không cắt "...". Từ 1000px trở xuống mỗi yêu cầu là một thẻ, mỗi trường một dòng "nhãn: giá trị" (Mã lịch, Loại yêu cầu, Lý do, Người yêu cầu, Trạng thái, Cập nhật).
+
+
+## Hộp thư hỗ trợ: bảng có viền (08/11/2026)
+
+Bảng danh sách yêu cầu có viền ngoài bo góc, đường kẻ giữa các hàng và các cột. Cột Lý do rộng tối thiểu 160px để tiêu đề không bị bẻ dòng. Từ 1000px trở xuống (dạng thẻ) giữ như cũ.

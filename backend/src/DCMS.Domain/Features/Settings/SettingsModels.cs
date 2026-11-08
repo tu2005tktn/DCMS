@@ -69,3 +69,47 @@ public sealed class SettingsReceipt
     public string Fingerprint { get; set; } = "";
     public string ResultJson { get; set; } = "{}";
 }
+
+public sealed class BranchProfile
+{
+    public int Id { get; set; }
+    public string Code { get; set; } = "";
+    public string Name { get; set; } = "";
+    public string? Address { get; set; }
+    public string? Phone { get; set; }
+    public string? Email { get; set; }
+    public string? Website { get; set; }
+    public Guid? LogoAssetId { get; set; }
+    public string TimeZoneId { get; set; } = "Asia/Ho_Chi_Minh";
+    public string? BankCode { get; set; }
+    public string? AccountNumber { get; set; }
+    public string? PayeeName { get; set; }
+    public int SlotIntervalMinutes { get; set; } = 15;
+    public int BookingSettingsVersion { get; set; } = 1;
+    public bool IsActive { get; set; } = true;
+    public int Version { get; set; } = 1;
+}
+
+// Logo image stored outside Git and the web root; only verified PNG/JPEG/WebP bytes with metadata removed.
+public sealed class BranchAsset
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public int BranchId { get; set; }
+    public string ContentType { get; set; } = "";
+    public long SizeBytes { get; set; }
+    public string Sha256 { get; set; } = "";
+    public int UploadedBy { get; set; }
+    public DateTimeOffset UploadedAt { get; set; }
+}
+
+public sealed class BranchChair
+{
+    public int Id { get; set; }
+    public int BranchId { get; set; }
+    public string Code { get; set; } = "";
+    public string Name { get; set; } = "";
+    public int OpenMinute { get; set; } = 480;
+    public int CloseMinute { get; set; } = 1080;
+    public bool IsActive { get; set; } = true;
+    public int Version { get; set; } = 1;
+}

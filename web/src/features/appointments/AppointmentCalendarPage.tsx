@@ -5,7 +5,7 @@ import { api } from '../../services/api';
 import { useNavigate } from 'react-router-dom';
 import BookingDrawer, { type BookingPrefill } from './BookingDrawer';
 import {
-  addDays, clinicToday, clock, formatDate, localDate, localMinute, mondayOf, statusColors, statusLabels, weekday,
+  addDays, clinicToday, clock, formatDate, localDate, localMinute, mondayOf, sourceLabels, statusColors, statusLabels, weekday,
   type AppointmentOptions, type AppointmentStatus, type CalendarPeriod, type CalendarView,
 } from './types';
 
@@ -140,7 +140,7 @@ export default function AppointmentCalendarPage() {
                     return <button type="button" key={a.id} className={`calendar-event status-${a.status}`} style={{ top, height: Math.max(ROW, a.durationMinutes / SLOT * ROW) - 2 }}
                       onClick={() => navigate(`/appointments/${a.id}`)} aria-label={`Lịch ${a.code}`}>
                       <strong>{clock(localMinute(a.startAt))}–{clock(localMinute(a.endAt))}</strong> {a.attendeeName}
-                      <span>{a.serviceName ?? ''}{a.chairName ? ` · ${a.chairName}` : ''}</span>
+                      <span>{a.code}{a.source ? ` · ${sourceLabels[a.source] ?? a.source}` : ''}{a.serviceName ? ` · ${a.serviceName}` : ''}{a.chairName ? ` · ${a.chairName}` : ''}</span>
                       <Tag color={statusColors[a.status]}>{statusLabels[a.status]}</Tag>
                     </button>;
                   })}

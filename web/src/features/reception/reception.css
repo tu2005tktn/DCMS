@@ -1,0 +1,18 @@
+.reception-panel .ant-tabs { margin-top: 16px; }
+.reception-panel .ant-table { border: 1px solid #d0d5dd; border-radius: 8px; overflow: hidden; }
+.reception-panel .ant-table-thead > tr > th { border-bottom: 1px solid #d0d5dd; border-inline-end: 1px solid #e4e7ec; }
+.reception-panel .ant-table-tbody > tr > td { border-bottom: 1px solid #e4e7ec; border-inline-end: 1px solid #eceff3; }
+.reception-panel .ant-table-thead > tr > th:last-child, .reception-panel .ant-table-tbody > tr > td:last-child { border-inline-end: 0; }
+.reception-panel .ant-table-tbody > tr:last-child > td { border-bottom: 0; }
+.reception-panel .ant-table-placeholder > td { border-inline-end: 0; }
+.reception-table .ant-table-cell { overflow-wrap: anywhere; }
+.reception-table table { width: 100% !important; table-layout: auto !important; }
+@media screen and (max-width: 1000px) {
+  .reception-panel .reception-table .ant-table { border: 0; border-radius: 0; }
+  .reception-table .ant-table-thead, .reception-table .ant-table-measure-row { display: none; }
+  .reception-table table, .reception-table tbody, .reception-table tr.ant-table-row { display: block; width: 100%; }
+  .reception-table tr.ant-table-row { margin: 0 0 8px; padding: 2px 8px; border: 1px solid #d0d5dd; border-radius: 8px; background: #fff; }
+  .reception-panel .reception-table .ant-table-tbody > tr > td { display: grid; grid-template-columns: minmax(100px, 40%) minmax(0, 1fr); gap: 8px; padding: 6px 0 !important; border: 0 !important; border-bottom: 1px dashed #eceff3 !important; text-align: left !important; }
+  .reception-table td.ant-table-cell:last-child { border-bottom: 0 !important; }
+  .reception-table td.ant-table-cell::before { content: attr(data-label); color: #475467; font-weight: 700; }
+}

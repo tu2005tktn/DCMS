@@ -58,6 +58,9 @@ public static class DependencyInjection
         services.AddScoped<IStaffIdleService>(sp => sp.GetRequiredService<StaffIdleService>());
         services.AddScoped<DCMS.Application.Features.Settings.ISettingsAccess, Features.Settings.SettingsAccess>();
         services.AddScoped<DCMS.Application.Features.Settings.ISettingsService, Features.Settings.SettingsService>();
+        services.AddScoped<DCMS.Application.Features.Settings.IBranchManagementService, Features.Settings.BranchManagementService>();
+        services.AddScoped<Features.Settings.BranchAssetStore>();
+        services.AddScoped<DCMS.Application.Features.Settings.IBranchLabObligationPort, Features.Settings.UnavailableBranchLabObligationPort>();
         services.AddScoped<IRegistrationService, RegistrationService>();
         services.AddHttpClient();
         services.AddSingleton<IGoogleTokenVerifier, GoogleTokenVerifier>();
