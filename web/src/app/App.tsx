@@ -43,10 +43,10 @@ import RevisionPage from '../features/treatment/RevisionPage';
 
 import ItemPlansPage from '../features/treatment/ItemPlansPage';
 
-export default // Đường dẫn cũ của màn Dịch vụ: giữ nguyên tham số ?dossier=.
+// Đường dẫn cũ của màn Dịch vụ: giữ nguyên tham số ?dossier=.
 function LegacyCommercialRedirect() { const { search } = useLocation(); return <Navigate to={'/settings/treatment-services' + search} replace />; }
 
-function App() {
+export default function App() {
   return <Routes>
     <Route path="/sign-in" element={<SignInPage />} />
     <Route path="/access" element={<AccessPage />} />
