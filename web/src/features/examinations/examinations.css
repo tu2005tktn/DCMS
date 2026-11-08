@@ -201,3 +201,26 @@
 
 .scoped-diagnoses-summary { margin-bottom: 20px; }
 .scoped-diagnoses-summary > div { margin: 6px 0; }
+.examination-prescription-open {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 22px 0 8px;
+  padding: 16px 18px;
+  border: 1px solid #d7e5e3;
+  border-radius: 10px;
+  background: #f4f9f8;
+}
+
+.examination-prescription-open > div {
+  display: grid;
+  gap: 4px;
+}
+
+@media (max-width: 640px) {
+  .examination-prescription-open {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

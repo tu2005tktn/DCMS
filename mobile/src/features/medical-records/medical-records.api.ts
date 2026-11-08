@@ -1,7 +1,7 @@
 import { env } from '@/config/env';
 import { ApiError } from '@/services/api/api-error';
 import type { OwnTreatmentSummaryItem, SystemMessage, VisitPage, VisitScope } from './medical-records.types';
-import type { PatientPrescription, PatientPrescriptionDetail } from '../prescriptions/prescriptions.types';
+import type { PatientProfilePrescription } from '../prescriptions/prescriptions.types';
 
 const connectionMessage = 'Không thể hoàn tất thao tác. Vui lòng kiểm tra kết nối và thử lại.';
 
@@ -31,8 +31,6 @@ export const medicalRecordsApi = {
   visits: (token: string, scope: VisitScope) =>
     call<VisitPage>(`/api/me/appointments?scope=${scope}&page=1&pageSize=50`, token),
   // Đơn thuốc mua ngoài đã hoàn tất (docs/specs/PRESCRIPTION-MANAGEMENT.md §4).
-  prescriptions: (token: string) => call<PatientPrescription[]>('/api/patients/me/prescriptions', token),
-  prescription: (token: string, visitId: string) => {
-    return call<PatientPrescriptionDetail>(`/api/patients/me/prescriptions/visits/${encodeURIComponent(visitId)}`, token);
-  },
+  prescriptions: (token: string) => call<PatientProfilePrescription[]>('/api/patients/me/prescriptions', token),
+  prescription: (token: string, id: string) => call<PatientProfilePrescription>(`/api/patients/me/prescriptions/${encodeURIComponent(id)}`, token),
 };

@@ -88,3 +88,7 @@ Các chức năng mới phải xuất hiện thành lựa chọn trong cây phâ
 2. Mỗi nhóm màn có ca API cấp quyền đọc, từ chối ghi, cấp ghi rồi thu hồi với cùng token; kiểm role/scope và alias cũ.
 3. Hồi quy các bộ lịch hẹn/lịch làm việc, điều trị/phiếu điều trị/giá, thiết lập, tài chính, khám/đơn thuốc/tài liệu và hồ sơ bệnh nhân.
 4. Browser mock kiểm route/menu/nút theo quyền; browser API thật trên schema riêng kiểm ít nhất lịch/cấu hình, điều trị và thiết lập được ủy quyền, cùng luồng thu hồi.
+
+## Shared permission keys
+
+A permission key may be referenced by more than one screen definition. The effective grant catalog exposed to APIs and role resolution must contain one canonical entry per key, preserving the existing first declaration and its parent/role metadata. Reusing a key must not make sign-in or permission expansion fail, and must not create duplicate grant choices.

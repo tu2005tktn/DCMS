@@ -12,6 +12,14 @@ Ngày chuẩn bị: 28/10/2026. Mục tiêu là bổ sung dữ liệu gần tìn
 
 Đây là dữ liệu tổng hợp lưu thật trong PostgreSQL local, không phải mock và không phải dữ liệu người thật. Không tuyên bố các phiếu/thu tiền giả là giao dịch vận hành thực tế.
 
+## Bổ sung luồng khám → điều trị → đơn thuốc mobile
+
+- Chuẩn bị một hồ sơ tổng hợp riêng để demo liền mạch bằng `dentist.demo`, dùng bệnh nhân `BN-DEMO-0001` Nguyễn Văn An. Không sửa hồ sơ có nguồn dữ liệu ngoài hoặc dùng dữ liệu người thật.
+- Lượt khám phải có phiếu khám đã lưu với triệu chứng, chẩn đoán và kết luận; bác sĩ chủ động xác nhận phiếu. Dossier điều trị phải được tạo từ nguồn lượt khám đã xác nhận và có ít nhất một dòng điều trị minh họa, ghi nhận nội dung/thực hiện theo đúng workflow hiện hành.
+- Đơn thuốc demo phải được bác sĩ rà soát và hoàn tất qua luồng kê đơn. Dữ liệu chỉ dùng cho demo, gắn ghi chú cảnh báo và không đại diện hướng dẫn lâm sàng.
+- Để xem trên mobile web, tài khoản Public tổng hợp `patient.demo` phải có liên kết tự thân `Verified` tới đúng bệnh nhân; chỉ nhân viên có quyền mới duyệt yêu cầu. Không tự cấp liên kết cho tài khoản người thật.
+- Hướng dẫn demo phải có các đường dẫn mở lượt khám, dossier điều trị và mobile `/(account)/prescriptions`; nếu chưa có lượt/dossier/đơn phù hợp thì báo rõ bước tạo còn thiếu, không coi một trang rỗng là dữ liệu hoàn chỉnh.
+
 ## Kết quả đã tạo và kiểm tra
 
 - 20 hồ sơ `DEMO2810-01` đến `DEMO2810-20`; 18 lịch: 12 ngày 28/10 và 6 ngày 29–31/10/2026. Hai hồ sơ chưa có lịch.

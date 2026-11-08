@@ -134,6 +134,7 @@ if (args.Contains("--migrate") || args.Contains("--seed-demo"))
     if (args.Contains("--seed-demo"))
     {
         await scope.ServiceProvider.GetRequiredService<DevelopmentAccountSeeder>().SeedAsync();
+        Console.WriteLine(await scope.ServiceProvider.GetRequiredService<DCMS.Infrastructure.Features.SystemSettings.DevelopmentMedicineSeeder>().SeedAsync());
         await scope.ServiceProvider.GetRequiredService<DevelopmentPatientLinkSeeder>().SeedAsync();
         await scope.ServiceProvider.GetRequiredService<DCMS.Infrastructure.Features.Scheduling.DevelopmentSchedulingSeeder>().SeedAsync();
         await scope.ServiceProvider.GetRequiredService<DCMS.Infrastructure.Features.Appointments.DevelopmentAppointmentSeeder>().SeedAsync();

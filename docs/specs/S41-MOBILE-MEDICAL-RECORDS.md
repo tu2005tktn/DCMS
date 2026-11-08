@@ -1,5 +1,7 @@
 # S41 — My Medical Records (Mobile App)
 
+> **Điều chỉnh luồng đơn thuốc:** xem [S23 — Kê đơn trực tiếp từ hồ sơ bệnh nhân](./S23-PATIENT-PRESCRIPTIONS.vi.md). Mobile hiển thị đơn đã lưu qua `GET /api/patients/me/prescriptions` và chi tiết `GET /api/patients/me/prescriptions/{prescriptionId}`; dữ liệu chỉ thuộc hồ sơ có liên kết VERIFIED. Luồng đơn theo Visit/Finalized cũ không còn là luồng chính cho người bệnh.
+
 Nguồn: task DCMS-92 (Tống Nguyên Tuấn, Epic DCMS-92) trích từ DCMS_Screen_Specifications_v2.2.docx và DCMS_Use_Cases_Business_Rules_Messages_v2.2.docx (19/10/2026), UC-55/UC-37. Backend own-record đầy đủ thuộc DCMS-95 (Tư) — **chưa có trong repo**; task này dựng toàn bộ UI và chỉ gọi API thật, hiển thị trạng thái “nguồn chưa sẵn sàng” cho phần backend chưa giao, không mock dữ liệu đã lưu.
 
 ## 1. Luồng

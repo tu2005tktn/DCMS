@@ -1,5 +1,7 @@
 # Phân hệ Quản lý & Kê đơn thuốc (Prescription Management)
 
+> Luồng staff/mobile đơn giản hiện hành được quy định tại [S23 — Kê đơn trực tiếp từ hồ sơ bệnh nhân](./S23-PATIENT-PRESCRIPTIONS.vi.md). Không hiển thị mục/quản lý mẫu đơn thuốc hoặc bắt staff đi qua luồng nhiều bước theo Visit. Các contract Visit/template bên dưới được giữ để tương thích dữ liệu và API cũ; chúng không phải đường đi mặc định cho demo hoặc thao tác kê đơn mới.
+
 Ngày cập nhật: 07/11/2026 (bản 2 — header đơn thuốc, phiên bản điều chỉnh, migration, mobile). Trạng thái: đặc tả triển khai.
 Tài liệu liên quan: [S19-OPTIONAL-PRESCRIPTION.vi.md](S19-OPTIONAL-PRESCRIPTION.vi.md), [S58-SUPPLY-CATALOGS.md](S58-SUPPLY-CATALOGS.md), [S41-MOBILE-MEDICAL-RECORDS.md](S41-MOBILE-MEDICAL-RECORDS.md).
 
@@ -86,6 +88,13 @@ Migration `20261107050902_PrescriptionsAndBranchProfiles` (dùng chung với S58
 8. **Xung đột 409 MSG111**: giữ nguyên form đang nhập, tải lại đơn để bác sĩ so sánh rồi lưu lại.
 9. **In đơn** (A5 mặc định, chọn A4): tên chi nhánh, địa chỉ, điện thoại, logo (nếu chi nhánh có logo đã upload), bác sĩ kê đơn (CCHN để trống dòng ký nếu hồ sơ nhân sự chưa có dữ liệu — không in giá trị giả), thông tin bệnh nhân (mã BN, họ tên, năm sinh, giới tính, địa chỉ), chẩn đoán, bảng thuốc đánh số (tên, hàm lượng, số lượng bằng số và chữ, đường dùng, liều cụ thể, số ngày), lời dặn chung, ngày kê, chữ ký bác sĩ, dòng "Đơn thuốc mua ngoài — phòng khám không bán thuốc", mã QR xác thực. Bản nháp in có watermark "BẢN NHÁP — CHƯA CÓ GIÁ TRỊ".
    - QR chứa `ODENTAL-RX|{prescriptionId}|R{revision}|{verificationCode}`; `verificationCode` là 16 ký tự đầu SHA-256 của nội dung đơn đã ký.
+
+### 3.2 Quản lý mẫu và dữ liệu demo
+
+- Mục menu **Mẫu đơn thuốc** tại `/prescriptions/templates` phải được đăng ký route staff và bảo vệ bằng `prescriptions.manage`; không được để menu dẫn tới trang 404.
+- Trang quản lý hỗ trợ tạo/sửa/ngừng dùng/khôi phục mẫu. Modal **Chọn mẫu đơn thuốc** trên màn kê đơn chỉ liệt kê mẫu đang hoạt động và cho xem trước trước khi áp dụng.
+- Môi trường Development có dữ liệu demo tổng hợp (synthetic), gồm tối thiểu ba mẫu theo nhóm chăm sóc sau điều trị, vệ sinh răng miệng và viêm nha chu. Mã mẫu có tiền tố `DEMO-`, mô tả ghi rõ chỉ phục vụ demo; không được xem các liều mẫu là hướng dẫn điều trị thực tế.
+- Seeder demo chạy lặp an toàn, chỉ thêm mẫu còn thiếu, tham chiếu thuốc đang hoạt động trong danh mục và không tạo đơn bệnh nhân/ký đơn. Production không được chạy seeder này.
 
 ### 3.1 Thêm thuốc vào danh mục ngay khi kê đơn
 

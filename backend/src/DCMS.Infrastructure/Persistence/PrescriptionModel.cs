@@ -118,5 +118,33 @@ public static class PrescriptionModel
             b.Property(x => x.ResultJson).HasColumnType("jsonb");
             b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.ActorId).OnDelete(DeleteBehavior.Restrict);
         });
+
+        model.Entity<PatientPrescription>(b =>
+        {
+            b.ToTable("PATIENT_PRESCRIPTION"); b.HasKey(x => x.Id);
+            b.Property(x => x.Diagnosis).HasMaxLength(1000); b.Property(x => x.OtherDiagnosis).HasMaxLength(1000);
+            b.Property(x => x.Advice).HasMaxLength(4000); b.Property(x => x.Version).IsConcurrencyToken();
+            b.HasIndex(x => new { x.PatientId, x.PrescribedOn });
+            b.HasMany(x => x.Items).WithOne().HasForeignKey(x => x.PrescriptionId).OnDelete(DeleteBehavior.Cascade);
+            b.HasOne<PatientProfile>().WithMany().HasForeignKey(x => x.PatientId).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<SchedulingBranch>().WithMany().HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<EmployeeProfile>().WithMany().HasForeignKey(x => x.PrescriberEmployeeId).OnDelete(DeleteBehavior.Restrict);
+        });
+        model.Entity<PatientPrescriptionItem>(b =>
+        {
+            b.ToTable("PATIENT_PRESCRIPTION_ITEM", t => t.HasCheckConstraint("CK_PATIENT_PRESCRIPTION_ITEM_QUANTITY", "\"Quantity\" > 0"));
+            b.HasKey(x => x.Id); b.Property(x => x.MedicineCode).HasMaxLength(40); b.Property(x => x.MedicineName).HasMaxLength(200);
+            b.Property(x => x.Strength).HasMaxLength(200); b.Property(x => x.DosageForm).HasMaxLength(200);
+            b.Property(x => x.Unit).HasMaxLength(100); b.Property(x => x.Instructions).HasMaxLength(1000);
+            b.HasIndex(x => x.PrescriptionId);
+            b.HasOne<CatalogMedicine>().WithMany().HasForeignKey(x => x.MedicineId).OnDelete(DeleteBehavior.Restrict);
+        });
+        model.Entity<PatientPrescriptionReceipt>(b =>
+        {
+            b.ToTable("PATIENT_PRESCRIPTION_RECEIPT"); b.HasKey(x => new { x.ActorId, x.RequestKey });
+            b.Property(x => x.Fingerprint).HasMaxLength(64);
+            b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.ActorId).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<PatientPrescription>().WithMany().HasForeignKey(x => x.PrescriptionId).OnDelete(DeleteBehavior.Restrict);
+        });
     }
 }

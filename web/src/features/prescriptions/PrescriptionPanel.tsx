@@ -4,10 +4,9 @@ import { api, ApiError } from '../../services/api';
 import { useAuth } from '../authentication/AuthContext';
 import { usePermissions } from '../authentication/usePermissions';
 import PrescriptionPrintModal from './PrescriptionPrintModal';
-import PrescriptionTemplateModal from './PrescriptionTemplateModal';
 import {
   doseSummary, mealLabel,
-  type ApplyTemplateResult, type ClinicalAllergyWarning, type MedicineOption, type Prescription, type PrescriptionLine,
+  type ClinicalAllergyWarning, type MedicineOption, type Prescription, type PrescriptionLine,
   type PrescriptionSummary, type VisitPrescription,
 } from './types';
 
@@ -94,7 +93,6 @@ export default function PrescriptionPanel({
   const [advice, setAdvice] = useState('');
   const [adviceDirty, setAdviceDirty] = useState(false);
 
-  const [templateModalOpen, setTemplateModalOpen] = useState(false);
   const [printModalOpen, setPrintModalOpen] = useState(false);
   const [correctionOpen, setCorrectionOpen] = useState(false);
   const [correctionReason, setCorrectionReason] = useState('');
@@ -360,19 +358,6 @@ export default function PrescriptionPanel({
     }
   };
 
-  const applyTemplate = async (templateId: string) => {
-    const body = { expectedVersion: rx?.version ?? 0, templateId };
-    const key = keyFor(JSON.stringify({ op: 'template', ...body }));
-    await run(
-      () => api<ApplyTemplateResult>(`${base}/apply-template`, { method: 'POST', body: JSON.stringify({ ...body, requestKey: key }) }),
-      async result => {
-        if (result.skippedLines > 0) setNotice(`Đã bỏ qua ${result.skippedLines} thuốc trong mẫu vì đã ngừng dùng hoặc không còn được kê đơn.`);
-        setExpanded(true);
-        await load(generation.current, adviceDirty);
-      },
-    );
-  };
-
   const finalizePrescription = () => {
     if (!rx || rx.lines.length === 0) return;
     if (adviceDirty) { Modal.warning({ title: 'Lời dặn chung chưa lưu', content: 'Lưu hoặc hoàn tác lời dặn chung trước khi hoàn tất kê đơn.' }); return; }
@@ -435,7 +420,6 @@ export default function PrescriptionPanel({
           lines && !loadError ? (
             <Space wrap>
               {lines.length > 0 && <Button size="small" onClick={() => setPrintModalOpen(true)}>In đơn thuốc</Button>}
-              {canEditDraft && <Button size="small" disabled={busy || disabled} onClick={() => setTemplateModalOpen(true)}>Chọn mẫu đơn thuốc</Button>}
               {canEditDraft && lines.length > 0 && (
                 <Button size="small" type="primary" onClick={finalizePrescription} loading={busy} disabled={disabled}>Hoàn tất kê đơn</Button>
               )}
@@ -688,7 +672,6 @@ export default function PrescriptionPanel({
         )}
       </Card>
 
-      <PrescriptionTemplateModal open={templateModalOpen} onClose={() => setTemplateModalOpen(false)} onApply={applyTemplate} />
       <PrescriptionPrintModal visitId={visitId} open={printModalOpen} onClose={() => setPrintModalOpen(false)} />
       <Modal
         open={catalogAddOpen}

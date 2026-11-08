@@ -70,6 +70,16 @@ export type PrescriptionPrint = {
 
 export type PatientPrescriptionDetail = { prescription: PatientPrescription; print: PrescriptionPrint };
 
+export type PatientProfilePrescriptionItem = {
+  id: string; medicineId: string; medicineName: string; medicineCode: string;
+  strength: string | null; dosageForm: string | null; unit: string; quantity: number; instructions: string;
+};
+export type PatientProfilePrescription = {
+  id: string; patientId: number; branchId: number; branchName: string; prescribedOn: string;
+  diagnosis: string; otherDiagnosis: string | null; advice: string | null; prescriberName: string; version: number;
+  items: PatientProfilePrescriptionItem[];
+};
+
 export const mealLabel = (value: string) => (value === 'BeforeMeal' ? 'Trước ăn' : value === 'WithMeal' ? 'Trong bữa ăn' : 'Sau ăn');
 
 export const doseSlots = (m: Pick<PatientPrescriptionMedicine, 'morningDose' | 'noonDose' | 'afternoonDose' | 'eveningDose'>) => [

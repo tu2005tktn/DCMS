@@ -29,7 +29,6 @@ export default function StaffWorkspace() {
     { key:'/working-schedules', title:'Lịch làm việc', icon:<CalendarOutlined />, group:'Vận hành', visible:has('working-schedules.read') },
     { key:'/support-inbox', title:'Hộp thư hỗ trợ', icon:<InboxOutlined />, group:'Vận hành', visible:has('appointments.support.handle') },
     { key:'/treatment-templates', title:'Kế hoạch điều trị', icon:<FileTextOutlined />, group:'Chuyên môn', visible:has('treatment.templates.read') },
-    { key:'/prescriptions/templates', title:'Mẫu đơn thuốc', icon:<MedicineBoxOutlined />, group:'Chuyên môn', visible:has('prescriptions.manage') },
     { key:'/commercial/treatment', title:'Giá và duyệt điều trị', icon:<MedicineBoxOutlined />, group:'Chuyên môn', visible:has('treatment.prices.read')||has('treatment.commercial.read') },
     { key:'/materials', title:'Dụng cụ - vật liệu', icon:<ExperimentOutlined />, group:'Chuyên môn', visible:['materials.purchases.read', 'materials.stock.read', 'materials.usage.read'].some(has) },
     { key:'/clinical-services', title:'Dịch vụ cận lâm sàng', icon:<ExperimentOutlined />, group:'Chuyên môn', visible:has('services.read') },

@@ -12,14 +12,16 @@ import { useSession } from '@/features/auth/session/useSession';
 import { medicalRecordsApi, RecordApiError } from '@/features/medical-records/medical-records.api';
 import { colors } from '@/theme/colors';
 import { spacing } from '@/theme/spacing';
-import { formatDate, type PatientPrescription } from './prescriptions.types';
+import type { PatientProfilePrescription } from './prescriptions.types';
+
+const formatDate = (value: string) => new Date(value).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
 
 export default function PrescriptionsScreen() {
   const router = useRouter();
   const session = useSession();
   const token = session.state.status === 'authenticated' ? session.state.accessToken : null;
 
-  const [items, setItems] = useState<PatientPrescription[] | null>(null);
+  const [items, setItems] = useState<PatientProfilePrescription[] | null>(null);
   const [error, setError] = useState<RecordApiError | null>(null);
   const [denied, setDenied] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -64,19 +66,18 @@ export default function PrescriptionsScreen() {
           ? <Text style={styles.muted}>Chưa có đơn thuốc nào được bác sĩ hoàn tất.</Text>
           : (items ?? []).map(item => (
             <Pressable
-              key={item.prescriptionId}
+              key={item.id}
               accessibilityRole="button"
-              accessibilityLabel={`Đơn thuốc ngày ${formatDate(item.prescribedAt)} tại ${item.branchName}`}
+              accessibilityLabel={`Đơn thuốc ngày ${formatDate(item.prescribedOn)} tại ${item.branchName}`}
               style={({ pressed }) => [styles.row, pressed && styles.pressed]}
-              onPress={() => router.push(`/(account)/prescriptions/${item.visitId}`)}
+              onPress={() => router.push(`/(account)/prescriptions/${item.id}`)}
             >
               <View style={{ flex: 1, gap: 2 }}>
-                <Text style={styles.rowTitle}>{formatDate(item.prescribedAt)} · {item.branchName}</Text>
-                <Text style={styles.muted}>Bác sĩ {item.doctorName}</Text>
+                <Text style={styles.rowTitle}>{formatDate(item.prescribedOn)} · {item.branchName}</Text>
+                <Text style={styles.muted}>Bác sĩ {item.prescriberName}</Text>
                 {item.diagnosis ? <Text style={styles.muted} numberOfLines={2}>Chẩn đoán: {item.diagnosis}</Text> : null}
-                <Text style={styles.muted}>{item.medicines.length} thuốc</Text>
+                <Text style={styles.muted}>{item.items.length} thuốc</Text>
               </View>
-              {item.isCorrection && <View style={styles.pill}><Text style={styles.pillText}>Bản điều chỉnh</Text></View>}
               <Text accessibilityElementsHidden style={styles.chevron}>›</Text>
             </Pressable>
           ))}

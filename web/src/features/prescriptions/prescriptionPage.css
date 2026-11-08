@@ -1,0 +1,41 @@
+.prescription-page {
+  display: grid;
+  gap: 18px;
+}
+
+.prescription-page-heading,
+.prescription-patient-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.prescription-page-heading h2.ant-typography {
+  margin: 4px 0;
+}
+
+.prescription-patient-card {
+  border-top: 3px solid #2f6b66;
+}
+
+.prescription-patient-heading {
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.prescription-patient-heading h4.ant-typography {
+  margin: 2px 0 0;
+}
+
+.prescription-readonly-note {
+  margin-bottom: 0;
+}
+
+@media (max-width: 640px) {
+  .prescription-page-heading,
+  .prescription-patient-heading {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
