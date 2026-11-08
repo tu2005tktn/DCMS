@@ -422,6 +422,56 @@ public sealed class TreatmentSheetV25Tests(ApiFixture fixture) : IClassFixture<A
     }
 
     [Fact]
+    public async Task LabWorkListFiltersTracksStatusAndKeepsHistory()
+    {
+        using var dentist = await Login();
+        var setup = await Prepare(false); var dossier = await Create(dentist, setup);
+        var draft = await Draft(dentist, setup, dossier.Id, "Plan");
+        var plan = await dentist.PostAsJsonAsync($"/api/dossiers/{dossier.Id}/sheet-drafts/{draft.Id}/confirm-plan",
+            new ConfirmSheetPlanRequest(dossier.Version, draft.Version, null, Guid.NewGuid()));
+        dossier = (await plan.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
+        var performed = await dentist.PostAsJsonAsync($"/api/dossiers/{dossier.Id}/sheet-items/{Assert.Single(dossier.Items).Id}/perform", new SheetItemActionRequest(dossier.Version, Guid.NewGuid()));
+        var activity = (await performed.Content.ReadFromJsonAsync<ConfirmSheetActualResult>())!.Activity;
+        var url = $"/api/dossiers/{dossier.Id}/sheet-activities/{activity.Id}/lab-order";
+        var context = (await dentist.GetFromJsonAsync<LabOrderContext>(url))!;
+        var dentistId = context.Options.DefaultDentistId ?? context.Options.Dentists[0].Id;
+        var today = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7));
+        var work = "Mão sứ " + Guid.NewGuid().ToString("N")[..8];
+        var save = await dentist.PutAsJsonAsync(url, new SaveLabOrderRequest(null, today.AddDays(-5), today.AddDays(-1), null, dentistId, null, null, work, null, null, null,
+            [], false, ["36"], new(), null, "Zirconia", 1, 2_000_000, 0, null, null));
+        Assert.True(save.IsSuccessStatusCode, await save.Content.ReadAsStringAsync());
+        var order = (await save.Content.ReadFromJsonAsync<LabOrderDto>())!; Assert.Equal("NotSent", order.Status);
+
+        var page = (await dentist.GetFromJsonAsync<LabWorkPage>($"/api/lab-orders?q={Uri.EscapeDataString(work)}"))!;
+        var item = Assert.Single(page.Items); Assert.True(item.Overdue); Assert.Equal(1, page.Counts.NotSent); Assert.Equal(1, page.Counts.Overdue);
+        Assert.Equal(item.PatientName, context.Patient.Name);
+        Assert.Single((await dentist.GetFromJsonAsync<LabWorkPage>($"/api/lab-orders?q={Uri.EscapeDataString(work)}&status=Overdue"))!.Items);
+        Assert.Empty((await dentist.GetFromJsonAsync<LabWorkPage>($"/api/lab-orders?q={Uri.EscapeDataString(work)}&status=Sent"))!.Items);
+        Assert.Equal(HttpStatusCode.BadRequest, (await dentist.GetAsync("/api/lab-orders?status=Bogus")).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await dentist.GetAsync("/api/lab-orders?pageSize=7")).StatusCode);
+
+        var statusUrl = $"/api/lab-orders/{order.Id}/status";
+        Assert.Equal(HttpStatusCode.BadRequest, (await dentist.PutAsJsonAsync(statusUrl, new ChangeLabStatusRequest("Delivered", 1, null))).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await dentist.PutAsJsonAsync(statusUrl, new ChangeLabStatusRequest("Sent", 9, null))).StatusCode);
+        var sent = await dentist.PutAsJsonAsync(statusUrl, new ChangeLabStatusRequest("Sent", 1, "Gửi xưởng"));
+        Assert.True(sent.IsSuccessStatusCode, await sent.Content.ReadAsStringAsync());
+        var sentItem = (await sent.Content.ReadFromJsonAsync<LabWorkItem>())!; Assert.Equal("Sent", sentItem.Status); Assert.Equal(today, sentItem.SentOn); Assert.Equal(2, sentItem.Version);
+        var received = (await (await dentist.PutAsJsonAsync(statusUrl, new ChangeLabStatusRequest("Received", 2, null))).Content.ReadFromJsonAsync<LabWorkItem>())!;
+        Assert.Equal(today, received.ReceivedOn); Assert.False(received.Overdue);
+        var delivered = (await (await dentist.PutAsJsonAsync(statusUrl, new ChangeLabStatusRequest("Delivered", 3, null))).Content.ReadFromJsonAsync<LabWorkItem>())!;
+        Assert.Equal(today, delivered.DeliveredOn);
+        var rework = (await (await dentist.PutAsJsonAsync(statusUrl, new ChangeLabStatusRequest("Rework", 4, "Răng lệch màu"))).Content.ReadFromJsonAsync<LabWorkItem>())!;
+        Assert.Null(rework.DeliveredOn); Assert.Null(rework.ReceivedOn); Assert.True(rework.Overdue);
+
+        var history = (await dentist.GetFromJsonAsync<LabStatusLogItem[]>($"/api/lab-orders/{order.Id}/history"))!;
+        Assert.Equal(["Rework", "Delivered", "Received", "Sent", "NotSent"], history.Select(x => x.ToStatus));
+        Assert.Equal("Răng lệch màu", history[0].Note);
+        Assert.Equal(HttpStatusCode.NotFound, (await dentist.GetAsync($"/api/lab-orders/{Guid.NewGuid()}/history")).StatusCode);
+        using var guest = await Login("guest.demo");
+        Assert.Equal(HttpStatusCode.Forbidden, (await guest.GetAsync("/api/lab-orders")).StatusCode);
+    }
+
+    [Fact]
     public async Task DirectTreatmentChargeCanBeCollectedInPartsAndSummaryUsesConfirmedAllocations()
     {
         using var dentist = await Login(); using var cashier = await Login("owner.demo");
