@@ -7,12 +7,14 @@ import { api } from '../../services/api';
 import BookingDrawer, { type BookingPrefill } from '../appointments/BookingDrawer';
 import { formatClock, formatDate, statusLabels } from '../appointments/types';
 import { arrivalClock, purposeLabels, visitLabels, type PageResult, type ReceptionAppointment, type ReceptionOptions, type VisitResult } from './types';
+import { useCanPickBranch } from '../authentication/useCanPickBranch';
 
 function withLabels<R>(columns: ColumnType<R>[]): ColumnType<R>[] {
   return columns.map(c => ({ ...c, onCell: () => ({ 'data-label': String(c.title ?? '') } as object) }));
 }
 
 export default function ReceptionPage() {
+  const canPickBranch = useCanPickBranch();
   const has = usePermissions();
   const navigate = useNavigate();
   const [options, setOptions] = useState<ReceptionOptions>();
@@ -55,8 +57,8 @@ export default function ReceptionPage() {
         <Button type="primary" onClick={() => setBooking({ branchId, date, dentistId, kind: 'WalkIn', source: 'InPerson' })}>Xếp lịch khách vãng lai</Button>}</Space>
     </Space>
     <Card className="reception-panel"><Space wrap>
-      <Select aria-label="Chi nhánh tiếp nhận" placeholder="Chi nhánh" style={{ minWidth: 220 }} value={branchId}
-        options={options?.calendar.branches.map(x => ({ value: x.id, label: x.name }))} onChange={value => { setBranch(value); setDentist(undefined); reset(); }} />
+      {canPickBranch && (options?.calendar.branches.length ?? 0) > 1 && <Select aria-label="Chi nhánh tiếp nhận" placeholder="Chi nhánh" style={{ minWidth: 220 }} value={branchId}
+        options={options?.calendar.branches.map(x => ({ value: x.id, label: x.name }))} onChange={value => { setBranch(value); setDentist(undefined); reset(); }} />}
       <Input aria-label="Ngày tiếp nhận" type="date" value={date} onChange={e => { setDate(e.target.value); reset(); }} />
       <Select aria-label="Bác sĩ tiếp nhận" allowClear placeholder="Bác sĩ" style={{ minWidth: 180 }} value={dentistId}
         options={options?.calendar.dentists.filter(x => x.branchId === branchId).map(x => ({ value: x.id, label: x.name }))}

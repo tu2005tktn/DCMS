@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../services/api';
 import './finance.css';
+import { useCanPickBranch } from '../authentication/useCanPickBranch';
 
 type RevenueItem = { id: string; source: 'Finance' | 'Treatment'; sourceId?: string; patientId: number; patientName: string;
   branchId: number; branchName: string; receivedAt: string; method: string; amountVnd: number };
@@ -14,6 +15,7 @@ const money = (n: number) => `${n.toLocaleString('vi-VN')} ₫`;
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 
 export default function RevenuePage() {
+  const canPickBranch = useCanPickBranch();
   const [branches, setBranches] = useState<Branch[]>([]);
   const [branchId, setBranchId] = useState<number>();
   const [from, setFrom] = useState(() => `${today().slice(0, 7)}-01`);
@@ -50,8 +52,8 @@ export default function RevenuePage() {
       }} options={[{ value: 'today', label: 'Hôm nay' }, { value: 'week', label: 'Tuần này' }, { value: 'month', label: 'Tháng này' }, { value: 'custom', label: 'Tùy chọn' }]} />
       <DatePicker aria-label="Từ ngày" value={dayjs(from)} format="DD/MM/YYYY" onChange={v => v && setFrom(v.format('YYYY-MM-DD'))} />
       <DatePicker aria-label="Đến ngày" value={dayjs(to)} format="DD/MM/YYYY" onChange={v => v && setTo(v.format('YYYY-MM-DD'))} />
-      <Select aria-label="Chi nhánh doanh thu" allowClear placeholder="Tất cả chi nhánh" style={{ minWidth: 210 }} value={branchId}
-        onChange={setBranchId} options={branches.map(x => ({ value: x.id, label: x.name }))} />
+      {canPickBranch && branches.length > 1 && <Select aria-label="Chi nhánh doanh thu" allowClear placeholder="Tất cả chi nhánh" style={{ minWidth: 210 }} value={branchId}
+        onChange={setBranchId} options={branches.map(x => ({ value: x.id, label: x.name }))} />}
     </Space>
     {error && <Alert type="error" showIcon message={error} action={<Button size="small" onClick={() => setRevision(x => x + 1)}>Thử lại</Button>} />}
     <Row gutter={[12, 12]}>{[
