@@ -1,4 +1,5 @@
 import { Alert, Button, Card, Empty, Space, Table, Tag, Typography } from 'antd';
+import type { ColumnType } from 'antd/es/table';
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../authentication/AuthContext';
 import {
@@ -14,6 +15,7 @@ import {
 import { supportInboxApi } from './supportInbox.api';
 import { subscribeSupportInbox, type RealtimeState } from './supportInbox.realtime';
 import RequestDrawer from './RequestDrawer';
+import './supportInbox.css';
 
 type LoadState =
   | { kind: 'loading' }
@@ -39,7 +41,7 @@ export default function SupportInboxPage() {
   const [pageSize, setPageSize] = useState(10);
   const [revision, setRevision] = useState(0);
   const [drawerRevision, setDrawerRevision] = useState(0);
-  const [realtimeState, setRealtimeState] = useState<RealtimeState>('connecting');
+  const [, setRealtimeState] = useState<RealtimeState>('connecting');
   const [load, setLoad] = useState<LoadState>({ kind: 'loading' });
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
@@ -95,17 +97,8 @@ export default function SupportInboxPage() {
     <div className="page-heading">
       <div>
         <Typography.Title level={2}>Hộp thư hỗ trợ</Typography.Title>
-        <Typography.Paragraph>
-          Xử lý yêu cầu đổi/huỷ/xác nhận từ booker &amp; attendee thuộc chi nhánh của bạn.
-          Resolve chỉ được tính khi mọi thay đổi lịch cần thiết đã commit trên hệ thống.
-        </Typography.Paragraph>
       </div>
       <Space>
-        <Tag color={realtimeState === 'connected' ? 'green' : realtimeState === 'offline' ? 'default' : 'blue'}>
-          {realtimeState === 'connected' ? 'Tự động cập nhật' :
-            realtimeState === 'reconnecting' ? 'Đang kết nối lại' :
-              realtimeState === 'connecting' ? 'Đang kết nối' : 'Realtime ngoại tuyến'}
-        </Tag>
         <Button onClick={() => setRevision(value => value + 1)} loading={load.kind === 'loading'}>Tải lại</Button>
       </Space>
     </div>
@@ -133,7 +126,6 @@ export default function SupportInboxPage() {
         className="support-inbox-table"
         dataSource={load.kind === 'ready' ? items : []}
         loading={load.kind === 'loading'}
-        scroll={{ x: 1100 }}
         rowClassName={item => item.id === selectedId ? 'support-row-selected' : 'support-row'}
         onRow={item => ({ onClick: () => setSelectedId(item.id) })}
         locale={{ emptyText: <Empty description={load.kind === 'error' ? 'Chưa tải được dữ liệu.' : 'Không có yêu cầu nào trong bộ lọc này.'} /> }}
@@ -143,7 +135,7 @@ export default function SupportInboxPage() {
           showTotal: value => `${value} yêu cầu`,
           onChange: (nextPage, size) => { setPage(size !== pageSize ? 1 : nextPage); setPageSize(size); },
         }}
-        columns={[
+        columns={([
           {
             title: 'Mã lịch', dataIndex: 'appointmentCode', width: 130,
             render: code => <Typography.Text strong>{code}</Typography.Text>,
@@ -153,7 +145,7 @@ export default function SupportInboxPage() {
             render: (_, item) => <Tag>{kindLabels[item.kind]}</Tag>,
           },
           {
-            title: 'Lý do', dataIndex: 'reason', ellipsis: true,
+            title: 'Lý do', dataIndex: 'reason',
             render: value => value || <Typography.Text type="secondary">—</Typography.Text>,
           },
           {
@@ -174,7 +166,7 @@ export default function SupportInboxPage() {
             title: 'Cập nhật', dataIndex: 'updatedAt', width: 160,
             render: value => formatDateTime(value),
           },
-        ]}
+        ] as ColumnType<SupportRequestDto>[]).map(c => ({ ...c, onCell: () => ({ 'data-label': String(c.title) } as object) }))}
       />
     </Card>
 

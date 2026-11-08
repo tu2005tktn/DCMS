@@ -134,3 +134,40 @@ Thứ tự chuẩn theo đặc tả oDental:
    - Khi xuất dữ liệu ra Excel, các ô văn bản bắt đầu bằng ký tự nguy hiểm (`=`, `+`, `-`, `@`) bắt buộc phải được tiền tố bằng dấu nháy đơn (`'`) hoặc escape an toàn.
 6. **Xử lý xung đột ghi đồng thời (Concurrency 409 MSG111)**:
    - Khi xảy ra xung đột phiên bản `MSG111`, giữ nguyên toàn bộ dữ liệu người dùng đang nhập trên form để người dùng so sánh và không bị mất công gõ lại.
+
+
+### 2.3. Sửa đường dẫn menu (08/11/2026)
+
+Menu "Thiết lập hệ thống" trỏ `/settings` nhưng router chỉ có `/system-settings`, nên bấm menu ra "Không tìm thấy trang". Router phải có `/settings` và `/settings/:section` (deep link của 11 nhóm) cùng quyền `settings.read`; đường dẫn cũ `/system-settings` vẫn mở được cùng trang.
+
+
+### 2.4. Điều hướng 11 nhóm dạng danh sách dọc (08/11/2026)
+
+Hàng tab ngang bị tràn, nhiều nhóm bị gom vào nút "...". Từ 992px trở lên, danh sách 11 nhóm xếp **dọc bên trái** (rộng cố định 260px, tên nhóm xuống dòng khi dài, nhóm đang chọn tô nổi), nội dung bên phải. Dưới 992px giữ tab ngang cuộn được. Thứ tự, quyền, deep link `/settings/{nhóm}` và hỏi xác nhận khi bỏ thay đổi chưa lưu không đổi.
+
+### 2.5. Trang chủ thiết lập dạng thẻ (08/11/2026, thay thế 2.4)
+
+Màn "Thiết lập hệ thống" không còn danh sách tab/dọc. `/settings` (không có nhóm) là **trang chủ dạng thẻ**:
+
+- Ô tìm "Tìm mục thiết lập…" lọc các mục theo tên (không phân biệt hoa thường, bỏ dấu không bắt buộc).
+- 5 thẻ nhóm, mỗi thẻ có biểu tượng, tên, mô tả ngắn và danh sách mục bên trong (chỉ mục tài khoản được quyền xem; nhóm không còn mục nào thì ẩn):
+  - **Phòng khám:** Thiết lập chung, Chi nhánh và ghế điều trị.
+  - **Danh mục:** Chẩn đoán / Tên bệnh, Dịch vụ, sản phẩm và giá, Thuốc / Dược phẩm.
+  - **Vật liệu và labo:** Công ty cung cấp vật liệu, Loại dụng cụ / Vật liệu, Công ty labo, Loại công việc labo.
+  - **Khách hàng:** Nhóm khách hàng.
+  - **Bảo mật:** Phân quyền truy cập.
+- Bấm một mục mở `/settings/{mục}` (deep link cũ giữ nguyên). Trang mục có đường dẫn "Thiết lập › {Nhóm} › {Mục}" và nút "Tất cả thiết lập" quay về trang chủ. Tên mục không còn đánh số.
+- Thứ tự mục, quyền xem từng mục, quyền sửa và hộp thoại "Bỏ thay đổi chưa lưu?" (khi chuyển mục hoặc về trang chủ lúc còn thay đổi chưa lưu) không đổi. `?tab=` vẫn mở đúng mục. Tài khoản chỉ có một mục vẫn thấy trang chủ với một thẻ.
+- Trang chủ không có mục nào (tài khoản không quyền) vẫn hiện 403 như cũ.
+
+### 2.5. Thiết kế lại bố cục: trang chủ dạng thẻ (mẫu B, 08/11/2026)
+
+Thay mục 2.4 (danh sách dọc) và hàng tab ngang. 11 mục vẫn giữ nguyên nội dung, quyền và deep link `/settings/{mục}`.
+
+- **Trang chủ `/settings`**: ô tìm mục (lọc theo tên, không phân biệt dấu/hoa thường) và các **nhóm** dạng thẻ. Mỗi nhóm là một khối có tiêu đề, bên trong là thẻ cho từng mục; bấm thẻ mở mục. Chỉ hiện mục (và nhóm) mà tài khoản có quyền; nhóm không còn mục thì ẩn. Không tìm thấy thì hiện "Không có mục phù hợp".
+- **Nhóm**: Phòng khám (Thiết lập chung, Chi nhánh và ghế, Nhóm khách hàng); Danh mục (Chẩn đoán / tên bệnh, Dịch vụ sản phẩm và giá, Thuốc / dược phẩm); Vật liệu và labo (Công ty cung cấp vật liệu, Loại dụng cụ / vật liệu, Công ty labo, Loại công việc labo); Bảo mật (Phân quyền truy cập). Số thứ tự cũ trước tên mục bị bỏ khỏi giao diện.
+- **Trong một mục `/settings/{mục}`**: đường dẫn "Thiết lập › Nhóm › Mục" (bấm "Thiết lập" về trang chủ) và, nếu nhóm có từ 2 mục được phép, thanh chuyển nhanh giữa các mục cùng nhóm. Nội dung mục nằm ngay dưới, rộng toàn trang.
+- `/settings/{mục}` không tồn tại hoặc không có quyền: về trang chủ. `?tab=` cũ vẫn mở đúng mục.
+- Mọi lần chuyển (đường dẫn, thanh chuyển nhanh, thẻ) vẫn hỏi "Bỏ thay đổi chưa lưu?" khi mục đang có bản nhập chưa lưu.
+- Màn hẹp: thẻ xếp một cột, thanh chuyển nhanh cuộn ngang được.
+- **Nút quay lại (08/11/2026)**: trong một mục có nút "Quay lại" ở đầu trang, bấm để về trang chủ thiết lập (vẫn hỏi "Bỏ thay đổi chưa lưu?" nếu có bản nhập chưa lưu).

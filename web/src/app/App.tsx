@@ -8,10 +8,11 @@ import PrescriptionTemplatesPage from '../features/prescriptions/PrescriptionTem
 import ClinicalServicesPage from '../features/finance/ClinicalServicesPage';
 import { Alert, Button, Card, Result, Space, Tag, Typography } from 'antd';
 import { useState, type ReactNode } from 'react';
-import { Link, Navigate, Route, Routes } from 'react-router-dom';
+import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuth } from '../features/authentication/AuthContext';
 import SignInPage from '../features/authentication/SignInPage';
 import SystemSettingsPage from '../features/system-settings/SystemSettingsPage';
+import LabWorkPage from '../features/lab-work/LabWorkPage';
 import MaterialsPage from '../features/system-settings/MaterialsPage';
 import WorkStatisticsPage from '../features/finance/WorkStatisticsPage';
 import RevenuePage from '../features/finance/RevenuePage';
@@ -41,9 +42,11 @@ import PlanPage from '../features/treatment/PlanPage';
 import RevisionPage from '../features/treatment/RevisionPage';
 
 import ItemPlansPage from '../features/treatment/ItemPlansPage';
-import CommercialTreatmentPage from '../features/treatment/CommercialTreatmentPage';
 
-export default function App() {
+export default // Đường dẫn cũ của màn Dịch vụ: giữ nguyên tham số ?dossier=.
+function LegacyCommercialRedirect() { const { search } = useLocation(); return <Navigate to={'/settings/treatment-services' + search} replace />; }
+
+function App() {
   return <Routes>
     <Route path="/sign-in" element={<SignInPage />} />
     <Route path="/access" element={<AccessPage />} />
@@ -67,7 +70,10 @@ export default function App() {
       <Route index element={<Home />} />
     </Route>
     <Route element={<Protected><Workspace /></Protected>}>
-      <Route path="system-settings" element={<Protected permission="settings.read"><SystemSettingsPage /></Protected>} />
+      <Route path="system-settings" element={<Protected permission={['settings.read','treatment.prices.read','treatment.commercial.read']}><SystemSettingsPage /></Protected>} />
+      <Route path="settings" element={<Protected permission={['settings.read','treatment.prices.read','treatment.commercial.read']}><SystemSettingsPage /></Protected>} />
+      <Route path="settings/:section" element={<Protected permission={['settings.read','treatment.prices.read','treatment.commercial.read']}><SystemSettingsPage /></Protected>} />
+      <Route path="lab-orders" element={<Protected permission="treatment.lab.read"><LabWorkPage /></Protected>} />
       <Route path="materials" element={<Protected permission={['materials.purchases.read', 'materials.stock.read', 'materials.usage.read']}><MaterialsPage /></Protected>} />
       <Route path="payments" element={<Protected permission="finance.read"><PaymentsPage /></Protected>} />
       <Route path="work-statistics" element={<Protected permission="finance.work-statistics.read"><WorkStatisticsPage /></Protected>} />
@@ -87,7 +93,7 @@ export default function App() {
       <Route path="patients/:id/dossiers/:dossierId/plan/revise/:itemId" element={<Protected permission="treatment.revisions.manage"><RevisionPage /></Protected>} />
       <Route path="treatment-templates" element={<Protected permission="treatment.templates.read"><ItemPlansPage /></Protected>} />
       <Route path="treatment-templates/legacy" element={<Navigate to="/treatment-templates" replace />} />
-      <Route path="commercial/treatment" element={<Protected permission={['treatment.prices.read','treatment.commercial.read']}><CommercialTreatmentPage /></Protected>} />
+      <Route path="commercial/treatment" element={<LegacyCommercialRedirect />} />
       <Route path="appointments" element={<Protected permission="appointments.read"><AppointmentCalendarPage /></Protected>} />
       <Route path="reception" element={<Protected permission="reception.read"><ReceptionPage /></Protected>} />
       <Route path="reception/appointments/:appointmentId" element={<Protected permission="reception.read"><CheckInPage /></Protected>} />

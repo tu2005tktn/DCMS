@@ -65,6 +65,7 @@ public sealed class DcmsDbContext(DbContextOptions<DcmsDbContext> options)
     public DbSet<TreatmentReceipt> TreatmentReceipts => Set<TreatmentReceipt>();
     public DbSet<TreatmentSheetDraft> TreatmentSheetDrafts => Set<TreatmentSheetDraft>();
     public DbSet<LabOrder> LabOrders => Set<LabOrder>();
+    public DbSet<LabOrderStatusLog> LabOrderStatusLogs => Set<LabOrderStatusLog>();
     public DbSet<DossierPayment> DossierPayments => Set<DossierPayment>();
     public DbSet<DossierPaymentLine> DossierPaymentLines => Set<DossierPaymentLine>();
     public DbSet<DossierPayOsOrder> DossierPayOsOrders => Set<DossierPayOsOrder>();

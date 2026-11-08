@@ -4,14 +4,54 @@
 .item-plans-heading h2 { margin:0; }.item-plans-heading p { margin:8px 0 0; color:#667085; }
 .item-plans-heading .ant-select { min-width:200px; }.item-plan-search { width:min(100%,460px); margin-bottom:16px; }
 .item-plans-page .ant-pagination { margin-top:16px; }.item-plans-page .ant-btn { min-height:40px; }
-.item-plan-table-scroll { overflow:auto; max-width:100%; margin-bottom:16px; }
-.item-plan-table { width:100%; min-width:1220px; border-collapse:collapse; table-layout:fixed; }
+.item-plan-table-scroll { overflow:visible; max-width:100%; margin-bottom:16px; }
+.item-plan-table { width:100%; border-collapse:collapse; table-layout:auto; }
 .item-plan-table th,.item-plan-table td { border:1px solid #e5e7eb; padding:10px; text-align:left; vertical-align:top; overflow-wrap:anywhere; }
-.item-plan-table th { background:#f4f7fb; font-size:13px; }.item-plan-table th:nth-child(3) { width:190px; }
-.item-plan-table th:nth-child(5),.item-plan-table th:nth-child(6) { width:180px; }
+.item-plan-table th { background:#f4f7fb; font-size:13px; }
+.item-plan-table td:nth-child(7) { white-space:nowrap; }
 .item-plan-table td .ant-select,.item-plan-table td .ant-input-number { width:100%; }
 .item-plan-table td .ant-select + .ant-select { margin-top:8px; }.item-plan-edit-row { background:#f5fbf7; }
 .item-plan-edit-row ul { padding-left:16px; color:#b42318; font-size:13px; }.item-plan-note { white-space:pre-wrap; }
 .item-plan-comparison { max-height:220px; overflow:auto; white-space:pre-wrap; font-size:12px; }
 @media(max-width:768px) { .item-plans-heading { align-items:stretch; flex-direction:column; }.item-plans-page .ant-card-head { padding:12px; }.item-plans-page .ant-card-body { padding:12px; }.item-plans-page .ant-btn { min-height:44px; } }
 @media(max-width:768px) { .item-plans-page .ant-card-head-wrapper { flex-wrap:wrap; gap:10px; }.item-plans-page .ant-card-head-title { white-space:normal; overflow-wrap:anywhere; flex:1 1 100%; }.item-plans-page .ant-card-extra { margin-inline-start:0; } }
+
+@media screen and (max-width:900px) {
+  .item-plan-table, .item-plan-table tbody, .item-plan-table tr { display:block; width:100%; }
+  .item-plan-table thead { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); }
+  .item-plan-table tr { margin:0 0 8px; padding:2px 8px; border:1px solid #e4e7ec; background:#fff; }
+  .item-plan-table td { display:grid; grid-template-columns:minmax(96px,36%) minmax(0,1fr); gap:8px; align-items:start; width:auto!important; padding:6px 0; border:0; border-bottom:1px dashed #eceff3; }
+  .item-plan-table td:last-child { border-bottom:0; display:flex; justify-content:flex-end; }
+  .item-plan-table td[colspan] { display:block; }
+  .item-plan-table td::before { color:#475467; font-weight:700; }
+  .item-plan-table td[colspan]::before, .item-plan-table td:last-child::before { content:none; }
+  .item-plan-table td:nth-child(1)::before { content:"Ngày"; }
+  .item-plan-table td:nth-child(2)::before { content:"Răng"; }
+  .item-plan-table td:nth-child(3)::before { content:"Điều trị/dịch vụ"; }
+  .item-plan-table td:nth-child(4)::before { content:"Thời gian dự kiến (phút)"; }
+  .item-plan-table td:nth-child(5)::before { content:"Ghi chú"; }
+  .item-plan-table td:nth-child(6)::before { content:"Bác sĩ & phụ tá"; }
+  .item-plan-table td:nth-child(7)::before { content:"Chi phí"; }
+}
+
+.item-plan-list .ant-table-cell { overflow-wrap:anywhere; }
+@media screen and (max-width:600px) {
+  .item-plan-list .ant-table-thead { display:none; }
+  .item-plan-list table, .item-plan-list tbody, .item-plan-list tr.ant-table-row { display:block; width:100%; }
+  .item-plan-list tr.ant-table-row { margin:0 0 8px; padding:2px 8px; border:1px solid #e4e7ec; background:#fff; }
+  .item-plan-list td.ant-table-cell { display:grid; grid-template-columns:minmax(96px,40%) minmax(0,1fr); gap:8px; padding:6px 0!important; border:0!important; border-bottom:1px dashed #eceff3!important; }
+  .item-plan-list td.ant-table-cell:last-child { display:flex; justify-content:flex-end; border-bottom:0!important; }
+  .item-plan-list td.ant-table-cell::before { color:#475467; font-weight:700; }
+  .item-plan-list td.ant-table-cell:nth-child(1)::before { content:"Tên kế hoạch"; }
+  .item-plan-list td.ant-table-cell:nth-child(2)::before { content:"Số hạng mục"; }
+  .item-plan-list td.ant-table-cell:nth-child(3)::before { content:"Tổng chi phí"; }
+}
+
+/* Bảng có viền (08/11/2026), chỉ khi hiển thị dạng bảng */
+@media screen and (min-width:601px) {
+  .item-plan-list .ant-table { border:1px solid #d0d5dd; border-radius:8px; overflow:hidden; }
+  .item-plan-list .ant-table-thead > tr > th { border-bottom:1px solid #d0d5dd; border-inline-end:1px solid #e4e7ec; }
+  .item-plan-list .ant-table-tbody > tr > td { border-bottom:1px solid #e4e7ec; border-inline-end:1px solid #eceff3; }
+  .item-plan-list .ant-table-thead > tr > th:last-child, .item-plan-list .ant-table-tbody > tr > td:last-child { border-inline-end:0; }
+  .item-plan-list .ant-table-tbody > tr:last-child > td { border-bottom:0; }
+}

@@ -18,7 +18,6 @@ test('staff sees inbox menu, can filter and open a request drawer', async ({ pag
   await expect(page.getByRole('link', { name: 'Hộp thư hỗ trợ', exact: true })).toBeVisible();
   await page.getByRole('link', { name: 'Hộp thư hỗ trợ', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Hộp thư hỗ trợ', exact: true })).toBeVisible();
-  await expect(page.getByText('Xử lý yêu cầu đổi/huỷ/xác nhận từ booker & attendee')).toBeVisible();
 
   // Bộ lọc mặc định "Cần xử lý" — phải có ít nhất một dòng.
   const firstRow = page.locator('table tbody tr.ant-table-row').first();

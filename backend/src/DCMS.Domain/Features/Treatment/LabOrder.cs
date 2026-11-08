@@ -12,6 +12,9 @@ public sealed class LabOrder
     public DateOnly OrderedOn { get; set; }
     public DateOnly? DueOn { get; set; }
     public DateOnly? DeliveredOn { get; set; }
+    public DateOnly? SentOn { get; set; }
+    public DateOnly? ReceivedOn { get; set; }
+    public string Status { get; set; } = LabOrderStatus.NotSent;
     public int DentistId { get; set; }
     public Guid? LabProviderId { get; set; }
     public Guid? LabWorkTypeId { get; set; }
@@ -34,4 +37,28 @@ public sealed class LabOrder
     public int CreatedBy { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
     public int UpdatedBy { get; set; }
+}
+
+public static class LabOrderStatus
+{
+    public const string NotSent = "NotSent", Sent = "Sent", Received = "Received", Delivered = "Delivered", Rework = "Rework";
+    public static readonly string[] All = [NotSent, Sent, Received, Delivered, Rework];
+    private static readonly Dictionary<string, string[]> Next = new()
+    {
+        [NotSent] = [Sent], [Sent] = [Received, Rework], [Received] = [Delivered, Rework], [Delivered] = [Rework], [Rework] = [Sent],
+    };
+    public static IReadOnlyList<string> NextOf(string status) => Next.TryGetValue(status, out var n) ? n : [];
+    public static bool CanMove(string from, string to) => NextOf(from).Contains(to);
+}
+
+// Append-only status history of a lab order. Rules: docs/specs/LAB-ORDER-MANAGEMENT.md.
+public sealed class LabOrderStatusLog
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid LabOrderId { get; set; }
+    public string? FromStatus { get; set; }
+    public string ToStatus { get; set; } = "";
+    public DateTimeOffset ChangedAt { get; set; }
+    public int ChangedBy { get; set; }
+    public string? Note { get; set; }
 }

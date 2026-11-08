@@ -73,7 +73,7 @@ function ItemPlansWorkspace() {
       <Button onClick={() => { setPlan(latest); setLatest(null); setError(null); }}>Giữ bản nhập để lưu lại</Button></>} />;
   const heading = <thead><tr>{['Ngày', 'Răng', 'Điều trị/dịch vụ', 'Thời gian dự kiến (phút)', 'Ghi chú', 'Bác sĩ & phụ tá', 'Chi phí', 'Thao tác'].map(x => <th key={x} scope="col">{x}</th>)}</tr></thead>;
   return <main className="item-plans-page">
-    <div className="item-plans-heading"><div><Typography.Title level={2}>Kế hoạch điều trị</Typography.Title><p>Quản lý kế hoạch dùng lại trong chi nhánh.</p></div>
+    <div className="item-plans-heading"><div><Typography.Title level={2}>Kế hoạch điều trị</Typography.Title></div>
       <Space wrap><Select aria-label="Chi nhánh" value={branch} disabled={busy}
         options={branches.map(x => ({ value: x.id, label: x.name }))} onChange={id => { if (canLeave()) { setBranch(id); setPlan(null); setEditing(null); setDirty(false); setPage(1); setData(null); setOptions(null); setError(null); } }} /></Space></div>
     {listError && <Alert showIcon type="error" message={listError} action={<Button onClick={() => branch ? setRevision(r => r + 1) : window.location.reload()}>Thử lại</Button>} />}
@@ -82,7 +82,7 @@ function ItemPlansWorkspace() {
     {!nameDialog && comparison}
     <Card title="Danh sách kế hoạch" extra={<Button type="primary" disabled={!canManage || !branch || busy} onClick={() => { if (canLeave()) { setEditing(null); setName(''); setNameDialog('create'); setDirty(false); setError(null); } }}>Tạo kế hoạch</Button>}>
       <Space.Compact className="item-plan-search"><Input aria-label="Tìm tên kế hoạch" value={search} maxLength={160} allowClear onChange={e => setSearch(e.target.value)} onPressEnter={() => { setKeyword(search.trim()); setPage(1); }} /><Button onClick={() => { setKeyword(search.trim()); setPage(1); }}>Tìm kiếm</Button></Space.Compact>
-      {loading && !data ? <Skeleton active /> : <Table rowKey="id" pagination={false} loading={loading} dataSource={data?.items ?? []} scroll={{ x: 650 }}
+      {loading && !data ? <Skeleton active /> : <Table className="item-plan-list" rowKey="id" pagination={false} loading={loading} dataSource={data?.items ?? []}
         locale={{ emptyText: listError ? 'Chưa tải được danh sách.' : <Empty description="Chưa có kế hoạch điều trị." /> }} columns={[
           { title: 'Tên kế hoạch', dataIndex: 'name' }, { title: 'Số hạng mục', dataIndex: 'itemCount' },
           { title: 'Tổng chi phí', dataIndex: 'totalCostVnd', render: planMoney }, { title: 'Thao tác', render: (_, row) => <Button disabled={busy} onClick={() => void open(row.id)}>Mở</Button> },
