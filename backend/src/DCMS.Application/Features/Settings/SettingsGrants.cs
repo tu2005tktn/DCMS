@@ -15,8 +15,6 @@ public static class SettingsGrants
         new("branches.manage", "Quản lý chi nhánh", AccountRoles.Admin, "branches.read"),
         new("chairs.read", "Xem ghế điều trị", null, "branches.read"),
         new("chairs.manage", "Quản lý ghế điều trị", AccountRoles.Admin, "chairs.read"),
-        new("prescriptions.read", "Xem đơn thuốc", null, null),
-        new("prescriptions.manage", "Kê và ký đơn thuốc", AccountRoles.Dentist, "prescriptions.read"),
         new("access-groups.read", "Xem nhóm quyền", AccountRoles.Admin, "settings.read"),
         new("access-groups.manage", "Quản lý nhóm quyền", AccountRoles.Admin, "access-groups.read"),
         new("staff.access.assign", "Gán nhóm cho nhân viên", AccountRoles.Admin, "access-groups.read"),

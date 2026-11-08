@@ -135,3 +135,8 @@ Lỗi theo chuẩn `{ code, message, field?, currentVersion?, blockers? }`.
 | Mã mẫu trùng | `409 MSG201` |
 | Sửa đơn đã ký, Visit không ở trạng thái cho phép, tạo điều chỉnh khi còn bản nháp | `409 MSG205` |
 | Sai version / requestKey dùng lại với payload khác | `409 MSG111` (+ `currentVersion`) |
+
+
+## Sửa lỗi biên dịch trùng tên DTO (08/11/2026)
+
+`PatientPrescriptionDto` bị khai báo hai lần trong `PrescriptionContracts.cs` (bản cho cổng bệnh nhân theo lượt khám và một bản cũ theo bệnh nhân), làm backend không build được. Chỉ giữ bản theo lượt khám đang được `PatientPrescriptionsAsync` và API dùng; bản cũ không có nơi nào dùng nên bị xóa. API và hợp đồng dữ liệu không đổi.

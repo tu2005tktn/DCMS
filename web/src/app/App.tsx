@@ -68,6 +68,8 @@ export default function App() {
     </Route>
     <Route element={<Protected><Workspace /></Protected>}>
       <Route path="system-settings" element={<Protected permission="settings.read"><SystemSettingsPage /></Protected>} />
+      <Route path="settings" element={<Protected permission="settings.read"><SystemSettingsPage /></Protected>} />
+      <Route path="settings/:section" element={<Protected permission="settings.read"><SystemSettingsPage /></Protected>} />
       <Route path="materials" element={<Protected permission={['materials.purchases.read', 'materials.stock.read', 'materials.usage.read']}><MaterialsPage /></Protected>} />
       <Route path="payments" element={<Protected permission="finance.read"><PaymentsPage /></Protected>} />
       <Route path="work-statistics" element={<Protected permission="finance.work-statistics.read"><WorkStatisticsPage /></Protected>} />
