@@ -1,5 +1,7 @@
 # Phiếu labo trong Quá trình điều trị/dịch vụ
 
+Cập nhật phân quyền 07/11/2026: đọc phiếu theo `treatment.read`; tạo/sửa/xóa phiếu cần `treatment.lab.manage`, phụ thuộc `treatment.actuals.update`. API, dịch vụ và form kiểm cùng quyền; thu hồi khi đang mở form khóa thao tác ghi và giữ bản nhập. Vai trò chuyên môn/phạm vi hồ sơ giữ nguyên.
+
 Ngày: 06/11/2026. Liên quan: [S21-S43-TREATMENT-DOSSIER.md](S21-S43-TREATMENT-DOSSIER.md), [SYSTEM-SETTINGS-MATERIAL-CATALOG.md](SYSTEM-SETTINGS-MATERIAL-CATALOG.md), nghiên cứu `docs/research/LABO-NHA-KHOA.vi.md`.
 
 ## Mục tiêu
@@ -60,3 +62,9 @@ Trạng thái theo dõi xưởng (gửi, nhận, làm lại), tệp đính kèm,
 # Kiểm tra ánh xạ EF khi chạy dự án
 
 Ánh xạ `DossierPayOsOrderLine` và `LabOrder` trong `TreatmentModel` là hai cấu hình entity độc lập. Mỗi khối `model.Entity` phải đóng đầy đủ để backend biên dịch và API khởi động được.
+
+Cập nhật 08/11/2026: danh sách phiếu labo riêng và theo dõi trạng thái xưởng (gửi, nhận, làm lại) đã chuyển sang [LAB-ORDER-MANAGEMENT.md](LAB-ORDER-MANAGEMENT.md). Phiếu mới có trạng thái mặc định `NotSent`.
+
+## Sửa lỗi in (08/11/2026)
+
+Quy tắc in của phiếu labo chỉ được áp dụng khi cửa sổ phiếu labo đang mở (`body:has(.lab-order-modal)`). Trước đây quy tắc `body * { visibility: hidden }` nằm trong CSS toàn cục nên mọi trang khác (ví dụ in phiếu thu) in ra trang trắng.

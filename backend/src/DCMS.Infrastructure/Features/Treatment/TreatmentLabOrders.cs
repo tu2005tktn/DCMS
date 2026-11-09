@@ -17,7 +17,7 @@ public sealed partial class TreatmentDossierService
 
     private static LabOrderDto ToDto(LabOrder x) => new(x.Id, x.ActivityId, x.Code, x.OrderedOn, x.DueOn, x.DeliveredOn, x.DentistId, x.LabProviderId,
         x.LabWorkTypeId, x.WorkName, x.MarginOuter, x.MarginInner, x.MarginSide, x.BridgeShapes, x.IsChild, x.Teeth, x.Shade, x.Note, x.Material,
-        x.Quantity, x.TotalFeeVnd, x.PaidVnd, x.Warranty, x.Version);
+        x.Quantity, x.TotalFeeVnd, x.PaidVnd, x.Warranty, x.Version, x.Status, x.SentOn, x.ReceivedOn);
 
     private static bool IsLab(CatalogProvider p) => p.Type == "Lab" || p.Type == "Both";
 
@@ -57,6 +57,7 @@ public sealed partial class TreatmentDossierService
 
     public async Task<LabOrderDto> SaveLabOrderAsync(int actorId, Guid dossierId, Guid activityId, SaveLabOrderRequest r, CancellationToken ct)
     {
+        await access.RequireAsync(actorId, "treatment.lab.manage", ct);
         var dossier = await DossierAsync(actorId, dossierId, ct);
         var activity = await LabActivityAsync(dossierId, activityId, ct);
         var code = Clean(r.Code); var work = Clean(r.WorkName); var note = Clean(r.Note); var material = Clean(r.Material); var warranty = Clean(r.Warranty);
@@ -82,6 +83,7 @@ public sealed partial class TreatmentDossierService
         {
             order = new LabOrder { ActivityId = activityId, DossierId = dossierId, PatientId = activity.PatientId, BranchId = dossier.BranchId, CreatedAt = now, CreatedBy = actorId };
             db.Add(order);
+            db.Add(new LabOrderStatusLog { LabOrderId = order.Id, ToStatus = LabOrderStatus.NotSent, ChangedAt = now, ChangedBy = actorId });
         }
         else if (r.ExpectedVersion != order.Version) throw Error("MSG111", 409);
         else order.Version++;
@@ -98,6 +100,7 @@ public sealed partial class TreatmentDossierService
 
     public async Task DeleteLabOrderAsync(int actorId, Guid dossierId, Guid activityId, CancellationToken ct)
     {
+        await access.RequireAsync(actorId, "treatment.lab.manage", ct);
         await DossierAsync(actorId, dossierId, ct);
         var order = await db.LabOrders.SingleOrDefaultAsync(x => x.ActivityId == activityId && x.DossierId == dossierId, ct) ?? throw Error("MSG113", 404);
         db.Remove(order); await db.SaveChangesAsync(ct);

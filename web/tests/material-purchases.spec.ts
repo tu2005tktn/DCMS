@@ -5,7 +5,7 @@ type Purchase = { id: string; enteredOn: string; receivedOn: string | null; expi
 
 async function prepare(page: Page) {
   const user = { id: 7, userName: 'synthetic', fullName: 'SYNTHETIC Dentist', accountType: 'Staff', roles: ['Dentist'], effectiveRoles: ['Dentist'],
-    permissions: ['settings.read', 'catalog.providers.create', 'catalog.materials.read', 'catalog.materials.create', 'catalog.materials.update', 'catalog.materials.deactivate'] };
+    permissions: ['settings.read', 'catalog.providers.create', 'catalog.materials.read', 'materials.purchases.read', 'materials.purchases.create', 'materials.purchases.update', 'materials.purchases.delete', 'materials.stock.read', 'materials.usage.read'] };
   const materials = [{ id: 'm-1', name: 'Implant SYNTHETIC', categoryName: 'Implant', version: 1 }, { id: 'm-2', name: 'Composite SYNTHETIC', categoryName: 'Trám', version: 1, usageUnit: 'g' }];
   const state = { purchases: [] as Purchase[], requests: [] as any[], failNetwork: false, suppliers: [{ id: 's-1', code: 'NCC-OLD', name: 'Công ty Có Sẵn', version: 1 }] as any[], supplierRequests: [] as any[] };
   const live = () => state.purchases.filter(p => !p.isDeleted);

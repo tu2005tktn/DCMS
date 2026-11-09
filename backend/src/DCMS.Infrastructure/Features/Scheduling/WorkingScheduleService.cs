@@ -41,6 +41,13 @@ public sealed partial class WorkingScheduleService(DcmsDbContext db, TimeProvide
     {
         var scope = await access.ResolveAsync(actorId, ct);
         if (scope.Assigned && !scope.Owner && !scope.BranchIds.Contains(branchId)) throw Error("MSG06", 403);
+        if (scope.Owner)
+        {
+            // Chủ phòng khám làm việc trên mọi chi nhánh đang hoạt động; nhân sự được chọn vẫn phải thuộc chi nhánh đó.
+            var active = await ActiveMembers(ct);
+            if (!active.Any(x => x.BranchId == branchId) || employeeId.HasValue && !active.Any(x => x.BranchId == branchId && x.EmployeeId == employeeId)) throw Error("MSG06", 403);
+            return;
+        }
         var own = await db.Employees.AsNoTracking().SingleOrDefaultAsync(x => x.AccountId == actorId, ct);
         var membership = (await ActiveMembers(ct)).SingleOrDefault(x => x.BranchId == branchId && x.EmployeeId == own?.Id);
         if (membership == null || (employeeId.HasValue && !membership.CanManageSchedules && (employeeId != own!.Id || !membership.CanDentist))) throw Error("MSG06", 403);
@@ -52,6 +59,8 @@ public sealed partial class WorkingScheduleService(DcmsDbContext db, TimeProvide
         var members = await ActiveMembers(ct);
         var own = await db.Employees.AsNoTracking().SingleOrDefaultAsync(x => x.AccountId == actorId, ct);
         var mine = members.Where(x => x.EmployeeId == own?.Id && (x.CanDentist || x.CanManageSchedules) && (!scope.Assigned || scope.Owner || scope.BranchIds.Contains(x.BranchId))).ToArray();
+        // Chủ phòng khám quản lý lịch mọi chi nhánh đang hoạt động, không cần là thành viên.
+        if (scope.Owner) mine = members.Select(x => x.BranchId).Distinct().Select(b => new SchedulingMember { BranchId = b, EmployeeId = own?.Id ?? 0, Active = true, CanManageSchedules = true, CanDentist = true }).ToArray();
         if (mine.Length == 0) throw Error("MSG06", 403);
         var branches = mine.Select(x => x.BranchId).ToArray();
         var employees = await db.Employees.AsNoTracking().ToDictionaryAsync(x => x.Id, ct);

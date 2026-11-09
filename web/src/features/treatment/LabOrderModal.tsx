@@ -74,6 +74,7 @@ export default function LabOrderModal({ dossierId, activityId, serviceName, canE
     Modal.confirm({ title: 'Phiếu labo có thay đổi chưa lưu. Đóng không lưu?', okText: 'Đóng không lưu', cancelText: 'Ở lại', onOk: onClose });
   }
   async function save() {
+    if (!canEdit || busy) return;
     setSubmitted(true); setError(undefined);
     if (!form || Object.keys(problems).length) return;
     setBusy(true);
@@ -88,6 +89,7 @@ export default function LabOrderModal({ dossierId, activityId, serviceName, canE
     finally { setBusy(false); }
   }
   async function remove() {
+    if (!canEdit || busy) return;
     setBusy(true); setError(undefined);
     try { await api(url, { method: 'DELETE' }); onSaved(); }
     catch (e) { setError(e instanceof Error ? e.message : 'Không xóa được phiếu labo.'); }

@@ -86,13 +86,13 @@ const sections: Section[] = [
 const base = '/api/system-settings/settings/catalogs';
 const commandLabels: Record<string, string> = { create: 'Tạo mới', update: 'Sửa', state: 'Đổi trạng thái' };
 
-export default function SupplyCatalogPanel({ onlyMedicines = false }: { onlyMedicines?: boolean }) {
+export default function SupplyCatalogPanel({ onlyMedicines = false, initialKey }: { onlyMedicines?: boolean; initialKey?: SectionKey } = {}) {
   // Static message does not render under React 19 + antd 5 (errors were silently lost); use the hook instance.
   const [toast, toastContext] = message.useMessage();
   const { user } = useAuth();
   const can = (resource: string, action: string) => user?.permissions.includes(`catalog.${resource}.${action}`) ?? false;
   const visibleSections = sections.filter(s => (!onlyMedicines || s.key === 'medicines') && can(s.resource, 'read'));
-  const [key, setKey] = useState<SectionKey>(onlyMedicines ? 'medicines' : 'suppliers'), [status, setStatus] = useState<Status>('Active');
+  const [key, setKey] = useState<SectionKey>(onlyMedicines ? 'medicines' : initialKey ?? 'suppliers'), [status, setStatus] = useState<Status>('Active');
   const [medicineType, setMedicineType] = useState<MedicineType>('Clinic');
   const [search, setSearch] = useState(''), [query, setQuery] = useState(''), [page, setPage] = useState(1), [size, setSize] = useState(20);
   const [data, setData] = useState<Page | null>(null), [loading, setLoading] = useState(false), [error, setError] = useState<string>(), [revision, setRevision] = useState(0);

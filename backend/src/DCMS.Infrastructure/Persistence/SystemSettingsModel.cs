@@ -78,6 +78,7 @@ internal static class SystemSettingsModel
             Supply(b, "CATALOG_MEDICINE", 200);
             b.Property(x => x.ActiveIngredient).HasMaxLength(200); b.Property(x => x.Strength).HasMaxLength(200); b.Property(x => x.DosageForm).HasMaxLength(200);
             b.Property(x => x.BaseUnit).HasMaxLength(40); b.Property(x => x.Packaging).HasMaxLength(160); b.Property(x => x.Instructions).HasMaxLength(1000);
+            b.Property(x => x.Route).HasMaxLength(40).HasDefaultValue("Uống"); b.Property(x => x.Contraindications).HasMaxLength(1000); b.Property(x => x.AllergyWarnings).HasMaxLength(1000);
         });
     }
 }

@@ -48,12 +48,12 @@ public interface IPatientService
 {
     Task<OwnPatientRecord> OwnAsync(int accountId, CancellationToken ct);
     Task<OwnPatientChange> UpdateOwnAsync(int accountId, UpdateOwnPatientRequest request, CancellationToken ct);
-    Task<PatientPage> SearchAsync(string? keyword, DateOnly? birthDate, bool includeArchived, int page, int pageSize, CancellationToken ct);
+    Task<PatientPage> SearchAsync(int actorId, string? keyword, DateOnly? birthDate, bool includeArchived, int page, int pageSize, int? branchId, CancellationToken ct);
     Task<IReadOnlyList<DuplicateCandidate>> DuplicatesAsync(DuplicateCheckRequest request, CancellationToken ct);
-    Task<PatientDetail> GetAsync(int id, CancellationToken ct);
+    Task<PatientDetail> GetAsync(int actorId, int id, CancellationToken ct);
     Task<PatientChange> CreateAsync(int actorId, CreatePatientRequest request, CancellationToken ct);
     Task<PatientChange> UpdateAsync(int actorId, int id, UpdatePatientRequest request, CancellationToken ct);
     Task<PatientChange> ArchiveAsync(int actorId, int id, ArchivePatientRequest request, bool archive, CancellationToken ct);
-    Task<IReadOnlyList<PatientAuditEntry>> AuditAsync(int id, CancellationToken ct);
+    Task<IReadOnlyList<PatientAuditEntry>> AuditAsync(int actorId, int id, CancellationToken ct);
     Task<PatientFormPolicy> FormPolicyAsync(CancellationToken ct);
 }

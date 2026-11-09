@@ -4,17 +4,20 @@ import VisitPage from '../features/examinations/ExaminationPage';
 import PaymentsPage from '../features/finance/PaymentsPage';
 import ReceiptPrintPage from '../features/finance/ReceiptPrintPage';
 import PrescriptionPage from '../features/prescriptions/PrescriptionPage';
+import PrescriptionTemplatesPage from '../features/prescriptions/PrescriptionTemplatesPage';
 import ClinicalServicesPage from '../features/finance/ClinicalServicesPage';
 import { Alert, Button, Card, Result, Space, Tag, Typography } from 'antd';
 import { useState, type ReactNode } from 'react';
-import { Link, Navigate, Route, Routes } from 'react-router-dom';
+import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuth } from '../features/authentication/AuthContext';
 import SignInPage from '../features/authentication/SignInPage';
 import SystemSettingsPage from '../features/system-settings/SystemSettingsPage';
 import MedicineManagementPage from '../features/system-settings/MedicineManagementPage';
+import LabWorkPage from '../features/lab-work/LabWorkPage';
 import MaterialsPage from '../features/system-settings/MaterialsPage';
 import WorkStatisticsPage from '../features/finance/WorkStatisticsPage';
 import RevenuePage from '../features/finance/RevenuePage';
+import FinanceOperationsPage from '../features/finance/FinanceOperationsPage';
 import AccountsPage from '../features/accounts/AccountsPage';
 import WorkingSchedulesPage from '../features/working-schedules/WorkingSchedulesPage';
 import BookingSettingsPage from '../features/working-schedules/BookingSettingsPage';
@@ -42,7 +45,9 @@ import PlanPage from '../features/treatment/PlanPage';
 import RevisionPage from '../features/treatment/RevisionPage';
 
 import ItemPlansPage from '../features/treatment/ItemPlansPage';
-import CommercialTreatmentPage from '../features/treatment/CommercialTreatmentPage';
+
+// Đường dẫn cũ của màn Dịch vụ: giữ nguyên tham số ?dossier=.
+function LegacyCommercialRedirect() { const { search } = useLocation(); return <Navigate to={'/settings/treatment-services' + search} replace />; }
 
 export default function App() {
   return <Routes>
@@ -70,14 +75,19 @@ export default function App() {
       <Route index element={<Home />} />
     </Route>
     <Route element={<Protected><Workspace /></Protected>}>
-      <Route path="system-settings" element={<Protected permission="settings.read"><SystemSettingsPage /></Protected>} />
       <Route path="medicines" element={<Protected permission="catalog.medicines.read"><MedicineManagementPage /></Protected>} />
-      <Route path="materials" element={<Protected permission="catalog.materials.read"><MaterialsPage /></Protected>} />
+      <Route path="system-settings" element={<Protected permission={['settings.read','treatment.prices.read','treatment.commercial.read']}><SystemSettingsPage /></Protected>} />
+      <Route path="settings" element={<Protected permission={['settings.read','treatment.prices.read','treatment.commercial.read']}><SystemSettingsPage /></Protected>} />
+      <Route path="settings/:section" element={<Protected permission={['settings.read','treatment.prices.read','treatment.commercial.read']}><SystemSettingsPage /></Protected>} />
+      <Route path="lab-orders" element={<Protected permission="treatment.lab.read"><LabWorkPage /></Protected>} />
+      <Route path="materials" element={<Protected permission={['materials.purchases.read', 'materials.stock.read', 'materials.usage.read']}><MaterialsPage /></Protected>} />
       <Route path="payments" element={<Protected permission="finance.read"><PaymentsPage /></Protected>} />
-      <Route path="work-statistics" element={<Protected permission="finance.read"><WorkStatisticsPage /></Protected>} />
-      <Route path="revenue" element={<Protected permission="finance.read"><RevenuePage /></Protected>} />
+      <Route path="work-statistics" element={<Protected permission="finance.work-statistics.read"><WorkStatisticsPage /></Protected>} />
+      <Route path="revenue" element={<Protected permission="finance.revenue.read"><RevenuePage /></Protected>} />
+      <Route path="finance/operations" element={<Protected permission="finance.read"><FinanceOperationsPage /></Protected>} />
       <Route path="visits/:visitId/payments" element={<Protected permission="finance.read"><PaymentsPage /></Protected>} />
       <Route path="visits/:visitId/prescription" element={<Protected permission="prescriptions.read"><PrescriptionPage /></Protected>} />
+      <Route path="prescriptions/templates" element={<Protected permission="prescriptions.manage"><PrescriptionTemplatesPage /></Protected>} />
       <Route path="payments/:id/print" element={<Protected permission="finance.receipts.print"><ReceiptPrintPage /></Protected>} />
       <Route path="clinical-services" element={<Protected permission="services.read"><ClinicalServicesPage /></Protected>} />
       <Route path="working-schedules" element={<Protected permission="working-schedules.read"><WorkingSchedulesPage /></Protected>} />
@@ -91,7 +101,7 @@ export default function App() {
       <Route path="patients/:id/dossiers/:dossierId/plan/revise/:itemId" element={<Protected permission="treatment.revisions.manage"><RevisionPage /></Protected>} />
       <Route path="treatment-templates" element={<Protected permission="treatment.templates.read"><ItemPlansPage /></Protected>} />
       <Route path="treatment-templates/legacy" element={<Navigate to="/treatment-templates" replace />} />
-      <Route path="commercial/treatment" element={<Protected permission={['treatment.prices.read','treatment.commercial.read']}><CommercialTreatmentPage /></Protected>} />
+      <Route path="commercial/treatment" element={<LegacyCommercialRedirect />} />
       <Route path="appointments" element={<Protected permission="appointments.read"><AppointmentCalendarPage /></Protected>} />
       <Route path="reception" element={<Protected permission="reception.read"><ReceptionPage /></Protected>} />
       <Route path="reception/appointments/:appointmentId" element={<Protected permission="reception.read"><CheckInPage /></Protected>} />

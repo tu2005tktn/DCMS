@@ -163,3 +163,16 @@ Bằng chứng bàn giao gồm PR, commit, contract đã thống nhất với DC
 Kiểm trên `main` tại `7da445f`: đã có Appointment/booking/availability, Patient master và các pattern transaction/receipt/concurrency. Các đầu mối là `backend/src/DCMS.Application/Features/Appointments/Contracts.cs`, `backend/src/DCMS.Infrastructure/Features/Appointments/AppointmentService.cs`, `backend/src/DCMS.Infrastructure/Persistence/DcmsDbContext.cs` và `web/src/app/App.tsx`.
 
 Baseline sau hoàn tác chưa có Visit domain/DbSet, Reception endpoints hoặc route tiếp nhận. Nhánh DCMS-111 đã bổ sung các phần này vào cùng codebase/context, cùng migration nâng cấp dữ liệu legacy. Không cherry-pick toàn bộ engine nguồn và chức năng xếp ưu tiên của nhánh cũ. Trang Visit hiện đọc dữ liệu bàn giao thật; phần bắt đầu/lưu khám và nguồn điều trị còn chờ module tương ứng.
+
+
+## Bỏ dòng mô tả dưới tiêu đề (08/11/2026)
+
+Màn "Tiếp nhận hôm nay" không còn dòng "Lịch hẹn và lượt khám có trạng thái riêng. Đối chiếu người thực sự đến trước khi tiếp nhận." Quy tắc tiếp nhận không đổi.
+
+
+## Tiếp nhận: một khối liền mạch và bảng có viền (08/11/2026)
+
+Bộ lọc, thẻ chuyển Lịch hẹn / Hàng chờ và lượt khám và bảng nằm chung một thẻ (không còn khối lọc tách riêng). Hai bảng có viền ngoài bo góc, đường kẻ giữa hàng và cột. Chức năng không đổi.
+
+
+Bảng không cuộn ngang: chữ trong ô tự xuống dòng; từ 1000px trở xuống mỗi dòng là một thẻ, mỗi trường một dòng "nhãn: giá trị" (cả hai tab Lịch hẹn và Hàng chờ và lượt khám).

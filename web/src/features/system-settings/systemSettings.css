@@ -28,3 +28,62 @@
 .reference-catalogs-menu { border-inline-end: none !important; }
 .reference-catalogs-body { min-width: 0; }
 @media (max-width: 768px) { .reference-catalogs { grid-template-columns: minmax(0, 1fr); } }
+
+.purchase-table .ant-table-cell { overflow-wrap:anywhere; }
+.purchase-table table { width:100% !important; table-layout:auto; }
+@media screen and (max-width:1200px) {
+  .purchase-table .ant-table-thead, .purchase-table .ant-table-measure-row { display:none; }
+  .purchase-table table, .purchase-table tbody, .purchase-table tr.ant-table-row { display:block; width:100%; }
+  .purchase-table tr.ant-table-row { margin:0 0 8px; padding:2px 8px; border:1px solid #e4e7ec; background:#fff; }
+  .purchase-table td.ant-table-cell { display:grid; grid-template-columns:minmax(110px,40%) minmax(0,1fr); gap:8px; padding:6px 0!important; border:0!important; border-bottom:1px dashed #eceff3!important; text-align:left!important; }
+  .purchase-table td.ant-table-cell:last-child { display:flex; justify-content:flex-end; border-bottom:0!important; }
+  .purchase-table td.ant-table-cell::before { color:#475467; font-weight:700; }
+  .purchase-table td.ant-table-cell:nth-child(1)::before { content:"Ngày nhập"; }
+  .purchase-table td.ant-table-cell:nth-child(2)::before { content:"Ngày nhận"; }
+  .purchase-table td.ant-table-cell:nth-child(3)::before { content:"Hạn dùng"; }
+  .purchase-table td.ant-table-cell:nth-child(4)::before { content:"Số lô"; }
+  .purchase-table td.ant-table-cell:nth-child(5)::before { content:"Tên dụng cụ/vật liệu"; }
+  .purchase-table td.ant-table-cell:nth-child(6)::before { content:"SL"; }
+  .purchase-table td.ant-table-cell:nth-child(7)::before { content:"Đơn giá"; }
+  .purchase-table td.ant-table-cell:nth-child(8)::before { content:"Tổng cộng"; }
+  .purchase-table td.ant-table-cell:nth-child(9)::before { content:"Đã thanh toán"; }
+}
+
+.supply-catalog-table .ant-table-cell { overflow-wrap:anywhere; }
+.supply-catalog-table table { width:100% !important; table-layout:auto !important; }
+@media screen and (max-width:1100px) {
+  .supply-catalog-table .ant-table-thead, .supply-catalog-table .ant-table-measure-row { display:none; }
+  .supply-catalog-table table, .supply-catalog-table tbody, .supply-catalog-table tr.ant-table-row { display:block; width:100%; }
+  .supply-catalog-table tr.ant-table-row { margin:0 0 8px; padding:2px 8px; border:1px solid #e4e7ec; background:#fff; }
+  .supply-catalog-table td.ant-table-cell { display:grid; grid-template-columns:minmax(110px,40%) minmax(0,1fr); gap:8px; padding:6px 0!important; border:0!important; border-bottom:1px dashed #eceff3!important; text-align:left!important; }
+  .supply-catalog-table td.ant-table-cell:last-child { display:flex; border-bottom:0!important; }
+  .supply-catalog-table td.ant-table-cell::before { content:attr(data-label); color:#475467; font-weight:700; }
+  .supply-catalog-table td.ant-table-cell:last-child::before { content:none; }
+}
+
+/* Trang chủ thiết lập dạng thẻ (08/11/2026) */
+.settings-search { max-width: 420px; margin: 0 0 20px; }
+.settings-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+.settings-group-card { border: 1px solid #98a2b3; }
+.settings-group-head { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 10px; }
+.settings-group-head strong { display: block; font-size: 16px; }
+.settings-group-head small { color: #667085; }
+.settings-group-icon { font-size: 22px; color: #175cd3; }
+.settings-group-card ul { list-style: none; margin: 0; padding: 0; border-top: 1px solid #e4e7ec; }
+.settings-group-card li { border-bottom: 1px solid #e4e7ec; }
+.settings-group-card li .ant-btn { padding-left: 0; height: 38px; width: 100%; text-align: left; justify-content: flex-start; }
+.settings-breadcrumb { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 16px; color: #667085; }
+.settings-breadcrumb .ant-btn-link { padding: 0; }
+.settings-breadcrumb strong { color: #1d2939; }
+.settings-breadcrumb .settings-back { margin-left: auto; }
+/* Trang chủ dạng thẻ (08/11/2026) */
+.settings-search { max-width: 420px; margin-bottom: 20px; }
+.settings-group { margin-bottom: 20px; }
+.settings-group .ant-typography { margin-bottom: 10px; }
+.settings-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.settings-card { text-align: left; padding: 16px; background: #fff; border: 1px solid #98a2b3; border-radius: 10px; font-size: 14px; font-weight: 600; color: #1d2939; cursor: pointer; }
+.settings-card:hover, .settings-card:focus-visible { border-color: #175cd3; background: #eff4ff; outline: none; }
+.settings-breadcrumb { margin-bottom: 12px; }
+.settings-breadcrumb a { cursor: pointer; }
+.settings-switch { max-width: 100%; overflow-x: auto; margin-bottom: 16px; }
+.settings-back { margin-bottom: 12px; }

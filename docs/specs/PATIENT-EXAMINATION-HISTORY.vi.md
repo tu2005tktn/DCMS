@@ -22,3 +22,12 @@ Cập nhật 02/11/2026; liên quan S06/UC-08, S19/S20 và kết thúc lượt k
 - API/PostgreSQL: kết thúc -> truy vấn hồ sơ đúng bệnh nhân có một dòng Completed, nội dung/phiên bản chính xác và completedAt; trước kết thúc không có completedAt; retry không trùng; đính chính không đổi completedAt; bệnh nhân khác không chứa lượt này.
 - Trình duyệt API thật: hoàn tất/kết thúc -> mở lịch sử đúng hồ sơ -> xem nội dung -> tải lại vẫn còn, mở lại phiếu gốc. Kiểm tra làm mới hồ sơ đang mở sau khi lượt kết thúc từ cửa sổ khác.
 - UI: phân biệt phiếu xác nhận và lượt kết thúc, lọc đúng, hiển thị thông tin khám và xử lý lỗi tải.
+
+## Bỏ đoạn mô tả tab "Lịch sử khám" (07/11/2026)
+
+Tab "Lịch sử khám" trong hồ sơ bệnh nhân không còn đoạn mô tả "Mỗi lượt khám được tự động lưu vào hồ sơ...". Nội dung tab và quy tắc lưu lượt khám không đổi.
+
+
+## Bảng lịch sử khám không cuộn ngang (08/11/2026)
+
+Bảng lịch sử khám không có thanh cuộn ngang; chữ trong ô tự xuống dòng. Từ 1000px trở xuống mỗi lượt khám là một thẻ, mỗi trường một dòng "nhãn: giá trị" (Nội dung, Ngày đến / lịch hẹn, Bác sĩ / chi nhánh, Phiếu khám, Chẩn đoán / hướng xử trí, Lượt đến / kết thúc, Thao tác). Bảng có viền ngoài và đường kẻ giữa ô khi hiển thị dạng bảng.

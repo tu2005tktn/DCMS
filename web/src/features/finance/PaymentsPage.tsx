@@ -8,8 +8,10 @@ import {useEffect,useRef,useState} from 'react';
 import {Link,useParams} from 'react-router-dom';
 import {api} from '../../services/api';
 import {type Bill,type QueueBill,type Capabilities,type Payment,money} from './types';
+import { useCanPickBranch } from '../authentication/useCanPickBranch';
 const paymentStates:Record<string,string>={Pending:'Chờ xác nhận tiền vào',Posted:'Đã thu',Cancelled:'Đã hủy'};
 export default function PaymentsPage(){
+  const canPickBranch = useCanPickBranch();
   const has = usePermissions();
  const [billingOrder,setBillingOrder]=useState<BillInvestigation>();
  const {visitId}=useParams();const [cap,setCap]=useState<Capabilities>(),[branch,setBranch]=useState<number>(),[queue,setQueue]=useState<QueueBill[]>([]),[bill,setBill]=useState<Bill>(),[error,setError]=useState<string>(),[busy,setBusy]=useState(false);
@@ -25,7 +27,7 @@ export default function PaymentsPage(){
  const method=Form.useWatch('method',form);
  return <main className="finance-page"><Space wrap><Typography.Title level={2}>{visitId?'Thanh toán lượt khám':'Danh sách cần thu'}</Typography.Title><Button disabled={busy} onClick={()=>{setError(undefined);void load().catch(e=>setError((e as Error).message));}}>Tải lại thanh toán</Button>{visitId&&<><Link to={`/visits/${visitId}`}>Về lượt khám</Link><Link to={`/visits/${visitId}/prescription`}>Đơn thuốc mua ngoài</Link></>}<Link to="/clinical-services">Danh mục dịch vụ</Link></Space>
  {error&&<Alert type="error" role="alert" message={error}/>}
- {!visitId?<><Select aria-label="Chi nhánh thanh toán" style={{minWidth:240}} value={branch} onChange={setBranch} options={cap?.branches.map(x=>({value:x.id,label:x.name}))}/><Table rowKey="visitId" dataSource={queue} columns={[{title:'Bệnh nhân',dataIndex:'patientName'},{title:'Tổng phí',dataIndex:'totalVnd',render:money},{title:'Còn phải thu',dataIndex:'remainingVnd',render:money},{title:'Chuyển khoản chờ',dataIndex:'pendingPayments'},{title:'Chỉ định chờ xử lý',dataIndex:'pendingServices'},{title:'Phí khám chờ xác định',dataIndex:'pendingExaminationFees'},{title:'',render:(_,row)=><Link to={`/visits/${row.visitId}/payments`}>Mở thanh toán</Link>}]}/></>:bill&&<>
+ {!visitId?<>{canPickBranch && (cap?.branches.length??0)>1&&<Select aria-label="Chi nhánh thanh toán" style={{minWidth:240}} value={branch} onChange={setBranch} options={cap?.branches.map(x=>({value:x.id,label:x.name}))}/>}<Table rowKey="visitId" dataSource={queue} columns={[{title:'Bệnh nhân',dataIndex:'patientName'},{title:'Tổng phí',dataIndex:'totalVnd',render:money},{title:'Còn phải thu',dataIndex:'remainingVnd',render:money},{title:'Chuyển khoản chờ',dataIndex:'pendingPayments'},{title:'Chỉ định chờ xử lý',dataIndex:'pendingServices'},{title:'Phí khám chờ xác định',dataIndex:'pendingExaminationFees'},{title:'',render:(_,row)=><Link to={`/visits/${row.visitId}/payments`}>Mở thanh toán</Link>}]}/></>:bill&&<>
  <Descriptions items={[{key:'p',label:'Bệnh nhân',children:bill.patientName},{key:'b',label:'Chi nhánh',children:bill.branchName}]}/>
  <ExaminationFeePanel key={bill.visitId} visitId={bill.visitId} onChanged={load}/>
  <Space wrap><Card title="Tổng phí đã ghi">{money(bill.totalVnd)}</Card><Card title="Đã thu">{money(bill.paidVnd)}</Card><Card title="Còn phải thu">{money(bill.remainingVnd)}</Card></Space>

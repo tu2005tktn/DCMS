@@ -14,17 +14,17 @@ using static DCMS.Infrastructure.Features.PatientLinks.PatientLinkSupport;
 namespace DCMS.Infrastructure.Features.Patients;
 
 // S05/S06 (UC-08, UC-09, UC-38). Search never creates, merges or changes a record; shared phones never merge identities.
-public sealed partial class PatientService(DcmsDbContext db) : IPatientService
+public sealed partial class PatientService(DcmsDbContext db, DCMS.Application.Features.Settings.ISettingsAccess access) : IPatientService
 {
     private static readonly int[] PageSizes = [20, 50, 100];
     private const string Entity = "bệnh nhân";
 
-    public async Task<PatientPage> SearchAsync(string? keyword, DateOnly? birthDate, bool includeArchived, int page, int pageSize,
+    public async Task<PatientPage> SearchAsync(int actorId, string? keyword, DateOnly? birthDate, bool includeArchived, int page, int pageSize, int? branchId,
         CancellationToken ct)
     {
         if (page < 1 || !PageSizes.Contains(pageSize) || page > int.MaxValue / pageSize) Invalid("Phân trang");
         var term = Optional(keyword, "Từ khóa", 100);
-        var query = db.Patients.AsNoTracking();
+        var query = await ScopedAsync(actorId, ct, branchId);
         if (!includeArchived) query = query.Where(x => !x.IsArchived);
         if (birthDate is { } birth) query = query.Where(x => x.BirthDate == birth);
         if (term != null)
@@ -49,8 +49,32 @@ public sealed partial class PatientService(DcmsDbContext db) : IPatientService
         return await FindDuplicatesAsync(NormalizeName(name), request.BirthDate, phone, request.ExcludeId, ct);
     }
 
-    public async Task<PatientDetail> GetAsync(int id, CancellationToken ct) =>
-        await DetailAsync(await db.Patients.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw Missing(), ct);
+    public async Task<PatientDetail> GetAsync(int actorId, int id, CancellationToken ct) =>
+        await DetailAsync(await (await ScopedAsync(actorId, ct)).SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw Missing(), ct);
+
+    // Chủ thấy tất cả; nhân viên khác thấy bệnh nhân có lịch hẹn/lượt khám/hồ sơ điều trị tại chi nhánh được gán,
+    // hoặc chưa có hoạt động ở chi nhánh nào (docs/specs/S58-BRANCHES-AND-CHAIRS.md §5).
+    private async Task<IQueryable<PatientProfile>> ScopedAsync(int actorId, CancellationToken ct, int? branchId = null)
+    {
+        var all = db.Patients.AsNoTracking();
+        var scope = await access.ResolveAsync(actorId, ct);
+        if (branchId.HasValue)
+        {
+            if (!scope.Owner && !scope.BranchIds.Contains(branchId.Value)) throw new BusinessException(403, SystemMessages.Get("MSG06"));
+            var one = db.Appointments.Where(a => a.PatientId != null && a.BranchId == branchId).Select(a => a.PatientId!.Value)
+                .Union(db.Visits.Where(v => v.BranchId == branchId).Select(v => v.PatientId))
+                .Union(db.TreatmentDossiers.Where(d => d.BranchId == branchId).Select(d => d.PatientId));
+            return all.Where(x => one.Contains(x.Id));
+        }
+        if (scope.Owner) return all;
+        var branches = scope.BranchIds;
+        var mine = db.Appointments.Where(a => a.PatientId != null && branches.Contains(a.BranchId)).Select(a => a.PatientId!.Value)
+            .Union(db.Visits.Where(v => branches.Contains(v.BranchId)).Select(v => v.PatientId))
+            .Union(db.TreatmentDossiers.Where(d => branches.Contains(d.BranchId)).Select(d => d.PatientId));
+        var any = db.Appointments.Where(a => a.PatientId != null).Select(a => a.PatientId!.Value)
+            .Union(db.Visits.Select(v => v.PatientId)).Union(db.TreatmentDossiers.Select(d => d.PatientId));
+        return all.Where(x => mine.Contains(x.Id) || !any.Contains(x.Id));
+    }
 
     public async Task<PatientChange> CreateAsync(int actorId, CreatePatientRequest request, CancellationToken ct)
     {
@@ -198,9 +222,9 @@ public sealed partial class PatientService(DcmsDbContext db) : IPatientService
         new(x.PatientCode, x.FullName, x.BirthDate, x.Gender, x.Phone, x.Address, x.GuardianName, x.GuardianRelationship,
             x.GuardianPhone, x.IsArchived, link.ReviewedAt ?? link.RequestedAt, x.UpdatedAt, x.Version);
 
-    public async Task<IReadOnlyList<PatientAuditEntry>> AuditAsync(int id, CancellationToken ct)
+    public async Task<IReadOnlyList<PatientAuditEntry>> AuditAsync(int actorId, int id, CancellationToken ct)
     {
-        if (!await db.Patients.AnyAsync(x => x.Id == id, ct)) throw Missing();
+        if (!await (await ScopedAsync(actorId, ct)).AnyAsync(x => x.Id == id, ct)) throw Missing();
         var rows = await (from audit in db.PatientAudits.AsNoTracking()
                           join user in db.Users.AsNoTracking() on audit.ActorAccountId equals user.Id
                           where audit.PatientId == id

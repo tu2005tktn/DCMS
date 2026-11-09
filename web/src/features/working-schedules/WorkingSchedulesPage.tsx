@@ -1,9 +1,11 @@
 import { usePermissions } from '../authentication/usePermissions';
+import { useCanPickBranch } from '../authentication/useCanPickBranch';
 import { Alert, Button, Card, Empty, Input, InputNumber, Select, Space, Spin, Table, Tag, Typography } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { api, ApiError } from '../../services/api';
 import type { Affected, Availability, Options, Period } from './contracts';
+import './workingSchedules.css';
 import { validateAvailabilityDuration, validateSchedulePeriods } from './validation';
 
 type BranchPeriod = Period & { branchId: number };
@@ -35,6 +37,8 @@ export default function WorkingSchedulesPage() {
   const [affected, setAffected] = useState<Affected[]>();
   const [days, setDays] = useState<Availability[]>();
   const [branch, setBranch] = useState<number>();
+  const canPickBranch = useCanPickBranch();
+  const [viewBranch, setViewBranch] = useState<number>();
   const [service, setService] = useState<number>();
   const [assistant, setAssistant] = useState<number>();
   const [duration, setDuration] = useState<number | null>(30);
@@ -46,6 +50,7 @@ export default function WorkingSchedulesPage() {
   const generation = useRef(0);
   const dirty = !!saved && baseline !== JSON.stringify({ periods, reason });
   const durationError = validateAvailabilityDuration(duration, mode === 'Public', options?.services.find(s => s.id === service)?.publicDurationMinutes);
+  const showBranchPicker = canPickBranch && (options?.branches.length ?? 0) > 1;
   const eligible = options?.branches.filter(b => options.employees.some(e => e.id === employee && e.branchId === b.id && (e.canView ?? e.canEdit))) ?? [];
   const fail = (e: unknown) => setError(e instanceof ApiError ? e : new ApiError(0, 'MSG144', 'Không thể kết nối. Vui lòng thử lại.'));
   const discardOkay = () => !dirty || window.confirm('Hủy các thay đổi chưa lưu?');
@@ -63,7 +68,7 @@ export default function WorkingSchedulesPage() {
       const result = await api<Options>('/api/working-schedules/options'); setOptions(result);
       const requested = Number(params.get('dentistId'));
       const own = result.employees.find(e => e.id === requested && (e.canView ?? e.canEdit)) ?? result.employees.find(e => e.self && (e.canView ?? e.canEdit)) ?? result.employees.find(e => (e.canView ?? e.canEdit));
-      setEmployee(own?.id); setBranch(own?.branchId); setService(result.services.find(s => s.branchId === own?.branchId)?.id);
+      setEmployee(own?.id); setBranch(own?.branchId); setViewBranch(own?.branchId); setService(result.services.find(s => s.branchId === own?.branchId)?.id);
     } catch (e) { fail(e); } finally { setBusy(false); }
   }
   useEffect(() => { void loadOptions(); }, []);
@@ -141,11 +146,12 @@ export default function WorkingSchedulesPage() {
   const revision = kind === 'Template' ? saved?.template : saved?.exception;
   return <Space direction="vertical" size="middle" style={{ width: '100%' }}>
     <Typography.Title level={2}>S09 · Lịch làm việc tuần</Typography.Title>
-    <Typography.Paragraph>Mẫu lặp từ Thứ 2 đến Chủ nhật · Mỗi ngày một chi nhánh hoặc không làm việc · Ngoại lệ chỉ thay thế ngày được chọn · Giờ phòng khám (UTC+7).</Typography.Paragraph>
     {error && <Alert type="error" showIcon message={`${error.status === 403 ? 'Không có quyền truy cập' : error.status === 409 ? 'Xung đột · Cần kiểm tra lại' : error.status === 400 ? 'Dữ liệu chưa hợp lệ' : 'Lỗi kết nối hoặc dịch vụ'} · ${error.code}`} description={<div style={{ whiteSpace: 'pre-line' }}>{error.message}</div>} action={<Button disabled={busy} onClick={() => { if (discardOkay()) void (options ? load() : loadOptions()); }}>Tải lại</Button>} />}
     {success && <Alert type="success" message={success} showIcon />}
     <Space wrap>
-      <label>Nhân viên / bác sĩ <Select aria-label="Nhân viên / bác sĩ" value={employee} disabled={busy} style={{ width: 230 }} options={options?.employees.filter((e, i, all) => (e.canView ?? e.canEdit) && all.findIndex(x => x.id === e.id && (x.canView ?? x.canEdit)) === i).map(e => ({ value: e.id, label: e.name }))} onChange={value => { if (discardOkay()) { setEmployee(value); const b = options?.employees.find(e => e.id === value && (e.canView ?? e.canEdit))?.branchId; setBranch(b); setService(options?.services.find(s => s.branchId === b)?.id); setAssistant(undefined); } }} /></label>
+      {showBranchPicker && <label>Chi nhánh <Select aria-label="Chi nhánh" value={viewBranch} disabled={busy} style={{ width: 230 }} options={options?.branches.map(b => ({ value: b.id, label: b.name }))}
+        onChange={value => { if (!discardOkay()) return; setViewBranch(value); const first = options?.employees.find(e => e.branchId === value && (e.canView ?? e.canEdit)); setEmployee(first?.id); setBranch(value); setService(options?.services.find(sv => sv.branchId === value)?.id); setAssistant(undefined); }} /></label>}
+      <label>Nhân viên / bác sĩ <Select aria-label="Nhân viên / bác sĩ" value={employee} disabled={busy} style={{ width: 230 }} options={options?.employees.filter((e, i, all) => (e.canView ?? e.canEdit) && (!showBranchPicker || e.branchId === viewBranch) && all.findIndex(x => x.id === e.id && (x.canView ?? x.canEdit) && (!showBranchPicker || x.branchId === viewBranch)) === i).map(e => ({ value: e.id, label: e.name }))} onChange={value => { if (discardOkay()) { setEmployee(value); const b = options?.employees.find(e => e.id === value && (e.canView ?? e.canEdit))?.branchId; setBranch(b); setService(options?.services.find(s => s.branchId === b)?.id); setAssistant(undefined); } }} /></label>
       <Select aria-label="Loại lịch" value={kind} disabled={busy} style={{ width: 230 }} options={[{ value: 'Template', label: 'Mẫu lặp hằng tuần' }, { value: 'Exception', label: 'Ngoại lệ ngày cụ thể' }]} onChange={value => { if (discardOkay()) setKind(value); }} />
       <label>{kind === 'Template' ? 'Áp dụng từ ngày' : 'Ngày ngoại lệ'} <Input aria-label="Ngày áp dụng" type="date" value={date} disabled={busy} onChange={e => { if (e.target.value && discardOkay()) setDate(e.target.value); }} /></label>
     </Space>
@@ -156,8 +162,7 @@ export default function WorkingSchedulesPage() {
       {saved.legacyWeek.length > 0 && <Alert type="info" message="Có lịch tuần cũ được giữ lại" description="Lịch cũ chỉ áp dụng đúng tuần đã lưu khi chưa có mẫu hoặc ngoại lệ có hiệu lực. Hãy nhập mẫu lặp mới để dùng cho các tuần sau." />}
       {!!saved.futureChanges.length && <Card size="small" title="Thay đổi đã công bố trong tương lai">{saved.futureChanges.map(r => <div key={r.id}>{r.date} · {r.kind === 'Template' ? 'Mẫu lặp' : 'Ngoại lệ'} · Version {r.version}{r.reason ? ` · ${r.reason}` : ''}</div>)}</Card>}
       {kind === 'Exception' && <label>Lý do ngoại lệ <Input aria-label="Lý do ngoại lệ" value={reason} maxLength={500} disabled={!has('working-schedules.manage') || busy} onChange={e => { setReason(e.target.value); clearResults(); }} /></label>}
-      <Typography.Text>Chọn chi nhánh để thêm giờ 08:00–17:00. Giờ làm/nghỉ theo bước 30 phút; slot đặt lịch vẫn theo đơn vị 15 phút. Nghỉ và Block cần lý do, nằm trọn trong giờ làm.</Typography.Text>
-      <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(330px, 1fr))' }}>
+      <div className="working-day-grid" style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(330px, 1fr))' }}>
         {Array.from({ length: 7 }, (_, day) => day).filter(day => kind === 'Template' || day === weekday(date)).map(day => {
           const dayBranch = periods.find(p => p.day === day)?.branchId;
           return <Card key={day} title={dayName(day)}>

@@ -173,8 +173,8 @@ export default function TreatmentSheet({ patientId, dossierId, dossierVersion, o
   async function saveMaterials(activity: SheetActivity, note: string, picked: MaterialUse[]) {
     if (!dossier) throw new Error('Chưa tải được phiếu.');
     // The server replaces the activity's usage lines, so send the lines already deducted plus the newly picked ones.
-    const existing = await api<{ items: { materialId: string; quantity: number }[] }>(`/api/system-settings/material-usage?activityId=${activity.id}&pageSize=100`);
-    const materials = mergeMaterialUses(existing.items.map(x => ({ materialId: x.materialId, quantity: x.quantity })), picked);
+    const existing = await api<MaterialUse[]>(`/api/dossiers/${dossierId}/sheet-activities/${activity.id}/materials`);
+    const materials = mergeMaterialUses(existing, picked);
     const row = { ...activityRow(activity), note, materials };
     const payload = JSON.stringify({ id: activity.id, note, materials });
     if (materialKey.current?.payload !== payload) materialKey.current = { payload, key: crypto.randomUUID() };
@@ -295,7 +295,7 @@ export default function TreatmentSheet({ patientId, dossierId, dossierVersion, o
       <p>{deleting?.serviceName}</p>{error && <Alert type="error" message={error} />}</Modal>
     {materialFor && <MaterialNotePicker note={materialFor.outcome ?? ''} onCancel={() => { materialKey.current = null; setMaterialFor(null); }}
       onApply={(value, uses) => saveMaterials(materialFor, value, uses)} />}
-    {labFor && <LabOrderModal dossierId={dossierId} activityId={labFor.id} serviceName={labFor.serviceNameSnapshot ?? 'điều trị'} canEdit={has('treatment.actuals.update') && canWrite}
+    {labFor && <LabOrderModal dossierId={dossierId} activityId={labFor.id} serviceName={labFor.serviceNameSnapshot ?? 'điều trị'} canEdit={has('treatment.lab.manage') && canWrite}
       onClose={() => setLabFor(null)} onSaved={() => { setLabFor(null); refresh(); }} />}
     {selectPlan && <ApplyItemPlanModal branchId={dossier.branchId} dossierId={dossierId} version={dossier.version} onReload={reloadSource} onClose={() => setSelectPlan(false)} onApplied={() => { setSelectPlan(false); refresh(); }} />}
     <Modal open={!!deletingActivity} title="Bạn có muốn xóa dòng này không?" okText="Đồng ý" cancelText="Không đồng ý" confirmLoading={busy}

@@ -87,7 +87,7 @@ public sealed class MaterialPurchaseService(DcmsDbContext db, TimeProvider clock
 
     public async Task<MaterialPurchasePage> ListAsync(int actorId, string? q, DateOnly? from, DateOnly? to, string? payment, int page, int pageSize, CancellationToken ct)
     {
-        await Require(actorId, "catalog.materials.read");
+        await Require(actorId, "materials.purchases.read");
         if (pageSize is not (20 or 50 or 100) || page < 1 || page > int.MaxValue / pageSize || q?.Length > 160) throw Error("MSG04");
         if (from.HasValue && to.HasValue && from > to) throw Error("MSG04");
         if (payment is not (null or "" or "unpaid" or "partial" or "paid")) throw Error("MSG04", field: "payment");
@@ -111,10 +111,10 @@ public sealed class MaterialPurchaseService(DcmsDbContext db, TimeProvider clock
         return new(rows.Select(ToDto).ToArray(), total, page, pageSize, totals);
     }
     public async Task<MaterialPurchaseDto> GetAsync(int actorId, Guid id, CancellationToken ct)
-    { await Require(actorId, "catalog.materials.read"); return ToDto(await db.MaterialPurchases.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct) ?? throw Error("MSG113", 404)); }
+    { await Require(actorId, "materials.purchases.read"); return ToDto(await db.MaterialPurchases.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct) ?? throw Error("MSG113", 404)); }
 
     public Task<MaterialPurchaseDto> CreateAsync(int actorId, CreateMaterialPurchaseRequest r, CancellationToken ct) =>
-        Command(actorId, "catalog.materials.create", r.RequestKey, "PurchaseCreate", r, async () =>
+        Command(actorId, "materials.purchases.create", r.RequestKey, "PurchaseCreate", r, async () =>
         {
             var f = await Validate(r.EnteredOn, r.ReceivedOn, r.ExpiresOn, r.MaterialId, r.Quantity, r.Unit, r.ConversionFactor, r.UnitPriceVnd, r.PaidVnd, r.SupplierId, r.LotNumber, ct);
             var row = new MaterialPurchase { CreatedAt = clock.GetUtcNow(), CreatedBy = actorId };
@@ -122,7 +122,7 @@ public sealed class MaterialPurchaseService(DcmsDbContext db, TimeProvider clock
             return new Change(row.Id, null, ToDto(row));
         }, ct);
     public Task<MaterialPurchaseDto> UpdateAsync(int actorId, Guid id, UpdateMaterialPurchaseRequest r, CancellationToken ct) =>
-        Command(actorId, "catalog.materials.update", r.RequestKey, "PurchaseUpdate", new { id, r }, async () =>
+        Command(actorId, "materials.purchases.update", r.RequestKey, "PurchaseUpdate", new { id, r }, async () =>
         {
             var row = await Row(id, ct); Version(row.Version, r.ExpectedVersion); var before = ToDto(row);
             var f = await Validate(r.EnteredOn, r.ReceivedOn, r.ExpiresOn, r.MaterialId, r.Quantity, r.Unit, r.ConversionFactor, r.UnitPriceVnd, r.PaidVnd, r.SupplierId, r.LotNumber, ct);
@@ -131,7 +131,7 @@ public sealed class MaterialPurchaseService(DcmsDbContext db, TimeProvider clock
             return new Change(id, before, ToDto(row));
         }, ct);
     public Task<MaterialPurchaseDto> DeleteAsync(int actorId, Guid id, DeleteCatalogRequest r, CancellationToken ct) =>
-        Command(actorId, "catalog.materials.deactivate", r.RequestKey, "PurchaseDelete", new { id, r }, async () =>
+        Command(actorId, "materials.purchases.delete", r.RequestKey, "PurchaseDelete", new { id, r }, async () =>
         {
             var row = await Row(id, ct); Version(row.Version, r.ExpectedVersion); var before = ToDto(row);
             row.IsDeleted = true; row.Version++; row.UpdatedAt = clock.GetUtcNow(); row.UpdatedBy = actorId; await db.SaveChangesAsync(ct);

@@ -43,3 +43,22 @@ Form S05/S06 thêm nhóm "Thông tin bổ sung": Ngày lập hồ sơ (mặc đ�
 Tạo/sửa có đủ trường; chọn mục ngừng dùng bị chặn nhưng giữ được mục đã gắn; bật bắt buộc nguồn/nhóm/ngày lập hồ sơ thì lưu thiếu bị MSG02, bệnh nhân tự sửa không bị chặn; ngày lập ở tương lai bị MSG04; preview đếm hồ sơ thiếu. Integration test trên schema tạm; web build.
 
 Tích hợp workspace 53d3e2e: các API `/api/settings/*` của module trong tài liệu này dùng tiền tố `/api/system-settings/settings/*`; API options dùng `/api/system-settings/reference-options`. Các API `/api/settings/*` hiện hữu tiếp tục dành cho module phân quyền/danh mục vận hành riêng. Xem [ghi chú tích hợp](../implementation/MAIN-INTEGRATION-20261027-53d3e2e.vi.md).
+
+## Màn Bệnh nhân: bỏ đoạn mô tả dưới tiêu đề (07/11/2026)
+
+Màn danh sách Bệnh nhân (`/patients`) chỉ có tiêu đề "Bệnh nhân" và nút "Thêm hồ sơ"; không còn đoạn mô tả "Tìm hồ sơ theo mã, họ tên hoặc số điện thoại...". Quy tắc tìm kiếm và việc không tự gộp hồ sơ trùng số điện thoại không đổi.
+
+## Danh sách bệnh nhân: không cuộn ngang (07/11/2026)
+
+Bảng "Danh sách bệnh nhân" không có thanh cuộn ngang ở mọi độ rộng; chữ tự xuống dòng. Từ 1000px trở xuống, mỗi hồ sơ là một thẻ, mỗi cột một dòng "nhãn: giá trị" (Mã bệnh nhân, Họ tên, Ngày sinh, Giới tính, Số điện thoại, Lần khám gần nhất, Trạng thái) và nút "Mở hồ sơ" ở cuối thẻ; bấm vào thẻ vẫn mở hồ sơ. Không đổi dữ liệu hay API.
+
+## Danh sách bệnh nhân: bỏ chữ tổng số ở phân trang (07/11/2026)
+
+Phân trang của bảng "Danh sách bệnh nhân" không còn dòng "N hồ sơ" bên trái; vẫn giữ số trang và ô chọn số dòng mỗi trang. Số hồ sơ vẫn hiện cạnh tiêu đề "Danh sách bệnh nhân".
+
+
+## Danh sách bệnh nhân: một khối và bảng có viền (08/11/2026)
+
+Bộ lọc và "Danh sách bệnh nhân" nằm chung một thẻ (không còn hai khối tách rời), ngăn cách bằng đường kẻ ngang. Bảng bệnh nhân có viền ngoài bo góc, đường kẻ giữa các hàng và cột khi hiển thị dạng bảng (trên 1000px). Chức năng không đổi.
+
+Cập nhật: khối liền mạch, bỏ đường kẻ ngăn giữa bộ lọc và tiêu đề "Danh sách bệnh nhân"; khoảng cách giữa các phần thu gọn.

@@ -58,6 +58,18 @@ public static class ScreenGrants
         new("finance.payments.cancel", "Hủy chuyển khoản đang chờ", null, "finance.read"),
         new("finance.receipts.print", "In phiếu thu", null, "finance.read"),
         new("finance.receipt-sequence.manage", "Thiết lập số phiếu thu tiếp theo", null, "finance.read"),
+        new("finance.revenue.read", "Xem doanh thu đã thu", null, "finance.read"),
+        new("finance.work-statistics.read", "Xem thống kê công việc / dịch vụ", null, "finance.read"),
+        new("finance.payos.create", "Tạo QR chuyển khoản PayOS", null, "finance.payments.create"),
+        new("treatment.lab.read", "Xem màn Quản lý công việc labo", null, "treatment.read"),
+        new("treatment.lab.track", "Đổi trạng thái phiếu labo", null, "treatment.lab.read"),
+        new("treatment.lab.manage", "Lập, sửa và xóa phiếu labo", AccountRoles.Dentist, "treatment.actuals.update"),
+        new("materials.purchases.read", "Xem nhập hàng dụng cụ / vật liệu", null, "catalog.materials.read"),
+        new("materials.purchases.create", "Thêm lần nhập hàng", null, "materials.purchases.read"),
+        new("materials.purchases.update", "Sửa lần nhập hàng và thanh toán nhà cung cấp", null, "materials.purchases.read"),
+        new("materials.purchases.delete", "Xóa lần nhập hàng hợp lệ", null, "materials.purchases.read"),
+        new("materials.stock.read", "Xem tồn kho theo lô", null, "catalog.materials.read"),
+        new("materials.usage.read", "Xem lịch sử xuất dùng vật liệu", null, "catalog.materials.read"),
         .. SupplyKinds.SelectMany((kind, index) => new[] {
             new GrantDefinition($"catalog.{kind}.read", $"{SupplyLabels[index]}: Xem", null, "settings.read"),
             new GrantDefinition($"catalog.{kind}.create", $"{SupplyLabels[index]}: Thêm", null, $"catalog.{kind}.read"),
@@ -70,6 +82,9 @@ public static class ScreenGrants
     public static bool? Allows(string permission, string[] roles)
     {
         bool Has(params string[] values) => roles.Any(values.Contains);
+        if (permission.StartsWith("materials.")) return Has(AccountRoles.ClinicOwner, AccountRoles.Admin, AccountRoles.Dentist);
+        if (permission is "finance.revenue.read" or "finance.work-statistics.read") return Has(AccountRoles.ClinicOwner, AccountRoles.Admin, AccountRoles.Dentist, AccountRoles.ClinicAssistant);
+        if (permission == "finance.payos.create") return Has(AccountRoles.ClinicOwner, AccountRoles.ClinicAssistant);
         if (permission is "settings.general.read" or "settings.general.manage") return Has(AccountRoles.ClinicOwner, AccountRoles.Admin);
         if (permission.StartsWith("catalog.") && SupplyKinds.Any(kind => permission.StartsWith($"catalog.{kind}.")))
             return Has(AccountRoles.ClinicOwner, AccountRoles.Admin) || !permission.StartsWith("catalog.medicines.") && Has(AccountRoles.Dentist);

@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore;
 namespace DCMS.Infrastructure.Features.Treatment;
 
 public sealed class PayOsOrderService(DcmsDbContext db, ITreatmentDossierService dossiers,
-    PayOsGateway gateway, TimeProvider clock) : IPayOsOrderService
+    PayOsGateway gateway, TimeProvider clock, DCMS.Application.Features.Settings.ISettingsAccess access) : IPayOsOrderService
 {
     private static BusinessException Bad() => new(400, SystemMessages.Get("MSG04"));
     private static BusinessException Conflict() => new(409, SystemMessages.Get("MSG111"));
@@ -35,6 +35,7 @@ public sealed class PayOsOrderService(DcmsDbContext db, ITreatmentDossierService
 
     public async Task<PayOsOrderDto> CreateAsync(int actorId, Guid dossierId, CreatePayOsOrderRequest request, CancellationToken ct)
     {
+        await access.RequireAsync(actorId, "finance.payos.create", ct);
         if (request.RequestKey == Guid.Empty || request.Lines is not { Count: > 0 and <= 500 }
             || request.CollectorId <= 0 || request.Note?.Length > 1000
             || request.Lines.Any(x => x.AmountVnd <= 0 || x.AmountVnd > 2_000_000_000)

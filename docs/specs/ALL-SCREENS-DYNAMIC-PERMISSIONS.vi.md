@@ -58,9 +58,43 @@ Yêu cầu 02/11/2026: mở rộng phân quyền động cho tất cả màn hì
 - Không tự cấp các quyền mới cho nhóm hạn chế hiện có. Không thay role/membership/lịch làm việc hoặc dữ liệu lâm sàng chỉ để gán quyền.
 - Tích hợp main PR #39/#40 ngày 03/11: áp kế hoạch dùng lại cần items.create; ngày dự kiến cần items.update; thanh toán theo phiếu cần finance.read/payments.create. Các API người thân giữ Public/ownership. Chi tiết và bằng chứng ở `docs/implementation/VINH-MAIN-INTEGRATION-20261103.vi.md`.
 
+## Bổ sung chức năng ngày 07/11/2026
+
+Các chức năng mới phải xuất hiện thành lựa chọn trong cây phân quyền, với kiểm tra đồng nhất tại API, dịch vụ và giao diện:
+
+| Chức năng | Quyền mới | Quyền cha |
+| --- | --- | --- |
+| Doanh thu đã thu | `finance.revenue.read` | `finance.read` |
+| Thống kê công việc/dịch vụ | `finance.work-statistics.read` | `finance.read` |
+| Danh sách/chi tiết nhập hàng | `materials.purchases.read` | `catalog.materials.read` |
+| Thêm, sửa, xóa lần nhập | `materials.purchases.create/update/delete` | `materials.purchases.read` |
+| Tồn kho theo lô | `materials.stock.read` | `catalog.materials.read` |
+| Lịch sử xuất dùng | `materials.usage.read` | `catalog.materials.read` |
+| Tạo QR chuyển khoản PayOS | `finance.payos.create` | `finance.payments.create` |
+| Lập, sửa, xóa đơn labo trên quá trình điều trị | `treatment.lab.manage` | `treatment.actuals.update` |
+
+- Giữ giới hạn vai trò hiện có: báo cáo theo vai trò được phép đọc tài chính; kho/nhập hàng theo vai trò được phép dùng danh mục vật liệu; PayOS theo vai trò lập phiếu thu; đơn labo theo vai trò sửa quá trình điều trị. Quyền con không mở rộng quyền nghề nghiệp hoặc chi nhánh.
+- Nhân viên chưa gán nhóm tiếp tục nhận quyền theo vai trò hiện hành. Nhóm hạn chế đã gán phải được người quản lý cấp rõ ràng các quyền mới; không tự sửa grant trong database, không có migration dữ liệu. Chọn quyền con tự chọn cha và bỏ cha thu hồi con như cơ chế hiện có.
+- Menu và route báo cáo dùng quyền riêng. Route `/materials` nhận một trong ba quyền đọc nhập hàng/tồn kho/xuất dùng; chỉ render tab được cấp, và không gọi API của tab bị ẩn. Sửa danh mục không đồng nghĩa được sửa/xóa lần nhập.
+- Picker vật liệu còn tồn trong form điều trị (`material-stock/available`) giữ quyền đọc danh mục hiện hành, không bắt quyền xem toàn bộ tồn kho. Options nhà cung cấp và chi nhánh dùng các quyền cha hiện có.
+- Chỉ quyền tạo QR bị tách khỏi thu tiền mặt. Đọc/đối soát lệnh PayOS vẫn dùng `finance.read`; webhook và worker giữ cơ chế xác minh, idempotency hiện hành. Không gọi PayOS thật trong kiểm thử tự động.
+- Labo vẫn cho đọc theo `treatment.read`; ghi/xóa cần quyền mới. Giữ kiểm tra tác giả/phụ trách, chi nhánh và trạng thái phiếu hiện có.
+- Báo cáo công việc lọc theo chi nhánh được phép của người xem khi không truyền `branchId`, và từ chối chi nhánh ngoài phạm vi khi truyền trực tiếp.
+- Kiểm chứng: cấp riêng từng quyền đọc, chặn quyền còn thiếu, thu hồi với cùng token; kiểm các thao tác nhập hàng, labo và PayOS; kiểm cây quyền, route/menu và tab trong browser. Kiểm tra trên dữ liệu synthetic/schema cách ly, không thay nhóm nhân viên đang dùng.
+
 ## Kiểm chứng
 
 1. Inventory mọi route màn nhân viên và mọi endpoint nghiệp vụ: phải ánh xạ hoặc có lý do baseline/public rõ ràng.
 2. Mỗi nhóm màn có ca API cấp quyền đọc, từ chối ghi, cấp ghi rồi thu hồi với cùng token; kiểm role/scope và alias cũ.
 3. Hồi quy các bộ lịch hẹn/lịch làm việc, điều trị/phiếu điều trị/giá, thiết lập, tài chính, khám/đơn thuốc/tài liệu và hồ sơ bệnh nhân.
 4. Browser mock kiểm route/menu/nút theo quyền; browser API thật trên schema riêng kiểm ít nhất lịch/cấu hình, điều trị và thiết lập được ủy quyền, cùng luồng thu hồi.
+
+
+## Sửa lỗi trùng khai báo quyền đơn thuốc (08/11/2026)
+
+`prescriptions.read` và `prescriptions.manage` bị khai báo hai lần (trong `SettingsGrants` và `ScreenGrants`) sau khi gộp nhánh, làm tra cứu quyền theo khóa lỗi "nhiều hơn một phần tử" và **không đăng nhập được** tài khoản nhân viên. Mỗi quyền chỉ được khai báo một lần: giữ bản trong `ScreenGrants` (có quyền cha `examinations.read`, `prescriptions.read` cho vai trò Nha sĩ), bỏ bản cũ trong `SettingsGrants`. Quy tắc theo vai trò (chủ, Nha sĩ, phụ tá chỉ đọc) trong `RoleAllows` giữ nguyên. Cần thêm kiểm tra không có khóa quyền trùng.
+
+
+## Quyền theo dõi phiếu labo (08/11/2026)
+
+Thêm `treatment.lab.read` (xem màn Quản lý công việc labo, cha `treatment.read`) và `treatment.lab.track` (đổi trạng thái phiếu labo, cha `treatment.lab.read`). Menu và route `/lab-orders` dùng `treatment.lab.read`; endpoint `/api/lab-orders` đọc dùng `treatment.lab.read`, ghi dùng `treatment.lab.track`. Chi tiết: [LAB-ORDER-MANAGEMENT.md](LAB-ORDER-MANAGEMENT.md).

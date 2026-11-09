@@ -114,6 +114,7 @@ public interface ITreatmentDossierService
     Task<TreatmentChange> DeleteSheetItemAsync(int actorId, Guid dossierId, Guid itemId, SheetItemActionRequest request, CancellationToken ct);
     Task<ConfirmSheetActualResult> PerformSheetItemAsync(int actorId, Guid dossierId, Guid itemId, PerformSheetItemRequest request, CancellationToken ct);
     Task<TreatmentSheetContext> SheetContextAsync(int actorId, Guid dossierId, CancellationToken ct);
+    Task<IReadOnlyList<SheetActivityMaterial>> ActivityMaterialsAsync(int actorId, Guid dossierId, Guid activityId, CancellationToken ct);
     Task<NextVisitCandidates> NextVisitCandidatesAsync(int actorId, int patientId, CancellationToken ct);
     Task<PlannedDatePreview> PlannedDatePreviewAsync(int actorId, Guid dossierId, Guid itemId, DateOnly plannedOn, CancellationToken ct);
     Task<TreatmentChange> ApplyPlannedDatesAsync(int actorId, Guid dossierId, ApplyPlannedDatesRequest request, CancellationToken ct);
@@ -121,6 +122,9 @@ public interface ITreatmentDossierService
     Task<LabOrderContext> LabOrderContextAsync(int actorId, Guid dossierId, Guid activityId, CancellationToken ct);
     Task<LabOrderDto> SaveLabOrderAsync(int actorId, Guid dossierId, Guid activityId, SaveLabOrderRequest request, CancellationToken ct);
     Task DeleteLabOrderAsync(int actorId, Guid dossierId, Guid activityId, CancellationToken ct);
+    Task<LabWorkPage> LabWorkAsync(int actorId, string? status, int? branchId, Guid? labProviderId, int? dentistId, DateOnly? from, DateOnly? to, string? q, int page, int pageSize, CancellationToken ct);
+    Task<IReadOnlyList<LabStatusLogItem>> LabWorkHistoryAsync(int actorId, Guid id, CancellationToken ct);
+    Task<LabWorkItem> ChangeLabStatusAsync(int actorId, Guid id, ChangeLabStatusRequest request, CancellationToken ct);
     Task<DossierPaymentContext> PaymentContextAsync(int actorId, Guid dossierId, CancellationToken ct);
     Task<IReadOnlyList<DossierPaymentDto>> PaymentsAsync(int actorId, Guid dossierId, CancellationToken ct);
     Task<DossierPaymentDto> CreatePaymentAsync(int actorId, Guid dossierId, CreateDossierPaymentRequest request, CancellationToken ct);
