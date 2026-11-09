@@ -12,7 +12,7 @@ async function mock(page: Page, config: { existing?: boolean; error?: boolean; s
   await page.addInitScript(() => sessionStorage.setItem('dcms.web.access-token', 'synthetic'));
   await page.route('**/api/**', async route => {
     const req = route.request(), url = new URL(req.url()), path = url.pathname, method = req.method();
-    if (path === '/api/auth/me') return route.fulfill({ json: { id: 1, fullName: 'Nha sĩ mẫu', userName: 'synthetic', accountType: 'Staff', roles: config.forbidden ? ['ClinicAssistant'] : ['Dentist'], effectiveRoles: config.forbidden ? ['ClinicAssistant'] : ['Dentist'], permissions: config.forbidden ? ['patients.read'] : ['patients.read', 'treatment.templates.read', 'treatment.templates.manage'] } });
+    if (path === '/api/auth/me') return route.fulfill({ json: { id: 1, fullName: 'Nha sĩ mẫu', userName: 'synthetic', accountType: 'Staff', roles: config.forbidden ? ['ClinicAssistant'] : ['Dentist'], effectiveRoles: config.forbidden ? ['ClinicAssistant'] : ['Dentist', 'ClinicOwner'], permissions: config.forbidden ? ['patients.read'] : ['patients.read', 'treatment.templates.read', 'treatment.templates.manage'] } });
     if (path === '/api/auth/session/idle') return route.fulfill({ json: { deadlineAt: new Date(Date.now() + 600000).toISOString(), serverNow: new Date().toISOString(), activityVersion: 1 } });
     if (path === '/api/appointments/options') return route.fulfill({ json: { branches: [{ id: 1, name: 'Chi nhánh A' }, { id: 2, name: 'Chi nhánh B' }], services: [], employees: [] } });
     if (path === '/api/treatment-templates') return route.fulfill({ json: [] });
@@ -122,9 +122,12 @@ test('responsive, bàn phím, đổi chi nhánh dirty và lối vào mẫu cũ',
   let discard = false;
   page.on('dialog', dialog => discard ? dialog.accept() : dialog.dismiss());
   await mock(page, { existing: true }); await open(page);
-  for (const width of [390, 768, 1440]) {
+  for (const width of [390, 768, 1000, 1440]) {
     await page.setViewportSize({ width, height: 1000 });
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width + 1);
+    await expect.poll(() => page.evaluate(() => { const w = document.querySelector('.item-plan-list .ant-table') as HTMLElement; const c = w.querySelector('.ant-table-content') as HTMLElement; return Math.max(0, c.scrollWidth - c.clientWidth); })).toBeLessThanOrEqual(1);
+    // The plan table must show every field without its own horizontal scrollbar.
+    await expect.poll(() => page.evaluate(() => { const t = document.querySelector('.item-plan-table') as HTMLElement; const c = t.parentElement as HTMLElement; return Math.max(t.scrollWidth - c.clientWidth, c.scrollWidth - c.clientWidth); })).toBeLessThanOrEqual(1);
     await page.screenshot({ path: `../.artifacts/item-plans-${width}.png`, fullPage: true });
   }
   await page.getByRole('button', { name: '+ Thêm hạng mục', exact: true }).click(); const row = await fillRow(page);

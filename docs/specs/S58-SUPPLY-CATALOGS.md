@@ -65,6 +65,10 @@ Trong form kê đơn, người có quyền `catalog.medicines.manage` có thể 
 
 ## Nghiệm thu
 
+Bổ sung 07/11/2026: bảng Thuốc có bộ lọc `Tất cả / Thuốc phòng khám / Thuốc mua ngoài` dựa trên `internalStockTracked`, mặc định 20 dòng/trang. API danh sách medicines chấp nhận `type=Clinic|External`; lựa chọn mới trong đơn bệnh nhân theo đúng nhóm, trong khi thuốc cũ giữ snapshot.
+
+Bổ sung điều hướng: Chủ phòng khám thấy mục **Quản lý thuốc** trực tiếp trong nhóm Quản trị của menu nhân viên. Đường dẫn `/medicines` mở thẳng bảng thuốc, mặc định lọc Thuốc phòng khám và 20 mục/trang; vẫn giữ mục Thuốc trong Thiết lập hệ thống cho người dùng quen luồng cũ. Quyền truy cập route là `catalog.medicines.read`, các quyền sửa/đổi trạng thái vẫn theo quyền danh mục hiện hữu.
+
 SET-AT-15 (công ty Both một ID ở hai tab; đổi về Supplier khi còn loại công việc labo bị chặn), 17 (loại công việc không có công ty mặc định vẫn lưu), 18 (thuốc kê mua ngoài không cần theo dõi tồn), 30 (export đúng lọc, ô công thức an toàn), 12 phần giá âm/NULL/0, quyền Owner. Integration test trên schema tạm; web build.
 
 Tích hợp workspace 53d3e2e: các API `/api/settings/*` của module trong tài liệu này dùng tiền tố `/api/system-settings/settings/*`; API options dùng `/api/system-settings/reference-options`. Các API `/api/settings/*` hiện hữu tiếp tục dành cho module phân quyền/danh mục vận hành riêng. Xem [ghi chú tích hợp](../implementation/MAIN-INTEGRATION-20261027-53d3e2e.vi.md).

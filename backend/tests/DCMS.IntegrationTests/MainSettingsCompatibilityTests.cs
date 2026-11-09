@@ -34,5 +34,8 @@ public sealed class MainSettingsCompatibilityTests(ReceptionFixture fixture):ICl
   var options=(await dentist.GetFromJsonAsync<ReferenceOption[]>("/api/system-settings/reference-options?kind=diagnoses"))!;
   var activeMerged=merged.Where(x=>x.Kind=="diagnoses"&&x.IsActive).Select(x=>x.Id).ToHashSet();
   Assert.All(legacy.Where(x=>x.Kind=="diagnoses"&&x.Active&&activeMerged.Contains(x.Id)),row=>Assert.Contains(options,o=>o.Id==row.Id&&o.Version==row.Version));
+  // The old module's seeded expense categories duplicate the reserved ones under other names; they are retired, not deleted.
+  Assert.Equal(new[]{"CHI-LABO","CHI-LUONG","CHI-VATLIEU"},merged.Where(x=>x.Kind=="expense-categories"&&x.IsReserved&&x.IsActive).Select(x=>x.Code!).Order().ToArray());
+  Assert.Equal(3,merged.Count(x=>x.Kind=="expense-categories"&&legacy.Any(l=>l.Id==x.Id)&&!x.IsActive&&!x.IsReserved));
  }
 }

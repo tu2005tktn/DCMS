@@ -1,0 +1,55 @@
+.working-week-editor { min-width: 0; overflow: hidden; background: #fff; border: 1px solid #dce4ef; border-radius: 14px; }
+.working-week-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 20px 24px; }
+.working-week-title { display: flex; align-items: center; gap: 10px; color: #254a76; }
+.working-week-title > .anticon { font-size: 20px; }
+.working-week-title h3 { margin: 0; font-size: 16px; font-weight: 600; color: #152e49; }
+.working-week-count { padding: 4px 10px; background: #eff5ff; border-radius: 20px; color: #49688b; font-size: 12px; }
+.working-week-columns, .working-day-row { display: grid; grid-template-columns: 90px minmax(180px, .8fr) minmax(0, 2.2fr); column-gap: 20px; }
+.working-week-columns { padding: 10px 24px; background: #f5f8fc; border-top: 1px solid #edf1f6; color: #6c7c90; font-size: 12px; font-weight: 500; }
+.working-day-row { align-items: start; padding: 18px 24px; border-top: 1px solid #edf1f6; }
+.working-day-off { background: #fafbfd; }
+.working-day-name { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding-top: 5px; }
+.working-day-name > strong { color: #253b53; font-size: 14px; font-weight: 600; }
+.working-day-status { color: #8b95a4; font-size: 11px; }
+.working-day-status.is-working { color: #43836e; }
+.working-day-status.is-working::before { display: inline-block; content: ''; width: 5px; height: 5px; margin-right: 5px; border-radius: 50%; background: #59a68a; vertical-align: 2px; }
+.working-day-branch { min-width: 0; padding-top: 3px; }
+.working-day-branch > .ant-select { width: 100%; }
+.working-day-periods { display: flex; flex-direction: column; align-items: stretch; min-width: 0; gap: 8px; }
+.working-day-empty { padding: 10px 0; color: #98a2b1; font-size: 13px; }
+.working-period { display: grid; grid-template-columns: 22px 112px 194px minmax(100px, 1fr) 30px; align-items: center; gap: 8px; padding: 8px 8px 8px 10px; background: #f6f9fe; border-left: 3px solid #7aa6dd; border-radius: 6px; }
+.working-period-break { background: #fffbf2; border-left-color: #dfb45f; }
+.working-period-block { background: #fcf5f5; border-left-color: #cd9292; }
+.working-period-number { color: #8a99ab; font-size: 11px; font-variant-numeric: tabular-nums; }
+.working-period-kind, .working-period-reason { width: 100%; min-width: 0; }
+.working-period-times { display: grid; grid-template-columns: minmax(0, 1fr) 10px minmax(0, 1fr); align-items: center; gap: 5px; }
+.working-period-times > .ant-select { min-width: 0; width: 100%; font-variant-numeric: tabular-nums; }
+.working-time-separator { text-align: center; color: #9aa6b5; }
+.working-period .ant-select-selector, .working-period-reason.ant-input { border-color: #e0e6ef; border-radius: 6px; font-size: 13px; }
+.working-period-remove.ant-btn { width: 30px; min-width: 30px; padding: 0; color: #9ba7b6; }
+.working-period-remove.ant-btn:hover { color: #d14343; background: #fff0f0; }
+.working-period-add.ant-btn { align-self: flex-start; height: 28px; padding: 0 8px; color: #436f9f; font-size: 12px; }
+@media (max-width: 1350px) {
+  .working-week-columns, .working-day-row { grid-template-columns: 76px minmax(160px, .8fr) minmax(0, 2fr); column-gap: 14px; }
+  .working-period { grid-template-columns: 20px 104px minmax(180px, 1fr) 30px; }
+  .working-period-reason { grid-column: 2 / 4; grid-row: 2; }
+  .working-period-remove { grid-column: 4; grid-row: 1; }
+}
+@media (max-width: 1000px) {
+  .working-week-columns { display: none; }
+  .working-day-row { grid-template-columns: 84px minmax(0, 1fr); row-gap: 12px; }
+  .working-day-periods { grid-column: 2; }
+}
+@media (max-width: 600px) {
+  .working-week-heading { padding: 16px; }
+  .working-week-title h3 { font-size: 14px; }
+  .working-day-row { grid-template-columns: minmax(0, 1fr); padding: 16px; gap: 12px; }
+  .working-day-name { flex-direction: row; align-items: center; justify-content: space-between; padding: 0; }
+  .working-day-periods { grid-column: 1; }
+  .working-day-branch { padding: 0; }
+  .working-day-off .working-day-periods { display: none; }
+  .working-period { grid-template-columns: 20px minmax(0, 1fr) 30px; }
+  .working-period-times { grid-column: 2 / 4; grid-row: 2; }
+  .working-period-reason { grid-column: 2 / 4; grid-row: 3; }
+  .working-period-remove { grid-column: 3; grid-row: 1; }
+}

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { api, type ApiError } from '../../services/api';
 import type { AppointmentOptions, PaymentTerm, PricePreview, ServicePrice, TreatmentChange, TreatmentDossier, TreatmentItem } from './types';
-import { decisionLabel, money } from './types';
+import { decisionLabel, money, progressLabel } from './types';
 import './treatment.css';
 import PlanStepsPanel from './PlanStepsPanel';
 
@@ -215,7 +215,7 @@ export default function PlanPage() {
     <div className="treatment-page-heading"><div><Typography.Title level={2}>Kế hoạch điều trị</Typography.Title>
       <Typography.Paragraph>{dossier.diagnosis}</Typography.Paragraph></div>
       <Space wrap><Tag>{dossier.planState === 'Committed' ? `Đã chốt · phiên bản ${dossier.planVersion}` : dossier.planState === 'Draft' ? 'Bản nháp' : 'Chưa có kế hoạch'}</Tag>
-        {editable && <Link to={`/commercial/treatment?dossier=${dossier.id}`}><Button>Giá và duyệt giảm trừ</Button></Link>}</Space></div>
+        {editable && <Link to={`/settings/treatment-services?dossier=${dossier.id}`}><Button>Giá và duyệt giảm trừ</Button></Link>}</Space></div>
     {(notice || revisionNotice) && <Alert type="success" showIcon className="form-alert"
       message={notice || revisionNotice} />}
     {saveError && <Alert type="error" showIcon className="form-alert" message={saveError.message}
@@ -240,7 +240,8 @@ export default function PlanPage() {
                     <Button size="small" aria-label={`Đưa hạng mục ${item.plannedOrder} xuống`} disabled={index === items.length - 1}
                       onClick={() => moveItem(index, 1)}>↓</Button></span>}</Space> },
                 { title: 'Dịch vụ và vùng', render: (_, item: ItemDraft) => <div>
-                  <strong>{options?.services.find(x => x.id === item.serviceId)?.name ?? `Dịch vụ #${item.serviceId}`}</strong>
+                  <strong>{options?.services.find(x => x.id === item.serviceId)?.name
+                    ?? dossier.items.find(x => x.id === item.id && x.serviceId === item.serviceId)?.serviceName ?? `Dịch vụ #${item.serviceId}`}</strong>
                   <div>{item.region || 'Chưa chọn vùng'}</div></div> },
                 { title: 'Số lượng', render: (_, item: ItemDraft) => `${item.quantity} ${item.unit}` },
                 { title: 'Giá dự kiến', render: (_, item: ItemDraft) => <div>
@@ -253,7 +254,7 @@ export default function PlanPage() {
                 { title: 'Quyết định', render: (_, item: ItemDraft) => <Tag>{decisionLabel[item.decision]}</Tag> },
                 { title: 'Tiến độ', render: (_, item: ItemDraft) => {
                   const current = dossier.items.find(x => x.id === item.id);
-                  return current?.progress ?? 'Chưa thực hiện';
+                  return current ? progressLabel[current.progress] ?? current.progress : 'Chưa thực hiện';
                 } },
                 { title: 'Thao tác', render: (_: unknown, _item: ItemDraft, index: number) => editable
                   ? <Space wrap><Button onClick={() => openScope(index)}>Sửa hạng mục</Button>

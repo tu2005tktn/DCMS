@@ -110,6 +110,7 @@ export function CustomerShell() {
       <NavLink to="/customer/appointments" aria-label="Lịch hẹn của tôi" className={({ isActive }) => `customer-nav-link${isActive ? ' active' : ''}`}><span className="customer-nav-long">Lịch hẹn của tôi</span><span className="customer-nav-short" aria-hidden="true">Lịch hẹn</span></NavLink>
       <NavLink to="/customer/prescriptions" aria-label="Đơn thuốc của tôi" className={({ isActive }) => `customer-nav-link${isActive ? ' active' : ''}`}><span className="customer-nav-long">Đơn thuốc của tôi</span><span className="customer-nav-short" aria-hidden="true">Đơn thuốc</span></NavLink>
       <NavLink to="/customer/patient-link" aria-label="Liên kết hồ sơ" className={({ isActive }) => `customer-nav-link${isActive ? ' active' : ''}`}><span className="customer-nav-long">Liên kết hồ sơ</span><span className="customer-nav-short" aria-hidden="true">Hồ sơ</span></NavLink>
+      <NavLink to="/customer/prescriptions" className={({ isActive }) => `customer-nav-link${isActive ? ' active' : ''}`}>Đơn thuốc</NavLink>
     </div></nav>
     <main className="customer-content" id="customer-main"><Outlet /></main>
   </div>;
@@ -147,9 +148,8 @@ export function CustomerSignInPage() {
         }}
         onValuesChange={changed => setIssues(current => current.filter(issue => !(issue.field in changed)))}>
         <AuthErrorSummary id="customer-sign-in-errors" formName="customer-sign-in" issues={issues} />
-        <Form.Item name="userName" label="Số điện thoại" rules={[{ required: true, message: 'Vui lòng nhập số điện thoại.' },
-          { pattern: phonePattern, message: 'Nhập số di động Việt Nam gồm 10 chữ số.' }]}>
-          <Input autoComplete="username" inputMode="numeric" maxLength={10} />
+        <Form.Item name="userName" label="Email hoặc tên đăng nhập" rules={[{ required: true, whitespace: true, message: 'Vui lòng nhập email hoặc tên đăng nhập.' }]}>
+          <Input autoComplete="username" placeholder="Nhập email hoặc tên đăng nhập" />
         </Form.Item>
         <Form.Item name="password" label="Mật khẩu" rules={[{ required: true, message: 'Vui lòng nhập mật khẩu.' }]}>
           <Input.Password autoComplete="current-password" />

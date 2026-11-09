@@ -25,6 +25,8 @@ public sealed class DevelopmentAccountSeeder(DcmsDbContext db, UserManager<Appli
             ("owner.demo", "Chủ phòng khám demo", [AccountRoles.ClinicOwner]),
             ("assistant.demo", "Trợ lý demo", [AccountRoles.ClinicAssistant]),
             ("dual.demo", "Nhân viên đa vai trò demo", [AccountRoles.Dentist, AccountRoles.ClinicAssistant]),
+            ("dentist.b.demo", "Nha sĩ chi nhánh B demo", [AccountRoles.Dentist]),
+            ("assistant.b.demo", "Trợ lý chi nhánh B demo", [AccountRoles.ClinicAssistant]),
             ("guest.demo", "Tài khoản công khai demo", [AccountRoles.Guest])
         ];
         foreach (var entry in demo)

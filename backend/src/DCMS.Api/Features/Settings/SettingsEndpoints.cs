@@ -14,8 +14,10 @@ public static class SettingsEndpoints
         endpoints.MapGet("/api/system-settings/access-capabilities", async (HttpContext c, ISettingsService s, CancellationToken ct) =>
             Results.Ok(await s.CapabilitiesAsync(Actor(c), ct))).RequireAuthorization().WithTags("S58 Access groups");
 
-        endpoints.MapGet("/api/system-settings/settings/audit", async (HttpContext c, string? section, int? page, int? pageSize, ISettingsService s, CancellationToken ct) =>
-            Results.Ok(await s.AuditAsync(Actor(c), section, page ?? 1, pageSize ?? 20, ct))).RequireAuthorization().WithTags("S58 Settings");
+        // DCMS-132: merged settings history (docs/specs/S58-DCMS-132-EXPORT-AUDIT.vi.md §3), filtered by section and clinic dates.
+        endpoints.MapGet("/api/system-settings/settings/audit", async (HttpContext c, string? section, DateOnly? from, DateOnly? to, int? page, int? pageSize,
+            DCMS.Application.Features.SystemSettings.ISettingsAuditService s, CancellationToken ct) =>
+            Results.Ok(await s.ListAsync(Actor(c), section, from, to, page ?? 1, pageSize ?? 20, ct))).RequireAuthorization().WithTags("S58 Settings");
 
         // Access groups
         var groups = endpoints.MapGroup("/api/system-settings/access-groups").RequireAuthorization().WithTags("S58 Access groups");

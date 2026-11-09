@@ -18,7 +18,7 @@ Một engine danh mục dùng chung cho các kind đơn giản trong allowlist v
 
 Các kind còn lại trong allowlist (`service-categories`, `services`, `providers`, `material-categories`, `materials`, `lab-work-types`, `medicines`) có hợp đồng typed riêng ở các đợt sau; gọi engine này với kind khác trả 400 MSG04 `field = kind`. Không hard-delete, không export Excel cho các kind ở đây.
 
-Consumer: S05/S06 chọn nguồn/nghề/nhóm/tiền sử từ [đợt 3](S58-PATIENT-CATALOG-FIELDS.md). Chưa nối: S19/S23 chọn chẩn đoán qua module này (S19 hiện dùng danh mục chẩn đoán của DCMS-121), S51 loại chi, S60 loại CSKH. Projection `reference-options` đã sẵn cho các consumer đó.
+Consumer: S05/S06 chọn nguồn/nghề/nhóm/tiền sử từ [đợt 3](S58-PATIENT-CATALOG-FIELDS.md). Chưa nối: S19/S23 chọn chẩn đoán qua module này (S19 hiện dùng danh mục chẩn đoán của DCMS-121), S51 loại chi. S60 loại CSKH đã nối từ 09/11/2026: ô "Loại chăm sóc" lưu mã mục `care-types` ([S60-CUSTOMER-CARE-WEB.vi.md](S60-CUSTOMER-CARE-WEB.vi.md)). Projection `reference-options` đã sẵn cho các consumer đó.
 
 ## Dữ liệu
 

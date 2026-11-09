@@ -47,6 +47,7 @@ public sealed class MaterialStockApiTests(ApiFixture fixture) : IClassFixture<Ap
     public async Task UsageDeductsReceivedStockOnlyAndIsReplacedOrReleasedPerActivity()
     {
         using var c = await Login(); var m = await Material(c);
+        using (var seed = fixture.Services.CreateScope()) await seed.ServiceProvider.GetRequiredService<DCMS.Infrastructure.Features.Scheduling.DevelopmentSchedulingSeeder>().SeedAsync(); // lịch sử dùng lọc theo chi nhánh đang hoạt động
         // 2 hộp x 10 = 20 received; 5 not yet received must not count.
         await c.PostAsJsonAsync(Purchases, new CreateMaterialPurchaseRequest(Today, Today, null, m.Id, 2, "hộp", 1000, 0, Guid.NewGuid(), 10));
         await c.PostAsJsonAsync(Purchases, new CreateMaterialPurchaseRequest(Today, null, null, m.Id, 5, "hộp", 1000, 0, Guid.NewGuid(), 10));

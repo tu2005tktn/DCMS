@@ -37,6 +37,11 @@ Phần backend chưa giao (hiển thị trạng thái trung thực, ghi task + n
 | Warranty patient-facing | API bảo hành (S21-S43 spec) | Chỉ hiện khi DTO có; hiện tại card nguồn chưa sẵn sàng |
 | Bill / S42 | S42 (task khác) | Chỉ link khi màn đã có; hiện tại không render link chết |
 
+Cập nhật 08/11/2026 ([MOBILE-PATIENT-VISIT-RESULTS](MOBILE-PATIENT-VISIT-RESULTS.vi.md)):
+- Kết quả khám chính thức theo lượt (findings/chẩn đoán/dặn dò/hướng xử trí) và ảnh/tài liệu `Ready` đã có API own-record `/api/patients/me/visits*`, `/api/patients/me/documents*`.
+- Summary có thẻ **Kết quả khám theo lượt** mở màn `(account)/visit-results`.
+- Card "nguồn chưa kết nối" chỉ còn lịch sử phiên bản/đồng bộ và hóa đơn.
+
 ## 3. Nội dung Summary
 
 - **Identity**: mã BN, họ tên, ngày sinh, ngày liên kết (từ `/record`).

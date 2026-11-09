@@ -111,6 +111,8 @@ public sealed class FamilyMemberService(DcmsDbContext db, TimeProvider clock) : 
             RequireContact(gender, phone);
             var member = await Owned(actor).SingleOrDefaultAsync(x => x.Id == id && x.DeletedAt == null, ct) ?? throw Missing();
             if (member.Version != command.ExpectedVersion) throw new BusinessException(409, SystemMessages.Get("MSG111"));
+            if (member.FullName != name || member.BirthDate != command.BirthDate)
+                await FamilyRecordService.EndAccessAsync(db, actor, id, "Thông tin định danh người thân đã thay đổi. Vui lòng gửi yêu cầu xác minh mới.", clock.GetUtcNow(), ct);
             member.FullName = name; member.Relationship = command.Relationship; member.BirthDate = command.BirthDate;
             member.Gender = gender; member.ContactPhone = phone;
             member.Version++; member.UpdatedAt = clock.GetUtcNow(); return Dto(member);
@@ -121,6 +123,7 @@ public sealed class FamilyMemberService(DcmsDbContext db, TimeProvider clock) : 
         {
             var member = await Owned(actor).SingleOrDefaultAsync(x => x.Id == id && x.DeletedAt == null, ct) ?? throw Missing();
             if (member.Version != command.ExpectedVersion) throw new BusinessException(409, SystemMessages.Get("MSG111"));
+            await FamilyRecordService.EndAccessAsync(db, actor, id, "Người thân đã được xóa khỏi danh sách.", clock.GetUtcNow(), ct);
             member.DeletedAt = member.UpdatedAt = clock.GetUtcNow(); member.Version++; return new DeletedFamilyMember(id, member.Version, true);
         }, ct)).Result;
 }

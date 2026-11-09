@@ -150,8 +150,8 @@ public sealed class RecurringSchedulingTests(ApiFixture fixture) : IClassFixture
             var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
             var owner = await (from e in db.Employees join a in db.Users on e.AccountId equals a.Id where a.UserName == "owner.demo" select e).SingleAsync();
             db.Add(new SchedulingMember { EmployeeId = owner.Id, BranchId = s.Branch, CanDentist = true, CanManageSchedules = true }); await db.SaveChangesAsync();
-            await Message(await manager.GetAsync($"/api/working-schedules/recurring?dentistId={s.Employee}&date=2032-01-05"), HttpStatusCode.Forbidden, "MSG06");
-            await Message(await manager.PostAsJsonAsync("/api/working-schedules/recurring/publish", Command(s, 1) with { Intervals = [] }), HttpStatusCode.Forbidden, "MSG06");
+            // Chủ phòng khám quản lý lịch mọi chi nhánh, không cần là thành viên (docs/specs/S58-BRANCHES-AND-CHAIRS.md §5).
+            Assert.Equal(HttpStatusCode.OK, (await manager.GetAsync($"/api/working-schedules/recurring?dentistId={s.Employee}&date=2032-01-05")).StatusCode);
             db.Add(new SchedulingMember { EmployeeId = owner.Id, BranchId = s.OtherBranch, CanDentist = true, CanManageSchedules = true }); await db.SaveChangesAsync();
         }
         Assert.Equal(HttpStatusCode.OK, (await manager.GetAsync($"/api/working-schedules/recurring?dentistId={s.Employee}&date=2032-01-05")).StatusCode);

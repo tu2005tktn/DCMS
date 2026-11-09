@@ -65,6 +65,7 @@ public sealed class DcmsDbContext(DbContextOptions<DcmsDbContext> options)
     public DbSet<TreatmentReceipt> TreatmentReceipts => Set<TreatmentReceipt>();
     public DbSet<TreatmentSheetDraft> TreatmentSheetDrafts => Set<TreatmentSheetDraft>();
     public DbSet<LabOrder> LabOrders => Set<LabOrder>();
+    public DbSet<LabOrderStatusLog> LabOrderStatusLogs => Set<LabOrderStatusLog>();
     public DbSet<DossierPayment> DossierPayments => Set<DossierPayment>();
     public DbSet<DossierPaymentLine> DossierPaymentLines => Set<DossierPaymentLine>();
     public DbSet<DossierPayOsOrder> DossierPayOsOrders => Set<DossierPayOsOrder>();
@@ -87,6 +88,7 @@ public sealed class DcmsDbContext(DbContextOptions<DcmsDbContext> options)
     protected override void OnModelCreating(ModelBuilder model)
     {
         FamilyMemberModel.Configure(model);
+        FamilyRecordModel.Configure(model);
         base.OnModelCreating(model);
         SchedulingModel.Configure(model);
         AppointmentModel.Configure(model);
@@ -94,6 +96,7 @@ public sealed class DcmsDbContext(DbContextOptions<DcmsDbContext> options)
         ExaminationModel.Configure(model);
         SettingsModel.Configure(model);
         FinanceModel.Configure(model);
+        FinanceSettlementModel.Configure(model);
         PrescriptionModel.Configure(model);
         TreatmentModel.Configure(model);
         SystemSettingsModel.Configure(model);

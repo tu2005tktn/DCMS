@@ -1,10 +1,14 @@
 import { usePermissions } from '../authentication/usePermissions';
-import { Alert, Button, Card, Empty, Input, InputNumber, Select, Space, Spin, Table, Tag, Typography } from 'antd';
+import { useCanPickBranch } from '../authentication/useCanPickBranch';
+import { Alert, Button, Card, Empty, Input, InputNumber, Select, Space, Spin, Table, Tag, Tooltip, Typography } from 'antd';
+import { CalendarOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { api, ApiError } from '../../services/api';
 import type { Affected, Availability, Options, Period } from './contracts';
+import './workingSchedules.css';
 import { validateAvailabilityDuration, validateSchedulePeriods } from './validation';
+import DoctorAppointmentsPanel from './DoctorAppointmentsPanel';
 
 type BranchPeriod = Period & { branchId: number };
 type Revision = { id: string; date: string; kind: string; version: number; intervals: BranchPeriod[]; reason: string; publishedBy: number; publishedAt: string };
@@ -35,6 +39,8 @@ export default function WorkingSchedulesPage() {
   const [affected, setAffected] = useState<Affected[]>();
   const [days, setDays] = useState<Availability[]>();
   const [branch, setBranch] = useState<number>();
+  const canPickBranch = useCanPickBranch();
+  const [viewBranch, setViewBranch] = useState<number>();
   const [service, setService] = useState<number>();
   const [assistant, setAssistant] = useState<number>();
   const [duration, setDuration] = useState<number | null>(30);
@@ -46,6 +52,7 @@ export default function WorkingSchedulesPage() {
   const generation = useRef(0);
   const dirty = !!saved && baseline !== JSON.stringify({ periods, reason });
   const durationError = validateAvailabilityDuration(duration, mode === 'Public', options?.services.find(s => s.id === service)?.publicDurationMinutes);
+  const showBranchPicker = canPickBranch && (options?.branches.length ?? 0) > 1;
   const eligible = options?.branches.filter(b => options.employees.some(e => e.id === employee && e.branchId === b.id && (e.canView ?? e.canEdit))) ?? [];
   const fail = (e: unknown) => setError(e instanceof ApiError ? e : new ApiError(0, 'MSG144', 'Không thể kết nối. Vui lòng thử lại.'));
   const discardOkay = () => !dirty || window.confirm('Hủy các thay đổi chưa lưu?');
@@ -63,7 +70,7 @@ export default function WorkingSchedulesPage() {
       const result = await api<Options>('/api/working-schedules/options'); setOptions(result);
       const requested = Number(params.get('dentistId'));
       const own = result.employees.find(e => e.id === requested && (e.canView ?? e.canEdit)) ?? result.employees.find(e => e.self && (e.canView ?? e.canEdit)) ?? result.employees.find(e => (e.canView ?? e.canEdit));
-      setEmployee(own?.id); setBranch(own?.branchId); setService(result.services.find(s => s.branchId === own?.branchId)?.id);
+      setEmployee(own?.id); setBranch(own?.branchId); setViewBranch(own?.branchId); setService(result.services.find(s => s.branchId === own?.branchId)?.id);
     } catch (e) { fail(e); } finally { setBusy(false); }
   }
   useEffect(() => { void loadOptions(); }, []);
@@ -141,47 +148,59 @@ export default function WorkingSchedulesPage() {
   const revision = kind === 'Template' ? saved?.template : saved?.exception;
   return <Space direction="vertical" size="middle" style={{ width: '100%' }}>
     <Typography.Title level={2}>S09 · Lịch làm việc tuần</Typography.Title>
-    <Typography.Paragraph>Mẫu lặp từ Thứ 2 đến Chủ nhật · Mỗi ngày một chi nhánh hoặc không làm việc · Ngoại lệ chỉ thay thế ngày được chọn · Giờ phòng khám (UTC+7).</Typography.Paragraph>
     {error && <Alert type="error" showIcon message={`${error.status === 403 ? 'Không có quyền truy cập' : error.status === 409 ? 'Xung đột · Cần kiểm tra lại' : error.status === 400 ? 'Dữ liệu chưa hợp lệ' : 'Lỗi kết nối hoặc dịch vụ'} · ${error.code}`} description={<div style={{ whiteSpace: 'pre-line' }}>{error.message}</div>} action={<Button disabled={busy} onClick={() => { if (discardOkay()) void (options ? load() : loadOptions()); }}>Tải lại</Button>} />}
     {success && <Alert type="success" message={success} showIcon />}
     <Space wrap>
-      <label>Nhân viên / bác sĩ <Select aria-label="Nhân viên / bác sĩ" value={employee} disabled={busy} style={{ width: 230 }} options={options?.employees.filter((e, i, all) => (e.canView ?? e.canEdit) && all.findIndex(x => x.id === e.id && (x.canView ?? x.canEdit)) === i).map(e => ({ value: e.id, label: e.name }))} onChange={value => { if (discardOkay()) { setEmployee(value); const b = options?.employees.find(e => e.id === value && (e.canView ?? e.canEdit))?.branchId; setBranch(b); setService(options?.services.find(s => s.branchId === b)?.id); setAssistant(undefined); } }} /></label>
+      {showBranchPicker && <label>Chi nhánh <Select aria-label="Chi nhánh" value={viewBranch} disabled={busy} style={{ width: 230 }} options={options?.branches.map(b => ({ value: b.id, label: b.name }))}
+        onChange={value => { if (!discardOkay()) return; setViewBranch(value); const first = options?.employees.find(e => e.branchId === value && (e.canView ?? e.canEdit)); setEmployee(first?.id); setBranch(value); setService(options?.services.find(sv => sv.branchId === value)?.id); setAssistant(undefined); }} /></label>}
+      <label>Nhân viên / bác sĩ <Select aria-label="Nhân viên / bác sĩ" value={employee} disabled={busy} style={{ width: 230 }} options={options?.employees.filter((e, i, all) => (e.canView ?? e.canEdit) && (!showBranchPicker || e.branchId === viewBranch) && all.findIndex(x => x.id === e.id && (x.canView ?? x.canEdit) && (!showBranchPicker || x.branchId === viewBranch)) === i).map(e => ({ value: e.id, label: e.name }))} onChange={value => { if (discardOkay()) { setEmployee(value); const b = options?.employees.find(e => e.id === value && (e.canView ?? e.canEdit))?.branchId; setBranch(b); setService(options?.services.find(s => s.branchId === b)?.id); setAssistant(undefined); } }} /></label>
       <Select aria-label="Loại lịch" value={kind} disabled={busy} style={{ width: 230 }} options={[{ value: 'Template', label: 'Mẫu lặp hằng tuần' }, { value: 'Exception', label: 'Ngoại lệ ngày cụ thể' }]} onChange={value => { if (discardOkay()) setKind(value); }} />
       <label>{kind === 'Template' ? 'Áp dụng từ ngày' : 'Ngày ngoại lệ'} <Input aria-label="Ngày áp dụng" type="date" value={date} disabled={busy} onChange={e => { if (e.target.value && discardOkay()) setDate(e.target.value); }} /></label>
     </Space>
     {busy && <Spin tip="Đang tải / kiểm tra lịch"><div style={{ height: 30 }} /></Spin>}
     {options && !options.employees.some(e => (e.canView ?? e.canEdit)) && <Empty description="Chưa có nhân viên được phân quyền" />}
+    {employee && options?.employees.some(person => person.id === employee && person.canDentist && (person.canView ?? person.canEdit))
+      && <DoctorAppointmentsPanel dentistId={employee} date={date} />}
     {saved && <>
       <Space wrap><Tag color={revision ? 'green' : 'default'}>{revision ? 'Đã công bố' : 'Chưa công bố'}</Tag><Typography.Text>Version {saved.version}{dirty ? ' · Có thay đổi chưa lưu' : ''}</Typography.Text>{revision && <Typography.Text>Hiệu lực: {revision.date} · Người công bố: {revision.publishedBy} · {clinicTime(revision.publishedAt)}</Typography.Text>}</Space>
-      {saved.legacyWeek.length > 0 && <Alert type="info" message="Có lịch tuần cũ được giữ lại" description="Lịch cũ chỉ áp dụng đúng tuần đã lưu khi chưa có mẫu hoặc ngoại lệ có hiệu lực. Hãy nhập mẫu lặp mới để dùng cho các tuần sau." />}
       {!!saved.futureChanges.length && <Card size="small" title="Thay đổi đã công bố trong tương lai">{saved.futureChanges.map(r => <div key={r.id}>{r.date} · {r.kind === 'Template' ? 'Mẫu lặp' : 'Ngoại lệ'} · Version {r.version}{r.reason ? ` · ${r.reason}` : ''}</div>)}</Card>}
       {kind === 'Exception' && <label>Lý do ngoại lệ <Input aria-label="Lý do ngoại lệ" value={reason} maxLength={500} disabled={!has('working-schedules.manage') || busy} onChange={e => { setReason(e.target.value); clearResults(); }} /></label>}
-      <Typography.Text>Chọn chi nhánh để thêm giờ 08:00–17:00. Giờ làm/nghỉ theo bước 30 phút; slot đặt lịch vẫn theo đơn vị 15 phút. Nghỉ và Block cần lý do, nằm trọn trong giờ làm.</Typography.Text>
-      <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(330px, 1fr))' }}>
+      <section className="working-week-editor" aria-label="Chỉnh lịch làm việc">
+        <div className="working-week-heading">
+          <div className="working-week-title"><CalendarOutlined /><h3>{kind === 'Template' ? 'Lịch làm việc hằng tuần' : 'Lịch làm việc trong ngày'}</h3></div>
+          <span className="working-week-count">{new Set(periods.filter(p => p.kind === 'Work').map(p => p.day)).size} ngày làm việc</span>
+        </div>
+        <div className="working-week-columns" aria-hidden="true"><span>Ngày</span><span>Chi nhánh</span><span>Khung giờ làm việc</span></div>
+        <div className="working-day-list">
         {Array.from({ length: 7 }, (_, day) => day).filter(day => kind === 'Template' || day === weekday(date)).map(day => {
           const dayBranch = periods.find(p => p.day === day)?.branchId;
-          return <Card key={day} title={dayName(day)}>
-            <Space direction="vertical" style={{ width: '100%' }}>
-              <Select aria-label={`Chi nhánh ${dayName(day)}`} style={{ width: '100%' }} value={dayBranch ?? 0} disabled={!has('working-schedules.manage') || busy} options={[{ value: 0, label: 'Không làm việc' }, ...eligible.map(b => ({ value: b.id, label: b.name }))]} onChange={value => {
+          return <div key={day} className={`working-day-row${dayBranch ? '' : ' working-day-off'}`}>
+            <div className="working-day-name"><strong>{dayName(day)}</strong><span className={`working-day-status${dayBranch ? ' is-working' : ''}`}>{dayBranch ? 'Có lịch' : 'Ngày nghỉ'}</span></div>
+            <div className="working-day-branch">
+              <Select aria-label={`Chi nhánh ${dayName(day)}`} value={dayBranch ?? 0} disabled={!has('working-schedules.manage') || busy} options={[{ value: 0, label: 'Không làm việc' }, ...eligible.map(b => ({ value: b.id, label: b.name }))]} onChange={value => {
                 const rest = periods.filter(p => p.day !== day);
                 edit(value ? [...rest, ...(dayBranch ? periods.filter(p => p.day === day).map(p => ({ ...p, branchId: value })) : [{ branchId: value, day, startMinute: 480, endMinute: 1020, kind: 'Work' as const, reason: '' }])] : rest);
               }} />
-              {!dayBranch && <Typography.Text type="secondary">Không làm việc</Typography.Text>}
-              {periods.map((p, i) => p.day === day && <div key={i} style={{ borderBottom: '1px solid #eee', paddingBottom: 8 }}>
-                <Typography.Text>Khoảng {i + 1} · {time(p.startMinute)} → {time(p.endMinute)}</Typography.Text>
-                <Space wrap>
-                  <Select aria-label={`Loại khoảng ${i + 1}`} value={p.kind} disabled={!has('working-schedules.manage') || busy} style={{ width: 115 }} options={[{ value: 'Work', label: 'Làm việc' }, { value: 'Break', label: 'Nghỉ' }, { value: 'Block', label: 'Block' }]} onChange={value => changePeriod(i, { kind: value })} />
-                  <Select aria-label={`Bắt đầu ${i + 1}`} showSearch optionFilterProp="label" value={p.startMinute} disabled={!has('working-schedules.manage') || busy} style={{ width: 100 }} options={timeOptions.slice(0, -1)} onChange={value => changePeriod(i, { startMinute: value })} />
-                  <Select aria-label={`Kết thúc ${i + 1}`} showSearch optionFilterProp="label" value={p.endMinute} disabled={!has('working-schedules.manage') || busy} style={{ width: 100 }} options={timeOptions.slice(1)} onChange={value => changePeriod(i, { endMinute: value })} />
-                  <Button danger disabled={!has('working-schedules.manage') || busy} onClick={() => edit(periods.filter((_, index) => index !== i))}>Xóa khoảng {i + 1}</Button>
-                </Space>
-                <Input aria-label={`Lý do ${i + 1}`} placeholder="Lý do nghỉ / block" value={p.reason} maxLength={500} disabled={!has('working-schedules.manage') || busy} onChange={e => changePeriod(i, { reason: e.target.value })} />
+            </div>
+            <div className="working-day-periods">
+              {!dayBranch && <span className="working-day-empty">Không có ca làm việc</span>}
+              {periods.map((p, i) => p.day === day && <div key={i} role="group" aria-label={`Khoảng ${i + 1} · ${time(p.startMinute)} → ${time(p.endMinute)}`} className={`working-period working-period-${p.kind.toLowerCase()}`}>
+                <span className="working-period-number" title={`Khoảng ${i + 1}`}>{String(i + 1).padStart(2, '0')}</span>
+                <Select className="working-period-kind" aria-label={`Loại khoảng ${i + 1}`} value={p.kind} disabled={!has('working-schedules.manage') || busy} options={[{ value: 'Work', label: 'Làm việc' }, { value: 'Break', label: 'Nghỉ' }, { value: 'Block', label: 'Block' }]} onChange={value => changePeriod(i, { kind: value })} />
+                <div className="working-period-times">
+                  <Select aria-label={`Bắt đầu ${i + 1}`} showSearch optionFilterProp="label" value={p.startMinute} disabled={!has('working-schedules.manage') || busy} options={timeOptions.slice(0, -1)} onChange={value => changePeriod(i, { startMinute: value })} />
+                  <span className="working-time-separator" aria-hidden="true">–</span>
+                  <Select aria-label={`Kết thúc ${i + 1}`} showSearch optionFilterProp="label" value={p.endMinute} disabled={!has('working-schedules.manage') || busy} options={timeOptions.slice(1)} onChange={value => changePeriod(i, { endMinute: value })} />
+                </div>
+                <Input className="working-period-reason" aria-label={`Lý do ${i + 1}`} placeholder={p.kind === 'Work' ? 'Ghi chú (không bắt buộc)' : 'Lý do nghỉ / block'} value={p.reason} maxLength={500} disabled={!has('working-schedules.manage') || busy} onChange={e => changePeriod(i, { reason: e.target.value })} />
+                <Tooltip title={`Xóa khoảng ${i + 1}`}><Button className="working-period-remove" type="text" danger icon={<DeleteOutlined />} aria-label={`Xóa khoảng ${i + 1}`} disabled={!has('working-schedules.manage') || busy} onClick={() => edit(periods.filter((_, index) => index !== i))} /></Tooltip>
               </div>)}
-              <Button disabled={!has('working-schedules.manage') || busy || !dayBranch} onClick={() => edit([...periods, { branchId: dayBranch!, day, startMinute: 480, endMinute: 720, kind: 'Work', reason: '' }])}>Thêm khoảng</Button>
-            </Space>
-          </Card>;
+              {dayBranch && <Button className="working-period-add" type="text" aria-label="Thêm khoảng" icon={<PlusOutlined aria-hidden="true" />} disabled={!has('working-schedules.manage') || busy} onClick={() => edit([...periods, { branchId: dayBranch, day, startMinute: 480, endMinute: 720, kind: 'Work', reason: '' }])}>Thêm khoảng</Button>}
+            </div>
+          </div>;
         })}
-      </div>
+        </div>
+      </section>
       <Space wrap><Button disabled={!has('working-schedules.manage') || busy} onClick={() => void check(false)}>Kiểm tra ảnh hưởng</Button><Button type="primary" disabled={!has('working-schedules.manage') || busy} onClick={() => void check(true)}>Lưu và công bố</Button><Button disabled={!has('working-schedules.manage') || busy || !dirty} onClick={() => { if (discardOkay()) { useSaved(saved); setError(undefined); clearResults(); } }}>Hủy thay đổi chưa lưu</Button></Space>
       {affected && (affected.length ? <><Alert type="warning" message={`MSG38 · Có ${affected.length} lịch Confirmed bị ảnh hưởng. Giải quyết tại S12 trước khi công bố.`} /><Table rowKey="id" dataSource={affected} columns={[{ title: 'Mã lịch', dataIndex: 'code', render: (value: string, row: Affected) => <Link to={`/appointments/${row.id}`}>{value} · S12</Link> }, { title: 'Bắt đầu', dataIndex: 'start', render: clinicTime }, { title: 'Kết thúc', dataIndex: 'end', render: clinicTime }, { title: 'Người đến', dataIndex: 'attendee' }, { title: 'Trạng thái', dataIndex: 'status' }]} /></> : <Alert type="info" message="Không có lịch Confirmed bị ảnh hưởng tại thời điểm kiểm tra." />)}
       <Card title="Preview availability">

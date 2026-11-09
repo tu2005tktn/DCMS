@@ -224,8 +224,10 @@ internal static class TreatmentModel
             b.HasIndex(x => x.OrderCode).IsUnique();
             b.HasIndex(x => x.RequestKey).IsUnique();
             b.HasIndex(x => x.PaymentLinkId).IsUnique().HasFilter("\"PaymentLinkId\" IS NOT NULL");
-            b.HasIndex(x => x.DossierId).IsUnique().HasDatabaseName("IX_TREATMENT_PAYOS_ORDER_ActiveDossier")
+            b.HasIndex(x => new { x.DossierId, x.Purpose }).IsUnique().HasDatabaseName("IX_TREATMENT_PAYOS_ORDER_ActiveDossierPurpose")
                 .HasFilter("\"State\" IN ('Creating','Pending','Review')");
+            b.Property(x => x.Purpose).HasMaxLength(20).HasDefaultValue("Treatment");
+            b.HasOne<DCMS.Domain.Features.Finance.FinanceAdvance>().WithMany().HasForeignKey(x => x.AdvanceId).OnDelete(DeleteBehavior.Restrict);
             b.Property(x => x.Fingerprint).HasMaxLength(64);
             b.Property(x => x.State).HasMaxLength(20);
             b.Property(x => x.PaymentLinkId).HasMaxLength(100);
@@ -256,12 +258,22 @@ internal static class TreatmentModel
             b.Property(x => x.Note).HasMaxLength(1000); b.Property(x => x.Material).HasMaxLength(100); b.Property(x => x.Warranty).HasMaxLength(100);
             b.HasIndex(x => x.ActivityId).IsUnique(); b.HasIndex(x => x.DossierId);
             b.HasIndex(x => new { x.BranchId, x.Code }).IsUnique().HasFilter("\"Code\" IS NOT NULL");
+            b.Property(x => x.Status).HasMaxLength(20).HasDefaultValue(LabOrderStatus.NotSent);
+            b.HasIndex(x => new { x.BranchId, x.Status, x.DueOn });
             b.HasOne<ClinicalActivity>().WithMany().HasForeignKey(x => x.ActivityId).OnDelete(DeleteBehavior.Cascade);
             b.ToTable(t =>
             {
+                t.HasCheckConstraint("CK_LAB_ORDER_STATUS", "\"Status\" IN ('NotSent','Sent','Received','Delivered','Rework')");
                 t.HasCheckConstraint("CK_LAB_ORDER_FEES", "\"TotalFeeVnd\" >= 0 AND \"PaidVnd\" >= 0 AND \"PaidVnd\" <= \"TotalFeeVnd\"");
                 t.HasCheckConstraint("CK_LAB_ORDER_QUANTITY", "\"Quantity\" BETWEEN 1 AND 999");
             });
+        });
+        model.Entity<LabOrderStatusLog>(b =>
+        {
+            b.ToTable("LAB_ORDER_STATUS_LOG"); b.HasKey(x => x.Id);
+            b.Property(x => x.FromStatus).HasMaxLength(20); b.Property(x => x.ToStatus).HasMaxLength(20); b.Property(x => x.Note).HasMaxLength(300);
+            b.HasIndex(x => new { x.LabOrderId, x.ChangedAt });
+            b.HasOne<LabOrder>().WithMany().HasForeignKey(x => x.LabOrderId).OnDelete(DeleteBehavior.Cascade);
         });
         model.Entity<TreatmentProgressionReceipt>(b =>
         {

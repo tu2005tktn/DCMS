@@ -5,11 +5,12 @@ import { useAuth } from '../authentication/AuthContext';
 import type { FollowUpHandoff } from '../follow-ups/types';
 import {
   clinicToday, clock, formatClock, formatDate, kindLabels, localMinute, newRequestKey, sourceLabels,
-  type AppointmentOptions, type AppointmentResult, type AvailabilitySlot,
+  type AppointmentListItem, type AppointmentOptions, type AppointmentResult, type AvailabilitySlot,
 } from './types';
+import { useCanPickBranch } from '../authentication/useCanPickBranch';
 
 export type BookingPrefill = { branchId: number; dentistId?: number; date: string; minute?: number;
-  kind?: 'Standard' | 'WalkIn'; source?: string };
+  kind?: 'Standard' | 'WalkIn'; source?: string; serviceId?: number; durationMinutes?: number };
 type Values = {
   kind: 'Standard' | 'WalkIn' | 'FollowUp'; source: string; bookerName: string; bookerContact: string; patientId?: number;
   attendeeName?: string; attendeeBirthDate?: string; relation: 'Self' | 'Relative'; serviceId?: number; reason?: string;
@@ -22,12 +23,14 @@ const slotChangedCodes = ['MSG25', 'MSG27', 'MSG28', 'MSG34'];
 // Vinh's shared POST /api/appointments with the staff session. Contract: docs/implementation/UC04-05-S10-S11.md §5.
 // `followUp` (S24, docs/specs/S24-FOLLOW-UP-INSTRUCTION-WEB.md): mở từ chỉ định quay lại — kind FollowUp + followUpId
 // theo contract POST /api/appointments, patient/nha sĩ/thời lượng/cửa sổ khóa theo chỉ định, không tự chọn slot.
-export default function BookingDrawer({ open, prefill, options, followUp, onClose, onBooked }: {
+export default function BookingDrawer({ open, prefill, options, followUp, replacement, onClose, onBooked }: {
   open: boolean; prefill: BookingPrefill | null; options: AppointmentOptions | null;
   followUp?: FollowUpHandoff | null;
+  replacement?: AppointmentListItem | null;
   onClose: () => void; onBooked: (result: AppointmentResult) => void;
 }) {
   const auth = useAuth();
+  const canPickBranch = useCanPickBranch();
   const canSearchPatients = auth.user?.permissions.includes('patients.read') ?? false;
   const [form] = Form.useForm<Values>();
   const values = Form.useWatch([], form) as Values | undefined;
@@ -40,6 +43,8 @@ export default function BookingDrawer({ open, prefill, options, followUp, onClos
   const [error, setError] = useState<ApiError | null>(null);
   const [patients, setPatients] = useState<PatientOption[]>([]);
   const requestKey = useRef<string | null>(null);
+  const requestPayload = useRef<string | null>(null);
+  const slotRevision = useRef(0);
   const wantedMinute = useRef<number | undefined>(undefined);
 
   useEffect(() => {
@@ -51,11 +56,12 @@ export default function BookingDrawer({ open, prefill, options, followUp, onClos
         patientId: followUp.patientId, bookerName: auth.user?.fullName ?? '' });
     } else {
       form.setFieldsValue({ kind: prefill.kind ?? 'Standard', source: prefill.source ?? 'Phone', relation: 'Self',
-        branchId: prefill.branchId, dentistId: prefill.dentistId, date: prefill.date, duration: 30 });
+        branchId: prefill.branchId, dentistId: prefill.dentistId, date: prefill.date, serviceId: prefill.serviceId, duration: prefill.durationMinutes ?? 30,
+        exceptionReason: replacement ? `Đặt thay khung giờ của lịch khách không tới ${replacement.code}.` : undefined });
     }
     wantedMinute.current = prefill.minute;
-    setSlots(null); setSlot(null); setReviewing(false); setError(null); setSlotsError(null); requestKey.current = null;
-  }, [open, prefill, followUp]);
+    setSlots(null); setSlot(null); setReviewing(false); setError(null); setSlotsError(null); requestKey.current = null; requestPayload.current = null;
+  }, [open, prefill, followUp, replacement]);
 
   const branchId = values?.branchId;
   const branchDentists = options?.dentists.filter(x => x.branchId === branchId) ?? [];
@@ -77,23 +83,29 @@ export default function BookingDrawer({ open, prefill, options, followUp, onClos
 
   // Any change to the resource selection invalidates the chosen slot; the server rechecks everything on confirm anyway.
   async function loadSlots() {
+    const revision = ++slotRevision.current;
     if (!canQuery || !values) return;
     setLoadingSlots(true); setSlotsError(null); setSlot(null); setReviewing(false);
     try {
       const query = new URLSearchParams({ branchId: String(values.branchId), dentistId: String(values.dentistId),
         serviceId: String(values.serviceId), date: values.date, durationMinutes: String(effectiveDuration) });
       const result = await api<{ slots: AvailabilitySlot[] }>(`/api/availability?${query}`);
-      setSlots(result.slots);
+      if (revision !== slotRevision.current) return;
+      const available = replacement ? result.slots.filter(value => Date.parse(value.start) > Date.now() && Date.parse(value.end) <= Date.parse(replacement.endAt)) : result.slots;
+      setSlots(available);
       const wanted = wantedMinute.current;
       if (wanted !== undefined) {
-        setSlot(result.slots.find(s => localMinute(s.start) === wanted && (!values.chairId || s.chairId === values.chairId)) ?? null);
+        setSlot(available.find(s => localMinute(s.start) === wanted && (!values.chairId || s.chairId === values.chairId)) ?? null);
         wantedMinute.current = undefined;
       }
-    } catch (failure) { setSlots(null); setSlotsError((failure as Error).message); }
-    finally { setLoadingSlots(false); }
+    } catch (failure) { if (revision === slotRevision.current) { setSlots(null); setSlotsError((failure as Error).message); } }
+    finally { if (revision === slotRevision.current) setLoadingSlots(false); }
   }
 
-  useEffect(() => { if (open && canQuery) void loadSlots(); else { setSlots(null); setSlot(null); } },
+  useEffect(() => {
+    if (open && canQuery) void loadSlots(); else { setSlots(null); setSlot(null); setLoadingSlots(false); }
+    return () => { slotRevision.current++; };
+  },
     [open, values?.branchId, values?.dentistId, values?.serviceId, values?.date, effectiveDuration]);
 
   async function searchPatients(keyword: string) {
@@ -114,12 +126,11 @@ export default function BookingDrawer({ open, prefill, options, followUp, onClos
 
   async function confirm() {
     if (!slot || !values || busy) return;
-    requestKey.current ??= newRequestKey();
     setBusy(true); setError(null);
     const contact = values.bookerContact.trim();
     const patient = patients.find(p => p.id === values.patientId);
     try {
-      const result = await api<AppointmentResult>('/api/appointments', { method: 'POST', body: JSON.stringify({
+      const payload = {
         branchId: values.branchId,
         booker: { name: values.bookerName.trim(), phone: contact.includes('@') ? null : contact, email: contact.includes('@') ? contact : null },
         attendee: followUp
@@ -131,9 +142,13 @@ export default function BookingDrawer({ open, prefill, options, followUp, onClos
         reason: values.reason?.trim() || null, dentistId: values.dentistId, assistantId: null, chairId: slot.chairId,
         startAt: slot.start, durationMinutes: effectiveDuration,
         followUpId: followUp?.instructionId ?? null, bookingSettingsVersion: slot.bookingSettingsVersion,
+        ...(replacement ? { replacesAppointmentId: replacement.id } : {}),
         exceptionReason: needsException ? values.exceptionReason?.trim() : null,
-        requestKey: requestKey.current, scheduleVersion: slot.scheduleVersion, assistantScheduleVersion: slot.assistantScheduleVersion,
-      }) });
+        scheduleVersion: slot.scheduleVersion, assistantScheduleVersion: slot.assistantScheduleVersion,
+      };
+      const fingerprint = JSON.stringify(payload);
+      if (requestPayload.current !== fingerprint || !requestKey.current) { requestPayload.current = fingerprint; requestKey.current = newRequestKey(); }
+      const result = await api<AppointmentResult>('/api/appointments', { method: 'POST', body: JSON.stringify({ ...payload, requestKey: requestKey.current }) });
       requestKey.current = null;
       onBooked(result);
     } catch (failure) {
@@ -148,10 +163,12 @@ export default function BookingDrawer({ open, prefill, options, followUp, onClos
   const dentistName = branchDentists.find(x => x.id === values?.dentistId)?.name;
   const chairName = (id: number) => branchChairs.find(x => x.id === id)?.name ?? `Ghế ${id}`;
 
-  return <Drawer open={open} onClose={onClose} width={640} destroyOnClose title="Đặt lịch tại quầy (S11)"
+  return <Drawer open={open} onClose={() => { if (!busy) onClose(); }} width={640} styles={{ wrapper: { maxWidth: '100vw' } }} destroyOnClose
+    title={replacement ? 'Đặt lịch thay thế' : 'Đặt lịch tại quầy (S11)'} aria-label={replacement ? 'Đặt lịch thay thế' : 'Đặt lịch tại quầy (S11)'}
     extra={<Space><Button onClick={onClose} disabled={busy}>Hủy</Button>
       {reviewing ? <Button type="primary" loading={busy} onClick={() => void confirm()}>Xác nhận đặt lịch</Button>
         : <Button type="primary" disabled={!slot} onClick={() => void review()}>Xem lại</Button>}</Space>}>
+    {replacement && <Alert className="form-alert" type="info" showIcon message={`Lịch ${replacement.code}: khách không tới. Nhập thông tin khách mới; thời gian phải kết thúc trước ${formatClock(replacement.endAt)}.`} />}
     {error && <Alert className="form-alert" type="error" showIcon message={error.message}
       description={slotChangedCodes.includes(error.code) ? 'Khung giờ đã thay đổi. Danh sách khung giờ đã được tải lại; thông tin đã nhập được giữ nguyên.'
         : error.code === 'MSG230' ? 'Chỉ định bị chặn (cửa sổ, điều kiện bước hoặc kết quả Labo) — xem lại chỉ định S24 trước khi đặt lịch; dữ liệu được giữ nguyên.'
@@ -162,11 +179,11 @@ export default function BookingDrawer({ open, prefill, options, followUp, onClos
         {followUp ? <div><Typography.Text type="secondary">Loại lịch</Typography.Text>
           <div><Tag color="purple">{kindLabels.FollowUp}</Tag> <Typography.Text type="secondary">
             Theo chỉ định {followUp.instructionId.slice(0, 8)} · v{followUp.version}</Typography.Text></div></div>
-          : <Form.Item name="kind" label="Loại lịch"><Radio.Group optionType="button" options={[
+          : <Form.Item name="kind" label="Loại lịch"><Radio.Group disabled={!!replacement} optionType="button" options={[
             { value: 'Standard', label: kindLabels.Standard }, { value: 'WalkIn', label: kindLabels.WalkIn },
             { value: 'FollowUp', label: <Tooltip title="Chỉ mở từ chỉ định quay lại S24">{kindLabels.FollowUp}</Tooltip>, disabled: !followUp }]} /></Form.Item>}
         <Form.Item name="source" label="Nguồn" extra="Chỉ ghi nhận nguồn, không kết nối kênh.">
-          <Select options={Object.entries(sourceLabels).map(([value, label]) => ({ value, label }))} />
+          <Select disabled={!!replacement} options={Object.entries(sourceLabels).map(([value, label]) => ({ value, label }))} />
         </Form.Item>
       </div>
       <Typography.Title level={5}>Người đặt</Typography.Title>
@@ -199,22 +216,22 @@ export default function BookingDrawer({ open, prefill, options, followUp, onClos
       <Typography.Title level={5}>Dịch vụ và tài nguyên</Typography.Title>
       <div className="patient-form-grid">
         <Form.Item name="serviceId" label="Dịch vụ" rules={[{ required: true, message: 'Vui lòng nhập Dịch vụ.' }]}>
-          <Select options={branchServices.map(s => ({ value: s.id, label: `${s.name} · ${s.publicDurationMinutes} phút` }))}
+          <Select disabled={!!replacement} options={branchServices.map(s => ({ value: s.id, label: `${s.name} · ${s.publicDurationMinutes} phút` }))}
             onChange={id => { if (!followUp) form.setFieldValue('duration', branchServices.find(s => s.id === id)?.publicDurationMinutes); }} /></Form.Item>
         <Form.Item name="reason" label="Lý do khám (tùy chọn)" rules={[{ max: 1000, message: 'Lý do không được vượt quá 1000 ký tự.' }]}><Input maxLength={1000} /></Form.Item>
-        <Form.Item name="branchId" label="Chi nhánh" rules={[{ required: true, message: 'Vui lòng nhập Chi nhánh.' }]}>
-          <Select disabled={!!followUp} options={options?.branches.map(b => ({ value: b.id, label: b.name }))}
+        <Form.Item name="branchId" label="Chi nhánh" hidden={!canPickBranch || (options?.branches.length ?? 0) <= 1} rules={[{ required: true, message: 'Vui lòng nhập Chi nhánh.' }]}>
+          <Select disabled={!!followUp || !!replacement} options={options?.branches.map(b => ({ value: b.id, label: b.name }))}
             onChange={() => form.setFieldsValue({ dentistId: undefined, chairId: undefined, serviceId: undefined })} />
         </Form.Item>
         <Form.Item name="dentistId" label="Nha sĩ" extra={followUp && followUp.dentistId !== null ? 'Khóa theo nha sĩ của chỉ định.' : undefined}
           rules={[{ required: true, message: 'Vui lòng nhập Nha sĩ.' }]}>
-          <Select disabled={!!followUp && followUp.dentistId !== null} options={branchDentists.map(d => ({ value: d.id, label: d.name }))} />
+          <Select disabled={!!replacement || !!followUp && followUp.dentistId !== null} options={branchDentists.map(d => ({ value: d.id, label: d.name }))} />
         </Form.Item>
         <Form.Item name="chairId" label="Ghế (để trống: tự chọn)"><Select allowClear options={branchChairs.map(c => ({ value: c.id, label: c.name }))} /></Form.Item>
         <Form.Item name="date" label="Ngày"
           extra={followUp ? `Trong cửa sổ ${formatDate(followUp.earliestOn)} – ${formatDate(followUp.latestOn)} của chỉ định.` : undefined}
           rules={[{ required: true, message: 'Vui lòng nhập Ngày.' }]}>
-          <Input type="date" min={followUp && clinicToday() < followUp.earliestOn ? followUp.earliestOn : clinicToday()}
+          <Input type="date" disabled={!!replacement} min={followUp && clinicToday() < followUp.earliestOn ? followUp.earliestOn : clinicToday()}
             max={followUp?.latestOn} />
         </Form.Item>
         {followUp ? <div><Typography.Text type="secondary">Thời lượng</Typography.Text>

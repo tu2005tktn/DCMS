@@ -2,7 +2,7 @@ import { Alert, Avatar, Button, Drawer, Layout, Menu, Typography } from 'antd';
 import type { MenuProps } from 'antd';
 import { CalendarOutlined, TeamOutlined, ScheduleOutlined, MedicineBoxOutlined, ExperimentOutlined, BarChartOutlined,
   CreditCardOutlined, SettingOutlined, UserOutlined, FileTextOutlined, AuditOutlined, InboxOutlined,
-  LinkOutlined, MenuOutlined, LogoutOutlined, CloseOutlined } from '@ant-design/icons';
+  LinkOutlined, MenuOutlined, LogoutOutlined, CloseOutlined, CustomerServiceOutlined } from '@ant-design/icons';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../features/authentication/AuthContext';
@@ -28,11 +28,15 @@ export default function StaffWorkspace() {
     { key:'/patients', title:'Bệnh nhân', icon:<TeamOutlined />, group:'Vận hành', visible:has('patients.read') },
     { key:'/working-schedules', title:'Lịch làm việc', icon:<CalendarOutlined />, group:'Vận hành', visible:has('working-schedules.read') },
     { key:'/support-inbox', title:'Hộp thư hỗ trợ', icon:<InboxOutlined />, group:'Vận hành', visible:has('appointments.support.handle') },
+    // S60: assistants and the clinic owner (docs/specs/S60-CUSTOMER-CARE-WEB.vi.md §2).
+    { key:'/customer-care', title:'Chăm sóc khách hàng', icon:<CustomerServiceOutlined />, group:'Vận hành', visible:has('care-tasks.read') && ['ClinicAssistant', 'ClinicOwner'].some(role => user?.effectiveRoles.includes(role)) },
     { key:'/treatment-templates', title:'Kế hoạch điều trị', icon:<FileTextOutlined />, group:'Chuyên môn', visible:has('treatment.templates.read') },
     { key:'/commercial/treatment', title:'Giá và duyệt điều trị', icon:<MedicineBoxOutlined />, group:'Chuyên môn', visible:has('treatment.prices.read')||has('treatment.commercial.read') },
     { key:'/materials', title:'Dụng cụ - vật liệu', icon:<ExperimentOutlined />, group:'Chuyên môn', visible:['materials.purchases.read', 'materials.stock.read', 'materials.usage.read'].some(has) },
+    { key:'/lab-orders', title:'Quản lý công việc labo', icon:<ExperimentOutlined />, group:'Chuyên môn', visible:has('treatment.lab.read') },
     { key:'/clinical-services', title:'Dịch vụ cận lâm sàng', icon:<ExperimentOutlined />, group:'Chuyên môn', visible:has('services.read') },
-    { key:'/payments', title:'Thanh toán', icon:<CreditCardOutlined />, group:'Quản trị', visible:has('finance.read') },
+    { key:'/medicines', title:'Quản lý thuốc', icon:<MedicineBoxOutlined />, group:'Quản trị', visible:has('catalog.medicines.read') },
+    { key:'/finance/operations', title:'Tài chính và công nợ', icon:<CreditCardOutlined />, group:'Quản trị', visible:has('finance.read') },
     { key:'/work-statistics', title:'Thống kê công việc/dịch vụ', icon:<BarChartOutlined />, group:'Quản trị', visible:has('finance.work-statistics.read') },
     { key:'/revenue', title:'Doanh thu', icon:<BarChartOutlined />, group:'Quản trị', visible:has('finance.revenue.read') },
     { key:'/accounts', title:'Quản lý tài khoản', icon:<AuditOutlined />, group:'Quản trị', visible:has('accounts.read') },
@@ -43,7 +47,7 @@ export default function StaffWorkspace() {
   const visible = links.filter(x=>x.visible);
   const path = location.pathname;
   const selected = visible.find(x=>path===x.key || path.startsWith(x.key+'/'))?.key
-    ?? (path.startsWith('/visits/') ? (path.endsWith('/payments') ? '/payments' : '/reception') : '/');
+    ?? (path.startsWith('/visits/') ? (path.endsWith('/payments') ? '/patients' : '/reception') : '/');
   const title = visible.find(x=>x.key===selected)?.title ?? 'Tài khoản của tôi';
   const items: MenuProps['items'] = ['Vận hành','Chuyên môn','Quản trị'].flatMap(group=> {
     const children = visible.filter(x=>x.group===group).map(x=>({key:x.key,icon:x.icon,label:<Link aria-label={x.title} title={x.title} to={x.key}>{x.title}</Link>}));

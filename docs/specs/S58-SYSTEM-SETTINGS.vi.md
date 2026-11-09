@@ -278,3 +278,8 @@ Q01 còn mở: danh mục thực tế, giá, phạm vi dịch vụ được làm
 ## 11. Nghiệm thu và giao việc
 
 Tiêu chí chi tiết, thứ tự công việc, khoảng trống code đã đối chiếu và ranh giới mock/API/database tại [kế hoạch triển khai S58](../implementation/S58-SYSTEM-SETTINGS-PLAN.vi.md). Đạt UI danh mục không đồng nghĩa đã đạt consumer khám/booking/in/kho hoặc kiểm quyền ở server. Chỉ báo hoàn thành sau khi các consumer thuộc phạm vi của đợt đó dùng cùng dữ liệu và kiểm thử có bằng chứng.
+
+
+## Cập nhật 08/11/2026: đưa "Dịch vụ" vào Thiết lập hệ thống
+
+Màn giá và duyệt giảm trừ điều trị (trước đây menu "Dịch vụ", `/commercial/treatment`) chuyển thành mục **"Dịch vụ điều trị"** trong Thiết lập hệ thống, nhóm **Danh mục**, đường dẫn `/settings/treatment-services`. Menu trái không còn mục "Dịch vụ". Mục hiện khi có `treatment.prices.read` hoặc `treatment.commercial.read`; các đường dẫn `/settings` cho phép vào nếu có một trong các quyền này hoặc `settings.read`. Đường dẫn cũ `/commercial/treatment` chuyển hướng sang đường dẫn mới và giữ tham số `?dossier=`. Nội dung màn, API và quyền giữ nguyên.

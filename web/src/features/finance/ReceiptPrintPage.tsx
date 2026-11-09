@@ -55,6 +55,6 @@ export default function ReceiptPrintPage() {
       <div><strong>Người nộp tiền</strong><p>(Ký, ghi rõ họ tên)</p></div>
       <div><strong>Người thu tiền</strong><p>(Ký, ghi rõ họ tên)</p></div>
     </div>}
-    <div className="receipt-print-actions"><Button type="primary" aria-label="In phiếu" loading={printing} disabled={printing} onClick={()=>void print()}>In phiếu</Button> <Link to="/payments">Quay lại thanh toán</Link></div>
+    <div className="receipt-print-actions"><Button type="primary" aria-label="In phiếu" loading={printing} disabled={printing} onClick={()=>void print()}>In phiếu</Button> <Link to="/patients">Về danh sách bệnh nhân</Link></div>
   </Card></main>;
 }

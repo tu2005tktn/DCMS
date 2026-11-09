@@ -179,6 +179,9 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<Guid?>("FamilyMemberId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid?>("FollowUpId")
                         .HasColumnType("uuid");
 
@@ -186,6 +189,12 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)");
+
+                    b.Property<DateTimeOffset?>("PatientConsentConfirmedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("PatientConsentConfirmedBy")
+                        .HasColumnType("integer");
 
                     b.Property<int?>("PatientId")
                         .HasColumnType("integer");
@@ -219,16 +228,18 @@ namespace DCMS.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("BookerAccountId");
-
                     b.HasIndex("CancelledBy");
 
                     b.HasIndex("Code")
                         .IsUnique();
 
+                    b.HasIndex("FamilyMemberId");
+
                     b.HasIndex("FollowUpId")
                         .IsUnique()
                         .HasFilter("\"FollowUpId\" IS NOT NULL AND \"Status\" IN ('Confirmed','CheckedIn')");
+
+                    b.HasIndex("PatientConsentConfirmedBy");
 
                     b.HasIndex("PatientId");
 
@@ -236,6 +247,8 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.HasIndex("BranchId", "StartAt");
+
+                    b.HasIndex("BookerAccountId", "FamilyMemberId", "StartAt");
 
                     b.ToTable("APPOINTMENT", null, t =>
                         {
@@ -1565,6 +1578,173 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.ToTable("CUSTOMER_FAMILY_RECEIPT", (string)null);
                 });
 
+            modelBuilder.Entity("DCMS.Domain.Features.FamilyMembers.FamilyRecordAccess", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("BranchId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<DateTimeOffset?>("DecidedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("DecidedBy")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("DecisionReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateOnly?>("DeclaredBirthDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("DeclaredFullName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("DeclaredPatientCode")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<DateTimeOffset?>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("FamilyMemberId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("MatchingInformation")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<int>("OwnerAccountId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("PatientId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("PublicNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Relationship")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTimeOffset>("RequestedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.PrimitiveCollection<string[]>("Scopes")
+                        .IsRequired()
+                        .HasColumnType("text[]");
+
+                    b.Property<string>("SharingBasis")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("VerificationNote")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BranchId");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.HasIndex("DecidedBy");
+
+                    b.HasIndex("FamilyMemberId")
+                        .IsUnique()
+                        .HasFilter("\"Status\" IN ('Pending','Verified')");
+
+                    b.HasIndex("PatientId");
+
+                    b.HasIndex("OwnerAccountId", "RequestedAt");
+
+                    b.ToTable("FAMILY_RECORD_ACCESS", (string)null);
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.FamilyMembers.FamilyRecordAudit", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<Guid>("AccessId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<int>("ActorAccountId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ActorAccountId");
+
+                    b.HasIndex("AccessId", "OccurredAt");
+
+                    b.ToTable("FAMILY_RECORD_AUDIT", (string)null);
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.FamilyMembers.FamilyRecordReceipt", b =>
+                {
+                    b.Property<int>("ActorAccountId")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("RequestKey")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AccessId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Fingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("ResultJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.HasKey("ActorAccountId", "RequestKey");
+
+                    b.HasIndex("AccessId");
+
+                    b.ToTable("FAMILY_RECORD_RECEIPT", (string)null);
+                });
+
             modelBuilder.Entity("DCMS.Domain.Features.Finance.BranchReceiptSequence", b =>
                 {
                     b.Property<int>("BranchId")
@@ -1650,6 +1830,93 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasIndex("State");
 
                     b.ToTable("EXAMINATION_FEE", (string)null);
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Finance.FinanceAdvance", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("BranchId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("CreatedBy")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("DossierId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)");
+
+                    b.Property<int>("PatientId")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("PaymentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BranchId");
+
+                    b.HasIndex("CreatedBy");
+
+                    b.HasIndex("DossierId");
+
+                    b.HasIndex("PaymentId")
+                        .IsUnique();
+
+                    b.HasIndex("PatientId", "BranchId");
+
+                    b.ToTable("FINANCE_ADVANCE", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_FINANCE_ADVANCE_KIND", "\"Kind\" IN ('Deposit','ServiceAdvance')");
+                        });
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Finance.FinanceAdvanceAllocation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AdvanceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("AllocatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("AllocatedBy")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("AmountVnd")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("InvoiceLineId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AllocatedBy");
+
+                    b.HasIndex("InvoiceLineId");
+
+                    b.HasIndex("AdvanceId", "InvoiceLineId");
+
+                    b.ToTable("FINANCE_ADVANCE_ALLOCATION", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_FINANCE_ADVANCE_ALLOCATION_AMOUNT", "\"AmountVnd\" > 0");
+                        });
                 });
 
             modelBuilder.Entity("DCMS.Domain.Features.Finance.FinanceAudit", b =>
@@ -1808,6 +2075,236 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.ToTable("FINANCE_COMMAND_RECEIPT", (string)null);
                 });
 
+            modelBuilder.Entity("DCMS.Domain.Features.Finance.FinanceInvoice", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("BranchId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("CreatedBy")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("DossierId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateOnly>("DueDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly>("InvoiceDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Number")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<int>("PatientId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("VisitId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedBy");
+
+                    b.HasIndex("DossierId");
+
+                    b.HasIndex("VisitId");
+
+                    b.HasIndex("BranchId", "Number")
+                        .IsUnique();
+
+                    b.HasIndex("PatientId", "BranchId", "DueDate");
+
+                    b.ToTable("FINANCE_INVOICE", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_FINANCE_INVOICE_DATES", "\"DueDate\" >= \"InvoiceDate\"");
+
+                            t.HasCheckConstraint("CK_FINANCE_INVOICE_SOURCE", "(\"VisitId\" IS NOT NULL) <> (\"DossierId\" IS NOT NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Finance.FinanceInvoiceLine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ChargeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("DiscountVnd")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("GrossVnd")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("InvoiceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("NetVnd")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateOnly>("ServiceDate")
+                        .HasColumnType("date");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChargeId")
+                        .IsUnique();
+
+                    b.HasIndex("InvoiceId");
+
+                    b.ToTable("FINANCE_INVOICE_LINE", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_FINANCE_INVOICE_LINE_AMOUNT", "\"GrossVnd\" >= 0 AND \"DiscountVnd\" >= 0 AND \"NetVnd\" = \"GrossVnd\" - \"DiscountVnd\"");
+                        });
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Finance.FinancePaymentMethod", b =>
+                {
+                    b.Property<int>("BranchId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Code")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<bool>("Active")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer");
+
+                    b.HasKey("BranchId", "Code");
+
+                    b.ToTable("FINANCE_PAYMENT_METHOD", (string)null);
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Finance.FinanceRefund", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("AdvanceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("AmountVnd")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset?>("ApprovedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("ApprovedBy")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("BranchId")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("ChargeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("CompletedBy")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("DossierPaymentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("InvoiceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Method")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("Number")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<int>("PatientId")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("PaymentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTimeOffset>("RequestedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("RequestedBy")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AdvanceId");
+
+                    b.HasIndex("ApprovedBy");
+
+                    b.HasIndex("ChargeId");
+
+                    b.HasIndex("CompletedBy");
+
+                    b.HasIndex("DossierPaymentId");
+
+                    b.HasIndex("InvoiceId");
+
+                    b.HasIndex("PaymentId");
+
+                    b.HasIndex("RequestedBy");
+
+                    b.HasIndex("BranchId", "Number")
+                        .IsUnique();
+
+                    b.HasIndex("PatientId", "BranchId", "RequestedAt");
+
+                    b.ToTable("FINANCE_REFUND", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_FINANCE_REFUND_AMOUNT", "\"AmountVnd\" > 0");
+
+                            t.HasCheckConstraint("CK_FINANCE_REFUND_SOURCE", "(\"PaymentId\" IS NOT NULL) <> (\"DossierPaymentId\" IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_FINANCE_REFUND_STATE", "\"State\" IN ('Requested','Approved','Completed','Rejected')");
+
+                            t.HasCheckConstraint("CK_FINANCE_REFUND_TARGET", "(\"AdvanceId\" IS NOT NULL AND \"InvoiceId\" IS NULL AND \"ChargeId\" IS NULL) OR (\"InvoiceId\" IS NOT NULL AND \"ChargeId\" IS NOT NULL AND \"AdvanceId\" IS NULL)");
+                        });
+                });
+
             modelBuilder.Entity("DCMS.Domain.Features.Finance.FinancialAccount", b =>
                 {
                     b.Property<int>("PatientId")
@@ -1898,8 +2395,8 @@ namespace DCMS.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Method")
                         .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
 
                     b.Property<string>("NormalizedBankReference")
                         .HasMaxLength(100)
@@ -1925,6 +2422,13 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(160)
                         .HasColumnType("character varying(160)");
+
+                    b.Property<string>("Purpose")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasDefaultValue("Charge");
 
                     b.Property<string>("State")
                         .IsRequired()
@@ -1958,9 +2462,9 @@ namespace DCMS.Infrastructure.Persistence.Migrations
 
                     b.ToTable("PAYMENT_RECEIPT", null, t =>
                         {
-                            t.HasCheckConstraint("CK_PAYMENT_RECEIPT", "\"AmountVnd\" > 0 AND \"Method\" IN ('Cash','Transfer') AND \"State\" IN ('Pending','Posted','Cancelled')");
+                            t.HasCheckConstraint("CK_PAYMENT_RECEIPT", "\"AmountVnd\" > 0 AND length(btrim(\"Method\")) > 0 AND \"State\" IN ('Pending','Posted','Cancelled')");
 
-                            t.HasCheckConstraint("CK_PAYMENT_RECEIPT_SOURCE", "(\"VisitId\" IS NOT NULL) <> (\"DossierId\" IS NOT NULL)");
+                            t.HasCheckConstraint("CK_PAYMENT_RECEIPT_SOURCE", "(\"Purpose\" = 'Advance' AND \"VisitId\" IS NULL AND \"DossierId\" IS NULL) OR (\"Purpose\" = 'Charge' AND ((\"VisitId\" IS NOT NULL) <> (\"DossierId\" IS NOT NULL)))");
                         });
                 });
 
@@ -4910,6 +5414,9 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)");
 
+                    b.Property<Guid?>("AdvanceId")
+                        .HasColumnType("uuid");
+
                     b.Property<long>("AmountVnd")
                         .HasColumnType("bigint");
 
@@ -4964,6 +5471,13 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<string>("Purpose")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Treatment");
+
                     b.Property<string>("QrCode")
                         .HasColumnType("text");
 
@@ -4980,10 +5494,7 @@ namespace DCMS.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("DossierId")
-                        .IsUnique()
-                        .HasDatabaseName("IX_TREATMENT_PAYOS_ORDER_ActiveDossier")
-                        .HasFilter("\"State\" IN ('Creating','Pending','Review')");
+                    b.HasIndex("AdvanceId");
 
                     b.HasIndex("OrderCode")
                         .IsUnique();
@@ -4996,6 +5507,11 @@ namespace DCMS.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("RequestKey")
                         .IsUnique();
+
+                    b.HasIndex("DossierId", "Purpose")
+                        .IsUnique()
+                        .HasDatabaseName("IX_TREATMENT_PAYOS_ORDER_ActiveDossierPurpose")
+                        .HasFilter("\"State\" IN ('Creating','Pending','Review')");
 
                     b.ToTable("TREATMENT_PAYOS_ORDER", null, t =>
                         {
@@ -5333,12 +5849,51 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasFilter("\"Code\" IS NOT NULL");
 
+                    b.HasIndex("BranchId", "Status", "DueOn");
+
                     b.ToTable("LAB_ORDER", null, t =>
                         {
                             t.HasCheckConstraint("CK_LAB_ORDER_FEES", "\"TotalFeeVnd\" >= 0 AND \"PaidVnd\" >= 0 AND \"PaidVnd\" <= \"TotalFeeVnd\"");
 
                             t.HasCheckConstraint("CK_LAB_ORDER_QUANTITY", "\"Quantity\" BETWEEN 1 AND 999");
+
+                            t.HasCheckConstraint("CK_LAB_ORDER_STATUS", "\"Status\" IN ('NotSent','Sent','Received','Delivered','Rework')");
                         });
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Treatment.LabOrderStatusLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("ChangedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("ChangedBy")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("FromStatus")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid>("LabOrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("ToStatus")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LabOrderId", "ChangedAt");
+
+                    b.ToTable("LAB_ORDER_STATUS_LOG", (string)null);
                 });
 
             modelBuilder.Entity("DCMS.Domain.Features.Treatment.TreatmentDossier", b =>
@@ -6590,6 +7145,16 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasForeignKey("CancelledBy")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("DCMS.Domain.Features.FamilyMembers.FamilyMember", null)
+                        .WithMany()
+                        .HasForeignKey("FamilyMemberId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("DCMS.Infrastructure.Features.Accounts.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("PatientConsentConfirmedBy")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("DCMS.Domain.Features.Patients.PatientProfile", null)
                         .WithMany()
                         .HasForeignKey("PatientId")
@@ -6984,6 +7549,66 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("DCMS.Domain.Features.FamilyMembers.FamilyRecordAccess", b =>
+                {
+                    b.HasOne("DCMS.Domain.Features.Scheduling.SchedulingBranch", null)
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("DCMS.Infrastructure.Features.Accounts.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("DecidedBy")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("DCMS.Domain.Features.FamilyMembers.FamilyMember", null)
+                        .WithMany()
+                        .HasForeignKey("FamilyMemberId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DCMS.Infrastructure.Features.Accounts.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DCMS.Domain.Features.Patients.PatientProfile", null)
+                        .WithMany()
+                        .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.FamilyMembers.FamilyRecordAudit", b =>
+                {
+                    b.HasOne("DCMS.Domain.Features.FamilyMembers.FamilyRecordAccess", null)
+                        .WithMany()
+                        .HasForeignKey("AccessId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DCMS.Infrastructure.Features.Accounts.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("ActorAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.FamilyMembers.FamilyRecordReceipt", b =>
+                {
+                    b.HasOne("DCMS.Domain.Features.FamilyMembers.FamilyRecordAccess", null)
+                        .WithMany()
+                        .HasForeignKey("AccessId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DCMS.Infrastructure.Features.Accounts.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("ActorAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("DCMS.Domain.Features.Finance.BranchReceiptSequence", b =>
                 {
                     b.HasOne("DCMS.Domain.Features.Scheduling.SchedulingBranch", null)
@@ -7019,6 +7644,59 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasOne("DCMS.Domain.Features.Visits.Visit", null)
                         .WithOne()
                         .HasForeignKey("DCMS.Domain.Features.Finance.ExaminationFee", "VisitId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Finance.FinanceAdvance", b =>
+                {
+                    b.HasOne("DCMS.Domain.Features.Scheduling.SchedulingBranch", null)
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DCMS.Infrastructure.Features.Accounts.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DCMS.Domain.Features.Treatment.TreatmentDossier", null)
+                        .WithMany()
+                        .HasForeignKey("DossierId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("DCMS.Domain.Features.Patients.PatientProfile", null)
+                        .WithMany()
+                        .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DCMS.Domain.Features.Finance.PaymentReceipt", null)
+                        .WithOne()
+                        .HasForeignKey("DCMS.Domain.Features.Finance.FinanceAdvance", "PaymentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Finance.FinanceAdvanceAllocation", b =>
+                {
+                    b.HasOne("DCMS.Domain.Features.Finance.FinanceAdvance", null)
+                        .WithMany()
+                        .HasForeignKey("AdvanceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DCMS.Infrastructure.Features.Accounts.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("AllocatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DCMS.Domain.Features.Finance.FinanceInvoiceLine", null)
+                        .WithMany()
+                        .HasForeignKey("InvoiceLineId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
@@ -7084,6 +7762,117 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasOne("DCMS.Infrastructure.Features.Accounts.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("ActorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Finance.FinanceInvoice", b =>
+                {
+                    b.HasOne("DCMS.Domain.Features.Scheduling.SchedulingBranch", null)
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DCMS.Infrastructure.Features.Accounts.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DCMS.Domain.Features.Treatment.TreatmentDossier", null)
+                        .WithMany()
+                        .HasForeignKey("DossierId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("DCMS.Domain.Features.Patients.PatientProfile", null)
+                        .WithMany()
+                        .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DCMS.Domain.Features.Visits.Visit", null)
+                        .WithMany()
+                        .HasForeignKey("VisitId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Finance.FinanceInvoiceLine", b =>
+                {
+                    b.HasOne("DCMS.Domain.Features.Finance.FinanceCharge", null)
+                        .WithMany()
+                        .HasForeignKey("ChargeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DCMS.Domain.Features.Finance.FinanceInvoice", null)
+                        .WithMany("Lines")
+                        .HasForeignKey("InvoiceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Finance.FinancePaymentMethod", b =>
+                {
+                    b.HasOne("DCMS.Domain.Features.Scheduling.SchedulingBranch", null)
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Finance.FinanceRefund", b =>
+                {
+                    b.HasOne("DCMS.Domain.Features.Finance.FinanceAdvance", null)
+                        .WithMany()
+                        .HasForeignKey("AdvanceId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("DCMS.Infrastructure.Features.Accounts.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("ApprovedBy")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("DCMS.Domain.Features.Scheduling.SchedulingBranch", null)
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DCMS.Domain.Features.Finance.FinanceCharge", null)
+                        .WithMany()
+                        .HasForeignKey("ChargeId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("DCMS.Infrastructure.Features.Accounts.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("CompletedBy")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("DCMS.Domain.Features.Treatment.DossierPayment", null)
+                        .WithMany()
+                        .HasForeignKey("DossierPaymentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("DCMS.Domain.Features.Finance.FinanceInvoice", null)
+                        .WithMany()
+                        .HasForeignKey("InvoiceId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("DCMS.Domain.Features.Patients.PatientProfile", null)
+                        .WithMany()
+                        .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DCMS.Domain.Features.Finance.PaymentReceipt", null)
+                        .WithMany()
+                        .HasForeignKey("PaymentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("DCMS.Infrastructure.Features.Accounts.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("RequestedBy")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
@@ -7712,6 +8501,11 @@ namespace DCMS.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("DCMS.Domain.Features.Treatment.DossierPayOsOrder", b =>
                 {
+                    b.HasOne("DCMS.Domain.Features.Finance.FinanceAdvance", null)
+                        .WithMany()
+                        .HasForeignKey("AdvanceId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("DCMS.Domain.Features.Treatment.TreatmentDossier", null)
                         .WithMany()
                         .HasForeignKey("DossierId")
@@ -7777,6 +8571,15 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasOne("DCMS.Domain.Features.Treatment.ClinicalActivity", null)
                         .WithMany()
                         .HasForeignKey("ActivityId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Treatment.LabOrderStatusLog", b =>
+                {
+                    b.HasOne("DCMS.Domain.Features.Treatment.LabOrder", null)
+                        .WithMany()
+                        .HasForeignKey("LabOrderId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
@@ -8033,6 +8836,11 @@ namespace DCMS.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("DCMS.Domain.Features.Appointments.InAppNotification", b =>
                 {
                     b.Navigation("Deliveries");
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Finance.FinanceInvoice", b =>
+                {
+                    b.Navigation("Lines");
                 });
 
             modelBuilder.Entity("DCMS.Domain.Features.Finance.PaymentReceipt", b =>

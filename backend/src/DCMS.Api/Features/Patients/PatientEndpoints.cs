@@ -2,6 +2,7 @@ using DCMS.Api.Features.Authentication;
 using DCMS.Api.Features.PatientLinks;
 using DCMS.Application.Features.Patients;
 using DCMS.Application.Features.Appointments;
+using DCMS.Application.Features.Examinations;
 
 namespace DCMS.Api.Features.Patients;
 
@@ -22,20 +23,33 @@ public static class PatientEndpoints
             Results.Ok(await service.OwnAsync(AuthenticationEndpoints.AccountId(context.User), ct)));
         own.MapPut("/", async (HttpContext context, UpdateOwnPatientRequest request, IPatientService service, CancellationToken ct) =>
             Results.Ok(await service.UpdateOwnAsync(AuthenticationEndpoints.AccountId(context.User), request, ct)));
+        // docs/specs/MOBILE-PATIENT-VISIT-RESULTS.vi.md §3: official visit results, Ready documents and their content.
+        own.MapGet("/visits", async (HttpContext context, int? page, int? pageSize, IOwnClinicalRecordService service, CancellationToken ct) =>
+            Results.Ok(await service.VisitsAsync(AuthenticationEndpoints.AccountId(context.User), page ?? 1, pageSize ?? 20, ct)));
+        own.MapGet("/visits/{visitId:guid}", async (HttpContext context, Guid visitId, IOwnClinicalRecordService service, CancellationToken ct) =>
+            Results.Ok(await service.VisitAsync(AuthenticationEndpoints.AccountId(context.User), visitId, ct)));
+        own.MapGet("/documents", async (HttpContext context, Guid? visitId, int? page, int? pageSize, IOwnClinicalRecordService service, CancellationToken ct) =>
+            Results.Ok(await service.DocumentsAsync(AuthenticationEndpoints.AccountId(context.User), visitId, page ?? 1, pageSize ?? 20, ct)));
+        own.MapGet("/documents/{documentId:guid}/content", async (HttpContext context, Guid documentId, IOwnClinicalRecordService service, CancellationToken ct) =>
+        {
+            var file = await service.DocumentContentAsync(AuthenticationEndpoints.AccountId(context.User), documentId, ct);
+            context.Response.Headers.CacheControl = "no-store";
+            return Results.File(file.Bytes, file.ContentType);
+        });
 
         // S05/S06: read for Clinic Assistant and Dentist (Owner via effective Dentist); writes for Clinic Assistant only.
         var group = endpoints.MapGroup("/api/patients").RequireAuthorization(ReadPolicy).WithTags("UC-08/09/38 S05/S06 Patients");
-        group.MapGet("/", async (IPatientService service, string? keyword, DateOnly? birthDate, bool? includeArchived,
-                int? page, int? pageSize, CancellationToken ct) =>
-            Results.Ok(await service.SearchAsync(keyword, birthDate, includeArchived ?? false, page ?? 1, pageSize ?? 20, ct)));
+        group.MapGet("/", async (HttpContext context, IPatientService service, string? keyword, DateOnly? birthDate, bool? includeArchived,
+                int? page, int? pageSize, int? branchId, CancellationToken ct) =>
+            Results.Ok(await service.SearchAsync(AuthenticationEndpoints.AccountId(context.User), keyword, birthDate, includeArchived ?? false, page ?? 1, pageSize ?? 20, branchId, ct)));
         group.MapPost("/duplicates", async (DuplicateCheckRequest request, IPatientService service, CancellationToken ct) =>
             Results.Ok(await service.DuplicatesAsync(request, ct)));
         // S58: required administrative fields and patient-code mode for the S05/S06 form.
         group.MapGet("/form-policy", async (IPatientService service, CancellationToken ct) => Results.Ok(await service.FormPolicyAsync(ct)));
-        group.MapGet("/{id:int}", async (int id, IPatientService service, CancellationToken ct) =>
-            Results.Ok(await service.GetAsync(id, ct)));
-        group.MapGet("/{id:int}/audit", async (int id, IPatientService service, CancellationToken ct) =>
-            Results.Ok(await service.AuditAsync(id, ct)));
+        group.MapGet("/{id:int}", async (HttpContext context, int id, IPatientService service, CancellationToken ct) =>
+            Results.Ok(await service.GetAsync(AuthenticationEndpoints.AccountId(context.User), id, ct)));
+        group.MapGet("/{id:int}/audit", async (HttpContext context, int id, IPatientService service, CancellationToken ct) =>
+            Results.Ok(await service.AuditAsync(AuthenticationEndpoints.AccountId(context.User), id, ct)));
         group.MapGet("/{id:int}/appointments", async (HttpContext context, int id, string? scope, int? page, int? pageSize,
             IAppointmentQueryService service, CancellationToken ct) => Results.Ok(await service.ForPatientAsync(
                 AuthenticationEndpoints.AccountId(context.User), id, scope ?? "ALL", page ?? 1, pageSize ?? 20, ct)));

@@ -47,6 +47,11 @@ public sealed class AppointmentQueryService(DcmsDbContext db, UserManager<Applic
         var dynamicScope = await access.ResolveAsync(actorId, ct);
         if (dynamicScope.Assigned && !dynamicScope.Owner && !dynamicScope.BranchIds.Contains(branchId)) throw Error("MSG06", 403);
         var (employeeId, broad) = await ActorAsync(actorId, ct);
+        if (dynamicScope.Owner)
+        {
+            if (!await db.Set<SchedulingBranch>().AsNoTracking().AnyAsync(x => x.Id == branchId && x.Active, ct)) throw Error("MSG06", 403);
+            return new(branchId, employeeId, null);
+        }
         var membership = await db.Set<SchedulingMember>().AsNoTracking()
             .SingleOrDefaultAsync(x => x.BranchId == branchId && x.EmployeeId == employeeId && x.Active, ct) ?? throw Error("MSG06", 403);
         if (broad || membership.CanManageSchedules) return new(branchId, employeeId, null);
@@ -61,8 +66,15 @@ public sealed class AppointmentQueryService(DcmsDbContext db, UserManager<Applic
         var dynamicScope = await access.ResolveAsync(actorId, ct);
         mine = mine.Where(x => !dynamicScope.Assigned || dynamicScope.Owner || dynamicScope.BranchIds.Contains(x.BranchId)).ToList();
         mine = mine.Where(x => broad || x.CanManageSchedules || x.CanDentist).ToList();
-        if (mine.Count == 0) throw Error("MSG06", 403);
-        var branchIds = mine.Select(x => x.BranchId).ToArray();
+        int[] branchIds;
+        if (dynamicScope.Owner)
+            branchIds = await db.Set<SchedulingBranch>().AsNoTracking().Where(x => x.Active).Select(x => x.Id).ToArrayAsync(ct);
+        else
+        {
+            if (mine.Count == 0) throw Error("MSG06", 403);
+            branchIds = mine.Select(x => x.BranchId).ToArray();
+        }
+        if (branchIds.Length == 0) throw Error("MSG06", 403);
         var ownOnly = mine.Where(x => !broad && !x.CanManageSchedules).Select(x => x.BranchId).ToHashSet();
         var branches = await db.Set<SchedulingBranch>().AsNoTracking().Where(x => branchIds.Contains(x.Id) && x.Active)
             .OrderBy(x => x.Name).Select(x => new CalendarOption(x.Id, x.Name)).ToArrayAsync(ct);
@@ -75,7 +87,8 @@ public sealed class AppointmentQueryService(DcmsDbContext db, UserManager<Applic
             .OrderBy(x => x.Name).Select(x => new CalendarChair(x.Id, x.BranchId, x.Name)).ToArrayAsync(ct);
         var services = await db.Set<SchedulingService>().AsNoTracking().Where(x => branchIds.Contains(x.BranchId) && x.Active && x.IsInitialExamination)
             .OrderBy(x => x.Name).Select(x => new CalendarService(x.Id, x.BranchId, x.Name, x.PublicDurationMinutes)).ToArrayAsync(ct);
-        return new(branches, dentists, chairs, services, ownOnly.Count == branchIds.Length);
+        return new(branches, dentists, chairs, services, ownOnly.Count == branchIds.Length,
+            dentists.Any(value => value.Id == employeeId) ? employeeId : null);
     }
 
     public async Task<CalendarView> CalendarAsync(int actorId, int branchId, DateOnly from, DateOnly to, int? dentistId, string? status, CancellationToken ct)

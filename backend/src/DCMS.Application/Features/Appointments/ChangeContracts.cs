@@ -5,9 +5,9 @@ namespace DCMS.Application.Features.Appointments;
 
 public sealed record RescheduleAppointmentRequest(int ExpectedVersion, Guid RequestKey, DateTimeOffset NewStart,
     int ChairId, int ScheduleVersion, int? AssistantScheduleVersion, string? Reason,
-    string? RequesterVerification = null, int? DentistId = null, int? BookingSettingsVersion = null);
+    string? RequesterVerification = null, int? DentistId = null, int? BookingSettingsVersion = null, bool ClinicInitiated = false);
 public sealed record CancelAppointmentRequest(int ExpectedVersion, Guid RequestKey, string? Reason,
-    string? RequesterVerification = null);
+    string? RequesterVerification = null, bool ClinicInitiated = false);
 public sealed record NoShowAppointmentRequest(int ExpectedVersion, Guid RequestKey, string? Reason);
 public sealed record AppointmentChangeResult(MyAppointmentDetail Appointment, SystemMessage Notification);
 public sealed record MyAppointmentChange(string Action, string ActorKind, DateTimeOffset OldStart,

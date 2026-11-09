@@ -23,7 +23,7 @@ export default function SignInPage() {
       {(error || auth.sessionMessage) && <Alert type="error" showIcon message={error ?? auth.sessionMessage} className="form-alert" />}
       <Form layout="vertical" onFinish={values => void submit(values)} requiredMark={false}>
         <Form.Item name="userName" label="Tên đăng nhập" rules={[{ required: true, message: 'Vui lòng nhập Tên đăng nhập.' }]}>
-          <Input autoComplete="username" maxLength={64} autoFocus disabled={busy} />
+          <Input autoComplete="username" autoFocus disabled={busy} />
         </Form.Item>
         <Form.Item name="password" label="Mật khẩu" rules={[{ required: true, message: 'Vui lòng nhập Mật khẩu.' }]}>
           <Input.Password autoComplete="current-password" maxLength={256} disabled={busy} />

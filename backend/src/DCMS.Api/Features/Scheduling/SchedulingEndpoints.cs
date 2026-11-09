@@ -16,6 +16,8 @@ public static class SchedulingEndpoints
         settings.MapPut("/{branchId:int}", async (HttpContext context, int branchId, SaveBookingSettings command, IBookingSettingsService service, CancellationToken ct) =>
             Results.Ok(await service.SaveAsync(AuthenticationEndpoints.AccountId(context.User), branchId, command, ct)));
         var group = endpoints.MapGroup("/api/working-schedules").RequireAuthorization().WithTags("S09 UC-03");
+        group.MapGet("/appointments", async (HttpContext context, int dentistId, DateOnly from, DateOnly to, IWorkingScheduleService service, CancellationToken ct) =>
+            Results.Ok(await service.AppointmentsAsync(AuthenticationEndpoints.AccountId(context.User), dentistId, from, to, ct)));
         group.MapGet("/recurring", async (HttpContext context, int dentistId, DateOnly date, IWorkingScheduleService service, CancellationToken ct) =>
             Results.Ok(await service.GetRecurringAsync(AuthenticationEndpoints.AccountId(context.User), dentistId, date, ct)));
         group.MapPost("/recurring/preview", async (HttpContext context, RecurringCommand request, IWorkingScheduleService service, CancellationToken ct) =>

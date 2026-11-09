@@ -222,7 +222,12 @@ public sealed class AppointmentQueryApiTests(ApiFixture fixture) : IClassFixture
         }
         await AssertMessage(await dentist.GetAsync($"/api/appointments/{other.AppointmentId}"), HttpStatusCode.Forbidden, "MSG06");
         var options = (await dentist.GetFromJsonAsync<AppointmentOptions>("/api/appointments/options"))!;
+        Assert.Equal(s.DentistId, options.CurrentDentistId);
         Assert.DoesNotContain(options.Dentists, x => x.BranchId == s.BranchId && x.Id == s.OtherDentistId);
+        var assistantOptions = (await assistant.GetFromJsonAsync<AppointmentOptions>("/api/appointments/options"))!;
+        Assert.Null(assistantOptions.CurrentDentistId);
+        var ownerOptions = (await (await Login("owner.demo")).GetFromJsonAsync<AppointmentOptions>("/api/appointments/options"))!;
+        Assert.Equal(s.OtherDentistId, ownerOptions.CurrentDentistId);
 
         await AssertMessage(await (await Login("admin.demo")).GetAsync($"/api/appointments/calendar?{Range(s)}"), HttpStatusCode.Forbidden, "MSG06");
         var outsider = await PrepareAsync(assistantMember: false);

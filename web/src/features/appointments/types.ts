@@ -3,7 +3,7 @@ import type { SystemMessage } from '../../services/api';
 // Contract: docs/implementation/UC04-05-S10-S11.md §3.
 export type AppointmentStatus = 'Confirmed' | 'CheckedIn' | 'InProgress' | 'Completed' | 'Cancelled' | 'NoShow';
 export const statusLabels: Record<AppointmentStatus, string> = {
-  Confirmed: 'Đã xác nhận', CheckedIn: 'Đã tiếp nhận', InProgress: 'Đang khám', Completed: 'Hoàn thành', Cancelled: 'Đã hủy', NoShow: 'Vắng mặt',
+  Confirmed: 'Đã xác nhận', CheckedIn: 'Đã tiếp nhận', InProgress: 'Đang khám', Completed: 'Hoàn thành', Cancelled: 'Đã hủy', NoShow: 'Khách không tới',
 };
 export const statusColors: Record<AppointmentStatus, string> = {
   Confirmed: 'green', CheckedIn: 'blue', InProgress: 'geekblue', Completed: 'default', Cancelled: 'red', NoShow: 'orange',
@@ -16,7 +16,7 @@ export type CalendarDentist = { id: number; branchId: number; name: string };
 export type CalendarChair = { id: number; branchId: number; name: string };
 export type CalendarService = { id: number; branchId: number; name: string; publicDurationMinutes: number };
 export type AppointmentOptions = {
-  branches: CalendarOption[]; dentists: CalendarDentist[]; chairs: CalendarChair[]; services: CalendarService[]; ownScheduleOnly: boolean;
+  branches: CalendarOption[]; dentists: CalendarDentist[]; chairs: CalendarChair[]; services: CalendarService[]; ownScheduleOnly: boolean; currentDentistId?: number | null;
 };
 export type AppointmentListItem = {
   id: string; code: string; branchId: number; branchName: string; startAt: string; endAt: string; durationMinutes: number;

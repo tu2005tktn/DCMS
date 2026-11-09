@@ -55,7 +55,7 @@ export default function ExaminationPage() {
   const currentWorkspace = useRef(w); currentWorkspace.current = w;
   const pendingCommand = useRef<{ fingerprint: string; key: string } | undefined>(undefined);
   const { contexts, error: contextError } = usePatientDocumentContexts(has('documents.read') ? w?.visit.patientId ?? 0 : 0);
-  const { options: diagnosisOptions, error: diagnosisOptionsError, reload: reloadDiagnosisOptions } = useDiagnosisOptions(w?.visit.branchId);
+  const { options: diagnosisOptions, error: diagnosisOptionsError, reload: reloadDiagnosisOptions } = useDiagnosisOptions(w && (w.allowedActions.includes('save') || w.allowedActions.includes('amend')) ? w.visit.branchId : undefined);
   const lockedFilters = useMemo(() => ({ ...filters, visitId }), [filters, visitId]);
   useEffect(() => { let active = true; generation.current++; setW(undefined); setContent(undefined); setDirty(false); setError(undefined);
     setAmending(false); setAmendReason(''); setEnding(false); setBusy(false);setValidationAttempt(0); setHistory([]); setVersions([]); setTab('exam'); pendingCommand.current = undefined;
@@ -285,8 +285,9 @@ export default function ExaminationPage() {
           {amending && <Button disabled={busy} onClick={() => { setContent(w.examination!.content); setAmending(false); setDirty(false); setAmendReason(''); }}>Hủy đính chính</Button>}
         </>}
         {!amending && w.allowedActions.includes('amend') && <Button key="amend-examination" aria-label="Đính chính kết quả" disabled={busy} onClick={() => { setAmending(true); setDirty(true); }}>Đính chính kết quả</Button>}
-        {!amending && handoff && <Link className="ant-btn ant-btn-primary" to={`/patients/${v.patientId}?tab=treatment&sourceExaminationVisitId=${visitId}&examinationVersion=${w.examination?.version ?? 0}`}>Lập kế hoạch điều trị</Link>}
-        {!amending && v.status === 'Completed' && w.examination?.confirmed && user?.permissions.includes('finance.read') && <Link className="ant-btn" to={`/visits/${visitId}/payments`}>Chuyển thu ngân</Link>}
+        {!amending && handoff && <Link to={`/patients/${v.patientId}?tab=treatment&sourceExaminationVisitId=${visitId}&examinationVersion=${w.examination?.version ?? 0}`}><Button type="primary">Lập kế hoạch điều trị</Button></Link>}
+        {!amending && v.status === 'Completed' && w.examination?.confirmed && user?.permissions.includes('finance.read') && <Link to={`/visits/${visitId}/payments`}><Button>Chuyển thu ngân</Button></Link>}
+        {!amending && w.examination?.confirmed && user?.permissions.includes('examinations.manage') && <Link to={`/visits/${visitId}/prescription`}><Button>Đơn thuốc mua ngoài</Button></Link>}
         {!amending && w.allowedActions.includes('complete') && <Button disabled={busy} onClick={() => { setWorkReviewed(false); setExaminationFee(undefined); setEnding(true); }}>Kết thúc lượt khám</Button>}</Space>
         {w.examination?.confirmed && v.status === 'InProgress' && <Typography.Paragraph type="secondary" style={{ marginTop: 16 }}>Phiếu khám đã hoàn tất. Kết thúc lượt khám trước khi chuyển sang phiếu điều trị.</Typography.Paragraph>}
       </Card> },
