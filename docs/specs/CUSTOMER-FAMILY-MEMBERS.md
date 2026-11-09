@@ -1,5 +1,7 @@
 # Người thân và điền sẵn đặt lịch hộ — 01/11/2026
 
+> Mở rộng triển khai web ngày 09/11/2026: [đặt lịch và quyền xem hồ sơ người thân](FAMILY-DELEGATED-RECORD-ACCESS.vi.md) là contract mới cho booking có `familyMemberId`, yêu cầu/cấp/thu hồi quyền đọc theo phạm vi và chi nhánh. Không tự tạo/ghép Patient và không thay đổi self-link. Các đoạn không có FamilyMemberId bên dưới mô tả tương thích booking cũ.
+
 ## Điều chỉnh bắt buộc giới tính và điện thoại
 Theo yêu cầu mới, mọi command tạo/sửa phải có gender và contactPhone hợp lệ; null/rỗng/whitespace trả FAMILY_MEMBER_VALIDATION kèm field. Form đánh dấu bắt buộc và báo lỗi tại trường trước khi gửi. Bản ghi cũ thiếu thông tin vẫn đọc được, schema giữ nullable để không giả lập/backfill dữ liệu; khi sửa phải bổ sung cả hai. Không cần migration cho thay đổi validation này. Không thay liên hệ người đặt hoặc quy tắc booking. Receipt đã commit trước thay đổi vẫn replay đúng kết quả cũ sau khi kiểm auth/owner, không tạo/sửa lại dữ liệu; validation bắt buộc áp dụng khi không có receipt. Cùng key khác payload tiếp tục conflict.
 

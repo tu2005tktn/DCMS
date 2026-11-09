@@ -8,20 +8,8 @@ namespace DCMS.Infrastructure.Features.Treatment;
 
 public sealed partial class TreatmentDossierService
 {
-    private sealed record SheetActivitySnapshot(Guid ActivityId, int SheetVersion, ActivityDto Activity);
-
-    private async Task<Dictionary<Guid, ActivityDto>> SheetActivityOverridesAsync(Guid dossierId, CancellationToken ct)
-    {
-        var entries = await db.TreatmentEvents.AsNoTracking().Where(e => e.DossierId == dossierId &&
-            (e.Kind == "SheetActivityEdited" || e.Kind == "SheetActivityDeleted")).OrderBy(e => e.DossierVersion).ToListAsync(ct);
-        var result = new Dictionary<Guid, ActivityDto>();
-        foreach (var e in entries)
-        {
-            var snapshot = JsonSerializer.Deserialize<SheetActivitySnapshot>(e.PayloadJson, Json) ?? throw Error("MSG144", 503);
-            result[snapshot.ActivityId] = snapshot.Activity;
-        }
-        return result;
-    }
+    private Task<Dictionary<Guid, ActivityDto>> SheetActivityOverridesAsync(Guid dossierId, CancellationToken ct)
+        => TreatmentBookingQueries.ActivityOverridesAsync(db, dossierId, ct);
 
     private async Task<(ClinicalActivity Source, ActivityDto Current)> EditableSheetActivityAsync(int actorId,
         TreatmentDossier dossier, Guid id, int expectedVersion, int expectedActivityVersion, int expectedSheetVersion, CancellationToken ct)
