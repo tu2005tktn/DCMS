@@ -250,6 +250,11 @@ export default function MedicalRecordsScreen() {
         </Text>
       </Card>
 
+      <Card title="Kết quả khám theo lượt">
+        <Text style={styles.muted}>Kết quả khám bác sĩ đã xác nhận, chẩn đoán, dặn dò, kết quả cận lâm sàng và hình ảnh của từng lượt.</Text>
+        <Button title="Xem kết quả khám" onPress={() => router.push('/(account)/visit-results')} />
+      </Card>
+
       <Card title="Đơn thuốc">
         <Text style={styles.muted}>Đơn thuốc mua ngoài bác sĩ đã hoàn tất, kèm liều dùng và lời dặn.</Text>
         <Button title="Xem đơn thuốc" variant="secondary" onPress={() => router.push('/(account)/prescriptions')} />
@@ -257,8 +262,6 @@ export default function MedicalRecordsScreen() {
 
       <Card title="Nguồn chưa kết nối">
         <Text style={styles.muted}>
-          • Kết quả/chẩn đoán lâm sàng (DCMS-93/96/99){'\n'}
-          • Ảnh/tài liệu ở trạng thái Ready (S20 / DCMS-95){'\n'}
           • Lịch sử phiên bản, đồng bộ chi tiết và hóa đơn (DCMS-95 / S42)
         </Text>
         <Text style={styles.note}>Phần này hiển thị trạng thái trung thực; ứng dụng không tự tạo dữ liệu khi API chưa có.</Text>

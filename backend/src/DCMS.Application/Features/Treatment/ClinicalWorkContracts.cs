@@ -96,6 +96,23 @@ public sealed record EscalationDto(Guid Id, Guid TaskId, int TargetClinicianAcco
     DateTimeOffset? ResolvedAt);
 public sealed record CareTaskDetail(CareTaskDto Task, IReadOnlyList<ContactAttemptDto> Contacts,
     IReadOnlyList<EscalationDto> Escalations);
+// S60 staff Web (docs/specs/S60-CUSTOMER-CARE-WEB.vi.md): read-only worklist, pickers and Excel.
+public sealed record CareStaffOption(int AccountId, string Name, string[] Roles);
+public sealed record CareBranchOption(int Id, string Name, bool CanCreate, IReadOnlyList<CareStaffOption> Staff);
+public sealed record CareTypeOption(string Code, string Name, bool System);
+// Branches the actor can read: the owner reads every active branch, other staff their member branches.
+public sealed record CareTaskOptions(DateOnly ClinicDate, int ActorAccountId, bool AllBranches,
+    IReadOnlyList<CareBranchOption> Branches, IReadOnlyList<CareTypeOption> Types);
+public sealed record CarePatientOption(int PatientId, string PatientCode, string FullName,
+    string? Phone, DateTimeOffset LastVisitAt);
+// BranchId null = every branch the actor can read.
+public sealed record CareWorklistQuery(int? BranchId, DateOnly? From, DateOnly? To, int? OwnerAccountId,
+    string? Type, string? Status, string? Search, int Page = 1, int PageSize = 20);
+public sealed record CareWorklistItem(CareTaskDto Task, string BranchName, string PatientCode, string PatientName,
+    string? Phone, string TypeName, string? OwnerName, string? LastContactResult,
+    DateTimeOffset? LastContactAt);
+public sealed record CareWorklistPage(IReadOnlyList<CareWorklistItem> Items, int Total, int Page,
+    int PageSize);
 public interface ICareTaskService
 {
     Task<IReadOnlyList<CareTaskDto>> ListAsync(int actorId, int branchId, DateOnly? from,
@@ -107,4 +124,9 @@ public interface ICareTaskService
     Task<EscalationDto> EscalateAsync(int actorId, Guid id, EscalateCareRequest request, CancellationToken ct);
     Task<EscalationDto> ChangeEscalationAsync(int actorId, Guid id, bool resolve,
         ResolveEscalationRequest request, CancellationToken ct);
+    Task<CareTaskOptions> OptionsAsync(int actorId, CancellationToken ct);
+    Task<IReadOnlyList<CarePatientOption>> PatientOptionsAsync(int actorId, int branchId,
+        string? search, CancellationToken ct);
+    Task<CareWorklistPage> WorklistAsync(int actorId, CareWorklistQuery query, CancellationToken ct);
+    Task<byte[]> ExportAsync(int actorId, CareWorklistQuery query, CancellationToken ct);
 }

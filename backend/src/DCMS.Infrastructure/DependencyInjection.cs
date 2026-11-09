@@ -113,6 +113,7 @@ public static class DependencyInjection
         services.AddScoped<DCMS.Application.Features.Examinations.IInvestigationService, Features.Examinations.InvestigationService>();
         services.AddScoped<DCMS.Application.Features.Examinations.IExaminationService, Features.Examinations.ExaminationService>();
         services.AddScoped<DCMS.Application.Features.Examinations.IClinicalDocumentService, Features.Examinations.ClinicalDocumentService>();
+        services.AddScoped<DCMS.Application.Features.Examinations.IOwnClinicalRecordService, Features.Examinations.OwnClinicalRecordService>();
         services.AddSingleton<DCMS.Application.Features.Examinations.IClinicalFileScanner, Features.Examinations.ClamAvClinicalFileScanner>();
         services.AddHostedService<Features.Examinations.ClinicalScanWorker>();
         services.AddScoped<IAppointmentQueryService, AppointmentQueryService>();
@@ -153,6 +154,8 @@ public static class DependencyInjection
         services.AddScoped<DCMS.Application.Features.Treatment.IWorkStatisticsService, Features.Treatment.WorkStatisticsService>();
         services.AddScoped<DCMS.Application.Features.SystemSettings.IGeneralSettingsService, Features.SystemSettings.GeneralSettingsService>();
         services.AddScoped<DCMS.Application.Features.SystemSettings.IReferenceCatalogService, Features.SystemSettings.ReferenceCatalogService>();
+        services.AddScoped<DCMS.Application.Features.SystemSettings.ISettingsAuditService, Features.SystemSettings.SettingsAuditService>();
+        services.AddScoped<DCMS.Application.Features.SystemSettings.IServiceCatalogExport, Features.SystemSettings.ServiceCatalogExport>();
         services.AddScoped<DCMS.Application.Features.SystemSettings.ISupplyCatalog<DCMS.Application.Features.SystemSettings.ProviderInput, DCMS.Application.Features.SystemSettings.ProviderDto>, Features.SystemSettings.ProviderCatalog>();
         services.AddScoped<DCMS.Application.Features.SystemSettings.ISupplyCatalog<DCMS.Application.Features.SystemSettings.LabWorkTypeInput, DCMS.Application.Features.SystemSettings.LabWorkTypeDto>, Features.SystemSettings.LabWorkTypeCatalog>();
         services.AddScoped<Features.SystemSettings.MedicineCatalog>();

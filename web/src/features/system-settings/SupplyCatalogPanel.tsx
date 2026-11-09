@@ -192,6 +192,7 @@ export default function SupplyCatalogPanel({ onlyMedicines = false, initialKey }
       const apiBase = (import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5080').replace(/\/$/, '');
       const response = await fetch(`${apiBase}${base}/${section.resource}/export?${new URLSearchParams({ q: query, status })}`,
         { headers: { Authorization: `Bearer ${readAccessToken() ?? ''}` }, cache: 'no-store' });
+      if (response.status === 403) throw new ApiError(403, 'MSG06', 'Bạn không có quyền xuất Excel danh mục này.');
       if (!response.ok) throw new ApiError(response.status, 'MSG144', 'Không thể xuất Excel. Vui lòng thử lại.');
       const url = URL.createObjectURL(await response.blob());
       const link = Object.assign(document.createElement('a'), { href: url, download: `danh-muc-${section.resource}.xlsx` });

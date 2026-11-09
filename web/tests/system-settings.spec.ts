@@ -10,6 +10,8 @@ async function prepare(page: Page, initial = true, role = 'Dentist', count = 1) 
     const ok=(json:unknown)=>route.fulfill({json});
     if(path==='/api/auth/sign-in')return ok({accessToken:'synthetic',user});
     if(path==='/api/auth/me')return ok(user);
+    // S58 shell (DCMS-132): tabs follow the server capabilities; a dentist only gets the material sections here.
+    if(path==='/api/system-settings/settings/capabilities')return ok(role==='Dentist'?{sections:[{key:'materials',canManage:true}],catalogKinds:[]}:{sections:[],catalogKinds:[]});
     if(!path.startsWith('/api/system-settings/'))return route.fulfill({status:404,json:{code:'NOT_MOCKED',message:path}});
     const kind=path.split('/')[3], id=path.split('/')[4], rows=kind==='materials'?state.materials:state.categories;
     const dto=(row:Row)=>({...row,...(kind==='materials'?{categoryName:state.categories.find(c=>c.id===row.categoryId)?.name}:{itemCount:state.materials.filter(i=>!i.isDeleted&&i.categoryId===row.id).length})});
@@ -46,14 +48,14 @@ test('tạo nhóm trước, thêm/sửa/chuyển/xóa vật liệu và chặn nh
   await page.getByRole('button',{name:'Tạo danh mục',exact:true}).click();
   await page.getByRole('button',{name:'Thêm mới',exact:true}).click();await page.getByLabel('Tên danh mục',{exact:true}).fill('Vật liệu trám');
   expect(state.requests).toHaveLength(0);await page.getByRole('button',{name:'Lưu',exact:true}).click();await expect(page.getByRole('button',{name:'Sửa Vật liệu trám'})).toBeVisible();
-  await page.getByRole('tab',{name:'Dụng cụ / Vật liệu',exact:true}).click();await page.getByRole('button',{name:'Thêm mới',exact:true}).click();
+  await page.getByRole('tab',{name:'Dụng cụ / Vật liệu',exact:true}).last().click();await page.getByRole('button',{name:'Thêm mới',exact:true}).click();
   await page.getByLabel('Tên',{exact:true}).fill('Composite');await choose(page,'Thuộc danh mục','Vật liệu trám');await page.getByRole('button',{name:'Lưu',exact:true}).click();
   await expect(page.getByRole('button',{name:'Sửa Composite'})).toBeVisible();
   await page.getByRole('button',{name:'Sửa Composite'}).click();await page.getByLabel('Tên',{exact:true}).fill('Composite A2');await page.getByRole('button',{name:'Lưu',exact:true}).click();
   await expect(page.getByRole('button',{name:'Sửa Composite A2'})).toBeVisible();
   await page.getByRole('tab',{name:'Danh mục',exact:true}).click();await page.getByRole('button',{name:'Xóa Vật liệu trám'}).click();await page.getByRole('button',{name:'Đồng ý',exact:true}).click();
   await expect(page.getByText('Danh mục đang có dụng cụ/vật liệu. Vui lòng chuyển hoặc xóa các mục trước.')).toBeVisible();await page.getByRole('button',{name:'Không đồng ý',exact:true}).click();
-  await page.getByRole('tab',{name:'Dụng cụ / Vật liệu',exact:true}).click();await page.getByRole('button',{name:'Xóa Composite A2'}).click();await page.getByRole('button',{name:'Không đồng ý',exact:true}).click();
+  await page.getByRole('tab',{name:'Dụng cụ / Vật liệu',exact:true}).last().click();await page.getByRole('button',{name:'Xóa Composite A2'}).click();await page.getByRole('button',{name:'Không đồng ý',exact:true}).click();
   await expect(page.getByRole('button',{name:'Sửa Composite A2'})).toBeVisible();await page.getByRole('button',{name:'Xóa Composite A2'}).click();await page.getByRole('button',{name:'Đồng ý',exact:true}).click();
   await expect(page.getByRole('button',{name:'Sửa Composite A2'})).toHaveCount(0);expect(state.materials[0].isDeleted).toBe(true);
   await page.getByRole('tab',{name:'Danh mục',exact:true}).click();await page.getByRole('button',{name:'Xóa Vật liệu trám'}).click();await page.getByRole('button',{name:'Đồng ý',exact:true}).click();await expect(page.getByRole('button',{name:'Sửa Vật liệu trám'})).toHaveCount(0);

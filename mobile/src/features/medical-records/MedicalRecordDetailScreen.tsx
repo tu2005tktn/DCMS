@@ -154,8 +154,7 @@ export default function MedicalRecordDetailScreen() {
 
       <Card title="Nguồn chưa kết nối">
         <Text style={styles.muted}>
-          • Kết quả/diagnosis/chẩn đoán chính thức (DCMS-93/96/99){'\n'}
-          • Ảnh/tài liệu ở trạng thái Ready — chỉ tải qua endpoint được cấp quyền (S20 / DCMS-95){'\n'}
+          • Kết quả khám và hình ảnh theo lượt: xem ở mục Kết quả khám theo lượt (Hồ sơ y tế của tôi){'\n'}
           • Lịch sử phiên bản/sửa đổi/đồng bộ chi tiết (DCMS-95){'\n'}
           • Hóa đơn thanh toán (S42 — màn đã có thì chỉ hiển thị link)
         </Text>

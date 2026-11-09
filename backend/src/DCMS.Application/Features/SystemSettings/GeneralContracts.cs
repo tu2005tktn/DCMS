@@ -34,7 +34,7 @@ public sealed record GeneralPreview(int CurrentVersion, bool Stale, IReadOnlyLis
 public sealed record GeneralHistoryItem(int Version, DateTimeOffset EffectiveAt, string ActorName, string Reason, int? RestoredFromVersion, GeneralSettings Settings);
 public sealed record GeneralHistoryPage(IReadOnlyList<GeneralHistoryItem> Items, int Total, int Page, int PageSize);
 public sealed record SettingsSection(string Key, bool CanManage);
-public sealed record SettingsCapabilities(IReadOnlyList<SettingsSection> Sections);
+public sealed record SettingsCapabilities(IReadOnlyList<SettingsSection> Sections, IReadOnlyList<string>? CatalogKinds = null);
 public sealed record PatientFormPolicy(int Version, RequiredFieldsSettings RequiredFields, PatientCodeSettings PatientCode);
 
 // DCMS-122: the shared patient code sequence. Reads never call nextval; the only write moves it forward.

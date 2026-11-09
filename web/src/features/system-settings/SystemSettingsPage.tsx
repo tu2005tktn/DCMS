@@ -7,6 +7,8 @@ import { useAuth } from '../authentication/AuthContext';
 import GeneralSettingsPanel from './GeneralSettingsPanel';
 import ReferenceCatalogPanel from './ReferenceCatalogPanel';
 import SupplyCatalogPanel from './SupplyCatalogPanel';
+import SettingsAuditPanel from './SettingsAuditPanel';
+import { downloadExport } from './exportFile';
 import AccessGroupsPanel from './AccessGroupsPanel';
 import BranchesPanel from './BranchesPanel';
 import ClinicalServicesPage from '../finance/ClinicalServicesPage';
@@ -118,6 +120,11 @@ export default function SystemSettingsPage() {
     ...(has('branches.read') || owner
       ? [{ key: 'branches', label: '11. Chi nhánh & Ghế điều trị', children: <BranchesPanel /> }]
       : []),
+
+    // 12. settings history (DCMS-132)
+    ...(capabilities.sections.some(x => x.key === 'audit') || has('settings.audit.read')
+      ? [{ key: 'audit', label: '12. Lịch sử thiết lập', children: <SettingsAuditPanel /> }]
+      : []),
   ];
 
   if (!tabs.length) {
@@ -219,6 +226,13 @@ function MaterialCatalog() {
     return () => { live = false; };
   }, [allowed, revision]);
   function tab(value: string) { setKind(value as Kind); setPage(1); setQuery(''); setSearch(''); setCategoryId(undefined); setData(null); }
+  const [exportError, setExportError] = useState<string>();
+  async function exportMaterials() {
+    setExportError(undefined);
+    const params = new URLSearchParams({ q: query }); if (categoryId) params.set('categoryId', categoryId);
+    try { await downloadExport(`${base}/materials/export?${params}`, 'danh-muc-vat-lieu.xlsx'); }
+    catch (e) { setExportError((e as Error).message); }
+  }
   function open(row?: Row) {
     pending.current = null; setFormError(undefined); form.resetFields();
     form.setFieldsValue({ name: row?.name ?? '', categoryId: row?.categoryId, usageUnit: row?.usageUnit ?? undefined }); setDialog({kind, row});
@@ -260,9 +274,11 @@ function MaterialCatalog() {
         {kind === 'materials' && <Select allowClear placeholder="Lọc theo nhóm" style={{ width: 200 }} value={categoryId}
           onChange={v => { setCategoryId(v); setPage(1); }} options={categories?.map(c => ({ value: c.id, label: c.name }))} />}
         {canCreate && <Button type="primary" onClick={() => open()}>+ Thêm mới</Button>}
+        {kind === 'materials' && user?.permissions.includes('catalog.materials.export') && <Button disabled={busy} onClick={() => void exportMaterials()}>Xuất Excel</Button>}
       </Space>
     </div>
     {error && <Alert type="error" showIcon message={error} style={{ marginBottom: 16 }} />}
+    {exportError && <Alert type="error" showIcon closable message={exportError} onClose={() => setExportError(undefined)} style={{ marginBottom: 16 }} />}
     {categoryError && <Alert type="warning" showIcon message={`Không tải được nhóm vật liệu: ${categoryError}`} style={{ marginBottom: 16 }} />}
     <Table
       loading={loading}

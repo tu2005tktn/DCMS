@@ -27,6 +27,10 @@ The 12 October 2026 [UC-33/S02 Mobile decision](UC33-S02-MOBILE.md) replaces the
 - Session starts anonymous. Native token storage uses Expo SecureStore; no login or refresh lifecycle is implemented. Tokens must not be stored in public environment variables.
 - `EXPO_PUBLIC_API_URL` is public build configuration. A physical phone requires a reachable development host address; `localhost` refers to the phone itself.
 
+## Central menu `(home)/index` — touch on native (07/11/2026)
+
+Every card in the central menu must open its route when tapped on Android/iOS, not only on web. A card is a pressable element (`Pressable` under `Link asChild`); a plain `View` does not receive press events on native, so `Link` cannot navigate from it. The cards keep the same layout, labels, and `accessibilityRole="button"`; Android shows a ripple on press. The card style is static because `Link asChild` merges styles as an array and would drop a style function. Routes, visibility rules, and session behavior do not change.
+
 ## Acceptance and team handoff
 
 All requested folders/files must exist and be Git-trackable. The app must typecheck and bundle with Expo. Screens must visibly identify themselves as placeholders and offer navigation without simulating successful business actions. README documents install/start/check commands, responsibilities, API limitations, environment configuration, and EAS setup. Commit the npm lockfile; exclude dependencies, `.expo`, builds, and local secrets. Native-device validation and EAS publishing require separate setup.

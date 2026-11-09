@@ -131,7 +131,9 @@ export default function HomeMenuScreen() {
             <Text style={styles.groupTitle}>{group.title}</Text>
             {visibleItems.map((item) => (
               <Link key={`${item.href.toString()}-${item.label}`} href={item.href} asChild>
-                <Pressable style={styles.card} accessibilityRole="button">
+                {/* Pressable, not View: a View receives no press events on native, so Link could not navigate.
+                    Static style only: Link asChild merges styles as an array, so a style function would be dropped. */}
+                <Pressable style={styles.card} android_ripple={{ color: colors.border }} accessibilityRole="button">
                   <Text style={styles.cardLabel}>{item.label}</Text>
                   <Text style={styles.cardDescription}>{item.description}</Text>
                 </Pressable>
