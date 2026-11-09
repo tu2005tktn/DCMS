@@ -9,6 +9,7 @@ Tài liệu liên quan: [S19-OPTIONAL-PRESCRIPTION.vi.md](S19-OPTIONAL-PRESCRIPT
 - Entry point web phải render router `App` qua default export của `App.tsx`. Hàm chuyển hướng `/commercial/treatment` là hàm riêng, giữ nguyên query string khi chuyển tới `/settings/treatment-services`.
 - Bản sửa khôi phục route bị mất khi merge và default export của router; không thay đổi API hoặc hợp đồng dữ liệu đơn thuốc.
 - Tích hợp main ngày 09/11/2026: khi giữ route `/prescriptions/templates`, router phải import `PrescriptionTemplatesPage` từ trang quản lý mẫu đơn hiện có để build TypeScript thành công; giữ nguyên kiểm tra quyền `prescriptions.manage`.
+Điều hướng web nhân viên: mục "Mẫu đơn thuốc" trong nhóm Chuyên môn mở `/prescriptions/templates`, yêu cầu quyền `prescriptions.manage` và hiển thị `PrescriptionTemplatesPage`. Tuyến này phải được khai báo trong router để menu hoạt động và bản build web thành công.
 
 ---
 

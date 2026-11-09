@@ -1,9 +1,10 @@
 namespace DCMS.Application.Features.Finance;
 
-public sealed record RevenueTotals(long ReceivedVnd, long CashVnd, long TransferVnd, long PendingVnd);
-public sealed record RevenueDay(DateOnly Date, long CashVnd, long TransferVnd);
+public sealed record RevenueTotals(long ReceivedVnd, long CashVnd, long TransferVnd, long PendingVnd,
+    IReadOnlyDictionary<string, long> ByMethod);
+public sealed record RevenueDay(DateOnly Date, long CashVnd, long TransferVnd, long OtherVnd);
 public sealed record RevenueItem(Guid Id, string Source, Guid? SourceId, int PatientId, string PatientName,
-    int BranchId, string BranchName, DateTimeOffset ReceivedAt, string Method, long AmountVnd);
+    int BranchId, string BranchName, DateTimeOffset ReceivedAt, DateOnly PaymentDate, string Method, long AmountVnd);
 public sealed record RevenueReport(DateOnly From, DateOnly To, RevenueTotals Totals,
     RevenueDay[] Daily, int Total, RevenueItem[] Items);
 

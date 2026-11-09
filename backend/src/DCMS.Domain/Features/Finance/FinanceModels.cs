@@ -58,6 +58,7 @@ public sealed class PaymentReceipt
     public string PatientName { get; set; } = "";
     public string BranchName { get; set; } = "";
     public string Method { get; set; } = "Cash";
+    public string Purpose { get; set; } = "Charge";
     public string State { get; set; } = "Pending";
     public long AmountVnd { get; set; }
     public string Payer { get; set; } = "";
