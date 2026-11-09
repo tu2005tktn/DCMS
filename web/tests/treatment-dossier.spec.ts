@@ -26,7 +26,7 @@ test('S43 opens S21 and a version conflict keeps the edited plan in the form', a
     acknowledgeShortReservation: boolean }[] } | null = null;
   const user = {
     id: 9, userName: 'synthetic.dentist', fullName: 'SYNTHETIC Dentist', accountType: 'Staff',
-    roles: ['Dentist'], effectiveRoles: ['Dentist'], permissions: ['patients.read'], hasVerifiedPatientLink: false,
+    roles: ['Dentist'], effectiveRoles: ['Dentist'], permissions: ['patients.read', 'treatment.read', 'treatment.plan.manage', 'treatment.items.create', 'treatment.items.price'], hasVerifiedPatientLink: false,
   };
   await page.route('**/api/auth/me', route => route.fulfill({ json: user }));
   await page.route('**/api/auth/sign-in', route => route.fulfill({ json: { accessToken: 'synthetic-token', user } }));

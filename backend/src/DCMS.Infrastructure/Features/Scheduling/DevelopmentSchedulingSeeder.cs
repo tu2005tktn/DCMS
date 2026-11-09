@@ -32,6 +32,26 @@ public sealed class DevelopmentSchedulingSeeder(DcmsDbContext db)
             if (!await db.Set<SchedulingMember>().AnyAsync(x => x.BranchId == branch.Id && x.EmployeeId == item.Employee.Id, ct))
                 db.Add(new SchedulingMember { BranchId = branch.Id, EmployeeId = item.Employee.Id, CanDentist = item.UserName != "assistant.demo", CanManageSchedules = item.UserName == "owner.demo" });
         }
+        await SeedSecondBranchAsync(ct);
         await db.SaveChangesAsync(ct); await transaction.CommitAsync(ct);
+    }
+
+    // Branch B has only its own two members, to exercise isolation between branches (docs/implementation/RUN-ACCOUNTS.vi.md).
+    private async Task SeedSecondBranchAsync(CancellationToken ct)
+    {
+        const string name = "S09 - Chi nhánh B";
+        var branch = await db.Set<SchedulingBranch>().SingleOrDefaultAsync(x => x.Name == name, ct);
+        if (branch == null)
+        {
+            branch = new() { Name = name }; db.Add(branch); await db.SaveChangesAsync(ct);
+            db.AddRange(new SchedulingService { BranchId = branch.Id, Name = "Khám", PublicDurationMinutes = 30, IsInitialExamination = true },
+                new SchedulingChair { BranchId = branch.Id, Name = "Ghế B 1" });
+        }
+        var members = await (from employee in db.Employees join user in db.Users on employee.AccountId equals user.Id
+            where user.UserName == "dentist.b.demo" || user.UserName == "assistant.b.demo"
+            select new { Employee = employee, user.UserName }).ToArrayAsync(ct);
+        foreach (var item in members)
+            if (!await db.Set<SchedulingMember>().AnyAsync(x => x.BranchId == branch.Id && x.EmployeeId == item.Employee.Id, ct))
+                db.Add(new SchedulingMember { BranchId = branch.Id, EmployeeId = item.Employee.Id, CanDentist = item.UserName == "dentist.b.demo" });
     }
 }

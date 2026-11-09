@@ -52,3 +52,7 @@ Backend (tích hợp, schema cách ly): lập phiếu mặc định `NotSent`; c
 ## Ngoài phạm vi
 
 Thông báo nhắc hạn, công nợ xưởng, tệp đính kèm, in danh sách, xuất Excel, tự gửi phiếu cho xưởng.
+
+## Bộ lọc chi nhánh (08/11/2026)
+
+Màn "Quản lý công việc labo" có ô lọc "Chi nhánh" (mặc định "Tất cả chi nhánh") chỉ dành cho chủ phòng khám có từ 2 chi nhánh; chọn là danh sách, các ô đếm trạng thái và danh sách công ty labo/bác sĩ đổi ngay theo chi nhánh (API `GET /api/lab-orders?branchId=`). Danh sách chi nhánh lấy từ `/api/appointments/options`. Nhân viên thường không có ô này và chỉ thấy phiếu chi nhánh mình.

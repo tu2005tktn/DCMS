@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError } from '../../services/api';
 import { formatDate } from '../appointments/types';
 import { usePermissions } from '../authentication/usePermissions';
+import { useCanPickBranch } from '../authentication/useCanPickBranch';
 import LabOrderModal from '../treatment/LabOrderModal';
 import './labWork.css';
 
@@ -37,11 +38,16 @@ export default function LabWorkPage() {
   const [data, setData] = useState<Page>(), [error, setError] = useState<string>(), [loading, setLoading] = useState(true);
   const [open, setOpen] = useState<Item>(), [history, setHistory] = useState<Log[]>(), [note, setNote] = useState(''), [busy, setBusy] = useState(false), [actionError, setActionError] = useState<string>();
   const [editing, setEditing] = useState(false);
+  const canPickBranch = useCanPickBranch();
+  const [branch, setBranch] = useState<number>();
+  const [branches, setBranches] = useState<{ id: number; name: string }[]>([]);
+  useEffect(() => { if (canPickBranch) api<{ branches: { id: number; name: string }[] }>('/api/appointments/options').then(o => setBranches(o.branches)).catch(() => setBranches([])); }, [canPickBranch]);
 
   useEffect(() => {
     let current = true; setLoading(true); setError(undefined);
     const p = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
     if (status) p.set('status', status);
+    if (branch) p.set('branchId', String(branch));
     if (search) p.set('q', search);
     if (lab) p.set('labProviderId', lab);
     if (dentist) p.set('dentistId', String(dentist));
@@ -49,7 +55,7 @@ export default function LabWorkPage() {
     if (to) p.set('to', to);
     api<Page>(`/api/lab-orders?${p}`).then(r => { if (current) setData(r); }).catch((e: unknown) => { if (current) setError(message(e)); }).finally(() => { if (current) setLoading(false); });
     return () => { current = false; };
-  }, [status, search, lab, dentist, from, to, page, pageSize, attempt]);
+  }, [status, branch, search, lab, dentist, from, to, page, pageSize, attempt]);
 
   const loadHistory = useCallback((id: string) => {
     setHistory(undefined);
@@ -90,6 +96,7 @@ export default function LabWorkPage() {
     <div className="lab-work-filters">
       <Input.Search allowClear placeholder="Mã phiếu, MSKH, tên bệnh nhân, công việc" aria-label="Tìm phiếu labo" value={q} maxLength={160}
         onChange={e => { setQ(e.target.value); if (!e.target.value) { setSearch(''); setPage(1); } }} onSearch={v => { setSearch(v.trim()); setPage(1); }} />
+      {canPickBranch && branches.length > 1 && <Select allowClear placeholder="Tất cả chi nhánh" aria-label="Chi nhánh" value={branch} onChange={v => { setBranch(v); setLab(undefined); setDentist(undefined); setPage(1); }} options={branches.map(b => ({ value: b.id, label: b.name }))} />}
       <Select allowClear placeholder="Công ty labo" aria-label="Công ty labo" value={lab} onChange={v => { setLab(v); setPage(1); }} options={data?.labs.map(l => ({ value: l.id, label: l.name }))} />
       <Select allowClear placeholder="Bác sĩ" aria-label="Bác sĩ" value={dentist} onChange={v => { setDentist(v); setPage(1); }} options={data?.dentists.map(d => ({ value: d.id, label: d.name }))} />
       <label>Hẹn từ <input type="date" aria-label="Hẹn từ ngày" value={from} max={to || undefined} onChange={e => { setFrom(e.target.value); setPage(1); }} /></label>

@@ -1,4 +1,5 @@
 import { usePermissions } from '../authentication/usePermissions';
+import { useCanPickBranch } from '../authentication/useCanPickBranch';
 import { Alert, Button, Card, Empty, Input, InputNumber, Select, Space, Spin, Table, Tag, Typography } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -36,6 +37,8 @@ export default function WorkingSchedulesPage() {
   const [affected, setAffected] = useState<Affected[]>();
   const [days, setDays] = useState<Availability[]>();
   const [branch, setBranch] = useState<number>();
+  const canPickBranch = useCanPickBranch();
+  const [viewBranch, setViewBranch] = useState<number>();
   const [service, setService] = useState<number>();
   const [assistant, setAssistant] = useState<number>();
   const [duration, setDuration] = useState<number | null>(30);
@@ -47,6 +50,7 @@ export default function WorkingSchedulesPage() {
   const generation = useRef(0);
   const dirty = !!saved && baseline !== JSON.stringify({ periods, reason });
   const durationError = validateAvailabilityDuration(duration, mode === 'Public', options?.services.find(s => s.id === service)?.publicDurationMinutes);
+  const showBranchPicker = canPickBranch && (options?.branches.length ?? 0) > 1;
   const eligible = options?.branches.filter(b => options.employees.some(e => e.id === employee && e.branchId === b.id && (e.canView ?? e.canEdit))) ?? [];
   const fail = (e: unknown) => setError(e instanceof ApiError ? e : new ApiError(0, 'MSG144', 'Không thể kết nối. Vui lòng thử lại.'));
   const discardOkay = () => !dirty || window.confirm('Hủy các thay đổi chưa lưu?');
@@ -64,7 +68,7 @@ export default function WorkingSchedulesPage() {
       const result = await api<Options>('/api/working-schedules/options'); setOptions(result);
       const requested = Number(params.get('dentistId'));
       const own = result.employees.find(e => e.id === requested && (e.canView ?? e.canEdit)) ?? result.employees.find(e => e.self && (e.canView ?? e.canEdit)) ?? result.employees.find(e => (e.canView ?? e.canEdit));
-      setEmployee(own?.id); setBranch(own?.branchId); setService(result.services.find(s => s.branchId === own?.branchId)?.id);
+      setEmployee(own?.id); setBranch(own?.branchId); setViewBranch(own?.branchId); setService(result.services.find(s => s.branchId === own?.branchId)?.id);
     } catch (e) { fail(e); } finally { setBusy(false); }
   }
   useEffect(() => { void loadOptions(); }, []);
@@ -145,7 +149,9 @@ export default function WorkingSchedulesPage() {
     {error && <Alert type="error" showIcon message={`${error.status === 403 ? 'Không có quyền truy cập' : error.status === 409 ? 'Xung đột · Cần kiểm tra lại' : error.status === 400 ? 'Dữ liệu chưa hợp lệ' : 'Lỗi kết nối hoặc dịch vụ'} · ${error.code}`} description={<div style={{ whiteSpace: 'pre-line' }}>{error.message}</div>} action={<Button disabled={busy} onClick={() => { if (discardOkay()) void (options ? load() : loadOptions()); }}>Tải lại</Button>} />}
     {success && <Alert type="success" message={success} showIcon />}
     <Space wrap>
-      <label>Nhân viên / bác sĩ <Select aria-label="Nhân viên / bác sĩ" value={employee} disabled={busy} style={{ width: 230 }} options={options?.employees.filter((e, i, all) => (e.canView ?? e.canEdit) && all.findIndex(x => x.id === e.id && (x.canView ?? x.canEdit)) === i).map(e => ({ value: e.id, label: e.name }))} onChange={value => { if (discardOkay()) { setEmployee(value); const b = options?.employees.find(e => e.id === value && (e.canView ?? e.canEdit))?.branchId; setBranch(b); setService(options?.services.find(s => s.branchId === b)?.id); setAssistant(undefined); } }} /></label>
+      {showBranchPicker && <label>Chi nhánh <Select aria-label="Chi nhánh" value={viewBranch} disabled={busy} style={{ width: 230 }} options={options?.branches.map(b => ({ value: b.id, label: b.name }))}
+        onChange={value => { if (!discardOkay()) return; setViewBranch(value); const first = options?.employees.find(e => e.branchId === value && (e.canView ?? e.canEdit)); setEmployee(first?.id); setBranch(value); setService(options?.services.find(sv => sv.branchId === value)?.id); setAssistant(undefined); }} /></label>}
+      <label>Nhân viên / bác sĩ <Select aria-label="Nhân viên / bác sĩ" value={employee} disabled={busy} style={{ width: 230 }} options={options?.employees.filter((e, i, all) => (e.canView ?? e.canEdit) && (!showBranchPicker || e.branchId === viewBranch) && all.findIndex(x => x.id === e.id && (x.canView ?? x.canEdit) && (!showBranchPicker || x.branchId === viewBranch)) === i).map(e => ({ value: e.id, label: e.name }))} onChange={value => { if (discardOkay()) { setEmployee(value); const b = options?.employees.find(e => e.id === value && (e.canView ?? e.canEdit))?.branchId; setBranch(b); setService(options?.services.find(s => s.branchId === b)?.id); setAssistant(undefined); } }} /></label>
       <Select aria-label="Loại lịch" value={kind} disabled={busy} style={{ width: 230 }} options={[{ value: 'Template', label: 'Mẫu lặp hằng tuần' }, { value: 'Exception', label: 'Ngoại lệ ngày cụ thể' }]} onChange={value => { if (discardOkay()) setKind(value); }} />
       <label>{kind === 'Template' ? 'Áp dụng từ ngày' : 'Ngày ngoại lệ'} <Input aria-label="Ngày áp dụng" type="date" value={date} disabled={busy} onChange={e => { if (e.target.value && discardOkay()) setDate(e.target.value); }} /></label>
     </Space>

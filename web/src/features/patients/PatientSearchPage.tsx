@@ -1,22 +1,26 @@
 import { PlusOutlined, SearchOutlined, ReloadOutlined, RightOutlined } from '@ant-design/icons';
-import { Alert, Button, Card, Checkbox, Empty, Input, Space, Table, Tag, Tooltip, Typography } from 'antd';
+import { Alert, Button, Card, Checkbox, Empty, Input, Select, Space, Table, Tag, Tooltip, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../services/api';
 import { useAuth } from '../authentication/AuthContext';
+import { useCanPickBranch } from '../authentication/useCanPickBranch';
 import { formatDate, formatTime } from '../patient-links/types';
 import PatientFormDrawer from './PatientFormDrawer';
 import './patientTreatment.css';
 import { genderLabels, noPatientsMessage, type PatientListItem, type PatientPage } from './types';
 
-type Filters = { keyword: string; birthDate: string; includeArchived: boolean };
+type Filters = { keyword: string; birthDate: string; includeArchived: boolean; branchId?: number };
 const initialFilters: Filters = { keyword: '', birthDate: '', includeArchived: false };
 
 // S05 Patient Search and Record (UC-08, UC-38). Search never creates, merges or changes a record.
 export default function PatientSearchPage() {
   const auth = useAuth();
   const navigate = useNavigate();
+  const canPickBranch = useCanPickBranch();
+  const [branches, setBranches] = useState<{ id: number; name: string }[]>([]);
+  useEffect(() => { if (canPickBranch) api<{ branches: { id: number; name: string }[] }>('/api/appointments/options').then(o => setBranches(o.branches)).catch(() => setBranches([])); }, [canPickBranch]);
   const canManage = auth.user?.permissions.some(p => p === 'patients.manage' || p === 'patients.create') ?? false;
   const [draft, setDraft] = useState<Filters>(initialFilters);
   const [filters, setFilters] = useState<Filters>(initialFilters);
@@ -34,6 +38,7 @@ export default function PatientSearchPage() {
     if (filters.keyword) query.set('keyword', filters.keyword);
     if (filters.birthDate) query.set('birthDate', filters.birthDate);
     if (filters.includeArchived) query.set('includeArchived', 'true');
+    if (filters.branchId) query.set('branchId', String(filters.branchId));
     setBusy(true); setError(null);
     api<PatientPage>(`/api/patients?${query}`)
       .then(result => { if (active) setData(result); })
@@ -53,6 +58,8 @@ export default function PatientSearchPage() {
       <div className="staff-patient-filter-panel"><div className="patient-filters">
         <label>Từ khóa<Input prefix={<SearchOutlined aria-hidden="true" />} allowClear maxLength={100} placeholder="Mã bệnh nhân, họ tên (có hoặc không dấu), SĐT" value={draft.keyword}
           onChange={e => setDraft({ ...draft, keyword: e.target.value })} onPressEnter={apply} /></label>
+        {canPickBranch && branches.length > 1 && <label>Chi nhánh<Select aria-label="Chi nhánh" allowClear placeholder="Tất cả chi nhánh" style={{ minWidth: 200 }} value={draft.branchId}
+          options={branches.map(b => ({ value: b.id, label: b.name }))} onChange={value => { const next = { ...draft, branchId: value }; setDraft(next); setPage(1); setFilters({ ...next, keyword: next.keyword.trim() }); }} /></label>}
         <label>Ngày sinh<Input type="date" value={draft.birthDate} onChange={e => setDraft({ ...draft, birthDate: e.target.value })} /></label>
         <Checkbox checked={draft.includeArchived} onChange={e => setDraft({ ...draft, includeArchived: e.target.checked })}>Gồm hồ sơ ngừng sử dụng</Checkbox>
         <Space className="link-filter-actions">

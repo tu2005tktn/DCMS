@@ -171,3 +171,38 @@ Thay mục 2.4 (danh sách dọc) và hàng tab ngang. 11 mục vẫn giữ nguy
 - Mọi lần chuyển (đường dẫn, thanh chuyển nhanh, thẻ) vẫn hỏi "Bỏ thay đổi chưa lưu?" khi mục đang có bản nhập chưa lưu.
 - Màn hẹp: thẻ xếp một cột, thanh chuyển nhanh cuộn ngang được.
 - **Nút quay lại (08/11/2026)**: trong một mục có nút "Quay lại" ở đầu trang, bấm để về trang chủ thiết lập (vẫn hỏi "Bỏ thay đổi chưa lưu?" nếu có bản nhập chưa lưu).
+
+## 3. Bổ sung nghĩa vụ chặn khi ngừng chi nhánh (08/11/2026)
+
+Thay đổi so với §1.4 và §1.5 (chỉ áp dụng cho lệnh ngừng/xem trước ngừng **chi nhánh**; ghế giữ nguyên):
+
+1. **Phiếu labo (thay thế mục 6 cũ):** cổng `IBranchLabObligationPort` được nối với dữ liệu thật, không còn trả "không khả dụng", nên không còn lỗi `503 MSG144` khi ngừng chi nhánh. Một phiếu labo của chi nhánh là *còn xử lý* khi trạng thái khác `Delivered` (Chưa gửi, Đã gửi xưởng, Đã nhận về, Làm lại; xem LAB-ORDER-MANAGEMENT.md). Blocker `LabOrders`, đường dẫn `/lab-orders`.
+2. **Đơn PayOS của hồ sơ điều trị:** đếm đơn của chi nhánh có trạng thái `Creating`, `Pending` hoặc `Review`. Blocker `PayOsOrders`, thông báo "Còn N đơn chuyển khoản PayOS chưa hoàn tất.", đường dẫn `/payments?branchId={id}`.
+3. **Hồ sơ điều trị đang mở:** đếm hồ sơ của chi nhánh có `State = Open`. Blocker `TreatmentDossiers`, thông báo "Còn N hồ sơ điều trị đang mở tại chi nhánh.", đường dẫn `/patients`.
+4. Thứ tự blocker trả về: Appointments, Visits, Reservations, Finance, PayOsOrders, TreatmentDossiers, LabOrders. Có blocker thì vẫn `409 MSG205` với mảng `blockers`; không tự hủy hay chuyển dữ liệu; chi nhánh chặn hẳn, không có cách bỏ qua.
+5. **Chưa làm (ghi nhận):** công nợ điều trị chưa thu đủ của hồ sơ đã đóng (đường tiền `DossierPayment`) chưa được kiểm trong blocker vì cách tính còn phụ thuộc dòng chỉnh sửa trên bảng điều trị; sẽ làm khi gom nguồn "đã thu" về một sổ (xem báo cáo thanh toán). Nhân sự chỉ gán duy nhất cho chi nhánh cũng chưa kiểm.
+
+Kiểm thử: tích hợp trên schema cách ly cho từng blocker mới và cho trường hợp chi nhánh sạch (ngừng được, kích hoạt lại được); web kiểm danh sách blocker hiển thị đúng liên kết.
+
+## 4. Chủ phòng khám xem và thao tác mọi chi nhánh (08/11/2026)
+
+- Tài khoản có vai trò Chủ phòng khám (`ClinicOwner`) được xem và thao tác trên **mọi chi nhánh đang hoạt động** mà không cần là thành viên lịch (`SchedulingMember`) của chi nhánh đó. Nhân sự khác vẫn bị giới hạn theo chi nhánh được gán (xem BranchIsolationTests).
+- Áp dụng cho lịch hẹn (`/api/appointments`, `/api/appointments/calendar`) và tiếp đón (`/api/reception/*`): chủ được coi như quyền rộng của trợ lý trong chi nhánh, không bị buộc là bác sĩ/thành viên. Chi nhánh đã ngừng hoạt động vẫn bị từ chối với chủ ở tiếp đón.
+- Quyền chức năng (`reception.*`, `appointments.*`) vẫn do cấp quyền màn hình quyết định; quy tắc này chỉ bỏ điều kiện "là thành viên chi nhánh".
+- Kiểm thử: `BranchIsolationTests` thêm ca chủ đọc lịch/tiếp đón của chi nhánh B (200) trong khi bác sĩ chi nhánh A vẫn 403.
+- **Lịch sử dùng vật tư (`GET /api/system-settings/material-usage`)** chỉ trả dòng của các chi nhánh trong phạm vi người xem (chủ: tất cả chi nhánh đang hoạt động; nhân sự khác: chi nhánh được gán). Trước đây danh sách này lộ tên bệnh nhân và hồ sơ của chi nhánh khác. Kho vật tư và phiếu mua là danh mục dùng chung toàn phòng khám nên không lọc theo chi nhánh.
+- `GET /api/availability/options` là API công khai cho khách đặt lịch nên liệt kê mọi chi nhánh; đây là chủ đích, không áp dụng cho màn nhân viên.
+- **Ô chọn chi nhánh trên màn nhân viên (08/11/2026):** chỉ chủ phòng khám (ClinicOwner) có, và chỉ khi có từ 2 chi nhánh. Mọi nhân sự khác không thấy ô chọn (lịch hẹn, tiếp nhận, thanh toán, dịch vụ khám, doanh thu, thống kê công việc, kế hoạch điều trị, cài đặt đặt lịch, tạo phiếu điều trị, form đặt lịch); chi nhánh duy nhất được chọn sẵn.
+
+## 5. Phạm vi xem bệnh nhân theo chi nhánh (08/11/2026)
+
+Hồ sơ bệnh nhân (`PatientProfile`) dùng chung toàn phòng khám nhưng **không phải ai cũng thấy mọi bệnh nhân**:
+
+- **Chủ phòng khám:** thấy tất cả bệnh nhân.
+- **Nhân viên khác:** `GET /api/patients` và `GET /api/patients/{id}` (cùng `/audit`) chỉ trả bệnh nhân có ít nhất một **lịch hẹn, lượt khám hoặc hồ sơ điều trị tại chi nhánh nhân viên đó được gán** (khi đặt lịch chọn chi nhánh nào thì nhân viên chi nhánh đó thấy bệnh nhân).
+- **Bệnh nhân chưa có hoạt động ở bất kỳ chi nhánh nào** (vừa tạo, chưa đặt lịch) hiện với mọi nhân viên có quyền xem để có thể tìm và đặt lịch; từ khi có hoạt động đầu tiên, bệnh nhân chỉ thuộc phạm vi các chi nhánh có hoạt động.
+- Bệnh nhân có hoạt động ở nhiều chi nhánh thì nhân viên của từng chi nhánh đó đều thấy.
+- Bệnh nhân ngoài phạm vi: danh sách không chứa; mở trực tiếp `GET /api/patients/{id}` trả `404` (như không tồn tại).
+- Kiểm thử: `PatientBranchScopeTests`.
+- **Lọc theo chi nhánh (chủ phòng khám):** `GET /api/patients` nhận thêm `branchId` (tùy chọn). Có `branchId` thì chỉ trả bệnh nhân có lịch hẹn, lượt khám hoặc hồ sơ điều trị tại chi nhánh đó; không có thì trả tất cả. Nhân viên thường chỉ được truyền chi nhánh trong phạm vi được gán, ngoài phạm vi trả `403`. Màn Bệnh nhân chỉ hiện ô "Chi nhánh" (mặc định "Tất cả chi nhánh") cho chủ phòng khám; danh sách chi nhánh lấy từ `/api/appointments/options`.
+- **Lịch làm việc (chủ phòng khám):** `GET /api/working-schedules/options` trả mọi chi nhánh đang hoạt động cùng toàn bộ nhân sự đang hoạt động của từng chi nhánh (chủ không cần là thành viên). Màn Lịch làm việc có ô "Chi nhánh" ở đầu bộ lọc (chỉ chủ và chỉ khi có từ 2 chi nhánh): chọn chi nhánh trước, ô "Nhân viên / bác sĩ" chỉ liệt kê người của chi nhánh đó, sau đó mới xem/sửa lịch. Chủ được xem và sửa lịch của nhân sự mọi chi nhánh (sửa vẫn cần quyền `working-schedules.manage`). Nhân viên thường không có ô chi nhánh và không đổi.
