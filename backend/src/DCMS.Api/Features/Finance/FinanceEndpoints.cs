@@ -10,6 +10,44 @@ public static class FinanceEndpoints
         var g = endpoints.MapGroup("/api/finance").RequireAuthorization().WithTags("Clinical service billing");
         g.MapGet("/revenue", async (HttpContext c, DateOnly? from, DateOnly? to, int? branchId, int? page, int? pageSize,
             IRevenueService s, CancellationToken ct) => Results.Ok(await s.GetAsync(Actor(c), from, to, branchId, page ?? 1, pageSize ?? 20, ct)));
+        g.MapGet("/overview", async (HttpContext c, DateOnly? from, DateOnly? to, int? branchId,
+            IFinanceSettlementService s, CancellationToken ct) => Results.Ok(await s.OverviewAsync(Actor(c), from, to, branchId, ct)));
+        g.MapGet("/payment-methods", async (HttpContext c, int branchId, IFinanceSettlementService s,
+            CancellationToken ct) => Results.Ok(await s.PaymentMethodsAsync(Actor(c), branchId, ct)));
+        g.MapPost("/payment-methods", async (HttpContext c, SavePaymentMethod command, IFinanceSettlementService s,
+            CancellationToken ct) => Results.Ok(await s.SavePaymentMethodAsync(Actor(c), command, ct)));
+        g.MapGet("/invoices", async (HttpContext c, int? branchId, int? patientId, int? page, int? pageSize,
+            IFinanceSettlementService s, CancellationToken ct) => Results.Ok(await s.InvoicesAsync(Actor(c), branchId, patientId, page ?? 1, pageSize ?? 20, ct)));
+        g.MapGet("/unbilled-charges", async (HttpContext c, int branchId, IFinanceSettlementService s,
+            CancellationToken ct) => Results.Ok(await s.UnbilledChargesAsync(Actor(c), branchId, ct)));
+        g.MapGet("/invoices/{id:guid}", async (HttpContext c, Guid id, IFinanceSettlementService s, CancellationToken ct) =>
+            Results.Ok(await s.InvoiceAsync(Actor(c), id, ct)));
+        g.MapPost("/invoices", async (HttpContext c, IssueInvoice command, IFinanceSettlementService s, CancellationToken ct) =>
+            Results.Ok(await s.IssueInvoiceAsync(Actor(c), command, ct)));
+        g.MapPost("/invoices/{id:guid}/payments", async (HttpContext c, Guid id, CollectPayment command,
+            IFinanceSettlementService s, CancellationToken ct) => Results.Ok(await s.CollectInvoiceAsync(Actor(c), id, command, ct)));
+        g.MapGet("/advances", async (HttpContext c, int? branchId, int? patientId, IFinanceSettlementService s,
+            CancellationToken ct) => Results.Ok(await s.AdvancesAsync(Actor(c), branchId, patientId, ct)));
+        g.MapPost("/advances", async (HttpContext c, CreateAdvance command, IFinanceSettlementService s,
+            CancellationToken ct) => Results.Ok(await s.CreateAdvanceAsync(Actor(c), command, ct)));
+        g.MapPost("/advances/{id:guid}/allocations", async (HttpContext c, Guid id, ApplyAdvance command,
+            IFinanceSettlementService s, CancellationToken ct) => Results.Ok(await s.ApplyAdvanceAsync(Actor(c), id, command, ct)));
+        g.MapGet("/receivables", async (HttpContext c, int? branchId, IFinanceSettlementService s,
+            CancellationToken ct) => Results.Ok(await s.ReceivablesAsync(Actor(c), branchId, ct)));
+        g.MapGet("/receivables/{patientId:int}/history", async (HttpContext c, int patientId, int branchId,
+            IFinanceSettlementService s, CancellationToken ct) => Results.Ok(await s.DebtHistoryAsync(Actor(c), patientId, branchId, ct)));
+        g.MapGet("/plans/{dossierId:guid}/settlement", async (HttpContext c, Guid dossierId,
+            IFinanceSettlementService s, CancellationToken ct) => Results.Ok(await s.PlanSettlementAsync(Actor(c), dossierId, ct)));
+        g.MapGet("/refunds", async (HttpContext c, int? branchId, IFinanceSettlementService s,
+            CancellationToken ct) => Results.Ok(await s.RefundsAsync(Actor(c), branchId, ct)));
+        g.MapPost("/refunds", async (HttpContext c, RequestRefund command, IFinanceSettlementService s,
+            CancellationToken ct) => Results.Ok(await s.RequestRefundAsync(Actor(c), command, ct)));
+        g.MapPost("/refunds/{id:guid}/approve", async (HttpContext c, Guid id, DecideRefund command,
+            IFinanceSettlementService s, CancellationToken ct) => Results.Ok(await s.ApproveRefundAsync(Actor(c), id, command, ct)));
+        g.MapPost("/refunds/{id:guid}/complete", async (HttpContext c, Guid id, DecideRefund command,
+            IFinanceSettlementService s, CancellationToken ct) => Results.Ok(await s.CompleteRefundAsync(Actor(c), id, command, ct)));
+        g.MapPost("/refunds/{id:guid}/reject", async (HttpContext c, Guid id, DecideRefund command,
+            IFinanceSettlementService s, CancellationToken ct) => Results.Ok(await s.RejectRefundAsync(Actor(c), id, command, ct)));
         g.MapGet("/examination-services",async(HttpContext c,int branchId,IExaminationFeeService s,CancellationToken ct)=>Results.Ok(await s.ServicesAsync(Actor(c),branchId,ct)));
   g.MapPost("/examination-services",async(HttpContext c,SaveExaminationService command,IExaminationFeeService s,CancellationToken ct)=>Results.Ok(await s.SaveServiceAsync(Actor(c),null,command,ct)));
   g.MapPut("/examination-services/{id:int}",async(HttpContext c,int id,SaveExaminationService command,IExaminationFeeService s,CancellationToken ct)=>Results.Ok(await s.SaveServiceAsync(Actor(c),id,command,ct)));

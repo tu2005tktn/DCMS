@@ -1,8 +1,10 @@
 import { Alert, Button, Input, Select, Table, Typography } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import './finance.css';
 import { api } from '../../services/api';
 import { clinicToday, formatDate } from '../appointments/types';
+import { useCanPickBranch } from '../authentication/useCanPickBranch';
 
 // Work/service statistics grouped by treatment dossier. Rules and API: docs/specs/WORK-SERVICE-STATISTICS.md.
 type Line = { activityId: string; serviceName: string; costVnd: number; paidVnd: number; dueVnd: number };
@@ -29,11 +31,19 @@ function periodRange(kind: Period) {
   return { from: iso(monday), to: iso(sunday) };
 }
 
-const spanned = (r: Flat) => ({ rowSpan: r.span });
+const narrowQuery = '(max-width: 900px)';
+function useNarrow() {
+  const [narrow, setNarrow] = useState(() => window.matchMedia(narrowQuery).matches);
+  useEffect(() => { const m = window.matchMedia(narrowQuery); const f = () => setNarrow(m.matches); m.addEventListener('change', f); return () => m.removeEventListener('change', f); }, []);
+  return narrow;
+}
 
 export default function WorkStatisticsPage() {
+  const canPickBranch = useCanPickBranch();
   const [branches, setBranches] = useState<{ id: number; name: string }[]>([]), [branchId, setBranchId] = useState<number>();
   const [from, setFrom] = useState(''), [to, setTo] = useState(''), [q, setQ] = useState(''), [search, setSearch] = useState('');
+  const narrow = useNarrow();
+  const spanned = (r: Flat) => ({ rowSpan: narrow ? 1 : r.span });
   const [period, setPeriod] = useState<Period>('all');
   const [page, setPage] = useState(1), [pageSize, setPageSize] = useState(20), [attempt, setAttempt] = useState(0);
   const [data, setData] = useState<Result>(), [loading, setLoading] = useState(true), [error, setError] = useState<string>();
@@ -64,8 +74,8 @@ export default function WorkStatisticsPage() {
         <Input type="date" aria-label="Từ ngày" value={from} max={to || undefined} onChange={e => { setFrom(e.target.value); }} style={{ width: 160 }} />
         <Input type="date" aria-label="Đến ngày" value={to} min={from || undefined} onChange={e => { setTo(e.target.value); }} style={{ width: 160 }} />
       </>}
-      <Select allowClear aria-label="Chi nhánh" placeholder="Tất cả chi nhánh" style={{ minWidth: 200 }} value={branchId} onChange={setBranchId}
-        options={branches.map(b => ({ value: b.id, label: b.name }))} />
+      {canPickBranch && branches.length > 1 && <Select allowClear aria-label="Chi nhánh" placeholder="Tất cả chi nhánh" style={{ minWidth: 200 }} value={branchId} onChange={setBranchId}
+        options={branches.map(b => ({ value: b.id, label: b.name }))} />}
       <Input.Search allowClear aria-label="Tìm công việc" placeholder="Tìm MSKH, khách hàng, dịch vụ" value={q} onChange={e => setQ(e.target.value)} style={{ maxWidth: 320 }} />
     </div>
     <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 8 }} aria-label="Tổng hợp">
@@ -75,7 +85,7 @@ export default function WorkStatisticsPage() {
       <span style={{ color: '#667085' }}>{data && <>Tìm thấy {data.lineCount} công việc/dịch vụ.</>}</span>
     </div>
     {error && <Alert type="error" showIcon style={{ marginBottom: 12 }} message={error} action={<Button size="small" onClick={() => setAttempt(a => a + 1)}>Thử lại</Button>} />}
-    <Table<Flat> rowKey="key" size="small" bordered loading={loading} dataSource={rows} scroll={{ x: 1150 }}
+    <Table<Flat> rowKey="key" size="small" bordered className="work-stats-table" loading={loading} dataSource={rows}
       locale={{ emptyText: 'Chưa có công việc nào.' }}
       pagination={{ current: page, pageSize, total: data?.total ?? 0, showSizeChanger: true, pageSizeOptions: [20, 50, 100], showTotal: t => `Có ${t} phiếu điều trị.`,
         onChange: (p, s) => { setPage(p); setPageSize(s); } }}

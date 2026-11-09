@@ -1,0 +1,140 @@
+name: Mobile APK
+
+on:
+  push:
+    branches:
+      - '**'
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/mobile-apk.yml'
+  workflow_dispatch:
+    inputs:
+      api_url:
+        description: 'Backend URL (empty = MOBILE_API_URL variable or current LAN demo URL)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build installable demo APK
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+        working-directory: mobile
+    env:
+      CI: '1'
+      EXPO_NO_TELEMETRY: '1'
+      EXPO_PUBLIC_API_URL: ${{ inputs.api_url || vars.MOBILE_API_URL || 'http://192.168.0.102:5080' }}
+      EXPO_PUBLIC_APPOINTMENTS_MOCK: 'false'
+      EXPO_PUBLIC_USE_REAL_NOTIFICATION_API: 'true'
+      APK_OUTPUT_DIR: ${{ github.workspace }}/.artifacts/mobile-apk
+      GRADLE_OPTS: '-Dorg.gradle.daemon=false -Dorg.gradle.workers.max=2'
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Set up Java
+        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle cache
+        uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+
+      - name: Validate API URL
+        run: |
+          node <<'NODE'
+          const url = new URL(process.env.EXPO_PUBLIC_API_URL);
+          const host = url.hostname.toLowerCase();
+          if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password ||
+              url.search || url.hash || host === 'localhost' || host.endsWith('.localhost') ||
+              host.startsWith('127.') || host === '[::1]' || host === '0.0.0.0') {
+            throw new Error('Use a LAN or public HTTP(S) API URL in MOBILE_API_URL; loopback URLs cannot work on a phone.');
+          }
+          console.log(`APK API: ${url.href}`);
+          NODE
+
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Check TypeScript
+        run: npm run typecheck
+
+      - name: Generate Android project
+        run: npx --no-install expo prebuild --platform android --no-install
+
+      - name: Build standalone APK
+        working-directory: mobile/android
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:assembleRelease \
+            --no-daemon --max-workers=2 --console=plain \
+            -PreactNativeArchitectures=armeabi-v7a,arm64-v8a
+
+      - name: Verify and package APK
+        id: package
+        run: |
+          apk='android/app/build/outputs/apk/release/app-release.apk'
+          test -s "$apk"
+          apksigner=$(find "$ANDROID_HOME/build-tools" -mindepth 2 -maxdepth 2 -name apksigner | sort -V | tail -n 1)
+          test -n "$apksigner"
+          "$apksigner" verify --verbose --print-certs "$apk"
+          unzip -Z1 "$apk" > "$RUNNER_TEMP/dcms-apk-entries.txt"
+          grep -Fx 'assets/index.android.bundle' "$RUNNER_TEMP/dcms-apk-entries.txt"
+          mkdir -p "$APK_OUTPUT_DIR"
+          short_sha="${GITHUB_SHA:0:8}"
+          apk_name="dcms-mobile-${short_sha}.apk"
+          cp "$apk" "$APK_OUTPUT_DIR/$apk_name"
+          (cd "$APK_OUTPUT_DIR" && sha256sum "$apk_name" > SHA256SUMS.txt)
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const file = `dcms-mobile-${process.env.GITHUB_SHA.slice(0, 8)}.apk`;
+          fs.writeFileSync(path.join(process.env.APK_OUTPUT_DIR, 'build-info.json'), JSON.stringify({
+            file, package: 'com.dcms.mobile', version: require('./package.json').version,
+            commit: process.env.GITHUB_SHA, branch: process.env.GITHUB_REF_NAME,
+            apiUrl: process.env.EXPO_PUBLIC_API_URL,
+            signing: 'Expo/React Native template debug key; internal demo only',
+            architectures: ['armeabi-v7a', 'arm64-v8a'],
+            bytes: fs.statSync(path.join(process.env.APK_OUTPUT_DIR, file)).size,
+            runUrl: `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`,
+          }, null, 2) + '\n');
+          NODE
+          echo "commit=$short_sha" >> "$GITHUB_OUTPUT"
+          {
+            echo '### Android demo APK'
+            echo "- File: \`$apk_name\`"
+            echo "- API: $EXPO_PUBLIC_API_URL"
+            echo '- Download the artifact ZIP below and extract the APK to install.'
+            echo '- LAN demo requires the API computer to stay on and the phone to use the same network.'
+            echo '- Standalone bundle; Expo Go and Metro are not required.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dcms-mobile-${{ steps.package.outputs.commit }}
+          path: .artifacts/mobile-apk/
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0

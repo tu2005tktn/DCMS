@@ -30,3 +30,18 @@ Hai bảng **Kế hoạch điều trị/dịch vụ** và **Quá trình điều 
 
 ## Vật liệu dùng trừ tồn kho (06/11/2026)
 Dòng "Quá trình điều trị/dịch vụ" nhận thêm `materials: [{ materialId, quantity }]` (trong `row` của confirm actual, perform, sửa hoạt động). Hộp "Vật liệu dùng" vẫn ghi ghi chú văn bản như trước và gửi thêm danh sách có cấu trúc; máy chủ trừ tồn kho theo `MATERIAL-STOCK.md`, thiếu tồn thì chặn lưu (409 `MATERIAL_STOCK_INSUFFICIENT`). Sửa hoạt động gửi `materials` = thay thế toàn bộ dòng đã trừ (`null` giữ nguyên); xóa hoạt động hoàn lại tồn. Hộp vật liệu trên dòng đã lưu tự gộp số lượng đã trừ trước đó với phần mới chọn.
+
+## Bảng hạng mục ở màn Kế hoạch điều trị khi thu nhỏ (06/11/2026)
+Bảng hạng mục của màn **Kế hoạch điều trị** (`/treatment-plans`, thẻ tên kế hoạch) áp dụng đúng quy tắc bố cục ở mục trên: **không có thanh cuộn ngang** ở mọi độ rộng. Từ 901 px trở lên bảng chiếm đúng chiều rộng khung (bỏ độ rộng tối thiểu cố định), cột co theo khung, chữ tự xuống dòng, số tiền không xuống dòng. Từ 900 px trở xuống mỗi hạng mục là một thẻ xếp dọc, mỗi trường có nhãn cột (Ngày, Răng, Điều trị/dịch vụ, Thời gian dự kiến (phút), Ghi chú, Bác sĩ & phụ tá, Chi phí) bên trái và giá trị bên phải; dòng nhập/sửa dùng cùng cách xếp, ô Thao tác nằm cuối thẻ. Chỉ đổi giao diện: dữ liệu, API, quyền không đổi.
+
+Bảng **Danh sách kế hoạch** cùng màn cũng không có thanh cuộn ngang: bỏ độ rộng cuộn cố định, cột co theo khung và chữ tự xuống dòng. Từ 600 px trở xuống mỗi kế hoạch là một thẻ xếp dọc với nhãn Tên kế hoạch, Số hạng mục, Tổng chi phí; nút Mở ở cuối thẻ. Chỉ đổi giao diện.
+
+
+## Bỏ dòng mô tả dưới tiêu đề (07/11/2026)
+
+Màn "Kế hoạch điều trị" (danh sách kế hoạch dùng lại) không còn dòng mô tả "Quản lý kế hoạch dùng lại trong chi nhánh." dưới tiêu đề. Chức năng không đổi.
+
+
+## Bảng danh sách kế hoạch có viền (08/11/2026)
+
+Bảng danh sách kế hoạch có viền ngoài bo góc, đường kẻ giữa các hàng và các cột. Từ 600px trở xuống (dạng thẻ) giữ viền từng thẻ như cũ.

@@ -31,10 +31,13 @@ public sealed class FollowUpAppointmentPort(DcmsDbContext db, ITreatmentLabReadi
             if (!instruction.DossierId.HasValue || !instruction.ItemId.HasValue) return;
             var sourceDossier = await db.TreatmentDossiers.Include(x => x.Items).AsNoTracking()
                 .SingleOrDefaultAsync(x => x.Id == instruction.DossierId, ct);
+            var sourceItem = sourceDossier?.Items.SingleOrDefault(x => x.Id == instruction.ItemId);
             if (sourceDossier == null || sourceDossier.PatientId != instruction.PatientId ||
                 sourceDossier.BranchId != instruction.BranchId || sourceDossier.State != "Open" ||
                 sourceDossier.PlanState != "Committed" || sourceDossier.PlanVersion != instruction.PlanVersion ||
-                sourceDossier.Items.All(x => x.Id != instruction.ItemId || !TreatmentItemRules.IsEffective(x)))
+                sourceItem == null || !TreatmentItemRules.IsPendingForBooking(sourceItem))
+                throw Error("MSG230");
+            if ((await TreatmentBookingQueries.PerformedItemIdsAsync(db, sourceDossier.Id, ct)).Contains(sourceItem.Id))
                 throw Error("MSG230");
             return;
         }
@@ -71,12 +74,13 @@ public sealed class FollowUpAppointmentPort(DcmsDbContext db, ITreatmentLabReadi
     }
 
     public async Task ValidateAsync(Guid followUpId, int patientId, int branchId, int dentistId, int durationMinutes,
-        DateTimeOffset startAt, CancellationToken ct)
+        DateTimeOffset startAt, CancellationToken ct, bool allowItemDurationOverride = false)
     {
         var row = await InstructionAsync(followUpId, ct);
         if (row.PatientId != patientId || row.BranchId != branchId) throw Error("MSG06", 403);
         if (row.Status != "NeedsBooking" || row.ActiveAppointmentId.HasValue) throw Error("MSG127");
-        if (row.DentistId.HasValue && row.DentistId != dentistId || row.DurationMinutes != durationMinutes
+        var editableDuration = allowItemDurationOverride && row.DossierId.HasValue && row.ItemId.HasValue && !row.StepId.HasValue;
+        if (row.DentistId.HasValue && row.DentistId != dentistId || (!editableDuration && row.DurationMinutes != durationMinutes)
             || !InWindow(row, startAt)) throw Error("MSG230");
         if (row.Capability != null && !await capabilities.HasCapabilityAsync(branchId, dentistId,
             row.Capability, ct)) throw Error("MSG230");

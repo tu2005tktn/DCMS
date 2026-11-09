@@ -23,6 +23,8 @@ async function mock(page: Page, options: { missing?: boolean; listError?: boolea
       if (bookings === 1) return route.fulfill({ status: 409, json: { code: 'MSG25', message: 'Khung giờ không còn khả dụng.' } });
       return route.fulfill({ status: 201, json: { appointmentId: 'saved', code: 'AP-FAMILY', version: 1, status: 'Confirmed', startAt: '2030-11-05T02:00:00Z', endAt: '2030-11-05T02:30:00Z', notification: {} } });
     }
+    if (method === 'GET' && path.endsWith('/record-access')) return route.fulfill({ json: { current: null, history: [], canRequest: true } });
+    if (method === 'GET' && path.startsWith('/api/me/family-members/') && path.endsWith('/appointments')) return route.fulfill({ json: { items: [], total: 0, page: 1, pageSize: 10 } });
     if (path.startsWith('/api/me/family-members')) {
       if (method === 'GET') {
         if (path === '/api/me/family-members') {
@@ -54,7 +56,7 @@ async function pickSchedule(page: Page) {
   await page.locator('.customer-slots button').first().click(); await page.getByRole('button', { name: 'Tiếp tục', exact: true }).click();
 }
 
-test('xem hồ sơ tạm đúng người, đóng bằng bàn phím/nút và không gọi API', async ({ page }) => {
+test('xem trạng thái quyền đúng người, đóng bằng bàn phím/nút và không tự cấp quyền', async ({ page }) => {
   const calls = await mock(page, { many: true });
   const requests: string[] = [];
   page.on('request', request => { if (new URL(request.url()).pathname.startsWith('/api/')) requests.push(request.url()); });
@@ -67,11 +69,11 @@ test('xem hồ sơ tạm đúng người, đóng bằng bàn phím/nút và khô
     await page.setViewportSize({ width, height: 900 });
     const container = page.locator(width <= 680 ? '.customer-family-mobile' : '.customer-family-table');
     const trigger = container.getByRole('button', { name: 'Xem hồ sơ', exact: true });
-    const before = requests.length;
     await trigger.focus(); await trigger.press('Enter');
     const modal = page.getByRole('dialog', { name: 'Hồ sơ của Người thân 21', exact: true });
     await expect(modal).toBeVisible();
-    await expect(modal.getByText('Chưa có hồ sơ nào', { exact: true })).toBeVisible();
+    await expect(modal.getByText('Chưa yêu cầu quyền xem hồ sơ', { exact: true })).toBeVisible();
+    await expect(modal.getByRole('button', { name: 'Yêu cầu quyền xem hồ sơ', exact: true })).toBeVisible();
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width + 1);
     const box = await modal.boundingBox(); expect(box).not.toBeNull();
     expect(box!.x).toBeGreaterThanOrEqual(0); expect(box!.x + box!.width).toBeLessThanOrEqual(width);
@@ -82,7 +84,7 @@ test('xem hồ sơ tạm đúng người, đóng bằng bàn phím/nút và khô
     await trigger.click(); await modal.getByRole('button', { name: 'Đóng', exact: true }).click(); await expect(modal).not.toBeVisible();
     await trigger.click(); await modal.locator('.ant-modal-close').click(); await expect(modal).not.toBeVisible();
     await expect(page.getByLabel('Tìm theo họ tên')).toHaveValue('Người thân 21');
-    expect(requests).toHaveLength(before); expect(calls).toHaveLength(0);
+    expect(requests.some(url => url.includes('/record-access'))).toBe(true); expect(calls).toHaveLength(0);
   }
   await page.getByLabel('Tìm theo họ tên').fill('Người thân 2'); await page.getByRole('button', { name: 'Tìm kiếm', exact: true }).click();
   await page.getByRole('row').filter({ hasText: /^Người thân 2Con/ }).getByRole('button', { name: 'Xem hồ sơ' }).click();
@@ -120,17 +122,18 @@ test('stale cho đối chiếu bản mới, giữ bản nhập rồi lưu có ve
   await saveDrawer(drawer); await expect(drawer).not.toBeVisible(); expect(calls.at(-1)!.body.expectedVersion).toBe(2);
 });
 
-test('deep link chọn người thân, sửa riêng trên lịch và retry slot không sửa danh sách', async ({ page }) => {
+test('deep link chọn người thân, giữ định danh chỉ đọc và retry slot không sửa danh sách', async ({ page }) => {
   const calls = await mock(page); await page.goto(`/customer/book?familyMemberId=${member.id}`);
   await expect(page.getByLabel('Người thân đã lưu')).toBeVisible(); await expect(page.getByText(/Con mẫu · Con/).first()).toBeVisible();
   await pickSchedule(page); await expect(page.getByLabel('Họ tên người khám')).toHaveValue(member.fullName); await expect(page.getByLabel('Ngày sinh người khám (không bắt buộc)')).toHaveValue(member.birthDate);
   await expect(page.getByLabel('Họ tên người đặt')).toHaveValue(user.fullName); await expect(page.getByLabel('Số điện thoại Việt Nam hoặc email')).toHaveValue(user.phoneNumber);
-  await page.getByLabel('Họ tên người khám').fill('Tên riêng trên lịch'); await page.getByRole('button', { name: 'Xem lại', exact: true }).click(); await expect(page.getByText('12/03/2015', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Sửa thông tin' }).click(); await expect(page.getByLabel('Họ tên người khám')).toHaveValue('Tên riêng trên lịch'); await page.getByRole('button', { name: 'Xem lại', exact: true }).click();
+  await expect(page.getByLabel('Họ tên người khám')).toHaveJSProperty('readOnly', true); await expect(page.getByLabel('Ngày sinh người khám (không bắt buộc)')).toHaveJSProperty('readOnly', true);
+  await page.getByRole('button', { name: 'Xem lại', exact: true }).click(); await expect(page.getByText('12/03/2015', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Sửa thông tin' }).click(); await expect(page.getByLabel('Họ tên người khám')).toHaveValue(member.fullName); await page.getByRole('button', { name: 'Xem lại', exact: true }).click();
   await page.getByRole('button', { name: 'Xác nhận đặt lịch', exact: true }).click(); await expect(page.getByText(/MSG25:/)).toBeVisible();
-  await page.locator('.customer-slots button').first().click(); await page.getByRole('button', { name: 'Tiếp tục', exact: true }).click(); await expect(page.getByLabel('Họ tên người khám')).toHaveValue('Tên riêng trên lịch');
+  await page.locator('.customer-slots button').first().click(); await page.getByRole('button', { name: 'Tiếp tục', exact: true }).click(); await expect(page.getByLabel('Họ tên người khám')).toHaveValue(member.fullName);
   await page.getByRole('button', { name: 'Xem lại', exact: true }).click(); await page.getByRole('button', { name: 'Xác nhận đặt lịch', exact: true }).click(); await expect(page.getByText('AP-FAMILY', { exact: true })).toBeVisible();
-  expect(calls).toHaveLength(2); expect(calls[1].body.attendee).toEqual({ patientId: null, name: 'Tên riêng trên lịch', birthDate: '2015-03-12' }); expect(calls[1].body.attendeeRelation).toBe('Relative'); expect(calls[1].body.familyMemberId).toBeUndefined();
+  expect(calls).toHaveLength(2); expect(calls[1].body.attendee).toEqual({ patientId: null, name: member.fullName, birthDate: '2015-03-12' }); expect(calls[1].body.attendeeRelation).toBe('Relative'); expect(calls[1].body.familyMemberId).toBe(member.id);
 });
 
 test('booking chỉ chọn người thân đã lưu, không nhập/thêm tại chỗ; lỗi danh sách không chặn Self', async ({ page }) => {

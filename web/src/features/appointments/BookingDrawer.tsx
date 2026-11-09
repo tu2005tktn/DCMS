@@ -7,6 +7,7 @@ import {
   clinicToday, clock, formatClock, formatDate, kindLabels, localMinute, newRequestKey, sourceLabels,
   type AppointmentOptions, type AppointmentResult, type AvailabilitySlot,
 } from './types';
+import { useCanPickBranch } from '../authentication/useCanPickBranch';
 
 export type BookingPrefill = { branchId: number; dentistId?: number; date: string; minute?: number;
   kind?: 'Standard' | 'WalkIn'; source?: string };
@@ -28,6 +29,7 @@ export default function BookingDrawer({ open, prefill, options, followUp, onClos
   onClose: () => void; onBooked: (result: AppointmentResult) => void;
 }) {
   const auth = useAuth();
+  const canPickBranch = useCanPickBranch();
   const canSearchPatients = auth.user?.permissions.includes('patients.read') ?? false;
   const [form] = Form.useForm<Values>();
   const values = Form.useWatch([], form) as Values | undefined;
@@ -202,7 +204,7 @@ export default function BookingDrawer({ open, prefill, options, followUp, onClos
           <Select options={branchServices.map(s => ({ value: s.id, label: `${s.name} · ${s.publicDurationMinutes} phút` }))}
             onChange={id => { if (!followUp) form.setFieldValue('duration', branchServices.find(s => s.id === id)?.publicDurationMinutes); }} /></Form.Item>
         <Form.Item name="reason" label="Lý do khám (tùy chọn)" rules={[{ max: 1000, message: 'Lý do không được vượt quá 1000 ký tự.' }]}><Input maxLength={1000} /></Form.Item>
-        <Form.Item name="branchId" label="Chi nhánh" rules={[{ required: true, message: 'Vui lòng nhập Chi nhánh.' }]}>
+        <Form.Item name="branchId" label="Chi nhánh" hidden={!canPickBranch || (options?.branches.length ?? 0) <= 1} rules={[{ required: true, message: 'Vui lòng nhập Chi nhánh.' }]}>
           <Select disabled={!!followUp} options={options?.branches.map(b => ({ value: b.id, label: b.name }))}
             onChange={() => form.setFieldsValue({ dentistId: undefined, chairId: undefined, serviceId: undefined })} />
         </Form.Item>

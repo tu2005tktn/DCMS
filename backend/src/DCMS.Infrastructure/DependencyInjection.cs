@@ -60,7 +60,7 @@ public static class DependencyInjection
         services.AddScoped<DCMS.Application.Features.Settings.ISettingsService, Features.Settings.SettingsService>();
         services.AddScoped<DCMS.Application.Features.Settings.IBranchManagementService, Features.Settings.BranchManagementService>();
         services.AddScoped<Features.Settings.BranchAssetStore>();
-        services.AddScoped<DCMS.Application.Features.Settings.IBranchLabObligationPort, Features.Settings.UnavailableBranchLabObligationPort>();
+        services.AddScoped<DCMS.Application.Features.Settings.IBranchLabObligationPort, Features.Settings.BranchLabObligationPort>();
         services.AddScoped<IRegistrationService, RegistrationService>();
         services.AddHttpClient();
         services.AddSingleton<IGoogleTokenVerifier, GoogleTokenVerifier>();
@@ -79,6 +79,7 @@ public static class DependencyInjection
         services.AddScoped<DCMS.Application.Features.Finance.IExaminationFeeService,Features.Finance.ExaminationFeeService>();
         services.AddScoped<DCMS.Application.Features.Finance.IFinanceService>(sp=>sp.GetRequiredService<Features.Finance.FinanceService>());
         services.AddScoped<DCMS.Application.Features.Finance.IRevenueService, Features.Finance.RevenueService>();
+        services.AddScoped<DCMS.Application.Features.Finance.IFinanceSettlementService, Features.Finance.FinanceSettlementService>();
         services.AddScoped<DCMS.Application.Features.Prescriptions.IPrescriptionService, Features.Prescriptions.PrescriptionService>();
         services.AddScoped<ITreatmentFinancialSummaryPort, Features.Finance.TreatmentFinancialSummaryPort>();
         services.AddScoped<ITreatmentFinancialWorkspace, TreatmentFinancialWorkspace>();
@@ -161,6 +162,7 @@ public static class DependencyInjection
         services.AddScoped<DCMS.Application.Features.SystemSettings.IMedicineCatalog>(sp => sp.GetRequiredService<Features.SystemSettings.MedicineCatalog>());
         services.AddScoped<DCMS.Application.Features.SystemSettings.ISupplyCatalog<DCMS.Application.Features.SystemSettings.MedicineInput, DCMS.Application.Features.SystemSettings.MedicineDto>>(sp => sp.GetRequiredService<Features.SystemSettings.MedicineCatalog>());
         services.AddScoped<DCMS.Application.Features.FamilyMembers.IFamilyMemberService, Features.FamilyMembers.FamilyMemberService>();
+        services.AddScoped<DCMS.Application.Features.FamilyMembers.IFamilyRecordService, Features.FamilyMembers.FamilyRecordService>();
         services.AddScoped<DCMS.Application.Features.Treatment.IItemPlanService, Features.Treatment.ItemPlanService>();
         return services;
     }

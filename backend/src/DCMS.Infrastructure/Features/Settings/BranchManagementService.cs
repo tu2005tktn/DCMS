@@ -8,6 +8,7 @@ using DCMS.Domain.Features.Appointments;
 using DCMS.Domain.Features.Finance;
 using DCMS.Domain.Features.Scheduling;
 using DCMS.Domain.Features.Settings;
+using DCMS.Domain.Features.Treatment;
 using DCMS.Domain.Features.Visits;
 using DCMS.Infrastructure.Features.SystemSettings;
 using DCMS.Infrastructure.Persistence;
@@ -255,8 +256,17 @@ public sealed partial class BranchManagementService(DcmsDbContext db, ISettingsA
         if (pendingReceipts + outstanding > 0)
             blockers.Add(new("Finance", $"Còn {outstanding} khoản phí chưa thu đủ và {pendingReceipts} phiếu thu chờ xác nhận.", pendingReceipts + outstanding, $"/payments?branchId={id}"));
 
+        var payOs = await db.Set<DossierPayOsOrder>().AsNoTracking()
+            .CountAsync(o => o.BranchId == id && (o.State == "Creating" || o.State == "Pending" || o.State == "Review"), ct);
+        if (payOs > 0)
+            blockers.Add(new("PayOsOrders", $"Còn {payOs} đơn chuyển khoản PayOS chưa hoàn tất.", payOs, $"/payments?branchId={id}"));
+
+        var dossiers = await db.Set<TreatmentDossier>().AsNoTracking().CountAsync(d => d.BranchId == id && d.State == "Open", ct);
+        if (dossiers > 0)
+            blockers.Add(new("TreatmentDossiers", $"Còn {dossiers} hồ sơ điều trị đang mở tại chi nhánh.", dossiers, "/patients"));
+
         if (labOrders.Count > 0)
-            blockers.Add(new("LabOrders", $"Còn {labOrders.Count} phiếu Labo đang xử lý.", labOrders.Count, $"/settings/lab-providers"));
+            blockers.Add(new("LabOrders", $"Còn {labOrders.Count} phiếu labo chưa giao bệnh nhân.", labOrders.Count, "/lab-orders"));
         return blockers.ToArray();
     }
 
@@ -536,7 +546,8 @@ public sealed partial class BranchManagementService(DcmsDbContext db, ISettingsA
     }
 }
 
-public sealed class UnavailableBranchLabObligationPort : IBranchLabObligationPort
+public sealed class BranchLabObligationPort(DcmsDbContext db) : IBranchLabObligationPort
 {
-    public Task<BranchObligationResult> OpenLabOrdersAsync(int branchId, CancellationToken ct) => Task.FromResult(new BranchObligationResult(false, 0));
+    public async Task<BranchObligationResult> OpenLabOrdersAsync(int branchId, CancellationToken ct) =>
+        new(true, await db.LabOrders.AsNoTracking().CountAsync(x => x.BranchId == branchId && x.Status != LabOrderStatus.Delivered, ct));
 }

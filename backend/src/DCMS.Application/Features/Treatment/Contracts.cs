@@ -122,6 +122,9 @@ public interface ITreatmentDossierService
     Task<LabOrderContext> LabOrderContextAsync(int actorId, Guid dossierId, Guid activityId, CancellationToken ct);
     Task<LabOrderDto> SaveLabOrderAsync(int actorId, Guid dossierId, Guid activityId, SaveLabOrderRequest request, CancellationToken ct);
     Task DeleteLabOrderAsync(int actorId, Guid dossierId, Guid activityId, CancellationToken ct);
+    Task<LabWorkPage> LabWorkAsync(int actorId, string? status, int? branchId, Guid? labProviderId, int? dentistId, DateOnly? from, DateOnly? to, string? q, int page, int pageSize, CancellationToken ct);
+    Task<IReadOnlyList<LabStatusLogItem>> LabWorkHistoryAsync(int actorId, Guid id, CancellationToken ct);
+    Task<LabWorkItem> ChangeLabStatusAsync(int actorId, Guid id, ChangeLabStatusRequest request, CancellationToken ct);
     Task<DossierPaymentContext> PaymentContextAsync(int actorId, Guid dossierId, CancellationToken ct);
     Task<IReadOnlyList<DossierPaymentDto>> PaymentsAsync(int actorId, Guid dossierId, CancellationToken ct);
     Task<DossierPaymentDto> CreatePaymentAsync(int actorId, Guid dossierId, CreateDossierPaymentRequest request, CancellationToken ct);

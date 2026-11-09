@@ -1,4 +1,5 @@
-import { Alert, Button, Card, Form, Input, Modal, Result, Select, Space, Table, Tabs, Typography } from 'antd';
+import { Alert, Button, Card, Form, Input, Modal, Result, Select, Space, Table, Typography, Breadcrumb, Segmented } from 'antd';
+import CommercialTreatmentPage from '../treatment/CommercialTreatmentPage';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { api } from '../../services/api';
@@ -40,6 +41,7 @@ export default function SystemSettingsPage() {
   const [capabilities, setCapabilities] = useState<SettingsCapabilities | null>(null);
   const [error, setError] = useState<string>();
   const [revision, setRevision] = useState(0);
+  const [query, setQuery] = useState('');
   const dirty = useRef(false);
 
   const owner = user?.effectiveRoles.includes('ClinicOwner') ?? false;
@@ -72,6 +74,11 @@ export default function SystemSettingsPage() {
     // 3. services
     ...(has('services.read')
       ? [{ key: 'services', label: '3. Dịch vụ, sản phẩm & giá', children: <ClinicalServicesPage /> }]
+      : []),
+
+    // 12. treatment-services (moved from the Chuyên môn menu)
+    ...(has('treatment.prices.read') || has('treatment.commercial.read')
+      ? [{ key: 'treatment-services', label: '12. Dịch vụ điều trị', children: <CommercialTreatmentPage /> }]
       : []),
 
     // 4. material-suppliers
@@ -126,12 +133,12 @@ export default function SystemSettingsPage() {
 
   // Current active section resolution: from route param :section, or ?tab= query param, or first available tab
   const requestedKey = section || search.get('tab');
-  const active = tabs.some(x => x.key === requestedKey) ? requestedKey! : tabs[0].key;
+  const current = tabs.find(x => x.key === requestedKey);
 
   function change(key: string) {
     const go = () => {
       dirty.current = false;
-      navigate(`/settings/${key}`, { replace: true });
+      navigate(key ? `/settings/${key}` : '/settings', { replace: !!key });
     };
     if (!dirty.current) {
       go();
@@ -146,11 +153,42 @@ export default function SystemSettingsPage() {
     });
   }
 
+  const plain = (label: string) => label.replace(/^\d+\.\s*/, '');
+  const groups = [
+    { name: 'Phòng khám', keys: ['general', 'branches', 'customer-groups'] },
+    { name: 'Danh mục', keys: ['diagnoses', 'services', 'treatment-services', 'medicines'] },
+    { name: 'Vật liệu và labo', keys: ['material-suppliers', 'materials', 'lab-providers', 'lab-work-types'] },
+    { name: 'Bảo mật', keys: ['access-groups'] },
+  ].map(g => ({ ...g, items: g.keys.map(k => tabs.find(t => t.key === k)).filter((t): t is (typeof tabs)[number] => !!t) })).filter(g => g.items.length > 0);
+  const fold = (v: string) => v.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').toLowerCase();
+  const needle = fold(query.trim());
+  const shown = groups.map(g => ({ ...g, items: g.items.filter(t => !needle || fold(plain(t.label)).includes(needle)) })).filter(g => g.items.length > 0);
+  const group = current ? groups.find(g => g.items.some(t => t.key === current.key)) : undefined;
+
   return (
     <div className="system-settings-page">
       {modalContext}
-      <Typography.Title level={2}>Thiết lập hệ thống (oDental System Settings)</Typography.Title>
-      <Tabs activeKey={active} onChange={change} destroyInactiveTabPane items={tabs} />
+      <Typography.Title level={2}>Thiết lập hệ thống</Typography.Title>
+      {!current ? <>
+        <Input.Search className="settings-search" allowClear aria-label="Tìm mục thiết lập" placeholder="Tìm mục thiết lập…" value={query} onChange={e => setQuery(e.target.value)} />
+        {shown.length === 0 && <Typography.Paragraph type="secondary">Không có mục phù hợp.</Typography.Paragraph>}
+        {shown.map(g => <section key={g.name} className="settings-group">
+          <Typography.Title level={4}>{g.name}</Typography.Title>
+          <div className="settings-card-grid">
+            {g.items.map(t => <button key={t.key} type="button" className="settings-card" onClick={() => change(t.key)}>{plain(t.label)}</button>)}
+          </div>
+        </section>)}
+      </> : <>
+        <Button className="settings-back" aria-label="Quay lại thiết lập hệ thống" onClick={() => change('')}>← Quay lại</Button>
+        <Breadcrumb className="settings-breadcrumb" items={[
+          { title: <a onClick={() => change('')}>Thiết lập</a> },
+          ...(group ? [{ title: group.name }] : []),
+          { title: plain(current.label) },
+        ]} />
+        {group && group.items.length > 1 && <Segmented className="settings-switch" value={current.key} onChange={v => change(String(v))}
+          options={group.items.map(t => ({ value: t.key, label: plain(t.label) }))} />}
+        <div key={current.key}>{current.children}</div>
+      </>}
     </div>
   );
 }

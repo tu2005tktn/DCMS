@@ -3,6 +3,14 @@
 Ngày cập nhật: 07/11/2026 (bản 2 — header đơn thuốc, phiên bản điều chỉnh, migration, mobile). Trạng thái: đặc tả triển khai.
 Tài liệu liên quan: [S19-OPTIONAL-PRESCRIPTION.vi.md](S19-OPTIONAL-PRESCRIPTION.vi.md), [S58-SUPPLY-CATALOGS.md](S58-SUPPLY-CATALOGS.md), [S41-MOBILE-MEDICAL-RECORDS.md](S41-MOBILE-MEDICAL-RECORDS.md).
 
+## Khôi phục điều hướng web (08/11/2026)
+
+- Mục **Mẫu đơn thuốc** mở `/prescriptions/templates` trong workspace nhân viên, yêu cầu đăng nhập và quyền `prescriptions.manage`, giống điều kiện hiển thị menu. Truy cập trực tiếp cũng phải kiểm tra quyền; không có quyền thì hiển thị 403.
+- Entry point web phải render router `App` qua default export của `App.tsx`. Hàm chuyển hướng `/commercial/treatment` là hàm riêng, giữ nguyên query string khi chuyển tới `/settings/treatment-services`.
+- Bản sửa khôi phục route bị mất khi merge và default export của router; không thay đổi API hoặc hợp đồng dữ liệu đơn thuốc.
+- Tích hợp main ngày 09/11/2026: khi giữ route `/prescriptions/templates`, router phải import `PrescriptionTemplatesPage` từ trang quản lý mẫu đơn hiện có để build TypeScript thành công; giữ nguyên kiểm tra quyền `prescriptions.manage`.
+Điều hướng web nhân viên: mục "Mẫu đơn thuốc" trong nhóm Chuyên môn mở `/prescriptions/templates`, yêu cầu quyền `prescriptions.manage` và hiển thị `PrescriptionTemplatesPage`. Tuyến này phải được khai báo trong router để menu hoạt động và bản build web thành công.
+
 ---
 
 ## 1. Nguyên tắc cốt lõi
@@ -135,3 +143,8 @@ Lỗi theo chuẩn `{ code, message, field?, currentVersion?, blockers? }`.
 | Mã mẫu trùng | `409 MSG201` |
 | Sửa đơn đã ký, Visit không ở trạng thái cho phép, tạo điều chỉnh khi còn bản nháp | `409 MSG205` |
 | Sai version / requestKey dùng lại với payload khác | `409 MSG111` (+ `currentVersion`) |
+
+
+## Sửa lỗi biên dịch trùng tên DTO (08/11/2026)
+
+`PatientPrescriptionDto` bị khai báo hai lần trong `PrescriptionContracts.cs` (bản cho cổng bệnh nhân theo lượt khám và một bản cũ theo bệnh nhân), làm backend không build được. Chỉ giữ bản theo lượt khám đang được `PatientPrescriptionsAsync` và API dùng; bản cũ không có nơi nào dùng nên bị xóa. API và hợp đồng dữ liệu không đổi.

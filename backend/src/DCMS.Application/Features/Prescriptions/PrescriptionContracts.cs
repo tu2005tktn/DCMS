@@ -250,10 +250,6 @@ public sealed record SavePatientPrescription(Guid RequestKey, int ExpectedVersio
 public sealed record SavePatientPrescriptionItem(Guid MedicineId, int Quantity, string? Instructions);
 public sealed record PatientPrescriptionItemDto(Guid Id, Guid MedicineId, string MedicineCode, string MedicineName,
     string? Strength, string? DosageForm, string Unit, int Quantity, string Instructions);
-// Renamed from a second PatientPrescriptionDto left by the PR #45 merge (CS0101); not referenced by any service yet.
-public sealed record PatientPrescriptionRecordDto(Guid Id, int PatientId, int BranchId, DateOnly PrescribedOn, string Diagnosis,
-    string? OtherDiagnosis, string? Advice, int PrescriberEmployeeId, string PrescriberName, int Version,
-    PatientPrescriptionItemDto[] Items);
 public sealed record PatientPrescriptionContext(int[] BranchIds, string PrescriberName);
 
 public interface IPrescriptionService

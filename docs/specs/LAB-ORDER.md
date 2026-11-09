@@ -58,3 +58,13 @@ Phần đầu form (Khách hàng, MSKH, tuổi, giới tính) chỉ đọc, lấ
 ## Ngoài phạm vi (làm sau)
 
 Trạng thái theo dõi xưởng (gửi, nhận, làm lại), tệp đính kèm, công nợ xưởng, báo cáo, danh sách phiếu labo riêng, thông báo nhắc hạn.
+
+# Kiểm tra ánh xạ EF khi chạy dự án
+
+Ánh xạ `DossierPayOsOrderLine` và `LabOrder` trong `TreatmentModel` là hai cấu hình entity độc lập. Mỗi khối `model.Entity` phải đóng đầy đủ để backend biên dịch và API khởi động được.
+
+Cập nhật 08/11/2026: danh sách phiếu labo riêng và theo dõi trạng thái xưởng (gửi, nhận, làm lại) đã chuyển sang [LAB-ORDER-MANAGEMENT.md](LAB-ORDER-MANAGEMENT.md). Phiếu mới có trạng thái mặc định `NotSent`.
+
+## Sửa lỗi in (08/11/2026)
+
+Quy tắc in của phiếu labo chỉ được áp dụng khi cửa sổ phiếu labo đang mở (`body:has(.lab-order-modal)`). Trước đây quy tắc `body * { visibility: hidden }` nằm trong CSS toàn cục nên mọi trang khác (ví dụ in phiếu thu) in ra trang trắng.

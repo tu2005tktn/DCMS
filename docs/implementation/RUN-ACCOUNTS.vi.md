@@ -17,7 +17,11 @@ docker compose --env-file .env -f infrastructure/docker/compose.yaml ps
 
 Đợi PostgreSQL healthy trước lệnh cuối. `initialize-development.ps1` chỉ thêm khóa JWT và mật khẩu demo còn thiếu, giữ giá trị đã có. `-Migrate -SeedDemo` áp dụng migration còn thiếu rồi thêm demo account chưa có và kết thúc; không khởi động HTTP server. Seed chỉ được chạy ở Development, không ghi đè mật khẩu/roles/states của account tồn tại. Không reset hoặc xóa volume.
 
-Các account demo: `admin.demo`, `dentist.demo`, `owner.demo`, `assistant.demo`, `dual.demo` (Dentist + Assistant), `guest.demo` (Public/Guest). Mật khẩu của account mới seed nằm ở **`DEV_SEED_PASSWORD` trong `.env` máy bạn**; mở file bằng editor để xem, không đưa mật khẩu vào source hoặc gửi file cho team. `guest.demo` là dữ liệu giả Development, không đại diện việc đã xác minh contact ngoài thực tế và không có Patient hoặc Verified link. Những account mới qua UI có mật khẩu ban đầu do Admin nhập.
+Các account demo: `admin.demo`, `dentist.demo`, `owner.demo`, `assistant.demo`, `dual.demo` (Dentist + Assistant), `guest.demo` (Public/Guest), cùng hai account của **chi nhánh B** để thử cách ly dữ liệu giữa chi nhánh: `dentist.b.demo` (Dentist) và `assistant.b.demo` (ClinicAssistant). Mật khẩu của account mới seed nằm ở **`DEV_SEED_PASSWORD` trong `.env` máy bạn**; mở file bằng editor để xem, không đưa mật khẩu vào source hoặc gửi file cho team. `guest.demo` là dữ liệu giả Development, không đại diện việc đã xác minh contact ngoài thực tế và không có Patient hoặc Verified link. Những account mới qua UI có mật khẩu ban đầu do Admin nhập.
+
+## Chi nhánh demo thứ hai (08/11/2026)
+
+`-SeedDemo` tạo thêm chi nhánh **"S09 - Chi nhánh B"** (1 ghế, 1 dịch vụ "Khám") chỉ có hai thành viên là `dentist.b.demo` (nha sĩ) và `assistant.b.demo` (không phải nha sĩ). Các account demo cũ (`dentist.demo`, `assistant.demo`, `dual.demo`, `owner.demo`) chỉ là thành viên chi nhánh "S09 - Chi nhánh thử nghiệm" (chi nhánh A), `owner.demo` thấy mọi chi nhánh. Hai account mới cùng mật khẩu demo như các account khác và chỉ được thêm nếu chưa tồn tại. Mục đích: kiểm tra nhân viên chi nhánh này không đọc, sửa hay đếm được dữ liệu chi nhánh kia (lịch hẹn, hồ sơ điều trị, phiếu labo, thanh toán, doanh thu).
 
 ## Mở ứng dụng
 

@@ -42,6 +42,7 @@ public static class ScreenEndpointPermissions
         if (p.StartsWith("/api/system-settings/material")) return Need($"catalog.materials.{(read ? "read" : method == "DELETE" ? "deactivate" : method == "POST" ? "create" : "update")}");
         if (p.StartsWith("/api/accounts")) return Need(read ? p.EndsWith("/audit") ? "accounts.audit" : "accounts.read" : p.EndsWith("/state") ? "accounts.state" : method == "POST" ? "accounts.create" : "accounts.update");
         if (p.StartsWith("/api/patient-link-reviews")) return Need(read ? "patient-links.read" : "patient-links.verify");
+        if (p.StartsWith("/api/family-record-reviews")) return Need(read && !p.EndsWith("/patients") ? "patient-links.read" : "patient-links.verify");
         if (p.StartsWith("/api/notifications")) return Need(read || p.EndsWith("/check-deep-link") ? "notifications.read" : "notifications.mark-read");
         if (p.StartsWith("/api/booking-settings")) return Need(read ? "booking-settings.read" : "booking-settings.manage");
         if (p.StartsWith("/api/working-schedules")) return Need(read ? "working-schedules.read" : "working-schedules.manage");
@@ -56,6 +57,12 @@ public static class ScreenEndpointPermissions
         if (p.StartsWith("/api/clinical-documents")) return Need(read ? "documents.read" : p.EndsWith("/review") ? "documents.review" : "documents.upload");
         if (p.StartsWith("/api/finance")) {
             if (p == "/api/finance/revenue") return Need("finance.revenue.read");
+            if (p == "/api/finance/overview") return Need("finance.revenue.read");
+            if (p == "/api/finance/payment-methods") return Need(read ? "finance.read" : "settings.general.manage");
+            if (p.StartsWith("/api/finance/invoices") || p.StartsWith("/api/finance/advances") ||
+                p.StartsWith("/api/finance/receivables") || p.StartsWith("/api/finance/refunds"))
+                return Need(read ? "finance.read" : p.EndsWith("/approve") || p.EndsWith("/complete") || p.EndsWith("/reject")
+                    ? "finance.payments.confirm" : "finance.payments.create");
             if (p.EndsWith("/examination-fee")) return read ? Need("finance.read") : ScreenEndpointRule.Any("finance.quotes.manage", "finance.payments.create");
             if (p == "/api/finance/providers") return Need(read ? "finance.costs.read" : "finance.costs.manage");
             if (p.Contains("/examination-services") || p.Contains("/services")) return Need(read ? "services.read" : "services.manage");
@@ -82,6 +89,7 @@ public static class ScreenEndpointPermissions
         if (p.StartsWith("/api/postoperative-reviews")) return Need("treatment.read");
         if (p.StartsWith("/api/reviews/")) return Need("treatment.read");
         if (p.StartsWith("/api/follow-up-instructions")) return Need(read ? "treatment.read" : "treatment.progress.manage");
+        if (p.StartsWith("/api/lab-orders")) return Need(read ? "treatment.lab.read" : "treatment.lab.track");
         if (p.StartsWith("/api/dossiers")) {
             if (p.Contains("/payos-orders")) return Need(read ? "finance.read" : "finance.payos.create");
             if (p.Contains("/payments")) return Need(read ? "finance.read" : "finance.payments.create");

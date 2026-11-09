@@ -7,12 +7,14 @@ import { useAuth } from '../authentication/AuthContext';
 import ItemPlanRowEditor from './ItemPlanRowEditor';
 import { itemPlanApi, planMoney, type ItemPlan, type ItemPlanInput, type ItemPlanOptions, type ItemPlanPage, type ItemPlanRow } from './itemPlanTypes';
 import './itemPlans.css';
+import { useCanPickBranch } from '../authentication/useCanPickBranch';
 
 export default function ItemPlansPage() {
   const { user } = useAuth();
   return user?.effectiveRoles.includes('Dentist') ? <ItemPlansWorkspace key={user.id} /> : <Result status="403" title="Bạn không có quyền quản lý kế hoạch điều trị." />;
 }
 function ItemPlansWorkspace() {
+  const canPickBranch = useCanPickBranch();
   const has = usePermissions();
   const canManage = has('treatment.templates.manage');
   const [branches, setBranches] = useState<{ id: number; name: string }[]>([]), [branch, setBranch] = useState<number>();
@@ -73,16 +75,16 @@ function ItemPlansWorkspace() {
       <Button onClick={() => { setPlan(latest); setLatest(null); setError(null); }}>Giữ bản nhập để lưu lại</Button></>} />;
   const heading = <thead><tr>{['Ngày', 'Răng', 'Điều trị/dịch vụ', 'Thời gian dự kiến (phút)', 'Ghi chú', 'Bác sĩ & phụ tá', 'Chi phí', 'Thao tác'].map(x => <th key={x} scope="col">{x}</th>)}</tr></thead>;
   return <main className="item-plans-page">
-    <div className="item-plans-heading"><div><Typography.Title level={2}>Kế hoạch điều trị</Typography.Title><p>Quản lý kế hoạch dùng lại trong chi nhánh.</p></div>
-      <Space wrap><Select aria-label="Chi nhánh" value={branch} disabled={busy}
-        options={branches.map(x => ({ value: x.id, label: x.name }))} onChange={id => { if (canLeave()) { setBranch(id); setPlan(null); setEditing(null); setDirty(false); setPage(1); setData(null); setOptions(null); setError(null); } }} /></Space></div>
+    <div className="item-plans-heading"><div><Typography.Title level={2}>Kế hoạch điều trị</Typography.Title></div>
+      <Space wrap>{canPickBranch && branches.length > 1 && <Select aria-label="Chi nhánh" value={branch} disabled={busy}
+        options={branches.map(x => ({ value: x.id, label: x.name }))} onChange={id => { if (canLeave()) { setBranch(id); setPlan(null); setEditing(null); setDirty(false); setPage(1); setData(null); setOptions(null); setError(null); } }} />}</Space></div>
     {listError && <Alert showIcon type="error" message={listError} action={<Button onClick={() => branch ? setRevision(r => r + 1) : window.location.reload()}>Thử lại</Button>} />}
     {error && <Alert showIcon type="error" message={`${error.code ?? ''}: ${error.message}`} description={error.code === 'MSG111' ? 'Bản nhập vẫn được giữ. Đọc phiên bản mới để đối chiếu trước khi lưu lại.' : undefined}
       action={error.code === 'MSG111' && plan ? <Button disabled={busy} onClick={readLatest}>Xem phiên bản mới</Button> : undefined} />}
     {!nameDialog && comparison}
     <Card title="Danh sách kế hoạch" extra={<Button type="primary" disabled={!canManage || !branch || busy} onClick={() => { if (canLeave()) { setEditing(null); setName(''); setNameDialog('create'); setDirty(false); setError(null); } }}>Tạo kế hoạch</Button>}>
       <Space.Compact className="item-plan-search"><Input aria-label="Tìm tên kế hoạch" value={search} maxLength={160} allowClear onChange={e => setSearch(e.target.value)} onPressEnter={() => { setKeyword(search.trim()); setPage(1); }} /><Button onClick={() => { setKeyword(search.trim()); setPage(1); }}>Tìm kiếm</Button></Space.Compact>
-      {loading && !data ? <Skeleton active /> : <Table rowKey="id" pagination={false} loading={loading} dataSource={data?.items ?? []} scroll={{ x: 650 }}
+      {loading && !data ? <Skeleton active /> : <Table className="item-plan-list" rowKey="id" pagination={false} loading={loading} dataSource={data?.items ?? []}
         locale={{ emptyText: listError ? 'Chưa tải được danh sách.' : <Empty description="Chưa có kế hoạch điều trị." /> }} columns={[
           { title: 'Tên kế hoạch', dataIndex: 'name' }, { title: 'Số hạng mục', dataIndex: 'itemCount' },
           { title: 'Tổng chi phí', dataIndex: 'totalCostVnd', render: planMoney }, { title: 'Thao tác', render: (_, row) => <Button disabled={busy} onClick={() => void open(row.id)}>Mở</Button> },

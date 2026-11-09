@@ -7,7 +7,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 const appointmentId = '66666666-6666-4666-8666-666666666666';
 const user = { id: 9, userName: 'synthetic.assistant', fullName: 'SYNTHETIC Assistant',
-  accountType: 'Staff', roles: ['ClinicAssistant'], effectiveRoles: ['ClinicAssistant'], permissions: ['appointments.write'] };
+  accountType: 'Staff', roles: ['ClinicAssistant'], effectiveRoles: ['ClinicAssistant'], permissions: ['appointments.read', 'appointments.create', 'appointments.write'] };
 
 // Cùng công thức với `OFFSET` trong web/src/features/appointments/types.ts (giờ VN, UTC+7).
 const clinicToday = () => new Date(Date.now() + 7 * 3_600_000).toISOString().slice(0, 10);

@@ -134,3 +134,75 @@ Thứ tự chuẩn theo đặc tả oDental:
    - Khi xuất dữ liệu ra Excel, các ô văn bản bắt đầu bằng ký tự nguy hiểm (`=`, `+`, `-`, `@`) bắt buộc phải được tiền tố bằng dấu nháy đơn (`'`) hoặc escape an toàn.
 6. **Xử lý xung đột ghi đồng thời (Concurrency 409 MSG111)**:
    - Khi xảy ra xung đột phiên bản `MSG111`, giữ nguyên toàn bộ dữ liệu người dùng đang nhập trên form để người dùng so sánh và không bị mất công gõ lại.
+
+
+### 2.3. Sửa đường dẫn menu (08/11/2026)
+
+Menu "Thiết lập hệ thống" trỏ `/settings` nhưng router chỉ có `/system-settings`, nên bấm menu ra "Không tìm thấy trang". Router phải có `/settings` và `/settings/:section` (deep link của 11 nhóm) cùng quyền `settings.read`; đường dẫn cũ `/system-settings` vẫn mở được cùng trang.
+
+
+### 2.4. Điều hướng 11 nhóm dạng danh sách dọc (08/11/2026)
+
+Hàng tab ngang bị tràn, nhiều nhóm bị gom vào nút "...". Từ 992px trở lên, danh sách 11 nhóm xếp **dọc bên trái** (rộng cố định 260px, tên nhóm xuống dòng khi dài, nhóm đang chọn tô nổi), nội dung bên phải. Dưới 992px giữ tab ngang cuộn được. Thứ tự, quyền, deep link `/settings/{nhóm}` và hỏi xác nhận khi bỏ thay đổi chưa lưu không đổi.
+
+### 2.5. Trang chủ thiết lập dạng thẻ (08/11/2026, thay thế 2.4)
+
+Màn "Thiết lập hệ thống" không còn danh sách tab/dọc. `/settings` (không có nhóm) là **trang chủ dạng thẻ**:
+
+- Ô tìm "Tìm mục thiết lập…" lọc các mục theo tên (không phân biệt hoa thường, bỏ dấu không bắt buộc).
+- 5 thẻ nhóm, mỗi thẻ có biểu tượng, tên, mô tả ngắn và danh sách mục bên trong (chỉ mục tài khoản được quyền xem; nhóm không còn mục nào thì ẩn):
+  - **Phòng khám:** Thiết lập chung, Chi nhánh và ghế điều trị.
+  - **Danh mục:** Chẩn đoán / Tên bệnh, Dịch vụ, sản phẩm và giá, Thuốc / Dược phẩm.
+  - **Vật liệu và labo:** Công ty cung cấp vật liệu, Loại dụng cụ / Vật liệu, Công ty labo, Loại công việc labo.
+  - **Khách hàng:** Nhóm khách hàng.
+  - **Bảo mật:** Phân quyền truy cập.
+- Bấm một mục mở `/settings/{mục}` (deep link cũ giữ nguyên). Trang mục có đường dẫn "Thiết lập › {Nhóm} › {Mục}" và nút "Tất cả thiết lập" quay về trang chủ. Tên mục không còn đánh số.
+- Thứ tự mục, quyền xem từng mục, quyền sửa và hộp thoại "Bỏ thay đổi chưa lưu?" (khi chuyển mục hoặc về trang chủ lúc còn thay đổi chưa lưu) không đổi. `?tab=` vẫn mở đúng mục. Tài khoản chỉ có một mục vẫn thấy trang chủ với một thẻ.
+- Trang chủ không có mục nào (tài khoản không quyền) vẫn hiện 403 như cũ.
+
+### 2.5. Thiết kế lại bố cục: trang chủ dạng thẻ (mẫu B, 08/11/2026)
+
+Thay mục 2.4 (danh sách dọc) và hàng tab ngang. 11 mục vẫn giữ nguyên nội dung, quyền và deep link `/settings/{mục}`.
+
+- **Trang chủ `/settings`**: ô tìm mục (lọc theo tên, không phân biệt dấu/hoa thường) và các **nhóm** dạng thẻ. Mỗi nhóm là một khối có tiêu đề, bên trong là thẻ cho từng mục; bấm thẻ mở mục. Chỉ hiện mục (và nhóm) mà tài khoản có quyền; nhóm không còn mục thì ẩn. Không tìm thấy thì hiện "Không có mục phù hợp".
+- **Nhóm**: Phòng khám (Thiết lập chung, Chi nhánh và ghế, Nhóm khách hàng); Danh mục (Chẩn đoán / tên bệnh, Dịch vụ sản phẩm và giá, Thuốc / dược phẩm); Vật liệu và labo (Công ty cung cấp vật liệu, Loại dụng cụ / vật liệu, Công ty labo, Loại công việc labo); Bảo mật (Phân quyền truy cập). Số thứ tự cũ trước tên mục bị bỏ khỏi giao diện.
+- **Trong một mục `/settings/{mục}`**: đường dẫn "Thiết lập › Nhóm › Mục" (bấm "Thiết lập" về trang chủ) và, nếu nhóm có từ 2 mục được phép, thanh chuyển nhanh giữa các mục cùng nhóm. Nội dung mục nằm ngay dưới, rộng toàn trang.
+- `/settings/{mục}` không tồn tại hoặc không có quyền: về trang chủ. `?tab=` cũ vẫn mở đúng mục.
+- Mọi lần chuyển (đường dẫn, thanh chuyển nhanh, thẻ) vẫn hỏi "Bỏ thay đổi chưa lưu?" khi mục đang có bản nhập chưa lưu.
+- Màn hẹp: thẻ xếp một cột, thanh chuyển nhanh cuộn ngang được.
+- **Nút quay lại (08/11/2026)**: trong một mục có nút "Quay lại" ở đầu trang, bấm để về trang chủ thiết lập (vẫn hỏi "Bỏ thay đổi chưa lưu?" nếu có bản nhập chưa lưu).
+
+## 3. Bổ sung nghĩa vụ chặn khi ngừng chi nhánh (08/11/2026)
+
+Thay đổi so với §1.4 và §1.5 (chỉ áp dụng cho lệnh ngừng/xem trước ngừng **chi nhánh**; ghế giữ nguyên):
+
+1. **Phiếu labo (thay thế mục 6 cũ):** cổng `IBranchLabObligationPort` được nối với dữ liệu thật, không còn trả "không khả dụng", nên không còn lỗi `503 MSG144` khi ngừng chi nhánh. Một phiếu labo của chi nhánh là *còn xử lý* khi trạng thái khác `Delivered` (Chưa gửi, Đã gửi xưởng, Đã nhận về, Làm lại; xem LAB-ORDER-MANAGEMENT.md). Blocker `LabOrders`, đường dẫn `/lab-orders`.
+2. **Đơn PayOS của hồ sơ điều trị:** đếm đơn của chi nhánh có trạng thái `Creating`, `Pending` hoặc `Review`. Blocker `PayOsOrders`, thông báo "Còn N đơn chuyển khoản PayOS chưa hoàn tất.", đường dẫn `/payments?branchId={id}`.
+3. **Hồ sơ điều trị đang mở:** đếm hồ sơ của chi nhánh có `State = Open`. Blocker `TreatmentDossiers`, thông báo "Còn N hồ sơ điều trị đang mở tại chi nhánh.", đường dẫn `/patients`.
+4. Thứ tự blocker trả về: Appointments, Visits, Reservations, Finance, PayOsOrders, TreatmentDossiers, LabOrders. Có blocker thì vẫn `409 MSG205` với mảng `blockers`; không tự hủy hay chuyển dữ liệu; chi nhánh chặn hẳn, không có cách bỏ qua.
+5. **Chưa làm (ghi nhận):** công nợ điều trị chưa thu đủ của hồ sơ đã đóng (đường tiền `DossierPayment`) chưa được kiểm trong blocker vì cách tính còn phụ thuộc dòng chỉnh sửa trên bảng điều trị; sẽ làm khi gom nguồn "đã thu" về một sổ (xem báo cáo thanh toán). Nhân sự chỉ gán duy nhất cho chi nhánh cũng chưa kiểm.
+
+Kiểm thử: tích hợp trên schema cách ly cho từng blocker mới và cho trường hợp chi nhánh sạch (ngừng được, kích hoạt lại được); web kiểm danh sách blocker hiển thị đúng liên kết.
+
+## 4. Chủ phòng khám xem và thao tác mọi chi nhánh (08/11/2026)
+
+- Tài khoản có vai trò Chủ phòng khám (`ClinicOwner`) được xem và thao tác trên **mọi chi nhánh đang hoạt động** mà không cần là thành viên lịch (`SchedulingMember`) của chi nhánh đó. Nhân sự khác vẫn bị giới hạn theo chi nhánh được gán (xem BranchIsolationTests).
+- Áp dụng cho lịch hẹn (`/api/appointments`, `/api/appointments/calendar`) và tiếp đón (`/api/reception/*`): chủ được coi như quyền rộng của trợ lý trong chi nhánh, không bị buộc là bác sĩ/thành viên. Chi nhánh đã ngừng hoạt động vẫn bị từ chối với chủ ở tiếp đón.
+- Quyền chức năng (`reception.*`, `appointments.*`) vẫn do cấp quyền màn hình quyết định; quy tắc này chỉ bỏ điều kiện "là thành viên chi nhánh".
+- Kiểm thử: `BranchIsolationTests` thêm ca chủ đọc lịch/tiếp đón của chi nhánh B (200) trong khi bác sĩ chi nhánh A vẫn 403.
+- **Lịch sử dùng vật tư (`GET /api/system-settings/material-usage`)** chỉ trả dòng của các chi nhánh trong phạm vi người xem (chủ: tất cả chi nhánh đang hoạt động; nhân sự khác: chi nhánh được gán). Trước đây danh sách này lộ tên bệnh nhân và hồ sơ của chi nhánh khác. Kho vật tư và phiếu mua là danh mục dùng chung toàn phòng khám nên không lọc theo chi nhánh.
+- `GET /api/availability/options` là API công khai cho khách đặt lịch nên liệt kê mọi chi nhánh; đây là chủ đích, không áp dụng cho màn nhân viên.
+- **Ô chọn chi nhánh trên màn nhân viên (08/11/2026):** chỉ chủ phòng khám (ClinicOwner) có, và chỉ khi có từ 2 chi nhánh. Mọi nhân sự khác không thấy ô chọn (lịch hẹn, tiếp nhận, thanh toán, dịch vụ khám, doanh thu, thống kê công việc, kế hoạch điều trị, cài đặt đặt lịch, tạo phiếu điều trị, form đặt lịch); chi nhánh duy nhất được chọn sẵn.
+
+## 5. Phạm vi xem bệnh nhân theo chi nhánh (08/11/2026)
+
+Hồ sơ bệnh nhân (`PatientProfile`) dùng chung toàn phòng khám nhưng **không phải ai cũng thấy mọi bệnh nhân**:
+
+- **Chủ phòng khám:** thấy tất cả bệnh nhân.
+- **Nhân viên khác:** `GET /api/patients` và `GET /api/patients/{id}` (cùng `/audit`) chỉ trả bệnh nhân có ít nhất một **lịch hẹn, lượt khám hoặc hồ sơ điều trị tại chi nhánh nhân viên đó được gán** (khi đặt lịch chọn chi nhánh nào thì nhân viên chi nhánh đó thấy bệnh nhân).
+- **Bệnh nhân chưa có hoạt động ở bất kỳ chi nhánh nào** (vừa tạo, chưa đặt lịch) hiện với mọi nhân viên có quyền xem để có thể tìm và đặt lịch; từ khi có hoạt động đầu tiên, bệnh nhân chỉ thuộc phạm vi các chi nhánh có hoạt động.
+- Bệnh nhân có hoạt động ở nhiều chi nhánh thì nhân viên của từng chi nhánh đó đều thấy.
+- Bệnh nhân ngoài phạm vi: danh sách không chứa; mở trực tiếp `GET /api/patients/{id}` trả `404` (như không tồn tại).
+- Kiểm thử: `PatientBranchScopeTests`.
+- **Lọc theo chi nhánh (chủ phòng khám):** `GET /api/patients` nhận thêm `branchId` (tùy chọn). Có `branchId` thì chỉ trả bệnh nhân có lịch hẹn, lượt khám hoặc hồ sơ điều trị tại chi nhánh đó; không có thì trả tất cả. Nhân viên thường chỉ được truyền chi nhánh trong phạm vi được gán, ngoài phạm vi trả `403`. Màn Bệnh nhân chỉ hiện ô "Chi nhánh" (mặc định "Tất cả chi nhánh") cho chủ phòng khám; danh sách chi nhánh lấy từ `/api/appointments/options`.
+- **Lịch làm việc (chủ phòng khám):** `GET /api/working-schedules/options` trả mọi chi nhánh đang hoạt động cùng toàn bộ nhân sự đang hoạt động của từng chi nhánh (chủ không cần là thành viên). Màn Lịch làm việc có ô "Chi nhánh" ở đầu bộ lọc (chỉ chủ và chỉ khi có từ 2 chi nhánh): chọn chi nhánh trước, ô "Nhân viên / bác sĩ" chỉ liệt kê người của chi nhánh đó, sau đó mới xem/sửa lịch. Chủ được xem và sửa lịch của nhân sự mọi chi nhánh (sửa vẫn cần quyền `working-schedules.manage`). Nhân viên thường không có ô chi nhánh và không đổi.

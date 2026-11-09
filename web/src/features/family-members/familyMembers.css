@@ -6,7 +6,13 @@
 .customer-family-page .ant-alert{margin-bottom:18px;}.customer-family-page .ant-pagination{margin-top:20px;}
 .customer-family-mobile{display:none;}.customer-family-drawer .ant-form{margin-top:20px;}
 .customer-family-records-modal .ant-btn { min-height:44px; }
-.customer-family-records-modal .ant-modal-title { overflow-wrap:anywhere; }
+.customer-family-records-modal .ant-modal-title { overflow-wrap:anywhere; padding-right:24px; }
+.family-record-content, .family-record-section { display: grid; gap: 16px; min-width: 0; overflow-wrap: anywhere; }
+.family-access-status { display: flex; gap: 8px; justify-content: space-between; align-items: center; flex-wrap: wrap; }
+.family-record-content .ant-descriptions-item-content { white-space: pre-wrap; overflow-wrap: anywhere; }
+.family-medicine-line { border-bottom: 1px solid #edf1f6; padding: 12px 0; }
+.family-medicine-line p { margin: 6px 0; }
+.family-record-content .ant-tabs { min-width: 0; }
 .customer-family-drawer .ant-input,.customer-family-drawer .ant-select-selector{min-height:44px;}
 .customer-family-compare{padding:16px;border:1px solid #dce5f1;border-radius:8px;margin-top:16px;}
 .customer-family-picker{display:grid;gap:12px;margin:22px 0;max-width:650px;}.customer-family-picker>.ant-select{width:100%;}
