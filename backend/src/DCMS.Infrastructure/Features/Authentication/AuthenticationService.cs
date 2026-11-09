@@ -23,9 +23,18 @@ public sealed class AuthenticationService(DcmsDbContext db, UserManager<Applicat
 {
     public async Task<SignInResponse> SignInAsync(SignInRequest request, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(request.UserName) || request.UserName.Length > 64
+        if (string.IsNullOrWhiteSpace(request.UserName)
             || string.IsNullOrEmpty(request.Password) || request.Password.Length > 256) DenySignIn();
-        var user = await users.FindByNameAsync(request.UserName.Trim());
+        var identifier = request.UserName.Trim();
+        var user = await users.FindByNameAsync(identifier);
+        if (user == null)
+        {
+            var normalizedEmail = users.NormalizeEmail(identifier);
+            // Only an unambiguous Public email match may authenticate; keep the database uniqueness contract.
+            var matches = await db.Users.Where(value => value.AccountType == "Public" && value.NormalizedEmail == normalizedEmail)
+                .Take(2).ToArrayAsync(ct);
+            if (matches.Length == 1) user = matches[0];
+        }
         if (user == null || !user.IsActive || await users.IsLockedOutAsync(user)
             || !await users.CheckPasswordAsync(user, request.Password)) DenySignIn();
         return await CreateSessionAsync(user!.Id, request.DeviceLabel, "SignIn", ct);

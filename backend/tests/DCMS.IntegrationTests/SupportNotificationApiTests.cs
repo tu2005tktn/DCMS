@@ -9,12 +9,25 @@ using DCMS.Domain.Features.Scheduling;
 using DCMS.Infrastructure.Features.Notifications;
 using DCMS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace DCMS.IntegrationTests;
 
-public sealed class SupportNotificationApiTests(ApiFixture fixture) : IClassFixture<ApiFixture>
+public sealed class SupportNotificationFixture : ApiFixture
+{
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        base.ConfigureWebHost(builder);
+        builder.ConfigureServices(services => {
+            // Dispatcher is driven explicitly by these tests; do not race a real background polling loop.
+            foreach (var descriptor in services.Where(value => value.ImplementationType == typeof(AppointmentNotificationWorker)).ToArray()) services.Remove(descriptor);
+        });
+    }
+}
+
+public sealed class SupportNotificationApiTests(SupportNotificationFixture fixture) : IClassFixture<SupportNotificationFixture>
 {
     private sealed record Seed(Guid AppointmentId, string AppointmentCode, string RequestCode,
         int GuestId, int BranchId);
@@ -169,6 +182,24 @@ public sealed class SupportNotificationApiTests(ApiFixture fixture) : IClassFixt
         Assert.All(realtime, call => Assert.Equal(seed.BranchId, call.BranchId));
         Assert.Equal([verified.ExpectedVersion, changed.Request.ExpectedVersion, resolved.Request.ExpectedVersion],
             realtime.Select(x => x.Payload.GetProperty("version").GetInt32()).ToArray());
+    }
+
+    [Fact]
+    public async Task NoShowNotificationSupersedesRemindersWithoutConfirmingTheOldAppointmentAgain()
+    {
+        var seed = await SeedAsync("General");
+        using var scope = fixture.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
+        var row = await db.Appointments.FindAsync(seed.AppointmentId);
+        row!.Status = "NoShow"; row.Version++;
+        db.AppointmentReminders.Add(new AppointmentReminder { AppointmentId = row.Id, AppointmentVersion = 1, AccountId = seed.GuestId,
+            LeadMinutes = 120, DueAt = DateTimeOffset.UtcNow.AddMinutes(-1), CreatedAt = DateTimeOffset.UtcNow.AddDays(-1) });
+        db.AppointmentOutboxEvents.Add(new AppointmentOutboxEvent { AggregateId = row.Id, EventType = "appointment.no_show", OccurredAt = DateTimeOffset.UtcNow, PayloadJson = "{}" });
+        await db.SaveChangesAsync();
+        var dispatcher = scope.ServiceProvider.GetRequiredService<IAppointmentNotificationDispatcher>();
+        await dispatcher.ProcessPendingAsync(default); await dispatcher.ProcessPendingAsync(default);
+        var notice = Assert.Single(await db.InAppNotifications.Where(x => x.AppointmentId == row.Id).ToArrayAsync());
+        Assert.Equal("NoShow", notice.Kind); Assert.Equal("Khách không tới", notice.Title); Assert.DoesNotContain("thành công", notice.Body);
+        Assert.DoesNotContain(await db.AppointmentReminders.Where(x => x.AppointmentId == row.Id).ToArrayAsync(), x => x.Status == "Pending" || x.Status == "Sent");
     }
 
     [Fact]

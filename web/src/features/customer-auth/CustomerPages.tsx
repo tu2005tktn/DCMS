@@ -147,9 +147,8 @@ export function CustomerSignInPage() {
         }}
         onValuesChange={changed => setIssues(current => current.filter(issue => !(issue.field in changed)))}>
         <AuthErrorSummary id="customer-sign-in-errors" formName="customer-sign-in" issues={issues} />
-        <Form.Item name="userName" label="Số điện thoại" rules={[{ required: true, message: 'Vui lòng nhập số điện thoại.' },
-          { pattern: phonePattern, message: 'Nhập số di động Việt Nam gồm 10 chữ số.' }]}>
-          <Input autoComplete="username" inputMode="numeric" maxLength={10} />
+        <Form.Item name="userName" label="Email hoặc tên đăng nhập" rules={[{ required: true, whitespace: true, message: 'Vui lòng nhập email hoặc tên đăng nhập.' }]}>
+          <Input autoComplete="username" placeholder="Nhập email hoặc tên đăng nhập" />
         </Form.Item>
         <Form.Item name="password" label="Mật khẩu" rules={[{ required: true, message: 'Vui lòng nhập mật khẩu.' }]}>
           <Input.Password autoComplete="current-password" />

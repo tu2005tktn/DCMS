@@ -1,5 +1,7 @@
 # Người thân: đặt lịch và xem hồ sơ — triển khai 09/11/2026
 
+> Cập nhật sau triển khai ban đầu: [quyền xem mặc định từ lịch đặt hộ đã tiếp nhận](FAMILY-DEFAULT-ACCESS-20261109.vi.md) thay bước xin/duyệt riêng cho liên kết tiếp nhận phù hợp. Báo cáo bên dưới giữ bằng chứng của luồng thủ công ban đầu.
+
 Trạng thái: đã triển khai theo `docs/specs/FAMILY-DELEGATED-RECORD-ACCESS.vi.md`. Phạm vi web khách hàng và hàng đợi nhân viên, API và migration; mobile không thuộc lượt này.
 
 Luồng: A lưu/chọn người thân → đặt lịch hộ → gửi yêu cầu quyền hồ sơ → ClinicAssistant đối chiếu Patient/căn cứ đồng ý → cấp scope/chi nhánh/thời hạn → A xem nội dung chính thức. Pending, thu hồi, hết hạn và người thân xóa/đổi định danh đều bị chặn ở server. Booking không tự tạo Patient hay cấp quyền. Dùng Patient và các nguồn lâm sàng hiện có, không tạo hồ sơ bệnh nhân thứ hai.

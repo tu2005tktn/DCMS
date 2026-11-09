@@ -228,7 +228,7 @@ test('actual API and PostgreSQL: customer views, reschedules and cancels on web'
   const appointment = await booked.json();
   try {
     await page.goto('/customer/sign-in');
-    await page.getByLabel('Số điện thoại', { exact: true }).fill(phone);
+    await page.getByLabel('Email hoặc tên đăng nhập', { exact: true }).fill(phone);
     await page.getByLabel('Mật khẩu', { exact: true }).fill(password);
     await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
     await page.getByRole('link', { name: 'Lịch hẹn của tôi', exact: true }).click();

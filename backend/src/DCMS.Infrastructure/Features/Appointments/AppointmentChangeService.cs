@@ -6,6 +6,7 @@ using System.Text.Json;
 using DCMS.Application.Common;
 using DCMS.Application.Features.Appointments;
 using DCMS.Application.Features.Scheduling;
+using DCMS.Application.Features.Settings;
 using DCMS.Domain.Features.Accounts;
 using DCMS.Domain.Features.Appointments;
 using DCMS.Domain.Features.PatientLinks;
@@ -20,7 +21,7 @@ namespace DCMS.Infrastructure.Features.Appointments;
 
 public sealed class AppointmentChangeService(DcmsDbContext db, IAvailabilityService availability,
     IAppointmentQueryService queries, UserManager<ApplicationUser> users,
-    IFollowUpAppointmentChangePort followUps, TimeProvider clock) : IAppointmentChangeService
+    IFollowUpAppointmentChangePort followUps, TimeProvider clock, ISettingsAccess access) : IAppointmentChangeService
 {
     private static BusinessException Error(string code, int status = 409) => new(status, SystemMessages.Get(code));
     private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
@@ -28,7 +29,7 @@ public sealed class AppointmentChangeService(DcmsDbContext db, IAvailabilityServ
     public async Task<AvailabilityResult> AvailabilityAsync(int actorId, string code, DateOnly date, int? dentistId, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(code) || code.Length > 40 || date.Year is < 2000 or > 2100) throw Error("MSG04", 400);
-        var (appointment, staff) = await AuthorizeAsync(actorId, code, ct);
+        var (appointment, staff) = await AuthorizeAsync(actorId, code, ct, clinicInitiated: true);
         RequireAvailabilityEligible(appointment, clock.GetUtcNow());
         var selectedDentistId = dentistId ?? appointment.DentistId;
         if (selectedDentistId <= 0 || selectedDentistId == appointment.AssistantId) throw Error("MSG04", 400);
@@ -50,20 +51,20 @@ public sealed class AppointmentChangeService(DcmsDbContext db, IAvailabilityServ
             : !AppointmentRules.CanSelfService(appointment.Status, appointment.StartAt, now)) throw Error("MSG31");
     }
 
-    private async Task<(Appointment Appointment, bool Staff)> AuthorizeAsync(int actorId, string code, CancellationToken ct)
+    private async Task<(Appointment Appointment, bool Staff)> AuthorizeAsync(int actorId, string code, CancellationToken ct,
+        string permission = "appointments.read", bool clinicInitiated = false)
     {
         var user = await users.FindByIdAsync(actorId.ToString());
         if (user == null || !user.IsActive || (user.LockoutEnabled && user.LockoutEnd > clock.GetUtcNow())) throw Error("MSG07", 401);
         var staff = user.AccountType == "Staff";
         if (!staff && user.AccountType != "Public") throw Error("MSG06", 403);
-        if (staff && !await users.IsInRoleAsync(user, AccountRoles.ClinicAssistant)) throw Error("MSG06", 403);
+        if (staff && !clinicInitiated && !await users.IsInRoleAsync(user, AccountRoles.ClinicAssistant)) throw Error("MSG06", 403);
         var appointment = await db.Appointments.SingleOrDefaultAsync(x => x.Code == code, ct) ?? throw Error("MSG102", 404);
         if (staff)
         {
-            if (!await (from member in db.Set<SchedulingMember>() join employee in db.Employees on member.EmployeeId equals employee.Id
-                join branch in db.Set<SchedulingBranch>() on member.BranchId equals branch.Id
-                where employee.AccountId == actorId && member.BranchId == appointment.BranchId && member.Active && branch.Active
-                select member).AnyAsync(ct)) throw Error("MSG102", 404);
+            var state = await access.RequireAsync(actorId, permission, ct);
+            if (!state.BranchIds.Contains(appointment.BranchId)) throw Error("MSG102", 404);
+            if (clinicInitiated) await queries.DetailAsync(actorId, appointment.Id, ct);
         }
         else if (appointment.BookerAccountId != actorId && !(appointment.PatientId.HasValue &&
             await db.PatientAccountLinks.AnyAsync(x => x.AccountId == actorId && x.PatientId == appointment.PatientId
@@ -72,10 +73,10 @@ public sealed class AppointmentChangeService(DcmsDbContext db, IAvailabilityServ
     }
 
     public Task<AppointmentChangeResult> RescheduleAsync(int actorId, string code, RescheduleAppointmentRequest request, CancellationToken ct) =>
-        ChangeAsync(actorId, code, request.ExpectedVersion, request.RequestKey, request.Reason, request.RequesterVerification, request, ct);
+        ChangeAsync(actorId, code, request.ExpectedVersion, request.RequestKey, request.Reason, request.RequesterVerification, request, request.ClinicInitiated, ct);
 
     public Task<AppointmentChangeResult> CancelAsync(int actorId, string code, CancelAppointmentRequest request, CancellationToken ct) =>
-        ChangeAsync(actorId, code, request.ExpectedVersion, request.RequestKey, request.Reason, request.RequesterVerification, null, ct);
+        ChangeAsync(actorId, code, request.ExpectedVersion, request.RequestKey, request.Reason, request.RequesterVerification, null, request.ClinicInitiated, ct);
 
     public async Task<AppointmentChangeResult> MarkNoShowAsync(int actorId, string code,
         NoShowAppointmentRequest request, CancellationToken ct)
@@ -87,7 +88,7 @@ public sealed class AppointmentChangeService(DcmsDbContext db, IAvailabilityServ
             JsonSerializer.Serialize(new { action = "NO_SHOW", code, request.ExpectedVersion, reason }))));
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
         await db.Database.ExecuteSqlRawAsync($"SELECT pg_advisory_xact_lock({WorkingScheduleService.TransactionLock})", ct);
-        var (appointment, staff) = await AuthorizeAsync(actorId, code, ct);
+        var (appointment, staff) = await AuthorizeAsync(actorId, code, ct, "appointments.no-show", clinicInitiated: true);
         if (!staff) throw Error("MSG06", 403);
         var receipt = await db.AppointmentChangeReceipts.AsNoTracking().SingleOrDefaultAsync(x =>
             x.ActorAccountId == actorId && x.RequestKey == request.RequestKey, ct);
@@ -98,9 +99,9 @@ public sealed class AppointmentChangeService(DcmsDbContext db, IAvailabilityServ
         }
         var now = clock.GetUtcNow();
         if (appointment.Version != request.ExpectedVersion) throw Error("MSG111");
-        if (appointment.Status != "Confirmed" || appointment.StartAt > now) throw Error("MSG31");
+        if (appointment.Status != "Confirmed" || appointment.StartAt > now || await db.Visits.AnyAsync(x => x.AppointmentId == appointment.Id, ct)) throw Error("MSG31");
         var reservation = await db.Set<ResourceReservation>().SingleAsync(x => x.Id == appointment.ReservationId, ct);
-        if (reservation.Status != "Confirmed") throw Error("MSG111");
+        if (reservation.Status != "Confirmed" || reservation.Start != appointment.StartAt || reservation.End != appointment.EndAt) throw Error("MSG111");
         if (appointment.FollowUpId.HasValue)
             await followUps.MarkNeedsBookingAsync(appointment.FollowUpId.Value, appointment.Id, ct);
         appointment.Status = reservation.Status = "NoShow";
@@ -140,7 +141,7 @@ public sealed class AppointmentChangeService(DcmsDbContext db, IAvailabilityServ
     }
 
     private async Task<AppointmentChangeResult> ChangeAsync(int actorId, string code, int expectedVersion, Guid requestKey,
-        string? rawReason, string? rawVerification, RescheduleAppointmentRequest? move, CancellationToken ct)
+        string? rawReason, string? rawVerification, RescheduleAppointmentRequest? move, bool clinicInitiated, CancellationToken ct)
     {
         if (requestKey == Guid.Empty || expectedVersion <= 0 || string.IsNullOrWhiteSpace(code) || code.Length > 40
             || (move != null && (move.NewStart == default || move.ChairId <= 0 || move.ScheduleVersion <= 0
@@ -154,12 +155,13 @@ public sealed class AppointmentChangeService(DcmsDbContext db, IAvailabilityServ
             action, code, expectedVersion, reason, verification,
             NewStart = move?.NewStart.ToUniversalTime(), move?.ChairId, move?.ScheduleVersion,
             move?.AssistantScheduleVersion, move?.DentistId, move?.BookingSettingsVersion
-        }))));
+        }) + (clinicInitiated ? "|clinic-initiated:true" : ""))));
 
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
         await db.Database.ExecuteSqlRawAsync($"SELECT pg_advisory_xact_lock({WorkingScheduleService.TransactionLock})", ct);
-        var (appointment, staff) = await AuthorizeAsync(actorId, code, ct);
-        if (staff) verification = RequiredText(verification, "Xác minh người yêu cầu");
+        var (appointment, staff) = await AuthorizeAsync(actorId, code, ct, move == null ? "appointments.cancel" : "appointments.reschedule", clinicInitiated);
+        if (clinicInitiated && !staff) throw Error("MSG06", 403);
+        if (staff) verification = clinicInitiated ? "Phòng khám chủ động điều chỉnh lịch hẹn." : RequiredText(verification, "Xác minh người yêu cầu");
 
         var receipt = await db.AppointmentChangeReceipts.AsNoTracking()
             .SingleOrDefaultAsync(x => x.ActorAccountId == actorId && x.RequestKey == requestKey, ct);
@@ -184,6 +186,8 @@ public sealed class AppointmentChangeService(DcmsDbContext db, IAvailabilityServ
         if (move != null)
         {
             var selectedDentistId = move.DentistId ?? appointment.DentistId;
+            if (staff && clinicInitiated && !(await queries.OptionsAsync(actorId, ct)).Dentists.Any(x => x.BranchId == appointment.BranchId && x.Id == selectedDentistId))
+                throw Error("MSG06", 403);
             if (selectedDentistId <= 0 || selectedDentistId == appointment.AssistantId) throw Error("MSG34");
             if (!AppointmentRules.PublicLeadTimeValid(now, move.NewStart)) throw Error("MSG34");
             if (move.NewStart == appointment.StartAt && move.ChairId == appointment.ChairId
