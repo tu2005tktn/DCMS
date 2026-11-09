@@ -4,6 +4,7 @@ import VisitPage from '../features/examinations/ExaminationPage';
 import PaymentsPage from '../features/finance/PaymentsPage';
 import ReceiptPrintPage from '../features/finance/ReceiptPrintPage';
 import PrescriptionPage from '../features/prescriptions/PrescriptionPage';
+import PrescriptionTemplatesPage from '../features/prescriptions/PrescriptionTemplatesPage';
 import ClinicalServicesPage from '../features/finance/ClinicalServicesPage';
 import { Alert, Button, Card, Result, Space, Tag, Typography } from 'antd';
 import { useState, type ReactNode } from 'react';
@@ -15,6 +16,7 @@ import LabWorkPage from '../features/lab-work/LabWorkPage';
 import MaterialsPage from '../features/system-settings/MaterialsPage';
 import WorkStatisticsPage from '../features/finance/WorkStatisticsPage';
 import RevenuePage from '../features/finance/RevenuePage';
+import FinanceOperationsPage from '../features/finance/FinanceOperationsPage';
 import AccountsPage from '../features/accounts/AccountsPage';
 import WorkingSchedulesPage from '../features/working-schedules/WorkingSchedulesPage';
 import BookingSettingsPage from '../features/working-schedules/BookingSettingsPage';
@@ -77,8 +79,10 @@ export default function App() {
       <Route path="payments" element={<Protected permission="finance.read"><PaymentsPage /></Protected>} />
       <Route path="work-statistics" element={<Protected permission="finance.work-statistics.read"><WorkStatisticsPage /></Protected>} />
       <Route path="revenue" element={<Protected permission="finance.revenue.read"><RevenuePage /></Protected>} />
+      <Route path="finance/operations" element={<Protected permission="finance.read"><FinanceOperationsPage /></Protected>} />
       <Route path="visits/:visitId/payments" element={<Protected permission="finance.read"><PaymentsPage /></Protected>} />
       <Route path="visits/:visitId/prescription" element={<Protected permission="prescriptions.read"><PrescriptionPage /></Protected>} />
+      <Route path="prescriptions/templates" element={<Protected permission="prescriptions.manage"><PrescriptionTemplatesPage /></Protected>} />
       <Route path="payments/:id/print" element={<Protected permission="finance.receipts.print"><ReceiptPrintPage /></Protected>} />
       <Route path="clinical-services" element={<Protected permission="services.read"><ClinicalServicesPage /></Protected>} />
       <Route path="working-schedules" element={<Protected permission="working-schedules.read"><WorkingSchedulesPage /></Protected>} />

@@ -34,6 +34,7 @@ export default function StaffWorkspace() {
     { key:'/lab-orders', title:'Quản lý công việc labo', icon:<ExperimentOutlined />, group:'Chuyên môn', visible:has('treatment.lab.read') },
     { key:'/clinical-services', title:'Dịch vụ cận lâm sàng', icon:<ExperimentOutlined />, group:'Chuyên môn', visible:has('services.read') },
     { key:'/payments', title:'Thanh toán', icon:<CreditCardOutlined />, group:'Quản trị', visible:has('finance.read') },
+    { key:'/finance/operations', title:'Tài chính và công nợ', icon:<CreditCardOutlined />, group:'Quản trị', visible:has('finance.read') },
     { key:'/work-statistics', title:'Thống kê công việc/dịch vụ', icon:<BarChartOutlined />, group:'Quản trị', visible:has('finance.work-statistics.read') },
     { key:'/revenue', title:'Doanh thu', icon:<BarChartOutlined />, group:'Quản trị', visible:has('finance.revenue.read') },
     { key:'/accounts', title:'Quản lý tài khoản', icon:<AuditOutlined />, group:'Quản trị', visible:has('accounts.read') },
