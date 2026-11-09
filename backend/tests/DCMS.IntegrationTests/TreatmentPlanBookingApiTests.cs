@@ -7,6 +7,7 @@ using DCMS.Application.Features.Scheduling;
 using DCMS.Application.Features.Treatment;
 using DCMS.Application.Features.Settings;
 using DCMS.Domain.Features.Patients;
+using DCMS.Domain.Features.PatientLinks;
 using DCMS.Domain.Features.Scheduling;
 using DCMS.Domain.Features.Treatment;
 using DCMS.Infrastructure.Persistence;
@@ -46,13 +47,13 @@ public sealed class TreatmentPlanBookingApiTests(ApiFixture fixture) : IClassFix
         return client;
     }
 
-    private async Task<Setup> Prepare()
+    private async Task<Setup> Prepare(int dayOffset = 7)
     {
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
         var dentist = await (from e in db.Employees join u in db.Users on e.AccountId equals u.Id where u.UserName == "dentist.demo" select e).SingleAsync();
         var assistant = await (from e in db.Employees join u in db.Users on e.AccountId equals u.Id where u.UserName == "assistant.demo" select e).SingleAsync();
-        var date = DateOnly.FromDateTime(DateTimeOffset.UtcNow.ToOffset(TimeSpan.FromHours(7)).DateTime).AddDays(7);
+        var date = DateOnly.FromDateTime(DateTimeOffset.UtcNow.ToOffset(TimeSpan.FromHours(7)).DateTime).AddDays(dayOffset);
         var branch = new SchedulingBranch { Name = "SYNTHETIC booking audit " + Guid.NewGuid() };
         var patient = new PatientProfile { PatientCode = "AUDIT-" + Guid.NewGuid().ToString("N"), FullName = "SYNTHETIC audit patient", CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow };
         db.AddRange(branch, patient); await db.SaveChangesAsync();
@@ -164,15 +165,16 @@ public sealed class TreatmentPlanBookingApiTests(ApiFixture fixture) : IClassFix
         }
     }
 
-    private async Task<HttpResponseMessage> Book(HttpClient client, Setup s, Guid? instruction, bool patientConsent = true)
+    private async Task<HttpResponseMessage> Book(HttpClient client, Setup s, Guid? instruction, bool patientConsent = true, int durationMinutes = 30)
     {
-        var availability = await client.GetFromJsonAsync<AvailabilityResult>($"/api/availability?branchId={s.Branch}&dentistId={s.Dentist}&serviceId={s.Service}&date={s.Date:yyyy-MM-dd}&durationMinutes=30");
+        var queryDuration = durationMinutes is >= 1 and <= 480 ? durationMinutes : 30;
+        var availability = await client.GetFromJsonAsync<AvailabilityResult>($"/api/availability?branchId={s.Branch}&dentistId={s.Dentist}&serviceId={s.Service}&date={s.Date:yyyy-MM-dd}&durationMinutes={queryDuration}");
         Assert.NotEmpty(availability!.Slots);
         var slot = availability.Slots[0];
         using (var scope = fixture.Services.CreateScope()) outboxBefore = await scope.ServiceProvider.GetRequiredService<DcmsDbContext>().AppointmentOutboxEvents.CountAsync();
         lastCommand = new CreateAppointmentRequest(s.Branch,
             new BookerContact("SYNTHETIC audit", "0912345678", null), new AppointmentAttendee(s.Patient, "SYNTHETIC audit patient", null),
-            "Self", instruction.HasValue ? "FollowUp" : "Standard", "InPerson", s.Service, "SYNTHETIC audit", s.Dentist, null, slot.ChairId, slot.Start, 30,
+            "Self", instruction.HasValue ? "FollowUp" : "Standard", "InPerson", s.Service, "SYNTHETIC audit", s.Dentist, null, slot.ChairId, slot.Start, durationMinutes,
             instruction, null, Guid.NewGuid(), slot.ScheduleVersion, slot.AssistantScheduleVersion, slot.BookingSettingsVersion, PatientConsentConfirmed: patientConsent);
         return await client.PostAsJsonAsync("/api/appointments", lastCommand);
     }
@@ -188,6 +190,63 @@ public sealed class TreatmentPlanBookingApiTests(ApiFixture fixture) : IClassFix
         var row = await db.Appointments.AsNoTracking().SingleAsync(x => x.Id == created.AppointmentId);
         Assert.Equal(row.CreatedAt, row.PatientConsentConfirmedAt);
         Assert.Equal(await db.Users.Where(x => x.UserName == "dentist.demo").Select(x => x.Id).SingleAsync(), row.PatientConsentConfirmedBy);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(37)]
+    [InlineData(480)]
+    public async Task ItemBookingUsesEditedDurationWithoutChangingPlanOrInstruction(int durationMinutes)
+    {
+        // These cases share the demo dentist: put long reservations on separate days from the regression fixtures.
+        var s = await Prepare(durationMinutes == 1 ? 10 : durationMinutes == 37 ? 11 : 12);
+        using var client = await Login(); var instruction = await Instruction(client, s);
+        var response = await Book(client, s, instruction, durationMinutes: durationMinutes);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var booked = (await response.Content.ReadFromJsonAsync<AppointmentResult>())!;
+        Assert.Equal(TimeSpan.FromMinutes(durationMinutes), booked.EndAt - booked.StartAt);
+        var replay = await client.PostAsJsonAsync("/api/appointments", lastCommand);
+        Assert.Equal(HttpStatusCode.OK, replay.StatusCode);
+        Assert.Equal(booked.AppointmentId, (await replay.Content.ReadFromJsonAsync<AppointmentResult>())!.AppointmentId);
+        using var scope = fixture.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
+        var saved = await db.Appointments.AsNoTracking().SingleAsync(x => x.Id == booked.AppointmentId);
+        var reserved = await db.Set<ResourceReservation>().AsNoTracking().SingleAsync(x => x.Id == saved.ReservationId);
+        Assert.Equal(TimeSpan.FromMinutes(durationMinutes), reserved.End - reserved.Start);
+        Assert.Equal(30, (await db.FollowUpInstructions.AsNoTracking().SingleAsync(x => x.Id == instruction)).DurationMinutes);
+        Assert.Equal(30, (await db.TreatmentDossiers.AsNoTracking().Where(x => x.Id == s.Dossier).SelectMany(x => x.Items).SingleAsync(x => x.Id == s.Item)).EstimatedMinutes);
+        var changedKeyContent = await client.PostAsJsonAsync("/api/appointments", lastCommand! with { DurationMinutes = durationMinutes == 1 ? 2 : 1 });
+        Assert.Equal(HttpStatusCode.Conflict, changedKeyContent.StatusCode);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(481)]
+    public async Task EditedItemDurationOutsideBoundsDoesNotCreateBooking(int durationMinutes)
+    {
+        var s = await Prepare(); using var client = await Login(); var instruction = await Instruction(client, s);
+        await AssertRejectedWithoutWrites(s, instruction, await Book(client, s, instruction, durationMinutes: durationMinutes), HttpStatusCode.BadRequest, "MSG04");
+    }
+
+    [Fact]
+    public async Task PublicAccountCannotOverrideInstructionDuration()
+    {
+        var s = await Prepare(); using var staff = await Login(); var instruction = await Instruction(staff, s);
+        await AssertRejectedWithoutWrites(s, instruction, await Book(staff, s, instruction, patientConsent: false, durationMinutes: 37),
+            HttpStatusCode.BadRequest, "APPOINTMENT_PATIENT_CONSENT_REQUIRED");
+        using (var scope = fixture.Services.CreateScope()) {
+            var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
+            var ownerId = await db.Users.Where(x => x.UserName == "guest.demo").Select(x => x.Id).SingleAsync();
+            db.PatientAccountLinks.Add(new PatientAccountLink { RequestCode = "DURATION-" + Guid.NewGuid().ToString("N")[..20],
+                AccountId = ownerId, PatientId = s.Patient, Status = PatientLinkStatus.Verified,
+                DeclaredFullName = "SYNTHETIC audit patient", RequestedAt = DateTimeOffset.UtcNow });
+            await db.SaveChangesAsync();
+        }
+        using var customer = await Login("guest.demo");
+        var response = await customer.PostAsJsonAsync("/api/appointments", lastCommand! with { PatientConsentConfirmed = true, RequestKey = Guid.NewGuid() });
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Equal("MSG230", (await response.Content.ReadFromJsonAsync<DCMS.Application.Common.SystemMessage>())!.Code);
+        using var check = fixture.Services.CreateScope();
+        Assert.False(await check.ServiceProvider.GetRequiredService<DcmsDbContext>().Appointments.AnyAsync(x => x.PatientId == s.Patient));
     }
 
     [Fact]
@@ -343,6 +402,7 @@ public sealed class TreatmentPlanBookingApiTests(ApiFixture fixture) : IClassFix
             s.Date.AddDays(-4), s.Date, s.Date.AddDays(4), 30, s.Dentist, null, Guid.NewGuid()));
         Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
         var instruction = (await response.Content.ReadFromJsonAsync<FollowUpChange>())!.Instruction.Id;
+        await AssertRejectedWithoutWrites(s, instruction, await Book(client, s, instruction, durationMinutes: 37));
         Assert.Equal(HttpStatusCode.Created, (await Book(client, s, instruction)).StatusCode);
     }
 }

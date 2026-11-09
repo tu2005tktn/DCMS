@@ -22,6 +22,6 @@ public interface IAppointmentService
 public interface IFollowUpBookingPort
 {
     Task ValidateAsync(Guid followUpId, int patientId, int branchId, int dentistId, int durationMinutes,
-        DateTimeOffset startAt, CancellationToken ct);
+        DateTimeOffset startAt, CancellationToken ct, bool allowItemDurationOverride = false);
     Task MarkBookedAsync(Guid followUpId, Guid appointmentId, CancellationToken ct);
 }

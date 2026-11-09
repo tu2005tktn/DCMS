@@ -74,12 +74,13 @@ public sealed class FollowUpAppointmentPort(DcmsDbContext db, ITreatmentLabReadi
     }
 
     public async Task ValidateAsync(Guid followUpId, int patientId, int branchId, int dentistId, int durationMinutes,
-        DateTimeOffset startAt, CancellationToken ct)
+        DateTimeOffset startAt, CancellationToken ct, bool allowItemDurationOverride = false)
     {
         var row = await InstructionAsync(followUpId, ct);
         if (row.PatientId != patientId || row.BranchId != branchId) throw Error("MSG06", 403);
         if (row.Status != "NeedsBooking" || row.ActiveAppointmentId.HasValue) throw Error("MSG127");
-        if (row.DentistId.HasValue && row.DentistId != dentistId || row.DurationMinutes != durationMinutes
+        var editableDuration = allowItemDurationOverride && row.DossierId.HasValue && row.ItemId.HasValue && !row.StepId.HasValue;
+        if (row.DentistId.HasValue && row.DentistId != dentistId || (!editableDuration && row.DurationMinutes != durationMinutes)
             || !InWindow(row, startAt)) throw Error("MSG230");
         if (row.Capability != null && !await capabilities.HasCapabilityAsync(branchId, dentistId,
             row.Capability, ct)) throw Error("MSG230");

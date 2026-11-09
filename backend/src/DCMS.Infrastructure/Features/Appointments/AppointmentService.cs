@@ -139,7 +139,7 @@ public sealed class AppointmentService(DcmsDbContext db, IAvailabilityService av
         if (request.FollowUpId.HasValue)
         {
             await followUps.ValidateAsync(request.FollowUpId.Value, patientId!.Value, request.BranchId, request.DentistId,
-                request.DurationMinutes, start, ct);
+                request.DurationMinutes, start, ct, allowItemDurationOverride: staff);
             treatmentPlanBooking = await db.FollowUpInstructions.AsNoTracking().AnyAsync(x => x.Id == request.FollowUpId.Value
                 && x.DossierId.HasValue && x.ItemId.HasValue, ct);
             if (treatmentPlanBooking && !request.PatientConsentConfirmed)
@@ -206,7 +206,7 @@ public sealed class AppointmentService(DcmsDbContext db, IAvailabilityService av
 public sealed class UnavailableFollowUpBookingPort : IFollowUpBookingPort
 {
     public Task ValidateAsync(Guid followUpId, int patientId, int branchId, int dentistId, int durationMinutes,
-        DateTimeOffset startAt, CancellationToken ct) =>
+        DateTimeOffset startAt, CancellationToken ct, bool allowItemDurationOverride = false) =>
         throw new BusinessException(503, SystemMessages.Get("MSG144"));
     public Task MarkBookedAsync(Guid followUpId, Guid appointmentId, CancellationToken ct) =>
         throw new BusinessException(503, SystemMessages.Get("MSG144"));

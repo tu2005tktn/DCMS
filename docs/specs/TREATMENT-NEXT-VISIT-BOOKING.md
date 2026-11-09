@@ -25,7 +25,7 @@ Trong các phiếu không bị xóa của bệnh nhân thuộc chi nhánh nha s�
 
 Sắp xếp: `EstimatedStart` tăng dần, hạng mục không có ngày xếp cuối, rồi `PlannedOrder`. Phần tử đầu tiên chưa `Booked` là **hạng mục kế tiếp**.
 - **Bác sĩ phụ trách** = `ResponsibleDentistId` của hạng mục, nếu trống thì nha sĩ của phiếu.
-- **Thời lượng** = `EstimatedMinutes` (mặc định 30) làm tròn lên bội số 15 phút, trong 15–480.
+- **Thời lượng mặc định** = `EstimatedMinutes` (mặc định 30) làm tròn lên bội số 15 phút, trong 15–480. Khi đặt hẹn cấp hạng mục, nhân viên được sửa thời lượng riêng của lần hẹn theo hợp đồng bên dưới.
 - **Ngày muốn hẹn** = `max(EstimatedStart, hôm nay giờ Việt Nam)`.
 
 ## API (policy `TreatmentDentist`, người dùng phải là nha sĩ của chi nhánh)
@@ -40,6 +40,15 @@ Sắp xếp: `EstimatedStart` tăng dần, hạng mục không có ngày xếp c
 
 ## Quyền đặt lịch (thay đổi 03/11/2026)
 Trước đây `POST /api/appointments` từ chối mọi tài khoản staff không có vai trò `ClinicAssistant` (403/MSG06), nên nha sĩ không đặt được buổi hẹn điều trị của chính mình. Nay **nha sĩ (vai trò hiệu lực `Dentist`) được tạo lịch khi và chỉ khi request có `followUpId`** (loại `FollowUp`); đặt lịch thường (Standard/WalkIn) vẫn chỉ dành cho `ClinicAssistant`. Các kiểm tra khác giữ nguyên: nha sĩ phải là thành viên hoạt động của chi nhánh, chỉ định phải đúng bệnh nhân/chi nhánh/khoảng ngày/thời lượng/nha sĩ (`FollowUpAppointmentPort.ValidateAsync`) và khung giờ phải nằm trong lịch làm của bác sĩ.
+
+### Sửa thời lượng khi đặt hẹn cấp hạng mục — 09/11/2026
+
+- Trong **Đặt lịch theo kế hoạch điều trị**, trường **Thời lượng (phút)** cho nhập số nguyên từ 1 đến 480, mặc định từ candidate. Đóng/mở lại hoặc chuyển hạng mục khôi phục mặc định. Giá trị rỗng/không hợp lệ hiện lỗi, không tải khung giờ hay xác nhận đặt lịch.
+- Đổi thời lượng hủy lựa chọn giờ và kết quả tìm cũ, rồi tìm lại các ngày/khung giờ trong đúng khoảng cho phép bằng thời lượng mới. Kết quả request cũ không được ghi đè kết quả mới; đang tải chưa được xác nhận. Thông tin liên hệ và xác nhận đồng ý đã nhập được giữ.
+- `GET /api/availability` và `POST /api/appointments.durationMinutes` cùng dùng thời lượng đã sửa. Chỉ định mới vẫn giữ thời lượng gợi ý mặc định của candidate; chỉ định đã có được dùng lại. Không sửa `TreatmentItem.EstimatedMinutes`, thời lượng chỉ định hay danh mục dịch vụ khi đặt lịch. Appointment/reservation lưu chính xác khoảng bắt đầu–kết thúc theo thời lượng lần hẹn.
+- Server chỉ cho phép lệch thời lượng chỉ định khi người đặt là nhân viên và chỉ định có nguồn dossier + item, không có StepId. Cờ cho phép được xác định từ phiên tại Application/Infrastructure, không nhận từ JSON của client. Chỉ định cấp bước hoặc nguồn khác và khách hàng Public vẫn kiểm thời lượng bằng chỉ định. Các kiểm tra quyền động, bác sĩ/chi nhánh, ngày cho phép, trạng thái hạng mục, đồng ý và xung đột tài nguyên tiếp tục áp dụng trong giao dịch.
+- Không thêm endpoint, trường JSON, bảng hoặc migration. Thời lượng đã nằm trong fingerprint đặt lịch: retry nguyên lệnh trả receipt cũ; đổi số phút phải dùng requestKey mới. Web giữ key khi retry lỗi mạng cùng nội dung, đổi thời lượng tạo key đặt lịch mới.
+- Kiểm chứng: browser đổi thời lượng và chọn lại giờ, bỏ kết quả cũ đến chậm, chặn giá trị rỗng, tái dùng chỉ định cũ; API lưu thời lượng mới nhưng không đổi kế hoạch/chỉ định, replay và giới hạn 1–480, tiếp tục khóa thời lượng chỉ định cấp bước/Public.
 
 ## Điều kiện hạng mục hiệu lực (thay đổi)
 `CreateFollowUpAsync` và `FollowUpAppointmentPort.CheckReadinessAsync` trước đây chỉ nhận hạng mục `Decision = Agreed`. Nay nhận cả hạng mục `EntrySource = ClinicianEntry` (đã được tính là hiệu lực trên phiếu và bảng giá); các điều kiện khác (phiếu `Open`, kế hoạch `Committed`, đúng `PlanVersion`) giữ nguyên.

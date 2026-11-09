@@ -6,7 +6,7 @@ import ReceiptPrintPage from '../features/finance/ReceiptPrintPage';
 import PrescriptionPage from '../features/prescriptions/PrescriptionPage';
 import PrescriptionTemplatesPage from '../features/prescriptions/PrescriptionTemplatesPage';
 import ClinicalServicesPage from '../features/finance/ClinicalServicesPage';
-import { Alert, Button, Card, Result, Space, Tag, Typography } from 'antd';
+import { Alert, Button, Card, Result, Typography } from 'antd';
 import { useState, type ReactNode } from 'react';
 import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuth } from '../features/authentication/AuthContext';
@@ -26,7 +26,6 @@ import SupportInboxPage from '../features/support-inbox/SupportInboxPage';
 import RecoverAccountPage from '../features/recovery/RecoverAccountPage';
 import AppointmentCalendarPage from '../features/appointments/AppointmentCalendarPage';
 import AppointmentDetailPage from '../features/appointments/AppointmentDetailPage';
-import { roleLabels } from '../features/accounts/types';
 import HealthStatus from '../features/HealthStatus';
 import ReceptionPage from '../features/reception/ReceptionPage';
 import CheckInPage from '../features/reception/CheckInPage';
@@ -136,9 +135,6 @@ function Home() {
     }}>Cập nhật quyền</Button>}>
       {error && <Alert type="error" message={error} showIcon className="form-alert" />}
       <Typography.Paragraph>Tên đăng nhập: <strong>{user?.userName}</strong></Typography.Paragraph>
-      <Typography.Paragraph>Loại tài khoản: {user?.accountType === 'Staff' ? 'Nhân viên' : 'Công khai'}</Typography.Paragraph>
-      <Typography.Paragraph>Vai trò được cấp: <Space wrap>{user?.roles.map(role => <Tag key={role}>{roleLabels[role] ?? role}</Tag>)}</Space></Typography.Paragraph>
-      <Typography.Paragraph>Vai trò hiệu lực: <Space wrap>{user?.effectiveRoles.map(role => <Tag key={role}>{roleLabels[role] ?? role}</Tag>)}</Space></Typography.Paragraph>
       {user?.accountType === 'Public' && <Typography.Paragraph>{user.hasVerifiedPatientLink
         ? 'Tài khoản đã được liên kết với hồ sơ của chính bạn.'
         : 'Chưa có liên kết hồ sơ bệnh án được xác minh. Tài khoản công khai không tự có quyền đọc hồ sơ lâm sàng.'}</Typography.Paragraph>}
