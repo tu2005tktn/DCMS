@@ -40,6 +40,7 @@ import RevisionPage from '../features/treatment/RevisionPage';
 
 import ItemPlansPage from '../features/treatment/ItemPlansPage';
 import CommercialTreatmentPage from '../features/treatment/CommercialTreatmentPage';
+import CustomerPrescriptionsPage, { CustomerPrescriptionDetailPage } from '../features/customer-prescriptions/CustomerPrescriptionsPage';
 
 export default function App() {
   return <Routes>
@@ -57,6 +58,8 @@ export default function App() {
       <Route path="patient-link" element={<CustomerPatientLinkPage />} />
       <Route path="appointments" element={<CustomerAppointmentsPage />} />
       <Route path="appointments/:code" element={<CustomerAppointmentDetailPage />} />
+      <Route path="prescriptions" element={<CustomerPrescriptionsPage />} />
+      <Route path="prescriptions/:id" element={<CustomerPrescriptionDetailPage />} />
     </Route>
     <Route path="/customer/*" element={<Result status="404" title="Không tìm thấy trang" extra={<Link to="/customer/home">Về trang chủ</Link>} />} />
     <Route path="/recover" element={<RecoverAccountPage />} />

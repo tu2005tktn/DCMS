@@ -63,7 +63,7 @@ export default function PrescriptionsScreen() {
       {error && <Banner tone="error" message={error.message} />}
       <Card title="Đơn thuốc của tôi">
         {(items ?? []).length === 0
-          ? <Text style={styles.muted}>Chưa có đơn thuốc nào được bác sĩ hoàn tất.</Text>
+          ? <Text style={styles.muted}>Chưa có đơn thuốc nào.</Text>
           : (items ?? []).map(item => (
             <Pressable
               key={item.id}

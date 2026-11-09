@@ -8,7 +8,7 @@ namespace DCMS.Infrastructure.Features.SystemSettings;
 // Development-only starter catalog and synthetic prescription templates for UI demos.
 public sealed class DevelopmentMedicineSeeder(DcmsDbContext db, TimeProvider clock)
 {
-    private sealed record Item(string Code, string Name, string ActiveIngredient, string Strength, string DosageForm, string Unit, string Route);
+    private sealed record Item(string Code, string Name, string ActiveIngredient, string Strength, string DosageForm, string Unit, string Route, string? Instructions = null);
     private sealed record DemoTemplate(string Code, string Name, string Diagnosis, string MedicineCode, string Route,
         string Morning, string Noon, string Afternoon, string Evening, string MealTiming, int Days, int Quantity, string Instructions);
 
@@ -19,6 +19,11 @@ public sealed class DevelopmentMedicineSeeder(DcmsDbContext db, TimeProvider clo
         new("MED-STARTER-003", "Amoxicillin 500 mg", "Amoxicillin", "500 mg", "Viên nang", "viên", "Uống"),
         new("MED-STARTER-004", "Metronidazole 250 mg", "Metronidazole", "250 mg", "Viên nén", "viên", "Uống"),
         new("MED-STARTER-005", "Chlorhexidine 0,12%", "Chlorhexidine", "0,12%", "Dung dịch súc miệng", "ml", "Súc miệng"),
+        new("MED-STARTER-006", "Spiramycin + Metronidazole", "Spiramycin; Metronidazole", "750.000 IU + 125 mg", "Viên nén bao phim", "viên", "Uống", "Uống sau ăn."),
+        new("MED-STARTER-007", "Alpha chymotrypsin 4,2 mg", "Alpha chymotrypsin", "4,2 mg", "Viên nén", "viên", "Ngậm dưới lưỡi", "Ngậm dưới lưỡi cho tan dần."),
+        new("MED-STARTER-008", "Clindamycin 300 mg", "Clindamycin", "300 mg", "Viên nang", "viên", "Uống", "Uống với nhiều nước."),
+        new("MED-STARTER-009", "Amoxicillin + Acid clavulanic 625 mg", "Amoxicillin; Acid clavulanic", "500 mg + 125 mg", "Viên nén bao phim", "viên", "Uống", "Uống ngay đầu bữa ăn."),
+        new("MED-STARTER-010", "Gel nha chu Metronidazole + Chlorhexidine", "Metronidazole; Chlorhexidine", "10 mg/g + 0,25%", "Gel bôi", "tuýp", "Bôi tại chỗ", "Bôi lên vùng nướu sau khi chải răng."),
     ];
 
     private static readonly DemoTemplate[] Templates =
@@ -55,6 +60,7 @@ public sealed class DevelopmentMedicineSeeder(DcmsDbContext db, TimeProvider clo
                 DosageForm = item.DosageForm,
                 BaseUnit = item.Unit,
                 Route = item.Route,
+                Instructions = item.Instructions,
                 PrescriptionEligible = true,
                 InternalStockTracked = false,
                 CreatedAt = now,

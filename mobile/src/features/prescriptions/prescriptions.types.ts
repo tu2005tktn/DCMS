@@ -78,7 +78,13 @@ export type PatientProfilePrescription = {
   id: string; patientId: number; branchId: number; branchName: string; prescribedOn: string;
   diagnosis: string; otherDiagnosis: string | null; advice: string | null; prescriberName: string; version: number;
   items: PatientProfilePrescriptionItem[];
+  // docs/specs/S23-PATIENT-PRESCRIPTIONS.vi.md: thông tin phòng khám và bệnh nhân để hiển thị bố cục tờ đơn.
+  prescriberEmployeeId: number; branchAddress: string | null; branchPhone: string | null; branchEmail: string | null;
+  patientCode: string; patientName: string; patientBirthDate: string | null; patientGender: string | null;
 };
+
+export const genderLabel = (value: string | null) =>
+  value === 'MALE' ? 'Nam' : value === 'FEMALE' ? 'Nữ' : value === 'OTHER' ? 'Khác' : value || '—';
 
 export const mealLabel = (value: string) => (value === 'BeforeMeal' ? 'Trước ăn' : value === 'WithMeal' ? 'Trong bữa ăn' : 'Sau ăn');
 

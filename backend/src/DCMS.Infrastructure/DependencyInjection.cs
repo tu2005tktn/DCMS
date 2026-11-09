@@ -124,6 +124,7 @@ public static class DependencyInjection
         services.AddScoped<Features.SystemSettings.DevelopmentMaterialSeeder>();
         services.AddScoped<Features.SystemSettings.DevelopmentLabSeeder>();
         services.AddScoped<Features.SystemSettings.DevelopmentMedicineSeeder>();
+        services.AddScoped<Features.Prescriptions.DevelopmentPrescriptionSeeder>();
         services.AddScoped<IFollowUpBookingPort>(sp => sp.GetRequiredService<FollowUpAppointmentPort>());
         services.AddScoped<IAppointmentNotificationDispatcher, AppointmentNotificationDispatcher>();
         services.AddScoped<IExternalNotificationAdapter, UnavailableExternalNotificationAdapter>();

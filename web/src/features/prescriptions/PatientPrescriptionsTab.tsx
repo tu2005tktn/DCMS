@@ -1,14 +1,23 @@
-import { Alert, Button, Card, Empty, Form, Input, InputNumber, Select, Space, Spin, Table, Typography, message } from 'antd';
-import { useEffect, useState } from 'react';
+import { Alert, Button, Card, DatePicker, Empty, Form, Input, InputNumber, Modal, Select, Space, Spin, Table, Tooltip, message } from 'antd';
+import dayjs, { type Dayjs } from 'dayjs';
+import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../services/api';
 import { useAuth } from '../authentication/AuthContext';
 import type { PatientDetail } from '../patients/types';
+import { formatDate, PatientGrid, ReadOnlySheet, type Item, type Prescription } from './PrescriptionSheet';
+import './patientPrescriptions.css';
 
-type Medicine = { id: string; code: string; name: string; strength?: string; baseUnit: string; defaultInstructions?: string };
-type Item = { id?: string; medicineId: string; medicineName?: string; medicineCode?: string; strength?: string; dosageForm?: string; unit?: string; quantity: number; instructions?: string };
-type Prescription = { id: string; branchId: number; branchName: string; prescribedOn: string; diagnosis: string; otherDiagnosis?: string; advice?: string; prescriberName: string; version: number; items: Item[] };
-type Context = { branchIds: number[]; prescriberName: string };
-type Values = { items: Item[]; advice?: string };
+// Contract: docs/specs/S23-PATIENT-PRESCRIPTIONS.vi.md — form "Đơn thuốc" kê từ hồ sơ bệnh nhân.
+type Medicine = { id: string; code: string; name: string; strength?: string | null; baseUnit: string; defaultInstructions?: string | null };
+type Branch = { id: number; name: string; address?: string | null; phone?: string | null; email?: string | null };
+type Doctor = { employeeId: number; name: string; branchId: number };
+type Context = { branchIds: number[]; prescriberName: string; prescriberEmployeeId: number; branches: Branch[]; doctors: Doctor[] };
+type DiagnosisOption = { id: string; name: string; code?: string | null };
+type Values = { branchId: number; diagnoses: string[]; otherDiagnosis?: string; items: Item[]; advice?: string; prescribedOn: Dayjs; prescriberEmployeeId: number };
+type Sheet = { mode: 'create' | 'edit' | 'view'; doc?: Prescription; initial?: Partial<Values> };
+
+const emptyItem = (): Item => ({ medicineId: '', quantity: 1, instructions: '' });
+const splitDiagnoses = (value?: string | null) => (value ?? '').split(';').map(x => x.trim()).filter(Boolean);
 
 export default function PatientPrescriptionsTab({ patient, active }: { patient: PatientDetail; active: boolean }) {
   const auth = useAuth();
@@ -17,12 +26,14 @@ export default function PatientPrescriptionsTab({ patient, active }: { patient: 
   const [rows, setRows] = useState<Prescription[]>([]);
   const [context, setContext] = useState<Context>();
   const [medicines, setMedicines] = useState<Medicine[]>([]);
+  const [diagnosisOptions, setDiagnosisOptions] = useState<DiagnosisOption[]>([]);
   const [form] = Form.useForm<Values>();
-  const [editing, setEditing] = useState<Prescription | null>(null);
-  const [editorOpen, setEditorOpen] = useState(false);
+  const [sheet, setSheet] = useState<Sheet | null>(null);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>();
+  const [sheetError, setSheetError] = useState<string>();
+  const branchId = Form.useWatch('branchId', form);
 
   async function refresh() {
     setLoading(true); setError(undefined);
@@ -33,65 +44,187 @@ export default function PatientPrescriptionsTab({ patient, active }: { patient: 
   useEffect(() => { if (active) void refresh(); }, [active, patient.id]);
   useEffect(() => {
     if (!active || !canManage) return;
-    void api<Context>(`/api/prescriptions/patients/${patient.id}/context`).then(async value => {
-      setContext(value);
-      if (value.branchIds[0]) setMedicines(await api<Medicine[]>(`/api/prescriptions/medicine-options?branchId=${value.branchIds[0]}`));
-    }).catch(e => setError((e as Error).message));
+    void api<Context>(`/api/prescriptions/patients/${patient.id}/context`).then(setContext).catch(e => setError((e as Error).message));
+    void api<DiagnosisOption[]>('/api/system-settings/reference-options?kind=diagnoses').then(setDiagnosisOptions).catch(() => setDiagnosisOptions([]));
   }, [active, canManage, patient.id]);
+  useEffect(() => {
+    if (!branchId || !sheet || sheet.mode === 'view') return;
+    let alive = true;
+    api<Medicine[]>(`/api/prescriptions/medicine-options?branchId=${branchId}`)
+      .then(value => { if (alive) setMedicines(value); })
+      .catch(e => { if (alive) setSheetError((e as Error).message); });
+    return () => { alive = false; };
+  }, [branchId, sheet]);
 
-  function start(doc?: Prescription) {
-    setError(undefined); setEditing(doc ?? null); setEditorOpen(true);
-    form.setFieldsValue(doc ? { advice: doc.advice, items: doc.items.map(x => ({ ...x })) }
-      : { advice: '', items: [{ medicineId: '', quantity: 1, instructions: '' }] });
+  const branch = useMemo(() => context?.branches.find(b => b.id === branchId), [context, branchId]);
+  const doctors = useMemo(() => context?.doctors.filter(d => d.branchId === branchId) ?? [], [context, branchId]);
+  const medicineOptions = useMemo(() => {
+    const known = medicines.map(m => ({ value: m.id, label: `${m.name}${m.strength ? ` · ${m.strength}` : ''}` }));
+    // Keep labels for medicines of an edited prescription that are no longer in the active catalog.
+    const legacy = (sheet?.doc?.items ?? []).filter(x => !medicines.some(m => m.id === x.medicineId))
+      .map(x => ({ value: x.medicineId, label: `${x.medicineName ?? x.medicineCode}${x.strength ? ` · ${x.strength}` : ''}` }));
+    return [...known, ...legacy];
+  }, [medicines, sheet]);
+
+  function open(mode: Sheet['mode'], doc?: Prescription) {
+    setSheetError(mode !== 'view' && !context?.branches.length ? 'Bác sĩ chưa được phân công chi nhánh để kê đơn.' : undefined);
+    if (mode === 'view') { setSheet({ mode, doc }); return; }
+    setSheet({ mode, doc, initial: doc ? {
+      branchId: doc.branchId, diagnoses: splitDiagnoses(doc.diagnosis), otherDiagnosis: doc.otherDiagnosis ?? '', advice: doc.advice ?? '',
+      prescribedOn: dayjs(doc.prescribedOn), prescriberEmployeeId: doc.prescriberEmployeeId, items: doc.items.map(x => ({ ...x })),
+    } : {
+      branchId: context?.branches[0]?.id, diagnoses: [], otherDiagnosis: '', advice: '', prescribedOn: dayjs(),
+      prescriberEmployeeId: context?.prescriberEmployeeId, items: [emptyItem()],
+    } });
   }
+  function close() { if (!busy) { setSheet(null); setSheetError(undefined); } }
+
+  function pickBranch(id: number) {
+    const current = form.getFieldValue('prescriberEmployeeId') as number | undefined;
+    const allowed = context?.doctors.filter(d => d.branchId === id) ?? [];
+    if (!allowed.some(d => d.employeeId === current))
+      form.setFieldValue('prescriberEmployeeId', allowed.find(d => d.employeeId === context?.prescriberEmployeeId)?.employeeId ?? allowed[0]?.employeeId);
+  }
+
   async function save(values: Values) {
-    if (!context?.branchIds[0]) { setError('Bác sĩ chưa được phân công chi nhánh để kê đơn.'); return; }
-    setBusy(true); setError(undefined);
+    const editing = sheet?.mode === 'edit' ? sheet.doc : undefined;
+    setBusy(true); setSheetError(undefined);
     try {
       await api(`/api/prescriptions/patients/${patient.id}${editing ? `/${editing.id}` : ''}`, {
         method: editing ? 'PUT' : 'POST',
-        body: JSON.stringify({ requestKey: crypto.randomUUID(), expectedVersion: editing?.version ?? 0,
-          branchId: editing?.branchId ?? context.branchIds[0], prescribedOn: editing?.prescribedOn ?? new Date().toISOString().slice(0, 10),
-          diagnosis: editing?.diagnosis ?? '', otherDiagnosis: editing?.otherDiagnosis ?? null, advice: values.advice ?? null,
-          items: values.items.map(x => ({ medicineId: x.medicineId, quantity: x.quantity, instructions: x.instructions ?? '' })) }),
+        body: JSON.stringify({
+          requestKey: crypto.randomUUID(), expectedVersion: editing?.version ?? 0, branchId: values.branchId,
+          prescribedOn: values.prescribedOn.format('YYYY-MM-DD'), diagnosis: (values.diagnoses ?? []).map(x => x.trim()).filter(Boolean).join('; '),
+          otherDiagnosis: values.otherDiagnosis?.trim() || null, advice: values.advice?.trim() || null,
+          prescriberEmployeeId: values.prescriberEmployeeId,
+          items: values.items.map(x => ({ medicineId: x.medicineId, quantity: x.quantity, instructions: x.instructions ?? '' })),
+        }),
       });
-      setEditing(null); setEditorOpen(false); void notice.success('Đã lưu đơn thuốc'); await refresh();
-    } catch (e) { setError((e as Error).message); }
+      setSheet(null); void notice.success('Đã lưu đơn thuốc'); await refresh();
+    } catch (e) { setSheetError((e as Error).message); }
     finally { setBusy(false); }
   }
 
-  return <Card title="Đơn thuốc" extra={canManage && !editorOpen ? <Button type="primary" onClick={() => start()}>+ Kê đơn thuốc</Button> : undefined}>
+  const doc = sheet?.doc;
+  const header = sheet?.mode === 'view' && doc
+    ? { name: doc.branchName, phone: doc.branchPhone, email: doc.branchEmail }
+    : { name: branch?.name ?? '', phone: branch?.phone, email: branch?.email };
+  const person = sheet?.mode === 'view' && doc
+    ? { name: doc.patientName, code: doc.patientCode, birthDate: doc.patientBirthDate, gender: doc.patientGender }
+    : { name: patient.fullName, code: patient.patientCode, birthDate: patient.birthDate, gender: patient.gender };
+
+  return <Card title="Đơn thuốc" extra={canManage ? <Button type="primary" disabled={!context} onClick={() => open('create')}>+ Kê đơn thuốc</Button> : undefined}>
     {holder}
     {error && <Alert type="error" showIcon message={error} style={{ marginBottom: 16 }} />}
-    {editorOpen && <Typography.Title level={5}>{editing ? 'Sửa đơn thuốc' : 'Kê đơn thuốc'}</Typography.Title>}
-    {editorOpen && <Form form={form} layout="vertical" onFinish={values => void save(values)}>
-      <Form.List name="items">{(fields, { add, remove }) => <>
-        {fields.map((field, index) => <Card key={field.key} size="small" style={{ marginBottom: 12 }}>
-          <Space align="start" wrap style={{ width: '100%' }}>
-            <Form.Item name={[field.name, 'medicineId']} label="Thuốc" rules={[{ required: true, message: 'Chọn thuốc' }]} style={{ minWidth: 280 }}>
-              <Select showSearch optionFilterProp="label" placeholder="Tìm thuốc" options={medicines.map(m => ({ value: m.id, label: `${m.name}${m.strength ? ` · ${m.strength}` : ''}` }))}
-                onChange={id => { const m = medicines.find(x => x.id === id); form.setFieldValue(['items', index, 'unit'], m?.baseUnit); form.setFieldValue(['items', index, 'instructions'], m?.defaultInstructions ?? ''); }} />
-            </Form.Item>
-            <Form.Item name={[field.name, 'quantity']} label="Số lượng" rules={[{ required: true }, { type: 'integer', min: 1, max: 10000 }]}><InputNumber min={1} max={10000} precision={0} /></Form.Item>
-            <Form.Item name={[field.name, 'unit']} label="Đơn vị"><Input readOnly placeholder="Tự lấy" /></Form.Item>
-            <Form.Item name={[field.name, 'instructions']} label="Cách dùng" style={{ flex: 1, minWidth: 220 }}><Input maxLength={1000} placeholder="Ví dụ: uống sau ăn" /></Form.Item>
-            {fields.length > 1 && <Button danger style={{ marginTop: 30 }} onClick={() => remove(field.name)}>Xóa</Button>}
-          </Space>
-        </Card>)}
-        <Button onClick={() => add({ medicineId: '', quantity: 1, instructions: '' })}>+ Thêm thuốc</Button>
-      </>}</Form.List>
-      <Form.Item name="advice" label="Lời dặn (không bắt buộc)" style={{ marginTop: 16 }}><Input.TextArea rows={2} maxLength={4000} /></Form.Item>
-      <Space><Button type="primary" htmlType="submit" loading={busy}>Lưu đơn thuốc</Button><Button disabled={busy} onClick={() => { setEditing(null); setEditorOpen(false); setError(undefined); }}>Hủy</Button></Space>
-    </Form>}
-    {!editorOpen && (loading ? <Spin /> : rows.length ? <Table rowKey="id" dataSource={rows} pagination={{ pageSize: 8 }} columns={[
-      { title: 'Ngày kê', dataIndex: 'prescribedOn', render: (v: string) => new Date(`${v}T00:00:00`).toLocaleDateString('vi-VN') },
+    {loading ? <Spin /> : rows.length ? <Table rowKey="id" dataSource={rows} pagination={{ pageSize: 8 }} columns={[
+      { title: 'Ngày kê', dataIndex: 'prescribedOn', width: 110, render: (v: string) => formatDate(v) },
+      { title: 'Chẩn đoán', render: (_, row: Prescription) => [row.diagnosis, row.otherDiagnosis].filter(Boolean).join(' · ') || '—' },
       { title: 'Thuốc', render: (_, row: Prescription) => row.items.map(x => x.medicineName).join(', ') },
-      { title: 'Bác sĩ', dataIndex: 'prescriberName' },
-      { title: '', render: (_, row: Prescription) => canManage ? <Button onClick={() => start(row)}>Xem / sửa</Button> : null },
-    ]} /> : <Empty description="Chưa có đơn thuốc. Bấm Kê đơn thuốc để bắt đầu." />)}
-    {!editorOpen && rows.length > 0 && !canManage && rows.map(row => <Card key={row.id} size="small" style={{ marginTop: 12 }} title={`${row.prescribedOn} · ${row.branchName}`}>
-      <Typography.Paragraph>{row.items.map(x => `${x.medicineName}: ${x.quantity} ${x.unit}${x.instructions ? ` — ${x.instructions}` : ''}`).join('\n')}</Typography.Paragraph>
-      {row.advice && <Typography.Text>{row.advice}</Typography.Text>}
-    </Card>)}
+      { title: 'Bác sĩ kê đơn', dataIndex: 'prescriberName' },
+      { title: '', width: 150, render: (_, row: Prescription) => <Space>
+        <Button size="small" onClick={() => open('view', row)}>Xem</Button>
+        {canManage && <Button size="small" disabled={!context} onClick={() => open('edit', row)}>Sửa</Button>}
+      </Space> },
+    ]} /> : <Empty description={canManage ? 'Chưa có đơn thuốc. Bấm Kê đơn thuốc để bắt đầu.' : 'Chưa có đơn thuốc.'} />}
+
+    <Modal open={!!sheet} onCancel={close} width={780} destroyOnClose className="rx-modal" maskClosable={false}
+      title={null} footer={sheet?.mode === 'view'
+        ? <Button onClick={close}>Đóng</Button>
+        : <Space><Button disabled={busy} onClick={close}>Hủy</Button><Button type="primary" loading={busy} onClick={() => form.submit()}>Lưu đơn thuốc</Button></Space>}>
+      {sheet && (() => {
+        const multiBranch = sheet.mode !== 'view' && (context?.branches.length ?? 0) > 1;
+        const head = <header className="rx-head">
+          <div>
+            <h2 className="rx-title">ĐƠN THUỐC</h2>
+            <Tooltip title="Chưa tích hợp — hệ thống không gửi đơn ra ngoài.">
+              <span><Button size="small" className="rx-national" disabled>GỬI LÊN DONTHUOCQUOCGIA.VN</Button></span>
+            </Tooltip>
+          </div>
+          <div className="rx-clinic">
+            {multiBranch
+              ? <Form.Item name="branchId" noStyle>
+                <Select size="small" aria-label="Chi nhánh kê đơn" style={{ minWidth: 220 }} onChange={pickBranch}
+                  options={context!.branches.map(b => ({ value: b.id, label: b.name }))} />
+              </Form.Item>
+              : <strong>{header.name}</strong>}
+            {(header.phone || header.email) && <div className="rx-contact">
+              {header.phone && <span>☎ {header.phone}</span>}{header.email && <span>✉ {header.email}</span>}
+            </div>}
+          </div>
+        </header>;
+        const alert = sheetError && <Alert type="error" showIcon message={sheetError} style={{ margin: '12px 0' }} />;
+        if (sheet.mode === 'view' && doc) return <div className="rx-sheet">{head}{alert}<ReadOnlySheet doc={doc} person={person} /></div>;
+        return <Form form={form} key={doc?.id ?? 'new'} initialValues={sheet.initial} layout="horizontal" requiredMark={false}
+          onFinish={values => void save(values)} className="rx-sheet rx-form">
+          {head}{alert}
+          {!multiBranch && <Form.Item name="branchId" hidden><InputNumber /></Form.Item>}
+            <section className="rx-section">
+              <h3>BỆNH NHÂN</h3>
+              <PatientGrid person={person} />
+              <div className="rx-row"><label htmlFor="rx-diagnoses">Chẩn đoán</label>
+                <Form.Item name="diagnoses" noStyle>
+                  <Select id="rx-diagnoses" mode="tags" allowClear placeholder="Chọn hoặc nhập chẩn đoán" tokenSeparators={[';']} maxTagTextLength={60}
+                    options={diagnosisOptions.map(o => ({ value: o.name, label: o.code ? `${o.name} (${o.code})` : o.name }))} />
+                </Form.Item></div>
+              <div className="rx-row"><label htmlFor="rx-other">Chẩn đoán khác</label>
+                <Form.Item name="otherDiagnosis" noStyle rules={[{ max: 1000 }]}><Input id="rx-other" maxLength={1000} /></Form.Item></div>
+            </section>
+
+            <section className="rx-section">
+              <h3>CHỈ ĐỊNH</h3>
+              <Form.List name="items">{(fields, { add, remove }) => <div className="rx-lines">
+                {fields.map((field, index) => <div key={field.key} className="rx-line">
+                  <span className="rx-index">{index + 1}</span>
+                  <div className="rx-line-body">
+                    <div className="rx-line-top">
+                      <Form.Item name={[field.name, 'medicineId']} rules={[{ required: true, message: 'Chọn thuốc' }]} className="rx-medicine">
+                        <Select showSearch optionFilterProp="label" placeholder="Tên thuốc" aria-label={`Tên thuốc dòng ${index + 1}`} options={medicineOptions}
+                          onChange={id => {
+                            const m = medicines.find(x => x.id === id);
+                            form.setFieldValue(['items', field.name, 'unit'], m?.baseUnit);
+                            if (!form.getFieldValue(['items', field.name, 'instructions'])) form.setFieldValue(['items', field.name, 'instructions'], m?.defaultInstructions ?? '');
+                          }} />
+                      </Form.Item>
+                      <Form.Item name={[field.name, 'quantity']} rules={[{ required: true, message: 'Nhập số lượng' }, { type: 'integer', min: 1, max: 10000, message: '1–10.000' }]} className="rx-qty">
+                        <InputNumber min={1} max={10000} precision={0} placeholder="SL" aria-label={`Số lượng dòng ${index + 1}`} style={{ width: '100%' }} />
+                      </Form.Item>
+                      <Form.Item noStyle shouldUpdate>{() => <span className="rx-unit">{form.getFieldValue(['items', field.name, 'unit']) ?? ''}</span>}</Form.Item>
+                    </div>
+                    <Form.Item name={[field.name, 'instructions']} rules={[{ max: 1000 }]} className="rx-usage">
+                      <Input maxLength={1000} placeholder="Hướng dẫn sử dụng" aria-label={`Hướng dẫn sử dụng dòng ${index + 1}`} />
+                    </Form.Item>
+                  </div>
+                  <Button type="text" danger aria-label={`Xóa dòng ${index + 1}`} disabled={fields.length <= 1} onClick={() => remove(field.name)}>✕</Button>
+                </div>)}
+                <div className="rx-add">
+                  <Button className="rx-add-btn" disabled={fields.length >= 30} onClick={() => add(emptyItem())}>+ THÊM</Button>
+                </div>
+              </div>}</Form.List>
+            </section>
+
+            <section className="rx-section">
+              <h3>GHI CHÚ/LỜI DẶN</h3>
+              <Form.Item name="advice" noStyle rules={[{ max: 4000 }]}><Input.TextArea rows={3} maxLength={4000} aria-label="Ghi chú, lời dặn" /></Form.Item>
+            </section>
+
+            <section className="rx-section">
+              <h3>NGÀY &amp; BÁC SĨ KÊ ĐƠN</h3>
+              <div className="rx-grid">
+                <div className="rx-row"><label>Ngày</label>
+                  <Form.Item name="prescribedOn" noStyle rules={[{ required: true }]}>
+                    <DatePicker format="DD/MM/YYYY" allowClear={false} aria-label="Ngày kê đơn" style={{ width: '100%' }} disabledDate={d => d.isAfter(dayjs(), 'day')} />
+                  </Form.Item></div>
+                <div className="rx-row"><label>Bác sĩ</label>
+                  <Form.Item name="prescriberEmployeeId" noStyle rules={[{ required: true }]}>
+                    <Select aria-label="Bác sĩ kê đơn" style={{ width: '100%' }} options={[
+                      ...doctors.map(d => ({ value: d.employeeId, label: d.name })),
+                      ...(doc && !doctors.some(d => d.employeeId === doc.prescriberEmployeeId) ? [{ value: doc.prescriberEmployeeId, label: doc.prescriberName }] : []),
+                    ]} />
+                  </Form.Item></div>
+              </div>
+            </section>
+        </Form>;
+      })()}
+    </Modal>
   </Card>;
 }

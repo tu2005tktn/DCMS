@@ -2605,7 +2605,7 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)")
-                        .HasDefaultValue("U?ng");
+                        .HasDefaultValue("Uống");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -2857,7 +2857,7 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)")
-                        .HasDefaultValue("U?ng");
+                        .HasDefaultValue("Uống");
 
                     b.Property<int>("SortOrder")
                         .HasColumnType("integer");
@@ -3168,7 +3168,7 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)")
-                        .HasDefaultValue("l?n");
+                        .HasDefaultValue("lần");
 
                     b.HasKey("Id");
 
@@ -3783,7 +3783,7 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)")
-                        .HasDefaultValue("U?ng");
+                        .HasDefaultValue("Uống");
 
                     b.Property<string>("Strength")
                         .HasMaxLength(200)

@@ -1,5 +1,5 @@
 import { Alert, Button, Card, Empty, Spin, Tag } from 'antd';
-import { CalendarOutlined, ClockCircleOutlined, RightOutlined, UserOutlined, LinkOutlined } from '@ant-design/icons';
+import { CalendarOutlined, ClockCircleOutlined, RightOutlined, UserOutlined, LinkOutlined, MedicineBoxOutlined } from '@ant-design/icons';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ApiError } from '../../services/api';
@@ -64,7 +64,7 @@ export default function CustomerDashboard() {
   if (state.status !== 'authenticated') return null;
   return <div className="customer-dashboard">
     <div className="customer-dashboard-heading"><h1>Xin chào, {state.user.fullName}</h1>
-      <p>Đặt lịch khám, xem lịch hẹn và theo dõi liên kết hồ sơ của chính bạn.</p></div>
+      <p>Đặt lịch khám, xem lịch hẹn, đơn thuốc và theo dõi liên kết hồ sơ của chính bạn.</p></div>
     <div className="customer-dashboard-main">
       <UpcomingAppointment />
       <section className="customer-dashboard-booking" aria-labelledby="customer-dashboard-book-title">
@@ -81,6 +81,8 @@ export default function CustomerDashboard() {
           <span><strong>Người thân của tôi</strong><span>Lưu thông tin để chọn nhanh khi đặt lịch hộ.</span></span><RightOutlined aria-hidden="true" /></Link>
         <Link to="/customer/appointments" className="customer-dashboard-shortcut"><span className="customer-dashboard-shortcut-icon"><CalendarOutlined aria-hidden="true" /></span>
           <span><strong>Lịch hẹn của tôi</strong><span>Xem lịch sắp tới, lịch sử và chi tiết lịch hẹn.</span></span><RightOutlined aria-hidden="true" /></Link>
+        <Link to="/customer/prescriptions" aria-label="Đơn thuốc của tôi" className="customer-dashboard-shortcut"><span className="customer-dashboard-shortcut-icon"><MedicineBoxOutlined aria-hidden="true" /></span>
+          <span><strong>Đơn thuốc của tôi</strong><span>Xem thuốc, liều dùng và lời dặn của bác sĩ.</span></span><RightOutlined aria-hidden="true" /></Link>
         <Link to="/customer/patient-link" aria-label="Liên kết hồ sơ của tôi" className="customer-dashboard-shortcut"><span className="customer-dashboard-shortcut-icon"><LinkOutlined aria-hidden="true" /></span>
           <span><strong>Liên kết hồ sơ của tôi</strong><span>Gửi yêu cầu và theo dõi việc xác minh hồ sơ.</span></span><RightOutlined aria-hidden="true" /></Link>
       </div>

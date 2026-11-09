@@ -780,13 +780,29 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
     private async Task<PatientProfilePrescriptionDto> PatientProfileDtoAsync(PatientPrescription rx, CancellationToken ct)
     {
         var branch = await db.Set<SchedulingBranch>().AsNoTracking().SingleAsync(x => x.Id == rx.BranchId, ct);
+        var profile = await db.Set<BranchProfile>().AsNoTracking().SingleOrDefaultAsync(x => x.Id == rx.BranchId, ct);
         var employee = await db.Employees.AsNoTracking().SingleAsync(x => x.Id == rx.PrescriberEmployeeId, ct);
+        var patient = await db.Set<PatientProfile>().AsNoTracking().SingleAsync(x => x.Id == rx.PatientId, ct);
         var items = await db.Set<PatientPrescriptionItem>().AsNoTracking().Where(x => x.PrescriptionId == rx.Id)
             .OrderBy(x => x.Position).Select(x => new PatientProfilePrescriptionItemDto(x.Id, x.MedicineId, x.MedicineName,
                 x.MedicineCode, x.Strength, x.DosageForm, x.Unit, x.Quantity, x.Instructions)).ToArrayAsync(ct);
-        return new(rx.Id, rx.PatientId, rx.BranchId, branch.Name, rx.PrescribedOn, rx.Diagnosis, rx.OtherDiagnosis,
-            rx.Advice, employee.FullName, rx.Version, items);
+        return new(rx.Id, rx.PatientId, rx.BranchId, NonEmpty(profile?.Name) ?? branch.Name, rx.PrescribedOn, rx.Diagnosis, rx.OtherDiagnosis,
+            rx.Advice, employee.FullName, rx.Version, items, employee.Id, NonEmpty(profile?.Address), NonEmpty(profile?.Phone),
+            NonEmpty(profile?.Email), patient.PatientCode, patient.FullName, patient.BirthDate, patient.Gender);
     }
+
+    private static string? NonEmpty(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private DateOnly ClinicToday() => DateOnly.FromDateTime(clock.GetUtcNow().ToOffset(TimeSpan.FromHours(7)).DateTime);
+
+    // Active members allowed to examine (CanDentist) in the given branches, with an active account.
+    private async Task<PrescriptionDoctorOption[]> DoctorOptionsAsync(int[] branchIds, CancellationToken ct) =>
+        await (from m in db.Set<SchedulingMember>().AsNoTracking()
+               join e in db.Employees.AsNoTracking() on m.EmployeeId equals e.Id
+               join u in db.Users.AsNoTracking() on e.AccountId equals u.Id
+               where branchIds.Contains(m.BranchId) && m.Active && m.CanDentist && u.IsActive
+               orderby e.FullName
+               select new PrescriptionDoctorOption(e.Id, e.FullName, m.BranchId)).ToArrayAsync(ct);
 
     private async Task<PatientProfile> ReadablePatientAsync(int actor, int patientId, CancellationToken ct)
     {
@@ -803,7 +819,20 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
         var state = await access.RequireAsync(actor, "prescriptions.manage", ct);
         if (!state.Roles.Contains(AccountRoles.Dentist)) throw Fail("MSG06", 403);
         var employee = await db.Employees.AsNoTracking().SingleAsync(x => x.AccountId == actor, ct);
-        return new(state.BranchIds, employee.FullName);
+        var branchIds = state.BranchIds;
+        var schedulingBranches = await db.Set<SchedulingBranch>().AsNoTracking().Where(x => branchIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.Name, ct);
+        var profiles = await db.Set<BranchProfile>().AsNoTracking().Where(x => branchIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, ct);
+        var branches = branchIds.Where(schedulingBranches.ContainsKey).Select(id =>
+        {
+            var profile = profiles.GetValueOrDefault(id);
+            return new PrescriptionBranchOption(id, NonEmpty(profile?.Name) ?? schedulingBranches[id], NonEmpty(profile?.Address),
+                NonEmpty(profile?.Phone), NonEmpty(profile?.Email));
+        }).OrderBy(x => x.Name).ToArray();
+        var doctors = (await DoctorOptionsAsync(branchIds, ct)).ToList();
+        // The signed-in prescriber is always selectable in each of their branches, even without a CanDentist membership.
+        foreach (var branch in branches.Where(b => !doctors.Any(d => d.BranchId == b.Id && d.EmployeeId == employee.Id)))
+            doctors.Add(new PrescriptionDoctorOption(employee.Id, employee.FullName, branch.Id));
+        return new(branchIds, employee.FullName, employee.Id, branches, doctors.OrderBy(x => x.Name).ToArray());
     }
 
     public async Task<PatientProfilePrescriptionDto[]> PatientProfilePrescriptionsAsync(int actor, int patientId, CancellationToken ct)
@@ -836,6 +865,10 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
         if (c.Diagnosis?.Length > 1000 || c.OtherDiagnosis?.Length > 1000 || c.Advice?.Length > 4000)
             throw Fail("MSG04", field: "diagnosis");
         if (c.Items.Any(x => x.MedicineId == Guid.Empty || x.Quantity is < 1 or > 10000 || x.Instructions?.Length > 1000)) throw Fail("MSG04", field: "items");
+        if (c.PrescribedOn > ClinicToday() || c.PrescribedOn.Year < 2000) throw Fail("MSG04", field: "prescribedOn", label: "Ngày kê đơn");
+        var prescriberId = c.PrescriberEmployeeId ?? employee.Id;
+        if (prescriberId != employee.Id && !(await DoctorOptionsAsync([c.BranchId], ct)).Any(x => x.EmployeeId == prescriberId))
+            throw Fail("MSG04", field: "prescriberEmployeeId", label: "Bác sĩ kê đơn");
         var hash = Hash(new { op = "patient-profile.save", patientId, id, c });
         await using var tx = await BeginAsync(ct);
         var receipt = await db.Set<PatientPrescriptionReceipt>().AsNoTracking().SingleOrDefaultAsync(x => x.ActorId == actor && x.RequestKey == c.RequestKey, ct);
@@ -858,12 +891,12 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
         else
         {
             if (c.ExpectedVersion != 0) throw Fail("MSG111", 409);
-            rx = new PatientPrescription { PatientId = patient.Id, PrescriberEmployeeId = employee.Id, CreatedAt = clock.GetUtcNow() };
+            rx = new PatientPrescription { PatientId = patient.Id, PrescriberEmployeeId = prescriberId, CreatedAt = clock.GetUtcNow() };
             db.Add(rx);
         }
         var meds = await db.Set<CatalogMedicine>().AsNoTracking().Where(x => c.Items.Select(i => i.MedicineId).Contains(x.Id) && x.IsActive && x.PrescriptionEligible).ToDictionaryAsync(x => x.Id, ct);
         if (meds.Count != c.Items.Select(x => x.MedicineId).Distinct().Count()) throw Fail("MSG113", 404, "items");
-        rx.BranchId = c.BranchId; rx.PrescriberEmployeeId = employee.Id; rx.PrescribedOn = c.PrescribedOn; rx.Diagnosis = c.Diagnosis?.Trim() ?? "";
+        rx.BranchId = c.BranchId; rx.PrescriberEmployeeId = prescriberId; rx.PrescribedOn = c.PrescribedOn; rx.Diagnosis = c.Diagnosis?.Trim() ?? "";
         rx.OtherDiagnosis = c.OtherDiagnosis?.Trim(); rx.Advice = c.Advice?.Trim(); rx.UpdatedAt = clock.GetUtcNow();
         for (var index = 0; index < c.Items.Length; index++)
         {
@@ -875,7 +908,7 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
         db.Add(new PatientPrescriptionReceipt { ActorId = actor, RequestKey = c.RequestKey, Fingerprint = hash, PrescriptionId = rx.Id });
         db.Add(new PrescriptionAudit { ActorId = actor, BranchId = rx.BranchId, Action = id.HasValue ? "PatientPrescriptionUpdate" : "PatientPrescriptionCreate",
             Reason = id.HasValue ? "Cập nhật đơn tại hồ sơ bệnh nhân" : "Kê đơn tại hồ sơ bệnh nhân", BeforeJson = beforeJson,
-            AfterJson = JsonSerializer.Serialize(new { rx.Id, rx.PatientId, rx.BranchId, rx.PrescribedOn, rx.Diagnosis, rx.OtherDiagnosis, rx.Advice, Items = c.Items }, Json), At = clock.GetUtcNow() });
+            AfterJson = JsonSerializer.Serialize(new { rx.Id, rx.PatientId, rx.BranchId, rx.PrescriberEmployeeId, rx.PrescribedOn, rx.Diagnosis, rx.OtherDiagnosis, rx.Advice, Items = c.Items }, Json), At = clock.GetUtcNow() });
         await db.SaveChangesAsync(ct); await tx.CommitAsync(ct);
         return await PatientProfileDtoAsync(rx, ct);
     }
