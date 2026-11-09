@@ -3,6 +3,8 @@
 Ngày cập nhật: 07/11/2026 (bản 2 — header đơn thuốc, phiên bản điều chỉnh, migration, mobile). Trạng thái: đặc tả triển khai.
 Tài liệu liên quan: [S19-OPTIONAL-PRESCRIPTION.vi.md](S19-OPTIONAL-PRESCRIPTION.vi.md), [S58-SUPPLY-CATALOGS.md](S58-SUPPLY-CATALOGS.md), [S41-MOBILE-MEDICAL-RECORDS.md](S41-MOBILE-MEDICAL-RECORDS.md).
 
+Điều hướng web nhân viên: mục "Mẫu đơn thuốc" trong nhóm Chuyên môn mở `/prescriptions/templates`, yêu cầu quyền `prescriptions.manage` và hiển thị `PrescriptionTemplatesPage`. Tuyến này phải được khai báo trong router để menu hoạt động và bản build web thành công.
+
 ---
 
 ## 1. Nguyên tắc cốt lõi

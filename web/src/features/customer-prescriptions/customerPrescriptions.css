@@ -1,0 +1,10 @@
+.customer-prescriptions { display: grid; gap: 20px; max-width: 1080px; margin: 0 auto; }
+.customer-prescriptions .customer-page-heading { margin-bottom: 0; }
+.customer-prescriptions > .ant-btn { justify-self: start; }
+.customer-prescription-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.customer-prescription-card { height: 100%; }
+.customer-prescription-card h3 { margin: 12px 0; font-size: 19px; color: #172b4d; }
+.customer-prescription-card p { margin: 8px 0; }
+.customer-prescription-items { display: grid; gap: 12px; }
+.customer-prescription-item { border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px; }
+.customer-prescription-item p { margin: 7px 0 0; }

@@ -125,6 +125,8 @@ export default function AccountHomeScreen() {
 
       {user.accountType === 'Public' && (
         <View style={styles.linkSection}>
+          <Text style={styles.linkDescription}>Xem thuốc và lời dặn do nha sĩ kê cho hồ sơ đã xác minh.</Text>
+          <PrimaryButton label="Đơn thuốc của tôi" onPress={() => router.push('/(account)/prescriptions')} disabled={signingOut} testID="open-prescriptions" />
           <Text style={styles.linkDescription}>Xem hồ sơ y tế chính thức: kế hoạch điều trị, lịch khám và bảo hành.</Text>
           <PrimaryButton
             label="Hồ sơ y tế của tôi"

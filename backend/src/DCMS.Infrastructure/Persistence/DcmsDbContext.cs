@@ -95,6 +95,7 @@ public sealed class DcmsDbContext(DbContextOptions<DcmsDbContext> options)
         ExaminationModel.Configure(model);
         SettingsModel.Configure(model);
         FinanceModel.Configure(model);
+        FinanceSettlementModel.Configure(model);
         PrescriptionModel.Configure(model);
         TreatmentModel.Configure(model);
         SystemSettingsModel.Configure(model);

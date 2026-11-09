@@ -22,8 +22,30 @@ public sealed partial class TreatmentDossierService
         }
     }
 
-    private async Task<long> PaidForActivityAsync(Guid activityId, CancellationToken ct) =>
-        await db.Set<DossierPaymentLine>().AsNoTracking().Where(x => x.ActivityId == activityId).SumAsync(x => (long?)x.AmountVnd, ct) ?? 0;
+    private async Task<long> PaidForActivityAsync(Guid activityId, CancellationToken ct)
+    {
+        var dossier = await db.Set<DossierPaymentLine>().AsNoTracking().Where(x => x.ActivityId == activityId)
+            .SumAsync(x => (long?)x.AmountVnd, ct) ?? 0;
+        var receipt = await (from allocation in db.Set<DCMS.Domain.Features.Finance.PaymentAllocation>().AsNoTracking()
+            join payment in db.Set<DCMS.Domain.Features.Finance.PaymentReceipt>().AsNoTracking()
+                on allocation.PaymentId equals payment.Id
+            join charge in db.Set<DCMS.Domain.Features.Finance.FinanceCharge>().AsNoTracking()
+                on allocation.ChargeId equals charge.Id
+            where charge.ActivityId == activityId && payment.State == "Posted"
+            select (long?)allocation.AmountVnd).SumAsync(ct) ?? 0;
+        var advance = await (from allocation in db.Set<DCMS.Domain.Features.Finance.FinanceAdvanceAllocation>().AsNoTracking()
+            join line in db.Set<DCMS.Domain.Features.Finance.FinanceInvoiceLine>().AsNoTracking()
+                on allocation.InvoiceLineId equals line.Id
+            join charge in db.Set<DCMS.Domain.Features.Finance.FinanceCharge>().AsNoTracking()
+                on line.ChargeId equals charge.Id
+            where charge.ActivityId == activityId select (long?)allocation.AmountVnd).SumAsync(ct) ?? 0;
+        var refunded = await (from refund in db.Set<DCMS.Domain.Features.Finance.FinanceRefund>().AsNoTracking()
+            join charge in db.Set<DCMS.Domain.Features.Finance.FinanceCharge>().AsNoTracking()
+                on refund.ChargeId equals charge.Id
+            where charge.ActivityId == activityId && refund.State == "Completed"
+            select (long?)refund.AmountVnd).SumAsync(ct) ?? 0;
+        return dossier + receipt + advance - refunded;
+    }
 
     private static long ActivityCost(ActivityDto activity) => checked((long)Math.Round(activity.Quantity * activity.PriceSnapshotVnd, MidpointRounding.AwayFromZero));
 
@@ -35,6 +57,31 @@ public sealed partial class TreatmentDossierService
             db.Set<DossierPayment>().Any(p => p.Id == x.PaymentId && p.DossierId == dossierId))
             .GroupBy(x => x.ActivityId).Select(g => new { g.Key, Total = g.Sum(x => x.AmountVnd) }).ToListAsync(ct))
             .ToDictionary(x => x.Key, x => x.Total);
+        var ledgerPaid = await (from allocation in db.Set<DCMS.Domain.Features.Finance.PaymentAllocation>().AsNoTracking()
+            join receipt in db.Set<DCMS.Domain.Features.Finance.PaymentReceipt>().AsNoTracking()
+                on allocation.PaymentId equals receipt.Id
+            join charge in db.Set<DCMS.Domain.Features.Finance.FinanceCharge>().AsNoTracking()
+                on allocation.ChargeId equals charge.Id
+            where charge.DossierId == dossierId && charge.ActivityId.HasValue && receipt.State == "Posted"
+            group allocation by charge.ActivityId!.Value into g
+            select new { ActivityId = g.Key, Total = g.Sum(x => x.AmountVnd) }).ToArrayAsync(ct);
+        foreach (var row in ledgerPaid) paidByActivity[row.ActivityId] = paidByActivity.GetValueOrDefault(row.ActivityId) + row.Total;
+        var advancePaid = await (from allocation in db.Set<DCMS.Domain.Features.Finance.FinanceAdvanceAllocation>().AsNoTracking()
+            join line in db.Set<DCMS.Domain.Features.Finance.FinanceInvoiceLine>().AsNoTracking()
+                on allocation.InvoiceLineId equals line.Id
+            join charge in db.Set<DCMS.Domain.Features.Finance.FinanceCharge>().AsNoTracking()
+                on line.ChargeId equals charge.Id
+            where charge.DossierId == dossierId && charge.ActivityId.HasValue
+            group allocation by charge.ActivityId!.Value into g
+            select new { ActivityId = g.Key, Total = g.Sum(x => x.AmountVnd) }).ToArrayAsync(ct);
+        foreach (var row in advancePaid) paidByActivity[row.ActivityId] = paidByActivity.GetValueOrDefault(row.ActivityId) + row.Total;
+        var refunds = await (from refund in db.Set<DCMS.Domain.Features.Finance.FinanceRefund>().AsNoTracking()
+            join charge in db.Set<DCMS.Domain.Features.Finance.FinanceCharge>().AsNoTracking()
+                on refund.ChargeId equals charge.Id
+            where charge.DossierId == dossierId && charge.ActivityId.HasValue && refund.State == "Completed"
+            group refund by charge.ActivityId!.Value into g
+            select new { ActivityId = g.Key, Total = g.Sum(x => x.AmountVnd) }).ToArrayAsync(ct);
+        foreach (var row in refunds) paidByActivity[row.ActivityId] = paidByActivity.GetValueOrDefault(row.ActivityId) - row.Total;
         var performerIds = activities.Select(x => x.PerformerId).Distinct().ToArray();
         var names = await db.Employees.AsNoTracking().Where(x => performerIds.Contains(x.Id))
             .ToDictionaryAsync(x => x.Id, x => x.FullName, ct);

@@ -55,6 +55,12 @@ public static class ScreenEndpointPermissions
         if (p.StartsWith("/api/clinical-documents")) return Need(read ? "documents.read" : p.EndsWith("/review") ? "documents.review" : "documents.upload");
         if (p.StartsWith("/api/finance")) {
             if (p == "/api/finance/revenue") return Need("finance.revenue.read");
+            if (p == "/api/finance/overview") return Need("finance.revenue.read");
+            if (p == "/api/finance/payment-methods") return Need(read ? "finance.read" : "settings.general.manage");
+            if (p.StartsWith("/api/finance/invoices") || p.StartsWith("/api/finance/advances") ||
+                p.StartsWith("/api/finance/receivables") || p.StartsWith("/api/finance/refunds"))
+                return Need(read ? "finance.read" : p.EndsWith("/approve") || p.EndsWith("/complete") || p.EndsWith("/reject")
+                    ? "finance.payments.confirm" : "finance.payments.create");
             if (p.EndsWith("/examination-fee")) return read ? Need("finance.read") : ScreenEndpointRule.Any("finance.quotes.manage", "finance.payments.create");
             if (p == "/api/finance/providers") return Need(read ? "finance.costs.read" : "finance.costs.manage");
             if (p.Contains("/examination-services") || p.Contains("/services")) return Need(read ? "services.read" : "services.manage");

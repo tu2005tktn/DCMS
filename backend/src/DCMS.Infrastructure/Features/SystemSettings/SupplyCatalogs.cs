@@ -336,6 +336,13 @@ public sealed class MedicineCatalog(DcmsDbContext db, UserManager<ApplicationUse
     protected override string Resource => "medicines";
     protected override DbSet<CatalogMedicine> Set => Db.CatalogMedicines;
     protected override int NameMax => 200;
+    protected override IQueryable<CatalogMedicine> Filter(IQueryable<CatalogMedicine> query, string? type) => type switch
+    {
+        null => query,
+        "Clinic" => query.Where(x => x.InternalStockTracked),
+        "External" => query.Where(x => !x.InternalStockTracked),
+        _ => throw Error("MSG04", label: "Loại thuốc", field: "type")
+    };
 
     protected override Task<CatalogMedicine> NormalizeAsync(MedicineInput? input, CatalogMedicine? current, CancellationToken ct)
     {
