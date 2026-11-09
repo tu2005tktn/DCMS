@@ -2,7 +2,7 @@ import { Alert, Avatar, Button, Drawer, Layout, Menu, Typography } from 'antd';
 import type { MenuProps } from 'antd';
 import { CalendarOutlined, TeamOutlined, ScheduleOutlined, MedicineBoxOutlined, ExperimentOutlined, BarChartOutlined,
   CreditCardOutlined, SettingOutlined, UserOutlined, FileTextOutlined, AuditOutlined, InboxOutlined,
-  LinkOutlined, MenuOutlined, LogoutOutlined, CloseOutlined } from '@ant-design/icons';
+  LinkOutlined, MenuOutlined, LogoutOutlined, CloseOutlined, CustomerServiceOutlined } from '@ant-design/icons';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../features/authentication/AuthContext';
@@ -28,6 +28,8 @@ export default function StaffWorkspace() {
     { key:'/patients', title:'Bệnh nhân', icon:<TeamOutlined />, group:'Vận hành', visible:has('patients.read') },
     { key:'/working-schedules', title:'Lịch làm việc', icon:<CalendarOutlined />, group:'Vận hành', visible:has('working-schedules.read') },
     { key:'/support-inbox', title:'Hộp thư hỗ trợ', icon:<InboxOutlined />, group:'Vận hành', visible:has('appointments.support.handle') },
+    // S60: assistants and the clinic owner (docs/specs/S60-CUSTOMER-CARE-WEB.vi.md §2).
+    { key:'/customer-care', title:'Chăm sóc khách hàng', icon:<CustomerServiceOutlined />, group:'Vận hành', visible:has('care-tasks.read') && ['ClinicAssistant', 'ClinicOwner'].some(role => user?.effectiveRoles.includes(role)) },
     { key:'/treatment-templates', title:'Kế hoạch điều trị', icon:<FileTextOutlined />, group:'Chuyên môn', visible:has('treatment.templates.read') },
     { key:'/prescriptions/templates', title:'Mẫu đơn thuốc', icon:<MedicineBoxOutlined />, group:'Chuyên môn', visible:has('prescriptions.manage') },
     { key:'/materials', title:'Dụng cụ - vật liệu', icon:<ExperimentOutlined />, group:'Chuyên môn', visible:['materials.purchases.read', 'materials.stock.read', 'materials.usage.read'].some(has) },

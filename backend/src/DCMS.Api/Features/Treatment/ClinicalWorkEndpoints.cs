@@ -52,6 +52,27 @@ public static class ClinicalWorkEndpoints
         care.MapGet("/", async (HttpContext http, int branchId, DateOnly? from, DateOnly? to,
             ICareTaskService service, CancellationToken ct) => Results.Ok(await service.ListAsync(
             AuthenticationEndpoints.AccountId(http.User), branchId, from, to, ct)));
+        // S60 staff Web (docs/specs/S60-CUSTOMER-CARE-WEB.vi.md); GET routes need care-tasks.read.
+        care.MapGet("/options", async (HttpContext http, ICareTaskService service, CancellationToken ct) =>
+            Results.Ok(await service.OptionsAsync(AuthenticationEndpoints.AccountId(http.User), ct)));
+        care.MapGet("/patient-options", async (HttpContext http, int branchId, string? search,
+            ICareTaskService service, CancellationToken ct) => Results.Ok(await service.PatientOptionsAsync(
+            AuthenticationEndpoints.AccountId(http.User), branchId, search, ct)));
+        care.MapGet("/worklist", async (HttpContext http, int? branchId, DateOnly? from, DateOnly? to,
+            int? ownerAccountId, string? type, string? status, string? search, int? page, int? pageSize,
+            ICareTaskService service, CancellationToken ct) => Results.Ok(await service.WorklistAsync(
+            AuthenticationEndpoints.AccountId(http.User), new CareWorklistQuery(branchId, from, to, ownerAccountId,
+                type, status, search, page ?? 1, pageSize ?? 20), ct)));
+        care.MapGet("/export", async (HttpContext http, int? branchId, DateOnly? from, DateOnly? to,
+            int? ownerAccountId, string? type, string? status, string? search,
+            ICareTaskService service, CancellationToken ct) =>
+        {
+            var bytes = await service.ExportAsync(AuthenticationEndpoints.AccountId(http.User),
+                new CareWorklistQuery(branchId, from, to, ownerAccountId, type, status, search), ct);
+            http.Response.Headers.CacheControl = "no-store";
+            return Results.File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                $"cham-soc-khach-hang-{DateTime.UtcNow.AddHours(7):yyyyMMdd}.xlsx");
+        });
         care.MapPost("/", async (HttpContext http, CreateCareTaskRequest request,
             ICareTaskService service, CancellationToken ct) => Results.Json(await service.CreateAsync(
             AuthenticationEndpoints.AccountId(http.User), request, ct), statusCode: 201));

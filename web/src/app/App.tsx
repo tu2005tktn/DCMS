@@ -25,6 +25,7 @@ import LinkVerificationPage from '../features/patient-links/LinkVerificationPage
 import PatientSearchPage from '../features/patients/PatientSearchPage';
 import PatientProfilePage from '../features/patients/PatientProfilePage';
 import SupportInboxPage from '../features/support-inbox/SupportInboxPage';
+import CustomerCarePage from '../features/customer-care/CustomerCarePage';
 import RecoverAccountPage from '../features/recovery/RecoverAccountPage';
 import AppointmentCalendarPage from '../features/appointments/AppointmentCalendarPage';
 import AppointmentDetailPage from '../features/appointments/AppointmentDetailPage';
@@ -108,6 +109,7 @@ export default function App() {
       <Route path="appointments/:id" element={<Protected permission="appointments.read"><AppointmentDetailPage /></Protected>} />
       <Route path="link-verification" element={<Protected permission="patient-links.read"><LinkVerificationPage /></Protected>} />
       <Route path="support-inbox" element={<Protected permission="appointments.support.handle"><SupportInboxPage /></Protected>} />
+      <Route path="customer-care" element={<Protected permission="care-tasks.read"><CustomerCarePage /></Protected>} />
       <Route path="*" element={<Result status="404" title="Không tìm thấy trang" extra={<Link to="/">Về trang chủ</Link>} />} />
     </Route>
   </Routes>;
