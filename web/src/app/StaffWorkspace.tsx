@@ -34,7 +34,6 @@ export default function StaffWorkspace() {
     { key:'/lab-orders', title:'Quản lý công việc labo', icon:<ExperimentOutlined />, group:'Chuyên môn', visible:has('treatment.lab.read') },
     { key:'/clinical-services', title:'Dịch vụ cận lâm sàng', icon:<ExperimentOutlined />, group:'Chuyên môn', visible:has('services.read') },
     { key:'/medicines', title:'Quản lý thuốc', icon:<MedicineBoxOutlined />, group:'Quản trị', visible:has('catalog.medicines.read') },
-    { key:'/payments', title:'Thanh toán', icon:<CreditCardOutlined />, group:'Quản trị', visible:has('finance.read') },
     { key:'/finance/operations', title:'Tài chính và công nợ', icon:<CreditCardOutlined />, group:'Quản trị', visible:has('finance.read') },
     { key:'/work-statistics', title:'Thống kê công việc/dịch vụ', icon:<BarChartOutlined />, group:'Quản trị', visible:has('finance.work-statistics.read') },
     { key:'/revenue', title:'Doanh thu', icon:<BarChartOutlined />, group:'Quản trị', visible:has('finance.revenue.read') },
@@ -46,7 +45,7 @@ export default function StaffWorkspace() {
   const visible = links.filter(x=>x.visible);
   const path = location.pathname;
   const selected = visible.find(x=>path===x.key || path.startsWith(x.key+'/'))?.key
-    ?? (path.startsWith('/visits/') ? (path.endsWith('/payments') ? '/payments' : '/reception') : '/');
+    ?? (path.startsWith('/visits/') ? (path.endsWith('/payments') ? '/patients' : '/reception') : '/');
   const title = visible.find(x=>x.key===selected)?.title ?? 'Tài khoản của tôi';
   const items: MenuProps['items'] = ['Vận hành','Chuyên môn','Quản trị'].flatMap(group=> {
     const children = visible.filter(x=>x.group===group).map(x=>({key:x.key,icon:x.icon,label:<Link aria-label={x.title} title={x.title} to={x.key}>{x.title}</Link>}));

@@ -1,5 +1,11 @@
 # Đề xuất tích hợp doanh thu, công nợ, nhận trước và hoàn tiền — 09/11/2026
 
+## Điều chỉnh điểm vào theo phiếu điều trị
+
+Nhân viên bắt đầu từ hồ sơ bệnh nhân, tab **Điều trị & Thanh toán**. Tại mỗi phiếu, khu vực cuối quá trình điều trị hiển thị số dư nhận trước của chính phiếu, nút **TRẢ TIỀN...**, **NHẬN TRƯỚC...** và **LỊCH SỬ**. Thu tiền cho việc đã làm vẫn dùng API dossier và bill PayOS tại chỗ; nhận tiền mặt trước dùng API `POST /api/finance/advances` với `patientId`, `branchId`, `dossierId` lấy từ phiếu, không nhập mã thủ công. Lịch sử hiển thị riêng giao dịch đã thu cho từng việc và các khoản nhận trước, số đã phân bổ, số còn lại. Nhận trước chưa phân bổ không làm giảm nợ dịch vụ hay tăng doanh thu thực hiện. Việc phân bổ khoản nhận trước vào dịch vụ, hoàn tiền và đối chiếu hóa đơn vẫn cần hoàn thiện trong chính luồng này; không được coi các thao tác đó là đã giải quyết chỉ vì có màn Tài chính riêng.
+
+Nhận trước còn hỗ trợ **chuyển khoản PayOS** tại chính hộp thoại này. Server tạo phiếu thu Pending, trả QR và bill, tự đối chiếu PayOS bằng webhook/polling rồi chuyển Posted một lần khi đúng số tiền. Trong thời gian chờ, số dư khả dụng là 0; lệnh hủy/hết hạn/lỗi liên kết hủy phiếu Pending; lệnh sai dữ liệu cần đối soát. Xem hợp đồng chi tiết tại [TREATMENT-DOSSIER-PAYMENTS.md](TREATMENT-DOSSIER-PAYMENTS.md).
+
 Trạng thái: đang triển khai; phần đã hiện thực và phần còn thiếu được ghi ở mục 8. Phạm vi không gồm thuế.
 
 ## 1. Hiện trạng đã kiểm tra trong mã nguồn

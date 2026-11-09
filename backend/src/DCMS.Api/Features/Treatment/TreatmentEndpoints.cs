@@ -73,6 +73,18 @@ public static class TreatmentEndpoints
         dossier.MapGet("/payos-orders/{orderId:guid}", async (HttpContext context, Guid dossierId, Guid orderId,
             IPayOsOrderService service, CancellationToken ct) => Results.Ok(await service.GetAsync(
                 AuthenticationEndpoints.AccountId(context.User), dossierId, orderId, ct)));
+        dossier.MapPost("/advance-payos-orders", async (HttpContext context, Guid dossierId, CreateAdvancePayOsOrderRequest request,
+            IPayOsOrderService service, CancellationToken ct) => Results.Ok(await service.CreateAdvanceAsync(
+                AuthenticationEndpoints.AccountId(context.User), dossierId, request, ct)));
+        dossier.MapGet("/advance-payos-orders/active", async (HttpContext context, Guid dossierId,
+            IPayOsOrderService service, CancellationToken ct) =>
+        {
+            var order = await service.ActiveAdvanceAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, ct);
+            return order is null ? Results.Text("null", "application/json") : Results.Json(order);
+        });
+        dossier.MapGet("/advance-payos-orders/{orderId:guid}", async (HttpContext context, Guid dossierId, Guid orderId,
+            IPayOsOrderService service, CancellationToken ct) => Results.Ok(await service.GetAdvanceAsync(
+                AuthenticationEndpoints.AccountId(context.User), dossierId, orderId, ct)));
         dossier.MapGet("/activities", async (HttpContext context, Guid dossierId, Guid? visitId, DateOnly? from, DateOnly? to,
             int? page, int? pageSize, ITreatmentDossierService service, CancellationToken ct) => Results.Ok(await service.ActivitiesAsync(
                 AuthenticationEndpoints.AccountId(context.User), dossierId, visitId, from, to, page ?? 1, pageSize ?? 20, ct)));

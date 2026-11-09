@@ -80,7 +80,7 @@ export default function App() {
       <Route path="settings/:section" element={<Protected permission={['settings.read','treatment.prices.read','treatment.commercial.read']}><SystemSettingsPage /></Protected>} />
       <Route path="lab-orders" element={<Protected permission="treatment.lab.read"><LabWorkPage /></Protected>} />
       <Route path="materials" element={<Protected permission={['materials.purchases.read', 'materials.stock.read', 'materials.usage.read']}><MaterialsPage /></Protected>} />
-      <Route path="payments" element={<Protected permission="finance.read"><PaymentsPage /></Protected>} />
+      <Route path="payments" element={<Navigate to="/patients" replace />} />
       <Route path="work-statistics" element={<Protected permission="finance.work-statistics.read"><WorkStatisticsPage /></Protected>} />
       <Route path="revenue" element={<Protected permission="finance.revenue.read"><RevenuePage /></Protected>} />
       <Route path="finance/operations" element={<Protected permission="finance.read"><FinanceOperationsPage /></Protected>} />

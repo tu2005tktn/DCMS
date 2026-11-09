@@ -4,6 +4,8 @@ using System.Text;
 using System.Text.Json;
 using DCMS.Application.Common;
 using DCMS.Application.Features.Treatment;
+using DCMS.Application.Features.Finance;
+using DCMS.Domain.Features.Finance;
 using DCMS.Domain.Features.Treatment;
 using DCMS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -11,7 +13,7 @@ using Microsoft.EntityFrameworkCore;
 namespace DCMS.Infrastructure.Features.Treatment;
 
 public sealed class PayOsOrderService(DcmsDbContext db, ITreatmentDossierService dossiers,
-    PayOsGateway gateway, TimeProvider clock, DCMS.Application.Features.Settings.ISettingsAccess access) : IPayOsOrderService
+    IFinanceSettlementService settlements, PayOsGateway gateway, TimeProvider clock, DCMS.Application.Features.Settings.ISettingsAccess access) : IPayOsOrderService
 {
     private static BusinessException Bad() => new(400, SystemMessages.Get("MSG04"));
     private static BusinessException Conflict() => new(409, SystemMessages.Get("MSG111"));
@@ -25,7 +27,7 @@ public sealed class PayOsOrderService(DcmsDbContext db, ITreatmentDossierService
     public async Task<PayOsOrderDto?> ActiveAsync(int actorId, Guid dossierId, CancellationToken ct)
     {
         await dossiers.GetAsync(actorId, dossierId, ct);
-        var id = await db.DossierPayOsOrders.AsNoTracking().Where(x => x.DossierId == dossierId
+        var id = await db.DossierPayOsOrders.AsNoTracking().Where(x => x.DossierId == dossierId && x.Purpose == "Treatment"
             && (x.State == "Creating" || x.State == "Pending" || x.State == "Review"))
             .Select(x => (Guid?)x.Id).SingleOrDefaultAsync(ct);
         if (!id.HasValue) return null;
@@ -46,7 +48,7 @@ public sealed class PayOsOrderService(DcmsDbContext db, ITreatmentDossierService
         if (request.PaidOn > today || request.PaidOn.Year < 2000) throw Bad();
         var fingerprint = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(
             new { request.PaidOn, request.CollectorId, request.Note, request.Lines }, Json))));
-        var pending = await db.DossierPayOsOrders.AsNoTracking().Where(x => x.DossierId == dossierId
+        var pending = await db.DossierPayOsOrders.AsNoTracking().Where(x => x.DossierId == dossierId && x.Purpose == "Treatment"
             && x.State == "Pending").Select(x => (Guid?)x.Id).SingleOrDefaultAsync(ct);
         if (pending.HasValue) await GetAsync(actorId, dossierId, pending.Value, ct);
         // The same lock as dossier payment writes makes pending-order creation and balance checks serial.
@@ -57,12 +59,12 @@ public sealed class PayOsOrderService(DcmsDbContext db, ITreatmentDossierService
             .SingleOrDefaultAsync(x => x.RequestKey == request.RequestKey, ct);
         if (old != null)
         {
-            if (old.CreatedBy != actorId || old.DossierId != dossierId || old.Fingerprint != fingerprint) throw Conflict();
+            if (old.CreatedBy != actorId || old.DossierId != dossierId || old.Purpose != "Treatment" || old.Fingerprint != fingerprint) throw Conflict();
             if (old.State == "LinkError") throw new BusinessException(503,
                 new SystemMessage("PAYOS_LINK_FAILED", "Không tạo được QR PayOS. Vui lòng thử lại."));
             return Dto(old);
         }
-        var active = await db.DossierPayOsOrders.AsNoTracking().Include(x => x.Lines).SingleOrDefaultAsync(x => x.DossierId == dossierId
+        var active = await db.DossierPayOsOrders.AsNoTracking().Include(x => x.Lines).SingleOrDefaultAsync(x => x.DossierId == dossierId && x.Purpose == "Treatment"
             && (x.State == "Creating" || x.State == "Pending" || x.State == "Review"), ct);
         if (active != null)
         {
@@ -106,18 +108,95 @@ public sealed class PayOsOrderService(DcmsDbContext db, ITreatmentDossierService
         }
         catch
         {
-            order.State = "LinkError"; order.UpdatedAt = clock.GetUtcNow();
-            await db.SaveChangesAsync(ct);
+            await CloseAsync(order.Id, "LinkError", ct);
             throw;
         }
+    }
+
+    public async Task<PayOsOrderDto?> ActiveAdvanceAsync(int actorId, Guid dossierId, CancellationToken ct)
+    {
+        await dossiers.GetAsync(actorId, dossierId, ct);
+        var order = await db.DossierPayOsOrders.AsNoTracking().Where(x => x.DossierId == dossierId && x.Purpose == "Advance"
+            && (x.State == "Creating" || x.State == "Pending" || x.State == "Review"))
+            .Select(x => (Guid?)x.Id).SingleOrDefaultAsync(ct);
+        return order.HasValue ? await GetAdvanceAsync(actorId, dossierId, order.Value, ct) : null;
+    }
+
+    public async Task<PayOsOrderDto> CreateAdvanceAsync(int actorId, Guid dossierId, CreateAdvancePayOsOrderRequest request, CancellationToken ct)
+    {
+        await access.RequireAsync(actorId, "finance.payos.create", ct);
+        var dossier = await dossiers.GetAsync(actorId, dossierId, ct);
+        if (request.RequestKey == Guid.Empty || request.Kind is not ("Deposit" or "ServiceAdvance")
+            || request.AmountVnd is < 1 or > 2_000_000_000 || string.IsNullOrWhiteSpace(request.Payer)
+            || request.Payer.Length > 160 || request.Note?.Length > 1000) throw Bad();
+        var fingerprint = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(request, Json))));
+        var old = await db.DossierPayOsOrders.AsNoTracking().Include(x => x.Lines)
+            .SingleOrDefaultAsync(x => x.RequestKey == request.RequestKey, ct);
+        if (old != null)
+        {
+            if (old.CreatedBy != actorId || old.DossierId != dossierId || old.Purpose != "Advance" || old.Fingerprint != fingerprint) throw Conflict();
+            if (old.State == "LinkError") throw new BusinessException(503,
+                new SystemMessage("PAYOS_LINK_FAILED", "Không tạo được QR PayOS. Vui lòng thử lại."));
+            return Dto(old);
+        }
+        if (await db.DossierPayOsOrders.AnyAsync(x => x.DossierId == dossierId && x.Purpose == "Advance"
+            && (x.State == "Creating" || x.State == "Pending" || x.State == "Review"), ct)) throw Conflict();
+        var now = clock.GetUtcNow();
+        var order = new DossierPayOsOrder
+        {
+            DossierId = dossierId, PatientId = dossier.PatientId, BranchId = dossier.BranchId,
+            Purpose = "Advance", RequestKey = request.RequestKey, Fingerprint = fingerprint,
+            OrderCode = now.ToUnixTimeMilliseconds() * 1000 + RandomNumberGenerator.GetInt32(1000),
+            AmountVnd = request.AmountVnd,
+            PaidOn = DateOnly.FromDateTime(now.ToOffset(TimeSpan.FromHours(7)).DateTime),
+            CreatedBy = actorId, Note = request.Note?.Trim(), CreatedAt = now, UpdatedAt = now,
+            ExpiresAt = now.AddMinutes(30)
+        };
+        db.DossierPayOsOrders.Add(order);
+        try { await db.SaveChangesAsync(ct); }
+        catch (DbUpdateException) { throw Conflict(); }
+        try
+        {
+            var advance = await settlements.CreateAdvanceAsync(actorId, new CreateAdvance(request.RequestKey,
+                dossier.PatientId, dossier.BranchId, dossierId, request.Kind, "Transfer", request.AmountVnd,
+                request.Payer.Trim(), request.Note?.Trim()), ct);
+            order.AdvanceId = advance.Id;
+            await db.SaveChangesAsync(ct);
+            var link = await gateway.CreateAsync(order.OrderCode, order.AmountVnd,
+                $"C{order.OrderCode % 100_000_000:00000000}", order.PatientId, dossierId, order.ExpiresAt, ct);
+            order.PaymentLinkId = link.PaymentLinkId; order.QrCode = link.QrCode;
+            order.BankBin = link.BankBin; order.AccountNumber = link.AccountNumber; order.AccountName = link.AccountName;
+            order.State = "Pending"; order.UpdatedAt = clock.GetUtcNow();
+            await db.SaveChangesAsync(ct);
+            return Dto(order);
+        }
+        catch
+        {
+            await CloseAsync(order.Id, "LinkError", ct);
+            throw;
+        }
+    }
+
+    public async Task<PayOsOrderDto> GetAdvanceAsync(int actorId, Guid dossierId, Guid orderId, CancellationToken ct)
+    {
+        await dossiers.GetAsync(actorId, dossierId, ct);
+        var order = await db.DossierPayOsOrders.Include(x => x.Lines)
+            .SingleOrDefaultAsync(x => x.Id == orderId && x.DossierId == dossierId && x.Purpose == "Advance", ct)
+            ?? throw Missing();
+        return await RefreshAsync(order, ct);
     }
 
     public async Task<PayOsOrderDto> GetAsync(int actorId, Guid dossierId, Guid orderId, CancellationToken ct)
     {
         await dossiers.GetAsync(actorId, dossierId, ct);
         var order = await db.DossierPayOsOrders.Include(x => x.Lines)
-            .SingleOrDefaultAsync(x => x.Id == orderId && x.DossierId == dossierId, ct)
+            .SingleOrDefaultAsync(x => x.Id == orderId && x.DossierId == dossierId && x.Purpose == "Treatment", ct)
             ?? throw Missing();
+        return await RefreshAsync(order, ct);
+    }
+
+    private async Task<PayOsOrderDto> RefreshAsync(DossierPayOsOrder order, CancellationToken ct)
+    {
         if (order.State == "Creating" && clock.GetUtcNow() - order.CreatedAt > TimeSpan.FromMinutes(3))
         {
             await CloseAsync(order.Id, "LinkError", ct);
@@ -181,6 +260,38 @@ public sealed class PayOsOrderService(DcmsDbContext db, ITreatmentDossierService
         await db.Entry(order).ReloadAsync(ct);
         if (order.State == "Paid") return;
         if (order.State != "Pending") return;
+        if (order.Purpose == "Advance")
+        {
+            if (!order.AdvanceId.HasValue) { order.State = "Review"; await db.SaveChangesAsync(ct); await tx.CommitAsync(ct); return; }
+            var advance = await db.Set<FinanceAdvance>().SingleOrDefaultAsync(x => x.Id == order.AdvanceId.Value, ct);
+            var receipt = advance == null ? null : await db.Set<PaymentReceipt>().SingleOrDefaultAsync(x => x.Id == advance.PaymentId, ct);
+            if (advance == null || receipt == null || receipt.State != "Pending" || receipt.Purpose != "Advance"
+                || receipt.Method != "Transfer" || receipt.AmountVnd != order.AmountVnd
+                || receipt.PatientId != order.PatientId || receipt.BranchId != order.BranchId)
+            {
+                order.State = "Review"; order.UpdatedAt = clock.GetUtcNow();
+                await db.SaveChangesAsync(ct); await tx.CommitAsync(ct); return;
+            }
+            var normalizedReference = bankReference?.Trim().ToUpperInvariant();
+            if (normalizedReference != null && await db.Set<PaymentReceipt>().AnyAsync(x =>
+                x.BranchId == order.BranchId && x.NormalizedBankReference == normalizedReference && x.Id != receipt.Id, ct))
+            {
+                order.State = "Review"; order.UpdatedAt = clock.GetUtcNow();
+                await db.SaveChangesAsync(ct); await tx.CommitAsync(ct); return;
+            }
+            var nowAdvance = clock.GetUtcNow();
+            var seq = await db.Set<BranchReceiptSequence>().SingleOrDefaultAsync(x => x.BranchId == order.BranchId, ct);
+            if (seq == null) { seq = new BranchReceiptSequence { BranchId = order.BranchId }; db.Add(seq); }
+            receipt.Number = $"PT-{order.BranchId}-{seq.NextNumber++:D8}";
+            receipt.State = "Posted"; receipt.ConfirmedAt = nowAdvance; receipt.ConfirmedBy = order.CreatedBy;
+            receipt.BankReference = bankReference;
+            receipt.NormalizedBankReference = normalizedReference;
+            receipt.Version++;
+            var account = await db.Set<FinancialAccount>().SingleAsync(x => x.PatientId == order.PatientId && x.BranchId == order.BranchId, ct);
+            account.Version++;
+            order.BankReference = bankReference; order.State = "Paid"; order.UpdatedAt = nowAdvance;
+            await db.SaveChangesAsync(ct); await tx.CommitAsync(ct); return;
+        }
         DossierPaymentContext context;
         try { context = await dossiers.PaymentContextAsync(order.CreatedBy, order.DossierId, ct); }
         catch (BusinessException) { order.State = "Review"; await db.SaveChangesAsync(ct); await tx.CommitAsync(ct); return; }
@@ -214,6 +325,17 @@ public sealed class PayOsOrderService(DcmsDbContext db, ITreatmentDossierService
         await db.Entry(order).ReloadAsync(ct);
         if (order.State == "Pending" || order.State == "Creating" && state == "LinkError")
         {
+            if (order.Purpose == "Advance" && order.AdvanceId.HasValue && state is ("LinkError" or "Expired" or "Cancelled"))
+            {
+                var advance = await db.Set<FinanceAdvance>().SingleAsync(x => x.Id == order.AdvanceId.Value, ct);
+                var receipt = await db.Set<PaymentReceipt>().SingleAsync(x => x.Id == advance.PaymentId, ct);
+                if (receipt.State == "Pending")
+                {
+                    receipt.State = "Cancelled"; receipt.CancellationReason = $"PayOS {state}"; receipt.Version++;
+                    var account = await db.Set<FinancialAccount>().SingleAsync(x => x.PatientId == order.PatientId && x.BranchId == order.BranchId, ct);
+                    account.Version++;
+                }
+            }
             order.State = state; order.UpdatedAt = clock.GetUtcNow();
             await db.SaveChangesAsync(ct); await tx.CommitAsync(ct);
         }

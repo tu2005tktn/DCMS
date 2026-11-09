@@ -4,6 +4,8 @@ public sealed class DossierPayOsOrder
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid DossierId { get; set; }
+    public string Purpose { get; set; } = "Treatment";
+    public Guid? AdvanceId { get; set; }
     public int PatientId { get; set; }
     public int BranchId { get; set; }
     public Guid RequestKey { get; set; }

@@ -23,14 +23,16 @@ public sealed class PayOsOrderWorker(IServiceScopeFactory scopes, ILogger<PayOsO
                     var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
                     var orders = await db.DossierPayOsOrders.AsNoTracking().Where(x => x.State == "Pending")
                         .OrderBy(x => x.CreatedAt).Take(30)
-                        .Select(x => new { x.Id, x.DossierId, x.CreatedBy }).ToArrayAsync(stoppingToken);
+                        .Select(x => new { x.Id, x.DossierId, x.CreatedBy, x.Purpose }).ToArrayAsync(stoppingToken);
                     foreach (var order in orders)
                     {
                         try
                         {
                             using var itemScope = scopes.CreateScope();
-                            await itemScope.ServiceProvider.GetRequiredService<IPayOsOrderService>()
-                                .GetAsync(order.CreatedBy, order.DossierId, order.Id, stoppingToken);
+                            var service = itemScope.ServiceProvider.GetRequiredService<IPayOsOrderService>();
+                            if (order.Purpose == "Advance")
+                                await service.GetAdvanceAsync(order.CreatedBy, order.DossierId, order.Id, stoppingToken);
+                            else await service.GetAsync(order.CreatedBy, order.DossierId, order.Id, stoppingToken);
                         }
                         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { return; }
                         catch (Exception ex) { logger.LogWarning(ex, "PayOS reconciliation failed for order {OrderId}", order.Id); }
