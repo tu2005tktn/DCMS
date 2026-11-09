@@ -5101,6 +5101,9 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)");
 
+                    b.Property<Guid?>("AdvanceId")
+                        .HasColumnType("uuid");
+
                     b.Property<long>("AmountVnd")
                         .HasColumnType("bigint");
 
@@ -5155,6 +5158,13 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<string>("Purpose")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Treatment");
+
                     b.Property<string>("QrCode")
                         .HasColumnType("text");
 
@@ -5171,10 +5181,7 @@ namespace DCMS.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("DossierId")
-                        .IsUnique()
-                        .HasDatabaseName("IX_TREATMENT_PAYOS_ORDER_ActiveDossier")
-                        .HasFilter("\"State\" IN ('Creating','Pending','Review')");
+                    b.HasIndex("AdvanceId");
 
                     b.HasIndex("OrderCode")
                         .IsUnique();
@@ -5187,6 +5194,11 @@ namespace DCMS.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("RequestKey")
                         .IsUnique();
+
+                    b.HasIndex("DossierId", "Purpose")
+                        .IsUnique()
+                        .HasDatabaseName("IX_TREATMENT_PAYOS_ORDER_ActiveDossierPurpose")
+                        .HasFilter("\"State\" IN ('Creating','Pending','Review')");
 
                     b.ToTable("TREATMENT_PAYOS_ORDER", null, t =>
                         {
@@ -8069,6 +8081,11 @@ namespace DCMS.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("DCMS.Domain.Features.Treatment.DossierPayOsOrder", b =>
                 {
+                    b.HasOne("DCMS.Domain.Features.Finance.FinanceAdvance", null)
+                        .WithMany()
+                        .HasForeignKey("AdvanceId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("DCMS.Domain.Features.Treatment.TreatmentDossier", null)
                         .WithMany()
                         .HasForeignKey("DossierId")

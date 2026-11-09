@@ -2,7 +2,6 @@ import ExaminationServiceCatalog from './ExaminationServiceCatalog';
 import './finance.css';
 ﻿import {Alert,Button,Card,Form,Input,InputNumber,Modal,Select,Space,Table,Tag,Typography} from 'antd';
 import {useEffect,useRef,useState} from 'react';
-import {Link} from 'react-router-dom';
 import {api} from '../../services/api';
 import {type Capabilities,type Service,type Provider,kinds,money} from './types';
 import { useCanPickBranch } from '../authentication/useCanPickBranch';
@@ -19,7 +18,7 @@ export default function ClinicalServicesPage(){
  const payload=provider?{code:v.code,name:v.name}:{branchId:branch,name:v.name,kind:v.kind,unit:v.unit,priceVnd:v.price??null,expectedVersion:edit?.version??0,active:v.active};const body=JSON.stringify(payload);if(pending.current?.body!==body)pending.current={body,key:crypto.randomUUID()};setBusy(true);setError(undefined);
  try{await api(provider?'/api/finance/providers':`/api/finance/services${edit?`/${edit.id}`:''}`,{method:provider||!edit?'POST':'PUT',body:JSON.stringify({...payload,requestKey:pending.current.key})});pending.current=undefined;if(provider){setProviderOpen(false);setProviders(await api<Provider[]>('/api/finance/providers'));}else{setEdit(undefined);await load();}}
  catch(e){setError((e as Error).message);}finally{setBusy(false);}}
- return <main className="finance-page"><Space wrap><Typography.Title level={2}>Dịch vụ khám & cận lâm sàng</Typography.Title><Link to="/payments">Thanh toán</Link></Space>
+ return <main className="finance-page"><Space wrap><Typography.Title level={2}>Dịch vụ khám & cận lâm sàng</Typography.Title></Space>
  {error&&<Alert role="alert" type="error" message={error}/>}
  <Space style={{marginBottom:16}}>{canPickBranch && (cap?.branches.length??0)>1&&<Select aria-label="Chi nhánh dịch vụ" style={{minWidth:220}} disabled={busy||edit!==undefined} value={branch} onChange={setBranch} options={cap?.branches.map(x=>({value:x.id,label:x.name}))}/>}{can('services.manage')&&<Button type="primary" disabled={!branch||busy} onClick={()=>open(null)}>Thêm dịch vụ</Button>}<Button disabled={busy} onClick={()=>void load().catch(e=>setError((e as Error).message))}>Tải lại danh mục</Button></Space>
  <ExaminationServiceCatalog branchId={branch} canManage={!!can('services.manage')}/>

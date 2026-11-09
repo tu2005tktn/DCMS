@@ -286,7 +286,7 @@ export default function TreatmentSheet({ patientId, dossierId, dossierVersion, o
       {(activities?.total ?? 0) > 20 && <Pagination current={page} total={activities?.total} pageSize={20} onChange={setPage} />}
       <div className="treatment-sheet-payment"><p><strong>Đã trả:</strong> {money(paid)}</p>
         <p><strong>Còn nợ:</strong> {money(owed)}</p>
-        {has('finance.read') && <DossierFinancialPanel dossierId={dossierId} onChanged={refresh} />}</div></section>
+        {has('finance.read') && <DossierFinancialPanel dossierId={dossierId} patientId={patientId} branchId={dossier.branchId} patientName={payments?.patientName ?? ''} onChanged={refresh} />}</div></section>
     <section className="treatment-sheet-images"><h3 className="treatment-sheet-section-title">HÌNH ẢNH</h3>{has('documents.read') && <PatientImageGallery patientId={patientId} dossierId={dossierId} canUpload={has('documents.upload')} />}</section>
     <section className="treatment-sheet-notes"><h3 className="treatment-sheet-minor-heading">GHI CHÚ</h3><Input.TextArea aria-label="Ghi chú hồ sơ" value={note} maxLength={4000} disabled={!has('treatment.dossiers.update') || !canWrite || noteBusy}
       onChange={e => { setNote(e.target.value); noteDirty.current = e.target.value !== noteSaved.current; }} /><Button size="small" loading={noteBusy} disabled={!has('treatment.dossiers.update') || !canWrite || note === noteSaved.current} onClick={() => void saveNote()}>Lưu ghi chú</Button>{noteError && <Alert type="error" message={noteError} />}</section>

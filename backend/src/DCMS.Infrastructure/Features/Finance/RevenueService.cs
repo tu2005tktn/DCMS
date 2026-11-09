@@ -53,7 +53,7 @@ public sealed class RevenueService(DcmsDbContext db, ISettingsAccess access, Tim
             .SumAsync(x => (long?)x.AmountVnd, ct) ?? 0;
         var payOsTableReady = await db.Database.SqlQueryRaw<bool>("SELECT to_regclass('\"TREATMENT_PAYOS_ORDER\"') IS NOT NULL AS \"Value\"").SingleAsync(ct);
         var pendingPayOs = payOsTableReady ? await db.Set<DossierPayOsOrder>().AsNoTracking()
-            .Where(x => branches.Contains(x.BranchId) && x.State == "Pending" && x.CreatedAt >= lower && x.CreatedAt < upper)
+            .Where(x => branches.Contains(x.BranchId) && x.Purpose == "Treatment" && x.State == "Pending" && x.CreatedAt >= lower && x.CreatedAt < upper)
             .SumAsync(x => (long?)x.AmountVnd, ct) ?? 0 : 0;
         var cash = items.Where(x => x.Method == "Cash").Sum(x => x.AmountVnd);
         var transfer = items.Where(x => x.Method == "Transfer").Sum(x => x.AmountVnd);

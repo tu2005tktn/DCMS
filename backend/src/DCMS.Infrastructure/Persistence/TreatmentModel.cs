@@ -224,8 +224,10 @@ internal static class TreatmentModel
             b.HasIndex(x => x.OrderCode).IsUnique();
             b.HasIndex(x => x.RequestKey).IsUnique();
             b.HasIndex(x => x.PaymentLinkId).IsUnique().HasFilter("\"PaymentLinkId\" IS NOT NULL");
-            b.HasIndex(x => x.DossierId).IsUnique().HasDatabaseName("IX_TREATMENT_PAYOS_ORDER_ActiveDossier")
+            b.HasIndex(x => new { x.DossierId, x.Purpose }).IsUnique().HasDatabaseName("IX_TREATMENT_PAYOS_ORDER_ActiveDossierPurpose")
                 .HasFilter("\"State\" IN ('Creating','Pending','Review')");
+            b.Property(x => x.Purpose).HasMaxLength(20).HasDefaultValue("Treatment");
+            b.HasOne<DCMS.Domain.Features.Finance.FinanceAdvance>().WithMany().HasForeignKey(x => x.AdvanceId).OnDelete(DeleteBehavior.Restrict);
             b.Property(x => x.Fingerprint).HasMaxLength(64);
             b.Property(x => x.State).HasMaxLength(20);
             b.Property(x => x.PaymentLinkId).HasMaxLength(100);

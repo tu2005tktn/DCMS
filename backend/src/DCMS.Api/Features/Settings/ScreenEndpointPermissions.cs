@@ -89,6 +89,7 @@ public static class ScreenEndpointPermissions
         if (p.StartsWith("/api/follow-up-instructions")) return Need(read ? "treatment.read" : "treatment.progress.manage");
         if (p.StartsWith("/api/lab-orders")) return Need(read ? "treatment.lab.read" : "treatment.lab.track");
         if (p.StartsWith("/api/dossiers")) {
+            if (p.Contains("/advance-payos-orders")) return Need(read ? "finance.read" : "finance.payos.create");
             if (p.Contains("/payos-orders")) return Need(read ? "finance.read" : "finance.payos.create");
             if (p.Contains("/payments")) return Need(read ? "finance.read" : "finance.payments.create");
             if (p.EndsWith("/sheet-items/from-item-plan")) return Need("treatment.items.create");
