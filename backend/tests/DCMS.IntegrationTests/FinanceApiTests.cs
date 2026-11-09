@@ -186,4 +186,235 @@ public sealed class FinanceApiTests(ReceptionFixture fixture) : IClassFixture<Re
         }
     }
 
+    [Fact]
+    public async Task InvoiceCanUseAdvanceAndMultiplePaymentMethodsWithoutDoubleCollection()
+    {
+        var (visit, _, dentist, _) = await Performed();
+        using (dentist) using (var cashier = await reception.Login()) using (var owner = await reception.Login("owner.demo"))
+        {
+            var bill = (await cashier.GetFromJsonAsync<BillDto>(Bill(visit.VisitId)))!;
+            var charge = Assert.Single(bill.Charges);
+            var localDay = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(fixture.Clock.Now,
+                TimeZoneInfo.FindSystemTimeZoneById("Asia/Ho_Chi_Minh")).DateTime);
+            var issue = new IssueInvoice(Guid.NewGuid(), visit.PatientId, visit.BranchId, localDay,
+                localDay.AddDays(7), [charge.Id]);
+            var invoice = await Ok<InvoiceDto>(await cashier.PostAsJsonAsync("/api/finance/invoices", issue));
+            Assert.Equal(200000, invoice.OutstandingVnd);
+            Assert.Equal(invoice.Id, (await Ok<InvoiceDto>(await cashier.PostAsJsonAsync("/api/finance/invoices", issue))).Id);
+
+            var advanceCommand = new CreateAdvance(Guid.NewGuid(), visit.PatientId, visit.BranchId,
+                null, "ServiceAdvance", "Cash", 100000, "SYNTHETIC payer", null);
+            var advance = await Ok<AdvanceDto>(await cashier.PostAsJsonAsync("/api/finance/advances", advanceCommand));
+            Assert.Equal("Posted", advance.PaymentState);
+            Assert.Equal(advance.Id, (await Ok<AdvanceDto>(await cashier.PostAsJsonAsync("/api/finance/advances", advanceCommand))).Id);
+            var apply = new ApplyAdvance(Guid.NewGuid(), invoice.Lines[0].Id, 80000, advance.Version);
+            advance = await Ok<AdvanceDto>(await cashier.PostAsJsonAsync($"/api/finance/advances/{advance.Id}/allocations", apply));
+            Assert.Equal(20000, advance.AvailableVnd);
+            Assert.Equal(HttpStatusCode.Conflict, (await cashier.PostAsJsonAsync($"/api/finance/advances/{advance.Id}/allocations",
+                new ApplyAdvance(Guid.NewGuid(), invoice.Lines[0].Id, 30000, advance.Version))).StatusCode);
+
+            invoice = (await cashier.GetFromJsonAsync<InvoiceDto>($"/api/finance/invoices/{invoice.Id}"))!;
+            Assert.Equal(120000, invoice.OutstandingVnd);
+            var cash = await Ok<PaymentDto>(await cashier.PostAsJsonAsync($"/api/finance/invoices/{invoice.Id}/payments",
+                new CollectPayment(visit.PatientId, invoice.AccountVersion, Guid.NewGuid(), "Cash", "SYNTHETIC payer",
+                    [new(charge.Id, 50000)])));
+            Assert.Equal("Posted", cash.State);
+            invoice = (await cashier.GetFromJsonAsync<InvoiceDto>($"/api/finance/invoices/{invoice.Id}"))!;
+            var pos = await Ok<PaymentDto>(await cashier.PostAsJsonAsync($"/api/finance/invoices/{invoice.Id}/payments",
+                new CollectPayment(visit.PatientId, invoice.AccountVersion, Guid.NewGuid(), "POS", "SYNTHETIC payer",
+                    [new(charge.Id, 70000)])));
+            Assert.Equal("Pending", pos.State);
+            invoice = (await cashier.GetFromJsonAsync<InvoiceDto>($"/api/finance/invoices/{invoice.Id}"))!;
+            Assert.Equal(70000, invoice.OutstandingVnd);
+            pos = await Ok<PaymentDto>(await cashier.PostAsJsonAsync($"/api/finance/payments/{pos.Id}/confirm",
+                new ConfirmPayment(pos.Version, invoice.AccountVersion, Guid.NewGuid(), "SYNTHETIC-POS-1", "SYNTHETIC reconciled")));
+            invoice = (await cashier.GetFromJsonAsync<InvoiceDto>($"/api/finance/invoices/{invoice.Id}"))!;
+            Assert.Equal("Paid", invoice.State);
+            Assert.Equal(0, invoice.OutstandingVnd);
+            Assert.Equal(200000, invoice.PaidVnd);
+            Assert.Equal(3, invoice.Payments.Count);
+
+            var refund = await Ok<RefundDto>(await cashier.PostAsJsonAsync("/api/finance/refunds",
+                new RequestRefund(Guid.NewGuid(), null, null, advance.Id, advance.PaymentId, null,
+                    20000, "Cash", "SYNTHETIC unused advance")));
+            refund = await Ok<RefundDto>(await owner.PostAsJsonAsync($"/api/finance/refunds/{refund.Id}/approve",
+                new DecideRefund(Guid.NewGuid(), refund.Version, null)));
+            refund = await Ok<RefundDto>(await owner.PostAsJsonAsync($"/api/finance/refunds/{refund.Id}/complete",
+                new DecideRefund(Guid.NewGuid(), refund.Version, null)));
+            Assert.Equal("Completed", refund.State);
+            advance = Assert.Single((await cashier.GetFromJsonAsync<AdvanceDto[]>($"/api/finance/advances?branchId={visit.BranchId}&patientId={visit.PatientId}"))!,
+                x => x.Id == advance.Id);
+            Assert.Equal(0, advance.AvailableVnd);
+            Assert.Equal("Paid", (await cashier.GetFromJsonAsync<InvoiceDto>($"/api/finance/invoices/{invoice.Id}"))!.State);
+        }
+    }
+
+    [Fact]
+    public async Task InvoiceRefundReopensDebtAndCannotExceedOriginalPayment()
+    {
+        var (visit, _, dentist, _) = await Performed();
+        using (dentist) using (var cashier = await reception.Login()) using (var owner = await reception.Login("owner.demo"))
+        {
+            var charge = Assert.Single((await cashier.GetFromJsonAsync<BillDto>(Bill(visit.VisitId)))!.Charges);
+            var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(fixture.Clock.Now,
+                TimeZoneInfo.FindSystemTimeZoneById("Asia/Ho_Chi_Minh")).DateTime);
+            var invoice = await Ok<InvoiceDto>(await cashier.PostAsJsonAsync("/api/finance/invoices",
+                new IssueInvoice(Guid.NewGuid(), visit.PatientId, visit.BranchId, today, today.AddDays(1), [charge.Id])));
+            var payment = await Ok<PaymentDto>(await cashier.PostAsJsonAsync($"/api/finance/invoices/{invoice.Id}/payments",
+                new CollectPayment(visit.PatientId, invoice.AccountVersion, Guid.NewGuid(), "Cash", "SYNTHETIC payer",
+                    [new(charge.Id, 200000)])));
+            var refund = await Ok<RefundDto>(await cashier.PostAsJsonAsync("/api/finance/refunds",
+                new RequestRefund(Guid.NewGuid(), invoice.Id, charge.Id, null, payment.Id, null,
+                    50000, "Cash", "SYNTHETIC partial refund")));
+            refund = await Ok<RefundDto>(await owner.PostAsJsonAsync($"/api/finance/refunds/{refund.Id}/approve",
+                new DecideRefund(Guid.NewGuid(), refund.Version, null)));
+            await Ok<RefundDto>(await owner.PostAsJsonAsync($"/api/finance/refunds/{refund.Id}/complete",
+                new DecideRefund(Guid.NewGuid(), refund.Version, null)));
+            invoice = (await cashier.GetFromJsonAsync<InvoiceDto>($"/api/finance/invoices/{invoice.Id}"))!;
+            Assert.Equal(50000, invoice.OutstandingVnd);
+            Assert.Equal(50000, (await cashier.GetFromJsonAsync<BillDto>(Bill(visit.VisitId)))!.RemainingVnd);
+            Assert.Equal(HttpStatusCode.Conflict, (await cashier.PostAsJsonAsync("/api/finance/refunds",
+                new RequestRefund(Guid.NewGuid(), invoice.Id, charge.Id, null, payment.Id, null,
+                    160000, "Cash", "SYNTHETIC excess"))).StatusCode);
+            await Ok<PaymentDto>(await cashier.PostAsJsonAsync($"/api/finance/invoices/{invoice.Id}/payments",
+                new CollectPayment(visit.PatientId, invoice.AccountVersion, Guid.NewGuid(), "Cash", "SYNTHETIC payer",
+                    [new(charge.Id, 50000)])));
+            Assert.Equal("PartiallyRefunded", (await cashier.GetFromJsonAsync<InvoiceDto>($"/api/finance/invoices/{invoice.Id}"))!.State);
+        }
+    }
+
+    [Fact]
+    public async Task TwoCashiersCannotPayTheSameInvoiceTwice()
+    {
+        var (visit, _, dentist, _) = await Performed();
+        using (dentist) using (var cashierOne = await reception.Login()) using (var cashierTwo = await reception.Login("owner.demo"))
+        {
+            var charge = Assert.Single((await cashierOne.GetFromJsonAsync<BillDto>(Bill(visit.VisitId)))!.Charges);
+            var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(fixture.Clock.Now,
+                TimeZoneInfo.FindSystemTimeZoneById("Asia/Ho_Chi_Minh")).DateTime);
+            var invoice = await Ok<InvoiceDto>(await cashierOne.PostAsJsonAsync("/api/finance/invoices",
+                new IssueInvoice(Guid.NewGuid(), visit.PatientId, visit.BranchId, today, today, [charge.Id])));
+            var first = new CollectPayment(visit.PatientId, invoice.AccountVersion, Guid.NewGuid(),
+                "Cash", "SYNTHETIC payer", [new(charge.Id, 200000)]);
+            var second = first with { RequestKey = Guid.NewGuid() };
+            var replies = await Task.WhenAll(
+                cashierOne.PostAsJsonAsync($"/api/finance/invoices/{invoice.Id}/payments", first),
+                cashierTwo.PostAsJsonAsync($"/api/finance/invoices/{invoice.Id}/payments", second));
+            Assert.Equal(1, replies.Count(x => x.IsSuccessStatusCode));
+            Assert.Contains(replies, x => x.StatusCode == HttpStatusCode.Conflict);
+            invoice = (await cashierOne.GetFromJsonAsync<InvoiceDto>($"/api/finance/invoices/{invoice.Id}"))!;
+            Assert.Equal(200000, invoice.PaidVnd);
+            Assert.Equal(0, invoice.OutstandingVnd);
+            Assert.Single(invoice.Payments);
+        }
+    }
+
+    [Fact]
+    public async Task BranchCanConfigureAndRetireAdditionalPaymentMethod()
+    {
+        var (visit, _, dentist, _) = await Performed();
+        using (dentist) using (var owner = await reception.Login("owner.demo"))
+        {
+            var method = await Ok<PaymentMethodDto>(await owner.PostAsJsonAsync("/api/finance/payment-methods",
+                new SavePaymentMethod(Guid.NewGuid(), visit.BranchId, "SYNTHETIC_WIRE", "SYNTHETIC wire", true, 0)));
+            Assert.True(method.Active);
+            var bill = (await owner.GetFromJsonAsync<BillDto>(Bill(visit.VisitId)))!;
+            var charge = Assert.Single(bill.Charges);
+            var payment = await Ok<PaymentDto>(await owner.PostAsJsonAsync(Bill(visit.VisitId) + "/payments",
+                new CollectPayment(visit.PatientId, bill.AccountVersion, Guid.NewGuid(), method.Code,
+                    "SYNTHETIC payer", [new(charge.Id, 50000)])));
+            Assert.Equal("Pending", payment.State);
+            method = await Ok<PaymentMethodDto>(await owner.PostAsJsonAsync("/api/finance/payment-methods",
+                new SavePaymentMethod(Guid.NewGuid(), visit.BranchId, method.Code, method.Name, false, method.Version)));
+            Assert.False(method.Active);
+            bill = (await owner.GetFromJsonAsync<BillDto>(Bill(visit.VisitId)))!;
+            Assert.Equal(HttpStatusCode.BadRequest, (await owner.PostAsJsonAsync(Bill(visit.VisitId) + "/payments",
+                new CollectPayment(visit.PatientId, bill.AccountVersion, Guid.NewGuid(), method.Code,
+                    "SYNTHETIC payer", [new(charge.Id, 50000)]))).StatusCode);
+            await Ok<PaymentDto>(await owner.PostAsJsonAsync($"/api/finance/payments/{payment.Id}/confirm",
+                new ConfirmPayment(payment.Version, bill.AccountVersion, Guid.NewGuid(),
+                    "SYNTHETIC-WIRE-1", "SYNTHETIC reconciled")));
+            Assert.Equal(150000, (await owner.GetFromJsonAsync<BillDto>(Bill(visit.VisitId)))!.RemainingVnd);
+        }
+    }
+
+    [Fact]
+    public async Task FullThirtyMillionAdvanceKeepsFourUnequalPlanStagesUnrecognized()
+    {
+        var (visit, _, dentist, _) = await Prepare();
+        using (dentist) using (var cashier = await reception.Login())
+        {
+            Guid dossierId;
+            using (var scope = fixture.Services.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
+                var now = fixture.Clock.Now;
+                var dossier = new TreatmentDossier
+                {
+                    Code = "S-" + Guid.NewGuid().ToString("N"), PatientId = visit.PatientId,
+                    BranchId = visit.BranchId, DentistId = visit.DentistId,
+                    StartedOn = DateOnly.FromDateTime(now.Date), PlanState = "Committed", PlanVersion = 1,
+                    CreatedAt = now, UpdatedAt = now
+                };
+                var amounts = new long[] { 3_000_000, 5_000_000, 7_000_000, 15_000_000 };
+                for (var i = 0; i < amounts.Length; i++) dossier.Items.Add(new TreatmentItem
+                {
+                    ServiceId = 1, ServiceName = $"SYNTHETIC stage {i + 1}", Unit = "Lần",
+                    Quantity = 1, PlannedOrder = i + 1, AgreedUnitPriceVnd = amounts[i], Decision = "Agreed"
+                });
+                db.TreatmentDossiers.Add(dossier);
+                await db.SaveChangesAsync();
+                dossierId = dossier.Id;
+            }
+            var advance = await Ok<AdvanceDto>(await cashier.PostAsJsonAsync("/api/finance/advances",
+                new CreateAdvance(Guid.NewGuid(), visit.PatientId, visit.BranchId, dossierId,
+                    "ServiceAdvance", "Cash", 30_000_000, "SYNTHETIC payer", null)));
+            Assert.Equal(30_000_000, advance.AvailableVnd);
+            var plan = (await cashier.GetFromJsonAsync<PlanSettlementDto>(
+                $"/api/finance/plans/{dossierId}/settlement"))!;
+            Assert.Equal(30_000_000, plan.PlannedNetVnd);
+            Assert.Equal(0, plan.PerformedNetVnd);
+            Assert.Equal(30_000_000, plan.AdvanceForUnperformedServicesVnd);
+            Assert.Equal(new long[] { 3_000_000, 5_000_000, 7_000_000, 15_000_000 },
+                plan.Stages.Select(x => x.PlannedNetVnd));
+        }
+    }
+
+    [Fact]
+    public async Task YesterdayServicePaidTodayChangesCashButNotYesterdayRevenue()
+    {
+        var (visit, _, dentist, _) = await Performed();
+        using (dentist) using (var owner = await reception.Login("owner.demo"))
+        {
+            var charge = Assert.Single((await owner.GetFromJsonAsync<BillDto>(Bill(visit.VisitId)))!.Charges);
+            var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(fixture.Clock.Now,
+                TimeZoneInfo.FindSystemTimeZoneById("Asia/Ho_Chi_Minh")).DateTime);
+            var yesterday = today.AddDays(-1);
+            var prior = (await owner.GetFromJsonAsync<SettlementOverview>(
+                $"/api/finance/overview?branchId={visit.BranchId}&from={yesterday:yyyy-MM-dd}&to={yesterday:yyyy-MM-dd}"))!;
+            using (var scope = fixture.Services.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
+                await db.Set<FinanceCharge>().Where(x => x.Id == charge.Id)
+                    .ExecuteUpdateAsync(x => x.SetProperty(c => c.PostedAt, fixture.Clock.Now.AddDays(-1)));
+            }
+            var invoice = await Ok<InvoiceDto>(await owner.PostAsJsonAsync("/api/finance/invoices",
+                new IssueInvoice(Guid.NewGuid(), visit.PatientId, visit.BranchId, today, today.AddDays(1), [charge.Id])));
+            Assert.Equal(yesterday, Assert.Single(invoice.Lines).ServiceDate);
+            var previousDay = (await owner.GetFromJsonAsync<SettlementOverview>(
+                $"/api/finance/overview?branchId={visit.BranchId}&from={yesterday:yyyy-MM-dd}&to={yesterday:yyyy-MM-dd}"))!;
+            Assert.Equal(200000, previousDay.Totals.RecognizedRevenueVnd - prior.Totals.RecognizedRevenueVnd);
+            Assert.Equal(prior.Totals.CollectedVnd, previousDay.Totals.CollectedVnd);
+            var todayBefore = (await owner.GetFromJsonAsync<SettlementOverview>(
+                $"/api/finance/overview?branchId={visit.BranchId}&from={today:yyyy-MM-dd}&to={today:yyyy-MM-dd}"))!;
+            await Ok<PaymentDto>(await owner.PostAsJsonAsync($"/api/finance/invoices/{invoice.Id}/payments",
+                new CollectPayment(visit.PatientId, invoice.AccountVersion, Guid.NewGuid(), "Cash",
+                    "SYNTHETIC payer", [new(charge.Id, 200000)])));
+            var todayAfter = (await owner.GetFromJsonAsync<SettlementOverview>(
+                $"/api/finance/overview?branchId={visit.BranchId}&from={today:yyyy-MM-dd}&to={today:yyyy-MM-dd}"))!;
+            Assert.Equal(200000, todayAfter.Totals.CollectedVnd - todayBefore.Totals.CollectedVnd);
+            Assert.Equal(0, (await owner.GetFromJsonAsync<InvoiceDto>($"/api/finance/invoices/{invoice.Id}"))!.OutstandingVnd);
+        }
+    }
+
 }
