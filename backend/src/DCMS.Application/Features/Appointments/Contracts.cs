@@ -8,7 +8,8 @@ public sealed record CreateAppointmentRequest(int BranchId, BookerContact? Booke
     string? AttendeeRelation, string? Kind, string? Source, int? ServiceId, string? Reason,
     int DentistId, int? AssistantId, int? ChairId, DateTimeOffset StartAt, int DurationMinutes,
     Guid? FollowUpId, string? ExceptionReason, Guid RequestKey, int ScheduleVersion,
-    int? AssistantScheduleVersion, int? BookingSettingsVersion = null, bool PatientConsentConfirmed = false, Guid? FamilyMemberId = null);
+    int? AssistantScheduleVersion, int? BookingSettingsVersion = null, bool PatientConsentConfirmed = false, Guid? FamilyMemberId = null,
+    Guid? ReplacesAppointmentId = null);
 public sealed record AppointmentResult(Guid AppointmentId, string Code, int Version, string Status,
     DateTimeOffset StartAt, DateTimeOffset EndAt, SystemMessage Notification);
 public sealed record CreateAppointmentOutcome(AppointmentResult Result, bool Replayed);

@@ -14,12 +14,13 @@ async function ok(response: Awaited<ReturnType<APIRequestContext['post']>>) {
   expect(response.ok(), await response.text()).toBeTruthy(); return response.json();
 }
 async function choose(page: Page, label: string, option: string) {
-  const box = page.getByRole('combobox', { name: new RegExp(`${label}$`) }); await box.click();
+  const box = page.getByRole('combobox', { name: new RegExp(`${label}$`) });
+  await page.locator('.ant-select').filter({ has: box }).locator('.ant-select-selector').click();
   const list = await box.getAttribute('aria-controls');
   await page.locator('.ant-select-dropdown').filter({ has: page.locator(`[id="${list}"]`) }).getByText(option, { exact: true }).click();
 }
 
-test('web: book for a relative without an account, verify consent, read official records, then revoke', async ({ page, browser, request }, testInfo) => {
+test('web: book for a relative without an account, read records by default after reception, then revoke', async ({ page, browser, request }, testInfo) => {
   test.setTimeout(120000);
   page.setDefaultTimeout(15000);
   const suffix = crypto.randomUUID().slice(0, 8), name = `SYNTHETIC người thân ${suffix}`;
@@ -29,7 +30,7 @@ test('web: book for a relative without an account, verify consent, read official
   await ok(await request.post(`${apiUrl}/api/auth/register`, { data: { fullName: `SYNTHETIC người đặt ${suffix}`, phoneNumber: customerPhone, email: `family-${suffix}@example.invalid`, password: customerPassword, confirmPassword: customerPassword } }));
   const runtimeErrors: string[] = []; page.on('pageerror', error => runtimeErrors.push(error.message));
   await page.goto(`${webUrl}/customer/sign-in`);
-  await page.getByLabel('Số điện thoại', { exact: true }).fill(customerPhone);
+  await page.getByLabel('Email hoặc tên đăng nhập', { exact: true }).fill(customerPhone);
   await page.getByLabel('Mật khẩu', { exact: true }).fill(customerPassword);
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
   await expect(page).toHaveURL(/\/customer\/home/);
@@ -78,37 +79,29 @@ test('web: book for a relative without an account, verify consent, read official
   console.log('Family flow: reception and confirmed examination created through real APIs.');
   await page.goto(`${webUrl}/customer/family-members`); await page.getByRole('row').filter({ hasText: name }).getByRole('button', { name: 'Xem hồ sơ', exact: true }).click();
   const records = page.getByRole('dialog', { name: `Hồ sơ của ${name}`, exact: true });
-  await expect(records.getByText('Chưa yêu cầu quyền xem hồ sơ', { exact: true })).toBeVisible();
-  await records.getByLabel('Mã hồ sơ người thân (nếu biết)').fill(patient.patientCode);
-  await records.getByLabel('Thông tin giúp phòng khám đối chiếu').fill('SYNTHETIC đã đến khám cùng người thân và có đồng ý chia sẻ.');
-  await records.getByRole('button', { name: 'Yêu cầu quyền xem hồ sơ', exact: true }).click();
-  await expect(records.getByText('Chờ phòng khám xác minh', { exact: true }).first()).toBeVisible();
-  await expect(records.getByRole('tab', { name: 'Lịch sử khám', exact: true })).toHaveCount(0);
-  console.log('Family flow: requested access and pending access cannot read records.');
+  await expect(records.getByText('Đã được cấp quyền', { exact: true })).toBeVisible();
+  await expect(records.getByRole('button', { name: 'Yêu cầu quyền xem hồ sơ', exact: true })).toHaveCount(0);
+  await expect(records.getByRole('tab', { name: 'Lịch sử khám', exact: true })).toHaveAttribute('aria-selected', 'true');
+  console.log('Family flow: reception established default access without a separate request or approval.');
 
   const staffContext = await browser.newContext(); const staffPage = await staffContext.newPage();
+  staffPage.setDefaultTimeout(15000);
   try {
     await staffPage.goto(`${webUrl}/sign-in`); await staffPage.getByLabel('Tên đăng nhập', { exact: true }).fill('assistant.demo');
     await staffPage.getByLabel('Mật khẩu', { exact: true }).fill(password!); await staffPage.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
     await expect(staffPage.getByRole('heading', { name: 'Tài khoản của tôi', exact: true })).toBeVisible({ timeout: 15000 });
     await staffPage.goto(`${webUrl}/link-verification`); await staffPage.getByRole('tab', { name: 'Hồ sơ người thân', exact: true }).click();
+    await choose(staffPage, 'Trạng thái quyền người thân', 'Tất cả');
     await staffPage.getByRole('row').filter({ hasText: name }).getByRole('button', { name: 'Đối chiếu', exact: true }).click();
     const review = staffPage.getByRole('dialog');
-    await review.getByRole('button', { name: 'Tra cứu hồ sơ', exact: true }).click();
-    await review.getByRole('row').filter({ hasText: patient.patientCode }).getByRole('radio').check();
-    await review.getByRole('checkbox', { name: 'Lịch sử khám', exact: true }).check();
-    await choose(staffPage, 'Căn cứ chia sẻ', 'Sự đồng ý của bệnh nhân');
-    await review.getByLabel('Kết quả đối chiếu và bằng chứng đã kiểm tra').fill('SYNTHETIC danh tính và đồng ý chia sẻ đã được kiểm tra tại tiếp nhận.');
-    await review.getByRole('checkbox', { name: 'Đã đối chiếu danh tính và kiểm tra sự đồng ý/căn cứ đại diện', exact: true }).check();
-    await review.getByRole('button', { name: 'Cấp quyền xem hồ sơ', exact: true }).click();
     await expect(review.getByText('Đã được cấp quyền', { exact: true })).toBeVisible();
-    console.log('Family flow: assistant verified access through staff UI.');
+    console.log('Family flow: assistant can inspect default access through staff UI.');
     await records.getByRole('button', { name: 'Tải lại trạng thái', exact: true }).click();
     await records.getByRole('tab', { name: 'Lịch sử khám', exact: true }).click();
     await records.locator('.family-record-section .ant-collapse-header').first().click();
     await expect(records.getByText('SYNTHETIC hướng dẫn chăm sóc', { exact: true })).toBeVisible();
     await expect(records.getByText('SYNTHETIC INTERNAL NOTE', { exact: true })).toHaveCount(0);
-    await expect(records.getByRole('tab', { name: 'Đơn thuốc', exact: true })).toHaveCount(0);
+    await expect(records.getByRole('tab', { name: 'Đơn thuốc', exact: true })).toBeVisible();
     for (const width of [1440, 390]) {
       await page.setViewportSize({ width, height: 1000 });
       await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width + 1);
@@ -123,5 +116,5 @@ test('web: book for a relative without an account, verify consent, read official
     expect((await request.get(`${apiUrl}/api/me/family-members/${relative.id}/record/examinations`, { headers: owner })).status()).toBe(403);
     expect(runtimeErrors).toEqual([]);
     console.log('Family flow: scoped record reads, responsive display and revoked access passed.');
-  } finally { await staffContext.close(); }
+  } finally { await staffContext.close().catch(() => {}); }
 });

@@ -15,7 +15,7 @@ public sealed partial class FamilyRecordService
 {
     private async Task<FamilyRecordAccess> GrantedAsync(int actor, Guid memberId, string? scope, CancellationToken ct)
     {
-        await MemberAsync(actor, memberId, ct);
+        await EnsureDefaultAccessAsync(actor, memberId, ct);
         var row = await db.Set<FamilyRecordAccess>().AsNoTracking().SingleOrDefaultAsync(x => x.OwnerAccountId == actor
             && x.FamilyMemberId == memberId && x.Status == "Verified" && x.ExpiresAt > clock.GetUtcNow()
             && x.PatientId != null && x.BranchId != null, ct) ?? throw Denied();

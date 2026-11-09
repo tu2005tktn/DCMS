@@ -89,7 +89,7 @@ public sealed partial class FamilyRecordService(DcmsDbContext db, TimeProvider c
 
     public async Task<FamilyAccessOverview> OverviewAsync(int actor, Guid memberId, CancellationToken ct)
     {
-        await MemberAsync(actor, memberId, ct);
+        await EnsureDefaultAccessAsync(actor, memberId, ct);
         var rows = await db.Set<FamilyRecordAccess>().AsNoTracking().Where(x => x.FamilyMemberId == memberId && x.OwnerAccountId == actor)
             .OrderByDescending(x => x.RequestedAt).ThenByDescending(x => x.Id).Take(50).ToArrayAsync(ct);
         var current = rows.FirstOrDefault(x => Status(x) is "Pending" or "Verified") ?? rows.FirstOrDefault();

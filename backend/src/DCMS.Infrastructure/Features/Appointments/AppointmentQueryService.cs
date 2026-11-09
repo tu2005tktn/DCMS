@@ -87,7 +87,8 @@ public sealed class AppointmentQueryService(DcmsDbContext db, UserManager<Applic
             .OrderBy(x => x.Name).Select(x => new CalendarChair(x.Id, x.BranchId, x.Name)).ToArrayAsync(ct);
         var services = await db.Set<SchedulingService>().AsNoTracking().Where(x => branchIds.Contains(x.BranchId) && x.Active && x.IsInitialExamination)
             .OrderBy(x => x.Name).Select(x => new CalendarService(x.Id, x.BranchId, x.Name, x.PublicDurationMinutes)).ToArrayAsync(ct);
-        return new(branches, dentists, chairs, services, ownOnly.Count == branchIds.Length);
+        return new(branches, dentists, chairs, services, ownOnly.Count == branchIds.Length,
+            dentists.Any(value => value.Id == employeeId) ? employeeId : null);
     }
 
     public async Task<CalendarView> CalendarAsync(int actorId, int branchId, DateOnly from, DateOnly to, int? dentistId, string? status, CancellationToken ct)

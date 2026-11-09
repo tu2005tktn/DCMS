@@ -2,11 +2,13 @@ import { Alert, Button, Descriptions, Skeleton, Tag } from 'antd';
 import { useEffect, useState } from 'react';
 import { api } from '../../services/api';
 import { formatClock, formatDate, kindLabels, localDate, sourceLabels, statusColors, statusLabels, type StaffAppointmentDetail } from './types';
+import StaffAppointmentActions from './StaffAppointmentActions';
 
-export default function AppointmentDetailContent({ id, revision }: { id: string; revision: number }) {
+export default function AppointmentDetailContent({ id, revision, onChanged }: { id: string; revision: number; onChanged?: () => void }) {
   const [detail, setDetail] = useState<StaffAppointmentDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [retry, setRetry] = useState(0);
+  const [notice, setNotice] = useState('');
 
   useEffect(() => {
     if (!id) return;
@@ -20,8 +22,10 @@ export default function AppointmentDetailContent({ id, revision }: { id: string;
 
   const a = detail?.appointment;
   return <>
+    {notice && <Alert className="form-alert" type="success" showIcon message={notice} closable onClose={() => setNotice('')} />}
     {error ? <Alert type="error" showIcon message={error} action={<Button onClick={() => setRetry(value => value + 1)}>Thử lại</Button>} /> : !a || !detail ? <Skeleton active /> : <>
       <h3>Lịch hẹn {a.code}</h3>
+      <div className="patient-section"><StaffAppointmentActions size="middle" appointment={a} onChanged={message => { setNotice(message); setRetry(value => value + 1); onChanged?.(); }} /></div>
       <Descriptions column={1} bordered size="small" items={[
         { label: 'Trạng thái', children: <Tag color={statusColors[a.status]}>{statusLabels[a.status]}</Tag> },
         { label: 'Thời gian', children: `${formatDate(localDate(a.startAt))} · ${formatClock(a.startAt)}–${formatClock(a.endAt)} (${a.durationMinutes} phút)` },

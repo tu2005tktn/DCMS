@@ -50,7 +50,7 @@ public sealed class FamilyRecordApiTests(ApiFixture fixture) : IClassFixture<Api
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", (await response.Content.ReadFromJsonAsync<SignInResponse>())!.AccessToken);
         return client;
     }
-    private async Task<Setup> Prepare()
+    private async Task<Setup> Prepare(bool linkedBooking = false)
     {
         var owner = await Client(); var assistant = await Client("assistant.demo");
         var ownerId = (await owner.GetFromJsonAsync<CurrentUser>("/api/auth/me"))!.Id;
@@ -67,7 +67,8 @@ public sealed class FamilyRecordApiTests(ApiFixture fixture) : IClassFixture<Api
         db.AddRange(service, chair, new SchedulingMember { BranchId = branch.Id, EmployeeId = dentist.Id, CanDentist = true }, new SchedulingMember { BranchId = branch.Id, EmployeeId = assistantId }); await db.SaveChangesAsync();
         var id = Guid.NewGuid(); var now = DateTimeOffset.UtcNow;
         db.Add(new ResourceReservation { Id = id, Code = "RV-" + id.ToString("N"), BranchId = branch.Id, DentistId = dentist.Id, ChairId = chair.Id, ServiceId = service.Id, Start = now.AddDays(-1), End = now.AddDays(-1).AddHours(1), AttendeeLabel = name });
-        db.Add(new Appointment { Id = id, ReservationId = id, Code = "AP-" + id.ToString("N"), BranchId = branch.Id, PatientId = patient.Id, DentistId = dentist.Id, ChairId = chair.Id, ServiceId = service.Id, BookerName = "SYNTHETIC", AttendeeName = name, StartAt = now.AddDays(-1), EndAt = now.AddDays(-1).AddHours(1), CreatedAt = now });
+        db.Add(new Appointment { Id = id, ReservationId = id, Code = "AP-" + id.ToString("N"), BranchId = branch.Id, PatientId = patient.Id, DentistId = dentist.Id, ChairId = chair.Id, ServiceId = service.Id, BookerName = "SYNTHETIC", AttendeeName = name, StartAt = now.AddDays(-1), EndAt = now.AddDays(-1).AddHours(1), CreatedAt = now,
+            BookerAccountId = linkedBooking ? ownerId : null, FamilyMemberId = linkedBooking ? member.Id : null, AttendeeBirthDate = linkedBooking ? member.BirthDate : null });
         await db.SaveChangesAsync();
         var visit = new Visit { AppointmentId = id, PatientId = patient.Id, BranchId = branch.Id, DentistId = dentist.Id, Status = VisitStatuses.Completed, ArrivalAt = now.AddDays(-1), RecordedAt = now, RecordedBy = (await db.Employees.Where(e => e.Id == assistantId).Select(e => e.AccountId).SingleAsync()), Note = "SYNTHETIC INTERNAL VISIT NOTE" };
         db.Add(visit); await db.SaveChangesAsync();
@@ -88,6 +89,108 @@ public sealed class FamilyRecordApiTests(ApiFixture fixture) : IClassFixture<Api
     {
         var response = await s.Assistant.PostAsJsonAsync($"/api/family-record-reviews/{row.Id}/verify", Verify(s, row, scopes));
         Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync()); return (await response.Content.ReadFromJsonAsync<FamilyAccessDto>())!;
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ReceivedFamilyBookingDefaultsToOfficialRecordsAndRevocationIsNeverBypassed(bool openOverviewFirst)
+    {
+        var s = await Prepare(linkedBooking: true);
+        var first = await s.Owner.GetAsync(Url(s.Member.Id) + (openOverviewFirst ? "/record-access" : "/record"));
+        Assert.True(first.IsSuccessStatusCode, await first.Content.ReadAsStringAsync());
+        var parallel = await Task.WhenAll(Enumerable.Range(0, 4).Select(_ => s.Owner.GetAsync(Url(s.Member.Id) + "/record-access")));
+        foreach (var response in parallel) Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
+        var overview = (await s.Owner.GetFromJsonAsync<FamilyAccessOverview>(Url(s.Member.Id) + "/record-access"))!;
+        Assert.Equal("Verified", overview.Current!.Status); Assert.False(overview.CanRequest);
+        Assert.Equal(FamilyRecordScopes.All.Order(), overview.Current.Scopes.Order());
+        var records = await s.Owner.GetAsync(Url(s.Member.Id) + "/record/examinations"); records.EnsureSuccessStatusCode();
+        var json = await records.Content.ReadAsStringAsync(); Assert.Contains("SYNTHETIC conclusion", json); Assert.DoesNotContain("INTERNAL", json);
+        using (var scope = fixture.Services.CreateScope()) {
+            var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
+            var grant = Assert.Single(await db.Set<FamilyRecordAccess>().Where(x => x.FamilyMemberId == s.Member.Id).ToArrayAsync());
+            Assert.Equal("DefaultFamilyBooking", grant.SharingBasis); Assert.Equal(s.PatientId, grant.PatientId); Assert.Equal(s.BranchId, grant.BranchId);
+            Assert.Single(await db.Set<FamilyRecordAudit>().Where(x => x.AccessId == grant.Id && x.Action == "DefaultGranted").ToArrayAsync());
+            Assert.False(await db.PatientAccountLinks.AnyAsync(x => x.PatientId == s.PatientId));
+            Assert.False(await db.Users.AnyAsync(x => x.FullName == s.Member.FullName));
+        }
+        using var stranger = await Client();
+        Assert.Equal(HttpStatusCode.NotFound, (await stranger.GetAsync(Url(s.Member.Id) + "/record")).StatusCode);
+        var revoked = await s.Assistant.PostAsJsonAsync($"/api/family-record-reviews/{overview.Current.Id}/revoke",
+            new DecideFamilyAccess("SYNTHETIC stop default sharing", null, overview.Current.Version, Guid.NewGuid()));
+        revoked.EnsureSuccessStatusCode();
+        Assert.Equal(HttpStatusCode.Forbidden, (await s.Owner.GetAsync(Url(s.Member.Id) + "/record/examinations")).StatusCode);
+        Assert.Equal("Revoked", (await s.Owner.GetFromJsonAsync<FamilyAccessOverview>(Url(s.Member.Id) + "/record-access"))!.Current!.Status);
+        await Submit(s);
+        Assert.Equal(HttpStatusCode.Forbidden, (await s.Owner.GetAsync(Url(s.Member.Id) + "/record")).StatusCode);
+    }
+
+    [Fact]
+    public async Task PendingRequestBecomesDefaultAccessButManualScopeIsPreserved()
+    {
+        var automatic = await Prepare(linkedBooking: true); var pending = await Submit(automatic);
+        var overview = (await automatic.Owner.GetFromJsonAsync<FamilyAccessOverview>(Url(automatic.Member.Id) + "/record-access"))!;
+        Assert.Equal(pending.Id, overview.Current!.Id); Assert.Equal("Verified", overview.Current.Status);
+        var manual = await Prepare(linkedBooking: true); var limited = await Grant(manual, await Submit(manual), ["Examinations"]);
+        var manualOverview = (await manual.Owner.GetFromJsonAsync<FamilyAccessOverview>(Url(manual.Member.Id) + "/record-access"))!;
+        Assert.Equal(limited.Version, manualOverview.Current!.Version); Assert.Equal(new[] { "Examinations" }, manualOverview.Current.Scopes);
+        Assert.Equal(HttpStatusCode.Forbidden, (await manual.Owner.GetAsync(Url(manual.Member.Id) + "/record/prescriptions")).StatusCode);
+    }
+
+    [Theory]
+    [InlineData("NoVisit")]
+    [InlineData("WrongOwner")]
+    [InlineData("SnapshotName")]
+    [InlineData("SnapshotBirth")]
+    [InlineData("PatientName")]
+    [InlineData("Archived")]
+    [InlineData("WrongPatient")]
+    [InlineData("WrongBranch")]
+    [InlineData("Cancelled")]
+    public async Task UnprovenBookingIdentityDoesNotDefaultToRecords(string invalid)
+    {
+        var s = await Prepare(linkedBooking: true);
+        using (var scope = fixture.Services.CreateScope()) {
+            var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
+            var visit = await db.Visits.SingleAsync(x => x.Id == s.VisitId);
+            var appointment = await db.Appointments.SingleAsync(x => x.Id == visit.AppointmentId);
+            var patient = await db.Patients.SingleAsync(x => x.Id == s.PatientId);
+            switch (invalid) {
+                case "NoVisit": db.Remove(await db.Set<VisitExamination>().SingleAsync(x => x.VisitId == s.VisitId)); db.Remove(visit); break;
+                case "WrongOwner": appointment.BookerAccountId = null; break;
+                case "SnapshotName": appointment.AttendeeName = "SYNTHETIC different attendee"; break;
+                case "SnapshotBirth": appointment.AttendeeBirthDate = new DateOnly(2014, 3, 12); break;
+                case "PatientName": patient.FullName = "SYNTHETIC different patient"; break;
+                case "Archived": patient.IsArchived = true; break;
+                case "WrongPatient": appointment.PatientId = null; break;
+                case "WrongBranch": appointment.BranchId = await db.Set<SchedulingBranch>().Where(x => x.Id != s.BranchId).Select(x => x.Id).FirstAsync(); break;
+                case "Cancelled": visit.Status = VisitStatuses.Cancelled; break;
+            }
+            await db.SaveChangesAsync();
+        }
+        Assert.Null((await s.Owner.GetFromJsonAsync<FamilyAccessOverview>(Url(s.Member.Id) + "/record-access"))!.Current);
+        Assert.Equal(HttpStatusCode.Forbidden, (await s.Owner.GetAsync(Url(s.Member.Id) + "/record")).StatusCode);
+    }
+
+    [Fact]
+    public async Task ConflictingPatientIdentitiesAndChangedMemberDoNotRecreateDefaultAccess()
+    {
+        var s = await Prepare(linkedBooking: true); var other = await Prepare();
+        using (var scope = fixture.Services.CreateScope()) {
+            var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
+            var otherVisit = await db.Visits.SingleAsync(x => x.Id == other.VisitId);
+            var appointment = await db.Appointments.SingleAsync(x => x.Id == otherVisit.AppointmentId);
+            appointment.BookerAccountId = s.OwnerId; appointment.FamilyMemberId = s.Member.Id;
+            appointment.AttendeeName = s.Member.FullName; appointment.AttendeeBirthDate = s.Member.BirthDate;
+            var patient = await db.Patients.SingleAsync(x => x.Id == other.PatientId); patient.FullName = s.Member.FullName; patient.BirthDate = s.Member.BirthDate;
+            await db.SaveChangesAsync();
+        }
+        Assert.Equal(HttpStatusCode.Forbidden, (await s.Owner.GetAsync(Url(s.Member.Id) + "/record")).StatusCode);
+        var clean = await Prepare(linkedBooking: true);
+        (await clean.Owner.GetAsync(Url(clean.Member.Id) + "/record")).EnsureSuccessStatusCode();
+        var changed = await clean.Owner.PutAsJsonAsync(Url(clean.Member.Id), new UpdateFamilyMember(clean.Member.FullName + " changed", "Child", clean.Member.BirthDate,
+            clean.Member.Version, Guid.NewGuid(), "MALE", "0912345678")); changed.EnsureSuccessStatusCode();
+        Assert.Equal(HttpStatusCode.Forbidden, (await clean.Owner.GetAsync(Url(clean.Member.Id) + "/record")).StatusCode);
     }
 
     [Fact]

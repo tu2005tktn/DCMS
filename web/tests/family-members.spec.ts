@@ -56,7 +56,32 @@ async function pickSchedule(page: Page) {
   await page.locator('.customer-slots button').first().click(); await page.getByRole('button', { name: 'Tiếp tục', exact: true }).click();
 }
 
-test('xem trạng thái quyền đúng người, đóng bằng bàn phím/nút và không tự cấp quyền', async ({ page }) => {
+test('hồ sơ đã liên kết được xem ngay, không cần gửi yêu cầu và tự mở lịch sử khám', async ({ page }) => {
+  await mock(page);
+  const access = { id: 'automatic-access', familyMemberId: member.id, code: 'FA-SYNTHETIC', status: 'Verified', fullName: member.fullName,
+    birthDate: member.birthDate, patientCode: 'BN-SYNTHETIC', requestedAt: '2026-11-09T01:00:00Z', expiresAt: '2099-01-01T00:00:00Z',
+    scopes: ['Examinations', 'Treatment', 'Prescriptions', 'Documents'], version: 1,
+    publicNote: 'Bạn được xem hồ sơ người thân mặc định từ lịch đặt hộ đã được phòng khám tiếp nhận.' };
+  await page.route('**/api/me/family-members/**', async route => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.endsWith('/record-access')) return route.fulfill({ json: { current: access, history: [access], canRequest: false } });
+    if (path.endsWith('/record')) return route.fulfill({ json: { patientCode: access.patientCode, fullName: member.fullName, birthDate: member.birthDate,
+      branchName: 'Chi nhánh thử nghiệm', scopes: access.scopes, expiresAt: access.expiresAt } });
+    if (path.endsWith('/record/examinations')) return route.fulfill({ json: { items: [{ visitId: 'visit', arrivalAt: '2026-11-09T01:00:00Z',
+      dentistName: 'Bác sĩ mẫu', branchName: 'Chi nhánh thử nghiệm', symptoms: 'Kiểm tra', diagnoses: ['Bình thường'], conclusion: 'Kết quả mẫu', advice: 'Lời dặn mẫu' }], total: 1, page: 1, pageSize: 20 } });
+    return route.fallback();
+  });
+  await page.goto('/customer/family-members');
+  await page.getByRole('button', { name: 'Xem hồ sơ', exact: true }).click();
+  const modal = page.getByRole('dialog', { name: `Hồ sơ của ${member.fullName}`, exact: true });
+  await expect(modal.getByRole('tab', { name: 'Lịch sử khám', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(modal.getByRole('tab', { name: 'Đơn thuốc', exact: true })).toBeVisible();
+  await expect(modal.getByRole('button', { name: 'Yêu cầu quyền xem hồ sơ', exact: true })).toHaveCount(0);
+  await modal.locator('.family-record-section .ant-collapse-header').first().click();
+  await expect(modal.getByText('Lời dặn mẫu', { exact: true })).toBeVisible();
+});
+
+test('người thân chưa tiếp nhận giải thích quyền mặc định, đóng bằng bàn phím/nút và giữ lịch đặt hộ', async ({ page }) => {
   const calls = await mock(page, { many: true });
   const requests: string[] = [];
   page.on('request', request => { if (new URL(request.url()).pathname.startsWith('/api/')) requests.push(request.url()); });
@@ -72,7 +97,9 @@ test('xem trạng thái quyền đúng người, đóng bằng bàn phím/nút v
     await trigger.focus(); await trigger.press('Enter');
     const modal = page.getByRole('dialog', { name: 'Hồ sơ của Người thân 21', exact: true });
     await expect(modal).toBeVisible();
-    await expect(modal.getByText('Chưa yêu cầu quyền xem hồ sơ', { exact: true })).toBeVisible();
+    await expect(modal.getByText('Chưa có hồ sơ liên kết', { exact: true })).toBeVisible();
+    await expect(modal.getByText(/Hồ sơ được xem mặc định sau khi phòng khám tiếp nhận/)).toBeVisible();
+    await modal.getByText('Liên kết hồ sơ đã có tại phòng khám', { exact: true }).click();
     await expect(modal.getByRole('button', { name: 'Yêu cầu quyền xem hồ sơ', exact: true })).toBeVisible();
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width + 1);
     const box = await modal.boundingBox(); expect(box).not.toBeNull();

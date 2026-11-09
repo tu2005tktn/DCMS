@@ -1,5 +1,11 @@
 # S06 patient appointments
 
+## Chủ động chỉnh sửa và hủy lịch — 09/11/2026
+
+Lịch Confirmed đã tới giờ, chưa được tiếp nhận có **Khách không tới** theo grant riêng `appointments.no-show`. Sau xác nhận, lịch cũ được giữ với trạng thái này; nếu còn giờ và có `appointments.create` thì có **Đặt lịch thay thế** cho khách khác trong phần thời gian còn trống. Không thay Patient của lịch cũ. Chi tiết contract thay thế ở UC-06.
+
+Tab Lịch hẹn có thao tác **Chỉnh sửa lịch** theo `appointments.reschedule` và **Hủy lịch** theo `appointments.cancel` trên từng lịch Confirmed chưa bắt đầu. Dùng chung form với màn chi tiết, gọi command với `clinicInitiated=true`; lý do bắt buộc, chỉ đổi/hủy sau server commit rồi tải lại danh sách và hạng mục cần hẹn. Lịch sử/ngoài quyền không hiện nút. Phạm vi nha sĩ/chi nhánh, slot và chỉ định tiếp tục kiểm ở server. Contract và kiểm thử tại [UC-06](UC06-APPOINTMENT-CHANGES.md), mục bổ sung cùng ngày.
+
 Decision: 19 October 2026. Replace the patient profile's S11/S12 placeholder with persisted appointment data.
 
 `GET /api/patients/{id:int}/appointments?scope=ALL&page=1&pageSize=20` requires the existing staff patient-read policy. Scope is `ALL`, `UPCOMING` or `HISTORY`; page sizes are 20/50/100. Response is the shared staff AppointmentListPage. Invalid filters return 400 MSG04, missing patient 404 MSG113, and unauthorized staff/public requests are denied by existing policies.

@@ -192,6 +192,22 @@ public sealed class TreatmentPlanBookingApiTests(ApiFixture fixture) : IClassFix
         Assert.Equal(await db.Users.Where(x => x.UserName == "dentist.demo").Select(x => x.Id).SingleAsync(), row.PatientConsentConfirmedBy);
     }
 
+    [Fact]
+    public async Task DentistProactivelyCancelsTreatmentAppointmentAndItemNeedsBookingAgain()
+    {
+        var s = await Prepare(); using var dentist = await Login(); var instruction = await Instruction(dentist, s);
+        var booked = await Book(dentist, s, instruction); booked.EnsureSuccessStatusCode();
+        var appointment = (await booked.Content.ReadFromJsonAsync<AppointmentResult>())!;
+        var response = await dentist.PostAsJsonAsync($"/api/appointments/{appointment.Code}/cancel",
+            new CancelAppointmentRequest(appointment.Version, Guid.NewGuid(), "SYNTHETIC clinic changes plan", ClinicInitiated: true));
+        Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
+        using var scope = fixture.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
+        var followUp = await db.FollowUpInstructions.AsNoTracking().SingleAsync(x => x.Id == instruction);
+        Assert.Equal("NeedsBooking", followUp.Status); Assert.Null(followUp.ActiveAppointmentId);
+        var next = await dentist.GetFromJsonAsync<NextVisitCandidates>($"/api/patients/{s.Patient}/next-visit-candidates");
+        Assert.Contains(next!.Items, x => x.ItemId == s.Item && x.Status == "NeedsBooking");
+    }
+
     [Theory]
     [InlineData(1)]
     [InlineData(37)]

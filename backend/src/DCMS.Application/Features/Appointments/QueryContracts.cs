@@ -7,7 +7,7 @@ public sealed record CalendarDentist(int Id, int BranchId, string Name);
 public sealed record CalendarChair(int Id, int BranchId, string Name);
 public sealed record CalendarService(int Id, int BranchId, string Name, int PublicDurationMinutes);
 public sealed record AppointmentOptions(CalendarOption[] Branches, CalendarDentist[] Dentists, CalendarChair[] Chairs,
-    CalendarService[] Services, bool OwnScheduleOnly);
+    CalendarService[] Services, bool OwnScheduleOnly, int? CurrentDentistId = null);
 
 public sealed record AppointmentListItem(Guid Id, string Code, int BranchId, string BranchName, DateTimeOffset StartAt,
     DateTimeOffset EndAt, int DurationMinutes, int DentistId, string DentistName, int ChairId, string ChairName,

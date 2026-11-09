@@ -71,7 +71,8 @@ public sealed class AppointmentNotificationDispatcher(
             await SupersedeRemindersAsync(appointment.Id, ct);
             var cancelled = item.EventType.Contains("cancel", StringComparison.OrdinalIgnoreCase)
                 || appointment.Status == "Cancelled";
-            if (!cancelled && appointment.BookerAccountId.HasValue)
+            var noShow = item.EventType.Equals("appointment.no_show", StringComparison.OrdinalIgnoreCase) || appointment.Status == "NoShow";
+            if (!cancelled && !noShow && appointment.Status == "Confirmed" && appointment.BookerAccountId.HasValue)
                 await ScheduleRemindersAsync(appointment, ct);
 
             if (item.EventType.Equals("appointment.attendance", StringComparison.OrdinalIgnoreCase))
@@ -81,18 +82,20 @@ public sealed class AppointmentNotificationDispatcher(
 
             if (appointment.BookerAccountId.HasValue)
             {
-                var kind = cancelled ? NotificationKind.AppointmentCancelled
+                var kind = noShow ? NotificationKind.NoShow : cancelled ? NotificationKind.AppointmentCancelled
                     : item.EventType.Contains("resched", StringComparison.OrdinalIgnoreCase)
                         ? NotificationKind.AppointmentRescheduled : NotificationKind.AppointmentBooked;
                 var when = appointment.StartAt.ToOffset(TimeSpan.FromHours(7))
                     .ToString("HH:mm dd/MM/yyyy", CultureInfo.InvariantCulture);
                 var title = kind switch
                 {
+                    NotificationKind.NoShow => "Khách không tới",
                     NotificationKind.AppointmentCancelled => "Lịch hẹn đã huỷ",
                     NotificationKind.AppointmentRescheduled => "Lịch hẹn đã đổi",
                     _ => "Đặt lịch thành công"
                 };
-                var body = kind == NotificationKind.AppointmentCancelled
+                var body = kind == NotificationKind.NoShow ? $"Lịch {appointment.Code} đã ghi nhận khách không tới."
+                    : kind == NotificationKind.AppointmentCancelled
                     ? $"Lịch {appointment.Code} đã được huỷ."
                     : $"Lịch {appointment.Code} vào {when}.";
                 await notifications.CreateAsync(appointment.BookerAccountId, appointment.BranchId, kind,

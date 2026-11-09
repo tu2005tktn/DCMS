@@ -14,6 +14,18 @@ Theo yêu cầu triển khai ngày 09/11/2026, thực hiện trên **web khách 
 
 ## Xin và cấp quyền theo dõi
 
+### Mặc định xem hồ sơ từ lịch đặt hộ đã tiếp nhận — bổ sung 09/11/2026
+
+Theo yêu cầu mới, người đặt được xem mặc định hồ sơ chính thức của người thân sau khi phòng khám đã tiếp nhận đúng người từ lịch đặt hộ. Luồng này không yêu cầu gửi yêu cầu và duyệt riêng. Các quy tắc xin quyền thủ công bên dưới tiếp tục dành cho hồ sơ cũ/chưa có liên kết tiếp nhận phù hợp.
+
+- Bằng chứng liên kết phải là Appointment có đồng thời `BookerAccountId` của phiên, `FamilyMemberId` thuộc owner và Visit đã được nhân viên tiếp nhận; Patient/chi nhánh trên Visit phải khớp Appointment. Không suy liên kết chỉ từ tên, ngày sinh, SĐT hoặc mã hồ sơ khách tự khai.
+- Họ tên/ngày sinh snapshot trên lịch, người thân hiện tại và Patient phải khớp; Patient chưa lưu trữ, owner Public active/không khóa, member chưa xóa. Nếu các lượt đã tiếp nhận dẫn tới nhiều Patient khác nhau thì không tự chọn. Không tạo Patient hoặc tài khoản cho B.
+- Khi mở trạng thái/hồ sơ, server kiểm chứng liên kết và tạo quyền `Verified` mặc định nếu chưa có quyết định quyền trước đó; có thể chuyển yêu cầu Pending hợp lệ sang Verified. Quyền có cả bốn phạm vi chính thức, giới hạn đúng chi nhánh của lượt tiếp nhận gần nhất và thời hạn 365 ngày từ lúc cấp. `SharingBasis=DefaultFamilyBooking` phân biệt quy tắc mặc định với căn cứ đồng ý thủ công; không ghi giả rằng đã xác minh đồng ý.
+- Quyền thủ công đã cấp giữ nguyên phạm vi/thời hạn. Revoked/Withdrawn/Rejected/Expired không tự được cấp lại, kể cả khi tải lại hoặc gọi trực tiếp API. Sửa định danh/xóa người thân tiếp tục chấm dứt quyền. Có thể gửi yêu cầu mới để phòng khám xử lý trường hợp đã chấm dứt.
+- Thực hiện trong transaction với advisory lock theo owner 90121, kiểm lại ownership và dữ liệu sau khóa, ghi audit `DefaultGranted` và snapshot nguồn Appointment/Visit. Hai lần đọc đồng thời chỉ tạo một quyền. Không tạo receipt cho GET; không tự sửa Patient hoặc self-link. Không cần migration/backfill hàng loạt: các lịch cũ có FamilyMemberId và Visit hợp lệ được kiểm khi mở hồ sơ.
+- Web giải thích quyền xem tự có sau tiếp nhận, tự mở các tab khi trạng thái Verified. Chưa có lượt hợp lệ hiển thị chưa có hồ sơ liên kết; form thủ công nằm trong mục **Liên kết hồ sơ đã có tại phòng khám**, dùng khi cần. Không coi đặt lịch chưa tiếp nhận là đã có bệnh án.
+- Kiểm thử: mở trực tiếp và mở trạng thái đều tự cấp; trường hợp Pending, concurrent, token cũ sau thu hồi, sai owner/Patient/chi nhánh/snapshot, archived, nhiều Patient, chưa tiếp nhận, định danh thay đổi và không mở rộng quyền thủ công. Nội dung nháp/nội bộ và tài chính vẫn bị loại.
+
 1. Trong Xem hồ sơ, A xem trạng thái và gửi yêu cầu kèm mã hồ sơ nếu biết/thông tin đối chiếu. Chưa được duyệt chỉ hiện dữ liệu A khai và lịch A đặt hộ.
 2. Yêu cầu lưu snapshot họ tên/ngày sinh/quan hệ và owner; PatientId để null. Một người thân chỉ có một Pending/Verified còn hiệu lực; gửi lại khi Pending trả yêu cầu hiện tại. Verified hết hạn có thể xin lại; lưu chuyển trạng thái hết hạn và audit.
 3. Nhân viên có role ClinicAssistant và quyền `patient-links.read` xem hàng đợi. Tra cứu/duyệt/từ chối/thu hồi yêu cầu quyền `patient-links.verify`, kiểm lại từ database ở service. Không tự mở quyền cho Dentist/Admin/Owner chỉ vì có menu.

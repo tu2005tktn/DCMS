@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using DCMS.Application.Common;
 using DCMS.Application.Features.Appointments;
 using DCMS.Application.Features.Scheduling;
+using DCMS.Application.Features.Settings;
 using DCMS.Domain.Features.Accounts;
 using DCMS.Domain.Features.Appointments;
 using DCMS.Domain.Features.PatientLinks;
@@ -19,7 +20,8 @@ using Microsoft.EntityFrameworkCore;
 namespace DCMS.Infrastructure.Features.Appointments;
 
 public sealed class AppointmentService(DcmsDbContext db, IAvailabilityService availability,
-    UserManager<ApplicationUser> users, IFollowUpBookingPort followUps, TimeProvider clock) : IAppointmentService
+    UserManager<ApplicationUser> users, IFollowUpBookingPort followUps, TimeProvider clock,
+    ISettingsAccess access, IAppointmentQueryService queries) : IAppointmentService
 {
     private static BusinessException Error(string code, int status = 400) => new(status, SystemMessages.Get(code));
     private static string Hash(string value) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
@@ -31,17 +33,19 @@ public sealed class AppointmentService(DcmsDbContext db, IAvailabilityService av
     public async Task<CreateAppointmentOutcome> CreateAsync(int? accountId, CreateAppointmentRequest request, CancellationToken ct)
     {
         if (request.RequestKey == Guid.Empty || request.BranchId <= 0 || request.DentistId <= 0
-            || request.ScheduleVersion <= 0 || request.StartAt == default) throw Error("MSG04");
+            || request.ScheduleVersion <= 0 || request.StartAt == default || request.ReplacesAppointmentId == Guid.Empty) throw Error("MSG04");
 
         var account = accountId.HasValue ? await users.FindByIdAsync(accountId.Value.ToString()) : null;
         if (accountId.HasValue && (account == null || !account.IsActive)) throw Error("MSG07", 401);
         var staff = account?.AccountType == "Staff";
+        if (request.ReplacesAppointmentId.HasValue && !staff) throw Error("MSG06", 403);
         if (staff)
         {
             // Counter booking is for assistants; a dentist may only book a treatment follow-up of their own plan.
             var treatmentFollowUp = request.FollowUpId.HasValue
                 && AccountRoles.Effective(await users.GetRolesAsync(account!)).Contains(AccountRoles.Dentist);
-            if (!treatmentFollowUp && !await users.IsInRoleAsync(account!, AccountRoles.ClinicAssistant)) throw Error("MSG06", 403);
+            if (request.ReplacesAppointmentId.HasValue) await access.RequireAsync(accountId!.Value, "appointments.create", ct);
+            if (!request.ReplacesAppointmentId.HasValue && !treatmentFollowUp && !await users.IsInRoleAsync(account!, AccountRoles.ClinicAssistant)) throw Error("MSG06", 403);
             var employee = await db.Employees.AsNoTracking().SingleOrDefaultAsync(x => x.AccountId == accountId, ct);
             if (employee == null || !await db.Set<SchedulingMember>().AsNoTracking().AnyAsync(x =>
                     x.BranchId == request.BranchId && x.EmployeeId == employee.Id && x.Active, ct)) throw Error("MSG06", 403);
@@ -50,6 +54,7 @@ public sealed class AppointmentService(DcmsDbContext db, IAvailabilityService av
         var relation = Clean(request.AttendeeRelation) ?? "Self";
         var kind = Clean(request.Kind) ?? "Standard";
         var source = staff ? Clean(request.Source) ?? "Phone" : "App";
+        if (request.ReplacesAppointmentId.HasValue && (kind != "WalkIn" || source != "InPerson" || request.FollowUpId.HasValue || request.AssistantId.HasValue)) throw Error("MSG04");
         if (request.FamilyMemberId.HasValue && (account?.AccountType != "Public" || relation != "Relative")) throw Error("MSG06", 403);
         if (relation is not ("Self" or "Relative") || kind is not ("Standard" or "WalkIn" or "FollowUp")
             || (staff && source is not ("Phone" or "Zalo" or "Facebook" or "InPerson" or "App"))
@@ -105,11 +110,18 @@ public sealed class AppointmentService(DcmsDbContext db, IAvailabilityService av
         };
         // Preserve fingerprints of older requests that omitted this optional field.
         var fingerprint = Hash(JsonSerializer.Serialize(canonical) + (request.PatientConsentConfirmed ? "|patient-consent:true" : "")
-            + (request.FamilyMemberId.HasValue ? "|family:" + request.FamilyMemberId.Value.ToString("N") : ""));
+            + (request.FamilyMemberId.HasValue ? "|family:" + request.FamilyMemberId.Value.ToString("N") : "")
+            + (request.ReplacesAppointmentId.HasValue ? "|replaces:" + request.ReplacesAppointmentId.Value.ToString("N") : ""));
 
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
         // Share S09's reservation lock so duplicate requests and competing slots serialize.
         await db.Database.ExecuteSqlRawAsync($"SELECT pg_advisory_xact_lock({WorkingScheduleService.TransactionLock})", ct);
+        AppointmentListItem? replacementSource = null;
+        if (request.ReplacesAppointmentId.HasValue) {
+            var permissions = await access.RequireAsync(accountId!.Value, "appointments.create", ct);
+            replacementSource = (await queries.DetailAsync(accountId.Value, request.ReplacesAppointmentId.Value, ct)).Appointment;
+            if (!permissions.BranchIds.Contains(replacementSource.BranchId)) throw Error("MSG06", 403);
+        }
         DCMS.Domain.Features.FamilyMembers.FamilyMember? familyMember = null;
         if (request.FamilyMemberId.HasValue) {
             await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(90121, {accountId!.Value})", ct);
@@ -128,6 +140,13 @@ public sealed class AppointmentService(DcmsDbContext db, IAvailabilityService av
             if (familyMember.DeletedAt.HasValue) throw new BusinessException(404, new("FAMILY_MEMBER_NOT_FOUND", "Người thân không còn khả dụng."));
             attendeeName = familyMember.FullName; attendeeBirthDate = familyMember.BirthDate;
         }
+
+        now = clock.GetUtcNow();
+        if (replacementSource != null && (replacementSource.Status != "NoShow" || replacementSource.StartAt > now || replacementSource.EndAt <= now
+            || replacementSource.BranchId != request.BranchId || replacementSource.DentistId != request.DentistId
+            || start.AddMinutes(request.DurationMinutes) > replacementSource.EndAt
+            || await db.Visits.AnyAsync(x => x.AppointmentId == replacementSource.Id, ct)))
+            throw new BusinessException(409, new SystemMessage("APPOINTMENT_REPLACEMENT_UNAVAILABLE", "Khung giờ của lịch khách không tới không còn phù hợp. Vui lòng tải lại hoặc đặt một lịch khác."));
 
         if (kind != "FollowUp" && !await db.Set<SchedulingService>().AsNoTracking().AnyAsync(s =>
             s.Id == request.ServiceId && s.BranchId == request.BranchId && s.Active && s.IsInitialExamination, ct)) throw Error("MSG110");
@@ -180,11 +199,13 @@ public sealed class AppointmentService(DcmsDbContext db, IAvailabilityService av
         db.Add(new AppointmentReceipt { ActorScope = scope, RequestKey = request.RequestKey,
             Fingerprint = fingerprint, AppointmentId = id,
             ResultJson = JsonSerializer.Serialize(Result(appointment, "MSG29")) });
+        var eventPayload = JsonSerializer.SerializeToNode(new { appointmentId = id, code, version = 1,
+            status = "Confirmed", branchId = request.BranchId, startAt = reservation.Start, endAt = reservation.End })!;
+        if (request.ReplacesAppointmentId.HasValue) eventPayload["replacesAppointmentId"] = JsonSerializer.SerializeToNode(request.ReplacesAppointmentId.Value);
         db.Add(new AppointmentOutboxEvent
         {
             AggregateId = id, OccurredAt = now,
-            PayloadJson = JsonSerializer.Serialize(new { appointmentId = id, code, version = 1,
-                status = "Confirmed", branchId = request.BranchId, startAt = reservation.Start, endAt = reservation.End })
+            PayloadJson = eventPayload.ToJsonString()
         });
         await db.SaveChangesAsync(ct);
         if (request.FollowUpId.HasValue)

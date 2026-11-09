@@ -76,8 +76,12 @@ test('S10 lưới 15 phút: card có mã/nguồn/trạng thái, không lộ lý 
   await expect(page.getByText('Đặt lịch tại quầy (S11)')).toBeVisible();
   await page.keyboard.press('Escape');
 
-  // Bấm lịch hẹn → mở S12, đọc chi tiết từ server (dòng 8).
+  // Bấm lịch hẹn → mở drawer tại lưới, vẫn có đường tới trang chi tiết đầy đủ.
   await card.click();
+  const drawer = page.getByRole('dialog', { name: 'Thông tin lịch hẹn', exact: true });
+  await expect(drawer).toBeVisible(); await expect(page).toHaveURL(/\/appointments$/);
   await expect(page.getByText(`Lịch hẹn ${appointment.code}`)).toBeVisible();
-  await expect(page.getByText('0901***234')).toBeVisible();
+  await expect(drawer.getByText(/0901\*\*\*234/)).toBeVisible();
+  await drawer.getByRole('link', { name: 'Mở chi tiết đầy đủ', exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`/appointments/${appointmentId}$`));
 });

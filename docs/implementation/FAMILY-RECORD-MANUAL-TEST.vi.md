@@ -2,6 +2,14 @@
 
 Phạm vi: web khách hàng và web nhân viên, dữ liệu giả trong môi trường local. Người đặt A có tài khoản; người thân B chỉ có thông tin người thân và hồ sơ bệnh nhân, không tạo tài khoản cho B.
 
+## Luồng mặc định mới — bổ sung 09/11/2026
+
+Thực hiện bước 1–3 bên dưới, rồi A mở **Người thân → Xem hồ sơ**. Hồ sơ chính thức tự hiển thị, mặc định vào **Lịch sử khám**; không cần bước 4–5 xin/duyệt riêng. Có sẵn cả các tab Điều trị/Đơn thuốc/Ảnh và tài liệu, nội dung tùy hồ sơ chính thức tại chi nhánh tiếp nhận. Nếu chỉ mới đặt lịch chưa tiếp nhận, hiển thị **Chưa có hồ sơ liên kết** và vẫn có **Lịch đặt hộ**.
+
+Kiểm thu hồi: trợ lý mở `/link-verification` → **Hồ sơ người thân**, đổi bộ lọc trạng thái sang **Tất cả** để thấy quyền tự cấp, chọn **Đối chiếu**, nhập lý do và **Thu hồi quyền**. A tải lại trạng thái thì hồ sơ biến mất; tải lại nhiều lần không tự cấp lại. Quyền đã bị thu hồi/hết hạn hoặc bị giới hạn thủ công không được tự mở rộng.
+
+Bước 4–5 chỉ là nhánh bổ sung khi cần liên kết hồ sơ đã có từ trước mà không có lịch đặt hộ đã được tiếp nhận phù hợp. Form xin quyền nằm trong mục **Liên kết hồ sơ đã có tại phòng khám**. Không dùng trùng tên/SĐT để tự chọn bệnh nhân.
+
 ## Chuẩn bị
 
 - Khách hàng: http://localhost:5173/customer/sign-in. Nếu chưa có A, đăng ký tại `/customer/register` bằng số điện thoại chưa sử dụng, rồi đăng nhập bằng số điện thoại đó.
@@ -44,7 +52,7 @@ Kỳ vọng: có phiếu khám chính thức. Phiếu chỉ lưu nháp chưa xu�
 ## 4. A xin quyền xem hồ sơ
 
 1. A mở B → **Xem hồ sơ**.
-2. Nhập mã hồ sơ B và thông tin giúp phòng khám đối chiếu.
+2. Mở **Liên kết hồ sơ đã có tại phòng khám**, nhập mã hồ sơ B và thông tin giúp phòng khám đối chiếu.
 3. Bấm **Yêu cầu quyền xem hồ sơ**.
 
 Kỳ vọng: **Chờ phòng khám xác minh**; A vẫn xem được lịch đặt hộ nhưng chưa có tab bệnh án.
