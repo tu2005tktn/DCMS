@@ -2,10 +2,12 @@ import { usePermissions } from '../authentication/usePermissions';
 import { Alert, Button, Card, Checkbox, Empty, Input, InputNumber, Select, Space, Spin, Table, Typography } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../../services/api';
+import { useCanPickBranch } from '../authentication/useCanPickBranch';
 
 type Service = { id: number; name: string; durationMinutes: number; active: boolean; publicBookable: boolean; isInitialExamination?: boolean };
 type Settings = { branchId: number; slotIntervalMinutes: number; version: number; services: Service[] };
 export default function BookingSettingsPage() {
+  const canPickBranch = useCanPickBranch();
   const has = usePermissions();
   const [branches, setBranches] = useState<{ id: number; name: string }[] | null>(null);
   const [branchId, setBranchId] = useState<number>();
@@ -59,8 +61,8 @@ export default function BookingSettingsPage() {
     {notice && <Alert className="form-alert" type="success" showIcon message={notice} />}
     {!branches ? !error && <Spin /> : branches.length === 0 ? <Empty description="Bạn chưa có chi nhánh được phép cài đặt." /> : <Card>
       <Space wrap style={{ marginBottom: 24 }}>
-        <Select aria-label="Chi nhánh cài đặt" style={{ width: 240 }} value={branchId} disabled={dirty || saving}
-          options={branches.map(b => ({ value: b.id, label: b.name }))} onChange={setBranchId} />
+        {canPickBranch && branches.length > 1 && <Select aria-label="Chi nhánh cài đặt" style={{ width: 240 }} value={branchId} disabled={dirty || saving}
+          options={branches.map(b => ({ value: b.id, label: b.name }))} onChange={setBranchId} />}
         {dirty && <Button disabled={!has('booking-settings.manage') || saving} onClick={() => setRevision(value => value + 1)}>Bỏ thay đổi</Button>}
       </Space>
       {loading ? <Spin /> : settings && <>

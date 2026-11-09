@@ -4,7 +4,6 @@ import VisitPage from '../features/examinations/ExaminationPage';
 import PaymentsPage from '../features/finance/PaymentsPage';
 import ReceiptPrintPage from '../features/finance/ReceiptPrintPage';
 import PrescriptionPage from '../features/prescriptions/PrescriptionPage';
-import PrescriptionTemplatesPage from '../features/prescriptions/PrescriptionTemplatesPage';
 import ClinicalServicesPage from '../features/finance/ClinicalServicesPage';
 import { Alert, Button, Card, Result, Space, Tag, Typography } from 'antd';
 import { useState, type ReactNode } from 'react';
@@ -43,10 +42,10 @@ import RevisionPage from '../features/treatment/RevisionPage';
 
 import ItemPlansPage from '../features/treatment/ItemPlansPage';
 
-export default // Đường dẫn cũ của màn Dịch vụ: giữ nguyên tham số ?dossier=.
+// Đường dẫn cũ của màn Dịch vụ: giữ nguyên tham số ?dossier=.
 function LegacyCommercialRedirect() { const { search } = useLocation(); return <Navigate to={'/settings/treatment-services' + search} replace />; }
 
-function App() {
+export default function App() {
   return <Routes>
     <Route path="/sign-in" element={<SignInPage />} />
     <Route path="/access" element={<AccessPage />} />

@@ -5,7 +5,9 @@ import {useEffect,useRef,useState} from 'react';
 import {Link} from 'react-router-dom';
 import {api} from '../../services/api';
 import {type Capabilities,type Service,type Provider,kinds,money} from './types';
+import { useCanPickBranch } from '../authentication/useCanPickBranch';
 export default function ClinicalServicesPage(){
+  const canPickBranch = useCanPickBranch();
  const [cap,setCap]=useState<Capabilities>(),[branch,setBranch]=useState<number>(),[services,setServices]=useState<Service[]>([]),[providers,setProviders]=useState<Provider[]>([]),[error,setError]=useState<string>(),[busy,setBusy]=useState(false),[edit,setEdit]=useState<Service|null|undefined>(),[providerOpen,setProviderOpen]=useState(false);
  const [form]=Form.useForm(),[providerForm]=Form.useForm();const pending=useRef<{body:string;key:string}|undefined>(undefined);
  const can=(p:string)=>cap?.permissions.includes(p);
@@ -19,7 +21,7 @@ export default function ClinicalServicesPage(){
  catch(e){setError((e as Error).message);}finally{setBusy(false);}}
  return <main className="finance-page"><Space wrap><Typography.Title level={2}>Dịch vụ khám & cận lâm sàng</Typography.Title><Link to="/payments">Thanh toán</Link></Space>
  {error&&<Alert role="alert" type="error" message={error}/>}
- <Space style={{marginBottom:16}}><Select aria-label="Chi nhánh dịch vụ" style={{minWidth:220}} disabled={busy||edit!==undefined} value={branch} onChange={setBranch} options={cap?.branches.map(x=>({value:x.id,label:x.name}))}/>{can('services.manage')&&<Button type="primary" disabled={!branch||busy} onClick={()=>open(null)}>Thêm dịch vụ</Button>}<Button disabled={busy} onClick={()=>void load().catch(e=>setError((e as Error).message))}>Tải lại danh mục</Button></Space>
+ <Space style={{marginBottom:16}}>{canPickBranch && (cap?.branches.length??0)>1&&<Select aria-label="Chi nhánh dịch vụ" style={{minWidth:220}} disabled={busy||edit!==undefined} value={branch} onChange={setBranch} options={cap?.branches.map(x=>({value:x.id,label:x.name}))}/>}{can('services.manage')&&<Button type="primary" disabled={!branch||busy} onClick={()=>open(null)}>Thêm dịch vụ</Button>}<Button disabled={busy} onClick={()=>void load().catch(e=>setError((e as Error).message))}>Tải lại danh mục</Button></Space>
  <ExaminationServiceCatalog branchId={branch} canManage={!!can('services.manage')}/>
  <Alert type="info" message="Thiết lập một đơn giá cụ thể cho từng dịch vụ cận lâm sàng. Khi chọn dịch vụ, giá này được điền sẵn. Nhập 0 nếu miễn phí theo bảng giá; dữ liệu cũ chưa có giá cần được thiết lập trước khi lập phí."/>
  <Table rowKey="id" dataSource={services} columns={[{title:'Tên dịch vụ',dataIndex:'name'},{title:'Nhóm',dataIndex:'kind',render:v=>kinds[v]},{title:'Đơn vị',dataIndex:'unit'},{title:'Đơn giá',dataIndex:'priceVnd',render:v=>v==null?<Tag color="orange">Chưa thiết lập giá</Tag>:v===0?<Tag color="green">Miễn phí (0 ₫)</Tag>:money(v)},{title:'Trạng thái',dataIndex:'active',render:v=><Tag>{v?'Đang dùng':'Ngừng dùng'}</Tag>},{title:'',render:(_,s)=>can('services.manage')&&<Button onClick={()=>open(s)}>Sửa</Button>}]}/>

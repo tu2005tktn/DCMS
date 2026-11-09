@@ -60,7 +60,7 @@ public static class DependencyInjection
         services.AddScoped<DCMS.Application.Features.Settings.ISettingsService, Features.Settings.SettingsService>();
         services.AddScoped<DCMS.Application.Features.Settings.IBranchManagementService, Features.Settings.BranchManagementService>();
         services.AddScoped<Features.Settings.BranchAssetStore>();
-        services.AddScoped<DCMS.Application.Features.Settings.IBranchLabObligationPort, Features.Settings.UnavailableBranchLabObligationPort>();
+        services.AddScoped<DCMS.Application.Features.Settings.IBranchLabObligationPort, Features.Settings.BranchLabObligationPort>();
         services.AddScoped<IRegistrationService, RegistrationService>();
         services.AddHttpClient();
         services.AddSingleton<IGoogleTokenVerifier, GoogleTokenVerifier>();

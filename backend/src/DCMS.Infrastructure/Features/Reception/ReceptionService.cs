@@ -43,7 +43,7 @@ public sealed class ReceptionService(DcmsDbContext db, UserManager<ApplicationUs
         if (user == null || !user.IsActive || user.LockoutEnabled && user.LockoutEnd > clock.GetUtcNow()) throw Error("MSG07", 401);
         if (user.AccountType != "Staff") throw Error("MSG06", 403);
         var roles = AccountRoles.Effective(await users.GetRolesAsync(user));
-        var assistant = roles.Contains(AccountRoles.ClinicAssistant);
+        var assistant = roles.Contains(AccountRoles.ClinicAssistant) || roles.Contains(AccountRoles.ClinicOwner);
         if (!assistant && !roles.Contains(AccountRoles.Dentist)) throw Error("MSG06", 403);
         var employee = await db.Employees.AsNoTracking().SingleOrDefaultAsync(x => x.AccountId == actorId, ct) ?? throw Error("MSG06", 403);
         var backdate = assistant && (await users.GetClaimsAsync(user)).Any(x => x.Type == "permission" && x.Value == "reception.backdate");
@@ -55,6 +55,11 @@ public sealed class ReceptionService(DcmsDbContext db, UserManager<ApplicationUs
         await settingsAccess.OperationalAsync(actorId,permission ?? (write ? "reception.check-in" : "reception.read"),branchId,ct);
         var actor = await ActorAsync(actorId, ct);
         if (write && !actor.Assistant) throw Error("MSG06", 403);
+        if ((await settingsAccess.ResolveAsync(actorId, ct)).Owner)
+        {
+            if (!await db.Set<SchedulingBranch>().AnyAsync(x => x.Id == branchId && x.Active, ct)) throw Error("MSG06", 403);
+            return actor;
+        }
         if (!await (from m in db.Set<SchedulingMember>() join b in db.Set<SchedulingBranch>() on m.BranchId equals b.Id
             where m.EmployeeId == actor.EmployeeId && m.BranchId == branchId && m.Active && b.Active && (actor.Assistant || m.CanDentist)
             select m).AnyAsync(ct)) throw Error("MSG06", 403);
@@ -72,7 +77,7 @@ public sealed class ReceptionService(DcmsDbContext db, UserManager<ApplicationUs
         var options = await appointments.OptionsAsync(actorId, ct);
         var branchIds = await (from m in db.Set<SchedulingMember>() join b in db.Set<SchedulingBranch>() on m.BranchId equals b.Id
             where m.EmployeeId == actor.EmployeeId && m.Active && b.Active && (actor.Assistant || m.CanDentist) select m.BranchId).ToArrayAsync(ct);
-        branchIds = branchIds.Intersect(permissionState.BranchIds).ToArray();
+        branchIds = permissionState.Owner ? options.Branches.Select(x => x.Id).ToArray() : branchIds.Intersect(permissionState.BranchIds).ToArray();
         return new(options with
         {
             Branches = options.Branches.Where(x => branchIds.Contains(x.Id)).ToArray(),

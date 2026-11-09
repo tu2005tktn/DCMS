@@ -32,7 +32,7 @@
   .lab-order-head-fields { width: 100%; display: grid; grid-template-columns: 1fr 1fr; }
 }
 @media print {
-  body * { visibility: hidden !important; }
+  body:has(.lab-order-modal) * { visibility: hidden !important; }
   .lab-order-modal, .lab-order-modal * { visibility: visible !important; }
   .lab-order-modal { position: absolute; left: 0; top: 0; width: 100%; }
   .lab-order-modal .ant-modal-content { box-shadow: none; }

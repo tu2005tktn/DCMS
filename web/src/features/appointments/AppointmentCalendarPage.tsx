@@ -8,6 +8,7 @@ import {
   addDays, clinicToday, clock, formatDate, localDate, localMinute, mondayOf, sourceLabels, statusColors, statusLabels, weekday,
   type AppointmentOptions, type AppointmentStatus, type CalendarPeriod, type CalendarView,
 } from './types';
+import { useCanPickBranch } from '../authentication/useCanPickBranch';
 
 const SLOT = 15;
 const ROW = 18; // px per 15 minutes
@@ -21,6 +22,7 @@ function cellKind(periods: CalendarPeriod[], minute: number) {
 
 // S10 Appointment calendar (UC-05). Scope is decided by the server; filters only narrow what the server allows.
 export default function AppointmentCalendarPage() {
+  const canPickBranch = useCanPickBranch();
   const has = usePermissions();
   const navigate = useNavigate();
   const [toast, toastContext] = message.useMessage();
@@ -103,8 +105,8 @@ export default function AppointmentCalendarPage() {
           <Typography.Text strong>{mode === 'DAY' ? `${weekday(date)}, ${formatDate(date)}` : `${formatDate(from)} – ${formatDate(to)}`}</Typography.Text>
         </Space>
         <Space wrap>
-          <Select aria-label="Chi nhánh" style={{ width: 220 }} value={branchId} options={options.branches.map(b => ({ value: b.id, label: b.name }))}
-            onChange={value => { setBranchId(value); setDentistId(undefined); }} />
+          {canPickBranch && options.branches.length > 1 && <Select aria-label="Chi nhánh" style={{ width: 220 }} value={branchId} options={options.branches.map(b => ({ value: b.id, label: b.name }))}
+            onChange={value => { setBranchId(value); setDentistId(undefined); }} />}
           <Select aria-label="Nha sĩ" style={{ width: 200 }} allowClear={mode === 'DAY'} placeholder="Tất cả nha sĩ" value={mode === 'WEEK' ? weekDentist : dentistId}
             options={dentists.map(d => ({ value: d.id, label: d.name }))} onChange={setDentistId} />
           <Select aria-label="Trạng thái" style={{ width: 170 }} value={status} onChange={setStatus}

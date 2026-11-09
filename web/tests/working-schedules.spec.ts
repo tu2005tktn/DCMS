@@ -10,7 +10,7 @@ async function select(page: Page, label: string, text: string) {
   await page.locator('.ant-select-dropdown').filter({ has: page.locator(`[id="${list}"]`) }).getByText(text, { exact: true }).last().click();
 }
 async function workspace(page: Page) {
-  const user = { id: 10, userName: 'dentist.test', fullName: 'Bác sĩ kiểm thử', accountType: 'Staff', roles: ['Dentist'], effectiveRoles: ['Dentist'], permissions: [] };
+  const user = { id: 10, userName: 'dentist.test', fullName: 'Bác sĩ kiểm thử', accountType: 'Staff', roles: ['Dentist'], effectiveRoles: ['Dentist'], permissions: ['working-schedules.read', 'working-schedules.manage'] };
   await page.route('**/api/auth/sign-in', route => route.fulfill({ json: { accessToken: 'test-only', user } }));
   await page.route('**/api/auth/me', route => route.fulfill({ json: user }));
   await page.route('**/api/working-schedules/options', route => route.fulfill({ json: options }));

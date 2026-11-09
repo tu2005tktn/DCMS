@@ -38,12 +38,14 @@ const timeOptions = Array.from({ length: 97 }, (_, i) => i * 15).map(m => ({
 }));
 const hhmm = (m: number) => timeOptions.find(o => o.value === m)?.label ?? String(m);
 
+const blockerLabels: Record<string, string> = { Appointments: 'Lịch hẹn', Visits: 'Lượt khám', Reservations: 'Giữ chỗ', Finance: 'Tài chính', PayOsOrders: 'Chuyển khoản PayOS', TreatmentDossiers: 'Hồ sơ điều trị', LabOrders: 'Phiếu labo' };
+
 function BlockerList({ blockers }: { blockers: Blocker[] }) {
   return (
     <ul style={{ paddingLeft: 18, margin: 0 }}>
       {blockers.map((b, i) => (
         <li key={i} style={{ marginBottom: 4 }}>
-          <Tag color="red">{b.count}</Tag>{b.message} <Link to={b.navigationUrl}>Mở để xử lý</Link>
+          <Tag color="red">{b.count}</Tag><strong>{blockerLabels[b.kind] ?? b.kind}:</strong> {b.message} <Link to={b.navigationUrl}>Mở để xử lý</Link>
         </li>
       ))}
     </ul>

@@ -61,3 +61,7 @@ Trạng thái theo dõi xưởng (gửi, nhận, làm lại), tệp đính kèm,
 
 
 Cập nhật 08/11/2026: danh sách phiếu labo riêng và theo dõi trạng thái xưởng (gửi, nhận, làm lại) đã chuyển sang [LAB-ORDER-MANAGEMENT.md](LAB-ORDER-MANAGEMENT.md). Phiếu mới có trạng thái mặc định `NotSent`.
+
+## Sửa lỗi in (08/11/2026)
+
+Quy tắc in của phiếu labo chỉ được áp dụng khi cửa sổ phiếu labo đang mở (`body:has(.lab-order-modal)`). Trước đây quy tắc `body * { visibility: hidden }` nằm trong CSS toàn cục nên mọi trang khác (ví dụ in phiếu thu) in ra trang trắng.

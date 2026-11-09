@@ -11,8 +11,9 @@ public sealed partial class TreatmentDossierService
 {
     private DateOnly VnToday() => DateOnly.FromDateTime(clock.GetUtcNow().ToOffset(TimeSpan.FromHours(7)).DateTime);
 
+    // BranchIds is already limited to the actor's own active branches (owner: all active; others: membership ∩ access-group branches).
     private IQueryable<LabOrder> LabScope(Application.Features.Settings.PermissionState scope) =>
-        scope.Assigned && !scope.Owner ? db.LabOrders.Where(x => scope.BranchIds.Contains(x.BranchId)) : db.LabOrders;
+        db.LabOrders.Where(x => scope.BranchIds.Contains(x.BranchId));
 
     private static bool IsOverdue(string status, DateOnly? due, DateOnly today) =>
         due is { } d && d < today && status is LabOrderStatus.NotSent or LabOrderStatus.Sent or LabOrderStatus.Rework;
@@ -24,7 +25,7 @@ public sealed partial class TreatmentDossierService
         q = Clean(q);
         if (page < 1 || pageSize is not (20 or 50 or 100) || page > int.MaxValue / pageSize || q?.Length > 160 || from > to
             || (status != null && status != "Overdue" && !LabOrderStatus.All.Contains(status))) throw Error("MSG04");
-        if (branchId is { } b && scope.Assigned && !scope.Owner && !scope.BranchIds.Contains(b)) throw Error("MSG06", 403);
+        if (branchId is { } b && !scope.BranchIds.Contains(b)) throw Error("MSG06", 403);
         var today = VnToday();
         var baseQuery = LabScope(scope);
         if (branchId.HasValue) baseQuery = baseQuery.Where(x => x.BranchId == branchId.Value);
@@ -68,7 +69,7 @@ public sealed partial class TreatmentDossierService
     private async Task<LabOrder> ScopedLabOrderAsync(Application.Features.Settings.PermissionState scope, Guid id, bool track, CancellationToken ct)
     {
         var order = await (track ? db.LabOrders : db.LabOrders.AsNoTracking()).SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw Error("MSG113", 404);
-        if (scope.Assigned && !scope.Owner && !scope.BranchIds.Contains(order.BranchId)) throw Error("MSG113", 404);
+        if (!scope.BranchIds.Contains(order.BranchId)) throw Error("MSG113", 404);
         return order;
     }
 

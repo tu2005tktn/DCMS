@@ -45,12 +45,16 @@
 .staff-patient-page .page-heading p { color: #667085; max-width: 760px; }
 .staff-patient-page .page-heading > .ant-btn { min-height: 44px; }
 .staff-patient-page .staff-patient-filter-panel { padding: 20px 20px 4px; }
-.staff-patient-page .patient-filters { grid-template-columns: minmax(180px, 1fr) 155px; gap: 16px; margin: 0; }
+.staff-patient-page .patient-filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 16px; margin: 0; }
+.staff-patient-page .patient-filters > label:first-child { flex: 1 1 280px; min-width: 220px; }
+.staff-patient-page .patient-filters > label:not(:first-child):not(.ant-checkbox-wrapper) { flex: 0 0 190px; }
+.staff-patient-page .patient-filters > label .ant-select, .staff-patient-page .patient-filters > label > .ant-input { width: 100%; }
+.staff-patient-page .patient-filters .ant-select, .staff-patient-page .patient-filters .ant-select-selector { height: 40px !important; align-items: center; }
 .staff-patient-page .patient-filters .ant-input, .staff-patient-page .patient-filters .ant-input-affix-wrapper { min-height: 40px; }
 .staff-patient-page .patient-filters .ant-input-affix-wrapper .ant-input { min-height: 0; }
 .staff-patient-page .patient-filters label { font-weight: 600; color: #344054; gap: 8px; }
-.staff-patient-page .patient-filters label.ant-checkbox-wrapper { display: inline-flex; flex-direction: row; align-items: center; font-weight: 400; margin-bottom: 10px; }
-.staff-patient-page .patient-filters .link-filter-actions { grid-column: auto; justify-self: end; }
+.staff-patient-page .patient-filters label.ant-checkbox-wrapper { display: inline-flex; flex-direction: row; align-items: center; font-weight: 400; margin-bottom: 10px; flex: 0 0 auto; }
+.staff-patient-page .patient-filters .link-filter-actions { margin-left: auto; margin-bottom: 4px; flex-wrap: nowrap; }
 .staff-patient-page .patient-filters .ant-btn { min-height: 40px; }
 .staff-patient-page .staff-patient-table-panel .ant-card-body { padding: 0; }
 .staff-patient-table-heading { display: flex; align-items: center; gap: 12px; padding: 12px 20px 0; }
@@ -60,7 +64,6 @@
 .staff-patient-code { color: #175cd3 !important; }
 .staff-patient-status { display: inline-flex; align-items: center; gap: 6px; border: 0; padding: 3px 10px; border-radius: 6px; }
 .staff-patient-status::before { content: ''; width: 7px; height: 7px; background: currentColor; border-radius: 50%; }
-@media(min-width:1400px) { .staff-patient-page .patient-filters { grid-template-columns: minmax(200px,1fr) 155px auto auto; } }
 @media(max-width:1100px) {
   .staff-sidebar { width: 232px; }
   .staff-main.ant-layout { margin-left: 232px; }
@@ -90,7 +93,9 @@
   .staff-user .ant-avatar { display: none; }
   .staff-user .ant-btn { margin: 0; font-size: 12px; padding: 0 10px; }
   .staff-patient-page .page-heading { align-items: flex-start; }
-  .staff-patient-page .patient-filters { grid-template-columns: minmax(0,1fr); }
+  .staff-patient-page .patient-filters { flex-direction: column; align-items: stretch; }
+  .staff-patient-page .patient-filters > label:first-child, .staff-patient-page .patient-filters > label:not(:first-child):not(.ant-checkbox-wrapper) { flex: 1 1 auto; }
+  .staff-patient-page .patient-filters .link-filter-actions { margin-left: 0; }
   .staff-patient-page .patient-filters .link-filter-actions { justify-self: start; flex-wrap: wrap; }
   .staff-patient-page .staff-patient-filter-panel { padding: 16px; }
   .staff-workspace .treatment-sheet-card-top { grid-template-columns: minmax(0,1fr); }

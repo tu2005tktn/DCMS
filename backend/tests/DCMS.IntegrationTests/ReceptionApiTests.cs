@@ -198,7 +198,7 @@ public sealed class ReceptionApiTests(ReceptionFixture fixture) : IClassFixture<
     [Fact] public async Task DentistOwnScopeAndRevokedBranchApplyToReadAndReplay()
     {
         var s = await Prepare(); using var client = await Login(); var command = Command(s); var v = await Check(client, s, command);
-        using var owner = await Login("owner.demo"); await Error(await owner.GetAsync($"/api/visits/{v.VisitId}"), HttpStatusCode.Forbidden);
+        using var owner = await Login("owner.demo"); Assert.Equal(HttpStatusCode.OK, (await owner.GetAsync($"/api/visits/{v.VisitId}")).StatusCode); // chủ phòng khám xem mọi chi nhánh (S58-BRANCHES-AND-CHAIRS §4)
         using var dual = await Login("dual.demo"); using var dentist = await Login("dentist.demo");
         var queue = await dentist.GetFromJsonAsync<ReceptionPage<VisitResult>>($"/api/reception/queue?branchId={s.BranchId}&date={Today:yyyy-MM-dd}&dentistId={s.AssistantId}"); Assert.Single(queue!.Items);
         using (var scope = fixture.Services.CreateScope()) { var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>(); (await db.Set<SchedulingMember>().SingleAsync(x => x.BranchId == s.BranchId && x.EmployeeId == s.AssistantId)).Active = false; await db.SaveChangesAsync(); }
