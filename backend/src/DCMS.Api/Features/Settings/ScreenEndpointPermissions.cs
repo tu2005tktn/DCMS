@@ -41,6 +41,7 @@ public static class ScreenEndpointPermissions
         if (p.StartsWith("/api/system-settings/material")) return Need($"catalog.materials.{(read ? "read" : method == "DELETE" ? "deactivate" : method == "POST" ? "create" : "update")}");
         if (p.StartsWith("/api/accounts")) return Need(read ? p.EndsWith("/audit") ? "accounts.audit" : "accounts.read" : p.EndsWith("/state") ? "accounts.state" : method == "POST" ? "accounts.create" : "accounts.update");
         if (p.StartsWith("/api/patient-link-reviews")) return Need(read ? "patient-links.read" : "patient-links.verify");
+        if (p.StartsWith("/api/family-record-reviews")) return Need(read && !p.EndsWith("/patients") ? "patient-links.read" : "patient-links.verify");
         if (p.StartsWith("/api/notifications")) return Need(read || p.EndsWith("/check-deep-link") ? "notifications.read" : "notifications.mark-read");
         if (p.StartsWith("/api/booking-settings")) return Need(read ? "booking-settings.read" : "booking-settings.manage");
         if (p.StartsWith("/api/working-schedules")) return Need(read ? "working-schedules.read" : "working-schedules.manage");

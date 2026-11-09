@@ -167,6 +167,7 @@ function BookingForm() {
         email: phonePattern.test(cleanContact) ? null : cleanContact },
       attendee: { patientId: null, name: attendeeName.trim(), birthDate: relation === 'Relative' ? attendeeBirthDate || null : null },
       attendeeRelation: relation, kind: 'Standard', source: 'App', serviceId: service.id, reason: reason.trim() || null,
+      ...(relation === 'Relative' && selectedMember ? { familyMemberId: selectedMember.id } : {}),
       dentistId, assistantId: null, chairId: null, startAt: slot.start,
       durationMinutes: service.publicDurationMinutes, followUpId: null, exceptionReason: null, bookingSettingsVersion: slot.bookingSettingsVersion,
       scheduleVersion: slot.scheduleVersion, assistantScheduleVersion: null,
@@ -306,11 +307,11 @@ function BookingForm() {
                 status={fieldErrors.contact ? 'error' : undefined} />{fieldErrors.contact && <span className="customer-field-error" id="booking-contact-error">{fieldErrors.contact}</span>}</label>
             </div></fieldset>
           <fieldset className="customer-booking-person"><legend>Người đến khám</legend><p>{relation === 'Self' ? 'Thông tin của bạn.' : 'Thông tin người thân sẽ đến khám.'}</p>
-            <label>Họ tên người khám<Input id="booking-attendee-name" value={attendeeName} maxLength={100} onChange={event => {
+            <label>Họ tên người khám<Input id="booking-attendee-name" value={attendeeName} readOnly={relation === 'Relative' && !!selectedMember} maxLength={100} onChange={event => {
               setAttendeeName(event.target.value); setFieldErrors(previous => ({ ...previous, attendeeName: undefined }));
             }} aria-invalid={!!fieldErrors.attendeeName} aria-describedby={fieldErrors.attendeeName ? 'booking-attendee-name-error' : undefined}
               status={fieldErrors.attendeeName ? 'error' : undefined} />{fieldErrors.attendeeName && <span className="customer-field-error" id="booking-attendee-name-error">{fieldErrors.attendeeName}</span>}</label>
-            {relation === 'Relative' && <label>Ngày sinh người khám (không bắt buộc)<Input id="booking-attendee-birth" type="date" max={clinicToday()} value={attendeeBirthDate}
+            {relation === 'Relative' && <label>Ngày sinh người khám (không bắt buộc)<Input id="booking-attendee-birth" type="date" max={clinicToday()} value={attendeeBirthDate} readOnly={!!selectedMember}
               onChange={e => { setAttendeeBirthDate(e.target.value); setFieldErrors(previous => ({ ...previous, attendeeBirthDate: undefined })); }}
               aria-invalid={!!fieldErrors.attendeeBirthDate} status={fieldErrors.attendeeBirthDate ? 'error' : undefined}
               aria-describedby={fieldErrors.attendeeBirthDate ? 'booking-attendee-birth-error' : undefined} />

@@ -46,6 +46,7 @@ export default function NextVisitBookingDrawer({ open, candidate, patient, onClo
   const [bookerName, setBookerName] = useState(''), [bookerContact, setBookerContact] = useState(''), [exceptionReason, setExceptionReason] = useState('');
   const [after, setAfter] = useState<{ result: AppointmentResult; preview: PlannedDatePreview } | null>(null);
   const [picked, setPicked] = useState<string[]>([]), [syncError, setSyncError] = useState<string | null>(null);
+  const [patientConsent, setPatientConsent] = useState(false);
   const requestKeys = useRef<{ instruction: string; appointment: string | null; sync: string }>({ instruction: newRequestKey(), appointment: null, sync: newRequestKey() });
   const followUpId = useRef<string | null>(null);
   const generation = useRef(0);
@@ -111,6 +112,7 @@ export default function NextVisitBookingDrawer({ open, candidate, patient, onClo
     const end = lastDay(candidate);
     setLimitEnd(end); setBookerName(patient.fullName); setBookerContact(patient.phone ?? ''); setExceptionReason('');
     setAfter(null); setPicked([]); setSyncError(null);
+    setPatientConsent(false);
     void suggest(end);
     return () => { generation.current++; };
   }, [open, candidate?.itemId, candidate?.followUpId]);
@@ -123,7 +125,7 @@ export default function NextVisitBookingDrawer({ open, candidate, patient, onClo
 
   const needsException = !!slot && Date.parse(slot.start) < Date.now() + 60 * 60_000;
   const contactValid = cleanPhone(bookerContact) || cleanEmail(bookerContact);
-  const canConfirm = has('appointments.create') && has('treatment.progress.manage') && !!slot && !busy && bookerName.trim().length > 0 && bookerName.trim().length <= 100 && contactValid
+  const canConfirm = patientConsent && has('appointments.create') && has('treatment.progress.manage') && !!slot && !busy && bookerName.trim().length > 0 && bookerName.trim().length <= 100 && contactValid
     && (!needsException || exceptionReason.trim().length > 0);
 
   async function confirm() {
@@ -155,6 +157,7 @@ export default function NextVisitBookingDrawer({ open, candidate, patient, onClo
         serviceId: candidate.serviceId, reason: `Điều trị theo kế hoạch: ${candidate.serviceName}${candidate.region ? ` · ${candidate.region}` : ''}`,
         dentistId: candidate.dentistId, assistantId: null, chairId: slot.chairId, startAt: slot.start, durationMinutes: candidate.durationMinutes,
         followUpId: followUpId.current, bookingSettingsVersion: slot.bookingSettingsVersion,
+        patientConsentConfirmed: patientConsent,
         exceptionReason: reason, requestKey: requestKeys.current.appointment,
         scheduleVersion: slot.scheduleVersion, assistantScheduleVersion: slot.assistantScheduleVersion }) });
       requestKeys.current.appointment = null;
@@ -245,6 +248,9 @@ export default function NextVisitBookingDrawer({ open, candidate, patient, onClo
       <Input id="next-visit-contact" maxLength={254} value={bookerContact} status={bookerContact && !contactValid ? 'error' : undefined}
         onChange={event => setBookerContact(event.target.value)} disabled={busy} />
       {bookerContact && !contactValid && <Typography.Text type="danger">Liên hệ người đặt không đúng định dạng.</Typography.Text>}
+      <div className="patient-section"><Checkbox checked={patientConsent} disabled={busy} onChange={event => setPatientConsent(event.target.checked)}>
+        Đã có sự đồng ý của bệnh nhân
+      </Checkbox></div>
     </>}
   </Drawer>;
 }

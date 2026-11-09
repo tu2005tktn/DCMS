@@ -30,12 +30,7 @@ public sealed partial class TreatmentDossierService
         var dossierIds = dossiers.Select(x => x.Id).ToArray();
         var performed = new HashSet<Guid>();
         foreach (var dossier in dossiers)
-        {
-            var deleted = (await SheetActivityOverridesAsync(dossier.Id, ct)).Where(x => x.Value.SheetDeleted).Select(x => x.Key).ToHashSet();
-            foreach (var itemId in await db.ClinicalActivities.AsNoTracking().Where(x => x.DossierId == dossier.Id && x.State == "Posted"
-                && x.ItemId.HasValue && !deleted.Contains(x.Id)).Select(x => x.ItemId!.Value).Distinct().ToListAsync(ct))
-                performed.Add(itemId);
-        }
+            performed.UnionWith(await PerformedItemIdsAsync(dossier.Id, ct));
 
         var instructions = await db.FollowUpInstructions.AsNoTracking().Where(x => x.PatientId == patientId && x.DossierId.HasValue
             && dossierIds.Contains(x.DossierId.Value) && x.ItemId.HasValue && x.StepId == null
@@ -47,8 +42,7 @@ public sealed partial class TreatmentDossierService
         var today = DateOnly.FromDateTime(clock.GetUtcNow().ToOffset(TimeSpan.FromHours(7)).DateTime);
         var rows = new List<(TreatmentDossier Dossier, TreatmentItem Item, int DentistId)>();
         foreach (var dossier in dossiers)
-            foreach (var item in dossier.Items.Where(x => !x.SheetDeleted && !x.HiddenFromSheet && TreatmentItemRules.IsEffective(x)
-                && !x.DisplayCompleted && x.Progress != "Completed" && !performed.Contains(x.Id)))
+            foreach (var item in dossier.Items.Where(x => TreatmentItemRules.IsPendingForBooking(x) && !performed.Contains(x.Id)))
                 rows.Add((dossier, item, item.ResponsibleDentistId ?? dossier.DentistId));
         var dentistIds = rows.Select(x => x.DentistId).Distinct().ToArray();
         var names = await db.Employees.AsNoTracking().Where(x => dentistIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.FullName, ct);
@@ -68,12 +62,8 @@ public sealed partial class TreatmentDossierService
         return new(items);
     }
 
-    private async Task<HashSet<Guid>> PerformedItemIdsAsync(Guid dossierId, CancellationToken ct)
-    {
-        var deleted = (await SheetActivityOverridesAsync(dossierId, ct)).Where(x => x.Value.SheetDeleted).Select(x => x.Key).ToHashSet();
-        return (await db.ClinicalActivities.AsNoTracking().Where(x => x.DossierId == dossierId && x.State == "Posted"
-            && x.ItemId.HasValue && !deleted.Contains(x.Id)).Select(x => x.ItemId!.Value).Distinct().ToListAsync(ct)).ToHashSet();
-    }
+    private Task<HashSet<Guid>> PerformedItemIdsAsync(Guid dossierId, CancellationToken ct)
+        => TreatmentBookingQueries.PerformedItemIdsAsync(db, dossierId, ct);
 
     // Proposes the planned-date changes that follow from booking `itemId` on `plannedOn`. See docs/specs/TREATMENT-NEXT-VISIT-BOOKING.md.
     public async Task<PlannedDatePreview> PlannedDatePreviewAsync(int actorId, Guid dossierId, Guid itemId, DateOnly plannedOn, CancellationToken ct)

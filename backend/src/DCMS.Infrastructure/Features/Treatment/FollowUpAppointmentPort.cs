@@ -31,10 +31,13 @@ public sealed class FollowUpAppointmentPort(DcmsDbContext db, ITreatmentLabReadi
             if (!instruction.DossierId.HasValue || !instruction.ItemId.HasValue) return;
             var sourceDossier = await db.TreatmentDossiers.Include(x => x.Items).AsNoTracking()
                 .SingleOrDefaultAsync(x => x.Id == instruction.DossierId, ct);
+            var sourceItem = sourceDossier?.Items.SingleOrDefault(x => x.Id == instruction.ItemId);
             if (sourceDossier == null || sourceDossier.PatientId != instruction.PatientId ||
                 sourceDossier.BranchId != instruction.BranchId || sourceDossier.State != "Open" ||
                 sourceDossier.PlanState != "Committed" || sourceDossier.PlanVersion != instruction.PlanVersion ||
-                sourceDossier.Items.All(x => x.Id != instruction.ItemId || !TreatmentItemRules.IsEffective(x)))
+                sourceItem == null || !TreatmentItemRules.IsPendingForBooking(sourceItem))
+                throw Error("MSG230");
+            if ((await TreatmentBookingQueries.PerformedItemIdsAsync(db, sourceDossier.Id, ct)).Contains(sourceItem.Id))
                 throw Error("MSG230");
             return;
         }

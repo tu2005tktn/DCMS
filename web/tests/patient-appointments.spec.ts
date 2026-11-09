@@ -106,11 +106,14 @@ test('tab shows the nearest unperformed plan item, jumps to the first day the de
   expect(sent.filter(x => x.command === 'availability').every(x => x.dentistId === '5')).toBe(true);
   await drawer.getByRole('button', { name: '09:00', exact: true }).click();
   await drawer.getByLabel('SĐT (10 số) hoặc email').fill('0912345678');
+  await expect(drawer.getByRole('button', { name: 'Xác nhận đặt lịch' })).toBeDisabled();
+  expect(sent.some(value => value.command === 'appointment' || value.command === 'follow-up')).toBe(false);
+  await drawer.getByRole('checkbox', { name: 'Đã có sự đồng ý của bệnh nhân', exact: true }).check();
   await drawer.getByRole('button', { name: 'Xác nhận đặt lịch' }).click();
   await expect(drawer).toBeHidden();
   const followUp = sent.find(x => x.command === 'follow-up'), appointment = sent.find(x => x.command === 'appointment');
   expect(followUp.source).toMatchObject({ dossierId: 'd1', itemId: 'i1' }); expect(followUp.dentistId).toBe(5);
-  expect(appointment).toMatchObject({ kind: 'FollowUp', followUpId: 'fu-1', serviceId: 3, dentistId: 5, durationMinutes: 30 });
+  expect(appointment).toMatchObject({ kind: 'FollowUp', followUpId: 'fu-1', serviceId: 3, dentistId: 5, durationMinutes: 30, patientConsentConfirmed: true });
   await expect(page.getByText('Mọi hạng mục chưa thực hiện đã có lịch hẹn.')).toBeVisible();
   await expect(page.getByText('AP-NEXT')).toHaveCount(0);
 });
@@ -135,6 +138,7 @@ test('only days within 4 days of the planned date are offered, nearest first wit
   await days.getByRole('button', { name: /12\/01\/2099/ }).click();
   await drawer.getByRole('button', { name: '09:00', exact: true }).click();
   await drawer.getByLabel('SĐT (10 số) hoặc email').fill('0912345678');
+  await drawer.getByRole('checkbox', { name: 'Đã có sự đồng ý của bệnh nhân', exact: true }).check();
   await drawer.getByRole('button', { name: 'Xác nhận đặt lịch' }).click();
   const sync = page.getByRole('dialog').filter({ hasText: 'Cập nhật ngày dự kiến theo lịch hẹn' });
   await expect(sync.getByText('Bọc sứ', { exact: false })).toBeVisible();
@@ -165,6 +169,7 @@ test('keeping the planned dates after booking sends no update', async ({ page })
   const drawer = page.getByRole('dialog').filter({ hasText: 'Đặt lịch theo kế hoạch điều trị' });
   await drawer.getByRole('button', { name: '09:00', exact: true }).click();
   await drawer.getByLabel('SĐT (10 số) hoặc email').fill('0912345678');
+  await drawer.getByRole('checkbox', { name: 'Đã có sự đồng ý của bệnh nhân', exact: true }).check();
   await drawer.getByRole('button', { name: 'Xác nhận đặt lịch' }).click();
   const sync = page.getByRole('dialog').filter({ hasText: 'Cập nhật ngày dự kiến theo lịch hẹn' });
   await sync.getByRole('button', { name: 'Giữ nguyên' }).click();
@@ -188,4 +193,39 @@ test('read error is distinct from empty data and can be retried', async ({ page 
   state.fail(false);
   await page.getByRole('button', { name: 'Thử lại', exact: true }).click();
   await expect(page.getByRole('link', { name: 'AP-PATIENT', exact: true })).toBeVisible();
+});
+
+test('patient consent resets when the plan booking drawer is reopened', async ({ page }) => {
+  await setupNextVisit(page);
+  await page.getByRole('tab', { name: 'Lịch hẹn', exact: true }).click();
+  await page.getByRole('button', { name: 'Đặt lịch', exact: true }).click();
+  const drawer = page.getByRole('dialog').filter({ hasText: 'Đặt lịch theo kế hoạch điều trị' });
+  const agreement = drawer.getByRole('checkbox', { name: 'Đã có sự đồng ý của bệnh nhân', exact: true });
+  await expect(agreement).not.toBeChecked(); await agreement.check();
+  await drawer.getByRole('button', { name: 'Hủy', exact: true }).click();
+  await expect(drawer).toBeHidden();
+  await page.getByRole('button', { name: 'Đặt lịch', exact: true }).click();
+  await expect(agreement).not.toBeChecked();
+});
+
+test('booking network retry preserves patient consent and the request key', async ({ page }) => {
+  await setupNextVisit(page); const requests: any[] = [];
+  await page.route('**/api/appointments', async route => {
+    requests.push(route.request().postDataJSON());
+    if (requests.length === 1) return route.abort('failed');
+    return route.fallback();
+  });
+  await page.getByRole('tab', { name: 'Lịch hẹn', exact: true }).click();
+  await page.getByRole('button', { name: 'Đặt lịch', exact: true }).click();
+  const drawer = page.getByRole('dialog').filter({ hasText: 'Đặt lịch theo kế hoạch điều trị' });
+  await drawer.getByRole('button', { name: '09:00', exact: true }).click();
+  await drawer.getByLabel('SĐT (10 số) hoặc email').fill('0912345678');
+  await drawer.getByRole('checkbox', { name: 'Đã có sự đồng ý của bệnh nhân', exact: true }).check();
+  await drawer.getByRole('button', { name: 'Xác nhận đặt lịch' }).click();
+  await expect(drawer.getByRole('alert')).toBeVisible();
+  await expect(drawer.getByRole('checkbox', { name: 'Đã có sự đồng ý của bệnh nhân', exact: true })).toBeChecked();
+  await drawer.getByRole('button', { name: 'Xác nhận đặt lịch' }).click();
+  await expect(drawer).toBeHidden();
+  expect(requests).toHaveLength(2); expect(requests[0].requestKey).toBe(requests[1].requestKey);
+  expect(requests.every(request => request.patientConsentConfirmed === true)).toBe(true);
 });

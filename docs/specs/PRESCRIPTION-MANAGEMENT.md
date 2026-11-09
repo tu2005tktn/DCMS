@@ -3,6 +3,13 @@
 Ngày cập nhật: 07/11/2026 (bản 2 — header đơn thuốc, phiên bản điều chỉnh, migration, mobile). Trạng thái: đặc tả triển khai.
 Tài liệu liên quan: [S19-OPTIONAL-PRESCRIPTION.vi.md](S19-OPTIONAL-PRESCRIPTION.vi.md), [S58-SUPPLY-CATALOGS.md](S58-SUPPLY-CATALOGS.md), [S41-MOBILE-MEDICAL-RECORDS.md](S41-MOBILE-MEDICAL-RECORDS.md).
 
+## Khôi phục điều hướng web (08/11/2026)
+
+- Mục **Mẫu đơn thuốc** mở `/prescriptions/templates` trong workspace nhân viên, yêu cầu đăng nhập và quyền `prescriptions.manage`, giống điều kiện hiển thị menu. Truy cập trực tiếp cũng phải kiểm tra quyền; không có quyền thì hiển thị 403.
+- Entry point web phải render router `App` qua default export của `App.tsx`. Hàm chuyển hướng `/commercial/treatment` là hàm riêng, giữ nguyên query string khi chuyển tới `/settings/treatment-services`.
+- Bản sửa khôi phục route bị mất khi merge và default export của router; không thay đổi API hoặc hợp đồng dữ liệu đơn thuốc.
+- Tích hợp main ngày 09/11/2026: khi giữ route `/prescriptions/templates`, router phải import `PrescriptionTemplatesPage` từ trang quản lý mẫu đơn hiện có để build TypeScript thành công; giữ nguyên kiểm tra quyền `prescriptions.manage`.
+
 ---
 
 ## 1. Nguyên tắc cốt lõi

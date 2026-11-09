@@ -37,7 +37,7 @@ function MemberList() {
     <Button onClick={() => { setEditing(member); setDrawer(true); }}>Sửa</Button><Popconfirm title="Bạn có muốn xóa người thân này khỏi danh sách không?" okText="Đồng ý" cancelText="Không đồng ý" onConfirm={() => remove(member)}>
       <Button danger loading={deleting === member.id} disabled={deleting !== null && deleting !== member.id}>Xóa</Button></Popconfirm></Space>;
   return <section className="customer-family-page">
-    <div className="customer-family-heading"><div><h1>Người thân của tôi</h1><p>Lưu thông tin để chọn nhanh khi đặt lịch hộ.</p></div><Button type="primary" onClick={() => { setEditing(null); setDrawer(true); }}>Thêm người thân</Button></div>
+    <div className="customer-family-heading"><div><h1>Người thân của tôi</h1><p>Đặt lịch hộ và theo dõi hồ sơ được phòng khám cấp quyền.</p></div><Button type="primary" onClick={() => { setEditing(null); setDrawer(true); }}>Thêm người thân</Button></div>
     <Card className="customer-family-search"><label htmlFor="family-search">Tìm theo họ tên</label><Space.Compact><Input id="family-search" value={search} maxLength={100} allowClear onChange={e => setSearch(e.target.value)} onPressEnter={() => { setKeyword(search.trim()); setPage(1); }} /><Button onClick={() => { setKeyword(search.trim()); setPage(1); }}>Tìm kiếm</Button></Space.Compact></Card>
     {error && <Alert type="error" showIcon message={error} action={<Button onClick={() => setRevision(r => r + 1)}>Thử lại</Button>} />}
     <div className="customer-family-table"><Table<FamilyMember> rowKey="id" loading={busy} dataSource={data?.items ?? []} pagination={false} scroll={{ x: 950 }}

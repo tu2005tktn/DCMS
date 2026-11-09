@@ -14,6 +14,7 @@ public sealed class Appointment
     public string Code { get; set; } = "";
     public int BranchId { get; set; }
     public int? BookerAccountId { get; set; }
+    public Guid? FamilyMemberId { get; set; }
     public string BookerName { get; set; } = "";
     public string? BookerPhone { get; set; }
     public string? BookerEmail { get; set; }
@@ -31,6 +32,8 @@ public sealed class Appointment
     public DateTimeOffset StartAt { get; set; }
     public DateTimeOffset EndAt { get; set; }
     public Guid? FollowUpId { get; set; }
+    public DateTimeOffset? PatientConsentConfirmedAt { get; set; }
+    public int? PatientConsentConfirmedBy { get; set; }
     public string? ExceptionReason { get; set; }
     public string Status { get; set; } = "Confirmed";
     // S12: attendance intent is not an Appointment/Visit lifecycle state.

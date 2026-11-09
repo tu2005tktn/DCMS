@@ -3,7 +3,19 @@
 Tab **Lịch hẹn** của hồ sơ bệnh nhân lấy hạng mục trong **KẾ HOẠCH ĐIỀU TRỊ/DỊCH VỤ** có ngày dự kiến gần nhất mà chưa thực hiện để bác sĩ đặt buổi hẹn điều trị tiếp theo. Lịch hẹn phải nằm trong thời gian bác sĩ phụ trách có lịch làm. Giao diện ở [PATIENT-APPOINTMENTS-TAB.md](PATIENT-APPOINTMENTS-TAB.md).
 
 ## Vì sao đi qua chỉ định hẹn tái khám
-`POST /api/appointments` chỉ nhận dịch vụ **Khám** khi `kind ≠ FollowUp`; dịch vụ điều trị bắt buộc `kind = "FollowUp"` kèm `followUpId` (`AppointmentService`). Vì vậy mỗi hạng mục được hẹn có một `FollowUpInstruction` (đã có trong [TREATMENT-PROGRESSION.vi.md](TREATMENT-PROGRESSION.vi.md)) với vòng đời `NeedsBooking → Booked → Completed`. **Không đổi hợp đồng `POST /api/appointments`, không thêm bảng.**
+`POST /api/appointments` chỉ nhận dịch vụ **Khám** khi `kind ≠ FollowUp`; dịch vụ điều trị bắt buộc `kind = "FollowUp"` kèm `followUpId` (`AppointmentService`). Vì vậy mỗi hạng mục được hẹn có một `FollowUpInstruction` (đã có trong [TREATMENT-PROGRESSION.vi.md](TREATMENT-PROGRESSION.vi.md)) với vòng đời `NeedsBooking → Booked → Completed`. Tiếp tục dùng endpoint và bảng lịch hẹn hiện có; trường xác nhận đồng ý và hai cột bổ sung ngày 07/11/2026 được mô tả bên dưới.
+
+### Xác nhận bệnh nhân đồng ý và lịch bác sĩ — bổ sung 07/11/2026
+
+- Drawer đặt lịch theo kế hoạch có checkbox **Đã có sự đồng ý của bệnh nhân** ở trước bước xác nhận, mặc định bỏ chọn mỗi lần mở/hạng mục mới. Chưa tích thì nút Xác nhận đặt lịch bị khóa. Lỗi mạng/validation giữ checkbox và bản nhập để thử lại.
+- `POST /api/appointments` bổ sung trường tùy chọn `patientConsentConfirmed: boolean = false`. Mọi lịch mới có chỉ định nguồn dossier/item (kể cả nguồn bước) phải gửi `true`; server xác định nguồn từ chỉ định, không dựa vào tên dịch vụ hoặc nội dung lý do. Thiếu/false trả HTTP 400 với mã `APPOINTMENT_PATIENT_CONSENT_REQUIRED`, field `patientConsentConfirmed`, không ghi lịch/đặt chỗ/receipt/outbox.
+- Khi lưu lịch hợp lệ, server ghi `Appointment.PatientConsentConfirmedAt` (UTC) và `PatientConsentConfirmedBy` (account ID) từ phiên hiện hành. Đây là xác nhận của người đặt rằng bệnh nhân đồng ý đặt lịch, không thay thế đồng thuận điều trị/chữ ký hoặc check-in/ConfirmedToAttend.
+- Thêm migration cộng hai cột nullable vào `APPOINTMENT`; dữ liệu cũ giữ null, không tự xác nhận thay bệnh nhân. Đặt khám thường và chỉ định không có nguồn hạng mục giữ hợp đồng hiện hành. Việc đổi lịch giữ quy trình hiện có; thông tin này thể hiện lần xác nhận khi tạo lịch.
+- Fingerprint idempotency phải phân biệt khi tích/bỏ đồng ý, đồng thời giữ tương thích receipt của request cũ không có trường mới. Replay lịch đã tạo không ghi lại thời điểm/tài khoản đồng ý hoặc tạo lịch thứ hai.
+- Trang **Lịch làm việc** hiển thị thẻ lịch hẹn theo tuần cho bác sĩ được chọn: giờ bắt đầu/kết thúc UTC+7, chi nhánh, bệnh nhân, dịch vụ, trạng thái lịch và trạng thái ghi nhận đồng ý. Có đổi tuần, tải lại, trạng thái tải/trống/lỗi và cập nhật khi quay lại cửa sổ. Lịch không sửa các khoảng làm việc hoặc giữ chỗ thêm.
+- Lịch theo kế hoạch cũ chưa có metadata hiển thị **Chưa ghi nhận**, lịch có metadata hiển thị **Đã đồng ý**, lịch khác hiển thị dấu gạch. Chỉ có link chi tiết lịch khi được cấp `appointments.read`.
+- API danh sách và quyền truy cập được mô tả tại `S09-UC03.md`; tiếp tục giữ phần sửa kiểm trạng thái hạng mục, không thêm lại ràng buộc đặt khác dịch vụ/hạng mục đã được người dùng loại khỏi phạm vi.
+- Kiểm chứng: chưa tích không gửi lệnh, checkbox gửi đúng/reset/giữ khi lỗi; API thiếu đồng ý không ghi dở, ghi đúng actor/time, replay; danh sách bác sĩ có lịch vừa tạo/đổi/hủy, giới hạn vai trò/nhân viên/chi nhánh, metadata cũ null. Kiểm tra migration và model snapshot trên schema cách ly.
 
 ## Hạng mục kế tiếp
 Trong các phiếu không bị xóa của bệnh nhân thuộc chi nhánh nha sĩ được phép, một hạng mục là **cần hẹn** khi thỏa tất cả:
@@ -24,7 +36,7 @@ Sắp xếp: `EstimatedStart` tăng dần, hạng mục không có ngày xếp c
 Đặt hẹn dùng các endpoint hiện có, theo thứ tự:
 1. Trước khi tạo, đọc lại `next-visit-candidates` để dùng chỉ định đã có của hạng mục (một lần đặt trước đó có thể đã tạo chỉ định nhưng thất bại ở bước đặt lịch; tạo thêm sẽ bị MSG233). Nếu hạng mục vẫn `Ready`: `POST /api/follow-up-instructions` với nguồn `{ dossierId, itemId }`, `purpose = TreatmentContinuation`, `earliestOn = hôm nay`, `targetOn = ngày muốn hẹn`, `latestOn = targetOn + 30 ngày`, `durationMinutes`, `dentistId`.
 2. `GET /api/availability` cho đúng bác sĩ, dịch vụ, thời lượng để lấy khung giờ **nằm trong lịch làm của bác sĩ**.
-3. `POST /api/appointments` với `kind = "FollowUp"`, `followUpId`, `serviceId`, `dentistId`, khung giờ đã chọn.
+3. `POST /api/appointments` với `kind = "FollowUp"`, `followUpId`, `serviceId`, `dentistId`, khung giờ đã chọn và `patientConsentConfirmed = true` sau khi đã ghi nhận bệnh nhân đồng ý đặt lịch.
 
 ## Quyền đặt lịch (thay đổi 03/11/2026)
 Trước đây `POST /api/appointments` từ chối mọi tài khoản staff không có vai trò `ClinicAssistant` (403/MSG06), nên nha sĩ không đặt được buổi hẹn điều trị của chính mình. Nay **nha sĩ (vai trò hiệu lực `Dentist`) được tạo lịch khi và chỉ khi request có `followUpId`** (loại `FollowUp`); đặt lịch thường (Standard/WalkIn) vẫn chỉ dành cho `ClinicAssistant`. Các kiểm tra khác giữ nguyên: nha sĩ phải là thành viên hoạt động của chi nhánh, chỉ định phải đúng bệnh nhân/chi nhánh/khoảng ngày/thời lượng/nha sĩ (`FollowUpAppointmentPort.ValidateAsync`) và khung giờ phải nằm trong lịch làm của bác sĩ.
@@ -62,3 +74,13 @@ Sau khi đặt thành công, nếu ngày hẹn khác ngày dự kiến thì hộ
 - Hủy hoặc vắng mặt: chỉ định quay về `NeedsBooking`, hạng mục lại xuất hiện là cần hẹn; **ngày dự kiến của hạng mục giữ nguyên** (chỉ bước cập nhật có xác nhận ở trên mới đổi ngày dự kiến). Nếu trước đó bác sĩ đã dời ngày dự kiến theo lịch hẹn thì ngày mới được giữ, không tự hoàn về ngày cũ.
 - Đổi lịch giữ cùng chỉ định (kiểm lại khoảng ngày và nha sĩ).
 - Khi bác sĩ thực hiện hạng mục (có hoạt động `Posted` gắn `ItemId`), hạng mục không còn là cần hẹn.
+
+## Kiểm tra lại khi ghi lịch — sửa lỗi 07/11/2026
+
+- Với chỉ định cấp hạng mục (không có `StepId`), tạo hoặc đổi lịch phải đọc lại hạng mục trong giao dịch lịch hẹn: phiếu `Open`, kế hoạch `Committed`, đúng phiên bản, hạng mục hiệu lực, chưa xóa/ẩn, chưa đánh dấu hoàn tất, `Progress != Completed`, chưa có hoạt động `Posted` còn hiệu lực gắn hạng mục. Dùng cùng tiêu chí với danh sách `next-visit-candidates`; hộp đặt lịch mở từ trước không được vượt kiểm tra này.
+- Hoạt động bị xóa khỏi phiếu qua sự kiện `SheetActivityDeleted` không còn là chứng cứ đã thực hiện. Khi đọc sự kiện chỉnh/xóa phải dùng snapshot cuối theo phiên bản phiếu, giống lịch sử hoạt động hiện có.
+- Phạm vi thu hẹp theo yêu cầu người dùng: không bổ sung ràng buộc dịch vụ/hạng mục khác trong lần sửa này; giữ hợp đồng lựa chọn dịch vụ và các port lịch hẹn hiện có.
+- Sai trạng thái hạng mục trả `409 MSG230`. Giao dịch thất bại không tạo/cập nhật lịch, đặt chỗ, receipt, outbox hoặc chuyển chỉ định sang `Booked`. Người dùng tải lại kế hoạch/hạng mục trước khi đặt tiếp. Hủy lịch vẫn theo hợp đồng hiện có để giải phóng lịch không còn phù hợp.
+- Chỉ định theo lượt khám/hoạt động không có nguồn hạng mục giữ hành vi hiện có. Chỉ định cấp bước tiếp tục kiểm tiền nhiệm, kết quả labo và trạng thái từng bước; hoạt động đã làm ở bước trước không chặn các bước tiếp theo của cùng hạng mục.
+- Retry cùng request key của lịch đã tạo tiếp tục trả receipt đã lưu; không tạo lịch lần hai hoặc kiểm lại thành một lệnh tạo mới. Riêng bản sửa kiểm trạng thái không đổi hợp đồng hoặc dữ liệu; bổ sung đồng ý đặt lịch dùng trường tùy chọn và migration nullable ở phần đầu tài liệu.
+- Kiểm thử bắt buộc trên schema cách ly: hoàn tất/xóa/ẩn hạng mục sau khi có chỉ định; hạng mục đã có hoạt động Posted; hoạt động đã xóa khỏi phiếu; đặt lịch, đổi lịch và retry. Kiểm tra trạng thái chỉ định và không có ghi dở khi từ chối.

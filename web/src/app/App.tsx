@@ -4,6 +4,7 @@ import VisitPage from '../features/examinations/ExaminationPage';
 import PaymentsPage from '../features/finance/PaymentsPage';
 import ReceiptPrintPage from '../features/finance/ReceiptPrintPage';
 import PrescriptionPage from '../features/prescriptions/PrescriptionPage';
+import PrescriptionTemplatesPage from '../features/prescriptions/PrescriptionTemplatesPage';
 import ClinicalServicesPage from '../features/finance/ClinicalServicesPage';
 import { Alert, Button, Card, Result, Space, Tag, Typography } from 'antd';
 import { useState, type ReactNode } from 'react';
@@ -79,6 +80,7 @@ export default function App() {
       <Route path="revenue" element={<Protected permission="finance.revenue.read"><RevenuePage /></Protected>} />
       <Route path="visits/:visitId/payments" element={<Protected permission="finance.read"><PaymentsPage /></Protected>} />
       <Route path="visits/:visitId/prescription" element={<Protected permission="prescriptions.read"><PrescriptionPage /></Protected>} />
+      <Route path="prescriptions/templates" element={<Protected permission="prescriptions.manage"><PrescriptionTemplatesPage /></Protected>} />
       <Route path="payments/:id/print" element={<Protected permission="finance.receipts.print"><ReceiptPrintPage /></Protected>} />
       <Route path="clinical-services" element={<Protected permission="services.read"><ClinicalServicesPage /></Protected>} />
       <Route path="working-schedules" element={<Protected permission="working-schedules.read"><WorkingSchedulesPage /></Protected>} />

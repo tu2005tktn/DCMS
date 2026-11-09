@@ -176,6 +176,7 @@ DCMS.Api.Features.Finance.FinanceEndpoints.MapFinanceEndpoints(app);
 DCMS.Api.Features.Prescriptions.PrescriptionEndpoints.MapPrescriptionEndpoints(app);
 app.MapPatientLinkEndpoints();
 DCMS.Api.Features.FamilyMembers.FamilyMemberEndpoints.MapFamilyMemberEndpoints(app);
+DCMS.Api.Features.FamilyMembers.FamilyRecordEndpoints.MapFamilyRecordEndpoints(app);
 app.MapPatientEndpoints();
 app.MapTreatmentEndpoints();
 app.MapPost("/api/payments/payos/webhook", async (System.Text.Json.JsonElement payload,
