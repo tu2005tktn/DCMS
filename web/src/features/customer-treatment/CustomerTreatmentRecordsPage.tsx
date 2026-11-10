@@ -21,7 +21,7 @@ const date = (value?: string) => value ? new Date(value).toLocaleDateString('vi-
 async function allPages<T>(path: string, token: string): Promise<T[]> {
   const items: T[] = [];
   for (let page = 1; ; page++) {
-    const result = await customerApi<{ items: T[]; total: number }>(`${path}?page=${page}&pageSize=100`, {}, token);
+    const result = await customerApi<{ items: T[]; total: number }>(`${path}?page=${page}&pageSize=50`, {}, token);
     items.push(...result.items);
     if (!result.items.length || items.length >= result.total) return items;
   }

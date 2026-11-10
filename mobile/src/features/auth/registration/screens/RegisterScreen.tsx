@@ -74,7 +74,7 @@ export default function RegisterScreen() {
   }
 
   return <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.container}>
-    <Link href="/(home)/" style={styles.backLink}>← Về trang chủ</Link>
+    <Link href="/(auth)/sign-in" style={styles.backLink}>← Đăng nhập</Link>
     <Text style={styles.brand}>DCMS · DÀNH CHO KHÁCH HÀNG</Text>
     <Text style={styles.heading}>Tạo tài khoản</Text>
     <Text style={styles.description}>Tạo tài khoản để đặt lịch và theo dõi chăm sóc. Số điện thoại này sẽ dùng để đăng nhập.</Text>

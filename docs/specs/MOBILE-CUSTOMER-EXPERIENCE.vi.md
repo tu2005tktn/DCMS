@@ -19,3 +19,7 @@ Typecheck mobile và build Android. Trên điện thoại: khách thấy lối v
 # Giao diện đăng nhập (10/11/2026)
 
 Màn đăng nhập mobile dùng bố cục nhận diện DCMS xanh và trắng, tiêu đề ngắn, biểu tượng răng, thẻ form dễ đọc, khoảng cách và vùng chạm phù hợp điện thoại. Giữ nguyên xác thực số điện thoại/tên đăng nhập và mật khẩu, Google, đăng ký, quên mật khẩu, đặt lịch không cần tài khoản; không thay đổi API hoặc logic kiểm tra lỗi.
+
+## Điểm vào ứng dụng khi chưa đăng nhập (10/11/2026)
+
+Sau khi khôi phục phiên, tài khoản đã xác thực vào trang chủ tương ứng. Khi chưa đăng nhập, route gốc và route Trang chủ chuyển thẳng đến Đăng nhập, không hiển thị màn chào/menu khách. Màn Đăng nhập liên kết tới Đăng ký và Quên mật khẩu; màn Đăng ký quay về Đăng nhập. Bỏ liên kết quay về màn chào và nút đặt lịch khách khỏi giao diện đăng nhập; không xóa API đặt lịch khách hoặc thay đổi xác thực. Đăng xuất cũng trở về Đăng nhập.

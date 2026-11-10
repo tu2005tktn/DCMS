@@ -1,4 +1,4 @@
-import { useFocusEffect, useRouter, type Href } from 'expo-router';
+import { Redirect, useFocusEffect, useRouter, type Href } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -58,11 +58,7 @@ export default function HomeScreen() {
   const go = (href: Href) => router.push(href);
 
   if (state.status === 'initializing') return <View style={styles.center}><ActivityIndicator color={blue} /></View>;
-  if (!user) return <SafeAreaView style={styles.safe} edges={['top']}><ScrollView contentContainerStyle={styles.content}>
-    <Text style={styles.brand}>DCMS</Text><Text style={styles.heroTitle}>Chăm sóc nụ cười của bạn</Text>
-    <Action label="Đăng nhập" onPress={() => go('/(auth)/sign-in')} primary />
-    <Action label="Tạo tài khoản" onPress={() => go('/(auth)/register')} />
-  </ScrollView></SafeAreaView>;
+  if (!user) return <Redirect href="/(auth)/sign-in" />;
   if (user.accountType !== 'Public') return <SafeAreaView style={styles.safe} edges={['top']}><ScrollView contentContainerStyle={styles.content}>
     <Text style={styles.eyebrow}>DCMS · NHÂN VIÊN</Text><Text style={styles.title}>Xin chào, {user.fullName}</Text>
     <Section title="Công việc của bạn" />

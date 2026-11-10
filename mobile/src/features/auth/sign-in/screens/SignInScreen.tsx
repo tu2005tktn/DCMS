@@ -100,7 +100,6 @@ export default function SignInScreen() {
       >
         <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
           <View style={styles.hero}>
-            <Link href="/(home)/" style={styles.backLink}>← Trang chủ</Link>
             <View style={styles.heroMark}><Image source={require('../../../../../assets/dcms-app-icon.png')} style={styles.logo} />
               <Text style={styles.brand}>DCMS</Text></View>
             <Text style={styles.title}>Chào mừng trở lại</Text>
@@ -169,9 +168,6 @@ export default function SignInScreen() {
               <GoogleIdentityButton onCredential={onGoogleCredential} onError={setGoogleError} />
               <FormError message={googleError} />
             </View>
-            <Link href="/book-appointment" asChild>
-              <Pressable accessibilityRole="button" style={styles.guestLink}><Text style={styles.linkText}>Đặt lịch không cần tài khoản →</Text></Pressable>
-            </Link>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -185,8 +181,7 @@ const styles = StyleSheet.create({
   container: { padding: spacing.lg, paddingTop: 0, gap: 0, flexGrow: 1, justifyContent: 'center' },
   hero: { backgroundColor: '#175CD3', marginHorizontal: -spacing.lg, paddingHorizontal: spacing.lg,
     paddingTop: 30, paddingBottom: 72, borderBottomLeftRadius: 34, borderBottomRightRadius: 34 },
-  backLink: { color: '#DCEAFF', fontWeight: '700', marginBottom: 36 },
-  heroMark: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 28 },
+  heroMark: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 28, marginTop: 28 },
   logo: { width: 54, height: 54, borderRadius: 14 },
   brand: { color: '#FFFFFF', fontSize: 25, fontWeight: '800', letterSpacing: 1 },
   title: { fontSize: 31, fontWeight: '800', color: '#FFFFFF', lineHeight: 38 },
@@ -198,7 +193,6 @@ const styles = StyleSheet.create({
   actions: { marginTop: spacing.sm },
   linksRow: { flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.sm },
   linkText: { color: colors.primary, fontWeight: '700' },
-  guestLink: { minHeight: 44, justifyContent: 'center', alignItems: 'center' },
   googleSection: { gap: spacing.sm, marginTop: spacing.md, alignItems: 'center' },
   orText: { color: colors.muted, textAlign: 'center' },
 });
