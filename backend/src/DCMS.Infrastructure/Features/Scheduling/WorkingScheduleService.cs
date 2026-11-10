@@ -236,7 +236,7 @@ public sealed partial class WorkingScheduleService(DcmsDbContext db, TimeProvide
         var staff = new[] { q.DentistId, q.AssistantId ?? q.DentistId };
         if (overlaps.Any(r => staff.Contains(r.DentistId) || (r.AssistantId.HasValue && staff.Contains(r.AssistantId.Value))
             || (!string.IsNullOrWhiteSpace(attendeeKey) && r.AttendeeKey == attendeeKey))) return Fail("MSG27");
-        var chair = data.Chairs.FirstOrDefault(c => (!chairId.HasValue || c.Id == chairId) && c.OpenMinute <= minute && c.CloseMinute >= minute + q.DurationMinutes && !overlaps.Any(r => r.ChairId == c.Id));
+        var chair = data.Chairs.FirstOrDefault(c => (!chairId.HasValue || c.Id == chairId) && !overlaps.Any(r => r.ChairId == c.Id));
         return chair == null ? Fail("MSG28") : new(start, end, chair.Id, q.DentistId, q.AssistantId, data.Main?.Version ?? 0, data.Assistant?.Version, data.Branch.BookingSettingsVersion);
     }
     private async Task<AvailabilitySlot?> Find(AvailabilityQuery q, bool isPublic, DateTimeOffset start, int? chairId, string? attendeeKey, Guid? exclude, ScheduleCommand? draft, CancellationToken ct)

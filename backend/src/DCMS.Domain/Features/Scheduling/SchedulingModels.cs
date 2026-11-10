@@ -22,8 +22,8 @@ public sealed class SchedulingChair
     public int BranchId { get; set; }
     public string Name { get; set; } = "";
     public bool Active { get; set; } = true;
-    public int OpenMinute { get; set; } = 480;
-    public int CloseMinute { get; set; } = 1080;
+    public int OpenMinute { get; set; } = 0;
+    public int CloseMinute { get; set; } = 1440;
 }
 public sealed class SchedulingService
 {

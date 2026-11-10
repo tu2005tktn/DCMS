@@ -108,8 +108,8 @@ public sealed class BranchChair
     public int BranchId { get; set; }
     public string Code { get; set; } = "";
     public string Name { get; set; } = "";
-    public int OpenMinute { get; set; } = 480;
-    public int CloseMinute { get; set; } = 1080;
+    public int OpenMinute { get; set; } = 0;
+    public int CloseMinute { get; set; } = 1440;
     public bool IsActive { get; set; } = true;
     public int Version { get; set; } = 1;
 }
