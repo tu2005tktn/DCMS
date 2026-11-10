@@ -44,35 +44,3 @@
 .treatment-selected-item, .ant-table-tbody > tr.treatment-selected-item > td {
   background: #eaf2ff;
 }
-.treatment-prescription-entry {
-  display: grid;
-  grid-template-columns: minmax(220px, 1fr) minmax(280px, 1.2fr);
-  align-items: center;
-  gap: 18px;
-  margin-top: 20px;
-  padding: 18px;
-  border: 1px solid #d7e5e3;
-  border-radius: 10px;
-  background: #f4f9f8;
-}
-
-.treatment-prescription-entry h3 {
-  margin: 0 0 4px;
-}
-
-.treatment-prescription-entry p {
-  margin: 0;
-  color: #667085;
-}
-
-.treatment-prescription-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-@media (max-width: 700px) {
-  .treatment-prescription-entry {
-    grid-template-columns: 1fr;
-  }
-}
