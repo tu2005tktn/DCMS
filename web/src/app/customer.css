@@ -1,11 +1,11 @@
 /* The patient portal has its own visual language; staff screens keep the shared theme. */
 .customer-portal {
   --customer-blue: #175cd3;
-  --customer-ink: #17233d;
+  --customer-ink: #101828;
   --customer-muted: #475467;
-  --customer-canvas: #f4f7fb;
+  --customer-canvas: #f9fafb;
   --customer-tint: #eaf2ff;
-  --customer-line: #dce6f3;
+  --customer-line: #eaecf0;
   --customer-success: #15803d;
   --customer-danger: #b42318;
   min-height: 100vh;
@@ -24,15 +24,16 @@
   outline: 3px solid #7bb4ff;
   outline-offset: 3px;
 }
-.customer-portal .ant-btn { min-height: 44px; font-weight: 600; }
+.customer-portal .ant-btn { min-height: 44px; font-weight: 600; border-radius: 10px; }
 .customer-portal .ant-btn-primary { min-height: 44px; box-shadow: none; }
 .customer-portal .ant-input, .customer-portal .ant-input-affix-wrapper, .customer-portal .ant-select-selector {
   min-height: 44px;
+  border-radius: 10px;
 }
 .customer-portal .ant-card {
   border: 1px solid var(--customer-line);
-  border-radius: 18px;
-  box-shadow: 0 12px 34px rgba(23, 43, 77, .045);
+  border-radius: 16px;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, .04);
 }
 .customer-kicker { display: block; color: var(--customer-blue); font-size: 13px; font-weight: 700; letter-spacing: .025em; }
 .customer-brand { display: inline-flex; align-items: baseline; gap: 11px; font-size: 24px; font-weight: 800; letter-spacing: -.055em; text-decoration: none; white-space: nowrap; }
@@ -97,16 +98,31 @@
 /* Signed-in portal shell and home. */
 .customer-skip-link { position: absolute; z-index: 100; top: -60px; left: 16px; padding: 10px 16px; background: #fff; border-radius: 8px; }
 .customer-skip-link:focus { top: 12px; }
-.customer-header { padding: 0 24px; min-height: 74px; }
-.customer-header-inner, .customer-nav-inner { display: flex; align-items: center; justify-content: space-between; width: min(100%, 1120px); margin: 0 auto; }
-.customer-header-account { display: flex; align-items: center; gap: 18px; }
-.customer-header-name { color: var(--customer-muted); font-weight: 600; }
-.customer-navigation { background: #fff; border-bottom: 1px solid var(--customer-line); margin: 0; padding: 0 24px; }
-.customer-nav-inner { justify-content: flex-start; gap: 8px; }
-.customer-nav-link { display: inline-flex; align-items: center; min-height: 52px; padding: 0 18px; border-bottom: 3px solid transparent; color: var(--customer-muted) !important; text-decoration: none; font-weight: 600; }
-.customer-nav-link:hover { color: var(--customer-blue) !important; }
-.customer-nav-link.active { color: var(--customer-blue) !important; border-bottom-color: var(--customer-blue); }
+.customer-header { position: sticky; top: 0; z-index: 30; padding: 0 24px; min-height: 68px; background: #fff; border-bottom: 1px solid var(--customer-line); }
+.customer-header-inner { display: flex; align-items: center; gap: 24px; width: min(100%, 1200px); min-height: 68px; margin: 0 auto; }
+.customer-header-inner .customer-brand { align-items: center; gap: 10px; font-size: 20px; }
+.customer-brand-mark, .customer-brand .customer-brand-mark { display: inline-grid; place-items: center; flex: 0 0 34px; width: 34px; height: 34px; border-radius: 10px; background: var(--customer-blue); color: #fff; font-size: 17px; font-weight: 800; letter-spacing: 0; }
+.customer-header-account { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+.customer-avatar { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: var(--customer-tint); color: var(--customer-blue); font-size: 13px; font-weight: 700; }
+.customer-header-name { color: var(--customer-ink); font-weight: 600; }
+.customer-navigation { flex: 1 1 auto; min-width: 0; margin: 0; padding: 0; background: transparent; border: 0; overflow-x: auto; }
+.customer-nav-inner { display: flex; align-items: center; justify-content: flex-start; gap: 4px; width: max-content; margin: 0; }
+.customer-nav-link { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; border-radius: 10px; color: var(--customer-muted) !important; text-decoration: none; font-weight: 600; white-space: nowrap; }
+.customer-nav-link:hover { color: var(--customer-blue) !important; background: #f2f6ff; }
+.customer-nav-link.active { color: var(--customer-blue) !important; background: var(--customer-tint); }
+.customer-nav-icon { display: none; }
 .customer-nav-short { display: none; }
+.customer-header-name { white-space: nowrap; }
+@media (min-width: 681px) and (max-width: 1279px) {
+  .customer-header-inner { gap: 12px; }
+  .customer-header-inner .customer-brand > span:not(.customer-brand-mark) { display: none; }
+  .customer-nav-link { padding: 0 10px; font-size: 14px; }
+  .customer-header-name { display: none; }
+}
+@media (min-width: 1280px) {
+  .customer-nav-link { padding: 0 10px; }
+  .customer-header-inner .customer-brand > span:not(.customer-brand-mark) { display: none; }
+}
 .customer-content { width: min(100%, 1120px); padding: clamp(24px, 4vw, 46px) 24px 72px; }
 .customer-home { max-width: none; }
 .customer-page-heading { margin-bottom: 28px; }
@@ -147,8 +163,8 @@
 .customer-booking .customer-field { margin-top: 7px; }
 .customer-booking label { font-weight: 600; }
 .customer-schedule-layout { display: grid; grid-template-columns: minmax(280px, .88fr) minmax(0, 1.12fr); grid-template-areas: 'filters times' 'summary times'; align-items: start; gap: 16px 20px; }
-.customer-schedule-filters, .customer-schedule-times, .customer-schedule-summary { min-width: 0; padding: 22px; border: 1px solid var(--customer-line); border-radius: 14px; background: #fff; }
-.customer-schedule-filters { grid-area: filters; background: #f8faff; }
+.customer-schedule-filters, .customer-schedule-times, .customer-schedule-summary { min-width: 0; padding: 22px; border: 1px solid var(--customer-line); border-radius: 16px; background: #fff; }
+.customer-schedule-filters { grid-area: filters; background: #fff; }
 .customer-schedule-filters .customer-booking-fields { grid-template-columns: 1fr; gap: 14px; }
 .customer-schedule-filters .customer-booking-fields > div { min-width: 0; }
 .customer-schedule-filters .customer-field, .customer-schedule-filters .ant-input { width: 100%; }
@@ -176,7 +192,8 @@
 .customer-slot-group h3, .customer-slot-group h4 { font-size: 16px; margin: 0 0 10px; }
 .customer-schedule-times .customer-slot-group + .customer-slot-group { padding-top: 18px; border-top: 1px solid var(--customer-line); }
 .customer-slots { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 0; }
-.customer-slots .ant-btn { min-width: 88px; min-height: 44px; }
+.customer-slots .ant-btn { min-width: 88px; min-height: 44px; border-radius: 10px; }
+.customer-slots .ant-btn-primary { background: var(--customer-blue); border-color: var(--customer-blue); color: #fff; }
 .customer-schedule-times .customer-slots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .customer-schedule-times .customer-slots .ant-btn { width: 100%; min-height: 48px; font-size: 16px; font-weight: 700; }
 .customer-slots .ant-btn[aria-pressed='true'] { outline: 2px solid var(--customer-blue); outline-offset: 2px; }
@@ -309,16 +326,14 @@
   .customer-auth-page { display: block; padding: 0; }
   .customer-auth-layout { min-height: 100vh; border: 0; border-radius: 0; }
   .customer-auth-panel { padding: 28px 18px 40px; }
-  .customer-header { padding: 0 16px; }
-  .customer-header-inner { min-height: 72px; }
+  .customer-header-inner { gap: 12px; min-height: 60px; }
   .customer-header-name { display: none; }
-  .customer-brand { font-size: 21px; }
+  .customer-brand { font-size: 19px; }
   .customer-brand span { font-size: 11px; }
-  .customer-navigation { padding: 0 8px; overflow-x: auto; }
-  .customer-nav-inner { min-width: 0; width: 100%; justify-content: space-between; }
-  .customer-nav-link { flex: 1 1 0; justify-content: center; min-height: 48px; padding: 0 6px; font-size: 14px; white-space: nowrap; }
-  .customer-nav-long { display: none; }
-  .customer-nav-short { display: inline; }
+  .customer-header { padding: 0 16px; }
+  .customer-header-inner { flex-wrap: wrap; row-gap: 0; }
+  .customer-navigation { order: 3; flex: 1 1 100%; padding-bottom: 8px; }
+  .customer-nav-link { min-height: 40px; padding: 0 12px; }
   .customer-content { padding: 24px 16px 56px; }
   .customer-home-primary { min-height: 0; padding: 28px 24px; }
   .customer-home-mark { display: none; }
@@ -349,6 +364,13 @@
   .customer-change-actions .ant-space-item { flex: 1 1 auto; }
   .customer-change-actions .ant-btn { width: 100%; }
   .customer-link-history li { align-items: flex-start; flex-direction: column; }
+}
+
+@media (max-width: 420px) {
+  .customer-header-inner { gap: 8px; }
+  .customer-header-inner .customer-brand > span:not(.customer-brand-mark) { display: none; }
+  .customer-avatar { display: none; }
+  .customer-header-account .ant-btn { padding-inline: 12px; }
 }
 
 @media (max-width: 280px) {

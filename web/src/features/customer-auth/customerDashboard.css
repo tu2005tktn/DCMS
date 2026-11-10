@@ -3,23 +3,23 @@
 .customer-dashboard-heading h1 { margin: 0 0 10px; font-size: clamp(26px, 3vw, 34px); line-height: 1.3; letter-spacing: -.6px; overflow-wrap: anywhere; }
 .customer-dashboard-heading p { margin: 0; color: #667085; font-size: 16px; line-height: 1.6; }
 .customer-dashboard-main { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 24px; align-items: stretch; }
-.customer-dashboard-upcoming.ant-card { border: 1px solid var(--customer-line, #dce5f1); border-radius: 14px; box-shadow: none; min-width: 0; }
+.customer-dashboard-upcoming.ant-card { border: 1px solid var(--customer-line, #eaecf0); border-radius: 16px; box-shadow: none; min-width: 0; }
 .customer-dashboard-upcoming .ant-card-body { padding: 26px; }
 .customer-dashboard-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 23px; }
 .customer-dashboard h2 { margin: 0; font-size: 21px; line-height: 1.4; }
 .customer-dashboard-section-heading > a { display: inline-flex; align-items: center; min-height: 44px; font-weight: 600; }
 .customer-dashboard-loading { min-height: 190px; display: flex; align-items: center; justify-content: center; gap: 12px; color: #667085; }
 .customer-dashboard-appointment { display: flex; align-items: flex-start; gap: 22px; padding: 0 0 24px; }
-.customer-dashboard-date { min-width: 84px; padding: 15px 9px; border-radius: 10px; background: #eaf2ff; color: #175cd3; text-align: center; }
+.customer-dashboard-date { min-width: 96px; padding: 16px 10px; border-radius: 14px; background: #eaf2ff; color: #175cd3; text-align: center; }
 .customer-dashboard-date > span { display: block; font-size: 13px; }
-.customer-dashboard-date strong { display: block; font-size: 35px; line-height: 1.4; }
+.customer-dashboard-date strong { display: block; font-size: 44px; line-height: 1.2; }
 .customer-dashboard-appointment-info { min-width: 0; overflow-wrap: anywhere; }
 .customer-dashboard-appointment-info h3 { font-size: 18px; margin: 9px 0 13px; }
 .customer-dashboard-appointment-info p { display: flex; align-items: baseline; gap: 9px; margin: 9px 0; color: #526277; font-size: 14px; line-height: 1.6; }
 .customer-dashboard-appointment-info .anticon { flex-shrink: 0; }
 .customer-dashboard-appointment-footer { display: flex; align-items: center; justify-content: space-between; gap: 15px; border-top: 1px solid #e4eaf2; padding-top: 20px; }
 .customer-dashboard-appointment-footer > span { font-size: 13px; color: #667085; }
-.customer-dashboard-booking { padding: 28px; border-radius: 14px; background: #175cd3; color: #fff; display: flex; align-items: flex-start; flex-direction: column; }
+.customer-dashboard-booking { padding: 28px; border-radius: 16px; background: #175cd3; color: #fff; display: flex; align-items: flex-start; flex-direction: column; }
 .customer-dashboard-booking-icon { width: 48px; height: 48px; background: #ffffff24; border-radius: 10px; display: grid; place-items: center; font-size: 25px; margin-bottom: 22px; }
 .customer-dashboard-booking h2 { color: #fff; }
 .customer-portal .customer-dashboard-booking h2 { color: #fff; }
@@ -30,9 +30,9 @@
 .customer-dashboard-shortcuts { margin-top: 28px; }
 .customer-dashboard-shortcuts > h2 { margin-bottom: 17px; }
 .customer-dashboard-shortcut-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; }
-.customer-dashboard-shortcut { display: flex; align-items: center; gap: 15px; min-height: 112px; padding: 22px; border-radius: 12px; background: #fff; border: 1px solid #dce5f1; color: #17233d; }
+.customer-dashboard-shortcut { display: flex; align-items: center; gap: 15px; min-height: 112px; padding: 20px; border-radius: 16px; background: #fff; border: 1px solid #eaecf0; color: #101828; }
 .customer-dashboard-shortcut:hover { border-color: #175cd3; color: #175cd3; }
-.customer-dashboard-shortcut-icon { width: 46px; height: 46px; display: grid; place-items: center; background: #eaf2ff; color: #175cd3; font-size: 23px; border-radius: 10px; flex-shrink: 0; }
+.customer-dashboard-shortcut-icon { width: 46px; height: 46px; display: grid; place-items: center; background: #eaf2ff; color: #175cd3; font-size: 23px; border-radius: 12px; flex-shrink: 0; }
 .customer-dashboard-shortcut > span:nth-child(2) { flex: 1; min-width: 0; }
 .customer-dashboard-shortcut strong { display: block; font-size: 16px; margin-bottom: 6px; }
 .customer-dashboard-shortcut strong + span { display: block; color: #667085; font-size: 14px; line-height: 1.6; }
