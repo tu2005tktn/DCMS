@@ -13,5 +13,8 @@ import { Stack } from 'expo-router';
 import { colors } from '@/theme/colors';
 
 export default function HomeLayout() {
-  return <Stack screenOptions={{ headerTitle: 'DCMS Mobile', headerTintColor: colors.primary }} />;
+  return <Stack screenOptions={{ headerTitle: 'DCMS Mobile', headerTintColor: colors.primary }}>
+    <Stack.Screen name="index" options={{ headerShown: false }} />
+    <Stack.Screen name="notifications" options={{ headerShown: false }} />
+  </Stack>;
 }

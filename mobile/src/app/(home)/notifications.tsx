@@ -15,12 +15,11 @@
  */
 
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSession } from '@/features/auth/session/useSession';
-import { notificationRepoPersist } from '@/features/appointments/notification.repo.persist';
-import { notificationRepo, NOTIFICATION_BACKEND } from '@/features/appointments/notification.repo';
+import { notificationRepo } from '@/features/appointments/notification.repo';
 import type { NotificationDto } from '@/features/appointments/notification.types';
 import { colors } from '@/theme/colors';
 import { spacing } from '@/theme/spacing';
@@ -40,35 +39,37 @@ export default function NotificationListScreen() {
 
   const [load, setLoad] = useState<LoadState>({ kind: 'loading' });
   const [refreshing, setRefreshing] = useState(false);
+  const [unreadOnly, setUnreadOnly] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
-    if (accountId === null) {
+    if (accountId === null || !accessToken) {
       setLoad({ kind: 'empty' });
       return;
     }
     try {
-      // S26+ — dùng persist repo thay mock để giữ thông báo qua reload.
-      const result = await notificationRepoPersist.listForAccount(accountId, { limit: 50 });
-      const items = result;
+      const result = await notificationRepo.list(accountId, { limit: 50, unreadOnly }, accessToken);
+      const items = result.items;
       setLoad(items.length === 0 ? { kind: 'empty' } : { kind: 'ready', items });
     } catch {
       setLoad({ kind: 'error', message: 'Không thể kết nối máy chủ. Vui lòng thử lại.' });
     }
-  }, [accountId]);
+  }, [accountId, accessToken, unreadOnly]);
 
-  useEffect(() => { void notificationRepoPersist.hydrate(); void reload(); }, [reload]);
   useFocusEffect(useCallback(() => { void reload(); }, [reload]));
 
   const openNotification = useCallback(async (n: NotificationDto) => {
     // 1. Mark read trước (KHÔNG đổi lifecycle lịch).
+    setActionError(null);
     if (accountId !== null && n.readAt === null) {
-      await notificationRepoPersist.markRead(n.id, accountId);
+      const result = await notificationRepo.markReadOne(n.id, accountId, accessToken);
+      if (!result.ok) { setActionError('Chưa đánh dấu đã đọc được. Vui lòng thử lại.'); return; }
     }
     // 2. Nếu có deep link: server re-check quyền.
     if (n.deepLink && accountId !== null) {
-      const check = await notificationRepoPersist.checkDeepLinkPermission(n.deepLink, accountId);
+      const check = await notificationRepo.checkDeepLink({ deepLink: n.deepLink }, accountId, accessToken);
       if (!check.allowed) {
-        setLoad({ kind: 'error', message: check.reason ?? 'Không có quyền mở thông báo này.' });
+        setActionError(check.reason ?? 'Không có quyền mở thông báo này.');
         return;
       }
       router.push(n.deepLink as never);
@@ -89,13 +90,13 @@ export default function NotificationListScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
-        <View style={styles.headerRow}>
-          <Text style={styles.title}>Thông báo</Text>
-          <View style={styles.backendBadge}>
-            <Text style={styles.backendText}>{NOTIFICATION_BACKEND === 'real' ? 'API' : 'MOCK'}</Text>
-          </View>
-        </View>
+        <Text style={styles.title}>Thông báo</Text>
         <Text style={styles.subtitle}>Chỉ thông báo lịch hẹn của tài khoản hiện tại.</Text>
+        <View style={styles.filters}>
+          <Pressable onPress={() => setUnreadOnly(false)} style={[styles.filter, !unreadOnly && styles.filterActive]} accessibilityRole="button"><Text style={[styles.filterText, !unreadOnly && styles.filterTextActive]}>Tất cả</Text></Pressable>
+          <Pressable onPress={() => setUnreadOnly(true)} style={[styles.filter, unreadOnly && styles.filterActive]} accessibilityRole="button"><Text style={[styles.filterText, unreadOnly && styles.filterTextActive]}>Chưa đọc</Text></Pressable>
+        </View>
+        {actionError ? <Text style={styles.actionError}>{actionError}</Text> : null}
       </View>
 
       <FlatList
@@ -117,7 +118,7 @@ export default function NotificationListScreen() {
             <View style={styles.emptyBox}>
               <Text style={styles.emptyTitle}>Chưa có thông báo</Text>
               <Text style={styles.emptyBody}>
-                Khi có thay đổi về lịch hẹn hoặc nhắc lịch sắp tới, thông báo sẽ xuất hiện ở đây.
+                {unreadOnly ? 'Bạn đã đọc hết thông báo.' : 'Khi có thay đổi về lịch hẹn hoặc nhắc lịch sắp tới, thông báo sẽ xuất hiện ở đây.'}
               </Text>
             </View>
           )
@@ -166,6 +167,11 @@ const styles = StyleSheet.create({
   subtitle: { color: colors.muted, fontSize: typography.caption + 1 },
   backendBadge: { paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: 6, backgroundColor: colors.infoSoft ?? '#E6F0FA' },
   backendText: { fontSize: typography.caption, color: colors.primary, fontWeight: '700' },
+  filters: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
+  filter: { minHeight: 44, justifyContent: 'center', paddingHorizontal: spacing.md, borderRadius: 22, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border },
+  filterActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  filterText: { color: colors.text, fontWeight: '600' }, filterTextActive: { color: colors.onPrimary },
+  actionError: { color: colors.danger, paddingTop: spacing.sm },
   listContent: { padding: spacing.md, paddingBottom: spacing.xl },
   card: { backgroundColor: colors.surface, borderRadius: 12, padding: spacing.md, gap: spacing.xs, borderWidth: 1, borderColor: colors.border },
   cardUnread: { borderColor: colors.primary, backgroundColor: colors.infoSoft },
