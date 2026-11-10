@@ -1,55 +1,22 @@
-/**
- * AccountHomeScreen — Trang chủ tài khoản.
- *
- * Đăng xuất đi qua SessionProvider.signOut (state machine chính thức). Trước đây từng
- * trộn useSignOut mới ở đây, gây trạng thái lệch: hook mới chỉ clear token storage mà
- * KHÔNG cập nhật state của SessionProvider, nên (account)/_layout vẫn authorized và
- * expo-router không tự pop — user thấy "bấm Đăng xuất nhưng không có gì xảy ra".
- * Xem docs/implementation/S01-ACCOUNT-HOME-LOGOUT.vi.md (sẽ tạo nếu cần) để tra log.
- */
-
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { PrimaryButton } from '@/components/ui/PrimaryButton';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSession } from '@/features/auth/session/useSession';
-import { colors } from '@/theme/colors';
-import { spacing } from '@/theme/spacing';
-import { typography } from '@/theme/typography';
 
-// eslint-disable-next-line no-console
-const debug = (...args: unknown[]) => console.log('[AccountHome/sign-out]', ...args);
+const blue = '#175CD3', ink = '#17233D', muted = '#617187';
 
 export default function AccountHomeScreen() {
   const { state, signOut } = useSession();
   const router = useRouter();
   const [signingOut, setSigningOut] = useState(false);
-
   const user = state.status === 'authenticated' ? state.user : null;
-
+  if (!user) return <View style={styles.center}><ActivityIndicator color={blue} /></View>;
+  const initials = user.fullName.split(' ').filter(Boolean).slice(-2).map(part => part[0]).join('').toUpperCase();
   async function handleSignOut() {
     if (signingOut) return;
     setSigningOut(true);
-    debug('clicked', { state: state.status });
-    try {
-      // Dùng state machine chính thức: state -> anonymous, (account)/_layout tự pop về home.
-      // Lý do không router.replace thủ công: useAuthGuard đã lo việc đó khi state đổi,
-      // và replace thủ công dễ đẩy về path không hợp lệ.
-      await signOut('user');
-      debug('signOut resolved', { state: 'anonymous (expected)' });
-    } catch (error) {
-      debug('signOut failed', error);
-    } finally {
-      setSigningOut(false);
-    }
-  }
-
-  if (!user) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator color={colors.primary} />
-      </View>
-    );
+    try { await signOut('user'); } finally { setSigningOut(false); }
   }
 
   const initials = user.fullName
@@ -175,16 +142,9 @@ export default function AccountHomeScreen() {
     </ScrollView>
   );
 }
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.row}>
-      <Text style={styles.rowLabel}>{label}</Text>
-      <Text style={styles.rowValue}>{value}</Text>
-    </View>
-  );
+function Item({ title, detail, onPress }: { title: string; detail: string; onPress: () => void }) {
+  return <Pressable style={styles.item} onPress={onPress} accessibilityRole="button"><View style={styles.itemText}><Text style={styles.itemTitle}>{title}</Text><Text style={styles.itemDetail}>{detail}</Text></View><Text style={styles.arrow}>›</Text></Pressable>;
 }
-
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
   scroll: { flex: 1, backgroundColor: colors.background },
