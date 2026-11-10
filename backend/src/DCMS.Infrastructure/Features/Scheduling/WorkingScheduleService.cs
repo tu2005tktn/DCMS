@@ -186,9 +186,12 @@ public sealed partial class WorkingScheduleService(DcmsDbContext db, TimeProvide
         var slots = new List<AvailabilitySlot>();
         // Load resources once per query; candidate starts all share the same resource snapshot.
         var data = await Load(q, draft, ct, recurringDraft);
+        var now = clock.GetUtcNow();
         foreach (var minute in CandidateMinutes(q, data))
         {
-            var slot = Evaluate(q, isPublic, Local(q.Date, minute), null, null, null, data);
+            var start = Local(q.Date, minute);
+            if (draft == null && recurringDraft == null && start <= now) continue; // never offer slots that already passed
+            var slot = Evaluate(q, isPublic, start, null, null, null, data);
             if (slot != null) slots.Add(slot);
         }
         return new("Asia/Ho_Chi_Minh", q.Date, slots.ToArray());
