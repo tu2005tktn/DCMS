@@ -11,6 +11,9 @@ public static class SettingsGrants
         new("settings.general.read", "Xem cấu hình chung", null, "settings.read"),
         new("settings.general.manage", "Sửa cấu hình chung", null, "settings.general.read"),
         new("settings.audit.read", "Xem lịch sử thiết lập", null, "settings.read"),
+        // DCMS-132 exports follow the catalog.{kind}.export convention of ScreenEndpointPermissions (catalog.medicines.export is in ScreenGrants).
+        new("catalog.services.export", "Dịch vụ: Xuất Excel", null, "settings.read"),
+        new("catalog.materials.export", "Dụng cụ / vật liệu: Xuất Excel", null, "catalog.materials.read"),
         new("branches.read", "Xem chi nhánh", null, "settings.read"),
         new("branches.manage", "Quản lý chi nhánh", AccountRoles.Admin, "branches.read"),
         new("chairs.read", "Xem ghế điều trị", null, "branches.read"),

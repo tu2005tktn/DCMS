@@ -68,6 +68,10 @@ Migration chỉ chèn thêm dòng, không cập nhật hay xóa dòng nào.
    - Dòng bị bỏ qua vẫn nằm nguyên trong bảng cũ.
    - Phiếu khám cũ trỏ tới dòng đó vẫn đọc được, vì snapshot nằm trên phiếu.
 3. Down: không làm gì. Không xóa dòng đã chép vì có thể đã được tham chiếu.
+4. Bổ sung ngày 01/11/2026 (migration `RetireMergedLegacyExpenseCategories`). Ba loại chi mặc định của module cũ trùng nghĩa với ba loại chi giữ chỗ của `REFERENCE_ENTRY`, nhưng khác tên và mã nên bước 2 không nhận ra:
+   - "Chi nhà cung cấp" trùng "Dụng cụ - Vật liệu"; "Chi labo" trùng "Labo"; "Chi lương" trùng "Trả lương".
+   - Không bảng nào tham chiếu ID loại chi. Ba dòng chép sang được chuyển thành ngừng dùng, bỏ cờ giữ chỗ (`IsReserved`) và tăng version. Dòng vẫn được giữ, không xóa.
+   - Dòng nào đã có người sửa (`Version > 1`) thì giữ nguyên.
 
 ## 4. Nghiệm thu
 

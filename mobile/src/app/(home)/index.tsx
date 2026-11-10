@@ -98,6 +98,7 @@ export default function HomeScreen() {
       {notifications.status === 'loading' ? <State text="Đang tải thông báo…" /> : notifications.status === 'error' ? <State text="Chưa tải được thông báo." retry={load} /> : unread.length === 0 ? <State text="Bạn chưa có thông báo mới." /> :
         unread.slice(0, 2).map(item => <Action key={item.id} label={item.title} detail={item.body} onPress={() => go('/(home)/notifications')} />)}
       <Section title="Khám phá" />
+      <Action label="Kết quả khám" detail="Xem kết quả từng lượt đã được bác sĩ xác nhận" onPress={() => go('/(account)/visit-results')} />
       <Action label="Đơn thuốc của tôi" detail="Xem thuốc và lời dặn của nha sĩ" onPress={() => go('/(account)/prescriptions')} />
       <Action label="Tài khoản của tôi" detail="Thông tin cá nhân và liên kết hồ sơ" onPress={() => go('/(account)/home')} />
     </ScrollView>

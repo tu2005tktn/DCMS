@@ -18,7 +18,6 @@ public sealed class SettingsService(DcmsDbContext db, ISettingsAccess access, Us
 {
     public static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     static string Normalize(string value) => value.Trim().Normalize(NormalizationForm.FormC).ToUpperInvariant();
-    static void Paging(string? search, int page, int size) { if (search?.Length > 100 || page < 1 || page > 1000000 || size is not (20 or 50 or 100)) throw Error("MSG04"); }
     static void Reason(string? reason) { if (string.IsNullOrWhiteSpace(reason) || reason.Length > 1000) throw Error("MSG02",field:"lý do"); }
     public async Task<SettingsCapabilities> CapabilitiesAsync(int actor, CancellationToken ct) {
         var state = await access.RequireAsync(actor,"settings.read",ct);
@@ -101,16 +100,6 @@ public sealed class SettingsService(DcmsDbContext db, ISettingsAccess access, Us
         var branches=await db.Set<SchedulingMember>().Where(x=>x.EmployeeId==employeeId&&x.Active).Select(x=>x.BranchId).ToArrayAsync(ct);
         if(!state.Owner&&(branches.Length==0||branches.Any(b=>!state.BranchIds.Contains(b))))throw Error("MSG06",403);
     });
-    public async Task<Page<object>> AuditAsync(int actor,string? section,int page,int pageSize,CancellationToken ct) {
-        var state=await access.RequireAsync(actor,"settings.audit.read",ct);Paging(null,page,pageSize);
-        var allowed=SettingsGrants.CatalogKinds.Where(k=>state.Permissions.Contains($"catalog.{k}.read")).ToList();
-        if(state.Permissions.Contains("settings.general.read"))allowed.Add("general");if(state.Permissions.Contains("access-groups.read"))allowed.Add("access-groups");
-        if(section!=null&&!allowed.Contains(section))throw Error("MSG06",403);
-        var rows=db.Set<SettingsAudit>().AsNoTracking().Where(x=>allowed.Contains(x.Section)&&(section==null||x.Section==section));
-        if(!state.Owner)rows=rows.Where(x=>x.Section!="access-groups"||x.BranchIds.All(branch=>state.BranchIds.Contains(branch)));
-        var total=await rows.CountAsync(ct);var items=await rows.OrderByDescending(x=>x.At).ThenBy(x=>x.Id).Skip((page-1)*pageSize).Take(pageSize).Select(x=>(object)new{x.Id,x.ActorId,x.Section,x.Target,x.Action,x.Version,x.Reason,x.At,x.BeforeJson,x.AfterJson}).ToArrayAsync(ct);
-        return new(items,total,page,pageSize);
-    }
     async Task<T> Run<T>(int actor,string permission,Guid key,string action,string target,object payload,string? reason,Func<PermissionState,Task<(T Result,int Version,object Before,object After)>> change,CancellationToken ct,Func<PermissionState,Task>? guard=null) {
         await using var tx=await db.Database.BeginTransactionAsync(ct);
         await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock({WorkingScheduleService.TransactionLock})",ct);

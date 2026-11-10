@@ -6,6 +6,7 @@ Cập nhật 02/11/2026 theo ảnh tham chiếu người dùng. Hoàn thiện m�
 
 ## Giao diện và quy trình
 
+- Cập nhật 09/11/2026: trang **Tài khoản của tôi** chỉ hiển thị tên nhân viên, tên đăng nhập và thao tác cập nhật quyền; bỏ khối **Loại tài khoản**, **Vai trò được cấp**, **Vai trò hiệu lực**. Các nhãn vai trò không dùng để diễn giải quyền thao tác của nhân viên trong giao diện này. Menu, route và thao tác tiếp tục dùng danh sách quyền động từ phiên; không thay hợp đồng API, nhóm quyền, vai trò nền hay kiểm tra quyền ở server. Thông báo liên kết hồ sơ cho tài khoản Public vẫn theo contract hiện hành.
 - Trong Thiết lập hệ thống có tab **Phân quyền** theo quyền `access-groups.read`. Danh sách nhóm hiển thị mã, tên, vai trò nền, trạng thái và số nhân viên thực tế. Có tạo, sửa, xem nội dung và ngừng/khôi phục nhóm theo quyền quản lý.
 - Form **Thiết lập phân quyền** có tên bắt buộc, mã, mô tả, vai trò nền và danh sách checkbox theo màn hình/nghiệp vụ, thụt lề thao tác con như ảnh. Nội dung dài cuộn trong modal, dùng được trên màn hình nhỏ; có tìm quyền theo tên.
 - Chọn quyền con tự chọn đủ quyền cha. Bỏ quyền cha bỏ mọi quyền phụ thuộc, kể cả quyền đang bị bộ lọc tìm kiếm che đi. Xem trước quyền tăng/giảm và số nhân viên bị ảnh hưởng trước khi lưu sửa. Bắt buộc lý do khi sửa hoặc ngừng/khôi phục; lỗi giữ nguyên bản nhập, stale version cho đọc lại phiên bản trước khi xem trước/lưu tiếp.

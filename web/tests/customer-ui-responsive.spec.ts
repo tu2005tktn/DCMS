@@ -48,8 +48,6 @@ for (const width of [320, 390, 768, 1440]) {
     await page.locator('.ant-select').nth(0).click();
     await page.getByText('Chi nhánh Trung tâm').last().click();
     await page.locator('.ant-select').nth(1).click();
-    await page.getByText(/Khám tổng quát/).last().click();
-    await page.locator('.ant-select').nth(2).click();
     await page.getByText('Bác sĩ Nguyễn').last().click();
     await page.getByRole('heading', { name: 'Chọn nơi khám và khung giờ' }).click();
     await page.keyboard.press('Escape');

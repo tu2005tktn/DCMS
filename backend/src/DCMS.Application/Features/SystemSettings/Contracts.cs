@@ -17,6 +17,7 @@ public static class CatalogMessages
 public interface ISystemCatalogService
 {
     Task<CatalogPage<MaterialCategoryDto>> CategoriesAsync(int actorId, string? q, int page, int pageSize, CancellationToken ct);
+    Task<byte[]> ExportMaterialsAsync(int actorId, string? q, Guid? categoryId, CancellationToken ct);
     Task<CatalogPage<MaterialDto>> MaterialsAsync(int actorId, string? q, Guid? categoryId, int page, int pageSize, CancellationToken ct);
     Task<MaterialCategoryDto> CategoryAsync(int actorId, Guid id, CancellationToken ct);
     Task<MaterialDto> MaterialAsync(int actorId, Guid id, CancellationToken ct);

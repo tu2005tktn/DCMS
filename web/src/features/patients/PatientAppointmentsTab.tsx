@@ -4,12 +4,16 @@ import { Link } from 'react-router-dom';
 import { api } from '../../services/api';
 import { formatClock, formatDate, localDate, statusColors, statusLabels, type AppointmentListItem } from '../appointments/types';
 import NextVisitPanel from './NextVisitPanel';
+import StaffAppointmentActions from '../appointments/StaffAppointmentActions';
+import { usePermissions } from '../authentication/usePermissions';
 
 type AppointmentPage = { items: AppointmentListItem[]; total: number; page: number; pageSize: number };
 
 export default function PatientAppointmentsTab({ patientId, patientName, patientPhone, active, revision }: {
   patientId: number; patientName: string; patientPhone: string | null; active: boolean; revision: number;
 }) {
+  const has = usePermissions();
+  const [notice, setNotice] = useState('');
   const [scope, setScope] = useState('ALL');
   const [reload, setReload] = useState(0);
   const [page, setPage] = useState(1);
@@ -32,6 +36,7 @@ export default function PatientAppointmentsTab({ patientId, patientName, patient
   return <>
     <NextVisitPanel patient={{ id: patientId, fullName: patientName, phone: patientPhone }} active={active} revision={revision + reload}
       onBooked={() => setReload(value => value + 1)} />
+    {notice && <Alert className="form-alert" type="success" showIcon message={notice} closable onClose={() => setNotice('')} />}
     <Space className="patient-actions" wrap>
       <Select aria-label="Nhóm lịch hẹn" value={scope} style={{ width: 180 }}
         options={[{ value: 'ALL', label: 'Tất cả' }, { value: 'UPCOMING', label: 'Sắp tới' }, { value: 'HISTORY', label: 'Lịch sử' }]}
@@ -50,6 +55,8 @@ export default function PatientAppointmentsTab({ patientId, patientName, patient
           { title: 'Chi nhánh / ghế', render: (_, a) => `${a.branchName} · ${a.chairName}` },
           { title: 'Nha sĩ', dataIndex: 'dentistName' },
           { title: 'Dịch vụ', render: (_, a) => a.serviceName ?? '—' },
+          ...(has('appointments.reschedule') || has('appointments.cancel') || has('appointments.no-show') || has('appointments.create') ? [{ title: 'Thao tác', key: 'actions', width: 240,
+            render: (_: unknown, a: AppointmentListItem) => <StaffAppointmentActions appointment={a} onChanged={message => { setNotice(message); setReload(value => value + 1); }} /> }] : []),
         ]} />}
   </>;
 }

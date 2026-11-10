@@ -84,10 +84,13 @@ public sealed partial class GeneralSettingsService(DcmsDbContext db, UserManager
         var state = await access.ResolveAsync(actorId, ct);
         var sections = new List<SettingsSection>();
         if (state.Permissions.Contains("settings.general.read")) sections.Add(new("general", state.Permissions.Contains("settings.general.manage")));
-        if (DCMS.Application.Features.Settings.SettingsGrants.CatalogKinds.Any(kind => state.Permissions.Contains($"catalog.{kind}.read"))) sections.Add(new("catalogs", true));
+        // DCMS-132 / SET-AT-01: catalog tabs follow catalog.{kind}.read grants.
+        string[] kinds = ReferenceKinds.All.Where(kind => state.Owner || state.Permissions.Contains($"catalog.{kind}.read")).ToArray();
+        if (kinds.Length > 0) sections.Add(new("catalogs", true));
         if (state.Permissions.Contains("catalog.materials.read")) sections.Add(new("materials", state.Permissions.Contains("catalog.materials.update")));
         if (new[]{"providers","lab-work-types","medicines"}.Any(kind => state.Permissions.Contains($"catalog.{kind}.read"))) sections.Add(new("supplies", true));
-        return new(sections);
+        if (state.Owner || state.Permissions.Contains("settings.audit.read")) sections.Add(new("audit", false));
+        return new(sections, kinds);
     }
 
     public async Task<GeneralSettingsDto> GetAsync(int actorId, CancellationToken ct)

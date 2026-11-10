@@ -28,12 +28,15 @@ internal static class AppointmentModel
             b.Property(x => x.Version).IsConcurrencyToken();
             b.Property(x => x.CancelReason).HasMaxLength(500);
             b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.CancelledBy).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.PatientConsentConfirmedBy).OnDelete(DeleteBehavior.Restrict);
             b.HasIndex(x => x.Code).IsUnique();
             b.HasIndex(x => x.ReservationId).IsUnique();
             b.HasIndex(x => new { x.BranchId, x.StartAt });
             b.HasIndex(x => x.FollowUpId).IsUnique().HasFilter("\"FollowUpId\" IS NOT NULL AND \"Status\" IN ('Confirmed','CheckedIn')");
             b.HasOne<ResourceReservation>().WithOne().HasForeignKey<Appointment>(x => x.ReservationId).OnDelete(DeleteBehavior.Restrict);
             b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.BookerAccountId).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<DCMS.Domain.Features.FamilyMembers.FamilyMember>().WithMany().HasForeignKey(x => x.FamilyMemberId).OnDelete(DeleteBehavior.Restrict);
+            b.HasIndex(x => new { x.BookerAccountId, x.FamilyMemberId, x.StartAt });
             b.HasOne<PatientProfile>().WithMany().HasForeignKey(x => x.PatientId).OnDelete(DeleteBehavior.Restrict);
         });
         model.Entity<AppointmentChange>(b =>

@@ -1,4 +1,4 @@
-import { Alert, Button, Checkbox, Descriptions, Drawer, Input, Space, Spin, Typography } from 'antd';
+import { Alert, Button, Checkbox, Descriptions, Drawer, Input, InputNumber, Space, Spin, Typography } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { api, ApiError } from '../../services/api';
 import { addDays, clinicToday, formatClock, formatDate, newRequestKey, type AppointmentResult, type AvailabilitySlot } from './types';
@@ -46,10 +46,13 @@ export default function NextVisitBookingDrawer({ open, candidate, patient, onClo
   const [bookerName, setBookerName] = useState(''), [bookerContact, setBookerContact] = useState(''), [exceptionReason, setExceptionReason] = useState('');
   const [after, setAfter] = useState<{ result: AppointmentResult; preview: PlannedDatePreview } | null>(null);
   const [picked, setPicked] = useState<string[]>([]), [syncError, setSyncError] = useState<string | null>(null);
+  const [patientConsent, setPatientConsent] = useState(false);
+  const [durationMinutes, setDurationMinutes] = useState<number | null>(null);
   const requestKeys = useRef<{ instruction: string; appointment: string | null; sync: string }>({ instruction: newRequestKey(), appointment: null, sync: newRequestKey() });
   const followUpId = useRef<string | null>(null);
   const generation = useRef(0);
   const today = clinicToday();
+  const durationValid = durationMinutes !== null && Number.isInteger(durationMinutes) && durationMinutes >= 1 && durationMinutes <= 480;
   const target = candidate?.targetOn ?? candidate?.estimatedStart ?? null;
   const windowed = !!candidate?.windowFrom && !!candidate.windowTo;
   const minDate = [today, candidate?.earliestOn, candidate?.windowFrom].reduce<string>((a, b) => (b && b > a ? b : a), today);
@@ -60,13 +63,13 @@ export default function NextVisitBookingDrawer({ open, candidate, patient, onClo
 
   const availabilityOf = async (day: string) => {
     const query = new URLSearchParams({ branchId: String(candidate!.branchId), dentistId: String(candidate!.dentistId),
-      serviceId: String(candidate!.serviceId), date: day, durationMinutes: String(candidate!.durationMinutes) });
+      serviceId: String(candidate!.serviceId), date: day, durationMinutes: String(durationMinutes) });
     return (await api<{ slots: AvailabilitySlot[] }>(`/api/availability?${query}`)).slots;
   };
 
   // Collects the days nearest to the planned date on which the dentist has a free slot and selects the nearest one.
   async function suggest(end: string) {
-    if (!candidate) return;
+    if (!candidate || !durationValid) return;
     const run = ++generation.current;
     setLoading(true); setError(null); setNotice(null); setSlot(null); setSlots(null); setDays([]);
     const anchor = anchorOf(candidate);
@@ -92,7 +95,7 @@ export default function NextVisitBookingDrawer({ open, candidate, patient, onClo
   }
 
   async function loadDay(day: string) {
-    if (!candidate) return;
+    if (!candidate || !durationValid) return;
     const run = ++generation.current;
     setLoading(true); setError(null); setNotice(null); setSlot(null); setSlots(null); setDate(day);
     try {
@@ -111,9 +114,16 @@ export default function NextVisitBookingDrawer({ open, candidate, patient, onClo
     const end = lastDay(candidate);
     setLimitEnd(end); setBookerName(patient.fullName); setBookerContact(patient.phone ?? ''); setExceptionReason('');
     setAfter(null); setPicked([]); setSyncError(null);
-    void suggest(end);
+    setPatientConsent(false);
+    setDurationMinutes(candidate.durationMinutes);
     return () => { generation.current++; };
   }, [open, candidate?.itemId, candidate?.followUpId]);
+
+  useEffect(() => {
+    if (!open || !candidate || !durationValid) return;
+    const timer = window.setTimeout(() => void suggest(lastDay(candidate)), 250);
+    return () => { window.clearTimeout(timer); generation.current++; };
+  }, [open, candidate?.itemId, candidate?.followUpId, durationMinutes]);
 
   const deviation = (day: string) => {
     if (!target) return null;
@@ -123,7 +133,7 @@ export default function NextVisitBookingDrawer({ open, candidate, patient, onClo
 
   const needsException = !!slot && Date.parse(slot.start) < Date.now() + 60 * 60_000;
   const contactValid = cleanPhone(bookerContact) || cleanEmail(bookerContact);
-  const canConfirm = has('appointments.create') && has('treatment.progress.manage') && !!slot && !busy && bookerName.trim().length > 0 && bookerName.trim().length <= 100 && contactValid
+  const canConfirm = durationValid && !loading && patientConsent && has('appointments.create') && has('treatment.progress.manage') && !!slot && !busy && bookerName.trim().length > 0 && bookerName.trim().length <= 100 && contactValid
     && (!needsException || exceptionReason.trim().length > 0);
 
   async function confirm() {
@@ -153,8 +163,9 @@ export default function NextVisitBookingDrawer({ open, candidate, patient, onClo
         branchId: candidate.branchId, booker: { name: bookerName.trim(), phone: contact.includes('@') ? null : contact, email: contact.includes('@') ? contact : null },
         attendee: { patientId: patient.id, name: patient.fullName, birthDate: null }, attendeeRelation: 'Self', kind: 'FollowUp', source: 'InPerson',
         serviceId: candidate.serviceId, reason: `Điều trị theo kế hoạch: ${candidate.serviceName}${candidate.region ? ` · ${candidate.region}` : ''}`,
-        dentistId: candidate.dentistId, assistantId: null, chairId: slot.chairId, startAt: slot.start, durationMinutes: candidate.durationMinutes,
+        dentistId: candidate.dentistId, assistantId: null, chairId: slot.chairId, startAt: slot.start, durationMinutes,
         followUpId: followUpId.current, bookingSettingsVersion: slot.bookingSettingsVersion,
+        patientConsentConfirmed: patientConsent,
         exceptionReason: reason, requestKey: requestKeys.current.appointment,
         scheduleVersion: slot.scheduleVersion, assistantScheduleVersion: slot.assistantScheduleVersion }) });
       requestKeys.current.appointment = null;
@@ -217,8 +228,19 @@ export default function NextVisitBookingDrawer({ open, candidate, patient, onClo
         { label: 'Ngày dự kiến', children: target ? formatDate(target) : 'Chưa có' },
         ...(candidate.windowFrom && candidate.windowTo ? [{ label: 'Khoảng cho phép', children: `${formatDate(candidate.windowFrom)} – ${formatDate(candidate.windowTo)}` }] : []),
         { label: 'Bác sĩ phụ trách', children: candidate.dentistName },
-        { label: 'Thời lượng', children: `${candidate.durationMinutes} phút` },
       ]} />
+      <div className="patient-section">
+        <label htmlFor="next-visit-duration">Thời lượng (phút)</label>
+        <InputNumber id="next-visit-duration" min={1} max={480} step={1} value={durationMinutes} disabled={busy}
+          status={!durationValid ? 'error' : undefined} aria-invalid={!durationValid} aria-describedby="next-visit-duration-help"
+          onChange={value => {
+            generation.current++; setSlot(null); setSlots(null); setDays([]); setNotice(null); setError(null);
+            setLoading(false); requestKeys.current.appointment = null; setDurationMinutes(value);
+          }} />
+        <Typography.Paragraph id="next-visit-duration-help" type={durationValid ? 'secondary' : 'danger'}>
+          {durationValid ? '1–480 phút. Áp dụng cho lần hẹn này; đổi thời lượng cần chọn lại giờ.' : 'Nhập số phút nguyên từ 1 đến 480.'}
+        </Typography.Paragraph>
+      </div>
       <Typography.Title level={5} className="patient-section">Ngày và khung giờ</Typography.Title>
       {days.length > 0 && <div className="booking-slots" role="group" aria-label="Ngày gần ngày dự kiến có lịch của bác sĩ">
         {days.map(d => <Button key={d.date} type={d.date === date ? 'primary' : 'default'} aria-pressed={d.date === date} disabled={busy}
@@ -245,6 +267,9 @@ export default function NextVisitBookingDrawer({ open, candidate, patient, onClo
       <Input id="next-visit-contact" maxLength={254} value={bookerContact} status={bookerContact && !contactValid ? 'error' : undefined}
         onChange={event => setBookerContact(event.target.value)} disabled={busy} />
       {bookerContact && !contactValid && <Typography.Text type="danger">Liên hệ người đặt không đúng định dạng.</Typography.Text>}
+      <div className="patient-section"><Checkbox checked={patientConsent} disabled={busy} onChange={event => setPatientConsent(event.target.checked)}>
+        Đã có sự đồng ý của bệnh nhân
+      </Checkbox></div>
     </>}
   </Drawer>;
 }

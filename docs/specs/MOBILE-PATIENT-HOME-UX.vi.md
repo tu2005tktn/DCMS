@@ -13,7 +13,7 @@ Thay màn hình bản đồ dành cho tester ở điểm vào mobile bằng tran
 
 ## Trải nghiệm
 
-- Trang chủ có lời chào, tác vụ chính, tóm tắt hồ sơ hiện tại, lịch sắp tới, thông báo mới và thanh điều hướng dễ bấm. Các màn chi tiết cũ giữ làm nguồn sự thật.
+- Trang chủ có lời chào, tác vụ chính, tóm tắt hồ sơ hiện tại, lịch sắp tới, thông báo mới và thanh điều hướng dễ bấm. Mục Khám phá và Tài khoản dẫn tới Kết quả khám theo lượt từ `main` (route `(account)/visit-results`); nội dung lâm sàng vẫn do màn đó kiểm quyền và tải qua API riêng. Các màn chi tiết cũ giữ làm nguồn sự thật.
 - Trạng thái loading, chưa liên kết, chờ xác minh, không có hồ sơ/lịch/thông báo, lỗi mạng và tải lại phải tách biệt. Kéo xuống để đồng bộ lại.
 - Bố cục cuộn dọc, các vùng chạm tối thiểu khoảng 44 px, màu và chữ tương phản. Không lộ thông tin lâm sàng trên màn khách/chưa xác minh.
 - Bản release có thể chạy khi không có Metro. Trong môi trường test qua USB, API dùng `adb reverse tcp:5080 tcp:5080` với `EXPO_PUBLIC_API_URL=http://localhost:5080`; khi tháo USB cần cấu hình lại URL API phù hợp mạng.

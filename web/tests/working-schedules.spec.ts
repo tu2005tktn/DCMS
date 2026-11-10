@@ -10,10 +10,12 @@ async function select(page: Page, label: string, text: string) {
   await page.locator('.ant-select-dropdown').filter({ has: page.locator(`[id="${list}"]`) }).getByText(text, { exact: true }).last().click();
 }
 async function workspace(page: Page) {
-  const user = { id: 10, userName: 'dentist.test', fullName: 'Bác sĩ kiểm thử', accountType: 'Staff', roles: ['Dentist'], effectiveRoles: ['Dentist'], permissions: ['working-schedules.read', 'working-schedules.manage'] };
+  const user = { id: 10, userName: 'dentist.test', fullName: 'Bác sĩ kiểm thử', accountType: 'Staff', roles: ['Dentist'], effectiveRoles: ['Dentist'], permissions: ['working-schedules.read', 'working-schedules.manage', 'appointments.read'] };
   await page.route('**/api/auth/sign-in', route => route.fulfill({ json: { accessToken: 'test-only', user } }));
   await page.route('**/api/auth/me', route => route.fulfill({ json: user }));
+  await page.route('**/api/auth/session/**', route => route.fulfill({ json: { serverNow: new Date().toISOString(), deadlineAt: new Date(Date.now() + 1200000).toISOString(), activityVersion: 1 } }));
   await page.route('**/api/working-schedules/options', route => route.fulfill({ json: options }));
+  await page.route('**/api/working-schedules/appointments?*', route => route.fulfill({ json: { items: [] } }));
   await page.route('**/api/working-schedules/recurring?*', route => route.fulfill({ json: empty() }));
   await page.route('**/api/working-schedules/recurring/preview', route => route.fulfill({ json: { affectedAppointments: [] } }));
   await page.goto('/sign-in'); await page.getByLabel('Tên đăng nhập', { exact: true }).fill('dentist.test'); await page.getByLabel('Mật khẩu', { exact: true }).fill('test-only');
@@ -40,7 +42,7 @@ test('recurring weekday rows choose branch or Not working with half-hour time en
   await expect(page.getByText('Đã công bố', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Hủy thay đổi chưa lưu' })).toBeDisabled();
   await select(page, 'Chi nhánh Thứ 2', 'Không làm việc');
-  await expect(page.getByText('Khoảng 1 · 09:00 → 17:00')).toHaveCount(0);
+  await expect(page.getByRole('group', { name: 'Khoảng 1 · 09:00 → 17:00', exact: true })).toHaveCount(0);
 });
 
 test('stale and network failures preserve draft; discard requires confirmation', async ({ page }) => {
@@ -49,13 +51,13 @@ test('stale and network failures preserve draft; discard requires confirmation',
   await page.route('**/api/working-schedules/recurring/publish', route => route.fulfill({ status: 409, json: { code: 'MSG111', message: 'Dữ liệu đã thay đổi.' } }));
   await page.getByRole('button', { name: 'Lưu và công bố' }).click();
   await expect(page.getByText('Xung đột · Cần kiểm tra lại · MSG111')).toBeVisible();
-  await expect(page.getByText('Khoảng 1 · 09:00 → 17:00')).toBeVisible();
+  await expect(page.getByRole('group', { name: 'Khoảng 1 · 09:00 → 17:00', exact: true })).toBeVisible();
   await page.route('**/api/working-schedules/recurring/publish', route => route.abort());
   await page.getByRole('button', { name: 'Lưu và công bố' }).click();
   await expect(page.getByText('Lỗi kết nối hoặc dịch vụ · MSG144')).toBeVisible();
   page.once('dialog', dialog => dialog.dismiss());
   await page.getByRole('button', { name: 'Hủy thay đổi chưa lưu' }).click();
-  await expect(page.getByText('Khoảng 1 · 09:00 → 17:00')).toBeVisible();
+  await expect(page.getByRole('group', { name: 'Khoảng 1 · 09:00 → 17:00', exact: true })).toBeVisible();
   page.once('dialog', dialog => dialog.accept());
   await page.getByRole('button', { name: 'Hủy thay đổi chưa lưu' }).click();
   await expect(page.getByRole('combobox', { name: 'Bắt đầu 1', exact: true })).toHaveCount(0);
@@ -104,7 +106,7 @@ test('duration correction and range preview preserve draft; invalid range sends 
   await page.getByLabel('Preview đến ngày', { exact: true }).fill('2032-02-05');
   await page.getByRole('button', { name: 'Preview slot', exact: true }).click();
   await expect(page.getByText('Chọn khoảng preview từ 1 đến 31 ngày.')).toBeVisible(); expect(calls).toBe(1);
-  await expect(page.getByText('Khoảng 1 · 08:00 → 17:00')).toBeVisible();
+  await expect(page.getByRole('group', { name: 'Khoảng 1 · 08:00 → 17:00', exact: true })).toBeVisible();
 });
 
 test('retry after a lost publish response reuses receipt key without stale preflight', async ({ page }) => {
@@ -155,9 +157,12 @@ test('real editor previews a recurring sample in a later week without publishing
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click(); await page.getByRole('link', { name: 'Lịch làm việc', exact: true }).click();
   await expect(page.getByLabel('Ngày áp dụng', { exact: true })).toBeVisible();
   await page.getByLabel('Ngày áp dụng', { exact: true }).fill('2035-01-01');
+  // Build a clean unsaved draft regardless of the clinic's already published template.
+  for (const day of ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ nhật']) await select(page, `Chi nhánh ${day}`, 'Không làm việc');
   const branchSelect = page.getByRole('combobox', { name: 'Chi nhánh Thứ 2', exact: true });
   await expect(branchSelect).toBeEnabled(); await branchSelect.press('ArrowDown');
-  await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasNotText: 'Không làm việc' }).first().click();
+  const branchList = await branchSelect.getAttribute('aria-controls');
+  await page.locator('.ant-select-dropdown').filter({ has: page.locator(`[id="${branchList}"]`) }).locator('.ant-select-item-option').filter({ hasNotText: 'Không làm việc' }).first().click();
   await page.getByRole('button', { name: 'Thêm khoảng', exact: true }).first().click();
   await select(page, 'Loại khoảng 2', 'Nghỉ'); await select(page, 'Bắt đầu 2', '12:00'); await select(page, 'Kết thúc 2', '13:00'); await page.getByLabel('Lý do 2', { exact: true }).fill('Nghỉ trưa');
   await page.getByRole('button', { name: 'Thêm khoảng', exact: true }).first().click();

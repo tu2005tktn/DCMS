@@ -9,6 +9,10 @@ public static class TreatmentItemRules
     public static bool IsEffective(TreatmentItem item) =>
         item.Decision == "Agreed" || item.EntrySource == "ClinicianEntry";
 
+    public static bool IsPendingForBooking(TreatmentItem item) =>
+        IsEffective(item) && !item.SheetDeleted && !item.HiddenFromSheet
+        && !item.DisplayCompleted && item.Progress != "Completed";
+
     // The date the plan currently aims for: the explicit return target if the window is complete, else the planned date.
     public static DateOnly? PlannedTarget(TreatmentItem item) =>
         item.ReturnEarliestOn.HasValue && item.ReturnTargetOn.HasValue && item.ReturnLatestOn.HasValue ? item.ReturnTargetOn : item.EstimatedStart;

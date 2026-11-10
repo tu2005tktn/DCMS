@@ -66,4 +66,10 @@ export const decisionLabel: Record<TreatmentItem['decision'], string> = {
 export const stateLabel: Record<TreatmentDossier['state'], string> = {
   Open: 'Đang điều trị', Completed: 'Đã kết thúc', Stopped: 'Đã dừng',
 };
+export const progressLabel: Record<string, string> = {
+  NotStarted: 'Chưa thực hiện', InProgress: 'Đang thực hiện', Partial: 'Đã làm một phần', Completed: 'Đã hoàn tất', Stopped: 'Đã dừng',
+};
+export const closureOutcomeLabel: Record<string, string> = {
+  CompletedAsAgreed: 'Hoàn tất đúng phần đã đồng ý', StoppedIncomplete: 'Dừng khi còn phần chưa thực hiện',
+};
 export const money = (amount: number) => `${new Intl.NumberFormat('vi-VN').format(amount)} ₫`;

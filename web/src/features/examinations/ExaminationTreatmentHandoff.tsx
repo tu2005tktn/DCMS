@@ -6,7 +6,8 @@ import type { ExaminationContent } from './types';
 import DossierList from '../treatment/DossierList';
 
 type Handoff = { patientId: number; branchId: number; visitId: string; version: number; examinationVersion: number; visitStatus: string; examination: ExaminationContent };
-export default function ExaminationTreatmentHandoff({ patientId, visitId, version }: { patientId: number; visitId: string; version: string | null }) {
+export default function ExaminationTreatmentHandoff({ patientId, visitId, version, patientName, patientCode, patientAge }: {
+  patientId: number; visitId: string; version: string | null; patientName?: string; patientCode?: string; patientAge?: number | null }) {
   const [source, setSource] = useState<Handoff>(); const [error, setError] = useState<string>(); const [retry, setRetry] = useState(0);
   useEffect(() => {
     let current = true; setSource(undefined); setError(undefined);
@@ -24,6 +25,7 @@ export default function ExaminationTreatmentHandoff({ patientId, visitId, versio
   if(source.visitStatus !== 'Completed') return <Alert type="info" showIcon message="Cần kết thúc lượt khám trước khi lập kế hoạch điều trị từ phiếu này." description={<Link to={`/visits/${visitId}`}>Về lượt khám</Link>}/>;
   return <><Alert type="info" showIcon message={`Chuyển từ phiếu khám · phiên bản ${source.examinationVersion}`}
     description={<><Typography.Paragraph>{source.examination.diagnosis}</Typography.Paragraph><Link to={`/visits/${visitId}`}>Xem kết quả khám gốc</Link></>} />
-    <DossierList patientId={patientId} visitId={visitId} sourceVisitVersion={source.version} diagnosis={source.examination.diagnosis} branchId={source.branchId} />
+    <DossierList patientId={patientId} visitId={visitId} sourceVisitVersion={source.version} diagnosis={source.examination.diagnosis} branchId={source.branchId}
+      patientName={patientName} patientCode={patientCode} patientAge={patientAge} />
   </>;
 }

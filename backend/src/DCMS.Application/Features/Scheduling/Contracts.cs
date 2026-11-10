@@ -10,6 +10,10 @@ public sealed record ScheduleDto(Guid? Id, int BranchId, int DentistId, DateOnly
 public sealed record PublishResult(ScheduleDto Schedule, SystemMessage Notification);
 public sealed record AffectedAppointment(Guid Id, string Code, DateTimeOffset Start, DateTimeOffset End, string Attendee, string Status);
 public sealed record SchedulePreview(AffectedAppointment[] AffectedAppointments);
+public sealed record ScheduleAppointment(Guid Id, string Code, int BranchId, string BranchName,
+    DateTimeOffset StartAt, DateTimeOffset EndAt, string PatientName, string ServiceName, string Status,
+    bool IsTreatmentPlan, DateTimeOffset? PatientConsentConfirmedAt);
+public sealed record ScheduleAppointments(IReadOnlyList<ScheduleAppointment> Items);
 public sealed record BranchOption(int Id, string Name);
 public sealed record EmployeeOption(int Id, int BranchId, string Name, bool CanDentist, bool CanEdit, bool Self, bool? CanView = null);
 public sealed record ChairOption(int Id, int BranchId, string Name);
@@ -36,6 +40,7 @@ public sealed record RecurringPreviewRequest(RecurringCommand Schedule, int Bran
 public sealed record RecurringAvailabilityResult(AvailabilityResult[] Days);
 public interface IWorkingScheduleService
 {
+    Task<ScheduleAppointments> AppointmentsAsync(int actorId, int dentistId, DateOnly from, DateOnly to, CancellationToken ct);
     Task<RecurringScheduleDto> GetRecurringAsync(int actorId, int dentistId, DateOnly date, CancellationToken ct);
     Task<SchedulePreview> PreviewRecurringAsync(int actorId, RecurringCommand command, CancellationToken ct);
     Task<RecurringPublishResult> PublishRecurringAsync(int actorId, RecurringCommand command, CancellationToken ct);

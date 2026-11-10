@@ -27,6 +27,7 @@ export default function AccountHomeScreen() {
     {user.accountType === 'Public' ? <>
       <Item title="Lịch hẹn" detail="Xem, đổi và hủy lịch" onPress={() => go('/(account)/appointments')} />
       <Item title="Bệnh án" detail="Theo dõi điều trị và lịch sử khám" onPress={() => go('/(account)/medical-records')} />
+      <Item title="Kết quả khám" detail="Xem kết quả theo từng lượt" onPress={() => go('/(account)/visit-results')} />
       <Item title="Đơn thuốc" detail="Thuốc và lời dặn của nha sĩ" onPress={() => go('/(account)/prescriptions')} />
       <Item title="Thông báo" detail="Cập nhật lịch hẹn của bạn" onPress={() => go('/(home)/notifications')} />
       <Item title="Liên kết hồ sơ" detail="Xác minh hồ sơ bệnh nhân" onPress={() => go('/(account)/account-link')} />

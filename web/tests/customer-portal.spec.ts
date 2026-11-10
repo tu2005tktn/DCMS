@@ -73,7 +73,7 @@ test('customer registers, signs in, and reaches the separate home', async ({ pag
   expect(registration?.phoneNumber).toBe('0912345678');
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
   await expect(page.locator('#customer-sign-in-errors')).toBeFocused();
-  await page.getByLabel('Số điện thoại').fill('0912345678');
+  await page.getByLabel('Email hoặc tên đăng nhập').fill('0912345678');
   await page.getByLabel('Mật khẩu').fill('Password123!');
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
   await expect(page).toHaveURL(/\/customer\/home$/);
@@ -88,7 +88,7 @@ test('customer portal rejects a staff account without storing its token', async 
   await mockCommon(page);
   await page.route('**/api/auth/sign-in', route => route.fulfill(json({ accessToken: 'staff-token', user: staffUser })));
   await page.goto('/customer/sign-in');
-  await page.getByLabel('Số điện thoại').fill('0912345678');
+  await page.getByLabel('Email hoặc tên đăng nhập').fill('0912345678');
   await page.getByLabel('Mật khẩu').fill('Password123!');
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
   await expect(page.getByText('Đây là tài khoản nhân viên. Vui lòng chọn đăng nhập Nhân viên.')).toBeVisible();
@@ -195,7 +195,7 @@ test('verified customer sees only own linked record', async ({ page }) => {
     patientCode: 'PAT-1', fullName: 'Nguyễn Văn A', birthDate: '1990-01-01', linkedAt: '2026-10-16T00:00:00Z',
   })));
   await page.goto('/customer/sign-in');
-  await page.getByLabel('Số điện thoại').fill('0912345678');
+  await page.getByLabel('Email hoặc tên đăng nhập').fill('0912345678');
   await page.getByLabel('Mật khẩu').fill('Password123!');
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
   await page.getByRole('link', { name: 'Liên kết hồ sơ của tôi' }).click();

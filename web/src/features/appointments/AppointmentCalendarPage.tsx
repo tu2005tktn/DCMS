@@ -1,8 +1,9 @@
 import { usePermissions } from '../authentication/usePermissions';
-import { Alert, Button, Card, Empty, Radio, Select, Space, Spin, Tag, Typography, message } from 'antd';
+import { Alert, Button, Card, Drawer, Empty, Radio, Select, Space, Spin, Tag, Typography, message } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../services/api';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
+import AppointmentDetailContent from './AppointmentDetailContent';
 import BookingDrawer, { type BookingPrefill } from './BookingDrawer';
 import {
   addDays, clinicToday, clock, formatDate, localDate, localMinute, mondayOf, sourceLabels, statusColors, statusLabels, weekday,
@@ -24,7 +25,6 @@ function cellKind(periods: CalendarPeriod[], minute: number) {
 export default function AppointmentCalendarPage() {
   const canPickBranch = useCanPickBranch();
   const has = usePermissions();
-  const navigate = useNavigate();
   const [toast, toastContext] = message.useMessage();
   const [options, setOptions] = useState<AppointmentOptions | null>(null);
   const [optionsError, setOptionsError] = useState<string | null>(null);
@@ -38,11 +38,21 @@ export default function AppointmentCalendarPage() {
   const [error, setError] = useState<string | null>(null);
   const [revision, setRevision] = useState(0);
   const [booking, setBooking] = useState<BookingPrefill | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const defaultDentist = (result: AppointmentOptions, branch: number | undefined) => result.dentists.find(value =>
+    value.branchId === branch && value.id === result.currentDentistId)?.id;
 
   useEffect(() => {
-    api<AppointmentOptions>('/api/appointments/options')
-      .then(result => { setOptions(result); setBranchId(result.branches[0]?.id); })
-      .catch(failure => setOptionsError((failure as Error).message));
+    let active = true; const controller = new AbortController();
+    api<AppointmentOptions>('/api/appointments/options', { signal: controller.signal })
+      .then(result => {
+        if (!active) return;
+        const ownBranch = result.branches.find(branch => defaultDentist(result, branch.id) !== undefined)?.id ?? result.branches[0]?.id;
+        setOptions(result); setBranchId(ownBranch); setDentistId(defaultDentist(result, ownBranch));
+      })
+      .catch(failure => { if (active) setOptionsError((failure as Error).message); });
+    return () => { active = false; controller.abort(); };
   }, []);
 
   const dentists = options?.dentists.filter(d => d.branchId === branchId) ?? [];
@@ -92,7 +102,7 @@ export default function AppointmentCalendarPage() {
   return <>
     {toastContext}
     <div className="page-heading"><div><Typography.Title level={2}>Lịch hẹn</Typography.Title>
-      <Typography.Paragraph>Lưới 15 phút theo giờ phòng khám. Bấm ô trống trong giờ làm để đặt lịch tại quầy; bấm lịch để xem chi tiết.
+      <Typography.Paragraph>Lưới 15 phút theo giờ phòng khám. Bấm ô trống trong giờ làm để đặt lịch tại quầy; bấm lịch để xem và thao tác.
         {options.ownScheduleOnly && ' Bạn chỉ thấy lịch của chính mình.'}</Typography.Paragraph></div>
       <Button type="primary" disabled={!has('appointments.create')} onClick={() => setBooking({ branchId: branchId!, dentistId: mode === 'WEEK' ? weekDentist : dentistId, date })}>Đặt lịch</Button></div>
     <Card>
@@ -106,7 +116,7 @@ export default function AppointmentCalendarPage() {
         </Space>
         <Space wrap>
           {canPickBranch && options.branches.length > 1 && <Select aria-label="Chi nhánh" style={{ width: 220 }} value={branchId} options={options.branches.map(b => ({ value: b.id, label: b.name }))}
-            onChange={value => { setBranchId(value); setDentistId(undefined); }} />}
+            onChange={value => { setBranchId(value); setDentistId(defaultDentist(options, value)); setSelectedId(null); }} />}
           <Select aria-label="Nha sĩ" style={{ width: 200 }} allowClear={mode === 'DAY'} placeholder="Tất cả nha sĩ" value={mode === 'WEEK' ? weekDentist : dentistId}
             options={dentists.map(d => ({ value: d.id, label: d.name }))} onChange={setDentistId} />
           <Select aria-label="Trạng thái" style={{ width: 170 }} value={status} onChange={setStatus}
@@ -140,7 +150,7 @@ export default function AppointmentCalendarPage() {
                   {items.map(a => {
                     const top = (localMinute(a.startAt) - startMinute) / SLOT * ROW;
                     return <button type="button" key={a.id} className={`calendar-event status-${a.status}`} style={{ top, height: Math.max(ROW, a.durationMinutes / SLOT * ROW) - 2 }}
-                      onClick={() => navigate(`/appointments/${a.id}`)} aria-label={`Lịch ${a.code}`}>
+                      onClick={() => setSelectedId(a.id)} aria-label={`Lịch ${a.code}`}>
                       <strong>{clock(localMinute(a.startAt))}–{clock(localMinute(a.endAt))}</strong> {a.attendeeName}
                       <span>{a.code}{a.source ? ` · ${sourceLabels[a.source] ?? a.source}` : ''}{a.serviceName ? ` · ${a.serviceName}` : ''}{a.chairName ? ` · ${a.chairName}` : ''}</span>
                       <Tag color={statusColors[a.status]}>{statusLabels[a.status]}</Tag>
@@ -152,6 +162,11 @@ export default function AppointmentCalendarPage() {
           </div>
         </Spin>}
     </Card>
+    <Drawer open={selectedId !== null} title="Thông tin lịch hẹn" aria-label="Thông tin lịch hẹn" width={640} styles={{ wrapper: { maxWidth: '100vw' } }}
+      onClose={() => setSelectedId(null)} destroyOnClose
+      extra={selectedId ? <Link to={`/appointments/${selectedId}`}>Mở chi tiết đầy đủ</Link> : undefined}>
+      {selectedId && <AppointmentDetailContent key={selectedId} id={selectedId} revision={revision} onChanged={() => setRevision(value => value + 1)} />}
+    </Drawer>
     <BookingDrawer open={booking !== null} prefill={booking} options={options} onClose={() => setBooking(null)} onBooked={result => {
       setBooking(null);
       void toast.success(`${result.notification.message} Mã lịch: ${result.code}`);

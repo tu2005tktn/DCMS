@@ -1,8 +1,9 @@
-import { Alert, Button, Card, Empty, Input, Select, Space, Table, Tag, Typography } from 'antd';
+import { Alert, Button, Card, Empty, Input, Select, Space, Table, Tabs, Tag, Typography } from 'antd';
 import { useEffect, useState } from 'react';
 import { api } from '../../services/api';
 import { useAuth } from '../authentication/AuthContext';
 import ReviewDrawer from './ReviewDrawer';
+import FamilyRecordReviews from './FamilyRecordReviews';
 import { formatTime, statusColors, statusLabels, type LinkQueueItem, type LinkQueuePage, type LinkStatus } from './types';
 
 type Filters = { status: LinkStatus | 'ALL'; from: string; to: string; keyword: string };
@@ -10,6 +11,9 @@ const initialFilters: Filters = { status: 'PENDING', from: '', to: '', keyword: 
 
 // S08 Link Verification Queue (UC-36). Server enforces ClinicAssistant; this page only mirrors the permission.
 export default function LinkVerificationPage() {
+  return <Tabs destroyInactiveTabPane items={[{ key: 'self', label: 'Hồ sơ của bản thân', children: <SelfLinkQueue /> }, { key: 'family', label: 'Hồ sơ người thân', children: <FamilyRecordReviews /> }]} />;
+}
+function SelfLinkQueue() {
   const auth = useAuth();
   const [draft, setDraft] = useState<Filters>(initialFilters);
   const [filters, setFilters] = useState<Filters>(initialFilters);

@@ -6,7 +6,7 @@ import ReceiptPrintPage from '../features/finance/ReceiptPrintPage';
 import PrescriptionPage from '../features/prescriptions/PrescriptionPage';
 import PrescriptionTemplatesPage from '../features/prescriptions/PrescriptionTemplatesPage';
 import ClinicalServicesPage from '../features/finance/ClinicalServicesPage';
-import { Alert, Button, Card, Result, Space, Tag, Typography } from 'antd';
+import { Alert, Button, Card, Result, Typography } from 'antd';
 import { useState, type ReactNode } from 'react';
 import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuth } from '../features/authentication/AuthContext';
@@ -25,10 +25,10 @@ import LinkVerificationPage from '../features/patient-links/LinkVerificationPage
 import PatientSearchPage from '../features/patients/PatientSearchPage';
 import PatientProfilePage from '../features/patients/PatientProfilePage';
 import SupportInboxPage from '../features/support-inbox/SupportInboxPage';
+import CustomerCarePage from '../features/customer-care/CustomerCarePage';
 import RecoverAccountPage from '../features/recovery/RecoverAccountPage';
 import AppointmentCalendarPage from '../features/appointments/AppointmentCalendarPage';
 import AppointmentDetailPage from '../features/appointments/AppointmentDetailPage';
-import { roleLabels } from '../features/accounts/types';
 import HealthStatus from '../features/HealthStatus';
 import ReceptionPage from '../features/reception/ReceptionPage';
 import CheckInPage from '../features/reception/CheckInPage';
@@ -109,6 +109,7 @@ export default function App() {
       <Route path="appointments/:id" element={<Protected permission="appointments.read"><AppointmentDetailPage /></Protected>} />
       <Route path="link-verification" element={<Protected permission="patient-links.read"><LinkVerificationPage /></Protected>} />
       <Route path="support-inbox" element={<Protected permission="appointments.support.handle"><SupportInboxPage /></Protected>} />
+      <Route path="customer-care" element={<Protected permission="care-tasks.read"><CustomerCarePage /></Protected>} />
       <Route path="*" element={<Result status="404" title="Không tìm thấy trang" extra={<Link to="/">Về trang chủ</Link>} />} />
     </Route>
   </Routes>;
@@ -143,9 +144,6 @@ function Home() {
     }}>Cập nhật quyền</Button>}>
       {error && <Alert type="error" message={error} showIcon className="form-alert" />}
       <Typography.Paragraph>Tên đăng nhập: <strong>{user?.userName}</strong></Typography.Paragraph>
-      <Typography.Paragraph>Loại tài khoản: {user?.accountType === 'Staff' ? 'Nhân viên' : 'Công khai'}</Typography.Paragraph>
-      <Typography.Paragraph>Vai trò được cấp: <Space wrap>{user?.roles.map(role => <Tag key={role}>{roleLabels[role] ?? role}</Tag>)}</Space></Typography.Paragraph>
-      <Typography.Paragraph>Vai trò hiệu lực: <Space wrap>{user?.effectiveRoles.map(role => <Tag key={role}>{roleLabels[role] ?? role}</Tag>)}</Space></Typography.Paragraph>
       {user?.accountType === 'Public' && <Typography.Paragraph>{user.hasVerifiedPatientLink
         ? 'Tài khoản đã được liên kết với hồ sơ của chính bạn.'
         : 'Chưa có liên kết hồ sơ bệnh án được xác minh. Tài khoản công khai không tự có quyền đọc hồ sơ lâm sàng.'}</Typography.Paragraph>}
