@@ -20,4 +20,11 @@ Thay màn hình bản đồ dành cho tester ở điểm vào mobile bằng tran
 
 ## Nghiệm thu
 
+### Sửa tích hợp màn tài khoản (10/11/2026)
+
+- Màn tài khoản dùng một khai báo tên viết tắt, component và theme có sẵn; loading và đăng xuất tiếp tục đi qua session hiện hữu.
+- Giữ đặt lịch, lịch hẹn, liên kết hồ sơ và thẻ **Đơn thuốc của tôi** của S23. Chỉ có một lối vào đơn thuốc trên màn tài khoản, không hiển thị thẻ/nút trùng nhau.
+- Khôi phục các lối vào **Kết quả khám**, **Bệnh án**, **Thông báo**, **Thông tin bệnh nhân** của trang chủ mới. Các lối vào này chỉ điều hướng; dữ liệu và quyền vẫn do API/màn đích kiểm tra. Nhân viên giữ lối vào **Hộp thư hỗ trợ**, không thấy các tác vụ riêng của Public.
+- TypeScript phải kiểm tra thành công; bản export mobile phải đóng gói được cùng các route mới và S23.
+
 Khách có thể đi tới đăng nhập/đăng ký. Public đã đăng nhập đi từ trang chủ tới bệnh án, lịch, đơn thuốc, thông báo và tài khoản trong một lần bấm; trạng thái hồ sơ/lịch/thông báo phản ánh API thật. Tài khoản chưa xác minh không thấy nội dung bệnh án. Thông báo đọc và mở liên kết đúng quyền. Build TypeScript và Android thành công, kiểm tra trên thiết bị Android.

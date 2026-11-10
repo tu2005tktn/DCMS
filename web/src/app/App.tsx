@@ -36,15 +36,18 @@ import { useCustomerAuth } from '../features/customer-auth/CustomerAuthContext';
 import CustomerBookingPage from '../features/customer-booking/CustomerBookingPage';
 import CustomerPatientLinkPage from '../features/customer-patient-link/CustomerPatientLinkPage';
 import CustomerAppointmentsPage from '../features/customer-appointments/CustomerAppointmentsPage';
-import { CustomerPrescriptionsPage, CustomerPrescriptionDetailPage } from '../features/customer-prescriptions/CustomerPrescriptionsPage';
 import CustomerAppointmentDetailPage from '../features/customer-appointments/CustomerAppointmentDetailPage';
 import DossierPage from '../features/treatment/DossierPage';
 import PlanPage from '../features/treatment/PlanPage';
 import RevisionPage from '../features/treatment/RevisionPage';
 
 import ItemPlansPage from '../features/treatment/ItemPlansPage';
-import CommercialTreatmentPage from '../features/treatment/CommercialTreatmentPage';
 import CustomerPrescriptionsPage, { CustomerPrescriptionDetailPage } from '../features/customer-prescriptions/CustomerPrescriptionsPage';
+
+function LegacyCommercialRedirect() {
+  const { search } = useLocation();
+  return <Navigate to={'/settings/treatment-services' + search} replace />;
+}
 
 export default function App() {
   return <Routes>
