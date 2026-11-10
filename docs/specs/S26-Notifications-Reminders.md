@@ -1,5 +1,32 @@
 # S26 Notifications & Appointment Reminders
 
+## Thông báo theo sự kiện của bệnh nhân (bổ sung 10/11/2026)
+
+| Sự kiện đã lưu thành công | Người nhận | Nội dung và đích mở |
+| --- | --- | --- |
+| Lịch hẹn được tạo, đổi hoặc hủy | Tài khoản đặt lịch và tài khoản có liên kết hồ sơ VERIFIED với bệnh nhân, không gửi trùng account | Mã và thời gian lịch; mở lịch hẹn sau kiểm tra quyền |
+| Nhắc lịch hẹn 24 giờ và 2 giờ | Các tài khoản đủ quyền nhận lịch ở trên; hủy nhắc cũ khi lịch đổi/hủy | Mã và thời gian lịch; mở lịch hẹn |
+| Bác sĩ lập yêu cầu đặt lịch tái khám (`NeedsBooking`) | Tài khoản liên kết VERIFIED | Lời nhắc đặt lịch chung; mở màn hình đặt lịch sau khi kiểm tra lại yêu cầu còn hiệu lực |
+| Phiếu khám được xác nhận hoặc chỉnh sửa chính thức | Tài khoản liên kết VERIFIED | Báo hồ sơ khám có cập nhật; mở kết quả khám của lượt đó |
+| Lượt khám hoàn tất, hoạt động điều trị được đăng chính thức, kế hoạch điều trị được chốt | Tài khoản liên kết VERIFIED | Báo hồ sơ điều trị có cập nhật; mở phần hồ sơ tương ứng |
+| Đơn thuốc được hoàn tất hoặc có bản đính chính đã hoàn tất | Tài khoản liên kết VERIFIED | Báo có đơn thuốc mới; mở đơn của lượt khám |
+| Tài liệu lâm sàng chuyển sang trạng thái Ready | Tài khoản liên kết VERIFIED | Báo có tài liệu mới; mở kết quả khám |
+| Khoản thanh toán điều trị được ghi nhận | Tài khoản liên kết VERIFIED | Báo đã cập nhật thanh toán, không đưa số tiền lên màn hình khóa |
+
+- Chỉ tạo thông báo khi giao dịch nghiệp vụ commit; nháp, thao tác lỗi và replay cùng request không tạo thông báo. Mỗi account nhận tối đa một bản cho cùng sự kiện/version. In-app và hàng đợi FCM được ghi cùng transaction với sự kiện; worker gửi sau commit. Lỗi FCM không hoàn tác nghiệp vụ.
+- Push trên màn hình khóa chỉ chứa câu chung, mã hoặc giờ lịch hẹn; không chứa chẩn đoán, thuốc, ảnh, số tiền hoặc ghi chú lâm sàng. Mọi đích mở yêu cầu phiên hợp lệ và backend kiểm tra lại liên kết VERIFIED tại thời điểm mở. Thu hồi liên kết chặn truy cập tiếp theo.
+- Thông báo phát sinh trước khi liên kết hồ sơ được xác minh không được gửi ngược cho account vừa liên kết. Nếu bệnh nhân chưa có tài khoản/thiết bị, nghiệp vụ vẫn thành công; dữ liệu chính thức vẫn có thể xem sau khi liên kết.
+- Những sự kiện không làm thay đổi thông tin bệnh nhân có thể hành động hoặc xem được (ví dụ chỉnh sửa nháp, đồng bộ nội bộ, thay đổi danh mục) không tạo push để tránh làm phiền. Khi mở rộng sự kiện mới, bổ sung ma trận này và kiểm thử quyền nhận trước khi bật gửi.
+
+## Firebase Android push (bổ sung 10/11/2026)
+
+- Ứng dụng Android có package `com.dcms.mobile`. Cấu hình Firebase bằng `google-services.json` cục bộ, không đưa tệp cấu hình hoặc khóa dịch vụ vào Git theo quy định của dự án. Web và iOS không đăng ký FCM Android.
+- Sau khi đăng nhập trên thiết bị thật, ứng dụng tạo kênh thông báo `appointments` với tên hiển thị bao quát lịch hẹn và hồ sơ, xin quyền thông báo Android, lấy FCM device token và đăng ký token với API bằng phiên hiện tại. Từ chối quyền không cản trở đăng nhập hoặc thông báo trong app. Đăng xuất hủy đăng ký token; token có thể đổi và phải đồng bộ lại.
+- API: `PUT /api/notifications/devices` nhận `{ token, platform: "android" }`, idempotent theo token, gắn token với account từ JWT; `DELETE /api/notifications/devices` nhận `{ token }`, chỉ xóa token thuộc account hiện tại. Không nhận account ID từ client. Token không xuất hiện trong log/response.
+- Sau khi lưu thông báo trong app, worker tạo delivery `Push` cho account có thiết bị đã đăng ký. Backend gửi FCM HTTP v1 với OAuth service account giữ ngoài Git. Payload chỉ gồm tiêu đề, nội dung lịch hẹn không chứa dữ liệu lâm sàng, `notificationId` và deep link nội bộ. Không coi FCM thành công là đã đọc thông báo.
+- FCM lỗi tạm thời dùng retry hiện có; token không hợp lệ bị vô hiệu hóa. Thông báo trong app vẫn là nguồn dữ liệu chính. Khi chạm thông báo hệ thống, app kiểm tra lại phiên và quyền truy cập qua API trước khi mở lịch hẹn.
+- Nghiệm thu: thông báo xuất hiện trong khay Android khi app ở nền, hiện phù hợp khi ở foreground, không gửi sang account khác, đăng xuất không còn nhận push cho phiên đó; từ chối quyền hoặc FCM lỗi không làm mất thông báo trong app.
+
 > Cập nhật nguồn 26/10/2026: [bộ đặc tả v2.5](README.md) là nguồn hiện hành. Nội dung và bằng chứng dưới đây giữ mốc triển khai ban đầu; chưa được nghiệm thu lại theo v2.5.
 
 Chủ màn hình: **Tư Nguyễn Văn** (theo ràng buộc spec chung). Quyết định người dùng ghi nhận theo yêu cầu 12/10/2026, nội dung đặc tả tham chiếu v2.0 ngày 15/10/2026.

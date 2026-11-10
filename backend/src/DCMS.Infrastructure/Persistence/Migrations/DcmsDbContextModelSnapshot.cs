@@ -455,7 +455,7 @@ namespace DCMS.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("Status", "DueAt");
 
-                    b.HasIndex("AppointmentId", "AppointmentVersion", "LeadMinutes")
+                    b.HasIndex("AppointmentId", "AppointmentVersion", "LeadMinutes", "AccountId")
                         .IsUnique();
 
                     b.ToTable("APPOINTMENT_REMINDER", (string)null);
@@ -728,6 +728,38 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasIndex("Status", "NextRetryAt");
 
                     b.ToTable("NOTIFICATION_DELIVERY", (string)null);
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Appointments.PushDevice", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("AccountId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Platform")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AccountId");
+
+                    b.HasIndex("Token")
+                        .IsUnique();
+
+                    b.ToTable("PUSH_DEVICE", (string)null);
                 });
 
             modelBuilder.Entity("DCMS.Domain.Features.Appointments.StaffHandlingItem", b =>
@@ -7177,6 +7209,15 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasOne("DCMS.Domain.Features.Appointments.InAppNotification", null)
                         .WithMany("Deliveries")
                         .HasForeignKey("NotificationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Appointments.PushDevice", b =>
+                {
+                    b.HasOne("DCMS.Infrastructure.Features.Accounts.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

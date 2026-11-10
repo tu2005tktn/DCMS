@@ -40,6 +40,10 @@ weights/
 dcms-mobile-qr.png
 .tools/
 .artifacts/
+**/google-services.json
+**/*service-account*.json
+**/*firebase-adminsdk*.json
+.secrets/
 
 # Public, attributed reference meshes used by the examination viewer (not AI weights or patient scans).
 !web/public/models/

@@ -16,6 +16,11 @@ public enum NotificationKind
     SupportRequestUpdate,
     NoShow,
     ScheduleReduced,
+    FollowUpBookingRequested,
+    MedicalRecordUpdated,
+    PrescriptionReady,
+    TreatmentUpdated,
+    PaymentRecorded,
 }
 
 /// <summary>Kênh dispatch — InApp authoritative, external qua adapter.</summary>

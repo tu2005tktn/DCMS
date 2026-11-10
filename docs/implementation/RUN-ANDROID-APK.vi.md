@@ -1,5 +1,14 @@
 # Build APK Android tự động để demo
 
+## Thông báo Firebase trên Android
+
+**Kiểm tra trên Samsung SM_A736B, 10/11/2026:** APK đã cài, quyền `POST_NOTIFICATIONS` được cấp; điện thoại gọi `/health` qua Wi-Fi trả 200. Một thông báo FCM trực tiếp và một thông báo do worker backend gửi đều xuất hiện trong khay Android. Delivery của worker chuyển sang `Delivered` với 2 lần thử sau khi tiến trình backend được chạy với quyền kết nối ra Google. Bài thử chỉ dùng nội dung chung, không chứa dữ liệu bệnh nhân.
+
+- Đăng ký Android package `com.dcms.mobile` trong Firebase. Đặt tệp tải về tại `mobile/google-services.json` trên máy build; tệp này bị Git bỏ qua theo chính sách dự án. Chạy `npx expo prebuild --platform android --no-install` sau khi đổi cấu hình native rồi build lại APK.
+- Backend cần **service account JSON riêng**, không phải `google-services.json`. Tạo trong Firebase Console → Project settings → Service accounts, giữ ngoài Git, đặt đường dẫn tuyệt đối vào `FIREBASE_SERVICE_ACCOUNT_PATH` trong `.env` của PC chạy API. Khởi động lại API. Không dùng biến `EXPO_PUBLIC_` cho khóa này.
+- Khi đăng nhập trên thiết bị Android thật, ứng dụng xin quyền thông báo, lấy FCM token và gọi `PUT /api/notifications/devices`. Sau đăng xuất ứng dụng gọi `DELETE` để hủy đăng ký. Worker chỉ gửi FCM khi có token đã đăng ký và service account được cấu hình; thông báo trong app vẫn hoạt động khi FCM chưa sẵn sàng.
+- Kiểm tra: cấp quyền thông báo cho DCMS trong Android Settings, đăng nhập, tạo/đổi lịch hẹn của đúng tài khoản, đưa app vào nền và kiểm tra khay thông báo. Nhấn thông báo mở danh sách thông báo trong app. Nếu không thấy, kiểm tra API, quyền Android và cấu hình Firebase trước khi thử lại.
+
 ## Phạm vi
 
 - Đóng gói ứng dụng Expo trong `mobile/` thành APK cài trực tiếp trên Android, có JavaScript bundle sẵn và không cần Expo Go hoặc Metro.

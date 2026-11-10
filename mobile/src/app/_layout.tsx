@@ -21,6 +21,7 @@ import { appointmentRepo } from '@/features/appointments/appointment.repo';
 import { notificationRepoPersist } from '@/features/appointments/notification.repo.persist';
 import { RealtimeProvider } from '@/features/appointments/realtime-provider';
 import { RealtimeToast } from '@/features/appointments/realtime-toast';
+import { PushNotificationsProvider } from '@/features/appointments/push-notifications';
 
 export default function RootLayout() {
   useEffect(() => {
@@ -30,6 +31,7 @@ export default function RootLayout() {
   return (
     <SessionProvider>
       <RealtimeProvider>
+        <PushNotificationsProvider />
         <StatusBar style="dark" />
         <Stack screenOptions={{ headerTintColor: '#175CD3', headerStyle: { backgroundColor: '#FFFFFF' } }}>
           <Stack.Screen name="(home)" options={{ headerShown: false }} />

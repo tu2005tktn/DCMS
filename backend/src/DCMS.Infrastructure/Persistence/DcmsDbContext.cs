@@ -11,7 +11,7 @@ using DCMS.Domain.Features.Treatment;
 
 namespace DCMS.Infrastructure.Persistence;
 
-public sealed class DcmsDbContext(DbContextOptions<DcmsDbContext> options)
+public sealed partial class DcmsDbContext(DbContextOptions<DcmsDbContext> options)
 : IdentityDbContext<ApplicationUser, IdentityRole<int>, int>(options)
 {
     public DbSet<DCMS.Domain.Features.SystemSettings.MaterialCategory> MaterialCategories => Set<DCMS.Domain.Features.SystemSettings.MaterialCategory>();
@@ -53,6 +53,7 @@ public sealed class DcmsDbContext(DbContextOptions<DcmsDbContext> options)
     public DbSet<SupportRequestReceipt> SupportRequestReceipts => Set<SupportRequestReceipt>();
     public DbSet<InAppNotification> InAppNotifications => Set<InAppNotification>();
     public DbSet<NotificationDelivery> NotificationDeliveries => Set<NotificationDelivery>();
+    public DbSet<PushDevice> PushDevices => Set<PushDevice>();
     public DbSet<AppointmentReminder> AppointmentReminders => Set<AppointmentReminder>();
     public DbSet<StaffHandlingItem> StaffHandlingItems => Set<StaffHandlingItem>();
     public DbSet<RecoveryToken> RecoveryTokens => Set<RecoveryToken>();
