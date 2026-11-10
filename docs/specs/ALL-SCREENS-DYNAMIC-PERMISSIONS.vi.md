@@ -89,12 +89,6 @@ Các chức năng mới phải xuất hiện thành lựa chọn trong cây phâ
 3. Hồi quy các bộ lịch hẹn/lịch làm việc, điều trị/phiếu điều trị/giá, thiết lập, tài chính, khám/đơn thuốc/tài liệu và hồ sơ bệnh nhân.
 4. Browser mock kiểm route/menu/nút theo quyền; browser API thật trên schema riêng kiểm ít nhất lịch/cấu hình, điều trị và thiết lập được ủy quyền, cùng luồng thu hồi.
 
+## Shared permission keys
 
-## Sửa lỗi trùng khai báo quyền đơn thuốc (08/11/2026)
-
-`prescriptions.read` và `prescriptions.manage` bị khai báo hai lần (trong `SettingsGrants` và `ScreenGrants`) sau khi gộp nhánh, làm tra cứu quyền theo khóa lỗi "nhiều hơn một phần tử" và **không đăng nhập được** tài khoản nhân viên. Mỗi quyền chỉ được khai báo một lần: giữ bản trong `ScreenGrants` (có quyền cha `examinations.read`, `prescriptions.read` cho vai trò Nha sĩ), bỏ bản cũ trong `SettingsGrants`. Quy tắc theo vai trò (chủ, Nha sĩ, phụ tá chỉ đọc) trong `RoleAllows` giữ nguyên. Cần thêm kiểm tra không có khóa quyền trùng.
-
-
-## Quyền theo dõi phiếu labo (08/11/2026)
-
-Thêm `treatment.lab.read` (xem màn Quản lý công việc labo, cha `treatment.read`) và `treatment.lab.track` (đổi trạng thái phiếu labo, cha `treatment.lab.read`). Menu và route `/lab-orders` dùng `treatment.lab.read`; endpoint `/api/lab-orders` đọc dùng `treatment.lab.read`, ghi dùng `treatment.lab.track`. Chi tiết: [LAB-ORDER-MANAGEMENT.md](LAB-ORDER-MANAGEMENT.md).
+A permission key may be referenced by more than one screen definition. The effective grant catalog exposed to APIs and role resolution must contain one canonical entry per key, preserving the existing first declaration and its parent/role metadata. Reusing a key must not make sign-in or permission expansion fail, and must not create duplicate grant choices.

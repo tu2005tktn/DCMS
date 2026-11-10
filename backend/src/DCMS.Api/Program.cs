@@ -134,10 +134,20 @@ if (args.Contains("--migrate") || args.Contains("--seed-demo"))
     if (args.Contains("--seed-demo"))
     {
         await scope.ServiceProvider.GetRequiredService<DevelopmentAccountSeeder>().SeedAsync();
+        Console.WriteLine(await scope.ServiceProvider.GetRequiredService<DCMS.Infrastructure.Features.SystemSettings.DevelopmentMedicineSeeder>().SeedAsync());
         await scope.ServiceProvider.GetRequiredService<DevelopmentPatientLinkSeeder>().SeedAsync();
         await scope.ServiceProvider.GetRequiredService<DCMS.Infrastructure.Features.Scheduling.DevelopmentSchedulingSeeder>().SeedAsync();
         await scope.ServiceProvider.GetRequiredService<DCMS.Infrastructure.Features.Appointments.DevelopmentAppointmentSeeder>().SeedAsync();
+        Console.WriteLine(await scope.ServiceProvider.GetRequiredService<DCMS.Infrastructure.Features.Prescriptions.DevelopmentPrescriptionSeeder>().SeedAsync());
     }
+    return;
+}
+
+if (args.Contains("--seed-clinic-medicines"))
+{
+    if (!app.Environment.IsDevelopment()) throw new InvalidOperationException("Development database commands require Development environment.");
+    using var medicineScope = app.Services.CreateScope();
+    Console.WriteLine(await medicineScope.ServiceProvider.GetRequiredService<DCMS.Infrastructure.Features.SystemSettings.DevelopmentMedicineSeeder>().SeedAsync());
     return;
 }
 
@@ -148,6 +158,7 @@ if (args.Contains("--seed-clinic-catalog"))
     Console.WriteLine(await catalogScope.ServiceProvider.GetRequiredService<DCMS.Infrastructure.Features.Treatment.DevelopmentTreatmentCatalogSeeder>().SeedAsync(args.Contains("--refresh")));
     Console.WriteLine(await catalogScope.ServiceProvider.GetRequiredService<DCMS.Infrastructure.Features.SystemSettings.DevelopmentMaterialSeeder>().SeedAsync());
     Console.WriteLine(await catalogScope.ServiceProvider.GetRequiredService<DCMS.Infrastructure.Features.SystemSettings.DevelopmentLabSeeder>().SeedAsync());
+    Console.WriteLine(await catalogScope.ServiceProvider.GetRequiredService<DCMS.Infrastructure.Features.SystemSettings.DevelopmentMedicineSeeder>().SeedAsync());
     return;
 }
 

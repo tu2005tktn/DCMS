@@ -1,5 +1,7 @@
 # Phân hệ Quản lý & Kê đơn thuốc (Prescription Management)
 
+> Luồng staff/mobile đơn giản hiện hành được quy định tại [S23 — Kê đơn trực tiếp từ hồ sơ bệnh nhân](./S23-PATIENT-PRESCRIPTIONS.vi.md). Không hiển thị mục/quản lý mẫu đơn thuốc hoặc bắt staff đi qua luồng nhiều bước theo Visit. Các contract Visit/template bên dưới được giữ để tương thích dữ liệu và API cũ; chúng không phải đường đi mặc định cho demo hoặc thao tác kê đơn mới.
+
 Ngày cập nhật: 07/11/2026 (bản 2 — header đơn thuốc, phiên bản điều chỉnh, migration, mobile). Trạng thái: đặc tả triển khai.
 Tài liệu liên quan: [S19-OPTIONAL-PRESCRIPTION.vi.md](S19-OPTIONAL-PRESCRIPTION.vi.md), [S58-SUPPLY-CATALOGS.md](S58-SUPPLY-CATALOGS.md), [S41-MOBILE-MEDICAL-RECORDS.md](S41-MOBILE-MEDICAL-RECORDS.md).
 
@@ -63,6 +65,8 @@ Tài liệu liên quan: [S19-OPTIONAL-PRESCRIPTION.vi.md](S19-OPTIONAL-PRESCRIPT
 ### 2.4. `EXTERNAL_PRESCRIPTION_LINE`
 Như S19 + các cột liều: `PrescriptionId` (FK header, bắt buộc), `ActiveIngredient`, `Route`, `MorningDose`, `NoonDose`, `AfternoonDose`, `EveningDose`, `MealTiming`, `Days`, `Status` (đồng bộ với header), `FinalizedAt`, `PrescribedByDoctorId`, `Version`. Validation: `Quantity` 1–10.000; `Days` 1–365; mỗi liều ≤20 ký tự; `MealTiming` thuộc enum; `Route` ≤40; `Instructions` ≤1000 → sai trả `400 MSG04` kèm `field`.
 
+Cho phép bác sĩ thêm thuốc dùng riêng cho một đơn khi chưa có trong danh mục: `MedicineId` nullable, các trường tên/hàm lượng/dạng dùng/đơn vị tiếp tục được lưu snapshot trên dòng. Dòng tùy chỉnh không được đưa vào mẫu đơn, không tạo/cập nhật `CATALOG_MEDICINE`, không có cảnh báo chống chỉ định dựa trên danh mục. Dòng danh mục vẫn bắt buộc tham chiếu thuốc đang hoạt động và được phép kê. Dữ liệu custom bắt buộc có `CustomMedicineName` 1–200 ký tự và `CustomUnit` 1–100 ký tự; mọi quy tắc liều/lượng/lời dặn hiện có vẫn áp dụng.
+
 ### 2.5. `PRESCRIPTION_AUDIT`, `PRESCRIPTION_COMMAND_RECEIPT`
 - Audit: `ActorId`, `BranchId`, `VisitId?`, `TemplateId?`, `Action` (`LineCreate|LineUpdate|LineDelete|TemplateApply|AdviceUpdate|Finalize|CorrectionCreate|TemplateCreate|TemplateUpdate|TemplateState`), `Reason`, `BeforeJson`, `AfterJson`, `At`.
 - Receipt: PK `(ActorId, RequestKey)`, `Fingerprint` (SHA-256 hex), `ResultJson`.
@@ -72,6 +76,7 @@ Migration `20261107050902_PrescriptionsAndBranchProfiles` (dùng chung với S58
 - Thêm cột liều/đường dùng/hoạt chất/trạng thái vào `EXTERNAL_PRESCRIPTION_LINE` với default an toàn cho dòng cũ.
 - Tạo `EXTERNAL_PRESCRIPTION`, `PRESCRIPTION_TEMPLATE`, `PRESCRIPTION_TEMPLATE_LINE`, `PRESCRIPTION_AUDIT`.
 - Backfill: mỗi `VisitId` đã có dòng cũ sinh một header `Revision 1, Status Draft`, gắn `PrescriptionId` cho các dòng rồi đặt cột `NOT NULL`. Không tạo dữ liệu demo.
+- Migration `20261107130000_AllowCustomPrescriptionMedicines` cho phép `MedicineId` null ở dòng đơn thuốc; khóa ngoại danh mục vẫn được giữ cho thuốc tham chiếu.
 
 ---
 
@@ -92,6 +97,21 @@ Migration `20261107050902_PrescriptionsAndBranchProfiles` (dùng chung với S58
 9. **In đơn** (A5 mặc định, chọn A4): tên chi nhánh, địa chỉ, điện thoại, logo (nếu chi nhánh có logo đã upload), bác sĩ kê đơn (CCHN để trống dòng ký nếu hồ sơ nhân sự chưa có dữ liệu — không in giá trị giả), thông tin bệnh nhân (mã BN, họ tên, năm sinh, giới tính, địa chỉ), chẩn đoán, bảng thuốc đánh số (tên, hàm lượng, số lượng bằng số và chữ, đường dùng, liều cụ thể, số ngày), lời dặn chung, ngày kê, chữ ký bác sĩ, dòng "Đơn thuốc mua ngoài — phòng khám không bán thuốc", mã QR xác thực. Bản nháp in có watermark "BẢN NHÁP — CHƯA CÓ GIÁ TRỊ".
    - QR chứa `ODENTAL-RX|{prescriptionId}|R{revision}|{verificationCode}`; `verificationCode` là 16 ký tự đầu SHA-256 của nội dung đơn đã ký.
 
+### 3.2 Quản lý mẫu và dữ liệu demo
+
+- Mục menu **Mẫu đơn thuốc** tại `/prescriptions/templates` phải được đăng ký route staff và bảo vệ bằng `prescriptions.manage`; không được để menu dẫn tới trang 404.
+- Trang quản lý hỗ trợ tạo/sửa/ngừng dùng/khôi phục mẫu. Modal **Chọn mẫu đơn thuốc** trên màn kê đơn chỉ liệt kê mẫu đang hoạt động và cho xem trước trước khi áp dụng.
+- Môi trường Development có dữ liệu demo tổng hợp (synthetic), gồm tối thiểu ba mẫu theo nhóm chăm sóc sau điều trị, vệ sinh răng miệng và viêm nha chu. Mã mẫu có tiền tố `DEMO-`, mô tả ghi rõ chỉ phục vụ demo; không được xem các liều mẫu là hướng dẫn điều trị thực tế.
+- Seeder demo chạy lặp an toàn, chỉ thêm mẫu còn thiếu, tham chiếu thuốc đang hoạt động trong danh mục và không tạo đơn bệnh nhân/ký đơn. Production không được chạy seeder này.
+
+### 3.1 Thêm thuốc vào danh mục ngay khi kê đơn
+
+- Nút `+` nhỏ cạnh ô chọn thuốc mở popup tạo thuốc theo luồng Odental: tên, mã thuốc/mã sản phẩm, hoạt chất/biệt dược, hàm lượng, dạng bào chế, đơn vị gốc, quy cách đóng gói, giá tham khảo và hướng dẫn sử dụng mặc định.
+- Lưu qua API danh mục thuốc hiện có (`catalog.medicines.manage`), không tạo một dòng thuốc chỉ thuộc đơn hiện tại. Thuốc mới mặc định được bật `prescriptionEligible=true`, `internalStockTracked=false`; thao tác không tạo tồn kho, xuất kho hay phí. Kiểm tra trùng mã/tên và lỗi quyền theo contract danh mục; không tiếp tục kê nếu API báo lỗi.
+- Khi tạo thành công, thêm thuốc mới vào lựa chọn, chọn ngay cho dòng kê hiện tại, điền đơn vị và hướng dẫn mặc định vào dòng; bác sĩ tiếp tục nhập liều, số ngày, số lượng và có thể sửa lời dặn riêng trước khi thêm vào đơn.
+- Người chỉ có quyền kê đơn nhưng không có quyền quản lý danh mục không được tạo thuốc qua nút này. Thuốc tùy chỉnh chỉ dùng cho đơn hiện tại tiếp tục là luồng riêng, không đưa vào danh mục.
+- Nút thêm dòng lớn màu xanh, lời dặn chung, bác sĩ kê đơn, ngày kê, chọn mẫu, cảnh báo lâm sàng, sửa/xóa dòng và hoàn tất đơn giữ nguyên. Bản in và app bệnh nhân hiển thị snapshot tên/đơn vị/liều/hướng dẫn.
+
 ---
 
 ## 4. Bệnh nhân xem đơn thuốc (Mobile — Expo)
@@ -102,6 +122,14 @@ Migration `20261107050902_PrescriptionsAndBranchProfiles` (dùng chung với S58
 4. **Không có** nút nhận thuốc tại kho/thanh toán tiền thuốc.
 5. **"Xem bản in đơn thuốc"**: màn hình bản in (bố cục như bản in web: chi nhánh, logo, bác sĩ, bệnh nhân, chẩn đoán, bảng thuốc, lời dặn, ngày kê) kèm **mã xác thực** dạng chữ để bệnh nhân đưa cho hiệu thuốc hoặc chụp màn hình. App hiện chưa có thư viện QR/PDF (`expo-print`, `react-native-svg`) nên QR và tải PDF chỉ có trên bản in web; khi bổ sung các gói này, màn bản in dùng cùng DTO `print` để sinh QR/PDF mà không đổi API.
 6. Không hiển thị ghi chú nội bộ, giá tham khảo, lý do điều chỉnh nội bộ (chỉ hiển thị nhãn "Bản điều chỉnh").
+
+### 4.1 Truy cập nhanh, danh sách và chia sẻ trên mobile
+
+- Trang chủ tài khoản Public có card truy cập nhanh **Đơn thuốc của tôi**, mô tả ngắn rằng người bệnh có thể xem thuốc và hướng dẫn của bác sĩ; chọn card mở `/(account)/prescriptions`. Card không tự tải danh sách riêng để đếm badge.
+- Danh sách sắp xếp mới nhất trước (theo API), mỗi mục hiển thị ngày kê, chi nhánh, bác sĩ, chẩn đoán, số thuốc và nhãn bản điều chỉnh khi có. Không tự tạo mã đơn để trình bày khi API không cung cấp mã đó.
+- Chỉ hiển thị badge số đơn mới nếu API cung cấp trạng thái chưa xem; hiện chưa có trường/API này nên không hiển thị số giả.
+- Chi tiết giữ thông tin chi nhánh, bác sĩ, ngày kê, chẩn đoán, từng thuốc, liều/lượng và lời dặn nổi bật như mục 3 ở trên.
+- Bản in hiện hiển thị trong app để người bệnh lưu/chụp màn hình. Bổ sung nút **Chia sẻ đơn thuốc** dùng native share sheet, chia sẻ nội dung văn bản tối thiểu (ngày kê, chi nhánh, bác sĩ, thuốc/liều/lời dặn và mã xác thực nếu có). Không chia sẻ thông tin hồ sơ ngoài dữ liệu của đơn. Chưa tạo hoặc tải PDF trên mobile; PDF vẫn thuộc bản in web cho đến khi tích hợp thư viện tạo/tải PDF.
 
 ---
 
@@ -123,6 +151,9 @@ Lỗi theo chuẩn `{ code, message, field?, currentVersion?, blockers? }`.
 - `PUT /api/prescriptions/visits/{visitId}/prescription` → `{ requestKey, expectedVersion, generalAdvice }`
 - `POST /api/prescriptions/visits/{visitId}/lines` → `{ requestKey, expectedVersion: 0, medicineId, route, morningDose, noonDose, afternoonDose, eveningDose, mealTiming, days, quantity, instructions }` (tạo header Draft Revision 1 nếu chưa có)
 - `PUT /api/prescriptions/visits/{visitId}/lines/{lineId}` → cùng body, `expectedVersion` của dòng
+
+Lệnh tạo/sửa dòng chọn đúng một nguồn thuốc: `medicineId` cho thuốc danh mục, hoặc `customMedicineName` + `customUnit` cho thuốc tùy chỉnh (không gửi `medicineId`).
+`MedicineId` trong DTO dòng có thể null chỉ với dòng tùy chỉnh.
 - `DELETE /api/prescriptions/visits/{visitId}/lines/{lineId}?requestKey=&expectedVersion=`
 - `POST /api/prescriptions/visits/{visitId}/apply-template` → `{ requestKey, expectedVersion (đơn; 0 khi chưa có đơn), templateId }` → `PrescriptionDto` + `skippedLines`
 - `POST /api/prescriptions/visits/{visitId}/finalize` → `{ requestKey, expectedVersion, clinicalNote? }` → `PrescriptionDto`

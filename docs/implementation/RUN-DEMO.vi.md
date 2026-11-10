@@ -150,3 +150,16 @@ Không commit `.env`, private keys, ảnh chứa credential, model weights hay d
 - **Script bị chặn execution policy**: `Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned` trong terminal đó.
 - **Quên mật khẩu demo**: xem `DEV_SEED_PASSWORD` trong `.env`.
 - **Repository bị khóa secret trong git**: kiểm tra `git status` sạch trước khi demo; không commit `.env`, `web/.env`, `.tools`, `test-results`.
+
+## Full demo data seed workflow
+
+`-SeedDemo` creates synthetic accounts, patient records, patient links, working schedules, appointments, starter medicines, and three synthetic prescription templates (`DEMO-*`). The templates are for UI demonstration only and are not clinical guidance. For treatment, material, and lab catalogs, run the catalog seeder separately after the first command:
+
+```powershell
+& .\infrastructure\scripts\start-api.ps1 -Migrate -SeedDemo
+& .\infrastructure\scripts\start-api.ps1 -SeedClinicCatalog
+```
+
+The catalog seeder is Development-only and adds missing data without deleting existing data. Start the API afterward with `& .\infrastructure\scripts\start-api.ps1`. The prescription API contract remains unchanged; employee prescription DTOs and patient purchase-prescription DTOs must be distinct declarations.
+
+Local machine setup: the existing Windows PostgreSQL owns port 5432, so this demo uses port 5433 and the isolated Compose project `dcms-demo`. Start it with `docker compose -p dcms-demo --env-file .env -f infrastructure/docker/compose.yaml up -d`; stop it with the same command plus `down` (do not add `-v` if keeping demo data).

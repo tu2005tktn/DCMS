@@ -1,0 +1,23 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dcms-api",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", "$env:Cors__AllowedOrigins__4='http://localhost:8082'; & ./infrastructure/scripts/start-api.ps1"],
+      "port": 5080
+    },
+    {
+      "name": "dcms-web",
+      "runtimeExecutable": "npm.cmd",
+      "runtimeArgs": ["--prefix", "web", "run", "dev"],
+      "port": 5173
+    },
+    {
+      "name": "dcms-mobile-web",
+      "runtimeExecutable": "npm.cmd",
+      "runtimeArgs": ["--prefix", "mobile", "run", "web", "--", "--port", "8081"],
+      "port": 8081
+    }
+  ]
+}

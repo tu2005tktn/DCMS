@@ -3,8 +3,6 @@ import FamilyMembersPage from '../features/family-members/FamilyMembersPage';
 import VisitPage from '../features/examinations/ExaminationPage';
 import PaymentsPage from '../features/finance/PaymentsPage';
 import ReceiptPrintPage from '../features/finance/ReceiptPrintPage';
-import PrescriptionPage from '../features/prescriptions/PrescriptionPage';
-import PrescriptionTemplatesPage from '../features/prescriptions/PrescriptionTemplatesPage';
 import ClinicalServicesPage from '../features/finance/ClinicalServicesPage';
 import { Alert, Button, Card, Result, Typography } from 'antd';
 import { useState, type ReactNode } from 'react';
@@ -38,7 +36,7 @@ import { useCustomerAuth } from '../features/customer-auth/CustomerAuthContext';
 import CustomerBookingPage from '../features/customer-booking/CustomerBookingPage';
 import CustomerPatientLinkPage from '../features/customer-patient-link/CustomerPatientLinkPage';
 import CustomerAppointmentsPage from '../features/customer-appointments/CustomerAppointmentsPage';
-import { CustomerPrescriptionsPage, CustomerPrescriptionDetailPage } from '../features/customer-prescriptions/CustomerPrescriptionsPage';
+import CustomerPrescriptionsPage, { CustomerPrescriptionDetailPage } from '../features/customer-prescriptions/CustomerPrescriptionsPage';
 import CustomerAppointmentDetailPage from '../features/customer-appointments/CustomerAppointmentDetailPage';
 import DossierPage from '../features/treatment/DossierPage';
 import PlanPage from '../features/treatment/PlanPage';
@@ -46,7 +44,6 @@ import RevisionPage from '../features/treatment/RevisionPage';
 
 import ItemPlansPage from '../features/treatment/ItemPlansPage';
 
-// Đường dẫn cũ của màn Dịch vụ: giữ nguyên tham số ?dossier=.
 function LegacyCommercialRedirect() { const { search } = useLocation(); return <Navigate to={'/settings/treatment-services' + search} replace />; }
 
 export default function App() {
@@ -86,8 +83,6 @@ export default function App() {
       <Route path="revenue" element={<Protected permission="finance.revenue.read"><RevenuePage /></Protected>} />
       <Route path="finance/operations" element={<Protected permission="finance.read"><FinanceOperationsPage /></Protected>} />
       <Route path="visits/:visitId/payments" element={<Protected permission="finance.read"><PaymentsPage /></Protected>} />
-      <Route path="visits/:visitId/prescription" element={<Protected permission="prescriptions.read"><PrescriptionPage /></Protected>} />
-      <Route path="prescriptions/templates" element={<Protected permission="prescriptions.manage"><PrescriptionTemplatesPage /></Protected>} />
       <Route path="payments/:id/print" element={<Protected permission="finance.receipts.print"><ReceiptPrintPage /></Protected>} />
       <Route path="clinical-services" element={<Protected permission="services.read"><ClinicalServicesPage /></Protected>} />
       <Route path="working-schedules" element={<Protected permission="working-schedules.read"><WorkingSchedulesPage /></Protected>} />

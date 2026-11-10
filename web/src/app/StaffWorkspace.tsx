@@ -31,7 +31,7 @@ export default function StaffWorkspace() {
     // S60: assistants and the clinic owner (docs/specs/S60-CUSTOMER-CARE-WEB.vi.md §2).
     { key:'/customer-care', title:'Chăm sóc khách hàng', icon:<CustomerServiceOutlined />, group:'Vận hành', visible:has('care-tasks.read') && ['ClinicAssistant', 'ClinicOwner'].some(role => user?.effectiveRoles.includes(role)) },
     { key:'/treatment-templates', title:'Kế hoạch điều trị', icon:<FileTextOutlined />, group:'Chuyên môn', visible:has('treatment.templates.read') },
-    { key:'/prescriptions/templates', title:'Mẫu đơn thuốc', icon:<MedicineBoxOutlined />, group:'Chuyên môn', visible:has('prescriptions.manage') },
+    { key:'/commercial/treatment', title:'Giá và duyệt điều trị', icon:<MedicineBoxOutlined />, group:'Chuyên môn', visible:has('treatment.prices.read')||has('treatment.commercial.read') },
     { key:'/materials', title:'Dụng cụ - vật liệu', icon:<ExperimentOutlined />, group:'Chuyên môn', visible:['materials.purchases.read', 'materials.stock.read', 'materials.usage.read'].some(has) },
     { key:'/lab-orders', title:'Quản lý công việc labo', icon:<ExperimentOutlined />, group:'Chuyên môn', visible:has('treatment.lab.read') },
     { key:'/clinical-services', title:'Dịch vụ cận lâm sàng', icon:<ExperimentOutlined />, group:'Chuyên môn', visible:has('services.read') },

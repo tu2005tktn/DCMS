@@ -52,3 +52,4 @@ web/public/models/*
 !web/public/models/dental/**
 *.bat
 .claude/settings.local.json
+web/package-lock.json

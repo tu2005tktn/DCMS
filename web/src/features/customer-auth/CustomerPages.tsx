@@ -108,6 +108,7 @@ export function CustomerShell() {
       <NavLink to="/customer/home" end className={({ isActive }) => `customer-nav-link${isActive ? ' active' : ''}`}>Trang chủ</NavLink>
       <NavLink to="/customer/family-members" aria-label="Người thân của tôi" className={({ isActive }) => `customer-nav-link${isActive ? ' active' : ''}`}><span className="customer-nav-long">Người thân của tôi</span><span className="customer-nav-short" aria-hidden="true">Người thân</span></NavLink>
       <NavLink to="/customer/appointments" aria-label="Lịch hẹn của tôi" className={({ isActive }) => `customer-nav-link${isActive ? ' active' : ''}`}><span className="customer-nav-long">Lịch hẹn của tôi</span><span className="customer-nav-short" aria-hidden="true">Lịch hẹn</span></NavLink>
+      <NavLink to="/customer/prescriptions" aria-label="Đơn thuốc của tôi" className={({ isActive }) => `customer-nav-link${isActive ? ' active' : ''}`}><span className="customer-nav-long">Đơn thuốc của tôi</span><span className="customer-nav-short" aria-hidden="true">Đơn thuốc</span></NavLink>
       <NavLink to="/customer/patient-link" aria-label="Liên kết hồ sơ" className={({ isActive }) => `customer-nav-link${isActive ? ' active' : ''}`}><span className="customer-nav-long">Liên kết hồ sơ</span><span className="customer-nav-short" aria-hidden="true">Hồ sơ</span></NavLink>
       <NavLink to="/customer/prescriptions" className={({ isActive }) => `customer-nav-link${isActive ? ' active' : ''}`}>Đơn thuốc</NavLink>
     </div></nav>
