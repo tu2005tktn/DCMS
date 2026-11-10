@@ -47,6 +47,12 @@ Bảng nhật ký mới `LAB_ORDER_STATUS_LOG` (không sửa/xóa): phiếu, tr�
 
 ## Kiểm thử
 
+### Tính toàn vẹn snapshot sau tích hợp (10/11/2026)
+
+- Snapshot EF phải giữ `LabOrder.Status` (chuỗi tối đa 20 ký tự, mặc định `NotSent`), `SentOn` và `ReceivedOn` (ngày nullable), cùng index `(BranchId, Status, DueOn)` và nhật ký trạng thái.
+- Sửa snapshot bị mất metadata khi merge phải giữ đồng thời model đơn thuốc S23/thuốc tùy chỉnh và model labo hiện tại. Đây là khôi phục metadata đã có migration, không tạo migration mới hay thay đổi dữ liệu.
+- `ClinicalModelSnapshotTests.SnapshotMatchesCurrentModel` phải khởi tạo được snapshot và không tìm thấy chênh lệch với model runtime.
+
 Backend (tích hợp, schema cách ly): lập phiếu mặc định `NotSent`; chuyển trạng thái hợp lệ ghi ngày và nhật ký; chuyển sai từ chối; version lệch 409; danh sách lọc theo trạng thái/công ty/ngày/từ khóa, quá hạn, `counts`, phân trang, giới hạn chi nhánh; di chuyển phiếu cũ. Web (Playwright, mock API): thẻ đếm lọc, bộ lọc, mở ngăn chi tiết, đổi trạng thái và cập nhật nhật ký, ẩn nút khi thiếu quyền, dạng thẻ ở màn hẹp.
 
 ## Ngoài phạm vi

@@ -7,6 +7,12 @@ Tài liệu liên quan: [S19-OPTIONAL-PRESCRIPTION.vi.md](S19-OPTIONAL-PRESCRIPT
 
 ## Khôi phục điều hướng web (08/11/2026)
 
+### Sửa tích hợp sau PR #53 (10/11/2026)
+
+- Router chỉ import một lần trang danh sách đơn thuốc bệnh nhân bằng default export và trang chi tiết bằng named export; giữ hai route `/customer/prescriptions` và `/customer/prescriptions/:id` trong vùng xác thực khách hàng hiện hữu.
+- `/commercial/treatment` tiếp tục chuyển tới `/settings/treatment-services`, giữ nguyên query string; khai báo hàm chuyển hướng độc lập với default export `App`.
+- Giữ luồng kê đơn trực tiếp S23 và quyết định ẩn mẫu đơn/luồng Visit trong PR #53. Các ghi chú khôi phục menu mẫu ngày 08–09/11 bên dưới là lịch sử, không tái bật menu/route trong lần sửa tích hợp này. Không thay đổi API hoặc quyền truy cập.
+
 - Mục **Mẫu đơn thuốc** mở `/prescriptions/templates` trong workspace nhân viên, yêu cầu đăng nhập và quyền `prescriptions.manage`, giống điều kiện hiển thị menu. Truy cập trực tiếp cũng phải kiểm tra quyền; không có quyền thì hiển thị 403.
 - Entry point web phải render router `App` qua default export của `App.tsx`. Hàm chuyển hướng `/commercial/treatment` là hàm riêng, giữ nguyên query string khi chuyển tới `/settings/treatment-services`.
 - Bản sửa khôi phục route bị mất khi merge và default export của router; không thay đổi API hoặc hợp đồng dữ liệu đơn thuốc.

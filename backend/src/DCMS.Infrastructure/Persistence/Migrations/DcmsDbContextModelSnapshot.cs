@@ -5841,9 +5841,22 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<int>("Quantity")
                         .HasColumnType("integer");
 
+                    b.Property<DateOnly?>("ReceivedOn")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly?>("SentOn")
+                        .HasColumnType("date");
+
                     b.Property<string>("Shade")
                         .IsRequired()
                         .HasColumnType("jsonb");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("NotSent");
 
                     b.Property<string>("Teeth")
                         .IsRequired()
