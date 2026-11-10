@@ -393,11 +393,8 @@ public sealed partial class BranchManagementService(DcmsDbContext db, ISettingsA
         var name = c.Name?.Trim() ?? "";
         if (name.Length == 0) throw Fail("MSG02", field: "name", label: "Tên ghế");
         if (name.Length > 160) throw Fail("MSG04", field: "name", label: "Tên ghế");
-        var open = c.OpenMinute ?? 480;
-        var close = c.CloseMinute ?? 1080;
-        if (open is < 0 or > 1440 || open % 15 != 0) throw Fail("MSG04", field: "openMinute", label: "Giờ mở");
-        if (close is < 0 or > 1440 || close % 15 != 0 || close <= open) throw Fail("MSG04", field: "closeMinute", label: "Giờ đóng");
-        return (code, name, open, close);
+        // Ghế chỉ là điều kiện sức chứa; giờ làm việc lấy từ lịch bác sĩ nên giờ mở/đóng luôn là 0–1440.
+        return (code, name, 0, 1440);
     }
 
     private async Task EnsureUniqueChairCodeAsync(int branchId, string code, int? selfId, CancellationToken ct)

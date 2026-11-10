@@ -24,19 +24,14 @@ type BranchDto = {
   chairCount: number;
 };
 
-type ChairDto = { id: number; branchId: number; code: string; name: string; openMinute: number; closeMinute: number; isActive: boolean; version: number };
+type ChairDto = { id: number; branchId: number; code: string; name: string; isActive: boolean; version: number };
 type BranchDetailDto = Omit<BranchDto, 'chairCount'> & { chairs: ChairDto[] };
 type ImpactPreviewResult = { allowed: boolean; blockers: Blocker[]; impact: string };
 type BranchForm = { code: string; name: string; address?: string; phone?: string; email?: string; website?: string; timeZoneId: string; bankCode?: string; accountNumber?: string; payeeName?: string };
-type ChairForm = { code: string; name: string; openMinute: number; closeMinute: number };
+type ChairForm = { code: string; name: string };
 type StateTarget = { kind: 'branch'; branch: BranchDto } | { kind: 'chair'; chair: ChairDto; branchId: number };
 
 const base = '/api/settings/branches';
-const timeOptions = Array.from({ length: 97 }, (_, i) => i * 15).map(m => ({
-  value: m,
-  label: `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`,
-}));
-const hhmm = (m: number) => timeOptions.find(o => o.value === m)?.label ?? String(m);
 
 const blockerLabels: Record<string, string> = { Appointments: 'Lịch hẹn', Visits: 'Lượt khám', Reservations: 'Giữ chỗ', Finance: 'Tài chính', PayOsOrders: 'Chuyển khoản PayOS', TreatmentDossiers: 'Hồ sơ điều trị', LabOrders: 'Phiếu labo' };
 
@@ -257,14 +252,14 @@ export default function BranchesPanel() {
     pending.current = null;
     chairForm.resetFields();
     chairForm.setFieldsValue(chair
-      ? { code: chair.code, name: chair.name, openMinute: chair.openMinute, closeMinute: chair.closeMinute }
-      : { openMinute: 480, closeMinute: 1080 });
+      ? { code: chair.code, name: chair.name }
+      : {});
     setChairModalOpen(true);
   };
 
   const saveChair = async (values: ChairForm) => {
     if (!selected || savingChair) return;
-    const body = { expectedVersion: editingChair?.version ?? 0, code: values.code.trim(), name: values.name.trim(), openMinute: values.openMinute, closeMinute: values.closeMinute };
+    const body = { expectedVersion: editingChair?.version ?? 0, code: values.code.trim(), name: values.name.trim() };
     const target = editingChair ? `${base}/${selected.id}/chairs/${editingChair.id}` : `${base}/${selected.id}/chairs`;
     const requestKey = keyFor(JSON.stringify({ target, ...body }));
     setSavingChair(true);
@@ -435,7 +430,6 @@ export default function BranchesPanel() {
               columns={[
                 { title: 'Mã ghế', dataIndex: 'code', width: 110, render: v => <code>{v}</code> },
                 { title: 'Tên ghế', dataIndex: 'name' },
-                { title: 'Giờ hoạt động', render: (_, c) => `${hhmm(c.openMinute)} – ${hhmm(c.closeMinute)}` },
                 { title: 'Trạng thái', width: 110, render: (_, c) => (c.isActive ? <Tag color="success">Đang dùng</Tag> : <Tag>Tạm ngừng</Tag>) },
                 ...(canManageChairs
                   ? [{
@@ -498,19 +492,6 @@ export default function BranchesPanel() {
           <Form.Item name="name" label="Tên ghế" rules={[{ required: true, whitespace: true, message: 'Nhập tên ghế.' }, { max: 160, message: 'Tối đa 160 ký tự.' }]}>
             <Input placeholder="Ghế 01 - Tổng quát" />
           </Form.Item>
-          <Row gutter={12}>
-            <Col span={12}>
-              <Form.Item name="openMinute" label="Giờ mở" rules={[{ required: true }]}>
-                <Select showSearch options={timeOptions.slice(0, -1)} optionFilterProp="label" />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item name="closeMinute" label="Giờ đóng" dependencies={['openMinute']}
-                rules={[{ required: true }, ({ getFieldValue }) => ({ validator: (_, v) => (v > getFieldValue('openMinute') ? Promise.resolve() : Promise.reject(new Error('Giờ đóng phải sau giờ mở.'))) })]}>
-                <Select showSearch options={timeOptions.slice(1)} optionFilterProp="label" />
-              </Form.Item>
-            </Col>
-          </Row>
         </Form>
       </Modal>
     </div>

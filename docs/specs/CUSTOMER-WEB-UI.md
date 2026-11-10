@@ -57,3 +57,15 @@ Thêm route, nav và Dashboard shortcut Người thân của tôi; CRUD tên/qua
 
 - Đăng ký/đăng nhập/khôi phục tiếp tục dùng API auth hiện có; đặt lịch dùng `/api/availability/options`, `/api/availability`, `POST /api/appointments`; quản lý lịch và liên kết hồ sơ dùng các endpoint đang có. Không thêm endpoint hay trường request/response.
 - Chi tiết quy tắc lịch và thông điệp lỗi theo [CUSTOMER-APPOINTMENTS-WEB.md](CUSTOMER-APPOINTMENTS-WEB.md); phần giao diện này chỉ thay cách trình bày, không đổi kết quả server.
+
+## Thiết kế lại giao diện theo Figma — 10/11/2026
+
+Áp dụng bản thiết kế Figma "DCMS - Staff Web UI" (trang Customer web redesign) vào cổng bệnh nhân. **Chỉ đổi giao diện Web** (`web/src`): không sửa backend, API, payload, quyền, route hiện có, quy tắc đặt/đổi/hủy lịch hay luồng 5 bước đã nêu ở trên.
+
+- **Khung điều hướng:** gộp thanh đầu trang và thanh điều hướng thành một thanh ngang cố định: logo DCMS, các mục Trang chủ / Đặt lịch / Lịch hẹn / Đơn thuốc / Người thân / Hồ sơ, tài khoản (avatar viết tắt + Đăng xuất). Thêm mục **Đặt lịch** trỏ `/customer/book`; bỏ mục Đơn thuốc bị lặp. Tên truy cập (aria-label) và đích của các liên kết hiện có giữ nguyên.
+- **Màn hình nhỏ:** không có giao diện mobile riêng; thanh điều hướng giữ nguyên, xuống hàng riêng và cuộn ngang khi cần (phạm vi thiết kế lại chỉ là Web desktop).
+- **Token:** nền `#F9FAFB`, viền `#EAECF0`, bo góc thẻ 16px và nút/ô nhập 10px, chữ chính `#101828`; giữ xanh `#175CD3`, Inter, Ant Design.
+- **Trang chủ:** thẻ "Lịch hẹn gần nhất" là điểm nhấn đầu trang (khối ngày/tháng lớn, trạng thái, nhóm nút); thẻ Đặt lịch khám và Truy cập nhanh dùng cùng bo góc và khoảng cách. Chỉ hiển thị dữ liệu hiện có của AppointmentCard; không thêm banner/trạng thái liên kết hồ sơ vì không có nguồn dữ liệu trên trang này.
+- **Đặt lịch:** thanh bước và tóm tắt giữ nguyên nội dung; khung giờ là chip bo góc 10px, giờ đã chọn nền xanh chữ trắng (vẫn có `aria-pressed`); nhóm sáng/chiều nằm trong thẻ trắng, tóm tắt là thẻ nhấn bên phải.
+- **Lịch hẹn, Người thân, Liên kết hồ sơ, Đơn thuốc:** thẻ/bảng, nhãn trạng thái và khoảng cách theo token mới; không đổi cột dữ liệu, bộ lọc hay thao tác.
+- **Kiểm tra:** build Web, Playwright các spec cổng khách hàng (customer-portal, customer-dashboard, customer-ui-responsive, customer-appointments, family-members, booking-prefill) và xem lại ở 390/768/1440 px.

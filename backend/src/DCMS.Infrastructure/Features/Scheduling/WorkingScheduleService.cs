@@ -186,9 +186,12 @@ public sealed partial class WorkingScheduleService(DcmsDbContext db, TimeProvide
         var slots = new List<AvailabilitySlot>();
         // Load resources once per query; candidate starts all share the same resource snapshot.
         var data = await Load(q, draft, ct, recurringDraft);
+        var now = clock.GetUtcNow();
         foreach (var minute in CandidateMinutes(q, data))
         {
-            var slot = Evaluate(q, isPublic, Local(q.Date, minute), null, null, null, data);
+            var start = Local(q.Date, minute);
+            if (draft == null && recurringDraft == null && start <= now) continue; // never offer slots that already passed
+            var slot = Evaluate(q, isPublic, start, null, null, null, data);
             if (slot != null) slots.Add(slot);
         }
         return new("Asia/Ho_Chi_Minh", q.Date, slots.ToArray());
@@ -236,7 +239,7 @@ public sealed partial class WorkingScheduleService(DcmsDbContext db, TimeProvide
         var staff = new[] { q.DentistId, q.AssistantId ?? q.DentistId };
         if (overlaps.Any(r => staff.Contains(r.DentistId) || (r.AssistantId.HasValue && staff.Contains(r.AssistantId.Value))
             || (!string.IsNullOrWhiteSpace(attendeeKey) && r.AttendeeKey == attendeeKey))) return Fail("MSG27");
-        var chair = data.Chairs.FirstOrDefault(c => (!chairId.HasValue || c.Id == chairId) && c.OpenMinute <= minute && c.CloseMinute >= minute + q.DurationMinutes && !overlaps.Any(r => r.ChairId == c.Id));
+        var chair = data.Chairs.FirstOrDefault(c => (!chairId.HasValue || c.Id == chairId) && !overlaps.Any(r => r.ChairId == c.Id));
         return chair == null ? Fail("MSG28") : new(start, end, chair.Id, q.DentistId, q.AssistantId, data.Main?.Version ?? 0, data.Assistant?.Version, data.Branch.BookingSettingsVersion);
     }
     private async Task<AvailabilitySlot?> Find(AvailabilityQuery q, bool isPublic, DateTimeOffset start, int? chairId, string? attendeeKey, Guid? exclude, ScheduleCommand? draft, CancellationToken ct)

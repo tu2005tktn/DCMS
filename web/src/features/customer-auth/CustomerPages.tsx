@@ -1,6 +1,7 @@
 import CustomerDashboard from './CustomerDashboard';
 import { Alert, Button, Card, Form, Input, Spin, Typography } from 'antd';
 import { useEffect, useState, type ReactNode } from 'react';
+import { CalendarOutlined, FileTextOutlined, HomeOutlined, LinkOutlined, MedicineBoxOutlined, PlusCircleOutlined, TeamOutlined } from '@ant-design/icons';
 import { Link, Navigate, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { ApiError } from '../../services/api';
 import { customerApi } from '../../services/customerApi';
@@ -97,22 +98,24 @@ export function CustomerShell() {
     await signOut();
     navigate('/customer/sign-in', { replace: true });
   }
+  const fullName = state.status === 'authenticated' ? state.user.fullName : '';
+  const initials = fullName.trim().split(/s+/).slice(-2).map(part => part[0]?.toUpperCase() ?? '').join('') || '?';
   return <div className="customer-portal customer-shell">
     <a className="customer-skip-link" href="#customer-main">Bỏ qua điều hướng</a>
     <header className="customer-header"><div className="customer-header-inner">
-      <Link to="/customer/home" className="customer-brand">DCMS <span>Cổng bệnh nhân</span></Link>
-      <div className="customer-header-account"><span className="customer-header-name">{state.status === 'authenticated' ? state.user.fullName : ''}</span>
+      <Link to="/customer/home" className="customer-brand"><span className="customer-brand-mark" aria-hidden="true">D</span>DCMS <span>Cổng bệnh nhân</span></Link>
+      <nav aria-label="Điều hướng khách hàng" className="customer-navigation"><div className="customer-nav-inner">
+          <NavLink to="/customer/home" end className={({ isActive }) => `customer-nav-link${isActive ? ' active' : ''}`}><HomeOutlined className="customer-nav-icon" aria-hidden="true" /><span className="customer-nav-long">Trang chủ</span><span className="customer-nav-short" aria-hidden="true">Trang chủ</span></NavLink>
+          <NavLink to="/customer/book" aria-label="Đặt lịch" className={({ isActive }) => `customer-nav-link${isActive ? ' active' : ''}`}><PlusCircleOutlined className="customer-nav-icon" aria-hidden="true" /><span className="customer-nav-long">Đặt lịch</span><span className="customer-nav-short" aria-hidden="true">Đặt lịch</span></NavLink>
+          <NavLink to="/customer/appointments" aria-label="Lịch hẹn của tôi" className={({ isActive }) => `customer-nav-link${isActive ? ' active' : ''}`}><CalendarOutlined className="customer-nav-icon" aria-hidden="true" /><span className="customer-nav-long">Lịch hẹn của tôi</span><span className="customer-nav-short" aria-hidden="true">Lịch hẹn</span></NavLink>
+          <NavLink to="/customer/prescriptions" aria-label="Đơn thuốc của tôi" className={({ isActive }) => `customer-nav-link${isActive ? ' active' : ''}`}><MedicineBoxOutlined className="customer-nav-icon" aria-hidden="true" /><span className="customer-nav-long">Đơn thuốc của tôi</span><span className="customer-nav-short" aria-hidden="true">Đơn thuốc</span></NavLink>
+          <NavLink to="/customer/family-members" aria-label="Người thân của tôi" className={({ isActive }) => `customer-nav-link${isActive ? ' active' : ''}`}><TeamOutlined className="customer-nav-icon" aria-hidden="true" /><span className="customer-nav-long">Người thân của tôi</span><span className="customer-nav-short" aria-hidden="true">Người thân</span></NavLink>
+          <NavLink to="/customer/treatment-records" className={({ isActive }) => `customer-nav-link${isActive ? ' active' : ''}`}><FileTextOutlined className="customer-nav-icon" aria-hidden="true" /><span className="customer-nav-long">Hồ sơ bệnh án</span><span className="customer-nav-short" aria-hidden="true">Bệnh án</span></NavLink>
+          <NavLink to="/customer/patient-link" aria-label="Liên kết hồ sơ" className={({ isActive }) => `customer-nav-link${isActive ? ' active' : ''}`}><LinkOutlined className="customer-nav-icon" aria-hidden="true" /><span className="customer-nav-long">Liên kết hồ sơ</span><span className="customer-nav-short" aria-hidden="true">Hồ sơ</span></NavLink>
+      </div></nav>
+      <div className="customer-header-account"><span className="customer-avatar" aria-hidden="true">{initials}</span><span className="customer-header-name">{fullName}</span>
         <Button loading={busy} onClick={() => void leave()}>Đăng xuất</Button></div>
     </div></header>
-    <nav aria-label="Điều hướng khách hàng" className="customer-navigation"><div className="customer-nav-inner">
-      <NavLink to="/customer/home" end className={({ isActive }) => `customer-nav-link${isActive ? ' active' : ''}`}>Trang chủ</NavLink>
-      <NavLink to="/customer/family-members" aria-label="Người thân của tôi" className={({ isActive }) => `customer-nav-link${isActive ? ' active' : ''}`}><span className="customer-nav-long">Người thân của tôi</span><span className="customer-nav-short" aria-hidden="true">Người thân</span></NavLink>
-      <NavLink to="/customer/appointments" aria-label="Lịch hẹn của tôi" className={({ isActive }) => `customer-nav-link${isActive ? ' active' : ''}`}><span className="customer-nav-long">Lịch hẹn của tôi</span><span className="customer-nav-short" aria-hidden="true">Lịch hẹn</span></NavLink>
-      <NavLink to="/customer/prescriptions" aria-label="Đơn thuốc của tôi" className={({ isActive }) => `customer-nav-link${isActive ? ' active' : ''}`}><span className="customer-nav-long">Đơn thuốc của tôi</span><span className="customer-nav-short" aria-hidden="true">Đơn thuốc</span></NavLink>
-      <NavLink to="/customer/treatment-records" className={({ isActive }) => `customer-nav-link${isActive ? ' active' : ''}`}>Hồ sơ điều trị</NavLink>
-      <NavLink to="/customer/patient-link" aria-label="Liên kết hồ sơ" className={({ isActive }) => `customer-nav-link${isActive ? ' active' : ''}`}><span className="customer-nav-long">Liên kết hồ sơ</span><span className="customer-nav-short" aria-hidden="true">Hồ sơ</span></NavLink>
-      <NavLink to="/customer/prescriptions" className={({ isActive }) => `customer-nav-link${isActive ? ' active' : ''}`}>Đơn thuốc</NavLink>
-    </div></nav>
     <main className="customer-content" id="customer-main"><Outlet /></main>
   </div>;
 }
