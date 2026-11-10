@@ -84,3 +84,17 @@ Giá catalog của `SchedulingService` thêm `referenceUnitPriceVnd?` và `price
 `GET /api/dossiers/{id}` trả `financialSummary` có `available`, `plannedVnd`, và khi có ledger DCMS-101: postedCharge, received, allocated, outstanding, sourceVersion. Production hiện chưa có ledger, vì vậy các số sau chỉ hiển thị `unavailable`, không được suy từ plan/payment terms. SourceDiagnosisId DCMS-94 vẫn fail closed khi adapter chưa có; Web giữ lối vào từ Patient. Commit nháp, chốt plan, phê duyệt và bảo hành dùng version + request receipt; lỗi stale MSG111 giữ form. Snapshot plan cũ, actual và tiền đã post không bị viết lại.
 
 AT30/31/33/34/36/39 và yêu cầu task: dossier nhiều lượt/item; đồng ý trám 25 và hoãn chữa tủy 46; snapshot giá; dự kiến không tạo Appointment; MSG243 khi còn agreed item chưa xử lý; closure StoppedIncomplete không xóa actual/debt; bảo hành xác nhận riêng, không suy từ Labo; quyền Patient/branch, retry và conflict giữ draft. Kiểm thử API trên PostgreSQL schema cách ly, Web bằng mock DTO chung, sau đó API thật khi các module nguồn sẵn sàng. Không ghi hoàn tất các ca phụ thuộc nguồn thật nếu chưa có bằng chứng.
+
+## Màn "Dịch vụ" thay cho "Giá và duyệt điều trị" (06/11/2026)
+
+Mục menu nhóm Chuyên môn (`/commercial/treatment`) đổi tên từ "Giá và duyệt điều trị" thành **"Dịch vụ"**, tiêu đề trang là **"Dịch vụ"**. Màn chỉ còn danh sách **Giá tham chiếu dịch vụ** (xem và cập nhật giá, đơn vị theo quyền `treatment.prices.read/manage`). Bỏ khỏi giao diện phần mô tả đầu trang và hai thẻ **Kế hoạch đang soạn** và **Chi tiết kế hoạch** (xem giảm trừ, duyệt/từ chối giảm trừ, duyệt ngoại lệ không cọc). Chỉ đổi giao diện: các API `/api/commercial/...`, quyền `treatment.commercial.*` và quy tắc duyệt ở backend giữ nguyên, nhưng màn này không còn đường vào để thao tác duyệt giảm trừ và ngoại lệ cọc.
+
+Bổ sung cùng ngày: thẻ "Giá tham chiếu dịch vụ" bỏ dòng mô tả "Thay đổi catalog không sửa giá đã chốt" ở góc phải tiêu đề, và mỗi dịch vụ chỉ hiện **tên và giá**, không hiện "Chi nhánh #n" (chưa có giá thì hiện "Chưa có giá tham chiếu"). Chỉ đổi giao diện.
+
+## Kế hoạch điều trị/dịch vụ: xếp thời gian tăng dần (07/11/2026)
+
+Bảng "KẾ HOẠCH ĐIỀU TRỊ/DỊCH VỤ" của phiếu điều trị xếp theo cột Ngày (ngày dự kiến bắt đầu) **tăng dần**: ngày sớm nhất ở trên cùng, ngày muộn nhất ở cuối. Dòng chưa có ngày nằm cuối bảng. Các dòng cùng ngày giữ thứ tự kế hoạch (`plannedOrder`) như cũ. Chỉ đổi cách hiển thị, không đổi dữ liệu hay API. Bảng "QUÁ TRÌNH ĐIỀU TRỊ/DỊCH VỤ" không đổi.
+
+## Bỏ khối "Đơn thuốc sau điều trị" khỏi phiếu điều trị (10/11/2026)
+
+Phiếu điều trị không còn khối "Đơn thuốc sau điều trị" (nút Kê đơn theo lượt khám / thông báo cần có lượt khám đang thực hiện). Kê đơn vẫn thực hiện ở màn đơn thuốc của lượt khám (`/visits/{id}/prescription`); phiếu chỉ còn kế hoạch, quá trình điều trị, thanh toán, hình ảnh và ghi chú.
