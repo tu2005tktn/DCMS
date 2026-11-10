@@ -1,30 +1,24 @@
-import { useRouter, type Href } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { useSession } from '@/features/auth/session/useSession';
-
-const blue = '#175CD3', ink = '#17233D', muted = '#617187';
+import { colors } from '@/theme/colors';
+import { spacing } from '@/theme/spacing';
+import { typography } from '@/theme/typography';
 
 export default function AccountHomeScreen() {
   const { state, signOut } = useSession();
   const router = useRouter();
   const [signingOut, setSigningOut] = useState(false);
   const user = state.status === 'authenticated' ? state.user : null;
-  if (!user) return <View style={styles.center}><ActivityIndicator color={blue} /></View>;
+  if (!user) return <View style={styles.center}><ActivityIndicator color={colors.primary} /></View>;
   const initials = user.fullName.split(' ').filter(Boolean).slice(-2).map(part => part[0]).join('').toUpperCase();
   async function handleSignOut() {
     if (signingOut) return;
     setSigningOut(true);
     try { await signOut('user'); } finally { setSigningOut(false); }
   }
-
-  const initials = user.fullName
-    .split(' ')
-    .map((p) => p[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2);
 
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
@@ -110,8 +104,6 @@ export default function AccountHomeScreen() {
 
       {user.accountType === 'Public' && (
         <View style={styles.linkSection}>
-          <Text style={styles.linkDescription}>Xem thuốc và lời dặn do nha sĩ kê cho hồ sơ đã xác minh.</Text>
-          <PrimaryButton label="Đơn thuốc của tôi" onPress={() => router.push('/(account)/prescriptions')} disabled={signingOut} testID="open-prescriptions" />
           <Text style={styles.linkDescription}>Xem hồ sơ y tế chính thức: kế hoạch điều trị, lịch khám và bảo hành.</Text>
           <PrimaryButton
             label="Hồ sơ y tế của tôi"
@@ -119,7 +111,14 @@ export default function AccountHomeScreen() {
             disabled={signingOut}
             testID="open-medical-records"
           />
+          <PrimaryButton label="Kết quả khám" onPress={() => router.push('/(account)/visit-results')} disabled={signingOut} testID="open-visit-results" />
+          <PrimaryButton label="Thông báo" onPress={() => router.push('/(home)/notifications')} disabled={signingOut} testID="open-notifications" />
+          <PrimaryButton label="Thông tin bệnh nhân" onPress={() => router.push('/(account)/my-record')} disabled={signingOut} testID="open-my-record" />
         </View>
+      )}
+
+      {user.accountType !== 'Public' && (
+        <PrimaryButton label="Hộp thư hỗ trợ" onPress={() => router.push('/(home)/staff/requests')} disabled={signingOut} testID="open-support-inbox" />
       )}
 
       {/* Sign out */}
@@ -142,8 +141,8 @@ export default function AccountHomeScreen() {
     </ScrollView>
   );
 }
-function Item({ title, detail, onPress }: { title: string; detail: string; onPress: () => void }) {
-  return <Pressable style={styles.item} onPress={onPress} accessibilityRole="button"><View style={styles.itemText}><Text style={styles.itemTitle}>{title}</Text><Text style={styles.itemDetail}>{detail}</Text></View><Text style={styles.arrow}>›</Text></Pressable>;
+function Row({ label, value }: { label: string; value: string }) {
+  return <View style={styles.row}><Text style={styles.rowLabel}>{label}</Text><Text style={styles.rowValue}>{value}</Text></View>;
 }
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
