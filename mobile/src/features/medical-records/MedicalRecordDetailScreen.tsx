@@ -16,7 +16,7 @@ import { useSession } from '@/features/auth/session/useSession';
 import { colors } from '@/theme/colors';
 import { spacing } from '@/theme/spacing';
 import { medicalRecordsApi, RecordApiError } from './medical-records.api';
-import { dossierStateLabels, type OwnTreatmentSummaryItem } from './medical-records.types';
+import { dossierStateLabels, money, type OwnTreatmentSummaryItem } from './medical-records.types';
 
 export default function MedicalRecordDetailScreen() {
   const { dossierId } = useLocalSearchParams<{ dossierId: string }>();
@@ -105,6 +105,14 @@ export default function MedicalRecordDetailScreen() {
             <Text style={styles.itemTitle}>{row.serviceName}{row.region ? ` · ${row.region}` : ''}</Text>
             <Text style={styles.muted}>{new Date(row.performedAt).toLocaleDateString('vi-VN')} · {row.quantity} {row.unit}</Text>
             {row.outcome ? <Text style={styles.muted}>Kết quả: {row.outcome}</Text> : null}
+          </View>)}
+      </Card>
+
+      <Card title="Thanh toán đã ghi">
+        {(item.payments ?? []).length === 0 ? <Text style={styles.muted}>Chưa có khoản thanh toán trên phiếu điều trị.</Text>
+          : item.payments.map(payment => <View key={payment.id} style={styles.itemBox}>
+            <Text style={styles.itemTitle}>{money(payment.totalVnd)}</Text>
+            <Text style={styles.muted}>{payment.paidOn} · {payment.method}</Text>
           </View>)}
       </Card>
 

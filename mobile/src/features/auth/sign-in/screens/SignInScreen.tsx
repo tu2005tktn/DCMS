@@ -16,7 +16,7 @@
 
 import { Link, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FormError } from '@/components/feedback/FormError';
 import { ApiError } from '@/services/api/api-error';
@@ -99,18 +99,17 @@ export default function SignInScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-          <Link href="/(home)/" style={styles.backLink}>← Về trang chủ</Link>
-          <View style={styles.header}>
-            <Text style={styles.brand}>DCMS · DÀNH CHO KHÁCH HÀNG</Text>
-            <Text style={styles.title}>Đăng nhập</Text>
-            <Text style={styles.subtitle}>
-              Tiếp tục đặt lịch và theo dõi chăm sóc của bạn.
-            </Text>
+          <View style={styles.hero}>
+            <Link href="/(home)/" style={styles.backLink}>← Trang chủ</Link>
+            <View style={styles.heroMark}><Image source={require('../../../../../assets/dcms-app-icon.png')} style={styles.logo} />
+              <Text style={styles.brand}>DCMS</Text></View>
+            <Text style={styles.title}>Chào mừng trở lại</Text>
+            <Text style={styles.subtitle}>Đăng nhập để tiếp tục chăm sóc nụ cười của bạn.</Text>
           </View>
 
-          <FormError message={generalError} />
-
           <View style={styles.form}>
+            <Text style={styles.formTitle}>Đăng nhập</Text>
+            <FormError message={generalError} />
             <TextField
               label="Số điện thoại hoặc tên đăng nhập"
               value={userName}
@@ -125,7 +124,6 @@ export default function SignInScreen() {
               textContentType="username"
               keyboardType="default"
               error={touched.userName ? fieldErrors.userName : null}
-              hint="Dùng số điện thoại đã đăng ký hoặc tên đăng nhập."
               disabled={isSubmitting}
               testID="sign-in-username"
             />
@@ -139,7 +137,6 @@ export default function SignInScreen() {
                 validateField('password', password);
               }}
               error={touched.password ? fieldErrors.password : null}
-              hint="Nhập mật khẩu tài khoản của bạn."
               disabled={isSubmitting}
               testID="sign-in-password"
             />
@@ -183,15 +180,21 @@ export default function SignInScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
+  safe: { flex: 1, backgroundColor: '#F3F7FD' },
   flex: { flex: 1 },
-  container: { padding: spacing.lg, gap: spacing.lg, flexGrow: 1, justifyContent: 'center' },
-  backLink: { color: colors.primary, fontWeight: '700', marginBottom: spacing.md },
-  brand: { color: colors.primary, fontSize: 12, fontWeight: '800', letterSpacing: 1 },
-  header: { gap: spacing.sm, marginBottom: spacing.sm },
-  title: { fontSize: 30, fontWeight: '800', color: colors.text },
-  subtitle: { color: colors.muted, fontSize: typography.body, lineHeight: 23 },
-  form: { gap: spacing.md, padding: spacing.lg, borderRadius: 20, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+  container: { padding: spacing.lg, paddingTop: 0, gap: 0, flexGrow: 1, justifyContent: 'center' },
+  hero: { backgroundColor: '#175CD3', marginHorizontal: -spacing.lg, paddingHorizontal: spacing.lg,
+    paddingTop: 30, paddingBottom: 72, borderBottomLeftRadius: 34, borderBottomRightRadius: 34 },
+  backLink: { color: '#DCEAFF', fontWeight: '700', marginBottom: 36 },
+  heroMark: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 28 },
+  logo: { width: 54, height: 54, borderRadius: 14 },
+  brand: { color: '#FFFFFF', fontSize: 25, fontWeight: '800', letterSpacing: 1 },
+  title: { fontSize: 31, fontWeight: '800', color: '#FFFFFF', lineHeight: 38 },
+  subtitle: { color: '#DCEAFF', fontSize: typography.body, lineHeight: 23, marginTop: 8 },
+  form: { gap: spacing.md, padding: spacing.lg, borderRadius: 24, backgroundColor: '#FFFFFF',
+    borderWidth: 1, borderColor: '#DCE6F3', marginTop: -42, shadowColor: '#15355E', shadowOpacity: 0.12,
+    shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 5 },
+  formTitle: { color: colors.text, fontSize: 22, fontWeight: '800', marginBottom: 4 },
   actions: { marginTop: spacing.sm },
   linksRow: { flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.sm },
   linkText: { color: colors.primary, fontWeight: '700' },

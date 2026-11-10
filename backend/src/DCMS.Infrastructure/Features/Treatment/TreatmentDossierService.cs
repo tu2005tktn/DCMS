@@ -5,6 +5,7 @@ using System.Text.Json;
 using DCMS.Application.Common;
 using DCMS.Application.Features.Treatment;
 using DCMS.Domain.Features.Accounts;
+using DCMS.Domain.Features.Finance;
 using DCMS.Domain.Features.PatientLinks;
 using DCMS.Domain.Features.Scheduling;
 using DCMS.Domain.Features.Treatment;
@@ -895,6 +896,13 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
         var activities = await db.ClinicalActivities.AsNoTracking()
             .Where(x => x.DossierId.HasValue && dossierIds.Contains(x.DossierId.Value) && x.State == "Posted")
             .OrderByDescending(x => x.PerformedAt).ToArrayAsync(ct);
+        var payments = await db.Set<DossierPayment>().AsNoTracking()
+            .Where(x => dossierIds.Contains(x.DossierId) && patientIds.Contains(x.PatientId))
+            .OrderByDescending(x => x.PaidOn).ToArrayAsync(ct);
+        var receipts = await db.Set<PaymentReceipt>().AsNoTracking()
+            .Where(x => x.DossierId.HasValue && dossierIds.Contains(x.DossierId.Value)
+                && patientIds.Contains(x.PatientId) && x.State == "Posted")
+            .OrderByDescending(x => x.ConfirmedAt).ToArrayAsync(ct);
         return dossiers.Select(x => new OwnTreatmentSummaryItem(x.Id, x.Code, x.State, x.StartedOn,
             x.Diagnosis, x.PlanVersion, x.Items.Where(item => item.Decision == "Agreed")
                 .OrderBy(item => item.PlannedOrder).Select(ItemDto).ToArray(),
@@ -902,6 +910,12 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
                 new PerformedTreatmentItem(activity.Id, activity.PerformedAt,
                     activity.ServiceNameSnapshot ?? x.Items.FirstOrDefault(item => item.Id == activity.ItemId)?.ServiceName ?? "Dịch vụ điều trị",
                     activity.Region, activity.Quantity, activity.Unit,
-                    string.IsNullOrWhiteSpace(activity.Outcome) ? null : activity.Outcome)).ToArray())).ToArray();
+                    string.IsNullOrWhiteSpace(activity.Outcome) ? null : activity.Outcome)).ToArray(),
+            payments.Where(payment => payment.DossierId == x.Id).Select(payment =>
+                new OwnTreatmentPaymentItem(payment.Id, payment.PaidOn, payment.Method, payment.TotalVnd, "DossierPayment"))
+                .Concat(receipts.Where(receipt => receipt.DossierId == x.Id).Select(receipt =>
+                    new OwnTreatmentPaymentItem(receipt.Id, DateOnly.FromDateTime((receipt.ConfirmedAt ?? receipt.CreatedAt).UtcDateTime),
+                        receipt.Method, receipt.AmountVnd, "PaymentReceipt")))
+                .OrderByDescending(payment => payment.PaidOn).ToArray())).ToArray();
     }
 }

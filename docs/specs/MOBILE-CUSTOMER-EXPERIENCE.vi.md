@@ -16,3 +16,6 @@ Tài khoản `Public` sử dụng ứng dụng như cổng khách hàng nha khoa
 ## Kiểm tra
 
 Typecheck mobile và build Android. Trên điện thoại: khách thấy lối vào đăng nhập/đăng ký/đặt lịch, người dùng Public vào trang chủ và các mục bằng một lần bấm; đặt lịch thử qua ba bước, mở lịch hẹn; liên kết chưa xác minh không lộ bệnh án; thông báo đọc qua API. Thử trạng thái API lỗi và danh sách trống. Không tạo hồ sơ hoặc đơn thuốc giả trong database.
+# Giao diện đăng nhập (10/11/2026)
+
+Màn đăng nhập mobile dùng bố cục nhận diện DCMS xanh và trắng, tiêu đề ngắn, biểu tượng răng, thẻ form dễ đọc, khoảng cách và vùng chạm phù hợp điện thoại. Giữ nguyên xác thực số điện thoại/tên đăng nhập và mật khẩu, Google, đăng ký, quên mật khẩu, đặt lịch không cần tài khoản; không thay đổi API hoặc logic kiểm tra lỗi.
