@@ -60,7 +60,6 @@ export default function PrescriptionsScreen() {
   return (
     <ScrollView contentContainerStyle={styles.container} refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void load(token)} />}>
       <Text style={styles.title}>Đơn thuốc của tôi</Text>
-      <Text style={styles.muted}>Xem lại đơn thuốc và hướng dẫn bác sĩ đã kê.</Text>
       <Banner tone="info" message="Đơn thuốc mua ngoài tại hiệu thuốc. Phòng khám không bán thuốc tại chỗ." />
       {error && <Banner tone="error" message={error.message} />}
       <Card title="Các đơn đã kê">

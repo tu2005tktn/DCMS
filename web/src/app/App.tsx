@@ -37,6 +37,7 @@ import CustomerBookingPage from '../features/customer-booking/CustomerBookingPag
 import CustomerPatientLinkPage from '../features/customer-patient-link/CustomerPatientLinkPage';
 import CustomerAppointmentsPage from '../features/customer-appointments/CustomerAppointmentsPage';
 import CustomerAppointmentDetailPage from '../features/customer-appointments/CustomerAppointmentDetailPage';
+import CustomerTreatmentRecordsPage from '../features/customer-treatment/CustomerTreatmentRecordsPage';
 import DossierPage from '../features/treatment/DossierPage';
 import PlanPage from '../features/treatment/PlanPage';
 import RevisionPage from '../features/treatment/RevisionPage';
@@ -67,6 +68,7 @@ export default function App() {
       <Route path="appointments/:code" element={<CustomerAppointmentDetailPage />} />
       <Route path="prescriptions" element={<CustomerPrescriptionsPage />} />
       <Route path="prescriptions/:id" element={<CustomerPrescriptionDetailPage />} />
+      <Route path="treatment-records" element={<CustomerTreatmentRecordsPage />} />
     </Route>
     <Route path="/customer/*" element={<Result status="404" title="Không tìm thấy trang" extra={<Link to="/customer/home">Về trang chủ</Link>} />} />
     <Route path="/recover" element={<RecoverAccountPage />} />

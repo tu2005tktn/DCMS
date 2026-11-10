@@ -79,9 +79,25 @@ public sealed class PatientNotificationTests(ReceptionFixture fixture) : IClassF
             && x.Kind == nameof(NotificationKind.PrescriptionReady)
             && x.DedupeKey.StartsWith($"patient:rx:{rx.Id}:")).ToListAsync());
 
+        var employeeId = await db.Employees.Where(x => x.AccountId == dentist.Id).Select(x => x.Id).SingleAsync();
+        var profilePrescription = new PatientPrescription
+        {
+            PatientId = setup.PatientId, BranchId = setup.BranchId,
+            PrescriberEmployeeId = employeeId, PrescribedOn = DateOnly.FromDateTime(DateTime.UtcNow),
+            Diagnosis = "Synthetic test", CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Set<PatientPrescription>().Add(profilePrescription);
+        await db.SaveChangesAsync();
+        Assert.Single(await db.InAppNotifications.Where(x => x.AccountId == guest.Id
+            && x.DedupeKey.StartsWith($"patient:patient-rx:{profilePrescription.Id}:")).ToListAsync());
+        await db.SaveChangesAsync();
+        Assert.Single(await db.InAppNotifications.Where(x => x.AccountId == guest.Id
+            && x.DedupeKey.StartsWith($"patient:patient-rx:{profilePrescription.Id}:")).ToListAsync());
+
         var notifications = scope.ServiceProvider.GetRequiredService<INotificationService>();
         Assert.True((await notifications.CheckDeepLinkAsync(guest.Id, "/book-appointment", default)).Allowed);
         Assert.True((await notifications.CheckDeepLinkAsync(guest.Id, $"/prescriptions/{visit.VisitId}", default)).Allowed);
+        Assert.True((await notifications.CheckDeepLinkAsync(guest.Id, $"/prescriptions/{profilePrescription.Id}", default)).Allowed);
         link.Status = PatientLinkStatus.Revoked;
         link.RevokedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync();

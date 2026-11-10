@@ -38,7 +38,17 @@ public sealed partial class DcmsDbContext
                 var p = entry.Entity;
                 events.Add(new(p.PatientId, p.BranchId, NotificationKind.PrescriptionReady,
                     "Đơn thuốc đã sẵn sàng", "Bác sĩ đã hoàn tất đơn thuốc của bạn. Mở ứng dụng để xem.",
-                    $"rx:{p.Id}:{p.Revision}", $"/prescriptions/{p.VisitId}"));
+                    $"rx:{p.Id}:{p.Revision}", "/prescriptions"));
+            }
+
+        foreach (var entry in ChangeTracker.Entries<PatientPrescription>())
+            if (entry.State == EntityState.Added || entry.State == EntityState.Modified &&
+                entry.Property(nameof(PatientPrescription.Version)).IsModified)
+            {
+                var prescription = entry.Entity;
+                events.Add(new(prescription.PatientId, prescription.BranchId, NotificationKind.PrescriptionReady,
+                    "Đơn thuốc mới của bạn", "Bác sĩ đã kê hoặc cập nhật đơn thuốc. Mở ứng dụng để xem chi tiết.",
+                    $"patient-rx:{prescription.Id}:{prescription.Version}", $"/prescriptions/{prescription.Id}"));
             }
 
         var examinations = ChangeTracker.Entries<VisitExamination>().Where(e => e.Entity.Confirmed &&

@@ -148,3 +148,5 @@ Bảng danh sách yêu cầu không còn thanh cuộn ngang; chữ trong ô tự
 ## Hộp thư hỗ trợ: bảng có viền (08/11/2026)
 
 Bảng danh sách yêu cầu có viền ngoài bo góc, đường kẻ giữa các hàng và các cột. Cột Lý do rộng tối thiểu 160px để tiêu đề không bị bẻ dòng. Từ 1000px trở xuống (dạng thẻ) giữ như cũ.
+- Android chỉ lấy FCM token khi khởi tạo phiên đăng ký; sự kiện token đổi phải dùng token trong callback, không gọi lại API lấy token từ chính callback. Không gửi lại `PUT /api/notifications/devices` cho cùng token và cùng phiên; nếu yêu cầu đang chạy thì bỏ qua sự kiện trùng. Luồng đăng ký không được tạo vòng lặp gây tăng CPU hoặc làm giật giao diện.
+- Khi nha sĩ lưu mới hoặc cập nhật đơn thuốc trực tiếp trong hồ sơ bệnh nhân (`PatientPrescription`), tài khoản có liên kết VERIFIED nhận một thông báo in-app và FCM sau commit; replay cùng request không gửi lại. Khi yêu cầu tái khám chuyển sang `NeedsBooking`, thông báo nêu rõ bệnh nhân cần đặt lịch và dẫn đến màn đặt lịch; bản nháp hoặc thao tác lỗi không tạo thông báo.

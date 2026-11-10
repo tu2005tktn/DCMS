@@ -6,6 +6,7 @@ import { useSession } from '@/features/auth/session/useSession';
 import { authedRequest } from '@/services/api/http-client';
 
 let registeredToken: string | null = null;
+let registeredAccessToken: string | null = null;
 
 if (Platform.OS === 'android') {
   Notifications.setNotificationHandler({
@@ -27,6 +28,7 @@ export async function unregisterPushDevice(accessToken: string): Promise<void> {
     body: JSON.stringify({ token }),
   });
   registeredToken = null;
+  registeredAccessToken = null;
 }
 
 export function PushNotificationsProvider() {
@@ -36,6 +38,25 @@ export function PushNotificationsProvider() {
   useEffect(() => {
     if (Platform.OS !== 'android' || !accessToken) return;
     let cancelled = false;
+    let pendingToken: string | null = null;
+    const syncToken = async (nativeToken: string) => {
+      if (cancelled || !nativeToken || pendingToken === nativeToken) return;
+      if (registeredToken === nativeToken && registeredAccessToken === accessToken) return;
+      pendingToken = nativeToken;
+      try {
+        await authedRequest('/api/notifications/devices', accessToken, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: nativeToken, platform: 'android' }),
+        });
+        if (!cancelled) {
+          registeredToken = nativeToken;
+          registeredAccessToken = accessToken;
+        }
+      } finally {
+        pendingToken = null;
+      }
+    };
     const register = async () => {
       await Notifications.setNotificationChannelAsync('appointments', {
         name: 'Lịch hẹn và hồ sơ',
@@ -46,15 +67,12 @@ export function PushNotificationsProvider() {
       if (!permission.granted || cancelled) return;
       const nativeToken = (await Notifications.getDevicePushTokenAsync()).data;
       if (typeof nativeToken !== 'string' || cancelled) return;
-      await authedRequest('/api/notifications/devices', accessToken, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: nativeToken, platform: 'android' }),
-      });
-      if (!cancelled) registeredToken = nativeToken;
+      await syncToken(nativeToken);
     };
     void register().catch(() => undefined);
-    const tokenListener = Notifications.addPushTokenListener(() => { void register().catch(() => undefined); });
+    const tokenListener = Notifications.addPushTokenListener(token => {
+      if (typeof token.data === 'string') void syncToken(token.data).catch(() => undefined);
+    });
     return () => { cancelled = true; tokenListener.remove(); };
   }, [accessToken]);
 

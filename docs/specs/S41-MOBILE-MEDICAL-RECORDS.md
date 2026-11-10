@@ -22,7 +22,7 @@ Nguồn: task DCMS-92 (Tống Nguyên Tuấn, Epic DCMS-92) trích từ DCMS_Scr
 | --- | --- | --- |
 | GET | `/api/patient-links/me` | Trạng thái liên kết (gate dữ liệu) |
 | GET | `/api/patient-links/me/record` | Identity: mã BN, họ tên, ngày sinh, ngày liên kết (điểm kiểm quyền, 403 MSG06 khi không Verified) |
-| GET | `/api/patients/me/treatment-summary` | Nguồn chính thức: dossier đã chốt kế hoạch + item Agreed (projection của Vinh, chỉ Patient VERIFIED) |
+| GET | `/api/patients/me/treatment-summary` | Hồ sơ đã chốt kế hoạch, item Agreed và `performedItems` đã Posted; chỉ Patient VERIFIED |
 | GET | `/api/me/appointments?scope=HISTORY` và `?scope=UPCOMING` | Các lượt khám theo ngày / nha sĩ / chi nhánh, trạng thái (UC-05 read API) |
 | GET | `/api/patients/me` | Thông tin hành chính bệnh nhân tự sửa (tab hồ sơ sẵn có trên app) |
 
@@ -40,20 +40,19 @@ Phần backend chưa giao (hiển thị trạng thái trung thực, ghi task + n
 Cập nhật 08/11/2026 ([MOBILE-PATIENT-VISIT-RESULTS](MOBILE-PATIENT-VISIT-RESULTS.vi.md)):
 - Kết quả khám chính thức theo lượt (findings/chẩn đoán/dặn dò/hướng xử trí) và ảnh/tài liệu `Ready` đã có API own-record `/api/patients/me/visits*`, `/api/patients/me/documents*`.
 - Summary có thẻ **Kết quả khám theo lượt** mở màn `(account)/visit-results`.
-- Card "nguồn chưa kết nối" chỉ còn lịch sử phiên bản/đồng bộ và hóa đơn.
+- Giao diện hiện tại không còn card "nguồn chưa kết nối"; các phần chưa có dữ liệu được ẩn.
 
 ## 3. Nội dung Summary
 
 - **Identity**: mã BN, họ tên, ngày sinh, ngày liên kết (từ `/record`).
-- **Lịch sử & sức khỏe**: health history/allergy chưa có nguồn API → card “chưa có dữ liệu từ máy chủ (chờ DCMS-95)”, phân biệt với “không có dữ liệu” (empty).
+- **Lịch sử & sức khỏe**: chưa có nguồn API thì không render card giả định dữ liệu.
 - **Các lượt khám**: từ `/api/me/appointments` — ngày/giờ, nha sĩ, chi nhánh, trạng thái; `Completed` của lượt khám **không** đồng nghĩa dossier hoàn tất (dossier hiển thị riêng với trạng thái `Open/Completed/Stopped`).
 - **Nhóm hồ sơ chính thức**: danh sách `OwnTreatmentSummaryItem` (code, state, startedOn, diagnosis, planVersion, số item Agreed) → chọn để vào Detail.
 
 ## 4. Nội dung Detail (read-only)
 
-- Header: code, trạng thái dossier, ngày bắt đầu, chẩn đoán, plan version.
-- **Plan** (dự kiến/đã đồng ý): item Agreed kèm `decision`, tư vấn, giá thỏa thuận, tiến độ `progress` do server trả — tách bạch “kế hoạch” với “đã thực hiện”.
-- **Actual / findings / prescription / files / warranty / bản sửa (corrected/superseded)**: chưa có DTO → card nêu rõ nguồn và task phụ trách; không tự xuất dữ liệu staff.
+- Header: code, trạng thái dossier, ngày bắt đầu và chẩn đoán.
+- **Hạng mục bác sĩ đã làm**: chỉ `performedItems` có `State=Posted`, hiển thị tên dịch vụ, vùng/răng, thời gian, số lượng và kết quả được phép xem. Không render kế hoạch, bảo hành hoặc card nguồn chưa kết nối trong Detail mobile.
 - Phân biệt trạng thái: `NeedsBooking` ≠ `Appointment Confirmed` (chỉ định chưa đặt lịch khác lịch đã xác nhận); hiển thị theo DTO tương ứng khi nguồn có.
 - **Contact clinic**: nút yêu cầu sửa đổi — app read-only, không sửa trực tiếp nguồn clinical/financial; modal hướng dẫn liên hệ phòng khám, **không** gửi/ghi dữ liệu khi chưa có API nhận yêu cầu.
 
@@ -69,3 +68,6 @@ Cập nhật 08/11/2026 ([MOBILE-PATIENT-VISIT-RESULTS](MOBILE-PATIENT-VISIT-RES
 
 - Không triển khai backend ACL/clinical edit/payment gateway/chatbot/toàn bộ S42 (DCMS-95 – Tư sở hữu own-record backend, sync/backfill).
 - Không chọn PatientId tùy ý: mọi query đi qua session (policy `PublicAccountPolicy` phía server).
+- Chi tiết hồ sơ điều trị trên mobile tập trung vào hạng mục bác sĩ đã thực hiện (`ClinicalActivity.State=Posted`) theo ngày, tên dịch vụ, vùng/răng, số lượng và kết quả nếu có. API `GET /api/patients/me/treatment-summary` trả thêm `performedItems`; chỉ hồ sơ của tài khoản có liên kết VERIFIED được truy cập. Giao diện mobile bỏ các thẻ kế hoạch đã chốt, bảo hành, “Nguồn chưa kết nối” và các đoạn giải thích kỹ thuật dài dưới tiêu đề. Thanh điều hướng chính dùng biểu tượng kèm nhãn cho Trang chủ, Lịch hẹn, Bệnh án và Tài khoản.
+- Các màn tổng quan và danh sách mobile chỉ hiển thị tên chức năng, trạng thái hoặc dữ liệu cần thao tác; bỏ các câu giới thiệu và mô tả chức năng dưới tiêu đề, thẻ điều hướng. Giữ hướng dẫn dùng thuốc, chi tiết bệnh án, thông báo thực tế và lỗi/hướng dẫn khắc phục vì đây là nội dung nghiệp vụ.
+- Icon ứng dụng DCMS là ảnh vuông dễ nhận ở kích thước nhỏ, theo tông xanh của giao diện và hình răng đơn giản. Cấu hình Expo và launcher Android dùng cùng một icon; bản gốc lưu trong `mobile/assets/`.

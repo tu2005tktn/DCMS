@@ -65,6 +65,9 @@ public sealed class NotificationService(
         if (string.IsNullOrWhiteSpace(deepLink))
             return new CheckDeepLinkResult(false, "Liên kết không hợp lệ.");
         if (deepLink == "/appointments") return new CheckDeepLinkResult(true, null);
+        if (deepLink == "/prescriptions")
+            return new CheckDeepLinkResult(await db.PatientAccountLinks.AsNoTracking().AnyAsync(x =>
+                x.AccountId == accountId && x.Status == PatientLinkStatus.Verified, ct), null);
         if (deepLink == "/book-appointment")
         {
             var canBook = await db.FollowUpInstructions.AsNoTracking().AnyAsync(x =>
@@ -90,8 +93,10 @@ public sealed class NotificationService(
                 "visit-results" => await db.Visits.AsNoTracking().AnyAsync(x => x.Id == id
                     && patients.Contains(x.PatientId) && db.Set<VisitExamination>()
                         .Any(e => e.VisitId == x.Id && e.Confirmed), ct),
-                "prescriptions" => await db.Set<ExternalPrescription>().AsNoTracking().AnyAsync(x =>
-                    x.VisitId == id && x.Status == PrescriptionStatuses.Finalized && patients.Contains(x.PatientId), ct),
+                "prescriptions" => await db.Set<PatientPrescription>().AsNoTracking().AnyAsync(x =>
+                    x.Id == id && patients.Contains(x.PatientId), ct)
+                    || await db.Set<ExternalPrescription>().AsNoTracking().AnyAsync(x =>
+                        x.VisitId == id && x.Status == PrescriptionStatuses.Finalized && patients.Contains(x.PatientId), ct),
                 "medical-records" => await db.TreatmentDossiers.AsNoTracking().AnyAsync(x =>
                     x.Id == id && x.PlanState == "Committed" && x.State != "Deleted"
                     && patients.Contains(x.PatientId), ct),

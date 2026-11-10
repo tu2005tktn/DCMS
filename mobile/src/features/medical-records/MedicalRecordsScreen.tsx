@@ -159,7 +159,6 @@ export default function MedicalRecordsScreen() {
     <ScrollView contentContainerStyle={styles.container} refreshControl={
       <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={palette.primary} />}>
       <Text style={styles.heading}>Bệnh án của tôi</Text>
-      <Text style={styles.muted}>Theo dõi quá trình điều trị và các lượt khám đã được phòng khám ghi nhận.</Text>
 
       {denied && <View style={styles.block}>
         <Banner tone="error" message="Quyền xem hồ sơ vừa bị thu hồi — dữ liệu đang hiển thị đã được xóa."
@@ -181,12 +180,6 @@ export default function MedicalRecordsScreen() {
           <Row label="Ngày sinh" value={record.birthDate ?? 'Chưa rõ'} />
           <Row label="Ngày liên kết" value={formatTime(record.linkedAt)} />
         </View> : <Text style={styles.muted}>Đang tải thông tin nhận diện…</Text>}
-      </Card>
-
-      <Card title="Thông tin sức khỏe và dị ứng">
-        <Text style={styles.muted}>
-          Ứng dụng chưa hỗ trợ hiển thị mục này. Hãy hỏi phòng khám khi cần đối chiếu thông tin.
-        </Text>
       </Card>
 
       <Card title="Các lượt khám">
@@ -221,7 +214,6 @@ export default function MedicalRecordsScreen() {
                   </Pressable>
                 );
               })}
-        <Text style={styles.note}>Trạng thái lịch khám và trạng thái điều trị được theo dõi riêng.</Text>
       </Card>
 
       <Card title="Hồ sơ chính thức của tôi">
@@ -242,16 +234,13 @@ export default function MedicalRecordsScreen() {
                 </View>
               </Pressable>
             ))}
-        <Text style={styles.note}>“Đang điều trị” nghĩa là đợt điều trị chưa kết thúc.</Text>
       </Card>
 
       <Card title="Kết quả khám theo lượt">
-        <Text style={styles.muted}>Kết quả khám bác sĩ đã xác nhận, chẩn đoán, dặn dò, kết quả cận lâm sàng và hình ảnh của từng lượt.</Text>
         <Button title="Xem kết quả khám" onPress={() => router.push('/(account)/visit-results')} />
       </Card>
 
       <Card title="Đơn thuốc">
-        <Text style={styles.muted}>Đơn thuốc mua ngoài bác sĩ đã hoàn tất, kèm liều dùng và lời dặn.</Text>
         <Button title="Xem đơn thuốc" variant="secondary" onPress={() => router.push('/(account)/prescriptions')} />
       </Card>
 

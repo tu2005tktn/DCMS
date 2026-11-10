@@ -16,10 +16,7 @@ import { useSession } from '@/features/auth/session/useSession';
 import { colors } from '@/theme/colors';
 import { spacing } from '@/theme/spacing';
 import { medicalRecordsApi, RecordApiError } from './medical-records.api';
-import {
-  decisionLabels, dossierStateLabels, money, progressLabel,
-  type OwnTreatmentSummaryItem, type TreatmentItem,
-} from './medical-records.types';
+import { dossierStateLabels, type OwnTreatmentSummaryItem } from './medical-records.types';
 
 export default function MedicalRecordDetailScreen() {
   const { dossierId } = useLocalSearchParams<{ dossierId: string }>();
@@ -87,9 +84,6 @@ export default function MedicalRecordDetailScreen() {
     </View>;
   }
 
-  const agreed = item.agreedItems.filter(x => x.decision === 'Agreed');
-  const warrantyItems = agreed.filter(x => x.warrantyConfirmedAt);
-
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Card title={`Hồ sơ ${item.code}`}>
@@ -98,70 +92,24 @@ export default function MedicalRecordDetailScreen() {
             <Text style={[styles.pillText, { color: item.state === 'Open' ? '#175CD3' : '#344054' }]}>
               {dossierStateLabels[item.state]}</Text>
           </View>
-          <Text style={styles.muted}>Kế hoạch v{item.planVersion} · Bắt đầu {item.startedOn}</Text>
+          <Text style={styles.muted}>Bắt đầu {item.startedOn}</Text>
         </View>
         <Text style={styles.diagnosis}>{item.diagnosis}</Text>
-        <Text style={styles.note}>
-          “Đang điều trị” nghĩa là đợt còn mở — hoàn thành một lượt khám không làm hồ sơ tự chuyển sang hoàn tất.
-        </Text>
-        {lastSyncAt && <Text style={styles.muted}>Lần tải thành công gần nhất: {new Date(lastSyncAt).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</Text>}
+        {lastSyncAt && <Text style={styles.muted}>Cập nhật: {new Date(lastSyncAt).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</Text>}
       </Card>
 
-      <Card title="Kế hoạch đã chốt (plan)">
-        <Text style={styles.muted}>
-          Các hạng mục dưới đây là phần đã thỏa thuận trong kế hoạch; “Tiến độ thực tế” do phòng khám ghi nhận,
-          tách riêng với dự kiến.
-        </Text>
-        {agreed.length === 0
-          ? <Text style={styles.muted}>Hồ sơ chưa có hạng mục nào ở trạng thái đã đồng ý.</Text>
-          : agreed.map((row: TreatmentItem) => (
-            <View key={row.id} style={styles.itemBox}>
-              <Text style={styles.itemTitle}>{row.serviceName}{row.region ? ` · ${row.region}` : ''}</Text>
-              <Text style={styles.muted}>
-                {row.quantity} {row.unit} · {money(row.agreedUnitPriceVnd)}
-                {row.estimatedMinutes ? ` · dự kiến ${row.estimatedMinutes} phút` : ''}
-              </Text>
-              <View style={styles.tagRow}>
-                <View style={styles.tag}><Text style={styles.tagText}>Quyết định: {decisionLabels[row.decision]}</Text></View>
-                <View style={styles.tag}><Text style={styles.tagText}>Tiến độ thực tế: {progressLabel(row.progress)}</Text></View>
-              </View>
-              {row.counseling && <Text style={styles.muted}>Tư vấn: {row.counseling}</Text>}
-            </View>
-          ))}
-      </Card>
-
-      <Card title="Bảo hành">
-        {warrantyItems.length === 0
-          ? <Text style={styles.muted}>
-            Chưa có bảo hành nào được xác nhận cho hồ sơ này. Bảo hành chỉ hiển thị khi phòng khám xác nhận qua API.
-          </Text>
-          : warrantyItems.map(row => (
-            <View key={row.id} style={styles.itemBox}>
-              <Text style={styles.itemTitle}>{row.serviceName}{row.region ? ` · ${row.region}` : ''}</Text>
-              <Text style={styles.muted}>
-                {row.warrantyPolicy} {row.warrantyPolicyVersion ? `· ${row.warrantyPolicyVersion}` : ''}
-                {row.warrantyEndsOn ? ` · đến ${row.warrantyEndsOn}` : ''}
-              </Text>
-              {row.warrantyScope && <Text style={styles.muted}>{row.warrantyScope}</Text>}
-            </View>
-          ))}
+      <Card title="Hạng mục bác sĩ đã làm">
+        {(item.performedItems ?? []).length === 0
+          ? <Text style={styles.muted}>Chưa có hạng mục điều trị đã ghi nhận.</Text>
+          : item.performedItems.map(row => <View key={row.id} style={styles.itemBox}>
+            <Text style={styles.itemTitle}>{row.serviceName}{row.region ? ` · ${row.region}` : ''}</Text>
+            <Text style={styles.muted}>{new Date(row.performedAt).toLocaleDateString('vi-VN')} · {row.quantity} {row.unit}</Text>
+            {row.outcome ? <Text style={styles.muted}>Kết quả: {row.outcome}</Text> : null}
+          </View>)}
       </Card>
 
       <Card title="Đơn thuốc">
-        <Text style={styles.muted}>Đơn thuốc theo từng lượt khám nằm ở mục Đơn thuốc của tôi.</Text>
         <Button title="Xem đơn thuốc" variant="secondary" onPress={() => router.push('/(account)/prescriptions')} />
-      </Card>
-
-      <Card title="Nguồn chưa kết nối">
-        <Text style={styles.muted}>
-          • Kết quả khám và hình ảnh theo lượt: xem ở mục Kết quả khám theo lượt (Hồ sơ y tế của tôi){'\n'}
-          • Lịch sử phiên bản/sửa đổi/đồng bộ chi tiết (DCMS-95){'\n'}
-          • Hóa đơn thanh toán (S42 — màn đã có thì chỉ hiển thị link)
-        </Text>
-        <Text style={styles.note}>
-          Ứng dụng không hiển thị ghi chú nội bộ của nhân viên, phí nhà cung cấp hay dữ liệu người thân;
-          không có quy trình “bấm xuất bản” — nguồn chính thức tự hiển thị theo UC-55.
-        </Text>
       </Card>
 
       {showContact
@@ -178,14 +126,10 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background, gap: spacing.sm },
   container: { padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xl * 2, backgroundColor: colors.background },
   muted: { color: palette.muted, fontSize: 14, lineHeight: 20 },
-  note: { color: palette.muted, fontSize: 12, lineHeight: 18, fontStyle: 'italic' },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
   diagnosis: { fontSize: 16, fontWeight: '600', color: palette.text },
   itemBox: { borderTopWidth: 1, borderTopColor: palette.border, paddingTop: spacing.sm, gap: 4 },
   itemTitle: { fontSize: 15, fontWeight: '600', color: palette.text },
-  tagRow: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' },
-  tag: { backgroundColor: '#F2F4F7', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
-  tagText: { fontSize: 12, color: palette.text },
   pill: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
   pillText: { fontSize: 12, fontWeight: '600' },
 });

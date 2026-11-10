@@ -60,16 +60,15 @@ export default function HomeScreen() {
   if (state.status === 'initializing') return <View style={styles.center}><ActivityIndicator color={blue} /></View>;
   if (!user) return <SafeAreaView style={styles.safe} edges={['top']}><ScrollView contentContainerStyle={styles.content}>
     <Text style={styles.brand}>DCMS</Text><Text style={styles.heroTitle}>Chăm sóc nụ cười của bạn</Text>
-    <Text style={styles.heroDescription}>Đặt lịch khám và theo dõi hành trình điều trị ngay trên điện thoại.</Text>
-    <Action label="Đăng nhập" detail="Xem lịch hẹn, hồ sơ và thông báo" onPress={() => go('/(auth)/sign-in')} primary />
-    <Action label="Tạo tài khoản" detail="Bắt đầu sử dụng DCMS" onPress={() => go('/(auth)/register')} />
+    <Action label="Đăng nhập" onPress={() => go('/(auth)/sign-in')} primary />
+    <Action label="Tạo tài khoản" onPress={() => go('/(auth)/register')} />
   </ScrollView></SafeAreaView>;
   if (user.accountType !== 'Public') return <SafeAreaView style={styles.safe} edges={['top']}><ScrollView contentContainerStyle={styles.content}>
     <Text style={styles.eyebrow}>DCMS · NHÂN VIÊN</Text><Text style={styles.title}>Xin chào, {user.fullName}</Text>
     <Section title="Công việc của bạn" />
-    <Action label="Hộp thư hỗ trợ" detail="Xử lý yêu cầu của bệnh nhân" onPress={() => go('/(home)/staff/requests')} />
-    <Action label="Lịch bị ảnh hưởng" detail="Theo dõi thay đổi giờ làm" onPress={() => go('/(home)/staff/schedule-impact')} />
-    <Action label="Tài khoản" detail="Thông tin và đăng xuất" onPress={() => go('/(account)/home')} />
+    <Action label="Hộp thư hỗ trợ" onPress={() => go('/(home)/staff/requests')} />
+    <Action label="Lịch bị ảnh hưởng" onPress={() => go('/(home)/staff/schedule-impact')} />
+    <Action label="Tài khoản" onPress={() => go('/(account)/home')} />
   </ScrollView></SafeAreaView>;
 
   const active = records.value?.filter(item => item.state === 'Open') ?? [];
@@ -79,13 +78,12 @@ export default function HomeScreen() {
     <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void load()} tintColor={blue} />} contentContainerStyle={styles.content}>
       <View style={styles.topRow}><Text style={styles.brand}>DCMS</Text><Pressable onPress={() => go('/(home)/notifications')} accessibilityRole="button" style={styles.bell}><Text style={styles.bellText}>Thông báo{unread.length ? ` · ${unread.length}` : ''}</Text></Pressable></View>
       <Text style={styles.eyebrow}>HÀNH TRÌNH SỨC KHỎE</Text><Text style={styles.title}>Xin chào, {user.fullName}</Text>
-      <Text style={styles.subtitle}>Thông tin chăm sóc của bạn ở một nơi.</Text>
       <Pressable onPress={() => go('/book-appointment')} style={styles.primaryCard} accessibilityRole="button">
-        <Text style={styles.primaryOverline}>BƯỚC TIẾP THEO</Text><Text style={styles.primaryTitle}>Đặt lịch khám</Text><Text style={styles.primaryDetail}>Chọn thời gian phù hợp với bạn  →</Text>
+        <Text style={styles.primaryTitle}>Đặt lịch khám →</Text>
       </Pressable>
       <Section title="Bệnh án hiện tại" action="Xem tất cả" onPress={() => go('/(account)/medical-records')} />
       {link.status === 'loading' ? <State text="Đang kiểm tra hồ sơ…" /> : link.status === 'error' ? <State text="Chưa tải được trạng thái hồ sơ." retry={load} /> : link.value !== 'VERIFIED' ?
-        <Action label={link.value === 'PENDING' ? 'Đang chờ xác minh' : 'Liên kết hồ sơ bệnh nhân'} detail={link.value === 'PENDING' ? 'Phòng khám đang xử lý yêu cầu của bạn.' : 'Xác minh để xem quá trình điều trị và bệnh án.'} onPress={() => go('/(account)/account-link')} /> :
+        <Action label={link.value === 'PENDING' ? 'Đang chờ xác minh' : 'Liên kết hồ sơ bệnh nhân'} onPress={() => go('/(account)/account-link')} /> :
         records.status === 'loading' ? <State text="Đang tải bệnh án…" /> : records.status === 'error' ? <State text="Chưa tải được bệnh án." retry={load} /> : active.length === 0 ? <State text="Chưa có hồ sơ đang điều trị. Bạn có thể xem hồ sơ trước đây." /> :
         active.slice(0, 2).map(item => <Pressable key={item.dossierId} style={styles.card} onPress={() => go({ pathname: '/(account)/medical-records/[dossierId]', params: { dossierId: item.dossierId } })} accessibilityRole="button">
           <View style={styles.cardRow}><Text style={styles.cardTitle}>{item.code}</Text><Text style={styles.pill}>Đang điều trị</Text></View>
@@ -98,17 +96,15 @@ export default function HomeScreen() {
       {notifications.status === 'loading' ? <State text="Đang tải thông báo…" /> : notifications.status === 'error' ? <State text="Chưa tải được thông báo." retry={load} /> : unread.length === 0 ? <State text="Bạn chưa có thông báo mới." /> :
         unread.slice(0, 2).map(item => <Action key={item.id} label={item.title} detail={item.body} onPress={() => go('/(home)/notifications')} />)}
       <Section title="Khám phá" />
-      <Action label="Kết quả khám" detail="Xem kết quả từng lượt đã được bác sĩ xác nhận" onPress={() => go('/(account)/visit-results')} />
-      <Action label="Đơn thuốc của tôi" detail="Xem thuốc và lời dặn của nha sĩ" onPress={() => go('/(account)/prescriptions')} />
-      <Action label="Tài khoản của tôi" detail="Thông tin cá nhân và liên kết hồ sơ" onPress={() => go('/(account)/home')} />
+      <Action label="Kết quả khám" onPress={() => go('/(account)/visit-results')} />
+      <Action label="Đơn thuốc của tôi" onPress={() => go('/(account)/prescriptions')} />
+      <Action label="Tài khoản của tôi" onPress={() => go('/(account)/home')} />
     </ScrollView>
-    <View style={styles.nav}><Nav label="Trang chủ" onPress={() => go('/(home)/')} active /><Nav label="Lịch hẹn" onPress={() => go('/(account)/appointments')} /><Nav label="Bệnh án" onPress={() => go('/(account)/medical-records')} /><Nav label="Tài khoản" onPress={() => go('/(account)/home')} /></View>
   </SafeAreaView>;
 }
 function Section({ title, action, onPress }: { title: string; action?: string; onPress?: () => void }) { return <View style={styles.section}><Text style={styles.sectionTitle}>{title}</Text>{action && <Pressable onPress={onPress} accessibilityRole="button"><Text style={styles.sectionAction}>{action} →</Text></Pressable>}</View>; }
-function Action({ label, detail, onPress, primary = false }: { label: string; detail: string; onPress: () => void; primary?: boolean }) { return <Pressable onPress={onPress} style={[styles.card, primary && styles.actionPrimary]} accessibilityRole="button"><Text style={styles.cardTitle}>{label}</Text><Text style={styles.cardDetail}>{detail}</Text><Text style={styles.cardLink}>Mở  →</Text></Pressable>; }
+function Action({ label, detail, onPress, primary = false }: { label: string; detail?: string; onPress: () => void; primary?: boolean }) { return <Pressable onPress={onPress} style={[styles.card, primary && styles.actionPrimary]} accessibilityRole="button"><Text style={styles.cardTitle}>{label}</Text>{detail ? <Text style={styles.cardDetail}>{detail}</Text> : null}<Text style={styles.cardLink}>Mở  →</Text></Pressable>; }
 function State({ text, retry }: { text: string; retry?: () => void }) { return <View style={styles.state}><Text style={styles.stateText}>{text}</Text>{retry && <Pressable onPress={retry} accessibilityRole="button"><Text style={styles.sectionAction}>Thử lại →</Text></Pressable>}</View>; }
-function Nav({ label, onPress, active }: { label: string; onPress: () => void; active?: boolean }) { return <Pressable style={styles.navItem} onPress={onPress} accessibilityRole="button"><Text style={[styles.navText, active && styles.navActive]}>{label}</Text></Pressable>; }
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: bg }, center: { flex: 1, justifyContent: 'center', alignItems: 'center' }, content: { padding: 20, paddingBottom: 38, gap: 12 },
   topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }, brand: { fontSize: 22, fontWeight: '800', color: blue }, bell: { minHeight: 44, paddingHorizontal: 14, justifyContent: 'center', borderRadius: 22, backgroundColor: '#E8F0FF' }, bellText: { color: blue, fontWeight: '700' },

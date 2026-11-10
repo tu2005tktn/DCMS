@@ -100,8 +100,11 @@ public sealed record DossierListItem(Guid Id, string Code, int PatientId, int Br
 public sealed record DossierPage(IReadOnlyList<DossierListItem> Items, int Total, int Page, int PageSize);
 public sealed record TreatmentChange(TreatmentDossierDto Dossier, SystemMessage Notification);
 public sealed record TreatmentHistoryItem(int Version, DateTimeOffset CommittedAt, int ActorId, string SnapshotJson);
+public sealed record PerformedTreatmentItem(Guid Id, DateTimeOffset PerformedAt, string ServiceName,
+    string? Region, decimal Quantity, string Unit, string? Outcome);
 public sealed record OwnTreatmentSummaryItem(Guid DossierId, string Code, string State, DateOnly StartedOn,
-    string Diagnosis, int PlanVersion, IReadOnlyList<TreatmentItemDto> AgreedItems);
+    string Diagnosis, int PlanVersion, IReadOnlyList<TreatmentItemDto> AgreedItems,
+    IReadOnlyList<PerformedTreatmentItem> PerformedItems);
 
 public interface ITreatmentDossierService
 {
