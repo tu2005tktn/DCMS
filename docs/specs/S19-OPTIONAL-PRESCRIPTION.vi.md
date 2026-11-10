@@ -11,6 +11,13 @@ Ngày 02/11/2026. Theo yêu cầu tích hợp luồng kê đơn của Triển v�
 - **Thêm vào đơn/Lưu thay đổi** lưu từng dòng bằng API Triển. Không tự lưu khi chọn thuốc, mở khối hoặc hoàn tất khám. Bỏ phần nhập chỉ bỏ form chưa lưu, không xóa dòng đã kê. API hiện chưa có xóa dòng đơn; bản tích hợp không giả lập xóa.
 - Kê được khi Visit đang `InProgress`, bác sĩ có quyền và workspace cho `save` hoặc `complete` (kể cả sau xác nhận kết luận, trước khi kết thúc lượt). Visit chưa bắt đầu/đã kết thúc hoặc workspace chỉ đọc hiển thị đơn đã lưu, không mở form chỉnh sửa. Route đơn thuốc riêng dùng cùng component và quyền UI, lấy branch từ workspace khám thay vì phụ thuộc `finance.read`.
 
+### Mở kê đơn từ khám và điều trị
+
+- Bác sĩ có thể mở cùng màn hình kê đơn từ phần Tổng kết khám hoặc phiếu điều trị của bệnh nhân; mọi đơn vẫn gắn với một `Visit`, không tạo nguồn đơn thuốc thứ hai và không gắn trực tiếp với dossier/clinical activity.
+- Phiếu điều trị chỉ hiện liên kết kê đơn khi ngữ cảnh trả về một Visit `InProgress` của đúng bệnh nhân, chi nhánh và bác sĩ hiện tại. Nút mở `/visits/{visitId}/prescription`; nếu không có Visit phù hợp, hướng dẫn bắt đầu lượt khám thay vì tạo/fake Visit.
+- Màn hình riêng trình bày thông tin bệnh nhân (mã, họ tên, ngày sinh, giới tính), chẩn đoán từ dossier khi mở ở ngữ cảnh điều trị (nếu không thì lấy phiếu khám), ngày kê đơn và bác sĩ phụ trách phía trên danh sách thuốc/lời dặn. Thông tin bệnh nhân, chẩn đoán, ngày và bác sĩ là ngữ cảnh đọc; không cho sửa/nhập trùng với hồ sơ khám/điều trị. Giờ ký/verification trong bản in vẫn do API quyết định.
+- Việc hoàn tất một hạng mục điều trị không tự ký đơn, không đóng Visit và không lưu nội dung thuốc chưa gửi. Bác sĩ chủ động mở màn hình, rà soát/liệt kê thuốc, lưu từng dòng rồi hoàn tất đơn theo API hiện có. Dossier không có Visit đang mở thì không thể tạo đơn theo đặc tả hiện tại.
+
 ## Optional và an toàn bản nhập
 
 - Chưa mở đơn, không chọn thuốc, danh mục rỗng hoặc lỗi tải prescription **không** trở thành điều kiện validation của kết luận/hướng xử trí. Có thể hoàn tất khám và kết thúc lượt mà không có dòng thuốc nào; không ghi đơn rỗng, không tạo tồn kho/phí/phiếu thu.

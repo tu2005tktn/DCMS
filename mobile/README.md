@@ -1,6 +1,6 @@
 # DCMS Mobile
 
-Bộ khung React Native + Expo SDK 55 + TypeScript + Expo Router để team phát triển chung. S02 triển khai đăng ký Guest với họ tên, số di động Việt Nam, email và mật khẩu theo [đặc tả UC-33 hiện hành](../docs/specs/UC33-S02-MOBILE.md). Email được lưu nhưng chưa xác minh; số điện thoại vẫn dùng để đăng nhập. S01/S03/S07 vẫn là placeholder; đăng nhập trên Mobile, khôi phục và liên kết bệnh nhân chưa triển khai.
+Bộ khung React Native + Expo SDK 55 + TypeScript + Expo Router để team phát triển chung. S02 triển khai đăng ký Guest với họ tên, số di động Việt Nam, email và mật khẩu theo [đặc tả UC-33 hiện hành](../docs/specs/UC33-S02-MOBILE.md). Email được lưu nhưng chưa xác minh; số điện thoại vẫn dùng để đăng nhập. Mobile hiện có đăng nhập/khôi phục/liên kết hồ sơ, hồ sơ y tế và danh sách/chi tiết đơn thuốc đã hoàn tất cho tài khoản Public đã liên kết hồ sơ Verified. S01/S03/S07 không còn là placeholder ở các luồng này.
 
 ## Chạy trên Windows / PowerShell
 
@@ -49,7 +49,9 @@ Trong mỗi feature, dùng `screens` cho màn hình, `components` cho UI riêng,
 
 ## API và môi trường
 
-`EXPO_PUBLIC_API_URL` là cấu hình công khai được nhúng vào app, không chứa secret. Khi dùng điện thoại thật, thay `localhost` bằng địa chỉ LAN của máy chạy API; cần cấu hình API listen/firewall phù hợp. S02 gọi `POST /api/auth/register` thật để tạo Guest. S01 Mobile vẫn là placeholder; đăng nhập bằng số vừa đăng ký đã hoạt động qua `POST /api/auth/sign-in`. Recovery và liên kết bệnh nhân phải có contract riêng trước khi tích hợp.
+`EXPO_PUBLIC_API_URL` là cấu hình công khai được nhúng vào app, không chứa secret. Khi dùng điện thoại thật, thay `localhost` bằng địa chỉ LAN của máy chạy API; cần cấu hình API listen/firewall phù hợp. S02 gọi `POST /api/auth/register` thật để tạo Guest. Đăng nhập dùng `POST /api/auth/sign-in`; Recovery và liên kết bệnh nhân dùng các API tương ứng.
+
+Tài khoản Public có thể mở **Đơn thuốc của tôi** từ quick action trên trang chủ hoặc từ Hồ sơ y tế. Danh sách chỉ trả đơn đã hoàn tất thuộc hồ sơ liên kết Verified; chi tiết có bản xem in trong app và chia sẻ nội dung đơn qua native share sheet. Mobile chưa tạo/tải PDF; dùng chức năng in trên web nếu cần PDF.
 
 Session hiện luôn anonymous. Layout account chưa có guard vì chưa có luồng xác thực. `token-storage.ts` cung cấp SecureStore trên native nhưng chưa gắn vào phiên; bản web báo chưa hỗ trợ lưu token lâu dài. Không commit `.env`, token hoặc dữ liệu bệnh nhân.
 

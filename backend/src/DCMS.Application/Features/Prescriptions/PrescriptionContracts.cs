@@ -25,7 +25,7 @@ public sealed record PrescriptionLineDto(
     int BranchId,
     int PrescribedByDoctorId,
     string? DoctorName,
-    Guid MedicineId,
+    Guid? MedicineId,
     string MedicineCode,
     string MedicineName,
     string? ActiveIngredient,
@@ -82,7 +82,7 @@ public sealed record ApplyTemplateResult(PrescriptionDto Prescription, int Skipp
 public sealed record SavePrescriptionLine(
     Guid RequestKey,
     int ExpectedVersion,
-    Guid MedicineId,
+    Guid? MedicineId,
     int Quantity,
     string? Route,
     string? MorningDose,
@@ -91,7 +91,9 @@ public sealed record SavePrescriptionLine(
     string? EveningDose,
     string? MealTiming,
     int? Days,
-    string? Instructions);
+    string? Instructions,
+    string? CustomMedicineName = null,
+    string? CustomUnit = null);
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record SavePrescriptionAdvice(Guid RequestKey, int ExpectedVersion, string? GeneralAdvice);
@@ -246,11 +248,19 @@ public sealed record PatientPrescriptionDetailDto(PatientPrescriptionDto Prescri
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record SavePatientPrescription(Guid RequestKey, int ExpectedVersion, int BranchId, DateOnly PrescribedOn,
-    string Diagnosis, string? OtherDiagnosis, string? Advice, SavePatientPrescriptionItem[] Items);
+    string Diagnosis, string? OtherDiagnosis, string? Advice, SavePatientPrescriptionItem[] Items, int? PrescriberEmployeeId = null);
 public sealed record SavePatientPrescriptionItem(Guid MedicineId, int Quantity, string? Instructions);
-public sealed record PatientPrescriptionItemDto(Guid Id, Guid MedicineId, string MedicineCode, string MedicineName,
+public sealed record PrescriptionBranchOption(int Id, string Name, string? Address, string? Phone, string? Email);
+public sealed record PrescriptionDoctorOption(int EmployeeId, string Name, int BranchId);
+public sealed record PatientPrescriptionContext(int[] BranchIds, string PrescriberName, int PrescriberEmployeeId,
+    PrescriptionBranchOption[] Branches, PrescriptionDoctorOption[] Doctors);
+
+public sealed record PatientProfilePrescriptionItemDto(Guid Id, Guid MedicineId, string MedicineName, string MedicineCode,
     string? Strength, string? DosageForm, string Unit, int Quantity, string Instructions);
-public sealed record PatientPrescriptionContext(int[] BranchIds, string PrescriberName);
+public sealed record PatientProfilePrescriptionDto(Guid Id, int PatientId, int BranchId, string BranchName,
+    DateOnly PrescribedOn, string Diagnosis, string? OtherDiagnosis, string? Advice, string PrescriberName, int Version,
+    PatientProfilePrescriptionItemDto[] Items, int PrescriberEmployeeId, string? BranchAddress, string? BranchPhone,
+    string? BranchEmail, string PatientCode, string PatientName, DateOnly? PatientBirthDate, string? PatientGender);
 
 public interface IPrescriptionService
 {
@@ -273,4 +283,10 @@ public interface IPrescriptionService
 
     Task<PatientPrescriptionDto[]> PatientPrescriptionsAsync(int actor, CancellationToken ct);
     Task<PatientPrescriptionDetailDto> PatientPrescriptionAsync(int actor, Guid visitId, CancellationToken ct);
+    Task<PatientPrescriptionContext> PatientContextAsync(int actor, int patientId, CancellationToken ct);
+    Task<PatientProfilePrescriptionDto[]> PatientProfilePrescriptionsAsync(int actor, int patientId, CancellationToken ct);
+    Task<PatientProfilePrescriptionDto> PatientProfilePrescriptionAsync(int actor, int patientId, Guid id, CancellationToken ct);
+    Task<PatientProfilePrescriptionDto> SavePatientProfilePrescriptionAsync(int actor, int patientId, Guid? id, SavePatientPrescription command, CancellationToken ct);
+    Task<PatientProfilePrescriptionDto[]> OwnPatientPrescriptionsAsync(int actor, CancellationToken ct);
+    Task<PatientProfilePrescriptionDto> OwnPatientPrescriptionAsync(int actor, Guid id, CancellationToken ct);
 }

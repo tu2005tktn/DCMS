@@ -1,33 +1,39 @@
-import { Alert, Button, Card, Checkbox, DatePicker, Empty, Form, Input, InputNumber, Modal, Select, Space, Spin, Table, Typography, message } from 'antd';
-import dayjs from 'dayjs';
-import { useEffect, useState } from 'react';
+import { Alert, Button, Card, DatePicker, Empty, Form, Input, InputNumber, Modal, Select, Space, Spin, Table, Tooltip, message } from 'antd';
+import dayjs, { type Dayjs } from 'dayjs';
+import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../services/api';
 import { useAuth } from '../authentication/AuthContext';
-import { formatDate } from '../patient-links/types';
 import type { PatientDetail } from '../patients/types';
+import { formatDate, PatientGrid, ReadOnlySheet, type Item, type Prescription } from './PrescriptionSheet';
+import './patientPrescriptions.css';
 
-type Medicine = { id: string; code: string; name: string; strength?: string; baseUnit: string; packaging?: string; defaultInstructions?: string; internalStockTracked: boolean };
-type Line = { medicineId: string; quantity: number; instructions?: string; unit?: string; isExternalPurchase: boolean };
-type Prescription = { id: string; patientId: number; branchId: number; prescribedOn: string; diagnosis: string; otherDiagnosis?: string; advice?: string; requiresExternalPurchase: boolean; prescriberName: string; version: number; items: (Line & { id: string; medicineName: string; medicineCode: string; strength?: string; dosageForm?: string })[] };
-type FormValues = { branchId: number; prescribedOn: dayjs.Dayjs; diagnosis: string; otherDiagnosis?: string; advice?: string; requiresExternalPurchase: boolean; items: Line[] };
+// Contract: docs/specs/S23-PATIENT-PRESCRIPTIONS.vi.md — form "Đơn thuốc" kê từ hồ sơ bệnh nhân.
+type Medicine = { id: string; code: string; name: string; strength?: string | null; baseUnit: string; defaultInstructions?: string | null };
+type Branch = { id: number; name: string; address?: string | null; phone?: string | null; email?: string | null };
+type Doctor = { employeeId: number; name: string; branchId: number };
+type Context = { branchIds: number[]; prescriberName: string; prescriberEmployeeId: number; branches: Branch[]; doctors: Doctor[] };
+type DiagnosisOption = { id: string; name: string; code?: string | null };
+type Values = { branchId: number; diagnoses: string[]; otherDiagnosis?: string; items: Item[]; advice?: string; prescribedOn: Dayjs; prescriberEmployeeId: number };
+type Sheet = { mode: 'create' | 'edit' | 'view'; doc?: Prescription; initial?: Partial<Values> };
+
+const emptyItem = (): Item => ({ medicineId: '', quantity: 1, instructions: '' });
+const splitDiagnoses = (value?: string | null) => (value ?? '').split(';').map(x => x.trim()).filter(Boolean);
 
 export default function PatientPrescriptionsTab({ patient, active }: { patient: PatientDetail; active: boolean }) {
   const auth = useAuth();
   const canManage = auth.user?.permissions.includes('prescriptions.manage') ?? false;
-  const [context, setContext] = useState<{ branchIds: number[]; prescriberName: string }>();
-  const [form] = Form.useForm<FormValues>();
-  const branchId = Form.useWatch('branchId', form);
-  const requiresExternalPurchase = Form.useWatch('requiresExternalPurchase', form);
-  const watchedItems = Form.useWatch('items', form) ?? [];
+  const [notice, holder] = message.useMessage();
   const [rows, setRows] = useState<Prescription[]>([]);
+  const [context, setContext] = useState<Context>();
   const [medicines, setMedicines] = useState<Medicine[]>([]);
-  const [medicineSearch, setMedicineSearch] = useState('');
-  const [selected, setSelected] = useState<Prescription | null>(null);
-  const [open, setOpen] = useState(false);
+  const [diagnosisOptions, setDiagnosisOptions] = useState<DiagnosisOption[]>([]);
+  const [form] = Form.useForm<Values>();
+  const [sheet, setSheet] = useState<Sheet | null>(null);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>();
-  const [notice, holder] = message.useMessage();
+  const [sheetError, setSheetError] = useState<string>();
+  const branchId = Form.useWatch('branchId', form);
 
   async function refresh() {
     setLoading(true); setError(undefined);
@@ -36,102 +42,189 @@ export default function PatientPrescriptionsTab({ patient, active }: { patient: 
     finally { setLoading(false); }
   }
   useEffect(() => { if (active) void refresh(); }, [active, patient.id]);
-  useEffect(() => { if (active && canManage) void api<{ branchIds: number[]; prescriberName: string }>(`/api/prescriptions/patients/${patient.id}/context`).then(setContext).catch(e => setError((e as Error).message)); }, [active, canManage, patient.id]);
   useEffect(() => {
-    if (!open || !branchId) return;
-    let live = true;
-    const timer = window.setTimeout(() => {
-      const sources = requiresExternalPurchase ? ['Clinic', 'External'] : ['Clinic'];
-      void Promise.all(sources.map(source => api<Medicine[]>(`/api/prescriptions/medicine-options?${new URLSearchParams({ branchId: String(branchId), source, search: medicineSearch })}`)))
-        .then(groups => { if (live) setMedicines(current => {
-          const all = new Map(current.map(item => [item.id, item]));
-          groups.flat().forEach(item => all.set(item.id, item));
-          return [...all.values()];
-        }); }).catch(e => { if (live) setError((e as Error).message); });
-    }, 250);
-    return () => { live = false; window.clearTimeout(timer); };
-  }, [open, branchId, requiresExternalPurchase, medicineSearch]);
-  function show(doc: Prescription | null) {
-    setSelected(doc); setError(undefined); setMedicineSearch(''); setMedicines([]); setOpen(true);
-    form.setFieldsValue(doc ? {
-      branchId: doc.branchId, prescribedOn: dayjs(doc.prescribedOn), diagnosis: doc.diagnosis, otherDiagnosis: doc.otherDiagnosis,
-      advice: doc.advice, requiresExternalPurchase: doc.requiresExternalPurchase,
-      items: doc.items.map(i => ({ medicineId: i.medicineId, quantity: i.quantity, instructions: i.instructions, unit: i.unit, isExternalPurchase: i.isExternalPurchase })),
-    } : { branchId: context?.branchIds[0], prescribedOn: dayjs(), diagnosis: '', otherDiagnosis: '', advice: '', requiresExternalPurchase: false,
-      items: [{ medicineId: '', quantity: 1, instructions: '', isExternalPurchase: false }] });
+    if (!active || !canManage) return;
+    void api<Context>(`/api/prescriptions/patients/${patient.id}/context`).then(setContext).catch(e => setError((e as Error).message));
+    void api<DiagnosisOption[]>('/api/system-settings/reference-options?kind=diagnoses').then(setDiagnosisOptions).catch(() => setDiagnosisOptions([]));
+  }, [active, canManage, patient.id]);
+  useEffect(() => {
+    if (!branchId || !sheet || sheet.mode === 'view') return;
+    let alive = true;
+    api<Medicine[]>(`/api/prescriptions/medicine-options?branchId=${branchId}`)
+      .then(value => { if (alive) setMedicines(value); })
+      .catch(e => { if (alive) setSheetError((e as Error).message); });
+    return () => { alive = false; };
+  }, [branchId, sheet]);
+
+  const branch = useMemo(() => context?.branches.find(b => b.id === branchId), [context, branchId]);
+  const doctors = useMemo(() => context?.doctors.filter(d => d.branchId === branchId) ?? [], [context, branchId]);
+  const medicineOptions = useMemo(() => {
+    const known = medicines.map(m => ({ value: m.id, label: `${m.name}${m.strength ? ` · ${m.strength}` : ''}` }));
+    // Keep labels for medicines of an edited prescription that are no longer in the active catalog.
+    const legacy = (sheet?.doc?.items ?? []).filter(x => !medicines.some(m => m.id === x.medicineId))
+      .map(x => ({ value: x.medicineId, label: `${x.medicineName ?? x.medicineCode}${x.strength ? ` · ${x.strength}` : ''}` }));
+    return [...known, ...legacy];
+  }, [medicines, sheet]);
+
+  function open(mode: Sheet['mode'], doc?: Prescription) {
+    setSheetError(mode !== 'view' && !context?.branches.length ? 'Bác sĩ chưa được phân công chi nhánh để kê đơn.' : undefined);
+    if (mode === 'view') { setSheet({ mode, doc }); return; }
+    setSheet({ mode, doc, initial: doc ? {
+      branchId: doc.branchId, diagnoses: splitDiagnoses(doc.diagnosis), otherDiagnosis: doc.otherDiagnosis ?? '', advice: doc.advice ?? '',
+      prescribedOn: dayjs(doc.prescribedOn), prescriberEmployeeId: doc.prescriberEmployeeId, items: doc.items.map(x => ({ ...x })),
+    } : {
+      branchId: context?.branches[0]?.id, diagnoses: [], otherDiagnosis: '', advice: '', prescribedOn: dayjs(),
+      prescriberEmployeeId: context?.prescriberEmployeeId, items: [emptyItem()],
+    } });
   }
-  async function save(values: FormValues) {
-    setBusy(true); setError(undefined);
+  function close() { if (!busy) { setSheet(null); setSheetError(undefined); } }
+
+  function pickBranch(id: number) {
+    const current = form.getFieldValue('prescriberEmployeeId') as number | undefined;
+    const allowed = context?.doctors.filter(d => d.branchId === id) ?? [];
+    if (!allowed.some(d => d.employeeId === current))
+      form.setFieldValue('prescriberEmployeeId', allowed.find(d => d.employeeId === context?.prescriberEmployeeId)?.employeeId ?? allowed[0]?.employeeId);
+  }
+
+  async function save(values: Values) {
+    const editing = sheet?.mode === 'edit' ? sheet.doc : undefined;
+    setBusy(true); setSheetError(undefined);
     try {
-      if (!values.branchId) throw new Error('Tài khoản chưa được phân công bác sĩ kê đơn tại chi nhánh.');
-      if (values.requiresExternalPurchase !== values.items.some(i => i.isExternalPurchase))
-        throw new Error('Hãy thêm ít nhất một thuốc mua ngoài khi chọn yêu cầu mua thêm thuốc ngoài.');
-      await api(`/api/prescriptions/patients/${patient.id}${selected ? `/${selected.id}` : ''}`, {
-        method: selected ? 'PUT' : 'POST', body: JSON.stringify({ requestKey: crypto.randomUUID(), expectedVersion: selected?.version ?? 0,
-          branchId: values.branchId, prescribedOn: values.prescribedOn.format('YYYY-MM-DD'),
-          diagnosis: values.diagnosis, otherDiagnosis: values.otherDiagnosis, advice: values.advice,
-          requiresExternalPurchase: values.requiresExternalPurchase,
-          items: values.items.map(x => ({ medicineId: x.medicineId, quantity: x.quantity, instructions: x.instructions, isExternalPurchase: x.isExternalPurchase })) }),
+      await api(`/api/prescriptions/patients/${patient.id}${editing ? `/${editing.id}` : ''}`, {
+        method: editing ? 'PUT' : 'POST',
+        body: JSON.stringify({
+          requestKey: crypto.randomUUID(), expectedVersion: editing?.version ?? 0, branchId: values.branchId,
+          prescribedOn: values.prescribedOn.format('YYYY-MM-DD'), diagnosis: (values.diagnoses ?? []).map(x => x.trim()).filter(Boolean).join('; '),
+          otherDiagnosis: values.otherDiagnosis?.trim() || null, advice: values.advice?.trim() || null,
+          prescriberEmployeeId: values.prescriberEmployeeId,
+          items: values.items.map(x => ({ medicineId: x.medicineId, quantity: x.quantity, instructions: x.instructions ?? '' })),
+        }),
       });
-      setOpen(false); void notice.success('Đã lưu đơn thuốc'); await refresh();
-    } catch (e) { setError((e as Error).message); }
+      setSheet(null); void notice.success('Đã lưu đơn thuốc'); await refresh();
+    } catch (e) { setSheetError((e as Error).message); }
     finally { setBusy(false); }
   }
-  return <Card title="Đơn thuốc" extra={canManage && <Button type="primary" onClick={() => show(null)}>+ Kê đơn thuốc</Button>}>
+
+  const doc = sheet?.doc;
+  const header = sheet?.mode === 'view' && doc
+    ? { name: doc.branchName, phone: doc.branchPhone, email: doc.branchEmail }
+    : { name: branch?.name ?? '', phone: branch?.phone, email: branch?.email };
+  const person = sheet?.mode === 'view' && doc
+    ? { name: doc.patientName, code: doc.patientCode, birthDate: doc.patientBirthDate, gender: doc.patientGender }
+    : { name: patient.fullName, code: patient.patientCode, birthDate: patient.birthDate, gender: patient.gender };
+
+  return <Card title="Đơn thuốc" extra={canManage ? <Button type="primary" disabled={!context} onClick={() => open('create')}>+ Kê đơn thuốc</Button> : undefined}>
     {holder}
-    {error && !open && <Alert type="error" showIcon message={error} style={{ marginBottom: 16 }} />}
-    {loading ? <Spin /> : rows.length ? <Table rowKey="id" dataSource={rows} pagination={{ pageSize: 10 }} columns={[
-      { title: 'Ngày', dataIndex: 'prescribedOn', render: (v: string) => formatDate(v) },
-      { title: 'Chẩn đoán', dataIndex: 'diagnosis' },
-      { title: 'Mã đơn thuốc', dataIndex: 'id', render: (v: string) => v.slice(0, 8).toUpperCase() },
-      { title: 'Bác sĩ', dataIndex: 'prescriberName' },
-      { title: '', render: (_, row) => <Button onClick={() => show(row)}>Xem đơn</Button> },
-    ]} /> : <Empty description="Chưa có đơn thuốc trong hồ sơ." />}
-    <Modal open={open} width={960} title="ĐƠN THUỐC" onCancel={() => setOpen(false)} onOk={() => form.submit()}
-      okText="Lưu lại" okButtonProps={{ disabled: !canManage }} confirmLoading={busy} destroyOnClose>
-      {error && <Alert type="error" showIcon message={error} style={{ marginBottom: 16 }} />}
-      <Typography.Title level={5}>KHÁCH HÀNG</Typography.Title>
-      <Space wrap size="large"><span>Họ và tên: <b>{patient.fullName}</b></span><span>MSKH: <b>{patient.patientCode}</b></span>
-        <span>Ngày sinh: <b>{patient.birthDate ? formatDate(patient.birthDate) : '—'}</b></span><span>Giới tính: <b>{patient.gender ?? '—'}</b></span></Space>
-      <Form form={form} layout="vertical" onFinish={values => void save(values)} style={{ marginTop: 24 }} disabled={!canManage}>
-        <Form.Item name="branchId" label="Chi nhánh" rules={[{ required: true, message: 'Chọn chi nhánh' }]}><Select options={(context?.branchIds ?? (selected ? [selected.branchId] : [])).map(id => ({ value: id, label: `Chi nhánh ${id}` }))} /></Form.Item>
-        <Form.Item name="diagnosis" label="Chẩn đoán" rules={[{ required: true, whitespace: true, message: 'Nhập chẩn đoán' }]}><Input maxLength={1000} /></Form.Item>
-        <Form.Item name="otherDiagnosis" label="Chẩn đoán khác"><Input maxLength={1000} /></Form.Item>
-        <Form.Item name="requiresExternalPurchase" valuePropName="checked" style={{ marginBottom: 8 }}>
-          <Checkbox onChange={e => { if (!e.target.checked) {
-            const clinicItems = ((form.getFieldValue('items') as Line[] | undefined) ?? []).filter(i => !i.isExternalPurchase);
-            form.setFieldValue('items', clinicItems.length ? clinicItems : [{ medicineId: '', quantity: 1, instructions: '', isExternalPurchase: false }]);
-          } }}>Yêu cầu mua thêm thuốc ngoài</Checkbox>
-        </Form.Item>
-        <Typography.Text type="secondary">Không chọn: đơn chỉ gồm thuốc phòng khám. Chọn: có thể kê thêm thuốc bệnh nhân mua ngoài.</Typography.Text>
-        <Typography.Title level={5}>CHỈ ĐỊNH</Typography.Title>
-        <Form.List name="items">{(fields, { add, remove }) => <>
-          {fields.map((field, index) => <Card key={field.key} size="small" title={watchedItems[index]?.isExternalPurchase ? 'Thuốc mua ngoài' : 'Thuốc phòng khám'} style={{ marginBottom: 8 }}>
-            <Space wrap align="start">
-              <Form.Item name={[field.name, 'isExternalPurchase']} label="Nguồn thuốc" initialValue={false}>
-                <Select style={{ width: 175 }} disabled={!requiresExternalPurchase} options={[{ value: false, label: 'Phòng khám' }, { value: true, label: 'Mua ngoài' }]}
-                  onChange={() => { form.setFieldValue(['items', index, 'medicineId'], undefined); form.setFieldValue(['items', index, 'unit'], undefined); }} />
+    {error && <Alert type="error" showIcon message={error} style={{ marginBottom: 16 }} />}
+    {loading ? <Spin /> : rows.length ? <Table rowKey="id" dataSource={rows} pagination={{ pageSize: 8 }} columns={[
+      { title: 'Ngày kê', dataIndex: 'prescribedOn', width: 110, render: (v: string) => formatDate(v) },
+      { title: 'Chẩn đoán', render: (_, row: Prescription) => [row.diagnosis, row.otherDiagnosis].filter(Boolean).join(' · ') || '—' },
+      { title: 'Thuốc', render: (_, row: Prescription) => row.items.map(x => x.medicineName).join(', ') },
+      { title: 'Bác sĩ kê đơn', dataIndex: 'prescriberName' },
+      { title: '', width: 150, render: (_, row: Prescription) => <Space>
+        <Button size="small" onClick={() => open('view', row)}>Xem</Button>
+        {canManage && <Button size="small" disabled={!context} onClick={() => open('edit', row)}>Sửa</Button>}
+      </Space> },
+    ]} /> : <Empty description={canManage ? 'Chưa có đơn thuốc. Bấm Kê đơn thuốc để bắt đầu.' : 'Chưa có đơn thuốc.'} />}
+
+    <Modal open={!!sheet} onCancel={close} width={780} destroyOnClose className="rx-modal" maskClosable={false}
+      title={null} footer={sheet?.mode === 'view'
+        ? <Button onClick={close}>Đóng</Button>
+        : <Space><Button disabled={busy} onClick={close}>Hủy</Button><Button type="primary" loading={busy} onClick={() => form.submit()}>Lưu đơn thuốc</Button></Space>}>
+      {sheet && (() => {
+        const multiBranch = sheet.mode !== 'view' && (context?.branches.length ?? 0) > 1;
+        const head = <header className="rx-head">
+          <div>
+            <h2 className="rx-title">ĐƠN THUỐC</h2>
+            <Tooltip title="Chưa tích hợp — hệ thống không gửi đơn ra ngoài.">
+              <span><Button size="small" className="rx-national" disabled>GỬI LÊN DONTHUOCQUOCGIA.VN</Button></span>
+            </Tooltip>
+          </div>
+          <div className="rx-clinic">
+            {multiBranch
+              ? <Form.Item name="branchId" noStyle>
+                <Select size="small" aria-label="Chi nhánh kê đơn" style={{ minWidth: 220 }} onChange={pickBranch}
+                  options={context!.branches.map(b => ({ value: b.id, label: b.name }))} />
               </Form.Item>
-              <Form.Item name={[field.name, 'medicineId']} label="Tên thuốc" rules={[{ required: true, message: 'Chọn thuốc' }]} style={{ minWidth: 360 }}>
-                <Select showSearch filterOption={false} onSearch={value => setMedicineSearch(value.slice(0, 100))} placeholder="Tìm tên hoặc mã thuốc" options={[...medicines.filter(m => m.internalStockTracked !== !!watchedItems[index]?.isExternalPurchase).map(m => ({ value: m.id, label: `${m.name}${m.strength ? ` · ${m.strength}` : ''}` })), ...(selected?.items ?? []).filter(i => i.isExternalPurchase === !!watchedItems[index]?.isExternalPurchase && !medicines.some(m => m.id === i.medicineId)).map(i => ({ value: i.medicineId, label: `${i.medicineName}${i.strength ? ` · ${i.strength}` : ''}` }))]}
-                  onChange={id => { const m = medicines.find(x => x.id === id); form.setFieldValue(['items', index, 'unit'], m?.baseUnit); form.setFieldValue(['items', index, 'instructions'], m?.defaultInstructions ?? ''); }} />
-              </Form.Item>
-              <Form.Item name={[field.name, 'unit']} label="Đơn vị"><Input readOnly style={{ width: 120 }} /></Form.Item>
-              <Form.Item name={[field.name, 'quantity']} label="Số lượng" rules={[{ required: true, message: 'Nhập số lượng' }]}><InputNumber min={1} max={10000} precision={0} /></Form.Item>
-              {canManage && <Button danger onClick={() => remove(field.name)} disabled={fields.length === 1}>Xóa</Button>}
-            </Space>
-            <Form.Item name={[field.name, 'instructions']} label="Hướng dẫn sử dụng" style={{ marginBottom: 0 }}><Input maxLength={1000} /></Form.Item>
-          </Card>)}
-          {canManage && <Space wrap><Button onClick={() => add({ medicineId: '', quantity: 1, instructions: '', isExternalPurchase: false })}>+ Thuốc phòng khám</Button>
-            {requiresExternalPurchase && <Button onClick={() => add({ medicineId: '', quantity: 1, instructions: '', isExternalPurchase: true })}>+ Thuốc mua ngoài</Button>}</Space>}
-        </>}</Form.List>
-        <Typography.Title level={5} style={{ marginTop: 24 }}>GHI CHÚ / LỜI DẶN</Typography.Title>
-        <Form.Item name="advice"><Input.TextArea rows={3} maxLength={4000} /></Form.Item>
-        <Typography.Title level={5}>NGÀY & BÁC SĨ KÊ ĐƠN</Typography.Title>
-        <Space wrap><Form.Item name="prescribedOn" label="Ngày" rules={[{ required: true }]}><DatePicker format="DD/MM/YYYY" /></Form.Item>
-          <span>Bác sĩ: <b>{selected?.prescriberName ?? context?.prescriberName ?? auth.user?.fullName ?? 'Tài khoản hiện tại'}</b></span></Space>
-      </Form>
-      <Typography.Text type="secondary">Chưa kết nối cổng đơn thuốc quốc gia.</Typography.Text>
+              : <strong>{header.name}</strong>}
+            {(header.phone || header.email) && <div className="rx-contact">
+              {header.phone && <span>☎ {header.phone}</span>}{header.email && <span>✉ {header.email}</span>}
+            </div>}
+          </div>
+        </header>;
+        const alert = sheetError && <Alert type="error" showIcon message={sheetError} style={{ margin: '12px 0' }} />;
+        if (sheet.mode === 'view' && doc) return <div className="rx-sheet">{head}{alert}<ReadOnlySheet doc={doc} person={person} /></div>;
+        return <Form form={form} key={doc?.id ?? 'new'} initialValues={sheet.initial} layout="horizontal" requiredMark={false}
+          onFinish={values => void save(values)} className="rx-sheet rx-form">
+          {head}{alert}
+          {!multiBranch && <Form.Item name="branchId" hidden><InputNumber /></Form.Item>}
+            <section className="rx-section">
+              <h3>BỆNH NHÂN</h3>
+              <PatientGrid person={person} />
+              <div className="rx-row"><label htmlFor="rx-diagnoses">Chẩn đoán</label>
+                <Form.Item name="diagnoses" noStyle>
+                  <Select id="rx-diagnoses" mode="tags" allowClear placeholder="Chọn hoặc nhập chẩn đoán" tokenSeparators={[';']} maxTagTextLength={60}
+                    options={diagnosisOptions.map(o => ({ value: o.name, label: o.code ? `${o.name} (${o.code})` : o.name }))} />
+                </Form.Item></div>
+              <div className="rx-row"><label htmlFor="rx-other">Chẩn đoán khác</label>
+                <Form.Item name="otherDiagnosis" noStyle rules={[{ max: 1000 }]}><Input id="rx-other" maxLength={1000} /></Form.Item></div>
+            </section>
+
+            <section className="rx-section">
+              <h3>CHỈ ĐỊNH</h3>
+              <Form.List name="items">{(fields, { add, remove }) => <div className="rx-lines">
+                {fields.map((field, index) => <div key={field.key} className="rx-line">
+                  <span className="rx-index">{index + 1}</span>
+                  <div className="rx-line-body">
+                    <div className="rx-line-top">
+                      <Form.Item name={[field.name, 'medicineId']} rules={[{ required: true, message: 'Chọn thuốc' }]} className="rx-medicine">
+                        <Select showSearch optionFilterProp="label" placeholder="Tên thuốc" aria-label={`Tên thuốc dòng ${index + 1}`} options={medicineOptions}
+                          onChange={id => {
+                            const m = medicines.find(x => x.id === id);
+                            form.setFieldValue(['items', field.name, 'unit'], m?.baseUnit);
+                            if (!form.getFieldValue(['items', field.name, 'instructions'])) form.setFieldValue(['items', field.name, 'instructions'], m?.defaultInstructions ?? '');
+                          }} />
+                      </Form.Item>
+                      <Form.Item name={[field.name, 'quantity']} rules={[{ required: true, message: 'Nhập số lượng' }, { type: 'integer', min: 1, max: 10000, message: '1–10.000' }]} className="rx-qty">
+                        <InputNumber min={1} max={10000} precision={0} placeholder="SL" aria-label={`Số lượng dòng ${index + 1}`} style={{ width: '100%' }} />
+                      </Form.Item>
+                      <Form.Item noStyle shouldUpdate>{() => <span className="rx-unit">{form.getFieldValue(['items', field.name, 'unit']) ?? ''}</span>}</Form.Item>
+                    </div>
+                    <Form.Item name={[field.name, 'instructions']} rules={[{ max: 1000 }]} className="rx-usage">
+                      <Input maxLength={1000} placeholder="Hướng dẫn sử dụng" aria-label={`Hướng dẫn sử dụng dòng ${index + 1}`} />
+                    </Form.Item>
+                  </div>
+                  <Button type="text" danger aria-label={`Xóa dòng ${index + 1}`} disabled={fields.length <= 1} onClick={() => remove(field.name)}>✕</Button>
+                </div>)}
+                <div className="rx-add">
+                  <Button className="rx-add-btn" disabled={fields.length >= 30} onClick={() => add(emptyItem())}>+ THÊM</Button>
+                </div>
+              </div>}</Form.List>
+            </section>
+
+            <section className="rx-section">
+              <h3>GHI CHÚ/LỜI DẶN</h3>
+              <Form.Item name="advice" noStyle rules={[{ max: 4000 }]}><Input.TextArea rows={3} maxLength={4000} aria-label="Ghi chú, lời dặn" /></Form.Item>
+            </section>
+
+            <section className="rx-section">
+              <h3>NGÀY &amp; BÁC SĨ KÊ ĐƠN</h3>
+              <div className="rx-grid">
+                <div className="rx-row"><label>Ngày</label>
+                  <Form.Item name="prescribedOn" noStyle rules={[{ required: true }]}>
+                    <DatePicker format="DD/MM/YYYY" allowClear={false} aria-label="Ngày kê đơn" style={{ width: '100%' }} disabledDate={d => d.isAfter(dayjs(), 'day')} />
+                  </Form.Item></div>
+                <div className="rx-row"><label>Bác sĩ</label>
+                  <Form.Item name="prescriberEmployeeId" noStyle rules={[{ required: true }]}>
+                    <Select aria-label="Bác sĩ kê đơn" style={{ width: '100%' }} options={[
+                      ...doctors.map(d => ({ value: d.employeeId, label: d.name })),
+                      ...(doc && !doctors.some(d => d.employeeId === doc.prescriberEmployeeId) ? [{ value: doc.prescriberEmployeeId, label: doc.prescriberName }] : []),
+                    ]} />
+                  </Form.Item></div>
+              </div>
+            </section>
+        </Form>;
+      })()}
     </Modal>
   </Card>;
 }

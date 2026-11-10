@@ -24,7 +24,7 @@ export type PrescriptionLine = {
   branchId: number;
   prescribedByDoctorId: number;
   doctorName?: string;
-  medicineId: string;
+  medicineId: string | null;
   medicineCode: string;
   medicineName: string;
   activeIngredient?: string;

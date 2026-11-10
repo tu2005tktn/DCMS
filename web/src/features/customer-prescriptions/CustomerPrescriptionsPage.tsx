@@ -1,86 +1,75 @@
-import { Alert, Button, Card, Empty, Pagination, Spin, Tag, Typography } from 'antd';
+import { Alert, Button, Card, Empty, Space, Spin, Typography } from 'antd';
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ApiError } from '../../services/api';
 import { customerApi } from '../../services/customerApi';
 import { useCustomerAuth } from '../customer-auth/CustomerAuthContext';
+import { formatDate, PrescriptionSheetView, type Prescription } from '../prescriptions/PrescriptionSheet';
 import './customerPrescriptions.css';
 
-type Summary = { id: string; prescribedOn: string; branchName: string; diagnosis: string; prescriberName: string; requiresExternalPurchase: boolean };
-type Page = { items: Summary[]; total: number; page: number; pageSize: number };
-type Item = { medicineName: string; strength: string | null; dosageForm: string | null; unit: string; quantity: number; instructions: string; isExternalPurchase: boolean };
-type Detail = Summary & { otherDiagnosis: string | null; advice: string | null; items: Item[] };
+// docs/specs/S23-PATIENT-PRESCRIPTIONS.vi.md — "Cổng bệnh nhân web": chỉ đọc đơn của hồ sơ đã liên kết VERIFIED.
+const notice = 'Đơn thuốc mua ngoài. Phòng khám không bán thuốc tại chỗ.';
 
-function formatDate(value: string) { const [y, m, d] = value.split('-'); return `${d}/${m}/${y}`; }
-function Failure({ error, retry }: { error: ApiError | Error; retry: () => void }) {
-  if (error instanceof ApiError && error.status === 403) return <Card><Empty description="Bạn cần xác minh liên kết hồ sơ bệnh nhân để xem đơn thuốc." />
-    <Link to="/customer/patient-link">Liên kết hồ sơ của tôi</Link></Card>;
-  return <Alert type="error" showIcon message={error.message} action={<Button onClick={retry}>Thử lại</Button>} />;
-}
-
-export function CustomerPrescriptionsPage() {
+function useCustomerLoad<T>(path: string | null) {
   const { state, expire } = useCustomerAuth();
   const token = state.status === 'authenticated' ? state.accessToken : null;
-  const [page, setPage] = useState(1);
-  const [data, setData] = useState<Page | null>(null);
-  const [error, setError] = useState<ApiError | Error | null>(null);
+  const [data, setData] = useState<T | null>(null);
   const [busy, setBusy] = useState(true);
+  const [error, setError] = useState<ApiError | Error | null>(null);
   const [revision, setRevision] = useState(0);
   useEffect(() => {
-    if (!token) return;
-    const controller = new AbortController(); let active = true;
+    if (!token || !path) return;
+    let active = true;
+    const controller = new AbortController();
     setBusy(true); setError(null); setData(null);
-    void customerApi<Page>(`/api/me/prescriptions?page=${page}`, { signal: controller.signal }, token)
+    void customerApi<T>(path, { signal: controller.signal }, token)
       .then(value => { if (active) setData(value); })
-      .catch(failure => { if (!active) return; if (failure instanceof ApiError && failure.status === 401) expire(); else setError(failure); })
-      .finally(() => { if (active) setBusy(false); });
+      .catch(failure => {
+        if (!active) return;
+        if (failure instanceof ApiError && failure.status === 401) expire();
+        else setError(failure as Error);
+      }).finally(() => { if (active) setBusy(false); });
     return () => { active = false; controller.abort(); };
-  }, [token, page, revision, expire]);
-  return <section className="customer-prescriptions"><div className="customer-page-heading"><span className="customer-kicker">Hồ sơ điều trị</span>
-    <Typography.Title level={2}>Đơn thuốc của tôi</Typography.Title><Typography.Paragraph>Đơn do nha sĩ kê cho hồ sơ đã xác minh của bạn.</Typography.Paragraph></div>
-    <Button onClick={() => setRevision(x => x + 1)} loading={busy}>Tải lại</Button>
-    {error ? <Failure error={error} retry={() => setRevision(x => x + 1)} /> : busy ? <Spin tip="Đang tải đơn thuốc"><div className="customer-loading" /></Spin>
-      : !data?.items.length ? <Empty description="Bạn chưa có đơn thuốc nào." /> : <>
-        <div className="customer-prescription-grid">{data.items.map(item => <Card key={item.id} className="customer-prescription-card">
-          <Typography.Text type="secondary">{formatDate(item.prescribedOn)} · {item.branchName}</Typography.Text>
-          <h3>{item.diagnosis}</h3><p>Nha sĩ: {item.prescriberName}</p>
-          {item.requiresExternalPurchase && <Tag color="blue">Có thuốc mua ngoài</Tag>}
-          <p><Link to={`/customer/prescriptions/${item.id}`}>Xem đơn thuốc</Link></p>
-        </Card>)}</div>
-        <Pagination current={page} total={data.total} pageSize={20} showSizeChanger={false} onChange={setPage} />
-      </>}
+  }, [token, path, revision, expire]);
+  return { data, busy, error, reload: () => setRevision(value => value + 1) };
+}
+
+export default function CustomerPrescriptionsPage() {
+  const { data, busy, error, reload } = useCustomerLoad<Prescription[]>('/api/patients/me/prescriptions');
+  return <section className="customer-prescriptions-page">
+    <div className="customer-page-heading"><span className="customer-kicker">Sức khỏe</span>
+      <Typography.Title level={2}>Đơn thuốc của tôi</Typography.Title>
+      <Typography.Paragraph>Xem thuốc, liều dùng và lời dặn bác sĩ đã kê cho hồ sơ bạn đã liên kết.</Typography.Paragraph></div>
+    <Alert type="info" showIcon message={notice} style={{ marginBottom: 16 }} />
+    {busy ? <div className="customer-rx-loading" role="status"><Spin /><span>Đang tải đơn thuốc…</span></div>
+      : error ? <Alert type="error" showIcon message={error.message} action={<Button onClick={reload}>Thử lại</Button>} />
+        : data?.length ? <div className="customer-rx-list">
+          {data.map(item => <Link key={item.id} to={`/customer/prescriptions/${item.id}`} className="customer-rx-card"
+            aria-label={`Đơn thuốc ngày ${formatDate(item.prescribedOn)} tại ${item.branchName}`}>
+            <div className="customer-rx-card-head"><strong>{formatDate(item.prescribedOn)}</strong><span>{item.items.length} thuốc</span></div>
+            <div className="customer-rx-card-clinic">{item.branchName}</div>
+            <div className="customer-rx-card-meta">Bác sĩ {item.prescriberName}</div>
+            {item.diagnosis && <div className="customer-rx-card-meta">Chẩn đoán: {item.diagnosis}</div>}
+            <div className="customer-rx-card-drugs">{item.items.map(x => x.medicineName).join(', ')}</div>
+            <span className="customer-text-action">Xem đơn thuốc <span aria-hidden="true">→</span></span>
+          </Link>)}
+        </div>
+          : <Empty description={<span>Chưa có đơn thuốc nào. Đơn chỉ hiển thị khi tài khoản đã <Link to="/customer/patient-link">liên kết hồ sơ</Link> được xác minh.</span>} />}
   </section>;
 }
 
 export function CustomerPrescriptionDetailPage() {
-  const { id } = useParams(); const { state, expire } = useCustomerAuth();
-  const token = state.status === 'authenticated' ? state.accessToken : null;
-  const [data, setData] = useState<Detail | null>(null);
-  const [error, setError] = useState<ApiError | Error | null>(null);
-  const [busy, setBusy] = useState(true);
-  const [revision, setRevision] = useState(0);
-  useEffect(() => {
-    if (!token || !id) return;
-    const controller = new AbortController(); let active = true;
-    setBusy(true); setError(null); setData(null);
-    void customerApi<Detail>(`/api/me/prescriptions/${encodeURIComponent(id)}`, { signal: controller.signal }, token)
-      .then(value => { if (active) setData(value); })
-      .catch(failure => { if (!active) return; if (failure instanceof ApiError && failure.status === 401) expire(); else setError(failure); })
-      .finally(() => { if (active) setBusy(false); });
-    return () => { active = false; controller.abort(); };
-  }, [token, id, revision, expire]);
-  return <section className="customer-prescriptions"><Link to="/customer/prescriptions">← Tất cả đơn thuốc</Link>
-    <Typography.Title level={2}>Chi tiết đơn thuốc</Typography.Title>
-    {error ? <Failure error={error} retry={() => setRevision(x => x + 1)} /> : busy ? <Spin /> : data && <Card>
-      <p>Ngày kê: {formatDate(data.prescribedOn)} · {data.branchName}</p><p>Nha sĩ: {data.prescriberName}</p>
-      <p><strong>Chẩn đoán:</strong> {data.diagnosis}</p>{data.otherDiagnosis && <p><strong>Chẩn đoán khác:</strong> {data.otherDiagnosis}</p>}
-      <Typography.Title level={4}>Thuốc được kê</Typography.Title>
-      <div className="customer-prescription-items">{data.items.map((item, index) => <div key={index} className="customer-prescription-item">
-        <strong>{index + 1}. {item.medicineName}</strong> {item.isExternalPurchase ? <Tag color="blue">Mua ngoài</Tag> : <Tag color="green">Thuốc phòng khám</Tag>}
-        <p>{[item.strength, item.dosageForm].filter(Boolean).join(' · ')} · Số lượng: {item.quantity} {item.unit}</p>
-        <p>Hướng dẫn: {item.instructions || 'Theo hướng dẫn của nha sĩ'}</p>
-      </div>)}</div>
-      {data.advice && <p><strong>Lời dặn:</strong> {data.advice}</p>}
-    </Card>}
+  const { id } = useParams<{ id: string }>();
+  const { data, busy, error, reload } = useCustomerLoad<Prescription>(id ? `/api/patients/me/prescriptions/${encodeURIComponent(id)}` : null);
+  const missing = error instanceof ApiError && (error.status === 404 || error.status === 403);
+  return <section className="customer-prescriptions-page">
+    <Space style={{ marginBottom: 16 }}><Link to="/customer/prescriptions">← Đơn thuốc của tôi</Link></Space>
+    {busy ? <div className="customer-rx-loading" role="status"><Spin /><span>Đang tải đơn thuốc…</span></div>
+      : missing ? <Alert type="error" showIcon message="Không tìm thấy đơn thuốc trong hồ sơ đã liên kết của bạn." />
+        : error ? <Alert type="error" showIcon message={error.message} action={<Button onClick={reload}>Thử lại</Button>} />
+          : data && <>
+            <Card className="customer-rx-sheet-card"><PrescriptionSheetView doc={data} /></Card>
+            <Alert type="info" showIcon message={notice} style={{ marginTop: 16 }} />
+          </>}
   </section>;
 }

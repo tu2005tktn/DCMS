@@ -1,6 +1,6 @@
 import { usePermissions } from '../authentication/usePermissions';
 import { Alert, Button, Dropdown, Input, Modal, Pagination, Skeleton, Tooltip } from 'antd';
-import { ExperimentOutlined, ToolOutlined } from '@ant-design/icons';
+import { ExperimentOutlined, MedicineBoxOutlined, ToolOutlined } from '@ant-design/icons';
 import { useEffect, useRef, useState } from 'react';
 import PatientImageGallery from '../clinical-documents/PatientImageGallery';
 import { Link } from 'react-router-dom';
@@ -284,6 +284,14 @@ export default function TreatmentSheet({ patientId, dossierId, dossierVersion, o
         {rowEditor('actual')}
       </tbody></table></div><Button className="treatment-sheet-create" aria-label="Thêm quá trình điều trị" disabled={!has('treatment.actuals.create') || !canWrite || !!editor || busy} onClick={() => setEditor({kind:'actual'})}>+ Thêm việc đã làm</Button>
       {(activities?.total ?? 0) > 20 && <Pagination current={page} total={activities?.total} pageSize={20} onChange={setPage} />}
+      {has('prescriptions.read') && <div className="treatment-prescription-entry">
+        <div><h3>Đơn thuốc sau điều trị</h3><p>Mở đơn thuốc theo lượt khám đang thực hiện của bệnh nhân.</p></div>
+        {context.visits.length ? <div className="treatment-prescription-links">{context.visits.map(visit =>
+          <Link key={visit.id} className="ant-btn ant-btn-primary" to={`/visits/${visit.id}/prescription?sourceDossier=${encodeURIComponent(dossierId)}`}>
+            <MedicineBoxOutlined /> Kê đơn · {date(visit.arrivalAt)}
+          </Link>)}</div> : <Alert type="info" showIcon message="Cần có lượt khám đang thực hiện để kê đơn"
+            description="Hãy tiếp nhận và bắt đầu lượt khám của bệnh nhân; hệ thống sẽ gắn đơn thuốc đúng lượt, không tạo lượt khám giả." />}
+      </div>}
       <div className="treatment-sheet-payment"><p><strong>Đã trả:</strong> {money(paid)}</p>
         <p><strong>Còn nợ:</strong> {money(owed)}</p>
         {has('finance.read') && <DossierFinancialPanel dossierId={dossierId} patientId={patientId} branchId={dossier.branchId} patientName={payments?.patientName ?? ''} onChanged={refresh} />}</div></section>

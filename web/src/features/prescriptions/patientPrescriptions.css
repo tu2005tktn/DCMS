@@ -1,0 +1,46 @@
+/* Form "Đơn thuốc" dạng tờ đơn — docs/specs/S23-PATIENT-PRESCRIPTIONS.vi.md */
+.rx-modal .ant-modal-content { padding: 28px 32px 20px; }
+.rx-sheet { color: #262626; }
+.rx-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap;
+  padding-bottom: 10px; border-bottom: 3px solid #e4e8ec; margin-bottom: 4px; }
+.rx-title { margin: 0 0 8px; font-size: 24px; font-weight: 500; letter-spacing: .5px; color: #2f3b45; }
+.rx-national.ant-btn[disabled] { background: #2f4553; color: #fff; border-color: #2f4553; opacity: .55; font-size: 11px; height: 24px; }
+.rx-clinic { text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.rx-clinic strong { font-size: 14px; }
+.rx-contact { display: flex; gap: 14px; flex-wrap: wrap; justify-content: flex-end; font-size: 12px; color: #595959; }
+
+.rx-section { margin-top: 18px; }
+.rx-section > h3 { margin: 0 0 12px; padding: 6px 8px; font-size: 11px; font-weight: 700; letter-spacing: .4px;
+  background: #f5f6f7; border-bottom: 2px solid #e4e8ec; color: #262626; }
+.rx-grid { display: grid; grid-template-columns: 1fr 1fr; column-gap: 24px; }
+.rx-row { display: grid; grid-template-columns: 110px minmax(0, 1fr); align-items: center; gap: 8px; min-height: 40px; margin-bottom: 6px; }
+.rx-row > label { color: #434343; font-size: 13px; }
+.rx-box { display: inline-block; min-width: 180px; padding: 5px 8px; border: 1px solid #d9d9d9; border-radius: 4px; font-weight: 600; background: #fafafa; }
+
+.rx-lines { background: #f7f8f9; border-radius: 6px; padding: 10px; display: flex; flex-direction: column; gap: 10px; }
+.rx-line { display: flex; align-items: flex-start; gap: 8px; background: #fff; border: 1px solid #edf0f2; border-radius: 6px; padding: 10px; }
+.rx-index { flex: none; width: 22px; height: 22px; margin-top: 5px; border-radius: 50%; background: #e8f5e9; color: #2e7d32;
+  font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
+.rx-line-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.rx-line-top { display: flex; gap: 8px; align-items: flex-start; }
+.rx-line .ant-form-item { margin-bottom: 0; }
+.rx-medicine { flex: 1; min-width: 0; }
+.rx-qty { width: 96px; flex: none; }
+.rx-unit { flex: none; min-width: 44px; line-height: 32px; color: #595959; font-size: 13px; }
+.rx-add { padding: 2px 0; }
+.rx-add-btn.ant-btn { background: #28a745; border-color: #28a745; color: #fff; font-weight: 600; font-size: 12px; }
+.rx-add-btn.ant-btn:not(:disabled):hover { background: #218838 !important; border-color: #218838 !important; color: #fff !important; }
+
+.rx-read-lines { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 10px; }
+.rx-read-top { display: flex; justify-content: space-between; gap: 12px; }
+.rx-read-top span { flex: none; font-weight: 600; }
+.rx-advice { margin: 0; white-space: pre-wrap; padding: 8px 10px; border: 1px solid #e4e8ec; border-radius: 4px; min-height: 56px; }
+
+@media (max-width: 640px) {
+  .rx-modal .ant-modal-content { padding: 20px 16px 16px; }
+  .rx-grid { grid-template-columns: 1fr; }
+  .rx-clinic { align-items: flex-start; text-align: left; }
+  .rx-row { grid-template-columns: 96px minmax(0, 1fr); }
+  .rx-line-top { flex-wrap: wrap; }
+  .rx-medicine { flex-basis: 100%; }
+}

@@ -18,7 +18,6 @@ import { surfaceOptions, surfaceText } from './odontogram';
 import './examinations.css';
 import { useDiagnosisOptions } from './useDiagnosisOptions';
 import type { ReferenceSnapshot } from './diagnosisReferences';
-import PrescriptionPanel from '../prescriptions/PrescriptionPanel';
 
 type CompletionIssue = { tab: 'exam' | 'summary' | 'investigations'; label: string; target: string };
 function completionIssues(c: ExaminationContent, investigations: Investigation[] = []) {
@@ -48,9 +47,7 @@ export default function ExaminationPage() {
   const [ending, setEnding] = useState(false); const [workReviewed, setWorkReviewed] = useState(false);
   const generation = useRef(0);
   const [error, setError] = useState<string>(); const [clinicalBusy, setBusy] = useState(false); const [dirty, setDirty] = useState(false);
-  const [prescriptionBusy,setPrescriptionBusy]=useState(false),[prescriptionDirty,setPrescriptionDirty]=useState(false);
-  const busy=clinicalBusy||prescriptionBusy;
-  const [prescriptionModal,prescriptionModalContext]=Modal.useModal();
+  const busy=clinicalBusy;
   const [tab, setTab] = useState('exam'); const [filters, setFilters] = useState<DocumentFilters>({});
   const [validationAttempt, setValidationAttempt] = useState(0);
   const summaryFeedback = useRef<HTMLDivElement>(null);
@@ -61,7 +58,7 @@ export default function ExaminationPage() {
   const { options: diagnosisOptions, error: diagnosisOptionsError, reload: reloadDiagnosisOptions } = useDiagnosisOptions(w && (w.allowedActions.includes('save') || w.allowedActions.includes('amend')) ? w.visit.branchId : undefined);
   const lockedFilters = useMemo(() => ({ ...filters, visitId }), [filters, visitId]);
   useEffect(() => { let active = true; generation.current++; setW(undefined); setContent(undefined); setDirty(false); setError(undefined);
-    setAmending(false); setAmendReason(''); setEnding(false); setBusy(false); setPrescriptionBusy(false);setPrescriptionDirty(false);setValidationAttempt(0); setHistory([]); setVersions([]); setTab('exam'); pendingCommand.current = undefined;
+    setAmending(false); setAmendReason(''); setEnding(false); setBusy(false);setValidationAttempt(0); setHistory([]); setVersions([]); setTab('exam'); pendingCommand.current = undefined;
     api<Workspace>(`/api/visits/${visitId}/examination`).then(value => {
       if (active) { setW(value); setContent(value.examination?.content ?? value.initialContent); }
     }).catch(e => { if (active) setError((e as Error).message); }); return () => { active = false; };
@@ -72,13 +69,13 @@ export default function ExaminationPage() {
     return () => { active = false; };
   }, [w, visitId]);
   useEffect(() => {
-    const warn = (e: BeforeUnloadEvent) => { if (dirty || prescriptionDirty || busy) e.preventDefault(); };
+    const warn = (e: BeforeUnloadEvent) => { if (dirty || busy) e.preventDefault(); };
     const navigate = (e: MouseEvent) => {
-      if ((dirty || prescriptionDirty || busy) && (e.target as HTMLElement).closest('a') && (busy || !window.confirm('Rời phiếu khám và bỏ thay đổi chưa lưu?'))) { e.preventDefault(); e.stopPropagation(); }
+      if ((dirty || busy) && (e.target as HTMLElement).closest('a') && (busy || !window.confirm('Rời phiếu khám và bỏ thay đổi chưa lưu?'))) { e.preventDefault(); e.stopPropagation(); }
     };
     window.addEventListener('beforeunload', warn); document.addEventListener('click', navigate, true);
     return () => { window.removeEventListener('beforeunload', warn); document.removeEventListener('click', navigate, true); };
-  }, [dirty, prescriptionDirty, busy]);
+  }, [dirty, busy]);
   useEffect(() => {
     if (tab === 'summary' && (error || (validationAttempt > 0 && validationIssues.length > 0))) {
       summaryFeedback.current?.focus({ preventScroll: true });
@@ -164,7 +161,6 @@ export default function ExaminationPage() {
   async function completeVisit() {
     if (!w || busy || !workReviewed) return;
     const token=generation.current;
-    if(prescriptionDirty&&!await prescriptionModal.confirm({title:'Có thuốc chưa lưu vào đơn',content:'Kết thúc lượt khám sẽ bỏ phần thuốc đang nhập, giữ nguyên các thuốc đã lưu. Bạn muốn tiếp tục?',okText:'Kết thúc, bỏ phần thuốc chưa lưu',cancelText:'Quay lại kê đơn'}))return;
     if(token!==generation.current)return;
     setBusy(true); setError(undefined);
     const payload = { patientId: w.visit.patientId, expectedVersion: w.visit.visitVersion, workReviewed, examinationFee:examinationFee??null };
@@ -192,7 +188,7 @@ export default function ExaminationPage() {
     }
     change({ findings: next, diagnosisReferences: [...(content!.diagnosisReferences??[]),...references].filter((ref,index,all)=>all.findIndex(other=>other.id===ref.id&&other.version===ref.version&&other.name===ref.name)===index) });
   }
-  return <>{prescriptionModalContext}<div className="examination-heading"><div><Typography.Title level={2}>Khám</Typography.Title>
+  return <><div className="examination-heading"><div><Typography.Title level={2}>Khám</Typography.Title>
     <Typography.Paragraph type="secondary">Phiếu khám · Kết quả, chẩn đoán và hướng xử trí</Typography.Paragraph></div><Space wrap>
     <Link to={`/patients/${v.patientId}?tab=examinations`}>Các phiếu khám</Link><Link to="/reception">Về hàng chờ</Link>
     <Button aria-label="Tải lại phiên bản" disabled={busy} loading={busy} onClick={() => void reloadVersion()}>Tải lại phiên bản</Button></Space></div>
@@ -275,10 +271,7 @@ export default function ExaminationPage() {
             <Typography.Text type="secondary">Ghi nhận nhu cầu chưa tạo lịch hẹn. Phòng khám cần sắp lịch riêng.</Typography.Text></Form.Item>}
           {content.disposition === 'Referral' && <Form.Item label="Nơi / lý do chuyển khám" required><Input.TextArea id="exam-referral" aria-label="Nơi / lý do chuyển khám" value={content.referralDestination ?? ''} maxLength={1000} onChange={e => change({ referralDestination: e.target.value })} /></Form.Item>}
         </Form>
-        {user?.permissions.includes('prescriptions.read')&&<PrescriptionPanel key={visitId} visitId={visitId!} branchId={v.branchId}
-          readOnly={!user.permissions.includes('prescriptions.manage')||v.status!=='InProgress'||!w.allowedActions.includes('prescribe')}
-          correctionAllowed={user.permissions.includes('prescriptions.manage')&&(v.status==='InProgress'||v.status==='Completed')}
-          disabled={clinicalBusy} onDirtyChange={setPrescriptionDirty} onBusyChange={setPrescriptionBusy}/>}
+        {user?.permissions.includes('prescriptions.manage')&&<Link className="ant-btn ant-btn-primary" to={`/patients/${v.patientId}?tab=prescriptions`}>Kê đơn trong hồ sơ bệnh nhân</Link>}
         {amending && <Form.Item label="Lý do đính chính" required><Input.TextArea aria-label="Lý do đính chính" disabled={busy} maxLength={1000} value={amendReason} onChange={e => { setAmendReason(e.target.value); pendingCommand.current = undefined; }} /></Form.Item>}
         {(validationIssues.length > 0 || error) && <div ref={summaryFeedback} tabIndex={-1} className="examination-completion-feedback">
           <Alert role="alert" type="error" showIcon message={validationIssues.length ? 'Chưa thể hoàn tất khám' : error}

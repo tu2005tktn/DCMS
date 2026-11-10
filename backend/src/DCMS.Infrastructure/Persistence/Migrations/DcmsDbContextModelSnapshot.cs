@@ -3067,7 +3067,7 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)");
 
-                    b.Property<Guid>("MedicineId")
+                    b.Property<Guid?>("MedicineId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("MedicineName")
@@ -3155,6 +3155,139 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("CK_EXTERNAL_PRESCRIPTION_QUANTITY", "\"Quantity\" > 0");
                         });
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Prescriptions.PatientPrescription", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Advice")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<int>("BranchId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Diagnosis")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("OtherDiagnosis")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<int>("PatientId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateOnly>("PrescribedOn")
+                        .HasColumnType("date");
+
+                    b.Property<int>("PrescriberEmployeeId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BranchId");
+
+                    b.HasIndex("PrescriberEmployeeId");
+
+                    b.HasIndex("PatientId", "PrescribedOn");
+
+                    b.ToTable("PATIENT_PRESCRIPTION", (string)null);
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Prescriptions.PatientPrescriptionItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("DosageForm")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Instructions")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("MedicineCode")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<Guid>("MedicineId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("MedicineName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("PrescriptionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Strength")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MedicineId");
+
+                    b.HasIndex("PrescriptionId");
+
+                    b.ToTable("PATIENT_PRESCRIPTION_ITEM", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_PATIENT_PRESCRIPTION_ITEM_QUANTITY", "\"Quantity\" > 0");
+                        });
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Prescriptions.PatientPrescriptionReceipt", b =>
+                {
+                    b.Property<int>("ActorId")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("RequestKey")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Fingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid>("PrescriptionId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("ActorId", "RequestKey");
+
+                    b.HasIndex("PrescriptionId");
+
+                    b.ToTable("PATIENT_PRESCRIPTION_RECEIPT", (string)null);
                 });
 
             modelBuilder.Entity("DCMS.Domain.Features.Prescriptions.PrescriptionAudit", b =>
@@ -5676,22 +5809,9 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<int>("Quantity")
                         .HasColumnType("integer");
 
-                    b.Property<DateOnly?>("ReceivedOn")
-                        .HasColumnType("date");
-
-                    b.Property<DateOnly?>("SentOn")
-                        .HasColumnType("date");
-
                     b.Property<string>("Shade")
                         .IsRequired()
                         .HasColumnType("jsonb");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasDefaultValue("NotSent");
 
                     b.Property<string>("Teeth")
                         .IsRequired()
@@ -7984,8 +8104,7 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasOne("DCMS.Domain.Features.SystemSettings.CatalogMedicine", null)
                         .WithMany()
                         .HasForeignKey("MedicineId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("DCMS.Domain.Features.Prescriptions.ExternalPrescription", null)
                         .WithMany()
@@ -8002,6 +8121,57 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasOne("DCMS.Domain.Features.Visits.Visit", null)
                         .WithMany()
                         .HasForeignKey("VisitId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Prescriptions.PatientPrescription", b =>
+                {
+                    b.HasOne("DCMS.Domain.Features.Scheduling.SchedulingBranch", null)
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DCMS.Domain.Features.Patients.PatientProfile", null)
+                        .WithMany()
+                        .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DCMS.Domain.Features.Accounts.EmployeeProfile", null)
+                        .WithMany()
+                        .HasForeignKey("PrescriberEmployeeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Prescriptions.PatientPrescriptionItem", b =>
+                {
+                    b.HasOne("DCMS.Domain.Features.SystemSettings.CatalogMedicine", null)
+                        .WithMany()
+                        .HasForeignKey("MedicineId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DCMS.Domain.Features.Prescriptions.PatientPrescription", null)
+                        .WithMany("Items")
+                        .HasForeignKey("PrescriptionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Prescriptions.PatientPrescriptionReceipt", b =>
+                {
+                    b.HasOne("DCMS.Infrastructure.Features.Accounts.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("ActorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DCMS.Domain.Features.Prescriptions.PatientPrescription", null)
+                        .WithMany()
+                        .HasForeignKey("PrescriptionId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
@@ -8676,6 +8846,11 @@ namespace DCMS.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("DCMS.Domain.Features.Finance.PaymentReceipt", b =>
                 {
                     b.Navigation("Allocations");
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Prescriptions.PatientPrescription", b =>
+                {
+                    b.Navigation("Items");
                 });
 
             modelBuilder.Entity("DCMS.Domain.Features.Prescriptions.PrescriptionTemplate", b =>

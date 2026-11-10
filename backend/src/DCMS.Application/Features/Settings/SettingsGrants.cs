@@ -6,7 +6,7 @@ public static class SettingsGrants
 {
     public static readonly string[] CatalogKinds = ["diagnoses", "patient-sources", "occupations", "intake-history", "care-types", "expense-categories", "customer-groups"];
     public static readonly string[] CatalogLabels = ["Chẩn đoán", "Nguồn khách hàng", "Nghề nghiệp", "Tiền sử hành chính", "Loại CSKH", "Loại chi", "Nhóm khách hàng"];
-    public static readonly GrantDefinition[] Definitions = [
+    private static readonly GrantDefinition[] AllDefinitions = [
         new("settings.read", "Mở Thiết lập hệ thống", null, null),
         new("settings.general.read", "Xem cấu hình chung", null, "settings.read"),
         new("settings.general.manage", "Sửa cấu hình chung", null, "settings.general.read"),
@@ -50,6 +50,9 @@ public static class SettingsGrants
             new GrantDefinition($"catalog.{kind}.deactivate", $"{CatalogLabels[Array.IndexOf(CatalogKinds,kind)]}: Ngừng dùng / khôi phục", null, $"catalog.{kind}.read")
         })
     ];
+    public static readonly GrantDefinition[] Definitions = AllDefinitions
+        .DistinctBy(x => x.Key, StringComparer.Ordinal)
+        .ToArray();
     public static bool RoleAllows(string permission, string[] roles)
     {
         var definition = Definitions.SingleOrDefault(x => x.Key == permission);

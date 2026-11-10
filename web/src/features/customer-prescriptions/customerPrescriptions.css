@@ -1,10 +1,14 @@
-.customer-prescriptions { display: grid; gap: 20px; max-width: 1080px; margin: 0 auto; }
-.customer-prescriptions .customer-page-heading { margin-bottom: 0; }
-.customer-prescriptions > .ant-btn { justify-self: start; }
-.customer-prescription-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
-.customer-prescription-card { height: 100%; }
-.customer-prescription-card h3 { margin: 12px 0; font-size: 19px; color: #172b4d; }
-.customer-prescription-card p { margin: 8px 0; }
-.customer-prescription-items { display: grid; gap: 12px; }
-.customer-prescription-item { border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px; }
-.customer-prescription-item p { margin: 7px 0 0; }
+.customer-prescriptions-page { max-width: 860px; margin: 0 auto; }
+.customer-rx-loading { display: flex; align-items: center; gap: 12px; padding: 24px 0; }
+.customer-rx-list { display: grid; gap: 12px; }
+.customer-rx-card { display: flex; flex-direction: column; gap: 4px; padding: 16px 18px; border: 1px solid #e4e8ec; border-radius: 12px;
+  background: #fff; color: inherit; transition: border-color .15s, box-shadow .15s; }
+.customer-rx-card:hover, .customer-rx-card:focus-visible { border-color: #1677ff; box-shadow: 0 2px 10px rgba(22, 119, 255, .12); color: inherit; }
+.customer-rx-card-head { display: flex; justify-content: space-between; gap: 12px; font-size: 16px; }
+.customer-rx-card-head span { color: #595959; font-size: 13px; }
+.customer-rx-card-clinic { font-weight: 600; }
+.customer-rx-card-meta { color: #595959; font-size: 14px; }
+.customer-rx-card-drugs { color: #262626; font-size: 14px; margin-top: 4px; }
+.customer-rx-card .customer-text-action { margin-top: 6px; color: #1677ff; font-weight: 600; }
+.customer-rx-sheet-card .ant-card-body { padding: 24px 28px; }
+@media (max-width: 640px) { .customer-rx-sheet-card .ant-card-body { padding: 16px; } }
