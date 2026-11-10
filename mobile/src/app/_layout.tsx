@@ -14,6 +14,7 @@
  */
 
 import { Stack } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { SessionProvider } from '@/features/auth/session/SessionProvider';
 import { appointmentRepo } from '@/features/appointments/appointment.repo';
@@ -29,11 +30,12 @@ export default function RootLayout() {
   return (
     <SessionProvider>
       <RealtimeProvider>
-        <Stack>
+        <StatusBar style="dark" />
+        <Stack screenOptions={{ headerTintColor: '#175CD3', headerStyle: { backgroundColor: '#FFFFFF' } }}>
           <Stack.Screen name="(home)" options={{ headerShown: false }} />
           <Stack.Screen name="(auth)" options={{ headerShown: false }} />
           <Stack.Screen name="(account)" options={{ headerShown: false }} />
-          <Stack.Screen name="book-appointment" options={{ title: 'Đặt lịch khám' }} />
+          <Stack.Screen name="book-appointment" options={{ headerShown: false }} />
           <Stack.Screen name="index" options={{ headerShown: false }} />
           <Stack.Screen name="+not-found" options={{ title: 'Không tìm thấy' }} />
         </Stack>

@@ -57,8 +57,7 @@ export default function SignInScreen() {
   const handleSignIn = useCallback(
     async (snapshot: SessionSnapshot) => {
       await signIn(snapshot);
-      // Sau khi đăng nhập, về menu trung tâm — "Trang chủ tài khoản" sẽ tự xuất hiện
-      // trong menu vì lúc này session đã authenticated.
+      // Trang chủ tự hiển thị nội dung phù hợp với vai trò sau khi đăng nhập.
       router.replace('/(home)/' as never);
     },
     [signIn, router],
@@ -100,10 +99,12 @@ export default function SignInScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+          <Link href="/(home)/" style={styles.backLink}>← Về trang chủ</Link>
           <View style={styles.header}>
+            <Text style={styles.brand}>DCMS · DÀNH CHO KHÁCH HÀNG</Text>
             <Text style={styles.title}>Đăng nhập</Text>
             <Text style={styles.subtitle}>
-              Dùng tài khoản DCMS đã được cấp để truy cập hệ thống.
+              Tiếp tục đặt lịch và theo dõi chăm sóc của bạn.
             </Text>
           </View>
 
@@ -111,20 +112,20 @@ export default function SignInScreen() {
 
           <View style={styles.form}>
             <TextField
-              label="Tên đăng nhập"
+              label="Số điện thoại hoặc tên đăng nhập"
               value={userName}
               onChangeText={setUserName}
               onBlur={() => {
                 setTouched((p) => ({ ...p, userName: true }));
                 validateField('userName', userName);
               }}
-              placeholder="vd: admin.demo"
+              placeholder="Ví dụ: 0912345678"
               autoCapitalize="none"
               autoCorrect={false}
               textContentType="username"
               keyboardType="default"
               error={touched.userName ? fieldErrors.userName : null}
-              hint="3–64 ký tự, gồm chữ, số và . _ -"
+              hint="Dùng số điện thoại đã đăng ký hoặc tên đăng nhập."
               disabled={isSubmitting}
               testID="sign-in-username"
             />
@@ -138,7 +139,7 @@ export default function SignInScreen() {
                 validateField('password', password);
               }}
               error={touched.password ? fieldErrors.password : null}
-              hint="Nhập mật khẩu hiện tại của bạn."
+              hint="Nhập mật khẩu tài khoản của bạn."
               disabled={isSubmitting}
               testID="sign-in-password"
             />
@@ -156,12 +157,12 @@ export default function SignInScreen() {
             <View style={styles.linksRow}>
               <Link href="/(auth)/register" asChild>
                 <Pressable hitSlop={8}>
-                  <Text style={styles.linkText}>Tạo tài khoản (S02)</Text>
+                  <Text style={styles.linkText}>Tạo tài khoản</Text>
                 </Pressable>
               </Link>
               <Link href="/(auth)/recover-account" asChild>
                 <Pressable hitSlop={8}>
-                  <Text style={styles.linkText}>Quên mật khẩu? (S03)</Text>
+                  <Text style={styles.linkText}>Quên mật khẩu?</Text>
                 </Pressable>
               </Link>
             </View>
@@ -172,7 +173,7 @@ export default function SignInScreen() {
               <FormError message={googleError} />
             </View>
             <Link href="/book-appointment" asChild>
-              <Pressable accessibilityRole="button"><Text style={styles.linkText}>Đặt lịch không cần tài khoản</Text></Pressable>
+              <Pressable accessibilityRole="button" style={styles.guestLink}><Text style={styles.linkText}>Đặt lịch không cần tài khoản →</Text></Pressable>
             </Link>
           </View>
         </ScrollView>
@@ -184,14 +185,17 @@ export default function SignInScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   flex: { flex: 1 },
-  container: { padding: spacing.lg, gap: spacing.lg, flexGrow: 1 },
-  header: { gap: spacing.xs, marginTop: spacing.md },
-  title: { fontSize: typography.heading, fontWeight: '700', color: colors.text },
-  subtitle: { color: colors.muted, fontSize: typography.body - 2 },
-  form: { gap: spacing.md },
+  container: { padding: spacing.lg, gap: spacing.lg, flexGrow: 1, justifyContent: 'center' },
+  backLink: { color: colors.primary, fontWeight: '700', marginBottom: spacing.md },
+  brand: { color: colors.primary, fontSize: 12, fontWeight: '800', letterSpacing: 1 },
+  header: { gap: spacing.sm, marginBottom: spacing.sm },
+  title: { fontSize: 30, fontWeight: '800', color: colors.text },
+  subtitle: { color: colors.muted, fontSize: typography.body, lineHeight: 23 },
+  form: { gap: spacing.md, padding: spacing.lg, borderRadius: 20, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
   actions: { marginTop: spacing.sm },
   linksRow: { flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.sm },
-  linkText: { color: colors.primary, fontWeight: '600' },
+  linkText: { color: colors.primary, fontWeight: '700' },
+  guestLink: { minHeight: 44, justifyContent: 'center', alignItems: 'center' },
   googleSection: { gap: spacing.sm, marginTop: spacing.md, alignItems: 'center' },
   orText: { color: colors.muted, textAlign: 'center' },
 });

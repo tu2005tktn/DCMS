@@ -5,7 +5,7 @@ import { spacing } from '@/theme/spacing';
 import type { LinkStatus } from '../patient-link.types';
 
 // Small UI pieces local to S07 so shared components stay untouched until the team agrees on them.
-export const palette = { ...colors, border: '#D0D7E2', danger: '#B42318', dangerBg: '#FEF3F2', success: '#067647', successBg: '#ECFDF3', card: '#F6F8FB' };
+export const palette = { ...colors, dangerBg: '#FEF3F2', success: '#067647', successBg: '#ECFDF3', card: '#FFFFFF' };
 
 export function Card({ title, children }: PropsWithChildren<{ title?: string }>) {
   return <View style={styles.card}>{title && <Text style={styles.cardTitle}>{title}</Text>}{children}</View>;
@@ -55,16 +55,16 @@ export const formatTime = (value: string | null) =>
   value ? new Date(value).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : '—';
 
 const styles = StyleSheet.create({
-  card: { backgroundColor: palette.card, borderRadius: 12, padding: spacing.md, gap: spacing.sm, borderWidth: 1, borderColor: palette.border },
-  cardTitle: { fontSize: 17, fontWeight: '600', color: palette.text },
+  card: { backgroundColor: palette.card, borderRadius: 16, padding: spacing.md, gap: spacing.sm, borderWidth: 1, borderColor: palette.border },
+  cardTitle: { fontSize: 17, fontWeight: '700', color: palette.text },
   field: { gap: spacing.xs },
   label: { fontWeight: '600', color: palette.text },
-  input: { borderWidth: 1, borderColor: palette.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 16, color: palette.text, backgroundColor: '#fff' },
+  input: { borderWidth: 1, borderColor: palette.border, borderRadius: 12, minHeight: 48, paddingHorizontal: 12, paddingVertical: 10, fontSize: 16, color: palette.text, backgroundColor: '#fff' },
   multiline: { minHeight: 96, textAlignVertical: 'top' },
   inputError: { borderColor: palette.danger },
   hint: { color: palette.muted, fontSize: 12 },
   error: { color: palette.danger, fontSize: 13 },
-  button: { minHeight: 48, borderRadius: 8, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.md, borderWidth: 1 },
+  button: { minHeight: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.md, borderWidth: 1 },
   primary: { backgroundColor: palette.primary, borderColor: palette.primary },
   secondary: { backgroundColor: '#fff', borderColor: palette.primary },
   danger: { backgroundColor: '#fff', borderColor: palette.danger },

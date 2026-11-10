@@ -20,7 +20,9 @@ export default function AccountLayout() {
     );
   }
   if (!authorized) return null;
-  return <Stack screenOptions={{ headerTitle: 'Tài khoản' }} />;
+  return <Stack screenOptions={{ headerTitle: 'Tài khoản', headerTintColor: colors.primary }}>
+    <Stack.Screen name="home" options={{ headerShown: false }} />
+  </Stack>;
 }
 
 const styles = StyleSheet.create({

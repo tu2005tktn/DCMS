@@ -57,9 +57,11 @@ export default function PrescriptionsScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.container} refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void load(token)} />}>
+      <Text style={styles.title}>Đơn thuốc của tôi</Text>
+      <Text style={styles.muted}>Xem lại đơn thuốc và hướng dẫn bác sĩ đã kê.</Text>
       <Banner tone="info" message="Đơn thuốc mua ngoài tại hiệu thuốc. Phòng khám không bán thuốc tại chỗ." />
       {error && <Banner tone="error" message={error.message} />}
-      <Card title="Đơn thuốc của tôi">
+      <Card title="Các đơn đã kê">
         {(items ?? []).length === 0
           ? <Text style={styles.muted}>Chưa có đơn thuốc nào được bác sĩ hoàn tất.</Text>
           : (items ?? []).map(item => (
@@ -75,6 +77,7 @@ export default function PrescriptionsScreen() {
                 <Text style={styles.muted}>Bác sĩ {item.doctorName}</Text>
                 {item.diagnosis ? <Text style={styles.muted} numberOfLines={2}>Chẩn đoán: {item.diagnosis}</Text> : null}
                 <Text style={styles.muted}>{item.medicines.length} thuốc</Text>
+                <Text style={styles.link}>Xem chi tiết →</Text>
               </View>
               {item.isCorrection && <View style={styles.pill}><Text style={styles.pillText}>Bản điều chỉnh</Text></View>}
             </Pressable>
@@ -87,10 +90,12 @@ export default function PrescriptionsScreen() {
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background, gap: spacing.sm },
   container: { padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xl * 2, backgroundColor: colors.background },
+  title: { color: palette.text, fontSize: 26, fontWeight: '800' },
   muted: { color: palette.muted, fontSize: 14, lineHeight: 20 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderTopWidth: 1, borderTopColor: palette.border, paddingVertical: spacing.sm, minHeight: 56 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderTopWidth: 1, borderTopColor: palette.border, paddingVertical: spacing.md, minHeight: 80 },
   pressed: { opacity: 0.7 },
   rowTitle: { fontSize: 15, fontWeight: '600', color: palette.text },
+  link: { color: palette.primary, fontWeight: '700', marginTop: 4 },
   pill: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4, backgroundColor: '#FFF6ED' },
   pillText: { fontSize: 12, fontWeight: '600', color: '#B54708' },
 });

@@ -158,8 +158,8 @@ export default function MedicalRecordsScreen() {
   return (
     <ScrollView contentContainerStyle={styles.container} refreshControl={
       <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={palette.primary} />}>
-      <Text style={styles.heading}>Hồ sơ y tế chính thức</Text>
-      <Text style={styles.muted}>Chỉ đọc — dữ liệu do phòng khám phát hành; ứng dụng không chỉnh sửa nguồn lâm sàng hay tài chính.</Text>
+      <Text style={styles.heading}>Bệnh án của tôi</Text>
+      <Text style={styles.muted}>Theo dõi quá trình điều trị và các lượt khám đã được phòng khám ghi nhận.</Text>
 
       {denied && <View style={styles.block}>
         <Banner tone="error" message="Quyền xem hồ sơ vừa bị thu hồi — dữ liệu đang hiển thị đã được xóa."
@@ -183,10 +183,9 @@ export default function MedicalRecordsScreen() {
         </View> : <Text style={styles.muted}>Đang tải thông tin nhận diện…</Text>}
       </Card>
 
-      <Card title="Lịch sử sức khỏe & dị ứng">
+      <Card title="Thông tin sức khỏe và dị ứng">
         <Text style={styles.muted}>
-          Chưa có nguồn dữ liệu sức khỏe/dị ứng từ máy chủ (DCMS-95 — Tư). Mục này không hiển thị dữ liệu suy diễn;
-          sẽ tự cập nhật khi API cung cấp.
+          Ứng dụng chưa hỗ trợ hiển thị mục này. Hãy hỏi phòng khám khi cần đối chiếu thông tin.
         </Text>
       </Card>
 
@@ -222,9 +221,7 @@ export default function MedicalRecordsScreen() {
                   </Pressable>
                 );
               })}
-        <Text style={styles.note}>
-          Lượt khám hoàn thành khác với đợt điều trị hoàn tất: trạng thái từng đợt hiển thị ở danh sách hồ sơ bên dưới.
-        </Text>
+        <Text style={styles.note}>Trạng thái lịch khám và trạng thái điều trị được theo dõi riêng.</Text>
       </Card>
 
       <Card title="Hồ sơ chính thức của tôi">
@@ -237,7 +234,7 @@ export default function MedicalRecordsScreen() {
                 <View style={styles.recordMain}>
                   <Text style={styles.recordCode}>{item.code}</Text>
                   <Text style={styles.muted}>{item.diagnosis}</Text>
-                  <Text style={styles.muted}>Bắt đầu {item.startedOn} · Kế hoạch v{item.planVersion} · {item.agreedItems.length} hạng mục đã đồng ý</Text>
+                  <Text style={styles.muted}>Bắt đầu {formatDate(item.startedOn)} · {item.agreedItems.length} hạng mục điều trị đã đồng ý</Text>
                 </View>
                 <View style={[styles.pill, { backgroundColor: item.state === 'Open' ? '#EFF8FF' : '#F2F4F7' }]}>
                   <Text style={[styles.pillText, { color: item.state === 'Open' ? '#175CD3' : '#344054' }]}>
@@ -245,9 +242,7 @@ export default function MedicalRecordsScreen() {
                 </View>
               </Pressable>
             ))}
-        <Text style={styles.note}>
-          “Đang điều trị” nghĩa là đợt còn mở; nguồn chính thức tự hiển thị theo UC-55, không cần bấm xuất bản.
-        </Text>
+        <Text style={styles.note}>“Đang điều trị” nghĩa là đợt điều trị chưa kết thúc.</Text>
       </Card>
 
       <Card title="Kết quả khám theo lượt">
@@ -260,11 +255,8 @@ export default function MedicalRecordsScreen() {
         <Button title="Xem đơn thuốc" variant="secondary" onPress={() => router.push('/(account)/prescriptions')} />
       </Card>
 
-      <Card title="Nguồn chưa kết nối">
-        <Text style={styles.muted}>
-          • Lịch sử phiên bản, đồng bộ chi tiết và hóa đơn (DCMS-95 / S42)
-        </Text>
-        <Text style={styles.note}>Phần này hiển thị trạng thái trung thực; ứng dụng không tự tạo dữ liệu khi API chưa có.</Text>
+      <Card title="Thông tin khác">
+        <Text style={styles.muted}>Lịch sử điều chỉnh hồ sơ và hóa đơn chưa hiển thị trên ứng dụng. Liên hệ phòng khám nếu bạn cần bản đầy đủ.</Text>
       </Card>
 
       {showContact
@@ -293,7 +285,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background, gap: spacing.sm },
   container: { padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xl * 2, backgroundColor: colors.background },
   block: { gap: spacing.sm },
-  heading: { fontSize: 20, fontWeight: '700', color: palette.text },
+  heading: { fontSize: 26, fontWeight: '800', color: palette.text },
   muted: { color: palette.muted, fontSize: 14, lineHeight: 20 },
   note: { color: palette.muted, fontSize: 12, lineHeight: 18, fontStyle: 'italic' },
   badgeRow: { flexDirection: 'row' },
@@ -301,7 +293,7 @@ const styles = StyleSheet.create({
   rowLabel: { color: palette.muted, fontSize: 14 },
   rowValue: { color: palette.text, fontSize: 14, fontWeight: '600', flexShrink: 1, textAlign: 'right' },
   chipRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
-  chip: { borderWidth: 1, borderColor: palette.border, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#fff' },
+  chip: { borderWidth: 1, borderColor: palette.border, borderRadius: 999, minHeight: 44, justifyContent: 'center', paddingHorizontal: 12, backgroundColor: '#fff' },
   chipSelected: { backgroundColor: palette.primary, borderColor: palette.primary },
   chipText: { fontSize: 13, color: palette.text },
   chipTextSelected: { color: '#fff', fontWeight: '600' },
