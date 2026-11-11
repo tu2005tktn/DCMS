@@ -146,12 +146,21 @@ internal static class AppointmentModel
             b.HasIndex(x => new { x.NotificationId, x.Channel }).IsUnique();
             b.HasOne<InAppNotification>().WithMany(x => x.Deliveries).HasForeignKey(x => x.NotificationId).OnDelete(DeleteBehavior.Cascade);
         });
+        model.Entity<PushDevice>(b =>
+        {
+            b.ToTable("PUSH_DEVICE");
+            b.Property(x => x.Token).HasMaxLength(512);
+            b.Property(x => x.Platform).HasMaxLength(16);
+            b.HasIndex(x => x.Token).IsUnique();
+            b.HasIndex(x => x.AccountId);
+            b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.AccountId).OnDelete(DeleteBehavior.Cascade);
+        });
         model.Entity<AppointmentReminder>(b =>
         {
             b.ToTable("APPOINTMENT_REMINDER");
             b.Property(x => x.Status).HasMaxLength(16);
             b.HasIndex(x => new { x.Status, x.DueAt });
-            b.HasIndex(x => new { x.AppointmentId, x.AppointmentVersion, x.LeadMinutes }).IsUnique();
+            b.HasIndex(x => new { x.AppointmentId, x.AppointmentVersion, x.LeadMinutes, x.AccountId }).IsUnique();
             b.HasOne<Appointment>().WithMany().HasForeignKey(x => x.AppointmentId).OnDelete(DeleteBehavior.Restrict);
             b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.AccountId).OnDelete(DeleteBehavior.Restrict);
         });

@@ -68,3 +68,6 @@ Cập nhật 08/11/2026: danh sách phiếu labo riêng và theo dõi trạng th
 ## Sửa lỗi in (08/11/2026)
 
 Quy tắc in của phiếu labo chỉ được áp dụng khi cửa sổ phiếu labo đang mở (`body:has(.lab-order-modal)`). Trước đây quy tắc `body * { visibility: hidden }` nằm trong CSS toàn cục nên mọi trang khác (ví dụ in phiếu thu) in ra trang trắng.
+# Local migration compatibility
+
+The EF Core model snapshot must retain the `LabOrder.Status` string property (maximum 20 characters) before declaring the `(BranchId, Status, DueOn)` index. The model also includes optional `SentOn` and `ReceivedOn` dates and a `NotSent` default for `Status`; a migration reconciles these fields after merging branches. Development startup with `--migrate` must be able to construct the snapshot and apply pending migrations.

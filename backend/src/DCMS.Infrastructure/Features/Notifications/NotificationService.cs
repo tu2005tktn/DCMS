@@ -1,5 +1,11 @@
 using DCMS.Application.Common;
 using DCMS.Application.Features.Notifications;
+using DCMS.Infrastructure.Persistence;
+using DCMS.Domain.Features.PatientLinks;
+using DCMS.Domain.Features.Prescriptions;
+using DCMS.Domain.Features.Examinations;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace DCMS.Infrastructure.Features.Notifications;
@@ -12,6 +18,8 @@ namespace DCMS.Infrastructure.Features.Notifications;
 /// </summary>
 public sealed class NotificationService(
     INotificationStore store,
+    DcmsDbContext db,
+    IConfiguration configuration,
     IRealtimeNotifier realtime,
     ILogger<NotificationService> logger) : INotificationService
 {
@@ -56,11 +64,46 @@ public sealed class NotificationService(
     {
         if (string.IsNullOrWhiteSpace(deepLink))
             return new CheckDeepLinkResult(false, "Liên kết không hợp lệ.");
-        if (!deepLink.StartsWith("/appointments/", StringComparison.Ordinal))
+        if (deepLink == "/appointments") return new CheckDeepLinkResult(true, null);
+        if (deepLink == "/prescriptions")
+            return new CheckDeepLinkResult(await db.PatientAccountLinks.AsNoTracking().AnyAsync(x =>
+                x.AccountId == accountId && x.Status == PatientLinkStatus.Verified, ct), null);
+        if (deepLink == "/book-appointment")
+        {
+            var canBook = await db.FollowUpInstructions.AsNoTracking().AnyAsync(x =>
+                x.Status == "NeedsBooking" && db.PatientAccountLinks.Any(link =>
+                    link.AccountId == accountId && link.Status == PatientLinkStatus.Verified
+                    && link.PatientId == x.PatientId), ct);
+            return canBook ? new CheckDeepLinkResult(true, null)
+                : new CheckDeepLinkResult(false, "Yêu cầu đặt lịch không còn hiệu lực.");
+        }
+        var parts = deepLink.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length != 2)
             return new CheckDeepLinkResult(false, "Loại liên kết chưa hỗ trợ.");
-
-        var id = deepLink["/appointments/".Length..];
-        var allowed = await store.CanOpenAppointmentAsync(accountId, id, ct);
+        bool allowed;
+        if (parts[0] == "appointments")
+            allowed = await store.CanOpenAppointmentAsync(accountId, parts[1], ct);
+        else if (Guid.TryParse(parts[1], out var id))
+        {
+            var patients = db.PatientAccountLinks.AsNoTracking().Where(x => x.AccountId == accountId
+                && x.Status == PatientLinkStatus.Verified && x.PatientId.HasValue)
+                .Select(x => x.PatientId!.Value);
+            allowed = parts[0] switch
+            {
+                "visit-results" => await db.Visits.AsNoTracking().AnyAsync(x => x.Id == id
+                    && patients.Contains(x.PatientId) && db.Set<VisitExamination>()
+                        .Any(e => e.VisitId == x.Id && e.Confirmed), ct),
+                "prescriptions" => await db.Set<PatientPrescription>().AsNoTracking().AnyAsync(x =>
+                    x.Id == id && patients.Contains(x.PatientId), ct)
+                    || await db.Set<ExternalPrescription>().AsNoTracking().AnyAsync(x =>
+                        x.VisitId == id && x.Status == PrescriptionStatuses.Finalized && patients.Contains(x.PatientId), ct),
+                "medical-records" => await db.TreatmentDossiers.AsNoTracking().AnyAsync(x =>
+                    x.Id == id && x.PlanState == "Committed" && x.State != "Deleted"
+                    && patients.Contains(x.PatientId), ct),
+                _ => false
+            };
+        }
+        else allowed = false;
         return !allowed
             ? new CheckDeepLinkResult(false, "Bạn không có quyền mở thông báo này.")
             : new CheckDeepLinkResult(true, null);
@@ -83,6 +126,10 @@ public sealed class NotificationService(
         var effectiveChannels = channels is { Count: > 0 }
             ? channels
             : (IReadOnlyList<NotificationChannel>)new[] { NotificationChannel.InApp };
+        if (accountId.HasValue && !string.IsNullOrWhiteSpace(configuration["Firebase:ServiceAccountPath"])
+            && await db.PushDevices.AnyAsync(x => x.AccountId == accountId.Value, ct)
+            && !effectiveChannels.Contains(NotificationChannel.Push))
+            effectiveChannels = [.. effectiveChannels, NotificationChannel.Push];
 
         var now = DateTimeOffset.UtcNow;
         var attempts = effectiveChannels.Select(ch => new NotificationAttempt(

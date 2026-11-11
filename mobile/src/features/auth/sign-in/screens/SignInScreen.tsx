@@ -16,7 +16,7 @@
 
 import { Link, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FormError } from '@/components/feedback/FormError';
 import { ApiError } from '@/services/api/api-error';
@@ -57,8 +57,7 @@ export default function SignInScreen() {
   const handleSignIn = useCallback(
     async (snapshot: SessionSnapshot) => {
       await signIn(snapshot);
-      // Sau khi đăng nhập, về menu trung tâm — "Trang chủ tài khoản" sẽ tự xuất hiện
-      // trong menu vì lúc này session đã authenticated.
+      // Trang chủ tự hiển thị nội dung phù hợp với vai trò sau khi đăng nhập.
       router.replace('/(home)/' as never);
     },
     [signIn, router],
@@ -100,31 +99,34 @@ export default function SignInScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-          <View style={styles.header}>
-            <Text style={styles.title}>Đăng nhập</Text>
-            <Text style={styles.subtitle}>
-              Dùng tài khoản DCMS đã được cấp để truy cập hệ thống.
-            </Text>
+          <View style={styles.hero}>
+            <View style={styles.heroCircleLarge} />
+            <View style={styles.heroCircleSmall} />
+            <View style={styles.heroMark}>
+              <Image source={require('../../../../../assets/dcms-app-icon.png')} style={styles.logo} />
+              <View><Text style={styles.brand}>DCMS</Text><Text style={styles.brandCaption}>NHA KHOA CỦA BẠN</Text></View>
+            </View>
+            <Text style={styles.title}>Chào mừng trở lại</Text>
+            <Text style={styles.subtitle}>Chăm sóc nụ cười, bắt đầu từ đây.</Text>
           </View>
 
-          <FormError message={generalError} />
-
           <View style={styles.form}>
+            <Text style={styles.formTitle}>Đăng nhập</Text>
+            <Text style={styles.formSubtitle}>Nhập thông tin tài khoản để tiếp tục</Text>
+            <FormError message={generalError} />
             <TextField
-              label="Tên đăng nhập"
+              label="Số điện thoại hoặc tên đăng nhập"
               value={userName}
               onChangeText={setUserName}
               onBlur={() => {
                 setTouched((p) => ({ ...p, userName: true }));
                 validateField('userName', userName);
               }}
-              placeholder="vd: admin.demo"
               autoCapitalize="none"
               autoCorrect={false}
               textContentType="username"
               keyboardType="default"
               error={touched.userName ? fieldErrors.userName : null}
-              hint="3–64 ký tự, gồm chữ, số và . _ -"
               disabled={isSubmitting}
               testID="sign-in-username"
             />
@@ -138,10 +140,15 @@ export default function SignInScreen() {
                 validateField('password', password);
               }}
               error={touched.password ? fieldErrors.password : null}
-              hint="Nhập mật khẩu hiện tại của bạn."
               disabled={isSubmitting}
               testID="sign-in-password"
             />
+
+            <Link href="/(auth)/recover-account" asChild>
+              <Pressable hitSlop={10} style={styles.forgotLink}>
+                <Text style={styles.linkText}>Quên mật khẩu?</Text>
+              </Pressable>
+            </Link>
 
             <View style={styles.actions}>
               <PrimaryButton
@@ -153,26 +160,17 @@ export default function SignInScreen() {
               />
             </View>
 
-            <View style={styles.linksRow}>
-              <Link href="/(auth)/register" asChild>
-                <Pressable hitSlop={8}>
-                  <Text style={styles.linkText}>Tạo tài khoản (S02)</Text>
-                </Pressable>
-              </Link>
-              <Link href="/(auth)/recover-account" asChild>
-                <Pressable hitSlop={8}>
-                  <Text style={styles.linkText}>Quên mật khẩu? (S03)</Text>
-                </Pressable>
-              </Link>
-            </View>
-
             <View style={styles.googleSection}>
-              <Text style={styles.orText}>Hoặc</Text>
+              <View style={styles.separator}><View style={styles.separatorLine} /><Text style={styles.orText}>hoặc tiếp tục bằng</Text><View style={styles.separatorLine} /></View>
               <GoogleIdentityButton onCredential={onGoogleCredential} onError={setGoogleError} />
               <FormError message={googleError} />
             </View>
-            <Link href="/book-appointment" asChild>
-              <Pressable accessibilityRole="button"><Text style={styles.linkText}>Đặt lịch không cần tài khoản</Text></Pressable>
+          </View>
+
+          <View style={styles.registerRow}>
+            <Text style={styles.registerPrompt}>Chưa có tài khoản? </Text>
+            <Link href="/(auth)/register" asChild>
+              <Pressable hitSlop={10}><Text style={styles.registerLink}>Đăng ký ngay</Text></Pressable>
             </Link>
           </View>
         </ScrollView>
@@ -182,16 +180,35 @@ export default function SignInScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
+  safe: { flex: 1, backgroundColor: '#F5F8FC' },
   flex: { flex: 1 },
-  container: { padding: spacing.lg, gap: spacing.lg, flexGrow: 1 },
-  header: { gap: spacing.xs, marginTop: spacing.md },
-  title: { fontSize: typography.heading, fontWeight: '700', color: colors.text },
-  subtitle: { color: colors.muted, fontSize: typography.body - 2 },
-  form: { gap: spacing.md },
-  actions: { marginTop: spacing.sm },
-  linksRow: { flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.sm },
-  linkText: { color: colors.primary, fontWeight: '600' },
-  googleSection: { gap: spacing.sm, marginTop: spacing.md, alignItems: 'center' },
-  orText: { color: colors.muted, textAlign: 'center' },
+  container: { flexGrow: 1, paddingBottom: spacing.xl, justifyContent: 'center' },
+  hero: { minHeight: 255, overflow: 'hidden', backgroundColor: '#123F91', paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xl, paddingBottom: 56, borderBottomLeftRadius: 32, borderBottomRightRadius: 32 },
+  heroCircleLarge: { position: 'absolute', width: 260, height: 260, borderRadius: 130, borderWidth: 42,
+    borderColor: 'rgba(255,255,255,0.07)', right: -100, top: -95 },
+  heroCircleSmall: { position: 'absolute', width: 120, height: 120, borderRadius: 60,
+    backgroundColor: 'rgba(255,255,255,0.06)', right: -42, bottom: -55 },
+  heroMark: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: spacing.xl },
+  logo: { width: 46, height: 46, borderRadius: 12 },
+  brand: { color: '#FFFFFF', fontSize: 22, fontWeight: '800', letterSpacing: 0.5 },
+  brandCaption: { color: '#BFD7FF', fontSize: 10, fontWeight: '700', letterSpacing: 1.5 },
+  title: { fontSize: 29, fontWeight: '800', color: '#FFFFFF', lineHeight: 36 },
+  subtitle: { color: '#D9E8FF', fontSize: typography.body - 1, lineHeight: 22, marginTop: 6 },
+  form: { gap: spacing.md, marginHorizontal: spacing.lg, marginTop: -30, padding: spacing.lg,
+    borderRadius: 24, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E7EDF6',
+    shadowColor: '#18395E', shadowOpacity: 0.08, shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 }, elevation: 4 },
+  formTitle: { color: colors.text, fontSize: 22, fontWeight: '800' },
+  formSubtitle: { color: colors.muted, fontSize: 13, marginTop: -spacing.sm, marginBottom: spacing.xs },
+  forgotLink: { alignSelf: 'flex-end', minHeight: 36, justifyContent: 'center', marginTop: -spacing.sm },
+  actions: { marginTop: 0 },
+  linkText: { color: colors.primary, fontWeight: '700', fontSize: 13 },
+  googleSection: { gap: spacing.md, marginTop: spacing.sm, alignItems: 'center' },
+  separator: { width: '100%', flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  separatorLine: { flex: 1, height: 1, backgroundColor: colors.border },
+  orText: { color: colors.muted, fontSize: 12 },
+  registerRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: spacing.lg },
+  registerPrompt: { color: colors.muted, fontSize: 14 },
+  registerLink: { color: colors.primary, fontSize: 14, fontWeight: '800' },
 });

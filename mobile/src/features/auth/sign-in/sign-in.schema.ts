@@ -29,10 +29,10 @@ export interface SignInValidationError {
 export function validateSignInForm(input: SignInFormInput): SignInValidationError | null {
   const userName = input.userName.trim();
   if (!userName) {
-    return { field: 'userName', code: 'MSG02', message: 'Vui lòng nhập tên đăng nhập.' };
+    return { field: 'userName', code: 'MSG02', message: 'Vui lòng nhập số điện thoại hoặc tên đăng nhập.' };
   }
   if (!USERNAME_PATTERN.test(userName)) {
-    return { field: 'userName', code: 'MSG04', message: 'Tên đăng nhập không đúng định dạng.' };
+    return { field: 'userName', code: 'MSG04', message: 'Số điện thoại hoặc tên đăng nhập không đúng định dạng.' };
   }
   const password = input.password;
   if (!password) {
@@ -48,8 +48,8 @@ export function validateSignInForm(input: SignInFormInput): SignInValidationErro
 export function validateSignInField(field: 'userName' | 'password', value: string): SignInValidationError | null {
   if (field === 'userName') {
     const trimmed = value.trim();
-    if (!trimmed) return { field, code: 'MSG02', message: 'Vui lòng nhập tên đăng nhập.' };
-    if (!USERNAME_PATTERN.test(trimmed)) return { field, code: 'MSG04', message: 'Tên đăng nhập không đúng định dạng.' };
+    if (!trimmed) return { field, code: 'MSG02', message: 'Vui lòng nhập số điện thoại hoặc tên đăng nhập.' };
+    if (!USERNAME_PATTERN.test(trimmed)) return { field, code: 'MSG04', message: 'Số điện thoại hoặc tên đăng nhập không đúng định dạng.' };
     return null;
   }
   if (!value) return { field, code: 'MSG02', message: 'Vui lòng nhập mật khẩu.' };

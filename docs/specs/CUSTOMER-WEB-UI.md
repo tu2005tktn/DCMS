@@ -69,3 +69,12 @@ Thêm route, nav và Dashboard shortcut Người thân của tôi; CRUD tên/qua
 - **Đặt lịch:** thanh bước và tóm tắt giữ nguyên nội dung; khung giờ là chip bo góc 10px, giờ đã chọn nền xanh chữ trắng (vẫn có `aria-pressed`); nhóm sáng/chiều nằm trong thẻ trắng, tóm tắt là thẻ nhấn bên phải.
 - **Lịch hẹn, Người thân, Liên kết hồ sơ, Đơn thuốc:** thẻ/bảng, nhãn trạng thái và khoảng cách theo token mới; không đổi cột dữ liệu, bộ lọc hay thao tác.
 - **Kiểm tra:** build Web, Playwright các spec cổng khách hàng (customer-portal, customer-dashboard, customer-ui-responsive, customer-appointments, family-members, booking-prefill) và xem lại ở 390/768/1440 px.
+# Hồ sơ bệnh án bệnh nhân (10/11/2026)
+
+Cổng bệnh nhân có một màn **Hồ sơ bệnh án** chỉ đọc, gom thông tin tương ứng các tab nhân viên: Thông tin cơ bản, Khám, Điều trị & Thanh toán, Hình ảnh, Đơn thuốc. Mọi yêu cầu dùng token khách hàng và các API `/api/patients/me/...` hoặc `/api/me/...`; server xác định patientId từ liên kết VERIFIED, không nhận patientId tùy ý từ URL. `GET /api/patients/me/treatment-summary` trả `payments` cho từng dossier từ `DossierPayment` đã ghi và `PaymentReceipt` ở trạng thái Posted, gồm ngày, phương thức, số tiền, nguồn; chỉ những khoản thuộc dossier của bệnh nhân đã xác minh. Không suy số còn nợ từ kế hoạch. Tài liệu hình ảnh dùng API documents và content có xác thực, không nhúng URL công khai. Thông tin chưa có API công khai hiển thị trạng thái chưa khả dụng, không lấy API nhân viên. Tài liệu, lượt khám, đơn thuốc và hồ sơ điều trị chỉ thuộc bệnh nhân đã liên kết; 401 kết thúc phiên, 403 yêu cầu xác minh liên kết. Các danh sách có tải lại và trạng thái trống.
+
+Danh sách lượt khám và tài liệu phân trang tối đa 50 bản ghi mỗi lần theo `IOwnClinicalRecordService.Paging`; cổng bệnh nhân tải tiếp từng trang cho đến `total`, không gửi `pageSize` lớn hơn 50 để tránh MSG04 và không làm lỗi toàn bộ màn bệnh án.
+
+## Điều hướng cổng bệnh nhân (10/11/2026)
+
+Header đã đăng nhập dùng hàng trên cho thương hiệu và tài khoản, hàng dưới cho bảy mục điều hướng hiện có: Trang chủ, Đặt lịch, Lịch hẹn, Đơn thuốc, Người thân, Hồ sơ bệnh án, Liên kết hồ sơ. Mỗi mục có icon và nhãn ngắn, trạng thái đang chọn rõ và vùng bấm tối thiểu 44 px. Desktop trình bày trên một hàng; màn hẹp tự chia thành lưới nhiều hàng, không có thanh cuộn ngang hoặc mục bị che. Giữ nguyên route, đăng xuất và quyền truy cập; có focus bàn phím và nhãn truy cập phù hợp.

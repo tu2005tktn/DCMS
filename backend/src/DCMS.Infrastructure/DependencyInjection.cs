@@ -129,7 +129,7 @@ public static class DependencyInjection
         services.AddScoped<Features.Prescriptions.DevelopmentPrescriptionSeeder>();
         services.AddScoped<IFollowUpBookingPort>(sp => sp.GetRequiredService<FollowUpAppointmentPort>());
         services.AddScoped<IAppointmentNotificationDispatcher, AppointmentNotificationDispatcher>();
-        services.AddScoped<IExternalNotificationAdapter, UnavailableExternalNotificationAdapter>();
+        services.AddScoped<IExternalNotificationAdapter, FirebasePushAdapter>();
         // S03 recovery delivery: a configured SMTP server sends real email in any environment; otherwise
         // only Development gets the logged-only adapter, so no environment can claim a message was sent.
         var smtp = configuration.GetSection("Smtp").Get<SmtpSettings>() ?? new SmtpSettings();

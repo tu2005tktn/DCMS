@@ -11,10 +11,12 @@
 
 import { Stack } from 'expo-router';
 import { colors } from '@/theme/colors';
+import { View } from 'react-native';
+import PatientBottomNav from '@/components/PatientBottomNav';
 
 export default function HomeLayout() {
-  return <Stack screenOptions={{ headerTitle: 'DCMS Mobile', headerTintColor: colors.primary }}>
+  return <View style={{ flex: 1 }}><Stack screenOptions={{ headerTitle: 'DCMS Mobile', headerTintColor: colors.primary }}>
     <Stack.Screen name="index" options={{ headerShown: false }} />
     <Stack.Screen name="notifications" options={{ headerShown: false }} />
-  </Stack>;
+  </Stack><PatientBottomNav /></View>;
 }
