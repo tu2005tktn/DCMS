@@ -23,3 +23,7 @@ Màn đăng nhập mobile dùng bố cục nhận diện DCMS xanh và trắng, 
 ## Điểm vào ứng dụng khi chưa đăng nhập (10/11/2026)
 
 Sau khi khôi phục phiên, tài khoản đã xác thực vào trang chủ tương ứng. Khi chưa đăng nhập, route gốc và route Trang chủ chuyển thẳng đến Đăng nhập, không hiển thị màn chào/menu khách. Màn Đăng nhập liên kết tới Đăng ký và Quên mật khẩu; màn Đăng ký quay về Đăng nhập. Bỏ liên kết quay về màn chào và nút đặt lịch khách khỏi giao diện đăng nhập; không xóa API đặt lịch khách hoặc thay đổi xác thực. Đăng xuất cũng trở về Đăng nhập.
+
+## Làm mới màn đăng nhập (11/11/2026)
+
+Giao diện đăng nhập dùng phần nhận diện gọn ở đầu màn, biểu tượng DCMS, tiêu đề rõ và biểu mẫu trắng với khoảng cách đủ cho điện thoại nhỏ. Trường tài khoản để trống hoàn toàn khi chưa nhập, không hiển thị số điện thoại ví dụ trong ô. Giữ tên trường, hành vi kiểm tra lỗi, hiện/ẩn mật khẩu, Google, quên mật khẩu và đăng ký; không đổi endpoint hoặc trạng thái phiên.

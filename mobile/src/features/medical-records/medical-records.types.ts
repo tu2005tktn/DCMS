@@ -21,7 +21,7 @@ export type OwnTreatmentSummaryItem = {
   startedOn: string; diagnosis: string; planVersion: number; agreedItems: TreatmentItem[];
   performedItems: { id: string; performedAt: string; serviceName: string; region: string | null;
     quantity: number; unit: string; outcome: string | null }[];
-  payments: { id: string; paidOn: string; method: string; totalVnd: number }[];
+  payments: { id: string; paidOn: string; method: string; totalVnd: number; source: string }[];
 };
 
 // GET /api/me/appointments — MyAppointmentCard của máy chủ (không có branchName: chỉ có ở chi tiết).

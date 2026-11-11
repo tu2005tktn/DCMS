@@ -100,14 +100,19 @@ export default function SignInScreen() {
       >
         <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
           <View style={styles.hero}>
-            <View style={styles.heroMark}><Image source={require('../../../../../assets/dcms-app-icon.png')} style={styles.logo} />
-              <Text style={styles.brand}>DCMS</Text></View>
+            <View style={styles.heroCircleLarge} />
+            <View style={styles.heroCircleSmall} />
+            <View style={styles.heroMark}>
+              <Image source={require('../../../../../assets/dcms-app-icon.png')} style={styles.logo} />
+              <View><Text style={styles.brand}>DCMS</Text><Text style={styles.brandCaption}>NHA KHOA CỦA BẠN</Text></View>
+            </View>
             <Text style={styles.title}>Chào mừng trở lại</Text>
-            <Text style={styles.subtitle}>Đăng nhập để tiếp tục chăm sóc nụ cười của bạn.</Text>
+            <Text style={styles.subtitle}>Chăm sóc nụ cười, bắt đầu từ đây.</Text>
           </View>
 
           <View style={styles.form}>
             <Text style={styles.formTitle}>Đăng nhập</Text>
+            <Text style={styles.formSubtitle}>Nhập thông tin tài khoản để tiếp tục</Text>
             <FormError message={generalError} />
             <TextField
               label="Số điện thoại hoặc tên đăng nhập"
@@ -117,7 +122,6 @@ export default function SignInScreen() {
                 setTouched((p) => ({ ...p, userName: true }));
                 validateField('userName', userName);
               }}
-              placeholder="Ví dụ: 0912345678"
               autoCapitalize="none"
               autoCorrect={false}
               textContentType="username"
@@ -140,6 +144,12 @@ export default function SignInScreen() {
               testID="sign-in-password"
             />
 
+            <Link href="/(auth)/recover-account" asChild>
+              <Pressable hitSlop={10} style={styles.forgotLink}>
+                <Text style={styles.linkText}>Quên mật khẩu?</Text>
+              </Pressable>
+            </Link>
+
             <View style={styles.actions}>
               <PrimaryButton
                 label={isSubmitting ? 'Đang đăng nhập…' : 'Đăng nhập'}
@@ -150,24 +160,18 @@ export default function SignInScreen() {
               />
             </View>
 
-            <View style={styles.linksRow}>
-              <Link href="/(auth)/register" asChild>
-                <Pressable hitSlop={8}>
-                  <Text style={styles.linkText}>Tạo tài khoản</Text>
-                </Pressable>
-              </Link>
-              <Link href="/(auth)/recover-account" asChild>
-                <Pressable hitSlop={8}>
-                  <Text style={styles.linkText}>Quên mật khẩu?</Text>
-                </Pressable>
-              </Link>
-            </View>
-
             <View style={styles.googleSection}>
-              <Text style={styles.orText}>Hoặc</Text>
+              <View style={styles.separator}><View style={styles.separatorLine} /><Text style={styles.orText}>hoặc tiếp tục bằng</Text><View style={styles.separatorLine} /></View>
               <GoogleIdentityButton onCredential={onGoogleCredential} onError={setGoogleError} />
               <FormError message={googleError} />
             </View>
+          </View>
+
+          <View style={styles.registerRow}>
+            <Text style={styles.registerPrompt}>Chưa có tài khoản? </Text>
+            <Link href="/(auth)/register" asChild>
+              <Pressable hitSlop={10}><Text style={styles.registerLink}>Đăng ký ngay</Text></Pressable>
+            </Link>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -176,23 +180,35 @@ export default function SignInScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F3F7FD' },
+  safe: { flex: 1, backgroundColor: '#F5F8FC' },
   flex: { flex: 1 },
-  container: { padding: spacing.lg, paddingTop: 0, gap: 0, flexGrow: 1, justifyContent: 'center' },
-  hero: { backgroundColor: '#175CD3', marginHorizontal: -spacing.lg, paddingHorizontal: spacing.lg,
-    paddingTop: 30, paddingBottom: 72, borderBottomLeftRadius: 34, borderBottomRightRadius: 34 },
-  heroMark: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 28, marginTop: 28 },
-  logo: { width: 54, height: 54, borderRadius: 14 },
-  brand: { color: '#FFFFFF', fontSize: 25, fontWeight: '800', letterSpacing: 1 },
-  title: { fontSize: 31, fontWeight: '800', color: '#FFFFFF', lineHeight: 38 },
-  subtitle: { color: '#DCEAFF', fontSize: typography.body, lineHeight: 23, marginTop: 8 },
-  form: { gap: spacing.md, padding: spacing.lg, borderRadius: 24, backgroundColor: '#FFFFFF',
-    borderWidth: 1, borderColor: '#DCE6F3', marginTop: -42, shadowColor: '#15355E', shadowOpacity: 0.12,
-    shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 5 },
-  formTitle: { color: colors.text, fontSize: 22, fontWeight: '800', marginBottom: 4 },
-  actions: { marginTop: spacing.sm },
-  linksRow: { flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.sm },
-  linkText: { color: colors.primary, fontWeight: '700' },
-  googleSection: { gap: spacing.sm, marginTop: spacing.md, alignItems: 'center' },
-  orText: { color: colors.muted, textAlign: 'center' },
+  container: { flexGrow: 1, paddingBottom: spacing.xl, justifyContent: 'center' },
+  hero: { minHeight: 255, overflow: 'hidden', backgroundColor: '#123F91', paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xl, paddingBottom: 56, borderBottomLeftRadius: 32, borderBottomRightRadius: 32 },
+  heroCircleLarge: { position: 'absolute', width: 260, height: 260, borderRadius: 130, borderWidth: 42,
+    borderColor: 'rgba(255,255,255,0.07)', right: -100, top: -95 },
+  heroCircleSmall: { position: 'absolute', width: 120, height: 120, borderRadius: 60,
+    backgroundColor: 'rgba(255,255,255,0.06)', right: -42, bottom: -55 },
+  heroMark: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: spacing.xl },
+  logo: { width: 46, height: 46, borderRadius: 12 },
+  brand: { color: '#FFFFFF', fontSize: 22, fontWeight: '800', letterSpacing: 0.5 },
+  brandCaption: { color: '#BFD7FF', fontSize: 10, fontWeight: '700', letterSpacing: 1.5 },
+  title: { fontSize: 29, fontWeight: '800', color: '#FFFFFF', lineHeight: 36 },
+  subtitle: { color: '#D9E8FF', fontSize: typography.body - 1, lineHeight: 22, marginTop: 6 },
+  form: { gap: spacing.md, marginHorizontal: spacing.lg, marginTop: -30, padding: spacing.lg,
+    borderRadius: 24, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E7EDF6',
+    shadowColor: '#18395E', shadowOpacity: 0.08, shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 }, elevation: 4 },
+  formTitle: { color: colors.text, fontSize: 22, fontWeight: '800' },
+  formSubtitle: { color: colors.muted, fontSize: 13, marginTop: -spacing.sm, marginBottom: spacing.xs },
+  forgotLink: { alignSelf: 'flex-end', minHeight: 36, justifyContent: 'center', marginTop: -spacing.sm },
+  actions: { marginTop: 0 },
+  linkText: { color: colors.primary, fontWeight: '700', fontSize: 13 },
+  googleSection: { gap: spacing.md, marginTop: spacing.sm, alignItems: 'center' },
+  separator: { width: '100%', flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  separatorLine: { flex: 1, height: 1, backgroundColor: colors.border },
+  orText: { color: colors.muted, fontSize: 12 },
+  registerRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: spacing.lg },
+  registerPrompt: { color: colors.muted, fontSize: 14 },
+  registerLink: { color: colors.primary, fontSize: 14, fontWeight: '800' },
 });

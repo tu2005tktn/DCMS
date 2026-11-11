@@ -30,6 +30,24 @@ const linkMessages: Record<Exclude<LinkStatus, 'VERIFIED'>, string> = {
 
 const visitScopeLabels: Record<VisitScope, string> = { HISTORY: 'Lịch sử khám', UPCOMING: 'Lịch sắp tới' };
 
+function paymentMethodLabel(method: string) {
+  if (method === 'Cash') return 'Tiền mặt';
+  if (method === 'Transfer' || method === 'BankTransfer') return 'Chuyển khoản';
+  return method;
+}
+
+function paymentHistory(dossiers: OwnTreatmentSummaryItem[]) {
+  const seen = new Set<string>();
+  return dossiers.flatMap(dossier => (dossier.payments ?? []).map(payment => ({ ...payment, dossierCode: dossier.code })))
+    .filter(payment => {
+      const key = `${payment.source}:${payment.id}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .sort((a, b) => b.paidOn.localeCompare(a.paidOn) || b.id.localeCompare(a.id));
+}
+
 export default function MedicalRecordsScreen() {
   const router = useRouter();
   const session = useSession();
@@ -49,6 +67,7 @@ export default function MedicalRecordsScreen() {
   const [syncError, setSyncError] = useState<string | null>(null);
   const [denied, setDenied] = useState(false);
   const [showContact, setShowContact] = useState(false);
+  const [showAllPayments, setShowAllPayments] = useState(false);
   const loadOrder = useRef(0);
   const hasLoadedOnce = useRef(false);
 
@@ -155,6 +174,8 @@ export default function MedicalRecordsScreen() {
     </ScrollView>;
   }
 
+  const transactions = summary ? paymentHistory(summary) : [];
+
   return (
     <ScrollView contentContainerStyle={styles.container} refreshControl={
       <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={palette.primary} />}>
@@ -244,8 +265,22 @@ export default function MedicalRecordsScreen() {
         <Button title="Xem đơn thuốc" variant="secondary" onPress={() => router.push('/(account)/prescriptions')} />
       </Card>
 
-      <Card title="Thông tin khác">
-        <Text style={styles.muted}>Lịch sử điều chỉnh hồ sơ và hóa đơn chưa hiển thị trên ứng dụng. Liên hệ phòng khám nếu bạn cần bản đầy đủ.</Text>
+      <Card title="Lịch sử giao dịch">
+        {summary === null ? <Text style={styles.muted}>Đang tải giao dịch…</Text>
+          : transactions.length === 0 ? <Text style={styles.muted}>Chưa có khoản thanh toán nào được ghi nhận.</Text>
+            : <View>
+              {transactions.slice(0, showAllPayments ? undefined : 10).map(payment => (
+                <View key={`${payment.source}:${payment.id}`} style={styles.paymentRow}>
+                  <View style={styles.paymentInfo}>
+                    <Text style={styles.paymentMethod}>{paymentMethodLabel(payment.method)}</Text>
+                    <Text style={styles.muted}>{formatDate(payment.paidOn)} · Hồ sơ {payment.dossierCode}</Text>
+                  </View>
+                  <Text style={styles.paymentAmount}>{payment.totalVnd.toLocaleString('vi-VN')} đ</Text>
+                </View>
+              ))}
+              {transactions.length > 10 && <Button title={showAllPayments ? 'Thu gọn' : `Xem tất cả ${transactions.length} giao dịch`}
+                variant="secondary" onPress={() => setShowAllPayments(value => !value)} />}
+            </View>}
       </Card>
 
       {showContact
@@ -294,6 +329,11 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm, borderTopWidth: 1, borderTopColor: palette.border },
   recordMain: { gap: 2, flexShrink: 1 },
   recordCode: { fontSize: 15, fontWeight: '700', color: palette.text },
+  paymentRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.sm,
+    paddingVertical: spacing.sm, borderTopWidth: 1, borderTopColor: palette.border },
+  paymentInfo: { flex: 1, gap: 3 },
+  paymentMethod: { color: palette.text, fontSize: 14, fontWeight: '700' },
+  paymentAmount: { color: palette.primary, fontSize: 15, fontWeight: '800' },
   pill: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
   pillText: { fontSize: 12, fontWeight: '600' },
   syncText: { fontSize: 12, color: palette.muted, textAlign: 'center' },
