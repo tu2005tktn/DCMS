@@ -49,6 +49,7 @@ public sealed partial class DcmsDbContext(DbContextOptions<DcmsDbContext> option
     public DbSet<SupportRequestReceipt> SupportRequestReceipts => Set<SupportRequestReceipt>();
     public DbSet<InAppNotification> InAppNotifications => Set<InAppNotification>();
     public DbSet<NotificationDelivery> NotificationDeliveries => Set<NotificationDelivery>();
+    public DbSet<PushDevice> PushDevices => Set<PushDevice>();
     public IQueryable<AppointmentReminder> AppointmentReminders => Appointments.AsNoTracking().SelectMany(x => x.Reminders);
     public DbSet<StaffHandlingItem> StaffHandlingItems => Set<StaffHandlingItem>();
     public IQueryable<RecoveryToken> RecoveryTokens => Users.AsNoTracking().SelectMany(x => x.Recoveries);

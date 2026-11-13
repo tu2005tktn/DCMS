@@ -188,14 +188,13 @@ public sealed class AppointmentNotificationDispatcher(
         {
             var dueAt = appointment.StartAt.AddMinutes(-lead);
             if (dueAt <= clock.GetUtcNow()) continue;
-            if (await db.AppointmentReminders.AnyAsync(x => x.AppointmentId == appointment.Id
-                && x.AppointmentVersion == appointment.Version && x.LeadMinutes == lead, ct)) continue;
-            appointment.Reminders.Add(new AppointmentReminder
+            // One reminder per appointment version, lead time and recipient account (S26); reminders live in the appointment's JSONB.
+            foreach (var accountId in recipients)
             {
                 if (await db.AppointmentReminders.AnyAsync(x => x.AppointmentId == appointment.Id
                     && x.AppointmentVersion == appointment.Version && x.LeadMinutes == lead
                     && x.AccountId == accountId, ct)) continue;
-                db.AppointmentReminders.Add(new AppointmentReminder
+                appointment.Reminders.Add(new AppointmentReminder
                 {
                     AppointmentId = appointment.Id, AppointmentVersion = appointment.Version,
                     AccountId = accountId, LeadMinutes = lead,

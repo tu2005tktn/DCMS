@@ -443,26 +443,11 @@ public sealed class TreatmentDossierApiTests(ApiFixture fixture) : IClassFixture
             var beforePost = await publicClient.GetFromJsonAsync<OwnTreatmentSummaryItem[]>("/api/patients/me/treatment-summary");
             Assert.Empty(Assert.Single(beforePost!, x => x.DossierId == created.Id).PerformedItems);
             activity.State = "Posted";
-            db.Set<DossierPayment>().Add(new DossierPayment
-            {
-                DossierId = created.Id, PatientId = setup.PatientId, BranchId = setup.BranchId,
-                PaidOn = DateOnly.FromDateTime(DateTime.UtcNow), Method = "Cash", TotalVnd = 50000,
-                CollectorEmployeeId = setup.DentistId, CreatedBy = setup.DentistId, CreatedAt = DateTimeOffset.UtcNow
-            });
-            db.Set<DCMS.Domain.Features.Finance.PaymentReceipt>().Add(new DCMS.Domain.Features.Finance.PaymentReceipt
-            {
-                DossierId = created.Id, PatientId = setup.PatientId, BranchId = setup.BranchId,
-                State = "Posted", Method = "BankTransfer", AmountVnd = 75000,
-                CreatedBy = await db.Users.Where(x => x.UserName == "dentist.demo").Select(x => x.Id).SingleAsync(),
-                CreatedAt = DateTimeOffset.UtcNow, ConfirmedAt = DateTimeOffset.UtcNow
-            });
             await db.SaveChangesAsync();
         }
         var afterPost = await publicClient.GetFromJsonAsync<OwnTreatmentSummaryItem[]>("/api/patients/me/treatment-summary");
         Assert.Equal("SYNTHETIC service performed", Assert.Single(Assert.Single(afterPost!, x => x.DossierId == created.Id).PerformedItems).ServiceName);
-        var recordedPayments = Assert.Single(afterPost!, x => x.DossierId == created.Id).Payments;
-        Assert.Equal(2, recordedPayments.Count);
-        Assert.Contains(recordedPayments, x => x.TotalVnd == 50000 && x.Source == "DossierPayment");
-        Assert.Contains(recordedPayments, x => x.TotalVnd == 75000 && x.Source == "PaymentReceipt");
+        // Finance is removed: the summary keeps the payments field but returns no payments.
+        Assert.Empty(Assert.Single(afterPost!, x => x.DossierId == created.Id).Payments);
     }
 }

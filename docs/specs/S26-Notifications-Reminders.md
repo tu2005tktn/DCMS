@@ -11,7 +11,7 @@
 | Lượt khám hoàn tất, hoạt động điều trị được đăng chính thức, kế hoạch điều trị được chốt | Tài khoản liên kết VERIFIED | Báo hồ sơ điều trị có cập nhật; mở phần hồ sơ tương ứng |
 | Đơn thuốc được hoàn tất hoặc có bản đính chính đã hoàn tất | Tài khoản liên kết VERIFIED | Báo có đơn thuốc mới; mở đơn của lượt khám |
 | Tài liệu lâm sàng chuyển sang trạng thái Ready | Tài khoản liên kết VERIFIED | Báo có tài liệu mới; mở kết quả khám |
-| Khoản thanh toán điều trị được ghi nhận | Tài khoản liên kết VERIFIED | Báo đã cập nhật thanh toán, không đưa số tiền lên màn hình khóa |
+| Khoản thanh toán điều trị được ghi nhận | Tài khoản liên kết VERIFIED | Tạm ngưng từ 13/11/2026 vì phân hệ tài chính đã bị xóa; khi có lại: báo đã cập nhật thanh toán, không đưa số tiền lên màn hình khóa |
 
 - Chỉ tạo thông báo khi giao dịch nghiệp vụ commit; nháp, thao tác lỗi và replay cùng request không tạo thông báo. Mỗi account nhận tối đa một bản cho cùng sự kiện/version. In-app và hàng đợi FCM được ghi cùng transaction với sự kiện; worker gửi sau commit. Lỗi FCM không hoàn tác nghiệp vụ.
 - Push trên màn hình khóa chỉ chứa câu chung, mã hoặc giờ lịch hẹn; không chứa chẩn đoán, thuốc, ảnh, số tiền hoặc ghi chú lâm sàng. Mọi đích mở yêu cầu phiên hợp lệ và backend kiểm tra lại liên kết VERIFIED tại thời điểm mở. Thu hồi liên kết chặn truy cập tiếp theo.

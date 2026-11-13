@@ -124,6 +124,15 @@ internal static class AppointmentModel
             b.HasOne<InAppNotification>().WithMany(x => x.Deliveries).HasForeignKey(x => x.NotificationId).OnDelete(DeleteBehavior.Restrict);
         });
 
+        model.Entity<PushDevice>(b =>
+        {
+            b.ToTable("PUSH_DEVICE");
+            b.Property(x => x.Token).HasMaxLength(512);
+            b.Property(x => x.Platform).HasMaxLength(16);
+            b.HasIndex(x => x.Token).IsUnique();
+            b.HasIndex(x => x.AccountId);
+            b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.AccountId).OnDelete(DeleteBehavior.Cascade);
+        });
         model.Entity<StaffHandlingItem>(b =>
         {
             b.Property(x => x.Kind).HasMaxLength(40).HasColumnName("Kind");

@@ -67,6 +67,8 @@ Cập nhật 08/11/2026 ([MOBILE-PATIENT-VISIT-RESULTS](MOBILE-PATIENT-VISIT-RES
 ## 6. Ranh giới
 
 - Không triển khai backend ACL/clinical edit/payment gateway/chatbot/toàn bộ S42 (DCMS-95 – Tư sở hữu own-record backend, sync/backfill).
+
+> Từ 13/11/2026 phân hệ tài chính đã bị xóa khỏi hệ thống ([CARE-LAB-FINANCE-STORAGE.vi.md](CARE-LAB-FINANCE-STORAGE.vi.md)). `GET /api/patients/me/treatment-summary` giữ trường `payments` nhưng luôn trả mảng rỗng cho đến khi tài chính được thêm lại; màn chi tiết hồ sơ và "Lịch sử giao dịch" hiển thị trạng thái rỗng. Hai mục dưới mô tả hành vi khi có lại `DossierPayment`/`PaymentReceipt`.
 - Không chọn PatientId tùy ý: mọi query đi qua session (policy `PublicAccountPolicy` phía server).
 - Chi tiết hồ sơ điều trị trên mobile tập trung vào hạng mục bác sĩ đã thực hiện (`ClinicalActivity.State=Posted`) theo ngày, tên dịch vụ, vùng/răng, số lượng và kết quả nếu có. API `GET /api/patients/me/treatment-summary` trả thêm `performedItems`; chỉ hồ sơ của tài khoản có liên kết VERIFIED được truy cập. Giao diện mobile bỏ các thẻ kế hoạch đã chốt, bảo hành, “Nguồn chưa kết nối” và các đoạn giải thích kỹ thuật dài dưới tiêu đề. Thanh điều hướng chính dùng biểu tượng kèm nhãn cho Trang chủ, Lịch hẹn, Bệnh án và Tài khoản.
 - Các màn tổng quan và danh sách mobile chỉ hiển thị tên chức năng, trạng thái hoặc dữ liệu cần thao tác; bỏ các câu giới thiệu và mô tả chức năng dưới tiêu đề, thẻ điều hướng. Giữ hướng dẫn dùng thuốc, chi tiết bệnh án, thông báo thực tế và lỗi/hướng dẫn khắc phục vì đây là nội dung nghiệp vụ.

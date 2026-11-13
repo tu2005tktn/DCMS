@@ -114,14 +114,7 @@ public sealed partial class DcmsDbContext
                     document.VisitId is { } id ? $"/visit-results/{id}" : null));
             }
 
-        foreach (var entry in ChangeTracker.Entries<DossierPayment>())
-            if (entry.State == EntityState.Added)
-            {
-                var payment = entry.Entity;
-                events.Add(new(payment.PatientId, payment.BranchId, NotificationKind.PaymentRecorded,
-                    "Thanh toán đã được ghi nhận", "Thông tin thanh toán điều trị của bạn đã được cập nhật.",
-                    $"payment:{payment.Id}", $"/medical-records/{payment.DossierId}"));
-            }
+        // Payment notifications (NotificationKind.PaymentRecorded) return with the finance module.
 
         if (events.Count == 0) return;
         var patientIds = events.Select(x => x.PatientId).Distinct().ToArray();
