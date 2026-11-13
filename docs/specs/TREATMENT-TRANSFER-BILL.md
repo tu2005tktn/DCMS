@@ -1,5 +1,7 @@
 # Bill chuyển khoản PayOS cho phiếu điều trị — 06/11/2026
 
+> **Đã gỡ ngày 13/11/2026.** Phân hệ tài chính đã được xóa khỏi backend, web và database theo [CARE-LAB-FINANCE-STORAGE.vi.md](CARE-LAB-FINANCE-STORAGE.vi.md). Tài liệu này chỉ còn giá trị tham khảo khi đặc tả lại chức năng; không mô tả hành vi hiện tại.
+
 ## Luồng
 
 - Form **TRẢ TIỀN** vẫn cho nhập số tiền theo từng việc đã làm, thu một phần và chọn Tiền mặt/Chuyển khoản. Tiền mặt tiếp tục ghi nhận ngay. Chọn Chuyển khoản rồi bấm **TẠO QR VÀ XEM BILL** tạo một yêu cầu thanh toán PayOS; không ghi vào Đã trả lúc này.

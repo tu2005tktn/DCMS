@@ -31,7 +31,7 @@ public sealed class OwnClinicalRecordService(DcmsDbContext db, IClinicalDocument
     }
 
     private IQueryable<Guid> VisitInvestigations(Guid visitId) =>
-        db.Set<InvestigationOrder>().Where(o => o.VisitId == visitId).Select(o => o.Id);
+        db.Investigations.Where(o => o.VisitId == visitId).Select(o => o.Id);
 
     private IQueryable<ClinicalDocument> ReadyDocuments(int patientId) =>
         db.Set<ClinicalDocument>().AsNoTracking().Where(d => d.PatientId == patientId && d.FileState == "Ready");
@@ -49,7 +49,7 @@ public sealed class OwnClinicalRecordService(DcmsDbContext db, IClinicalDocument
                 : null,
             Version = db.Set<VisitAudit>().Count(a => a.VisitId == v.Id && SaveActions.Contains(a.Action)),
             DocumentCount = db.Set<ClinicalDocument>().Count(x => x.PatientId == patientId && x.FileState == "Ready"
-                && (x.VisitId == v.Id || db.Set<InvestigationOrder>().Any(o => o.VisitId == v.Id && o.Id == x.InvestigationId))),
+                && (x.VisitId == v.Id || db.Investigations.Any(o => o.VisitId == v.Id && o.Id == x.InvestigationId))),
             HasPrescription = db.Set<ExternalPrescription>().Any(p => p.VisitId == v.Id && p.PatientId == patientId && p.Status == PrescriptionStatuses.Finalized) };
 
     // Member-init (not a positional record) so EF can order, filter and count on the projected columns.
@@ -97,7 +97,7 @@ public sealed class OwnClinicalRecordService(DcmsDbContext db, IClinicalDocument
         var findings = c.Findings.Select(f => new OwnFinding(f.Tooth, f.Region, f.Condition, f.Surfaces ?? [], f.Diagnoses ?? [])).ToArray();
         var examination = new OwnExaminationResult(row.Version, c.Symptoms, findings, Diagnoses(c), c.Conclusion, c.Advice,
             c.Disposition, c.ReturnNeed, c.ReferralDestination);
-        var orders = await db.Set<InvestigationOrder>().AsNoTracking().Where(o => o.VisitId == visitId && o.State != "Cancelled")
+        var orders = await db.Investigations.AsNoTracking().Where(o => o.VisitId == visitId && o.State != "Cancelled")
             .OrderBy(o => o.CreatedAt).ThenBy(o => o.Id).ToArrayAsync(ct);
         var investigations = orders.Select(o => o.State == "Reviewed"
             ? new OwnInvestigation(o.Id, o.Kind, o.Name, o.Region, o.State, o.ResultText, o.Interpretation, o.ReviewedAt)

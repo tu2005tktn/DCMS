@@ -25,7 +25,7 @@ public sealed class ItemPlanService(DcmsDbContext db, UserManager<ApplicationUse
         var account = await users.FindByIdAsync(actor.ToString());
         if (account is not { IsActive: true, AccountType: "Staff" }
             || !AccountRoles.Effective(await users.GetRolesAsync(account)).Contains(AccountRoles.Dentist)
-            || !await (from m in db.Set<SchedulingMember>() join e in db.Employees on m.EmployeeId equals e.Id
+            || !await (from m in db.SchedulingMembers join e in db.Employees on m.EmployeeId equals e.Id
                 join b in db.Set<SchedulingBranch>() on m.BranchId equals b.Id
                 where e.AccountId == actor && b.Id == branch && b.Active && m.Active && m.CanDentist select m).AnyAsync(ct))
             throw new BusinessException(403, SystemMessages.Get("MSG06"));
@@ -34,7 +34,7 @@ public sealed class ItemPlanService(DcmsDbContext db, UserManager<ApplicationUse
         await db.TreatmentTemplates.SingleOrDefaultAsync(x => x.Id == id && x.DefinitionKind == "ItemPlan" && (includeDeleted || x.DeletedAt == null), ct) ?? throw Missing();
     private async Task<ItemPlanDto> Dto(TreatmentTemplate plan, CancellationToken ct)
     {
-        var rows = await db.Set<TreatmentTemplateItem>().AsNoTracking().Where(x => x.TemplateId == plan.Id && x.DeletedAt == null)
+        var rows = await db.TreatmentTemplateItems.AsNoTracking().Where(x => x.TemplateId == plan.Id && x.DeletedAt == null)
             .OrderBy(x => x.Position).ThenBy(x => x.Id).ToListAsync(ct);
         return new(plan.Id, plan.BranchId, plan.Name, plan.Version, rows.Count, rows.Sum(x => x.CostVnd), rows.Select(x =>
             new ItemPlanRowDto(x.Id, x.Position, x.Date, JsonSerializer.Deserialize<string[]>(x.TeethJson) ?? [], x.ServiceId,
@@ -51,7 +51,7 @@ public sealed class ItemPlanService(DcmsDbContext db, UserManager<ApplicationUse
         var query = db.TreatmentTemplates.AsNoTracking().Where(x => x.BranchId == branchId && x.DefinitionKind == "ItemPlan" && x.DeletedAt == null);
         var term = keyword?.Trim().ToLowerInvariant(); if (!string.IsNullOrEmpty(term)) query = query.Where(x => x.Name.ToLower().Contains(term));
         var count = await query.CountAsync(ct);
-        var rows = db.Set<TreatmentTemplateItem>().Where(x => x.DeletedAt == null);
+        var rows = db.TreatmentTemplateItems.Where(x => x.DeletedAt == null);
         var list = await query.OrderBy(x => x.Name).ThenBy(x => x.Id).Skip((page - 1) * pageSize).Take(pageSize)
             .Select(x => new ItemPlanListDto(x.Id, x.BranchId, x.Name, x.Version, rows.Count(r => r.TemplateId == x.Id),
                 rows.Where(r => r.TemplateId == x.Id).Sum(r => (long?)r.CostVnd) ?? 0)).ToListAsync(ct);
@@ -62,7 +62,7 @@ public sealed class ItemPlanService(DcmsDbContext db, UserManager<ApplicationUse
         await Authorize(actor, branchId, ct);
         var services = await db.Set<SchedulingService>().AsNoTracking().Where(x => x.BranchId == branchId && x.Active)
             .OrderBy(x => x.Name).Select(x => new ItemPlanServiceOption(x.Id, x.Name, x.ReferenceUnitPriceVnd)).ToListAsync(ct);
-        var members = await (from m in db.Set<SchedulingMember>() join e in db.Employees on m.EmployeeId equals e.Id
+        var members = await (from m in db.SchedulingMembers join e in db.Employees on m.EmployeeId equals e.Id
             join a in db.Users on e.AccountId equals a.Id
             where m.BranchId == branchId && m.Active && a.IsActive && a.AccountType == "Staff"
             orderby e.FullName select new ItemPlanMemberOption(e.Id, e.FullName, m.CanDentist, !m.CanDentist)).ToListAsync(ct);
@@ -111,7 +111,7 @@ public sealed class ItemPlanService(DcmsDbContext db, UserManager<ApplicationUse
         }, ct);
     public Task<ItemPlanDto> DeleteRowAsync(int actor, Guid id, Guid rowId, ItemPlanDelete command, CancellationToken ct) =>
         Write(actor, id, 0, command.RequestKey, "DeleteRow", new { id, rowId, command }, command.ExpectedVersion, async plan => {
-            var row = await db.Set<TreatmentTemplateItem>().SingleOrDefaultAsync(x => x.Id == rowId && x.TemplateId == id && x.DeletedAt == null, ct) ?? throw Missing();
+            var row = plan!.Items.SingleOrDefault(x => x.Id == rowId && x.DeletedAt == null) ?? throw Missing();
             row.DeletedAt = clock.GetUtcNow(); await db.SaveChangesAsync(ct); return await Dto(plan!, ct);
         }, ct);
     public Task<ItemPlanDto> SaveRowAsync(int actor, Guid id, Guid? rowId, ItemPlanRowInput command, CancellationToken ct) =>
@@ -120,8 +120,8 @@ public sealed class ItemPlanService(DcmsDbContext db, UserManager<ApplicationUse
             if (command.EstimatedMinutes is < 1 or > 480) throw Invalid("estimatedMinutes");
             if (command.Note?.Length > 1000) throw Invalid("note");
             if (command.CostVnd < 0 || command.CostVnd > 999999999999m || decimal.Truncate(command.CostVnd) != command.CostVnd) throw Invalid("costVnd");
-            var row = rowId.HasValue ? await db.Set<TreatmentTemplateItem>().SingleOrDefaultAsync(x => x.Id == rowId && x.TemplateId == id && x.DeletedAt == null, ct) ?? throw Missing() : null;
-            if (row == null && await db.Set<TreatmentTemplateItem>().CountAsync(x => x.TemplateId == id && x.DeletedAt == null, ct) >= 100) throw Invalid("items");
+            var row = rowId.HasValue ? plan!.Items.SingleOrDefault(x => x.Id == rowId && x.DeletedAt == null) ?? throw Missing() : null;
+            if (row == null && await db.TreatmentTemplateItems.CountAsync(x => x.TemplateId == id && x.DeletedAt == null, ct) >= 100) throw Invalid("items");
             // Resolve only new selections: retained inactive sources keep their original snapshots.
             var options = await OptionsAsync(actor, plan!.BranchId, ct);
             var service = options.Services.SingleOrDefault(x => x.Id == command.ServiceId);
@@ -131,8 +131,8 @@ public sealed class ItemPlanService(DcmsDbContext db, UserManager<ApplicationUse
             if (command.DentistId.HasValue && (row == null || row.DentistId != command.DentistId) && dentist == null) throw Invalid("dentistId");
             if (command.AssistantId.HasValue && (row == null || row.AssistantId != command.AssistantId) && assistant == null) throw Invalid("assistantId");
             if (row == null) {
-                var max = await db.Set<TreatmentTemplateItem>().Where(x => x.TemplateId == id).MaxAsync(x => (int?)x.Position, ct) ?? 0;
-                row = new TreatmentTemplateItem { TemplateId = id, Position = max + 1 }; db.Add(row);
+                var max = await db.TreatmentTemplateItems.Where(x => x.TemplateId == id).MaxAsync(x => (int?)x.Position, ct) ?? 0;
+                row = new TreatmentTemplateItem { TemplateId = id, Position = max + 1 }; plan.Items.Add(row);
             }
             if (row.ServiceId != command.ServiceId) row.ServiceName = service!.Name;
             if (row.DentistId != command.DentistId) row.DentistName = dentist?.Name;

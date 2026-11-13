@@ -60,7 +60,7 @@ public sealed class ReceptionService(DcmsDbContext db, UserManager<ApplicationUs
             if (!await db.Set<SchedulingBranch>().AnyAsync(x => x.Id == branchId && x.Active, ct)) throw Error("MSG06", 403);
             return actor;
         }
-        if (!await (from m in db.Set<SchedulingMember>() join b in db.Set<SchedulingBranch>() on m.BranchId equals b.Id
+        if (!await (from m in db.SchedulingMembers join b in db.Set<SchedulingBranch>() on m.BranchId equals b.Id
             where m.EmployeeId == actor.EmployeeId && m.BranchId == branchId && m.Active && b.Active && (actor.Assistant || m.CanDentist)
             select m).AnyAsync(ct)) throw Error("MSG06", 403);
         return actor;
@@ -75,7 +75,7 @@ public sealed class ReceptionService(DcmsDbContext db, UserManager<ApplicationUs
         var permissionState = await settingsAccess.RequireAsync(actorId,"reception.read",ct);
         var actor = await ActorAsync(actorId, ct);
         var options = await appointments.OptionsAsync(actorId, ct);
-        var branchIds = await (from m in db.Set<SchedulingMember>() join b in db.Set<SchedulingBranch>() on m.BranchId equals b.Id
+        var branchIds = await (from m in db.SchedulingMembers join b in db.Set<SchedulingBranch>() on m.BranchId equals b.Id
             where m.EmployeeId == actor.EmployeeId && m.Active && b.Active && (actor.Assistant || m.CanDentist) select m.BranchId).ToArrayAsync(ct);
         branchIds = permissionState.Owner ? options.Branches.Select(x => x.Id).ToArray() : branchIds.Intersect(permissionState.BranchIds).ToArray();
         return new(options with
@@ -125,7 +125,7 @@ public sealed class ReceptionService(DcmsDbContext db, UserManager<ApplicationUs
         var patients = await db.Patients.AsNoTracking().Where(x => patientsIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, ct);
         var dentists = await db.Employees.AsNoTracking().Where(x => dentistIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.FullName, ct);
         var branches = await db.Set<SchedulingBranch>().AsNoTracking().Where(x => branchIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.Name, ct);
-        var chairs = await db.Set<SchedulingChair>().AsNoTracking().Where(x => chairIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.Name, ct);
+        var chairs = await db.SchedulingChairs.AsNoTracking().Where(x => chairIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.Name, ct);
         var visits = await db.Visits.AsNoTracking().Where(x => ids.Contains(x.AppointmentId)).ToDictionaryAsync(x => x.AppointmentId, x => x.Id, ct);
         var now = clock.GetUtcNow();
         return rows.Select(a =>

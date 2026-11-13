@@ -1,3 +1,4 @@
+using DCMS.Infrastructure.Features.Accounts;
 using System.Text.Json;
 using DCMS.Application.Common;
 using DCMS.Application.Features.Authentication;
@@ -47,9 +48,8 @@ public sealed class StaffIdleService(DcmsDbContext db, TimeProvider clock) : ISt
         StaffIdleActivityRequest? request, CancellationToken ct)
     {
         await using var tx = await db.Database.BeginTransactionAsync(ct);
-        var session = await db.AuthSessions.FromSqlInterpolated(
-            $"SELECT * FROM \"AUTH_SESSION\" WHERE \"Id\" = {sessionId} FOR UPDATE")
-            .SingleOrDefaultAsync(ct);
+        var owner = await db.LockAccountAsync(actorId, ct);
+        var session = owner?.Sessions.SingleOrDefault(x => x.Id == sessionId);
         if (session == null || session.AccountId != actorId || session.ClientKind != "StaffWeb"
             || session.RevokedAt != null) throw Error(403, "MSG06");
         var now = clock.GetUtcNow(); var minutes = await MinutesAsync(ct);
@@ -90,9 +90,7 @@ public sealed class StaffIdleService(DcmsDbContext db, TimeProvider clock) : ISt
 
     public async Task ExpireAsync(AuthSession session, DateTimeOffset now, CancellationToken ct)
     {
-        session.RevokedAt = now;
-        await db.AuthRefreshTokens.Where(x => x.SessionId == session.Id && x.Status == "ACTIVE")
-            .ExecuteUpdateAsync(s => s.SetProperty(x => x.Status, "REVOKED").SetProperty(x => x.RevokedAt, now), ct);
+        AccountSessions.Revoke(session, now);
         await db.SaveChangesAsync(ct);
     }
 }

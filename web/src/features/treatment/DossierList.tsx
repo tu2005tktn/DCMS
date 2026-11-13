@@ -7,7 +7,6 @@ import { useAuth } from '../authentication/AuthContext';
 import type { AppointmentOptions, DossierListItem, DossierPage, TreatmentChange, TreatmentDossier } from './types';
 import TreatmentSheet from './TreatmentSheet';
 import DossierClosureModal from './DossierClosureModal';
-import FinancialPatientDossiers from './FinancialPatientDossiers';
 
 
 const displayTime = (value: string) => new Intl.DateTimeFormat('vi-VN', {
@@ -113,7 +112,7 @@ export default function DossierList({ patientId, visitId, sourceVisitVersion, br
     finally { setStatusBusyId(null); }
   }
 
-  if (!canUse) return has('finance.read') ? <FinancialPatientDossiers patientId={patientId} /> : <Alert type="info" message="Bạn chưa được cấp quyền xem hồ sơ điều trị." />;
+  if (!canUse) return <Alert type="info" message="Bạn chưa được cấp quyền xem hồ sơ điều trị." />;
   return <section className="treatment-list treatment-sheets" aria-label="Các phiếu điều trị">
     <div className="treatment-sheets-heading"><div>
       <Typography.Title level={4}>DS PHIẾU ĐIỀU TRỊ/DỊCH VỤ</Typography.Title>

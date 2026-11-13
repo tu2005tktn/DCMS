@@ -19,6 +19,10 @@ public sealed class TreatmentCatalogSeedTests(ApiFixture fixture) : IClassFixtur
         await scope.ServiceProvider.GetRequiredService<DevelopmentSchedulingSeeder>().SeedAsync();
         var seeder = scope.ServiceProvider.GetRequiredService<DevelopmentTreatmentCatalogSeeder>();
         var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
+        var demoBranch = await db.Set<SchedulingBranch>().SingleAsync(x => x.Name == "S09 - Chi nhánh thử nghiệm");
+        var examination = await db.Set<SchedulingService>().SingleAsync(x => x.BranchId == demoBranch.Id && x.IsInitialExamination);
+        db.Add(new SchedulingService { BranchId = demoBranch.Id, Name = examination.Name, PublicBookable = false });
+        await db.SaveChangesAsync();
         await seeder.SeedAsync();
         var branch = await db.Set<SchedulingBranch>().SingleAsync(x => x.Name == "S09 - Chi nhánh thử nghiệm");
         var plans = await db.TreatmentTemplates.Where(x => x.BranchId == branch.Id && x.DefinitionKind == "ItemPlan" && x.DeletedAt == null).ToListAsync();
@@ -26,9 +30,10 @@ public sealed class TreatmentCatalogSeedTests(ApiFixture fixture) : IClassFixtur
         var serviceIds = await db.Set<SchedulingService>().Where(x => x.BranchId == branch.Id).Select(x => x.Id).ToListAsync();
         foreach (var plan in plans)
         {
-            var rows = await db.Set<TreatmentTemplateItem>().Where(x => x.TemplateId == plan.Id && x.DeletedAt == null).ToListAsync();
+            var rows = await db.TreatmentTemplateItems.Where(x => x.TemplateId == plan.Id && x.DeletedAt == null).ToListAsync();
             Assert.NotEmpty(rows);
             Assert.All(rows, r => { Assert.Contains(r.ServiceId, serviceIds); Assert.InRange(r.EstimatedMinutes ?? 0, 1, 480); Assert.True(r.CostVnd >= 0); });
+            Assert.All(rows.Where(r => r.ServiceName == examination.Name), r => Assert.Equal(examination.Id, r.ServiceId));
         }
         Assert.Equal(1, await db.Set<SchedulingService>().CountAsync(x => x.BranchId == branch.Id && x.IsInitialExamination));
 

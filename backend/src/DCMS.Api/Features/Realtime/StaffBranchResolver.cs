@@ -20,7 +20,7 @@ internal static class StaffBranchResolver
             var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
             var user = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == accountId);
             if (user is null || !user.IsActive || user.AccountType != "Staff") return Array.Empty<int>();
-            return await (from member in db.Set<SchedulingMember>().AsNoTracking()
+            return await (from member in db.SchedulingMembers.AsNoTracking()
                           join employee in db.Employees.AsNoTracking() on member.EmployeeId equals employee.Id
                           join branch in db.Set<SchedulingBranch>().AsNoTracking() on member.BranchId equals branch.Id
                           where employee.AccountId == accountId && member.Active && branch.Active

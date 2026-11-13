@@ -1,5 +1,7 @@
 # S62 — Điều chỉnh kế hoạch điều trị đã thỏa thuận
 
+Cập nhật lưu trữ ngày 12/11/2026 theo [thiết kế bốn bảng điều trị](TREATMENT-FOUR-TABLES.vi.md). Bản nháp chỉnh sửa nằm trong JSONB của phiếu điều trị. Khi ghi, nạp phiếu có tracking và giữ phạm vi người sửa, hạng mục, phiên bản cùng giao dịch áp dụng thay đổi.
+
 Nguồn: `DCMS_Screen_Specifications_v2.3.docx`, `DCMS_Use_Cases_Business_Rules_Messages_v2.3.docx` (24/10/2026), UC-13; GBR-141/144/145/151/158; AT33/40/49; MSG111/144/233/240/245. S62 là màn hình ngữ cảnh của Staff Web, không có mục sidebar riêng. S21/S43 mở S62 với Patient, dossier và item đã chọn; S22 dùng cùng deep link khi module đó có thật.
 
 ## Luồng và ranh giới

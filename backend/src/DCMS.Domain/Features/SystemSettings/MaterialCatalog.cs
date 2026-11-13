@@ -68,14 +68,13 @@ public sealed class MaterialUsage
     public int? RecordedBy { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
 }
-public sealed class SystemCatalogChange
+// Replay receipt and change history of system catalogs, stored in the shared COMMAND_RECEIPT table
+// (docs/specs/SETTINGS-CATALOG-STORAGE.vi.md). RequestKey, Fingerprint and ResultJson come from the base receipt.
+public sealed class SystemCatalogChange : DCMS.Domain.Common.CommandReceiptRecord
 {
-    public Guid RequestKey { get; set; }
     public int ActorId { get; set; }
     public string Command { get; set; } = "";
     public Guid ResourceId { get; set; }
-    public string Fingerprint { get; set; } = "";
     public string? BeforeJson { get; set; }
-    public string ResultJson { get; set; } = "";
     public DateTimeOffset OccurredAt { get; set; }
 }

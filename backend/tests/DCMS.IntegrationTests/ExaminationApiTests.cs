@@ -573,7 +573,11 @@ public sealed class ExaminationApiTests(ExaminationFixture fixture) : IClassFixt
             var other = await reception.Prepare();
             Guid dossierId;
             using (var scope = fixture.Services.CreateScope()) { var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
-                var a = await db.Appointments.SingleAsync(x => x.Id == other.AppointmentId); a.PatientId = s.PatientId; a.BranchId = s.BranchId;
+                var a = await db.Appointments.SingleAsync(x => x.Id == other.AppointmentId);
+                a.PatientId = s.PatientId;
+                a.BranchId = s.BranchId;
+                a.ChairId = s.ChairId;
+                a.ServiceId = s.ServiceId;
                 var reservation = await db.Set<ResourceReservation>().SingleAsync(x => x.Id == a.ReservationId); reservation.AttendeeKey = $"patient:{s.PatientId}";
                 // Attach a second already-checked-in Visit to the same Patient. Check-in itself is covered through real API in the other cases.
                 a.Status = "CheckedIn"; var visit = new DCMS.Domain.Features.Visits.Visit { AppointmentId = a.Id, PatientId = s.PatientId, BranchId = s.BranchId, DentistId = s.DentistId,
@@ -633,7 +637,7 @@ public sealed class ExaminationApiTests(ExaminationFixture fixture) : IClassFixt
             Assert.Single((await Ok<DocumentDto>(await c.PostAsJsonAsync($"/api/clinical-documents/{d.DocumentId}/review",review))).Reviews);
             Assert.Equal(HttpStatusCode.Conflict, (await Upload(c,m with { Description = "changed" })).StatusCode);
             using var scope = fixture.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
-            (await db.Set<SchedulingMember>().SingleAsync(x => x.BranchId == s.BranchId && x.EmployeeId == s.DentistId)).Active = false; await db.SaveChangesAsync();
+            (await db.LoadMemberAsync(s.BranchId, s.DentistId)).Active = false; await db.SaveChangesAsync();
             Assert.Equal(HttpStatusCode.Forbidden, (await c.GetAsync($"/api/clinical-documents/{d.DocumentId}/content")).StatusCode);
             Assert.Equal(HttpStatusCode.Forbidden, (await Upload(c,m)).StatusCode);
         }

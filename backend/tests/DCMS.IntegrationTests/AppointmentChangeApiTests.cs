@@ -64,12 +64,12 @@ public sealed class AppointmentChangeApiTests(AppointmentChangeFixture fixture) 
             where u.UserName == "assistant.demo" select e).SingleAsync();
         var branch = new SchedulingBranch { Name = "UC06 synthetic " + Guid.NewGuid() };
         db.Add(branch); await db.SaveChangesAsync();
-        db.Add(new SchedulingMember { BranchId = branch.Id, EmployeeId = dentist.Id, CanDentist = true });
-        db.Add(new SchedulingMember { BranchId = branch.Id, EmployeeId = secondDentist.Id, CanDentist = true });
-        if (assistantMember) db.Add(new SchedulingMember { BranchId = branch.Id, EmployeeId = assistant.Id });
+        await db.AddSchedulingDataAsync(new SchedulingMember { BranchId = branch.Id, EmployeeId = dentist.Id, CanDentist = true });
+        await db.AddSchedulingDataAsync(new SchedulingMember { BranchId = branch.Id, EmployeeId = secondDentist.Id, CanDentist = true });
+        if (assistantMember) await db.AddSchedulingDataAsync(new SchedulingMember { BranchId = branch.Id, EmployeeId = assistant.Id });
         var service = new SchedulingService { BranchId = branch.Id, Name = "UC06 exam", PublicDurationMinutes = 30, IsInitialExamination = true };
         var chair = new SchedulingChair { BranchId = branch.Id, Name = "UC06 chair", OpenMinute = 0, CloseMinute = 1440 };
-        db.AddRange(service, chair);
+        await db.AddSchedulingDataAsync(service, chair);
         var date = today ? DateOnly.FromDateTime(fixture.Clock.Now.ToOffset(TimeSpan.FromHours(7)).DateTime)
             : DateOnly.FromDateTime(fixture.Clock.Now.UtcDateTime).AddDays(14 + fixture.NextWeek() * 7);
         var monday = date.AddDays(-(((int)date.DayOfWeek + 6) % 7));
@@ -210,7 +210,7 @@ public sealed class AppointmentChangeApiTests(AppointmentChangeFixture fixture) 
             db.Add(employee); await db.SaveChangesAsync();
             var group = new AccessGroup { Code = username, Name = username, NormalizedCode = username.ToUpperInvariant(), NormalizedName = username.ToUpperInvariant(), BaseRole = "ClinicAssistant" };
             foreach (var permission in new[] { "appointments.read", "appointments.no-show", "appointments.create" }) group.Grants.Add(new AccessGroupGrant { GroupId = group.Id, Permission = permission });
-            groupId = group.Id; db.AddRange(group, new SchedulingMember { BranchId = s.BranchId, EmployeeId = employee.Id },
+            groupId = group.Id; await db.AddSchedulingDataAsync(group, new SchedulingMember { BranchId = s.BranchId, EmployeeId = employee.Id },
                 new StaffAccessAssignment { AccountId = actor, GroupId = group.Id, BranchIds = [s.BranchId] }); await db.SaveChangesAsync();
         }
         using var client = await Login(username); var mark = new NoShowAppointmentRequest(1, Guid.NewGuid(), "SYNTHETIC no-show");
@@ -218,7 +218,8 @@ public sealed class AppointmentChangeApiTests(AppointmentChangeFixture fixture) 
         var booking = await Replacement(client, s, source); (await client.PostAsJsonAsync("/api/appointments", booking)).EnsureSuccessStatusCode();
         using (var scope = fixture.Services.CreateScope()) {
             var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
-            db.RemoveRange(await db.Set<AccessGroupGrant>().Where(x => x.GroupId == groupId && x.Permission != "appointments.read").ToArrayAsync()); await db.SaveChangesAsync();
+            var group = await db.Set<AccessGroup>().SingleAsync(x => x.Id == groupId);
+            group.Grants.RemoveAll(x => x.Permission != "appointments.read"); await db.SaveChangesAsync();
         }
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync(Path(source, "no-show"), mark)).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync("/api/appointments", booking)).StatusCode);
@@ -342,7 +343,7 @@ public sealed class AppointmentChangeApiTests(AppointmentChangeFixture fixture) 
             var group = new AccessGroup { Code = username, Name = username, NormalizedCode = username.ToUpperInvariant(), NormalizedName = username.ToUpperInvariant(), BaseRole = "ClinicAssistant" };
             foreach (var permission in new[] { "appointments.read", "appointments.reschedule", "appointments.cancel" }) group.Grants.Add(new AccessGroupGrant { GroupId = group.Id, Permission = permission });
             groupId = group.Id;
-            db.AddRange(group, new SchedulingMember { BranchId = s.BranchId, EmployeeId = employee.Id }, new StaffAccessAssignment { AccountId = actor, GroupId = group.Id, BranchIds = [s.BranchId] }); await db.SaveChangesAsync();
+            await db.AddSchedulingDataAsync(group, new SchedulingMember { BranchId = s.BranchId, EmployeeId = employee.Id }, new StaffAccessAssignment { AccountId = actor, GroupId = group.Id, BranchIds = [s.BranchId] }); await db.SaveChangesAsync();
         }
         using var staff = await Login(username); var slots = (await staff.GetFromJsonAsync<AvailabilityResult>(Path(a, "availability") + $"?date={s.Date:yyyy-MM-dd}"))!.Slots;
         var move = Move(a, slots.First()) with { ClinicInitiated = true };
@@ -350,7 +351,8 @@ public sealed class AppointmentChangeApiTests(AppointmentChangeFixture fixture) 
         var moved = (await response.Content.ReadFromJsonAsync<AppointmentChangeResult>())!.Appointment;
         using (var scope = fixture.Services.CreateScope()) {
             var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
-            db.RemoveRange(await db.Set<AccessGroupGrant>().Where(x => x.GroupId == groupId && x.Permission != "appointments.read").ToArrayAsync()); await db.SaveChangesAsync();
+            var group = await db.Set<AccessGroup>().SingleAsync(x => x.Id == groupId);
+            group.Grants.RemoveAll(x => x.Permission != "appointments.read"); await db.SaveChangesAsync();
         }
         var cancel = new CancelAppointmentRequest(moved.Version, Guid.NewGuid(), "SYNTHETIC revoked grant", ClinicInitiated: true);
         Assert.Equal(HttpStatusCode.Forbidden, (await staff.PostAsJsonAsync(Path(a, "cancel"), cancel)).StatusCode);

@@ -35,7 +35,7 @@ public sealed class PatientAccountLink
     public int Version { get; set; } = 1;
 }
 
-public sealed class PatientLinkAudit
+public sealed class PatientLinkAudit : DCMS.Domain.Common.AuditRecord
 {
     public long Id { get; set; }
     public int LinkId { get; set; }

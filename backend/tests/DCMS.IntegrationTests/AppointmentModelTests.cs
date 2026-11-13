@@ -25,10 +25,11 @@ public sealed class AppointmentModelTests
         using var db = new DcmsDbContext(new DbContextOptionsBuilder<DcmsDbContext>()
             .UseNpgsql("Host=localhost;Database=not_used;Username=none;Password=none").Options);
         var receipt = db.Model.FindEntityType(typeof(AppointmentReceipt))!;
-        Assert.Equal(nameof(AppointmentReceipt.RequestKey), Assert.Single(receipt.FindPrimaryKey()!.Properties).Name);
+        Assert.Contains(receipt.GetIndexes(), index => index.IsUnique
+            && index.Properties.Select(property => property.Name).SequenceEqual(["ReceiptType", nameof(AppointmentReceipt.RequestKey)]));
         var appointment = db.Model.FindEntityType(typeof(Appointment))!;
-        Assert.Contains(appointment.GetIndexes(), index => index.IsUnique
-            && index.Properties.SingleOrDefault()?.Name == nameof(Appointment.ReservationId));
+        Assert.Equal([nameof(Appointment.ReservationId)], appointment.FindPrimaryKey()!.Properties.Select(x => x.Name));
+        Assert.Contains(appointment.GetKeys(), key => key.Properties.Select(x => x.Name).SequenceEqual([nameof(Appointment.Id)]));
         var service = db.Model.FindEntityType(typeof(ResourceReservation))!
             .FindProperty(nameof(ResourceReservation.ServiceId))!;
         Assert.True(service.IsNullable);

@@ -97,7 +97,12 @@ public sealed class SystemCatalogApiTests(ApiFixture fixture) : IClassFixture<Ap
             using var second = await Login(doctor.UserName);
             Assert.Equal(group.Name, (await second.GetFromJsonAsync<MaterialCategoryDto>($"{Categories}/{group.Id}"))!.Name);
             Assert.Equal(HttpStatusCode.OK, (await second.PutAsJsonAsync($"{Categories}/{group.Id}", new UpdateCategoryRequest(Unique("SYNTHETIC shared "),group.Version,Guid.NewGuid()))).StatusCode);
-            doctor.IsActive = false; await users.UpdateAsync(doctor);
+            // Session changes also advance the account concurrency stamp. Apply the state change
+            // to the current account and require the write to succeed before testing access denial.
+            catalogDb.ChangeTracker.Clear();
+            doctor = (await users.FindByIdAsync(doctor.Id.ToString()))!;
+            doctor.IsActive = false;
+            Assert.True((await users.UpdateAsync(doctor)).Succeeded);
             Assert.Contains((await second.GetAsync(Categories)).StatusCode, new[] { HttpStatusCode.Forbidden, HttpStatusCode.Unauthorized });
         }
         using var anonymous = fixture.CreateClient(); Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync(Categories)).StatusCode);

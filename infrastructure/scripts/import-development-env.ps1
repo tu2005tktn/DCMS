@@ -6,7 +6,7 @@ if (-not (Test-Path -LiteralPath $environmentFile)) {
 }
 $settings = @{}
 foreach ($line in Get-Content -LiteralPath $environmentFile) {
-    if ($line -match '^\s*(POSTGRES_DB|POSTGRES_USER|POSTGRES_PASSWORD|POSTGRES_PORT|JWT_SIGNING_KEY|DEV_SEED_PASSWORD|GOOGLE_WEB_CLIENT_ID|SMTP_HOST|SMTP_PORT|SMTP_ENABLE_SSL|SMTP_USERNAME|SMTP_PASSWORD|SMTP_FROM_ADDRESS|SMTP_FROM_NAME|CLINICAL_DOCUMENTS_STORAGE_PATH|CLAMAV_HOST|CLAMAV_PORT|PAYOS_CLIENT_ID|PAYOS_API_KEY|PAYOS_CHECKSUM_KEY|PAYOS_WEB_BASE_URL|FIREBASE_SERVICE_ACCOUNT_PATH)=(.*)$') {
+    if ($line -match '^\s*(POSTGRES_DB|POSTGRES_USER|POSTGRES_PASSWORD|POSTGRES_PORT|JWT_SIGNING_KEY|DEV_SEED_PASSWORD|GOOGLE_WEB_CLIENT_ID|SMTP_HOST|SMTP_PORT|SMTP_ENABLE_SSL|SMTP_USERNAME|SMTP_PASSWORD|SMTP_FROM_ADDRESS|SMTP_FROM_NAME|CLINICAL_DOCUMENTS_STORAGE_PATH|CLAMAV_HOST|CLAMAV_PORT)=(.*)$') {
         $settings[$Matches[1]] = $Matches[2].Trim()
     }
 }
@@ -32,7 +32,5 @@ if ($settings['GOOGLE_WEB_CLIENT_ID']) { $env:Google__WebClientId = $settings['G
 $smtp = @{ SMTP_HOST = 'Host'; SMTP_PORT = 'Port'; SMTP_ENABLE_SSL = 'EnableSsl'; SMTP_USERNAME = 'UserName'
     SMTP_PASSWORD = 'Password'; SMTP_FROM_ADDRESS = 'FromAddress'; SMTP_FROM_NAME = 'FromName' }
 foreach ($key in $smtp.Keys) { if ($settings[$key]) { Set-Item -Path "env:Smtp__$($smtp[$key])" -Value $settings[$key] } }
-$payOs = @{ PAYOS_CLIENT_ID = 'ClientId'; PAYOS_API_KEY = 'ApiKey'; PAYOS_CHECKSUM_KEY = 'ChecksumKey'; PAYOS_WEB_BASE_URL = 'WebBaseUrl' }
-foreach ($key in $payOs.Keys) { if ($settings[$key]) { Set-Item -Path "env:PayOs__$($payOs[$key])" -Value $settings[$key] } }
 $localDotnet = Join-Path $repositoryRoot '.tools\dotnet\dotnet.exe'
 $dotnet = if (Test-Path -LiteralPath $localDotnet) { $localDotnet } else { 'dotnet' }

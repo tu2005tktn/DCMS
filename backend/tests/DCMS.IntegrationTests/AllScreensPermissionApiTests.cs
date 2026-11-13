@@ -34,7 +34,7 @@ public sealed class AllScreensPermissionApiTests(ReceptionFixture fixture) : ICl
         var user = new ApplicationUser { UserName = name, FullName = "SYNTHETIC screen staff", AccountType = "Staff", IsActive = true, CreatedAt = fixture.Clock.Now, UpdatedAt = fixture.Clock.Now };
         Assert.True((await users.CreateAsync(user, fixture.Password)).Succeeded); Assert.True((await users.AddToRoleAsync(user, role)).Succeeded);
         var employee = new EmployeeProfile { AccountId = user.Id, FullName = user.FullName, EmployeeCode = name }; db.Add(employee); await db.SaveChangesAsync();
-        db.Add(new SchedulingMember { BranchId = branch, EmployeeId = employee.Id, CanDentist = role == AccountRoles.Dentist }); await db.SaveChangesAsync();
+        await db.AddSchedulingDataAsync(new SchedulingMember { BranchId = branch, EmployeeId = employee.Id, CanDentist = role == AccountRoles.Dentist }); await db.SaveChangesAsync();
         return (new(employee.Id, user.Id, user.FullName, true, user.Version, null, 0, [branch]), name);
     }
     async Task<GroupDto> Assign(HttpClient owner, StaffAccessDto staff, string role, params string[] grants) {
@@ -72,13 +72,11 @@ public sealed class AllScreensPermissionApiTests(ReceptionFixture fixture) : ICl
     [InlineData("documents.read", "Dentist", "/api/patients/{patient}/document-contexts", "/api/clinical-documents/11111111-1111-4111-8111-111111111111/review", "POST")]
     [InlineData("care-tasks.read", "ClinicAssistant", "/api/care-tasks?branchId={branch}", "/api/care-tasks", "POST")]
     [InlineData("accounts.read", "Admin", "/api/accounts", "/api/accounts", "POST")]
-    [InlineData("finance.costs.read", "Admin", "/api/finance/providers", "/api/finance/providers", "POST")]
     [InlineData("settings.general.read", "Admin", "/api/system-settings/settings/general", "/api/system-settings/settings/general/preview", "POST")]
     [InlineData("catalog.materials.read", "Dentist", "/api/system-settings/materials", "/api/system-settings/materials", "POST")]
     [InlineData("materials.purchases.read", "Dentist", "/api/system-settings/material-purchases", "/api/system-settings/material-purchases", "POST")]
     [InlineData("materials.stock.read", "Dentist", "/api/system-settings/material-stock", "/api/system-settings/material-purchases", "POST")]
     [InlineData("materials.usage.read", "Dentist", "/api/system-settings/material-usage", "/api/system-settings/material-purchases", "POST")]
-    [InlineData("finance.revenue.read", "Admin", "/api/finance/revenue", "/api/finance/visits/11111111-1111-4111-8111-111111111111/payments", "POST")]
     [InlineData("finance.work-statistics.read", "Admin", "/api/work-statistics", "/api/system-settings/material-purchases", "POST")]
     [InlineData("catalog.medicines.read", "Admin", "/api/system-settings/settings/catalogs/medicines", "/api/system-settings/settings/catalogs/medicines", "POST")]
     [InlineData("catalog.customer-groups.read", "ClinicAssistant", "/api/system-settings/settings/catalogs/customer-groups", "/api/system-settings/settings/catalogs/customer-groups", "POST")]
@@ -99,7 +97,7 @@ public sealed class AllScreensPermissionApiTests(ReceptionFixture fixture) : ICl
     [Fact] public async Task AssignedScheduleScopeFiltersOptionsAndDeniesAnotherBranch() {
         var first = await reception.Prepare(); var second = await reception.Prepare(); using var owner = await reception.Login("owner.demo");
         var (staff, name) = await Staff(first.BranchId, AccountRoles.Dentist);
-        using (var scope = fixture.Services.CreateScope()) { var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>(); db.Add(new SchedulingMember { BranchId = second.BranchId, EmployeeId = staff.EmployeeId, CanDentist = true }); await db.SaveChangesAsync(); }
+        using (var scope = fixture.Services.CreateScope()) { var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>(); await db.AddSchedulingDataAsync(new SchedulingMember { BranchId = second.BranchId, EmployeeId = staff.EmployeeId, CanDentist = true }); await db.SaveChangesAsync(); }
         await Assign(owner, staff, AccountRoles.Dentist, "working-schedules.read", "appointments.read", "booking-settings.read"); using var user = await reception.Login(name);
         var options = await Ok<DCMS.Application.Features.Scheduling.ScheduleOptions>(await user.GetAsync("/api/working-schedules/options"));
         Assert.Equal(first.BranchId, Assert.Single(options.Branches).Id); Assert.All(options.Employees, employee => Assert.False(employee.CanEdit));
@@ -110,21 +108,11 @@ public sealed class AllScreensPermissionApiTests(ReceptionFixture fixture) : ICl
     [InlineData("materials.purchases.create", "Dentist", "/api/system-settings/material-purchases", "POST")]
     [InlineData("materials.purchases.update", "Dentist", "/api/system-settings/material-purchases/11111111-1111-4111-8111-111111111111", "PUT")]
     [InlineData("materials.purchases.delete", "Dentist", "/api/system-settings/material-purchases/11111111-1111-4111-8111-111111111111", "DELETE")]
-    [InlineData("finance.payos.create", "ClinicAssistant", "/api/dossiers/11111111-1111-4111-8111-111111111111/payos-orders", "POST")]
     [InlineData("treatment.lab.manage", "Dentist", "/api/dossiers/11111111-1111-4111-8111-111111111111/sheet-activities/11111111-1111-4111-8111-111111111111/lab-order", "PUT")]
     [InlineData("treatment.lab.manage", "Dentist", "/api/dossiers/11111111-1111-4111-8111-111111111111/sheet-activities/11111111-1111-4111-8111-111111111111/lab-order", "DELETE")]
     public async Task NewWriteGrantsAreRequiredBeyondTheirParentAndCanBeRevoked(string permission, string role, string path, string method) {
         var setup = await reception.Prepare(); using var owner = await reception.Login("owner.demo");
         var (staff, name) = await Staff(setup.BranchId, role);
-        if (permission == "finance.payos.create") {
-            // Dossier endpoints still require the clinical role in addition to the cashier grant.
-            using var scope = fixture.Services.CreateScope();
-            var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
-            Assert.True((await users.AddToRoleAsync((await users.FindByIdAsync(staff.AccountId.ToString()))!, AccountRoles.Dentist)).Succeeded);
-            var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
-            (await db.Set<SchedulingMember>().SingleAsync(x => x.EmployeeId == staff.EmployeeId)).CanDentist = true;
-            await db.SaveChangesAsync();
-        }
         using var user = await reception.Login(name);
         var parent = SettingsGrants.Definitions.Single(x => x.Key == permission).Parent!;
         var group = await Assign(owner, staff, role, parent);
@@ -148,22 +136,21 @@ public sealed class AllScreensPermissionApiTests(ReceptionFixture fixture) : ICl
         var setup = await reception.Prepare(); using var owner = await reception.Login("owner.demo");
         var (staff, name) = await Staff(setup.BranchId, AccountRoles.Dentist);
         await Assign(owner, staff, AccountRoles.Dentist, "finance.read", "catalog.materials.read"); using var user = await reception.Login(name);
-        foreach (var path in new[] { "/api/finance/revenue", "/api/work-statistics", "/api/system-settings/material-stock", "/api/system-settings/material-usage", "/api/system-settings/material-purchases" })
+        foreach (var path in new[] { "/api/work-statistics", "/api/system-settings/material-stock", "/api/system-settings/material-usage", "/api/system-settings/material-purchases" })
             Assert.Equal(HttpStatusCode.Forbidden, (await user.GetAsync(path)).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await user.GetAsync("/api/system-settings/material-stock/available")).StatusCode);
     }
     [Fact] public async Task NewReportGrantsStillRejectBranchesOutsideTheAssignment() {
         var first = await reception.Prepare(); var second = await reception.Prepare(); using var owner = await reception.Login("owner.demo");
         var (staff, name) = await Staff(first.BranchId, AccountRoles.Dentist);
-        await Assign(owner, staff, AccountRoles.Dentist, "finance.revenue.read", "finance.work-statistics.read"); using var user = await reception.Login(name);
-        foreach (var path in new[] { "/api/finance/revenue", "/api/work-statistics" }) {
+        await Assign(owner, staff, AccountRoles.Dentist, "finance.work-statistics.read"); using var user = await reception.Login(name);
+        foreach (var path in new[] { "/api/work-statistics" }) {
             Assert.Equal(HttpStatusCode.OK, (await user.GetAsync(path)).StatusCode);
             Assert.Equal(HttpStatusCode.Forbidden, (await user.GetAsync($"{path}?branchId={second.BranchId}")).StatusCode);
         }
     }
     [Fact] public void UnassignedAdminDoesNotGainFinancialReportsOrMaterialOperations() {
         var legacy = SettingsGrants.Legacy([AccountRoles.Admin]);
-        Assert.DoesNotContain("finance.revenue.read", legacy);
         Assert.DoesNotContain("finance.work-statistics.read", legacy);
         Assert.DoesNotContain(legacy, x => x.StartsWith("materials."));
     }
@@ -206,21 +193,6 @@ public sealed class AllScreensPermissionApiTests(ReceptionFixture fixture) : ICl
         await Assign(owner, staff, AccountRoles.ClinicAssistant, "reception.read"); using var user = await reception.Login(name);
         Assert.Equal(HttpStatusCode.OK, (await user.GetAsync($"/api/visits/{visit.VisitId}")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await user.GetAsync($"/api/visits/{visit.VisitId}/examination")).StatusCode);
-    }
-    [Fact] public async Task DossierPaymentRightsAreIndependentOfClinicalEditing() {
-        var setup = await reception.Prepare(); using var owner = await reception.Login("owner.demo"); using var dentist = await reception.Login("dentist.demo");
-        var dossier = (await Ok<DCMS.Application.Features.Treatment.TreatmentChange>(await dentist.PostAsJsonAsync($"/api/patients/{setup.PatientId}/dossiers", new DCMS.Application.Features.Treatment.CreateDossierRequest(setup.BranchId, setup.DentistId, "SYNTHETIC payment access", null, null, Guid.NewGuid())))).Dossier;
-        var (staff, name) = await Staff(setup.BranchId, AccountRoles.Dentist);
-        var group = await Assign(owner, staff, AccountRoles.Dentist, "treatment.dossiers.update"); using var user = await reception.Login(name);
-        Assert.Equal(HttpStatusCode.OK, (await user.GetAsync($"/api/dossiers/{dossier.Id}")).StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, (await user.GetAsync($"/api/dossiers/{dossier.Id}/payments/context")).StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, (await user.PostAsJsonAsync($"/api/dossiers/{dossier.Id}/payments", new {})).StatusCode);
-        group = (await owner.GetFromJsonAsync<GroupDto>($"/api/system-settings/access-groups/{group.Id}"))!;
-        await Ok<GroupDto>(await owner.PutAsJsonAsync($"/api/system-settings/access-groups/{group.Id}", new GroupCommand(Guid.NewGuid(), new(group.Code, group.Name, group.BaseRole, ["finance.read"]), group.Version, "SYNTHETIC finance only")));
-        Assert.Equal(HttpStatusCode.OK, (await user.GetAsync($"/api/dossiers/{dossier.Id}/payments/context")).StatusCode);
-        Assert.Equal(HttpStatusCode.OK, (await user.GetAsync($"/api/dossiers/{dossier.Id}/payments")).StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, (await user.GetAsync($"/api/dossiers/{dossier.Id}")).StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, (await user.PostAsJsonAsync($"/api/dossiers/{dossier.Id}/payments", new {})).StatusCode);
     }
     [Fact] public async Task PrescriptionReadDoesNotRequireExaminationWriteOrReceptionAccess() {
         var setup = await reception.Prepare(); using var assistant = await reception.Login(); var visit = await reception.Check(assistant, setup);

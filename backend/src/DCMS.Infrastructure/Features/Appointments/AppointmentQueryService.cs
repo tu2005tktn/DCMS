@@ -52,7 +52,7 @@ public sealed class AppointmentQueryService(DcmsDbContext db, UserManager<Applic
             if (!await db.Set<SchedulingBranch>().AsNoTracking().AnyAsync(x => x.Id == branchId && x.Active, ct)) throw Error("MSG06", 403);
             return new(branchId, employeeId, null);
         }
-        var membership = await db.Set<SchedulingMember>().AsNoTracking()
+        var membership = await db.SchedulingMembers.AsNoTracking()
             .SingleOrDefaultAsync(x => x.BranchId == branchId && x.EmployeeId == employeeId && x.Active, ct) ?? throw Error("MSG06", 403);
         if (broad || membership.CanManageSchedules) return new(branchId, employeeId, null);
         if (!membership.CanDentist) throw Error("MSG06", 403);
@@ -62,7 +62,7 @@ public sealed class AppointmentQueryService(DcmsDbContext db, UserManager<Applic
     public async Task<AppointmentOptions> OptionsAsync(int actorId, CancellationToken ct)
     {
         var (employeeId, broad) = await ActorAsync(actorId, ct);
-        var mine = await db.Set<SchedulingMember>().AsNoTracking().Where(x => x.EmployeeId == employeeId && x.Active).ToListAsync(ct);
+        var mine = await db.SchedulingMembers.AsNoTracking().Where(x => x.EmployeeId == employeeId && x.Active).ToListAsync(ct);
         var dynamicScope = await access.ResolveAsync(actorId, ct);
         mine = mine.Where(x => !dynamicScope.Assigned || dynamicScope.Owner || dynamicScope.BranchIds.Contains(x.BranchId)).ToList();
         mine = mine.Where(x => broad || x.CanManageSchedules || x.CanDentist).ToList();
@@ -78,12 +78,12 @@ public sealed class AppointmentQueryService(DcmsDbContext db, UserManager<Applic
         var ownOnly = mine.Where(x => !broad && !x.CanManageSchedules).Select(x => x.BranchId).ToHashSet();
         var branches = await db.Set<SchedulingBranch>().AsNoTracking().Where(x => branchIds.Contains(x.Id) && x.Active)
             .OrderBy(x => x.Name).Select(x => new CalendarOption(x.Id, x.Name)).ToArrayAsync(ct);
-        var members = await db.Set<SchedulingMember>().AsNoTracking().Where(x => branchIds.Contains(x.BranchId) && x.Active && x.CanDentist).ToListAsync(ct);
+        var members = await db.SchedulingMembers.AsNoTracking().Where(x => branchIds.Contains(x.BranchId) && x.Active && x.CanDentist).ToListAsync(ct);
         var names = await EmployeeNamesAsync(members.Select(x => x.EmployeeId), ct);
         var dentists = members.Where(x => !ownOnly.Contains(x.BranchId) || x.EmployeeId == employeeId)
             .Select(x => new CalendarDentist(x.EmployeeId, x.BranchId, names.GetValueOrDefault(x.EmployeeId, $"#{x.EmployeeId}")))
             .OrderBy(x => x.Name).ToArray();
-        var chairs = await db.Set<SchedulingChair>().AsNoTracking().Where(x => branchIds.Contains(x.BranchId) && x.Active)
+        var chairs = await db.SchedulingChairs.AsNoTracking().Where(x => branchIds.Contains(x.BranchId) && x.Active)
             .OrderBy(x => x.Name).Select(x => new CalendarChair(x.Id, x.BranchId, x.Name)).ToArrayAsync(ct);
         var services = await db.Set<SchedulingService>().AsNoTracking().Where(x => branchIds.Contains(x.BranchId) && x.Active && x.IsInitialExamination)
             .OrderBy(x => x.Name).Select(x => new CalendarService(x.Id, x.BranchId, x.Name, x.PublicDurationMinutes)).ToArrayAsync(ct);
@@ -99,10 +99,10 @@ public sealed class AppointmentQueryService(DcmsDbContext db, UserManager<Applic
         var dentist = scope.OwnDentistId ?? dentistId;
         var rows = await Range(scope.BranchId, from, to, dentist, filterStatus).OrderBy(x => x.StartAt).ToListAsync(ct);
 
-        int[] dentistIds = dentist.HasValue ? [dentist.Value] : await db.Set<SchedulingMember>().AsNoTracking()
+        int[] dentistIds = dentist.HasValue ? [dentist.Value] : await db.SchedulingMembers.AsNoTracking()
             .Where(x => x.BranchId == branchId && x.Active && x.CanDentist).Select(x => x.EmployeeId).ToArrayAsync(ct);
         var weekStarts = Enumerable.Range(0, to.DayNumber - from.DayNumber + 1).Select(i => Monday(from.AddDays(i))).Distinct().ToArray();
-        var weeks = await db.Set<WorkingWeek>().AsNoTracking().Include(x => x.Periods)
+        var weeks = await db.Set<WorkingWeek>().AsNoTracking()
             .Where(x => x.BranchId == branchId && dentistIds.Contains(x.EmployeeId) && weekStarts.Contains(x.WeekStart)).ToListAsync(ct);
         var days = new List<CalendarDay>();
         foreach (var id in dentistIds)
@@ -134,7 +134,7 @@ public sealed class AppointmentQueryService(DcmsDbContext db, UserManager<Applic
             throw Error("MSG04");
         var (employeeId, broad) = await ActorAsync(actorId, ct);
         if (!await db.Patients.AsNoTracking().AnyAsync(x => x.Id == patientId, ct)) throw Error("MSG113", 404);
-        var memberships = db.Set<SchedulingMember>().AsNoTracking().Where(x => x.EmployeeId == employeeId && x.Active);
+        var memberships = db.SchedulingMembers.AsNoTracking().Where(x => x.EmployeeId == employeeId && x.Active);
         var activeBranches = db.Set<SchedulingBranch>().AsNoTracking().Where(x => x.Active);
         var source = db.Appointments.AsNoTracking().Where(a => a.PatientId == patientId
             && activeBranches.Any(b => b.Id == a.BranchId)
@@ -285,7 +285,7 @@ public sealed class AppointmentQueryService(DcmsDbContext db, UserManager<Applic
         var chairIds = rows.Select(x => x.ChairId).Distinct().ToArray();
         var serviceIds = rows.Where(x => x.ServiceId.HasValue).Select(x => x.ServiceId!.Value).Distinct().ToArray();
         var branches = await db.Set<SchedulingBranch>().AsNoTracking().Where(x => branchIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.Name, ct);
-        var chairs = await db.Set<SchedulingChair>().AsNoTracking().Where(x => chairIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.Name, ct);
+        var chairs = await db.SchedulingChairs.AsNoTracking().Where(x => chairIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.Name, ct);
         var services = await db.Set<SchedulingService>().AsNoTracking().Where(x => serviceIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.Name, ct);
         return rows.Select(x => new AppointmentListItem(x.Id, x.Code, x.BranchId, branches.GetValueOrDefault(x.BranchId, ""),
             x.StartAt, x.EndAt, (int)(x.EndAt - x.StartAt).TotalMinutes, x.DentistId, names.GetValueOrDefault(x.DentistId, ""),

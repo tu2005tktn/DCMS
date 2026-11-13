@@ -39,9 +39,8 @@ internal static class SystemSettingsModel
             b.HasIndex(x => x.MaterialId); b.HasIndex(x => x.ActivityId); b.HasIndex(x => x.UsedAt);
         });
         model.Entity<SystemCatalogChange>(b => {
-            b.ToTable("SYSTEM_CATALOG_CHANGE"); b.HasKey(x => x.RequestKey); b.Property(x => x.RequestKey).ValueGeneratedNever();
-            b.Property(x => x.Command).HasMaxLength(48); b.Property(x => x.Fingerprint).HasMaxLength(64);
-            b.Property(x => x.BeforeJson).HasColumnType("jsonb"); b.Property(x => x.ResultJson).HasColumnType("jsonb");
+            b.Property(x => x.Command).HasMaxLength(48); b.Property(x => x.BeforeJson).HasColumnType("jsonb");
+            b.HasIndex(new[] { "ReceiptType", "RequestKey" }, "UX_SystemCatalogChange_Scope").IsUnique().HasDatabaseName("UX_RECEIPT_RequestKey");
             b.HasIndex(x => new { x.ResourceId, x.OccurredAt });
         });
         model.Entity<ClinicSettingsVersion>(b => {

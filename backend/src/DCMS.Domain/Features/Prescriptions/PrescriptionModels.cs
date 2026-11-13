@@ -17,9 +17,8 @@ public static class PrescriptionRules
 }
 
 // One signed (or draft) revision of the external prescription of a visit; finalized revisions are immutable.
-public sealed class ExternalPrescription
+public sealed class ExternalPrescription : DCMS.Domain.Common.PrescriptionRecord
 {
-    public Guid Id { get; set; } = Guid.NewGuid();
     public Guid VisitId { get; set; }
     public int PatientId { get; set; }
     public int BranchId { get; set; }
@@ -38,6 +37,7 @@ public sealed class ExternalPrescription
     public DateTimeOffset CreatedAt { get; set; }
     public int UpdatedBy { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
+    public List<ExternalPrescriptionLine> Lines { get; set; } = [];
 }
 
 public sealed class ExternalPrescriptionLine
@@ -73,9 +73,8 @@ public sealed class ExternalPrescriptionLine
     public DateTimeOffset UpdatedAt { get; set; }
 }
 
-public sealed class PrescriptionTemplate
+public sealed class PrescriptionTemplate : DCMS.Domain.Common.PrescriptionRecord
 {
-    public Guid Id { get; set; } = Guid.NewGuid();
     public string Code { get; set; } = "";
     public string Name { get; set; } = "";
     public string? DiagnosisKind { get; set; }
@@ -112,7 +111,7 @@ public sealed class PrescriptionTemplateLine
     public int SortOrder { get; set; }
 }
 
-public sealed class PrescriptionAudit
+public sealed class PrescriptionAudit : DCMS.Domain.Common.AuditRecord
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public int ActorId { get; set; }
@@ -126,18 +125,16 @@ public sealed class PrescriptionAudit
     public DateTimeOffset At { get; set; }
 }
 
-public sealed class PrescriptionCommandReceipt
+public sealed class PrescriptionCommandReceipt : DCMS.Domain.Common.CommandReceiptRecord
 {
     public int ActorId { get; set; }
-    public Guid RequestKey { get; set; }
-    public string Fingerprint { get; set; } = "";
-    public string ResultJson { get; set; } = "{}";
 }
 
 // Patient-profile prescription: a single saved clinical instruction set, visible to its verified patient link.
-public sealed class PatientPrescription
+public sealed class PatientPrescription : DCMS.Domain.Common.PrescriptionRecord
 {
-    public Guid Id { get; set; } = Guid.NewGuid();
+    // Retained legacy metadata supports data-preserving migration rollback.
+    public bool RequiresExternalPurchase { get; set; }
     public int PatientId { get; set; }
     public int BranchId { get; set; }
     public DateOnly PrescribedOn { get; set; }
@@ -153,6 +150,7 @@ public sealed class PatientPrescription
 
 public sealed class PatientPrescriptionItem
 {
+    public bool IsExternalPurchase { get; set; }
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid PrescriptionId { get; set; }
     public Guid MedicineId { get; set; }
@@ -166,10 +164,8 @@ public sealed class PatientPrescriptionItem
     public int Position { get; set; }
 }
 
-public sealed class PatientPrescriptionReceipt
+public sealed class PatientPrescriptionReceipt : DCMS.Domain.Common.CommandReceiptRecord
 {
     public int ActorId { get; set; }
-    public Guid RequestKey { get; set; }
-    public string Fingerprint { get; set; } = "";
     public Guid PrescriptionId { get; set; }
 }

@@ -215,7 +215,7 @@ public sealed class RecoveryApiTests(ApiFixture fixture) : IClassFixture<ApiFixt
         await using var connection = new Npgsql.NpgsqlConnection(fixture.ConnectionString);
         await connection.OpenAsync();
         await using var command = new Npgsql.NpgsqlCommand(
-            """SELECT count(*) FROM "RECOVERY_TOKEN" WHERE "AccountId" = @id AND "UsedAt" IS NOT NULL AND "ResetGrantHash" <> '' """, connection);
+            """SELECT count(*) FROM "USER_ACCOUNT" u CROSS JOIN LATERAL jsonb_array_elements(u."Recoveries") r WHERE u."Id" = @id AND r->>'UsedAt' IS NOT NULL AND r->>'ResetGrantHash' <> '' """, connection);
         command.Parameters.AddWithValue("id", accountId);
         Assert.Equal(1L, (long)(await command.ExecuteScalarAsync())!);
     }
@@ -294,17 +294,16 @@ public sealed class RecoveryApiTests(ApiFixture fixture) : IClassFixture<ApiFixt
         // Scan every recovery table for a plaintext proof, grant or password.
         var tables = new (string Table, string[] Columns)[]
         {
-            ("RECOVERY_TOKEN", ["TokenHash", "ResetGrantHash", "ChannelType", "NormalizedDestination"]),
-            ("RECOVERY_AUDIT", ["Reason", "ChannelType", "Result"]),
-            ("RECOVERY_OUTBOX", ["Destination", "Provider", "Status", "ProviderMessageId"]),
-            ("ACCOUNT_AUDIT", ["Reason", "BeforeJson", "AfterJson"])
+            ("USER_ACCOUNT", ["Recoveries", "RecoveryDeliveries"]),
+            ("AUDIT_LOG", ["Reason", "ChannelType", "Result"]),
+            ("AUDIT_LOG", ["Reason", "BeforeJson", "AfterJson"])
         };
         foreach (var (table, columns) in tables)
         {
             // The audit JSON columns are cast to text so the neutral concatenation stays a plain
             // text projection; without the cast PostgreSQL resolves COALESCE to the json type.
             var projection = string.Join(" || '|' || ", columns.Select(c =>
-                table == "ACCOUNT_AUDIT" && c.EndsWith("Json", StringComparison.Ordinal)
+                (table == "AUDIT_LOG" && c.EndsWith("Json", StringComparison.Ordinal)) || table == "USER_ACCOUNT"
                     ? $"COALESCE(\"{c}\"::text, '')"
                     : $"COALESCE(\"{c}\", '')"));
             await using var command = new Npgsql.NpgsqlCommand($"""SELECT {projection} FROM "{table}" """, connection);
@@ -320,8 +319,8 @@ public sealed class RecoveryApiTests(ApiFixture fixture) : IClassFixture<ApiFixt
 
         // Only the hash forms are persisted, so a leaked database cannot be replayed.
         await using var hashCommand = new Npgsql.NpgsqlCommand("""
-            SELECT count(*) FROM "RECOVERY_TOKEN" WHERE "AccountId" = @id
-            AND "TokenHash" <> @proof AND "ResetGrantHash" <> @grant
+            SELECT count(*) FROM "USER_ACCOUNT" u CROSS JOIN LATERAL jsonb_array_elements(u."Recoveries") r WHERE u."Id" = @id
+            AND r->>'TokenHash' <> @proof AND r->>'ResetGrantHash' <> @grant
             """, connection);
         hashCommand.Parameters.AddWithValue("id", accountId);
         hashCommand.Parameters.AddWithValue("proof", proof);
@@ -400,8 +399,8 @@ public sealed class RecoveryApiTests(ApiFixture fixture) : IClassFixture<ApiFixt
         await using var connection = new Npgsql.NpgsqlConnection(fixture.ConnectionString);
         await connection.OpenAsync();
         await using var command = new Npgsql.NpgsqlCommand("""
-            SELECT "ActorId", "TargetId", "Action" FROM "RECOVERY_AUDIT"
-            WHERE "TargetId" = @id AND "Action" IN ('RecoveryRequested', 'RecoveryVerified')
+            SELECT "ActorId", "TargetId", "Action" FROM "AUDIT_LOG" WHERE "AuditType" = 'RecoveryAudit'
+            AND "TargetId" = @id AND "Action" IN ('RecoveryRequested', 'RecoveryVerified')
             """, connection);
         command.Parameters.AddWithValue("id", accountId);
         await using var reader = await command.ExecuteReaderAsync();
@@ -456,7 +455,7 @@ public sealed class RecoveryApiTests(ApiFixture fixture) : IClassFixture<ApiFixt
         await using var connection = new Npgsql.NpgsqlConnection(fixture.ConnectionString);
         await connection.OpenAsync();
         await using var command = new Npgsql.NpgsqlCommand("""
-            SELECT "Action", "Reason", "ChannelType", "Result" FROM "RECOVERY_AUDIT" WHERE "TargetId" = @id
+            SELECT "Action", "Reason", "ChannelType", "Result" FROM "AUDIT_LOG" WHERE "AuditType" = 'RecoveryAudit' AND "TargetId" = @id
             """, connection);
         command.Parameters.AddWithValue("id", accountId);
         var actions = new List<string>();
@@ -480,7 +479,7 @@ public sealed class RecoveryApiTests(ApiFixture fixture) : IClassFixture<ApiFixt
         // The account audit also carries the credential change with actor, time and reason.
         await using var accountCommand = new Npgsql.NpgsqlCommand("""
             SELECT "ActorId", "TargetId", "Action", "Reason", "OccurredAt", "BeforeJson"
-            FROM "ACCOUNT_AUDIT" WHERE "TargetId" = @id AND "Action" = 'PasswordReset'
+            FROM "AUDIT_LOG" WHERE "AuditType" = 'AccountAudit' AND "TargetId" = @id AND "Action" = 'PasswordReset'
             """, connection);
         accountCommand.Parameters.AddWithValue("id", accountId);
         await using var accountReader = await accountCommand.ExecuteReaderAsync();
@@ -651,8 +650,8 @@ public sealed class RecoveryApiTests(ApiFixture fixture) : IClassFixture<ApiFixt
     private static async Task<string[]> RolesAsync(Npgsql.NpgsqlConnection connection, int accountId)
     {
         await using var command = new Npgsql.NpgsqlCommand("""
-            SELECT r."Name" FROM "USER_ACCOUNT_ROLE" ur JOIN "ROLE" r ON r."Id" = ur."RoleId"
-            WHERE ur."UserId" = @id ORDER BY r."Name"
+            SELECT r FROM "USER_ACCOUNT" u CROSS JOIN LATERAL unnest(u."AssignedRoles") r
+            WHERE u."Id" = @id ORDER BY r
             """, connection);
         command.Parameters.AddWithValue("id", accountId);
         var roles = new List<string>();
@@ -666,8 +665,7 @@ public sealed class RecoveryApiTests(ApiFixture fixture) : IClassFixture<ApiFixt
         await using var connection = new Npgsql.NpgsqlConnection(fixture.ConnectionString);
         await connection.OpenAsync();
         await using var command = new Npgsql.NpgsqlCommand("""
-            UPDATE "RECOVERY_TOKEN" SET "ExpiresAt" = now() - interval '1 hour'
-            WHERE "AccountId" = @id AND "UsedAt" IS NULL
+            UPDATE "USER_ACCOUNT" SET "Recoveries"=(SELECT jsonb_agg(CASE WHEN r->>'UsedAt' IS NULL THEN jsonb_set(r,'{ExpiresAt}',to_jsonb(now() - interval '1 hour')) ELSE r END) FROM jsonb_array_elements("Recoveries") r) WHERE "Id"=@id
             """, connection);
         command.Parameters.AddWithValue("id", accountId);
         await command.ExecuteNonQueryAsync();
@@ -678,8 +676,7 @@ public sealed class RecoveryApiTests(ApiFixture fixture) : IClassFixture<ApiFixt
         await using var connection = new Npgsql.NpgsqlConnection(fixture.ConnectionString);
         await connection.OpenAsync();
         await using var command = new Npgsql.NpgsqlCommand("""
-            UPDATE "RECOVERY_TOKEN" SET "LastResentAt" = @when
-            WHERE "AccountId" = @id AND "UsedAt" IS NULL
+            UPDATE "USER_ACCOUNT" SET "Recoveries"=(SELECT jsonb_agg(CASE WHEN r->>'UsedAt' IS NULL THEN jsonb_set(r,'{LastResentAt}',to_jsonb(@when)) ELSE r END) FROM jsonb_array_elements("Recoveries") r) WHERE "Id"=@id
             """, connection);
         command.Parameters.AddWithValue("when", when);
         command.Parameters.AddWithValue("id", accountId);
@@ -691,8 +688,7 @@ public sealed class RecoveryApiTests(ApiFixture fixture) : IClassFixture<ApiFixt
         await using var connection = new Npgsql.NpgsqlConnection(fixture.ConnectionString);
         await connection.OpenAsync();
         await using var command = new Npgsql.NpgsqlCommand("""
-            UPDATE "RECOVERY_TOKEN" SET "ResendCount" = @count
-            WHERE "AccountId" = @id AND "UsedAt" IS NULL
+            UPDATE "USER_ACCOUNT" SET "Recoveries"=(SELECT jsonb_agg(CASE WHEN r->>'UsedAt' IS NULL THEN jsonb_set(r,'{ResendCount}',to_jsonb(@count)) ELSE r END) FROM jsonb_array_elements("Recoveries") r) WHERE "Id"=@id
             """, connection);
         command.Parameters.AddWithValue("count", count);
         command.Parameters.AddWithValue("id", accountId);

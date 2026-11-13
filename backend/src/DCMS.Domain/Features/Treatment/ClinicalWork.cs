@@ -1,12 +1,18 @@
 namespace DCMS.Domain.Features.Treatment;
 
-public sealed class ClinicalActivity
+public abstract class TreatmentProcessRecord
+{
+    public Guid StorageId { get; set; } = Guid.NewGuid();
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid StorageStamp { get; set; } = Guid.NewGuid();
+}
+
+public sealed class ClinicalActivity : TreatmentProcessRecord
 {
     public string SourceKind { get; set; } = "Visit";
     public string? ServiceNameSnapshot { get; set; }
     public string? LabWorkSnapshot { get; set; }
     public bool IsPlanTransfer { get; set; }
-    public Guid Id { get; set; } = Guid.NewGuid();
     public Guid? VisitId { get; set; }
     public int PatientId { get; set; }
     public int BranchId { get; set; }
@@ -37,9 +43,8 @@ public sealed class ClinicalActivity
     public DateTimeOffset? PostedAt { get; set; }
 }
 
-public sealed class ClinicalReview
+public sealed class ClinicalReview : TreatmentProcessRecord
 {
-    public Guid Id { get; set; } = Guid.NewGuid();
     public Guid VisitId { get; set; }
     public int PatientId { get; set; }
     public int BranchId { get; set; }
@@ -60,9 +65,8 @@ public sealed class ClinicalReview
     public int Version { get; set; } = 1;
 }
 
-public sealed class ClinicalCareNote
+public sealed class ClinicalCareNote : TreatmentProcessRecord
 {
-    public Guid Id { get; set; } = Guid.NewGuid();
     public Guid VisitId { get; set; }
     public int PatientId { get; set; }
     public int BranchId { get; set; }
@@ -74,12 +78,10 @@ public sealed class ClinicalCareNote
     public DateTimeOffset RecordedAt { get; set; }
 }
 
-public sealed class ClinicalCommandReceipt
+public sealed class ClinicalCommandReceipt : DCMS.Domain.Common.CommandReceiptRecord
 {
-    public Guid RequestKey { get; set; }
     public int ActorId { get; set; }
     public string Command { get; set; } = "";
-    public string Fingerprint { get; set; } = "";
     public Guid ResultId { get; set; }
 }
 
@@ -101,6 +103,10 @@ public sealed class CareTask
     public int CreatedBy { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
+    // Contact attempts and escalations are stored on the task row.
+    public List<CareContactAttempt> ContactAttempts { get; set; } = [];
+    public List<CareEscalation> Escalations { get; set; } = [];
+    public Guid StorageStamp { get; set; } = Guid.NewGuid();
 }
 
 public sealed class CareContactAttempt

@@ -17,7 +17,7 @@ Thêm vào phiếu labo:
 
 Chuyển trạng thái hợp lệ: `NotSent → Sent`; `Sent → Received | Rework`; `Received → Delivered | Rework`; `Delivered → Rework`; `Rework → Sent`. Chuyển khác → MSG04. Hệ quả: vào `Sent` đặt `sentOn` = hôm nay; vào `Received` đặt `receivedOn`; vào `Delivered` đặt `deliveredOn` (nếu trống); vào `Rework` xóa `receivedOn` và `deliveredOn`. Mỗi lần chuyển tăng `version`.
 
-Bảng nhật ký mới `LAB_ORDER_STATUS_LOG` (không sửa/xóa): phiếu, trạng thái cũ (trống khi tạo), trạng thái mới, thời điểm, người đổi, ghi chú (≤ 300 ký tự, không bắt buộc). Phiếu cũ trước khi có tính năng: `Delivered` nếu đã có ngày giao, ngược lại `NotSent`. Xóa phiếu xóa luôn nhật ký.
+Nhật ký trạng thái (không sửa/xóa) lưu trong collection JSONB `StatusLogs` của dòng `LAB_ORDER` từ 13/11/2026 (trước đó là bảng `LAB_ORDER_STATUS_LOG`, xem [CARE-LAB-FINANCE-STORAGE.vi.md](CARE-LAB-FINANCE-STORAGE.vi.md)): phiếu, trạng thái cũ (trống khi tạo), trạng thái mới, thời điểm, người đổi, ghi chú (≤ 300 ký tự, không bắt buộc). Phiếu cũ trước khi có tính năng: `Delivered` nếu đã có ngày giao, ngược lại `NotSent`. Xóa phiếu xóa luôn nhật ký.
 
 **Quá hạn** (tính, không lưu): có ngày hẹn nhỏ hơn hôm nay (giờ Việt Nam) và trạng thái là `NotSent`, `Sent` hoặc `Rework`.
 

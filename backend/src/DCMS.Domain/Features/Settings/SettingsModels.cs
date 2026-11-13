@@ -1,30 +1,17 @@
 namespace DCMS.Domain.Features.Settings;
 
-public sealed class SettingsVersion
+// Structure and rows of a retired /api/settings table (SETTINGS_VERSION, OPERATIONAL_REFERENCE_ENTRY), kept so a rollback
+// can rebuild it (docs/specs/SETTINGS-CATALOG-STORAGE.vi.md). BeforeJson holds { table, columns, constraints, indexes, rows }.
+public sealed class SettingsLegacyArchive : DCMS.Domain.Common.AuditRecord
 {
-    public int Version { get; set; }
-    public string ContentJson { get; set; } = "{}";
-    public int ActorId { get; set; }
-    public string Reason { get; set; } = "";
-    public DateTimeOffset EffectiveAt { get; set; }
-}
-public sealed class ReferenceEntry
-{
-    public Guid Id { get; set; } = Guid.NewGuid();
-    public string Kind { get; set; } = "";
-    public string? Code { get; set; }
-    public string? NormalizedCode { get; set; }
-    public string Name { get; set; } = "";
-    public string NormalizedName { get; set; } = "";
-    public string? Description { get; set; }
-    public bool Reserved { get; set; }
-    public bool Active { get; set; } = true;
-    public int Version { get; set; } = 1;
-    public int CreatedBy { get; set; }
-    public DateTimeOffset CreatedAt { get; set; }
+    public string BeforeJson { get; set; } = "{}";
 }
 public sealed class AccessGroup
 {
+    public string RecordKind { get; set; } = "PermissionGroup";
+    public int? IdentityRoleId { get; set; }
+    public string? RoleConcurrencyStamp { get; set; }
+    public List<DCMS.Domain.Features.Authentication.AccountClaim> RoleClaims { get; set; } = [];
     public Guid Id { get; set; } = Guid.NewGuid();
     public string Code { get; set; } = "";
     public string Name { get; set; } = "";
@@ -48,7 +35,7 @@ public sealed class StaffAccessAssignment
     public int[] BranchIds { get; set; } = [];
     public int Version { get; set; } = 1;
 }
-public sealed class SettingsAudit
+public sealed class SettingsAudit : DCMS.Domain.Common.AuditRecord
 {
     public int[] BranchIds { get; set; } = [];
     public Guid Id { get; set; } = Guid.NewGuid();
@@ -62,12 +49,9 @@ public sealed class SettingsAudit
     public string AfterJson { get; set; } = "{}";
     public DateTimeOffset At { get; set; }
 }
-public sealed class SettingsReceipt
+public sealed class SettingsReceipt : DCMS.Domain.Common.CommandReceiptRecord
 {
     public int ActorId { get; set; }
-    public Guid RequestKey { get; set; }
-    public string Fingerprint { get; set; } = "";
-    public string ResultJson { get; set; } = "{}";
 }
 
 public sealed class BranchProfile

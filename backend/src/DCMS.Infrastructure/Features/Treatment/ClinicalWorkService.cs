@@ -68,7 +68,7 @@ public sealed class ClinicalWorkService(DcmsDbContext db, UserManager<Applicatio
             !AccountRoles.Effective(await users.GetRolesAsync(user)).Contains(AccountRoles.Dentist))
             throw Error("MSG06", 403);
         var employee = await db.Employees.AsNoTracking().SingleOrDefaultAsync(x => x.AccountId == actorId, ct);
-        if (employee == null || !await db.Set<SchedulingMember>().AsNoTracking().AnyAsync(x =>
+        if (employee == null || !await db.SchedulingMembers.AsNoTracking().AnyAsync(x =>
             x.BranchId == branchId && x.EmployeeId == employee.Id && x.Active && x.CanDentist, ct))
             throw Error("MSG06", 403);
         return employee.Id;
@@ -183,8 +183,8 @@ public sealed class ClinicalWorkService(DcmsDbContext db, UserManager<Applicatio
             }
             if (x.StepId.HasValue)
             {
-                var step = await db.TreatmentSteps.SingleOrDefaultAsync(s => s.Id == x.StepId &&
-                    s.DossierId == dossier.Id && s.ItemId == item.Id, ct);
+                var step = await db.LoadTreatmentStepAsync(db.TreatmentSteps.Where(s => s.Id == x.StepId &&
+                    s.DossierId == dossier.Id && s.ItemId == item.Id), ct);
                 if (step == null) throw Error("MSG113", 404);
                 if (step.HoldReason != null || step.Outcome is "Completed" or "Stopped" or "Cancelled")
                     throw Error("MSG230", 409);

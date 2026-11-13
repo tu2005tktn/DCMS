@@ -1,5 +1,7 @@
 # Hồ sơ khách hàng — Điều trị & Thanh toán (Web)
 
+> **Đã gỡ ngày 13/11/2026.** Phân hệ tài chính đã được xóa khỏi backend, web và database theo [CARE-LAB-FINANCE-STORAGE.vi.md](CARE-LAB-FINANCE-STORAGE.vi.md). Tài liệu này chỉ còn giá trị tham khảo khi đặc tả lại chức năng; không mô tả hành vi hiện tại.
+
 ## Baseline v2.5 — 27/10/2026
 
 Điều chỉnh mới nhất: bỏ tự lưu hàng và ghi chú. Nút ✓ trên hàng chỉ mở bước xem lại; chỉ xác nhận cuối cùng mới ghi máy chủ. Ghi chú có nút Lưu ghi chú. Quy định này thay thế các mô tả tự lưu còn giữ bên dưới để tham khảo lịch sử UI.

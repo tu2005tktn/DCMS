@@ -78,8 +78,7 @@ public sealed partial class FamilyRecordService
             total = await query.CountAsync(ct);
             var prescriptions = await query.OrderByDescending(x => x.FinalizedAt).ThenBy(x => x.Id).Skip(skip).Take(pageSize).ToArrayAsync(ct);
             var ids = prescriptions.Select(x => x.Id).ToArray();
-            var lines = await db.Set<ExternalPrescriptionLine>().AsNoTracking().Where(x => ids.Contains(x.PrescriptionId)
-                && x.PatientId == row.PatientId && x.BranchId == row.BranchId && x.Status == "Finalized").OrderBy(x => x.CreatedAt).ThenBy(x => x.Id).ToArrayAsync(ct);
+            var lines = prescriptions.SelectMany(x => x.Lines).ToArray();
             items = prescriptions.Select(x => (object)new FamilyPrescriptionDto(x.Id, x.VisitId, x.FinalizedAt, x.Diagnosis, x.GeneralAdvice,
                 lines.Where(l => l.PrescriptionId == x.Id).Select(l => new FamilyMedicineDto(l.MedicineName, l.Strength, l.Unit, l.Quantity,
                     l.Route, l.MorningDose, l.NoonDose, l.AfternoonDose, l.EveningDose, l.MealTiming, l.Days, l.Instructions)).ToArray())).ToArray();

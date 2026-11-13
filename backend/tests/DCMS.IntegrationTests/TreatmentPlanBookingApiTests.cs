@@ -58,7 +58,7 @@ public sealed class TreatmentPlanBookingApiTests(ApiFixture fixture) : IClassFix
         var patient = new PatientProfile { PatientCode = "AUDIT-" + Guid.NewGuid().ToString("N"), FullName = "SYNTHETIC audit patient", CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow };
         db.AddRange(branch, patient); await db.SaveChangesAsync();
         var service = new SchedulingService { BranchId = branch.Id, Name = "SYNTHETIC planned service", PublicBookable = false, Unit = "răng" };
-        db.AddRange(service, new SchedulingChair { BranchId = branch.Id, Name = "SYNTHETIC chair", OpenMinute = 480, CloseMinute = 1080 },
+        await db.AddSchedulingDataAsync(service, new SchedulingChair { BranchId = branch.Id, Name = "SYNTHETIC chair", OpenMinute = 480, CloseMinute = 1080 },
             new SchedulingMember { BranchId = branch.Id, EmployeeId = dentist.Id, CanDentist = true },
             new SchedulingMember { BranchId = branch.Id, EmployeeId = assistant.Id });
         var monday = date.AddDays(-(((int)date.DayOfWeek + 6) % 7));
@@ -142,7 +142,7 @@ public sealed class TreatmentPlanBookingApiTests(ApiFixture fixture) : IClassFix
         using (var scope = fixture.Services.CreateScope()) {
             var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
             otherDentist = await (from e in db.Employees join u in db.Users on e.AccountId equals u.Id where u.UserName == "owner.demo" select e.Id).SingleAsync();
-            db.Add(new SchedulingMember { BranchId = first.Branch, EmployeeId = otherDentist, CanDentist = true }); await db.SaveChangesAsync();
+            await db.AddSchedulingDataAsync(new SchedulingMember { BranchId = first.Branch, EmployeeId = otherDentist, CanDentist = true }); await db.SaveChangesAsync();
         }
         var range = $"from={first.Date:yyyy-MM-dd}&to={first.Date:yyyy-MM-dd}";
         Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync($"/api/working-schedules/appointments?dentistId={otherDentist}&{range}")).StatusCode);
@@ -407,7 +407,7 @@ public sealed class TreatmentPlanBookingApiTests(ApiFixture fixture) : IClassFix
                 Name = "SYNTHETIC next step", EstimatedMinutes = 30, ReservedMinutes = 30,
                 PredecessorsJson = System.Text.Json.JsonSerializer.Serialize(new[] { first.Id }) };
             nextStepId = next.Id;
-            db.AddRange(first, next, new ClinicalActivity { SourceKind = "Dossier", DossierId = s.Dossier, ItemId = s.Item, StepId = first.Id,
+            await db.AddTreatmentDataAsync(first, next, new ClinicalActivity { SourceKind = "Dossier", DossierId = s.Dossier, ItemId = s.Item, StepId = first.Id,
                 PatientId = s.Patient, BranchId = s.Branch, PlanVersion = 1, ServiceId = s.Service, PerformerId = s.Dentist,
                 Unit = "răng", Quantity = 1, State = "Posted", Outcome = "SYNTHETIC first step done",
                 PerformedAt = DateTimeOffset.UtcNow, CreatedAt = DateTimeOffset.UtcNow, PostedAt = DateTimeOffset.UtcNow });

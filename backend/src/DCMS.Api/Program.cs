@@ -183,19 +183,12 @@ app.MapRecoveryEndpoints();
 app.MapEmailVerificationEndpoints();
 app.MapAccountEndpoints();
 DCMS.Api.Features.Settings.SettingsEndpoints.MapSettingsEndpoints(app);
-DCMS.Api.Features.Finance.FinanceEndpoints.MapFinanceEndpoints(app);
 DCMS.Api.Features.Prescriptions.PrescriptionEndpoints.MapPrescriptionEndpoints(app);
 app.MapPatientLinkEndpoints();
 DCMS.Api.Features.FamilyMembers.FamilyMemberEndpoints.MapFamilyMemberEndpoints(app);
 DCMS.Api.Features.FamilyMembers.FamilyRecordEndpoints.MapFamilyRecordEndpoints(app);
 app.MapPatientEndpoints();
 app.MapTreatmentEndpoints();
-app.MapPost("/api/payments/payos/webhook", async (System.Text.Json.JsonElement payload,
-    DCMS.Application.Features.Treatment.IPayOsOrderService service, CancellationToken ct) =>
-{
-    await service.ReceiveWebhookAsync(payload, ct);
-    return Results.Ok(new { code = "00", desc = "success" });
-}).AllowAnonymous();
 DCMS.Api.Features.Treatment.ItemPlanEndpoints.MapItemPlanEndpoints(app);
 DCMS.Api.Features.SystemSettings.SystemSettingsEndpoints.MapSystemSettingsEndpoints(app);
 app.MapClinicalWorkEndpoints();

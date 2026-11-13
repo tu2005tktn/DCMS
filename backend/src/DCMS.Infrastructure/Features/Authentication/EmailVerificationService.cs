@@ -44,8 +44,7 @@ public sealed class EmailVerificationService(
         if (hourlyCount >= settings.RateLimitPerAccountPerHour)
             return new("Đã đạt giới hạn gửi mã. Vui lòng thử lại sau.", 3600);
 
-        var latest = await db.EmailVerificationTokens.Where(x => x.AccountId == accountId)
-            .OrderByDescending(x => x.Id).FirstOrDefaultAsync(ct);
+        var latest = user.EmailVerifications.OrderByDescending(x => x.Id).FirstOrDefault();
         if (latest is { UsedAt: null } && latest.ExpiresAt > now)
         {
             var remaining = TimeSpan.FromMinutes(settings.ResendCooldownMinutes) - (now - latest.LastSentAt);
@@ -63,8 +62,9 @@ public sealed class EmailVerificationService(
             throw new BusinessException(503, SystemMessages.Get("MSG144"));
 
         if (latest is { UsedAt: null }) latest.UsedAt = now;
-        db.EmailVerificationTokens.Add(new EmailVerificationToken
+        user.EmailVerifications.Add(new EmailVerificationToken
         {
+            Id = await db.NextAccountEntryIdAsync(ct),
             AccountId = accountId,
             NormalizedEmail = user.NormalizedEmail!,
             CodeHash = Hash(code),
@@ -89,8 +89,7 @@ public sealed class EmailVerificationService(
         if (user.EmailConfirmed)
             throw new BusinessException(400, SystemMessages.Get("MSG108"));
         var now = DateTimeOffset.UtcNow;
-        var token = await db.EmailVerificationTokens.Where(x => x.AccountId == accountId)
-            .OrderByDescending(x => x.Id).FirstOrDefaultAsync(ct);
+        var token = user.EmailVerifications.OrderByDescending(x => x.Id).FirstOrDefault();
         if (token == null || token.UsedAt != null || token.ExpiresAt <= now ||
             token.VerifyAttempts >= settings.MaxVerifyAttempts ||
             !string.Equals(token.NormalizedEmail, user.NormalizedEmail, StringComparison.OrdinalIgnoreCase))
@@ -124,9 +123,7 @@ public sealed class EmailVerificationService(
 
     private async Task LockAccountAsync(int accountId, CancellationToken ct)
     {
-        _ = await db.Users.FromSqlInterpolated(
-            $"SELECT * FROM \"USER_ACCOUNT\" WHERE \"Id\" = {accountId} FOR UPDATE")
-            .AsNoTracking().ToListAsync(ct);
+        _ = await db.LockAccountAsync(accountId, ct);
     }
 
     private void AddAudit(int accountId, string action, string result, DateTimeOffset now) =>

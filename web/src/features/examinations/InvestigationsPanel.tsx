@@ -1,5 +1,3 @@
-import InvestigationBillingDrawer from '../finance/InvestigationBillingDrawer';
-import {useAuth} from '../authentication/AuthContext';
 ﻿import { Alert, AutoComplete, Button, Card, Checkbox, Empty, Form, Input, Modal, Select, Space, Tag, Typography } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { api, ApiError } from '../../services/api';
@@ -24,7 +22,6 @@ export default function InvestigationsPanel({ workspace, contexts, busy, onBusy,
   workspace: Workspace; contexts: PatientDocumentContexts | null; busy: boolean; onBusy: (busy: boolean) => void;
   onChanged: (page: InvestigationPage, mutation: boolean) => Promise<void>;
 }) {
-  const {user}=useAuth(); const [billingOrder,setBillingOrder]=useState<Investigation>();
   const [form] = Form.useForm<Values>();
   const [mode, setMode] = useState<Mode>(), [upload, setUpload] = useState<string>(), [documentId, setDocumentId] = useState<string | null>(null);
   const [error, setError] = useState<string>(), [working, setWorking] = useState(false);
@@ -90,7 +87,6 @@ export default function InvestigationsPanel({ workspace, contexts, busy, onBusy,
       {order.reviewedAt && <p>Đã đọc: {order.reviewedByName} · {formatStamp(order.reviewedAt)}</p>}
       {order.cancellationReason && <p>Lý do hủy: {order.cancellationReason}</p>}
       <Space wrap>
-        {user?.permissions.includes('finance.read') && <Button disabled={busy} onClick={()=>setBillingOrder(order)}>Dịch vụ và phí</Button>}
         {order.allowedActions.includes('upload') && <Button disabled={busy} onClick={() => setUpload(order.id)}>Tải tệp kết quả</Button>}
         {order.allowedActions.includes('result') && <Button disabled={busy} onClick={() => open('result', order)}>Nhận kết quả</Button>}
         {order.allowedActions.includes('review') && <Button type="primary" disabled={busy} onClick={() => open('review', order)}>Đọc kết quả</Button>}
@@ -123,7 +119,6 @@ export default function InvestigationsPanel({ workspace, contexts, busy, onBusy,
         {mode?.action === 'cancel' && <><Alert type="info" message="Nếu dịch vụ đã thực hiện, hủy chỉ định không tự xóa phí, khoản phải trả hoặc phiếu thu."/><Form.Item label="Lý do hủy" name="reason" rules={[{ required: true, whitespace: true, max: 1000 }]}><Input.TextArea aria-label="Lý do hủy chỉ định" maxLength={1000} /></Form.Item></>}
       </Form>
     </Modal>
-    {billingOrder&&<InvestigationBillingDrawer key={billingOrder.id} workspace={workspace} order={billingOrder} onClose={()=>setBillingOrder(undefined)} onChanged={()=>load(true)}/>}
     <UploadDrawer key={upload ?? 'none'} open={!!upload} patientId={workspace.visit.patientId} contexts={contexts} initialContext={{ visitId, investigationId: upload, investigationLabel: orders.find(order => order.id === upload)?.name, documentType: orders.find(order => order.id === upload)?.kind === 'XRay' ? 'XRay' : ['Lab', 'Pathology'].includes(orders.find(order => order.id === upload)?.kind ?? '') ? 'LabResult' : 'Other' }} constraints={defaultConstraints}
       lockedVisitId={visitId} onClose={() => setUpload(undefined)} onUploaded={() => { polls.current = 0; void load(true); }} />
     <DocumentDetailDrawer documentId={documentId} onClose={() => setDocumentId(null)} />

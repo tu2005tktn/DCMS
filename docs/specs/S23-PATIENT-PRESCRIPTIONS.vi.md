@@ -1,5 +1,7 @@
 # S23 — Kê đơn trực tiếp từ hồ sơ bệnh nhân
 
+Cập nhật lưu trữ 12/11/2026 theo [hợp đồng rút gọn database](DATABASE-SIMPLIFICATION.vi.md). Đơn lưu một dòng trong `PRESCRIPTION`; `Items` JSONB chứa ID dòng, ID thuốc, snapshot và thứ tự. Danh mục thuốc dùng chung `CATALOG_MEDICINE`. Các route và DTO bên dưới tiếp tục áp dụng.
+
 Cập nhật 09/11/2026: form kê đơn dạng "tờ đơn thuốc", chọn bác sĩ kê đơn, context phòng khám, mobile hiển thị cùng bố cục và dữ liệu demo đơn thuốc.
 
 ## Mục tiêu và luồng chính

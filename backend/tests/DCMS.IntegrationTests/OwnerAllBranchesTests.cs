@@ -30,8 +30,8 @@ public sealed class OwnerAllBranchesTests(ApiFixture fixture) : IClassFixture<Ap
         var lines = new List<string>();
         foreach (var (name, branch) in new[] { ("A", a), ("B", b) })
             foreach (var url in new[] { $"/api/appointments/calendar?branchId={branch}&from={from}&to={to}", $"/api/appointments?branchId={branch}&from={from}&to={to}",
-                $"/api/reception/appointments?branchId={branch}&date={from}", $"/api/reception/queue?branchId={branch}&date={from}", $"/api/finance/queue?branchId={branch}",
-                $"/api/finance/revenue?branchId={branch}", $"/api/lab-orders?branchId={branch}", $"/api/settings/branches/{branch}", $"/api/appointments/options", "/api/reception/options" })
+                $"/api/reception/appointments?branchId={branch}&date={from}", $"/api/reception/queue?branchId={branch}&date={from}",
+                $"/api/lab-orders?branchId={branch}", $"/api/settings/branches/{branch}", $"/api/appointments/options", "/api/reception/options" })
                 { var code = (int)(await owner.GetAsync(url)).StatusCode; lines.Add($"{name} {code} {url}"); Assert.True(code == 200, $"{name} {code} {url}"); }
         lines.Add($"ALL {(int)(await owner.GetAsync("/api/work-statistics")).StatusCode} /api/work-statistics");
         // Lịch làm việc: chủ chọn chi nhánh B rồi xem lịch của bác sĩ chi nhánh B.

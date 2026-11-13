@@ -113,9 +113,10 @@ public sealed class AppointmentNotificationDispatcher(
         var now = clock.GetUtcNow();
         var due = await db.AppointmentReminders.Where(x => x.Status == "Pending" && x.DueAt <= now)
             .OrderBy(x => x.DueAt).Take(50).ToListAsync(ct);
-        foreach (var reminder in due)
+        foreach (var candidate in due)
         {
-            var appointment = await db.Appointments.AsNoTracking().SingleOrDefaultAsync(x => x.Id == reminder.AppointmentId, ct);
+            var appointment = await db.Appointments.SingleAsync(x => x.Id == candidate.AppointmentId, ct);
+            var reminder = appointment.Reminders.Single(x => x.Id == candidate.Id);
             if (appointment == null || appointment.Version != reminder.AppointmentVersion
                 || appointment.Status != "Confirmed" ||
                 !(await RecipientsAsync(appointment, ct)).Contains(reminder.AccountId))
@@ -176,9 +177,8 @@ public sealed class AppointmentNotificationDispatcher(
 
     private async Task SupersedeRemindersAsync(Guid appointmentId, CancellationToken ct)
     {
-        var old = await db.AppointmentReminders.Where(x => x.AppointmentId == appointmentId
-            && (x.Status == "Pending" || x.Status == "Retrying")).ToListAsync(ct);
-        foreach (var reminder in old) reminder.Status = "Superseded";
+        var owner = await db.Appointments.SingleAsync(x => x.Id == appointmentId, ct);
+        foreach (var reminder in owner.Reminders.Where(x => x.Status is "Pending" or "Retrying")) reminder.Status = "Superseded";
     }
 
     private async Task ScheduleRemindersAsync(Appointment appointment, CancellationToken ct)
@@ -188,7 +188,9 @@ public sealed class AppointmentNotificationDispatcher(
         {
             var dueAt = appointment.StartAt.AddMinutes(-lead);
             if (dueAt <= clock.GetUtcNow()) continue;
-            foreach (var accountId in recipients)
+            if (await db.AppointmentReminders.AnyAsync(x => x.AppointmentId == appointment.Id
+                && x.AppointmentVersion == appointment.Version && x.LeadMinutes == lead, ct)) continue;
+            appointment.Reminders.Add(new AppointmentReminder
             {
                 if (await db.AppointmentReminders.AnyAsync(x => x.AppointmentId == appointment.Id
                     && x.AppointmentVersion == appointment.Version && x.LeadMinutes == lead

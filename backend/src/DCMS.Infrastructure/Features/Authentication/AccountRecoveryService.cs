@@ -1,4 +1,4 @@
-﻿using System.Data;
+using System.Data;
 using System.Security.Cryptography;
 using DCMS.Application.Common;
 using DCMS.Application.Features.Authentication;
@@ -157,7 +157,8 @@ public sealed class AccountRecoveryService(
 
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
         // Reload inside the transaction so two concurrent verifies cannot both pass.
-        var row = await db.RecoveryTokens.SingleAsync(x => x.Id == current.Id, ct);
+        user = (await db.LockAccountAsync(user.Id, ct))!;
+        var row = user.Recoveries.Single(x => x.Id == current.Id);
         row.VerifyAttempts++;
 
         if (row.UsedAt != null || row.ExpiresAt <= DateTimeOffset.UtcNow || !Matches(proof, row.TokenHash))
@@ -290,7 +291,8 @@ public sealed class AccountRecoveryService(
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
         try
         {
-            var row = await db.RecoveryTokens.SingleAsync(x => x.Id == current.Id, ct);
+            user = (await db.LockAccountAsync(user.Id, ct))!;
+            var row = user.Recoveries.Single(x => x.Id == current.Id);
             if (row.UsedAt != null)
             {
                 await transaction.RollbackAsync(ct);
@@ -316,11 +318,7 @@ public sealed class AccountRecoveryService(
 
             // Old sessions are revoked so the new credential cannot sit next to a session issued
             // with the old one (shared S01 session policy).
-            await db.AuthSessions.Where(x => x.AccountId == user.Id && x.RevokedAt == null)
-                .ExecuteUpdateAsync(s => s.SetProperty(x => x.RevokedAt, now), ct);
-            await db.AuthRefreshTokens.Where(x => x.AccountId == user.Id && x.Status == "ACTIVE")
-                .ExecuteUpdateAsync(s => s.SetProperty(x => x.Status, "REVOKED")
-                    .SetProperty(x => x.RevokedAt, now), ct);
+            AccountSessions.Revoke(user, now);
 
             var before = Snapshot(user);
             await db.SaveChangesAsync(ct);
@@ -385,10 +383,12 @@ public sealed class AccountRecoveryService(
         // Issuing a new proof invalidates every older unused proof for this account, so two live
         // codes can never be valid at the same time (GBR-081: stale change detection). This runs
         // before the send and is only committed with it, so a failed send cannot leave a half state.
-        var stale = await db.RecoveryTokens.Where(x => x.AccountId == user.Id && x.UsedAt == null).ToListAsync(ct);
+        user = (await db.LockAccountAsync(user.Id, ct))!;
+        var stale = user.Recoveries.Where(x => x.UsedAt == null);
         foreach (var old in stale) old.UsedAt = now;
 
-        db.RecoveryTokens.Add(token);
+        token.Id = checked((int)await db.NextAccountEntryIdAsync(ct));
+        user.Recoveries.Add(token);
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
 

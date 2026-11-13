@@ -1,5 +1,7 @@
 # S03 / UC-02 — Public email password recovery
 
+C?p nh?t l?u tr? 12/11/2026: t?i kho?n, h? s? nh?n vi?n, g?n nh?m, phi?n v? d? li?u x?c th?c n?m trong `USER_ACCOUNT`; nh?m quy?n ??ng v? vai tr? h? th?ng n?m trong `ACCESS_GROUP`. C?c t?n b?ng c? trong m? t? b?n d??i l? c?u tr?c l?ch s?. H?p ??ng API v? quy t?c quy?n gi? nguy?n. Xem [thi?t k? hai b?ng](ACCOUNT-TWO-TABLES.vi.md).
+
 Decision updated 18 October 2026: the email registered on a Public account is eligible for password recovery without a separate email-confirmation step. This specification narrows S03 to Public accounts on customer Web and Mobile. Staff sign-in and S04 Admin recovery retain their existing behavior. There is no SMS delivery or phone recovery in this scope.
 
 ## Account and channel boundary

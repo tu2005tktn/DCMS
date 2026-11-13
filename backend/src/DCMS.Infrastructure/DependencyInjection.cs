@@ -36,7 +36,7 @@ public static class DependencyInjection
         {
             configuration.GetSection("Identity:Password").Bind(options.Password);
             options.User.AllowedUserNameCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._";
-        }).AddRoles<IdentityRole<int>>().AddEntityFrameworkStores<DcmsDbContext>()
+        }).AddRoles<IdentityRole<int>>().AddUserStore<AccountUserStore>().AddRoleStore<AccountRoleStore>()
             // Password reset issues a security token, so the default token providers must be
             // registered; AddIdentityCore alone does not add them.
             .AddDefaultTokenProviders();
@@ -71,18 +71,10 @@ public static class DependencyInjection
         services.AddScoped<DevelopmentPatientLinkSeeder>();
         services.AddScoped<IPatientService, PatientService>();
         services.AddScoped<ITreatmentDossierService, TreatmentDossierService>();
-        services.AddScoped<PayOsGateway>();
-        services.AddScoped<IPayOsOrderService, PayOsOrderService>();
-        if (!string.IsNullOrWhiteSpace(configuration["PayOs:ClientId"])) services.AddHostedService<PayOsOrderWorker>();
         services.AddScoped<IServicePriceService, ServicePriceService>();
-        services.AddScoped<Features.Finance.FinanceService>();
-        services.AddScoped<DCMS.Application.Features.Finance.IExaminationFeeService,Features.Finance.ExaminationFeeService>();
-        services.AddScoped<DCMS.Application.Features.Finance.IFinanceService>(sp=>sp.GetRequiredService<Features.Finance.FinanceService>());
-        services.AddScoped<DCMS.Application.Features.Finance.IRevenueService, Features.Finance.RevenueService>();
-        services.AddScoped<DCMS.Application.Features.Finance.IFinanceSettlementService, Features.Finance.FinanceSettlementService>();
         services.AddScoped<DCMS.Application.Features.Prescriptions.IPrescriptionService, Features.Prescriptions.PrescriptionService>();
-        services.AddScoped<ITreatmentFinancialSummaryPort, Features.Finance.TreatmentFinancialSummaryPort>();
-        services.AddScoped<ITreatmentFinancialWorkspace, TreatmentFinancialWorkspace>();
+        // The finance module is not installed: the dossier shows no ledger summary and posted work only records a fee request event.
+        services.AddScoped<ITreatmentFinancialSummaryPort, UnavailableTreatmentFinancialSummaryPort>();
         services.AddScoped<ITreatmentRevisionService, TreatmentRevisionService>();
         services.AddScoped<ITreatmentRevisionActualPort, UnavailableRevisionActualPort>();
         services.AddScoped<ITreatmentRevisionFinancePort, UnavailableRevisionFinancePort>();
@@ -91,8 +83,7 @@ public static class DependencyInjection
         services.AddScoped<IClinicalWorkService, ClinicalWorkService>();
         services.AddScoped<IClinicalVisitPort, Features.Examinations.ClinicalVisitPort>();
         services.AddScoped<IClinicalConsentPort, ClinicalConsentPort>();
-        services.AddScoped<OutboxClinicalChargePort>();
-        services.AddScoped<IClinicalChargePort, Features.Finance.ClinicalChargePort>();
+        services.AddScoped<IClinicalChargePort, OutboxClinicalChargePort>();
         services.AddScoped<ICareTaskService, CareTaskService>();
         services.AddScoped<ITreatmentLabReadinessPort, UnavailableTreatmentLabReadinessPort>();
         services.AddScoped<ITreatmentVisitActivitySourcePort, UnavailableTreatmentVisitActivitySourcePort>();

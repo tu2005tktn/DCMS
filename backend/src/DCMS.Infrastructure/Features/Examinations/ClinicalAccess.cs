@@ -22,10 +22,10 @@ public sealed class ClinicalAccess(DcmsDbContext db, UserManager<ApplicationUser
         var assistant = roles.Contains(AccountRoles.ClinicAssistant);
         if (u.AccountType != "Staff" || !dentist && !assistant || dentistOnly && !dentist) throw Error("MSG06", 403);
         var e = await db.Employees.AsNoTracking().SingleOrDefaultAsync(x => x.AccountId == actorId, ct);
-        if (e == null || !await (from m in db.Set<SchedulingMember>() join b in db.Set<SchedulingBranch>() on m.BranchId equals b.Id
+        if (e == null || !await (from m in db.SchedulingMembers join b in db.Set<SchedulingBranch>() on m.BranchId equals b.Id
             where m.EmployeeId == e.Id && m.BranchId == branchId && m.Active && b.Active && (dentistOnly ? m.CanDentist : assistant || m.CanDentist)
             select m).AnyAsync(ct)) throw Error("MSG06", 403);
-        return dentist && await db.Set<SchedulingMember>().AnyAsync(x => x.EmployeeId == e.Id && x.BranchId == branchId && x.Active && x.CanDentist, ct);
+        return dentist && await db.SchedulingMembers.AnyAsync(x => x.EmployeeId == e.Id && x.BranchId == branchId && x.Active && x.CanDentist, ct);
     }
     public async Task<Visit> VisitAsync(int actorId, Guid id, bool dentistOnly, CancellationToken ct, string? permission = null)
     {
@@ -36,7 +36,7 @@ public sealed class ClinicalAccess(DcmsDbContext db, UserManager<ApplicationUser
     }
     public async Task<int[]> BranchesAsync(int actorId, CancellationToken ct)
     {
-        var ids = await (from m in db.Set<SchedulingMember>() join e in db.Employees on m.EmployeeId equals e.Id
+        var ids = await (from m in db.SchedulingMembers join e in db.Employees on m.EmployeeId equals e.Id
             where e.AccountId == actorId && m.Active select m.BranchId).ToArrayAsync(ct);
         var allowed = new List<int>();
         foreach (var id in ids) { try { await BranchAsync(actorId, id, false, ct); allowed.Add(id); } catch (BusinessException ex) when (ex.Status == 403) { } }

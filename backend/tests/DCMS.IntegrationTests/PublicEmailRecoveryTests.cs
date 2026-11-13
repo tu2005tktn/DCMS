@@ -105,7 +105,8 @@ public sealed class PublicEmailRecoveryTests(ApiFixture fixture) : IClassFixture
         using (var scope = fixture.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
-            var token = await db.EmailVerificationTokens.SingleAsync(x => x.AccountId == expired.AccountId);
+            var owner = await db.Users.SingleAsync(x => x.Id == expired.AccountId);
+            var token = owner.EmailVerifications.Single();
             token.ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(-1);
             await db.SaveChangesAsync();
         }

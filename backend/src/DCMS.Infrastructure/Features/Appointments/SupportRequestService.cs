@@ -116,7 +116,7 @@ public sealed class SupportRequestService(DcmsDbContext db, UserManager<Applicat
 
         // Booking action is committed by IAppointmentChangeService before this marker is written.
         await using var markerTx = await db.Database.BeginTransactionAsync(ct);
-        request = await db.AppointmentSupportRequests.SingleAsync(x => x.Id == request.Id, ct);
+        request = await db.LoadSupportRequestAsync(request.Id, ct);
         RequirePending(request, command.ExpectedVersion);
         request.AppointmentActionRequestKey = command.RequestKey;
         request.Version++; request.UpdatedAt = clock.GetUtcNow();
@@ -237,6 +237,15 @@ public sealed class SupportRequestService(DcmsDbContext db, UserManager<Applicat
         var replay = await ReplayAsync<SupportCustomerResult>(actorId, command.RequestKey, fingerprint, ct);
         if (replay != null) return replay;
 
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        await db.Database.ExecuteSqlRawAsync("SELECT pg_advisory_xact_lock(90403)", ct);
+        replay = await ReplayAsync<SupportCustomerResult>(actorId, command.RequestKey, fingerprint, ct);
+        if (replay != null) return replay;
+        if (await db.AppointmentSupportRequests.AnyAsync(x => x.RequestKey == command.RequestKey, ct)) throw Error("MSG111", 409);
+        string requestCode;
+        do { requestCode = "SR-" + Guid.NewGuid().ToString("N")[..8].ToUpperInvariant(); }
+        while (await db.AppointmentSupportRequests.AnyAsync(x => x.Code == requestCode, ct));
+
         var appointment = await AuthorizeCustomerAppointmentAsync(actorId, code, ct);
         if (appointment.Status != "Confirmed" || appointment.StartAt <= clock.GetUtcNow())
             throw Error("MSG31", 409);
@@ -247,7 +256,7 @@ public sealed class SupportRequestService(DcmsDbContext db, UserManager<Applicat
         var request = new AppointmentSupportRequest
         {
             Id = Guid.NewGuid(),
-            Code = "SR-" + Guid.NewGuid().ToString("N")[..8].ToUpperInvariant(),
+            Code = requestCode,
             AppointmentId = appointment.Id,
             Kind = kind,
             Status = "Pending",
@@ -263,7 +272,7 @@ public sealed class SupportRequestService(DcmsDbContext db, UserManager<Applicat
             UpdatedAt = clock.GetUtcNow()
         };
 
-        db.AppointmentSupportRequests.Add(request);
+        appointment.SupportRequests.Add(request);
         db.AppointmentSupportHistories.Add(new AppointmentSupportHistory
         {
             RequestId = request.Id,
@@ -289,6 +298,7 @@ public sealed class SupportRequestService(DcmsDbContext db, UserManager<Applicat
             request.Version, request.ProposedStartAt);
         var result = new SupportCustomerResult(dto, SystemMessages.Get("MSG33"));
         await SaveReceiptAsync(actorId, command.RequestKey, fingerprint, request.Id, result, ct);
+        await tx.CommitAsync(ct);
         await PublishSupportUpdatedAsync(request, appointment, "Created");
         return result;
     }
@@ -297,7 +307,7 @@ public sealed class SupportRequestService(DcmsDbContext db, UserManager<Applicat
         WithdrawSupportCommand command, CancellationToken ct)
     {
         if (command.ExpectedVersion <= 0) throw Error("MSG04", 400);
-        var request = await db.AppointmentSupportRequests.SingleOrDefaultAsync(x => x.Code == id, ct)
+        var request = await db.LoadSupportRequestAsync(id, ct)
             ?? throw Error("MSG102", 404);
         var appointment = await db.Appointments.SingleAsync(x => x.Id == request.AppointmentId, ct);
         var user = await users.FindByIdAsync(actorId.ToString());
@@ -363,7 +373,7 @@ public sealed class SupportRequestService(DcmsDbContext db, UserManager<Applicat
     private async Task<(AppointmentSupportRequest Request, Appointment Appointment)> AuthorizedAsync(int actorId,
         string id, CancellationToken ct)
     {
-        var request = await db.AppointmentSupportRequests.SingleOrDefaultAsync(x => x.Code == id, ct)
+        var request = await db.LoadSupportRequestAsync(id, ct)
             ?? throw Error("MSG102", 404);
         var appointment = await db.Appointments.SingleAsync(x => x.Id == request.AppointmentId, ct);
         await RequireBranchAsync(actorId, appointment.BranchId, ct);
@@ -376,7 +386,7 @@ public sealed class SupportRequestService(DcmsDbContext db, UserManager<Applicat
         var user = await users.FindByIdAsync(actorId.ToString());
         if (user == null || !user.IsActive || user.AccountType != "Staff"
             || !await users.IsInRoleAsync(user, AccountRoles.ClinicAssistant)) throw Error("MSG06", 403);
-        var result = await (from member in db.Set<SchedulingMember>().AsNoTracking()
+        var result = await (from member in db.SchedulingMembers.AsNoTracking()
             join employee in db.Employees.AsNoTracking() on member.EmployeeId equals employee.Id
             join branch in db.Set<SchedulingBranch>().AsNoTracking() on member.BranchId equals branch.Id
             where employee.AccountId == actorId && member.Active && branch.Active

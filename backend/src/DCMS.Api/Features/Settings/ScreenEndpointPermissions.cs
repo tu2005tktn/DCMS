@@ -17,13 +17,12 @@ public static class ScreenEndpointPermissions
         var p = Regex.Replace(template.TrimEnd('/'), @"\{([^}:]+):[^}]+\}", "{$1}");
         var read = method is "GET" or "HEAD";
         ScreenEndpointRule Need(string grant) => ScreenEndpointRule.Need(grant);
-        if (p == "/api/payments/payos/webhook" && method == "POST") return ScreenEndpointRule.Open("Provider webhook; the service verifies the PayOS HMAC signature and payment identity");
         if (p.StartsWith("/api/admin/recovery/") || p.StartsWith("/api/dev/recovery/proof/")) return Need(read && !p.StartsWith("/api/dev/") ? "accounts.read" : "accounts.update");
         if (p is "/api/test/realtime/ping" or "/api/test/realtime/state") return ScreenEndpointRule.Open("Integration fixture realtime probes; not registered by the application");
         if (p == "/health" || p.StartsWith("/openapi/") || p.StartsWith("/api/auth") || p.StartsWith("/api/recovery") || p.StartsWith("/api/email-verification") || p.StartsWith("/api/development") || p.StartsWith("/api/dev/")
             || p.StartsWith("/api/customer/recovery/") || p.StartsWith("/api/me/") || p.StartsWith("/api/patients/me") || p.StartsWith("/api/patient-links/me") || p.StartsWith("/hubs/"))
             return ScreenEndpointRule.Open("Authentication, self ownership, health or authenticated realtime transport");
-        if (p == "/api/system-settings/settings/capabilities" || p == "/api/finance/capabilities") return ScreenEndpointRule.Open("Capabilities contain no operational records");
+        if (p == "/api/system-settings/settings/capabilities") return ScreenEndpointRule.Open("Capabilities contain no operational records");
         if (p == "/api/system-settings/reference-options") return ScreenEndpointRule.Any("patients.read", "examinations.read", "treatment.read", "settings.read");
         if (p.StartsWith("/api/system-settings/access-groups")) return Need(read ? "access-groups.read" : p.EndsWith("/preview") ? "access-groups.manage" : "access-groups.manage");
         if (p.StartsWith("/api/system-settings/staff/")) return Need("staff.access.assign");
@@ -55,27 +54,10 @@ public static class ScreenEndpointPermissions
             return Need(p.Contains("/chairs") ? (read ? "chairs.read" : "chairs.manage") : read ? "branches.read" : "branches.manage");
         if (p.StartsWith("/api/prescriptions")) return Need(read && !p.EndsWith("/medicine-options") ? "prescriptions.read" : "prescriptions.manage");
         if (p.StartsWith("/api/clinical-documents")) return Need(read ? "documents.read" : p.EndsWith("/review") ? "documents.review" : "documents.upload");
-        if (p.StartsWith("/api/finance")) {
-            if (p == "/api/finance/revenue") return Need("finance.revenue.read");
-            if (p == "/api/finance/overview") return Need("finance.revenue.read");
-            if (p == "/api/finance/payment-methods") return Need(read ? "finance.read" : "settings.general.manage");
-            if (p.StartsWith("/api/finance/invoices") || p.StartsWith("/api/finance/advances") ||
-                p.StartsWith("/api/finance/receivables") || p.StartsWith("/api/finance/refunds"))
-                return Need(read ? "finance.read" : p.EndsWith("/approve") || p.EndsWith("/complete") || p.EndsWith("/reject")
-                    ? "finance.payments.confirm" : "finance.payments.create");
-            if (p.EndsWith("/examination-fee")) return read ? Need("finance.read") : ScreenEndpointRule.Any("finance.quotes.manage", "finance.payments.create");
-            if (p == "/api/finance/providers") return Need(read ? "finance.costs.read" : "finance.costs.manage");
-            if (p.Contains("/examination-services") || p.Contains("/services")) return Need(read ? "services.read" : "services.manage");
-            if (p.EndsWith("/print")) return Need("finance.receipts.print");
-            if (p.EndsWith("/receipt-sequence")) return Need("finance.receipt-sequence.manage");
-            return Need(read ? "finance.read" : p.EndsWith("/confirm") ? "finance.payments.confirm" : p.EndsWith("/cancel") ? "finance.payments.cancel"
-                : p.EndsWith("/payments") ? "finance.payments.create" : "finance.quotes.manage");
-        }
         if (p.StartsWith("/api/visits")) {
             if (p == "/api/visits/{visitId}") return Need("reception.read");
             if (p.EndsWith("/treatment-context") || p.EndsWith("/reviews")) return Need(read ? "treatment.read" : "treatment.progress.manage");
             if (p.EndsWith("/activities/drafts") || p.EndsWith("/care-notes")) return Need("treatment.actuals.create");
-            if (p.Contains("/billing")) return Need(read ? "finance.read" : p.EndsWith("/perform") ? "investigations.perform" : "finance.quotes.manage");
             if (p.Contains("/investigations/") && p.EndsWith("/result")) return Need("investigations.results.receive");
             return Need(read ? "examinations.read" : "examinations.manage");
         }
@@ -91,9 +73,6 @@ public static class ScreenEndpointPermissions
         if (p.StartsWith("/api/follow-up-instructions")) return Need(read ? "treatment.read" : "treatment.progress.manage");
         if (p.StartsWith("/api/lab-orders")) return Need(read ? "treatment.lab.read" : "treatment.lab.track");
         if (p.StartsWith("/api/dossiers")) {
-            if (p.Contains("/advance-payos-orders")) return Need(read ? "finance.read" : "finance.payos.create");
-            if (p.Contains("/payos-orders")) return Need(read ? "finance.read" : "finance.payos.create");
-            if (p.Contains("/payments")) return Need(read ? "finance.read" : "finance.payments.create");
             if (p.EndsWith("/sheet-items/from-item-plan")) return Need("treatment.items.create");
             if (p.EndsWith("/plan/planned-dates")) return Need("treatment.items.update");
             if (p.EndsWith("/materials") && p.Contains("/sheet-activities/")) return Need("treatment.actuals.update");
@@ -111,7 +90,6 @@ public static class ScreenEndpointPermissions
         }
         if (p.StartsWith("/api/patients/")) {
             if (p.EndsWith("/next-visit-candidates")) return Need("treatment.read");
-            if (p.EndsWith("/dossiers/financial-context")) return Need("finance.read");
             if (p.Contains("/dossiers")) return Need(read ? "treatment.read" : "treatment.dossiers.create");
             if (p.EndsWith("/examinations")) return Need("examinations.read");
             if (p.EndsWith("/document-contexts")) return Need("documents.read");

@@ -29,11 +29,11 @@ public sealed class AppointmentApiTests(ApiFixture fixture) : IClassFixture<ApiF
             where user.UserName == "assistant.demo" select employee.Id).SingleAsync();
         var branch = new SchedulingBranch { Name = "UC04 fixture " + Guid.NewGuid() };
         db.Add(branch); await db.SaveChangesAsync();
-        db.AddRange(new SchedulingMember { BranchId = branch.Id, EmployeeId = dentist.Id, CanDentist = true },
+        await db.AddSchedulingDataAsync(new SchedulingMember { BranchId = branch.Id, EmployeeId = dentist.Id, CanDentist = true },
             new SchedulingMember { BranchId = branch.Id, EmployeeId = assistant });
         var service = new SchedulingService { BranchId = branch.Id, Name = "Khám", PublicDurationMinutes = 30, IsInitialExamination = true };
         db.Add(service);
-        db.AddRange(
+        await db.AddSchedulingDataAsync(
             new SchedulingChair { BranchId = branch.Id, Name = "Ghế 1", OpenMinute = 0, CloseMinute = 1440 },
             new SchedulingChair { BranchId = branch.Id, Name = "Ghế 2", OpenMinute = 0, CloseMinute = 1440 },
             new SchedulingChair { BranchId = branch.Id, Name = "Ghế 3", OpenMinute = 0, CloseMinute = 1440 });
@@ -100,7 +100,7 @@ public sealed class AppointmentApiTests(ApiFixture fixture) : IClassFixture<ApiF
         Assert.Single(responses, x => x.StatusCode == HttpStatusCode.Conflict);
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
-        Assert.Equal(3, await db.Set<SchedulingChair>().CountAsync(x => x.BranchId == setup.BranchId));
+        Assert.Equal(3, await db.SchedulingChairs.CountAsync(x => x.BranchId == setup.BranchId));
         Assert.Equal(1, await db.Appointments.CountAsync(x => x.BranchId == setup.BranchId));
     }
 

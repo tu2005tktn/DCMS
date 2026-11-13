@@ -36,7 +36,7 @@ public sealed class CareTaskService(DcmsDbContext db, UserManager<ApplicationUse
             throw Error("MSG06", 403);
         var employeeId = await db.Employees.AsNoTracking().Where(x => x.AccountId == actorId)
             .Select(x => (int?)x.Id).SingleOrDefaultAsync(ct);
-        if (!employeeId.HasValue || !await db.Set<SchedulingMember>().AsNoTracking().AnyAsync(x =>
+        if (!employeeId.HasValue || !await db.SchedulingMembers.AsNoTracking().AnyAsync(x =>
             x.BranchId == branchId && x.EmployeeId == employeeId && x.Active, ct))
             throw Error("MSG06", 403);
         return roles.Contains(AccountRoles.Dentist);
@@ -102,10 +102,8 @@ public sealed class CareTaskService(DcmsDbContext db, UserManager<ApplicationUse
         var row = await db.CareTasks.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, ct)
             ?? throw Error("MSG113", 404);
         await ReadableAsync(actorId, row.BranchId, ct);
-        var contacts = await db.CareContactAttempts.AsNoTracking().Where(x => x.TaskId == id)
-            .OrderBy(x => x.OccurredAt).ToListAsync(ct);
-        var escalations = await db.CareEscalations.AsNoTracking().Where(x => x.TaskId == id)
-            .OrderBy(x => x.CreatedAt).ToListAsync(ct);
+        var contacts = row.ContactAttempts.OrderBy(x => x.OccurredAt).ToList();
+        var escalations = row.Escalations.OrderBy(x => x.CreatedAt).ToList();
         return new(Map(row), contacts.Select(Map).ToArray(), escalations.Select(Map).ToArray());
     }
 
@@ -194,7 +192,7 @@ public sealed class CareTaskService(DcmsDbContext db, UserManager<ApplicationUse
             ActorId = actorId, OccurredAt = clock.GetUtcNow()
         };
         task.Version++; task.UpdatedAt = row.OccurredAt;
-        db.CareContactAttempts.Add(row);
+        task.ContactAttempts.Add(row);
         Receipt(actorId, request.RequestKey, "CareContact", new { id, request }, row.Id);
         await db.SaveChangesAsync(ct);
         return Map(row);
@@ -219,7 +217,7 @@ public sealed class CareTaskService(DcmsDbContext db, UserManager<ApplicationUse
             Reason = request.Reason.Trim(), CreatedBy = actorId, CreatedAt = clock.GetUtcNow()
         };
         task.Version++; task.UpdatedAt = row.CreatedAt;
-        db.CareEscalations.Add(row);
+        task.Escalations.Add(row);
         Receipt(actorId, request.RequestKey, "CareEscalate", new { id, request }, row.Id);
         await db.SaveChangesAsync(ct);
         return Map(row);
@@ -233,9 +231,10 @@ public sealed class CareTaskService(DcmsDbContext db, UserManager<ApplicationUse
         var command = resolve ? "CareResolve" : "CareAcknowledge";
         var replay = await ReplayAsync(actorId, request.RequestKey, command, new { id, request }, ct);
         if (replay.HasValue) return Map(await db.CareEscalations.AsNoTracking().SingleAsync(x => x.Id == replay, ct));
-        var row = await db.CareEscalations.SingleOrDefaultAsync(x => x.Id == id, ct)
+        // The escalation is changed through the tracked task that stores it.
+        var task = await db.CareTasks.SingleOrDefaultAsync(x => x.Escalations.Any(e => e.Id == id), ct)
             ?? throw Error("MSG113", 404);
-        var task = await db.CareTasks.AsNoTracking().SingleAsync(x => x.Id == row.TaskId, ct);
+        var row = task.Escalations.Single(x => x.Id == id);
         if (!await AuthorizedAsync(actorId, task.BranchId, ct) || actorId != row.TargetClinicianAccountId)
             throw Error("MSG06", 403);
         if (row.Version != request.ExpectedVersion ||
@@ -316,7 +315,7 @@ public sealed class CareTaskService(DcmsDbContext db, UserManager<ApplicationUse
         foreach (var branch in scope.Branches.Select(x => new { Id = x.Key, Name = x.Value }))
         {
             var canCreate = await StaffRolesAsync(actorId, branch.Id, ct) != null;
-            var members = await (from m in db.Set<SchedulingMember>().AsNoTracking()
+            var members = await (from m in db.SchedulingMembers.AsNoTracking()
                                  join e in db.Employees.AsNoTracking() on m.EmployeeId equals e.Id
                                  where m.BranchId == branch.Id && m.Active
                                  orderby e.FullName

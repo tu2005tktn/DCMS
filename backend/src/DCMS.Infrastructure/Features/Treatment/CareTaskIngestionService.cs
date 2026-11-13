@@ -53,7 +53,8 @@ public sealed class CareTaskIngestionService(DcmsDbContext db, ITreatmentLabRead
                 var step = await db.TreatmentSteps.AsNoTracking()
                     .SingleOrDefaultAsync(x => x.Id == source.AggregateId, ct);
                 if (step == null || step.Outcome is "Completed" or "Stopped" or "Cancelled" ||
-                    step.PlanVersion != root.GetProperty("planVersion").GetInt32()) continue;
+                    !root.TryGetProperty("planVersion", out var planVersion) || !planVersion.TryGetInt32(out var sourceVersion) ||
+                    step.PlanVersion != sourceVersion) continue;
                 var dossier = await db.TreatmentDossiers.AsNoTracking()
                     .SingleOrDefaultAsync(x => x.Id == step.DossierId, ct);
                 if (dossier == null || dossier.PatientId != patientId || dossier.State != "Open") continue;

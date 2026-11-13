@@ -5,7 +5,6 @@ using DCMS.Application.Features.Authentication;
 using DCMS.Application.Features.Treatment;
 using DCMS.Domain.Features.Scheduling;
 using DCMS.Domain.Features.Treatment;
-using DCMS.Domain.Features.Finance;
 using DCMS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -29,7 +28,7 @@ public sealed class ItemPlanApiTests(ApiFixture fixture) : IClassFixture<ApiFixt
         var dentist = await (from e in db.Employees join u in db.Users on e.AccountId equals u.Id where u.UserName == "dentist.demo" select e.Id).SingleAsync();
         var branch = new SchedulingBranch { Name = "SYNTHETIC item-plan " + Guid.NewGuid() }; db.Add(branch); await db.SaveChangesAsync();
         var service = new SchedulingService { BranchId = branch.Id, Name = "SYNTHETIC service", PublicBookable = false, ReferenceUnitPriceVnd = 600000 };
-        db.AddRange(service, new SchedulingMember { BranchId = branch.Id, EmployeeId = dentist, CanDentist = true }); await db.SaveChangesAsync();
+        await db.AddSchedulingDataAsync(service, new SchedulingMember { BranchId = branch.Id, EmployeeId = dentist, CanDentist = true }); await db.SaveChangesAsync();
         return (branch.Id, dentist, service.Id);
     }
     private static async Task<ItemPlanDto> Create(HttpClient client, int branch) {
@@ -41,7 +40,7 @@ public sealed class ItemPlanApiTests(ApiFixture fixture) : IClassFixture<ApiFixt
     private async Task<int[]> Counts() {
         using var scope = fixture.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
         return [await db.Patients.CountAsync(), await db.TreatmentDossiers.CountAsync(), await db.ClinicalActivities.CountAsync(), await db.Appointments.CountAsync(),
-            await db.Set<ResourceReservation>().CountAsync(), await db.Set<FinanceCharge>().CountAsync(), await db.Set<PaymentReceipt>().CountAsync()];
+            await db.Set<ResourceReservation>().CountAsync(), await db.TreatmentProgressionEvents.CountAsync(x => x.Kind == "clinical.fee.requested")];
     }
     [Fact]
     public async Task CrudSnapshotsSoftDeleteAndNoClinicalOrFinancialSideEffects() {
@@ -59,7 +58,7 @@ public sealed class ItemPlanApiTests(ApiFixture fixture) : IClassFixture<ApiFixt
         var key = Guid.NewGuid(); (await Delete(client, $"{Root}/{plan.Id}", plan.Version, key)).EnsureSuccessStatusCode(); (await Delete(client, $"{Root}/{plan.Id}", plan.Version, key)).EnsureSuccessStatusCode();
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"{Root}/{plan.Id}")).StatusCode); Assert.Equal(counts, await Counts());
         using var check = fixture.Services.CreateScope(); var context = check.ServiceProvider.GetRequiredService<DcmsDbContext>();
-        Assert.NotNull((await context.Set<TreatmentTemplateItem>().FindAsync(row.Id))!.DeletedAt);
+        Assert.NotNull((await context.LoadTemplateItemAsync(row.Id))!.DeletedAt);
         Assert.True(await context.TreatmentProgressionEvents.AnyAsync(x => x.AggregateId == plan.Id && x.Kind == "ItemPlan.SaveRow"));
         Assert.False(context.Database.HasPendingModelChanges());
     }
@@ -75,7 +74,7 @@ public sealed class ItemPlanApiTests(ApiFixture fixture) : IClassFixture<ApiFixt
         using (var scope = fixture.Services.CreateScope()) {
             var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
             assistant = await (from e in db.Employees join a in db.Users on e.AccountId equals a.Id where a.UserName == "assistant.demo" select e.Id).SingleAsync();
-            db.Add(new SchedulingMember { BranchId = setup.Branch, EmployeeId = assistant, CanDentist = false }); await db.SaveChangesAsync();
+            await db.AddSchedulingDataAsync(new SchedulingMember { BranchId = setup.Branch, EmployeeId = assistant, CanDentist = false }); await db.SaveChangesAsync();
         }
         var assigned = await client.PutAsJsonAsync($"{Root}/{plan.Id}/items/{row.Id}", Row(setup, plan.Version) with { AssistantId = assistant }); assigned.EnsureSuccessStatusCode();
         plan = (await assigned.Content.ReadFromJsonAsync<ItemPlanDto>())!; Assert.Equal(setup.Dentist, plan.Items[0].DentistId); Assert.NotNull(plan.Items[0].DentistName);
@@ -112,7 +111,7 @@ public sealed class ItemPlanApiTests(ApiFixture fixture) : IClassFixture<ApiFixt
         using (var scope = fixture.Services.CreateScope()) { var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>(); var b = new SchedulingBranch { Name = "UNASSIGNED" }; db.Add(b); await db.SaveChangesAsync(); otherBranch = b.Id; }
         Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync($"{Root}?branchId={otherBranch}")).StatusCode);
         var key = Guid.NewGuid(); var input = Row(s, plan.Version) with { RequestKey = key }; (await client.PostAsJsonAsync($"{Root}/{plan.Id}/items", input)).EnsureSuccessStatusCode();
-        using (var scope = fixture.Services.CreateScope()) { var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>(); var m = await db.Set<SchedulingMember>().FindAsync(s.Branch, s.Dentist); m!.Active = false; await db.SaveChangesAsync(); }
+        using (var scope = fixture.Services.CreateScope()) { var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>(); var m = await db.LoadMemberAsync(s.Branch, s.Dentist); m!.Active = false; await db.SaveChangesAsync(); }
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync($"{Root}/{plan.Id}/items", input)).StatusCode);
     }
     [Fact]

@@ -1,6 +1,4 @@
 import {useAuth} from '../authentication/AuthContext';
-import ExaminationFeePanel from '../finance/ExaminationFeePanel';
-import type {ExaminationFeeChoice} from '../finance/examinationFeeTypes';
 ﻿import { Alert, Button, Card, Checkbox, Descriptions, Form, Input, Modal, Select, Space, Spin, Tabs, Tag, Typography } from 'antd';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
@@ -157,13 +155,12 @@ export default function ExaminationPage() {
       visitId, expectedVersion: doc.version, requestKey: crypto.randomUUID() }) }); }
     catch (e) { setError((e as Error).message); throw e; }
   }
-  const [examinationFee,setExaminationFee]=useState<ExaminationFeeChoice>();
   async function completeVisit() {
     if (!w || busy || !workReviewed) return;
     const token=generation.current;
     if(token!==generation.current)return;
     setBusy(true); setError(undefined);
-    const payload = { patientId: w.visit.patientId, expectedVersion: w.visit.visitVersion, workReviewed, examinationFee:examinationFee??null };
+    const payload = { patientId: w.visit.patientId, expectedVersion: w.visit.visitVersion, workReviewed };
     const fingerprint = JSON.stringify({ visitId, complete: payload });
     if (pendingCommand.current?.fingerprint !== fingerprint) pendingCommand.current = { fingerprint, key: crypto.randomUUID() };
     try {
@@ -286,9 +283,8 @@ export default function ExaminationPage() {
         </>}
         {!amending && w.allowedActions.includes('amend') && <Button key="amend-examination" aria-label="Đính chính kết quả" disabled={busy} onClick={() => { setAmending(true); setDirty(true); }}>Đính chính kết quả</Button>}
         {!amending && handoff && <Link to={`/patients/${v.patientId}?tab=treatment&sourceExaminationVisitId=${visitId}&examinationVersion=${w.examination?.version ?? 0}`}><Button type="primary">Lập kế hoạch điều trị</Button></Link>}
-        {!amending && v.status === 'Completed' && w.examination?.confirmed && user?.permissions.includes('finance.read') && <Link to={`/visits/${visitId}/payments`}><Button>Chuyển thu ngân</Button></Link>}
         {!amending && w.examination?.confirmed && user?.permissions.includes('examinations.manage') && <Link to={`/visits/${visitId}/prescription`}><Button>Đơn thuốc mua ngoài</Button></Link>}
-        {!amending && w.allowedActions.includes('complete') && <Button disabled={busy} onClick={() => { setWorkReviewed(false); setExaminationFee(undefined); setEnding(true); }}>Kết thúc lượt khám</Button>}</Space>
+        {!amending && w.allowedActions.includes('complete') && <Button disabled={busy} onClick={() => { setWorkReviewed(false); setEnding(true); }}>Kết thúc lượt khám</Button>}</Space>
         {w.examination?.confirmed && v.status === 'InProgress' && <Typography.Paragraph type="secondary" style={{ marginTop: 16 }}>Phiếu khám đã hoàn tất. Kết thúc lượt khám trước khi chuyển sang phiếu điều trị.</Typography.Paragraph>}
       </Card> },
       { key: 'history', label: 'Lịch sử khám', children: <><Typography.Title level={4}>Các phiên bản phiếu hiện tại</Typography.Title>
@@ -315,7 +311,6 @@ export default function ExaminationPage() {
     <Modal open={ending} title="Kết thúc lượt khám" okText="Xác nhận kết thúc lượt" confirmLoading={busy} okButtonProps={{ disabled: !workReviewed || busy }}
       onOk={() => void completeVisit()} onCancel={() => { if (!busy) setEnding(false); }}>
       <Typography.Paragraph>Xác nhận kết quả, dặn dò và công việc của lượt khám này. Chưa thực hiện điều trị không cản kết thúc khám. Kế hoạch và các buổi điều trị sẽ được theo dõi riêng, công nợ hiện có vẫn được giữ.</Typography.Paragraph>
-      {ending&&user?.permissions.includes('finance.read')&&<ExaminationFeePanel visitId={visitId!} completion disabled={busy} onChoice={setExaminationFee}/>}
       <Checkbox checked={workReviewed} disabled={busy} onChange={e => setWorkReviewed(e.target.checked)}>Đã kiểm tra công việc và nhu cầu quay lại của lượt này</Checkbox>
       {error && <Alert type="error" message={error} />}
     </Modal>

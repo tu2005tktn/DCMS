@@ -1,5 +1,7 @@
 # Màn hình doanh thu — 06/11/2026
 
+> **Đã gỡ ngày 13/11/2026.** Phân hệ tài chính đã được xóa khỏi backend, web và database theo [CARE-LAB-FINANCE-STORAGE.vi.md](CARE-LAB-FINANCE-STORAGE.vi.md). Tài liệu này chỉ còn giá trị tham khảo khi đặc tả lại chức năng; không mô tả hành vi hiện tại.
+
 ## Mục đích và nguồn
 
 - Màn **Doanh thu** cho người có `finance.revenue.read` (cha `finance.read`, cập nhật 07/11/2026) xem tiền thực nhận theo ngày Việt Nam và chi nhánh được cấp quyền. Mặc định tháng hiện tại; có hôm nay, tuần, tháng, khoảng tùy chọn và tất cả. Không cho chọn chi nhánh ngoài phạm vi tài khoản.

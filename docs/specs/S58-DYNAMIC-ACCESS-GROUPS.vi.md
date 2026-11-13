@@ -1,5 +1,9 @@
 # S58 — Thiết lập phân quyền động
 
+C?p nh?t l?u tr? 12/11/2026: t?i kho?n, h? s? nh?n vi?n, g?n nh?m, phi?n v? d? li?u x?c th?c n?m trong `USER_ACCOUNT`; nh?m quy?n ??ng v? vai tr? h? th?ng n?m trong `ACCESS_GROUP`. C?c t?n b?ng c? trong m? t? b?n d??i l? c?u tr?c l?ch s?. H?p ??ng API v? quy t?c quy?n gi? nguy?n. Xem [thi?t k? hai b?ng](ACCOUNT-TWO-TABLES.vi.md).
+
+Cập nhật lưu trữ 12/11/2026 theo [hợp đồng rút gọn database](DATABASE-SIMPLIFICATION.vi.md). Các grant nằm trong `Grants` JSONB của `ACCESS_GROUP`. Server tiếp tục kiểm tra quyền trước khi xử lý hoặc trả kết quả replay; lịch sử và receipt dùng kho chung toàn hệ thống.
+
 Mở rộng theo yêu cầu tiếp theo cho tất cả màn hình: [ALL-SCREENS-DYNAMIC-PERMISSIONS.vi.md](ALL-SCREENS-DYNAMIC-PERMISSIONS.vi.md). Tài liệu mở rộng thay thế giới hạn phạm vi của bản đầu bên dưới.
 
 Cập nhật 02/11/2026 theo ảnh tham chiếu người dùng. Hoàn thiện mục Nhóm quyền/nhân viên trong S58; tận dụng AccessGroup, StaffAccessAssignment và SettingsAccess đã có.

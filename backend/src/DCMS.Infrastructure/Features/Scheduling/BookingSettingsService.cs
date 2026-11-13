@@ -22,7 +22,7 @@ public sealed class BookingSettingsService(DcmsDbContext db, UserManager<Applica
         if (user == null || !user.IsActive || user.AccountType != "Staff") throw Error("MSG06", 403);
         var roles = AccountRoles.Effective(await users.GetRolesAsync(user));
         var dentist = roles.Contains(AccountRoles.Dentist);
-        return await (from member in db.Set<SchedulingMember>().AsNoTracking()
+        return await (from member in db.SchedulingMembers.AsNoTracking()
             join employee in db.Employees on member.EmployeeId equals employee.Id
             join branch in db.Set<SchedulingBranch>() on member.BranchId equals branch.Id
             where employee.AccountId == actorId && member.Active && branch.Active && (dentist || member.CanManageSchedules)

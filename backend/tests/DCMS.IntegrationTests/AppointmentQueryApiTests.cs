@@ -35,13 +35,13 @@ public sealed class AppointmentQueryApiTests(ApiFixture fixture) : IClassFixture
         var owner = staff.Single(x => x.UserName == "owner.demo");
         var branch = new SchedulingBranch { Name = "S10 fixture " + Guid.NewGuid() };
         db.Add(branch); await db.SaveChangesAsync();
-        db.AddRange(new SchedulingMember { BranchId = branch.Id, EmployeeId = dentist.Id, CanDentist = true },
+        await db.AddSchedulingDataAsync(new SchedulingMember { BranchId = branch.Id, EmployeeId = dentist.Id, CanDentist = true },
             new SchedulingMember { BranchId = branch.Id, EmployeeId = owner.Id, CanDentist = true });
-        if (assistantMember) db.Add(new SchedulingMember { BranchId = branch.Id, EmployeeId = staff.Single(x => x.UserName == "assistant.demo").Id });
+        if (assistantMember) await db.AddSchedulingDataAsync(new SchedulingMember { BranchId = branch.Id, EmployeeId = staff.Single(x => x.UserName == "assistant.demo").Id });
         var service = new SchedulingService { BranchId = branch.Id, Name = "Khám", PublicDurationMinutes = 30, IsInitialExamination = true };
         db.Add(service);
-        db.Add(new SchedulingChair { BranchId = branch.Id, Name = "Ghế 1", OpenMinute = 0, CloseMinute = 1440 });
-        db.Add(new SchedulingChair { BranchId = branch.Id, Name = "Ghế 2", OpenMinute = 0, CloseMinute = 1440 });
+        await db.AddSchedulingDataAsync(new SchedulingChair { BranchId = branch.Id, Name = "Ghế 1", OpenMinute = 0, CloseMinute = 1440 });
+        await db.AddSchedulingDataAsync(new SchedulingChair { BranchId = branch.Id, Name = "Ghế 2", OpenMinute = 0, CloseMinute = 1440 });
         var date = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(10));
         var monday = date.AddDays(-(((int)date.DayOfWeek + 6) % 7));
         foreach (var employee in new[] { dentist, owner })
@@ -128,7 +128,7 @@ public sealed class AppointmentQueryApiTests(ApiFixture fixture) : IClassFixture
             db.Patients.AddRange(patient, other); await db.SaveChangesAsync(); patientId = patient.Id;
             async Task<Guid> Add(Setup branch, int dentist, int? patientKey, int days, string status = "Confirmed")
             {
-                var chair = await db.Set<SchedulingChair>().FirstAsync(x => x.BranchId == branch.BranchId);
+                var chair = await db.SchedulingChairs.FirstAsync(x => x.BranchId == branch.BranchId);
                 var id = Guid.NewGuid(); var start = now.AddDays(days);
                 db.Set<ResourceReservation>().Add(new ResourceReservation { Id = id, Code = "RS-" + id.ToString("N"),
                     BranchId = branch.BranchId, DentistId = dentist, ChairId = chair.Id, ServiceId = branch.ServiceId,

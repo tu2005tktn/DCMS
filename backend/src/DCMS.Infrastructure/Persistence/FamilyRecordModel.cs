@@ -28,14 +28,14 @@ internal static class FamilyRecordModel
             b.HasOne<SchedulingBranch>().WithMany().HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Restrict);
         });
         model.Entity<FamilyRecordAudit>(b => {
-            b.ToTable("FAMILY_RECORD_AUDIT"); b.HasKey(x => x.Id);
+
             b.Property(x => x.Action).HasMaxLength(40); b.Property(x => x.Reason).HasMaxLength(1000);
             b.HasIndex(x => new { x.AccessId, x.OccurredAt });
             b.HasOne<FamilyRecordAccess>().WithMany().HasForeignKey(x => x.AccessId).OnDelete(DeleteBehavior.Restrict);
             b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.ActorAccountId).OnDelete(DeleteBehavior.Restrict);
         });
         model.Entity<FamilyRecordReceipt>(b => {
-            b.ToTable("FAMILY_RECORD_RECEIPT"); b.HasKey(x => new { x.ActorAccountId, x.RequestKey });
+            b.HasIndex(new[] { "ReceiptType", "ActorAccountId", "RequestKey" }, "UX_FamilyRecordReceipt_Scope").IsUnique().HasDatabaseName("UX_RECEIPT_ActorAccountId_RequestKey");
             b.Property(x => x.Fingerprint).HasMaxLength(64); b.Property(x => x.ResultJson).HasColumnType("jsonb");
             b.HasOne<FamilyRecordAccess>().WithMany().HasForeignKey(x => x.AccessId).OnDelete(DeleteBehavior.Restrict);
             b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.ActorAccountId).OnDelete(DeleteBehavior.Restrict);

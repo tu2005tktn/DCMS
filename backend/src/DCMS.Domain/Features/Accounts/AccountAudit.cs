@@ -1,6 +1,6 @@
 namespace DCMS.Domain.Features.Accounts;
 
-public sealed class AccountAudit
+public sealed class AccountAudit : DCMS.Domain.Common.AuditRecord
 {
     public long Id { get; set; }
     public int ActorId { get; set; }

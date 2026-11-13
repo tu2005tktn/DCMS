@@ -1,4 +1,3 @@
-using System.Data;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
@@ -42,8 +41,8 @@ public sealed class AuthenticationService(DcmsDbContext db, UserManager<Applicat
 
     public async Task<SignInResponse> CreateSessionAsync(int accountId, string? deviceLabel, string auditAction, CancellationToken ct)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
-        var user = await db.Users.SingleOrDefaultAsync(x => x.Id == accountId, ct);
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        var user = await db.LockAccountAsync(accountId, ct);
         if (user == null || !user.IsActive || await users.IsLockedOutAsync(user)) DenySignIn();
         var current = await CurrentAsync(user!, ct);
         if (current == null) DenySignIn();
@@ -59,8 +58,9 @@ public sealed class AuthenticationService(DcmsDbContext db, UserManager<Applicat
             ExpiresAt = current.AccountType == "Staff" ? refreshExpires : accessExpires
         };
         var (refresh, refreshPlaintext) = CreateRefreshToken(session.AccountId, session.Id, refreshExpires);
-        db.AuthSessions.Add(session);
-        db.AuthRefreshTokens.Add(refresh);
+        refresh.Id = await db.NextAccountEntryIdAsync(ct);
+        session.RefreshTokens.Add(refresh);
+        user.Sessions.Add(session);
         db.AccountAudits.Add(new AccountAudit
         {
             ActorId = user.Id, TargetId = user.Id, Action = auditAction, Reason = "Đăng nhập",
@@ -75,24 +75,17 @@ public sealed class AuthenticationService(DcmsDbContext db, UserManager<Applicat
     public async Task<CurrentUser?> ValidateSessionAsync(int accountId, Guid sessionId, CancellationToken ct)
     {
         var now = clock.GetUtcNow();
-        var session = await db.AuthSessions.AsNoTracking()
-            .SingleOrDefaultAsync(x => x.Id == sessionId && x.AccountId == accountId, ct);
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        var user = await db.LockAccountAsync(accountId, ct);
+        var session = user?.Sessions.SingleOrDefault(x => x.Id == sessionId);
         if (session == null || session.RevokedAt != null || session.ExpiresAt <= now) return null;
-        if (session.ClientKind == "StaffWeb")
+        if (session.ClientKind == "StaffWeb" && session.LastInteractiveActivityAt.AddMinutes(await staffIdle.MinutesAsync(ct)) <= now)
         {
-            await using var tx = await db.Database.BeginTransactionAsync(ct);
-            session = await db.AuthSessions.FromSqlInterpolated(
-                $"SELECT * FROM \"AUTH_SESSION\" WHERE \"Id\" = {sessionId} FOR UPDATE").SingleAsync(ct);
-            if (session.RevokedAt != null || session.ExpiresAt <= now) return null;
-            if (session.LastInteractiveActivityAt.AddMinutes(await staffIdle.MinutesAsync(ct)) <= now)
-            {
-                await staffIdle.ExpireAsync(session, now, ct); await tx.CommitAsync(ct); return null;
-            }
-            session.LastSeenAt = now; await db.SaveChangesAsync(ct); await tx.CommitAsync(ct);
+            await staffIdle.ExpireAsync(session, now, ct); await tx.CommitAsync(ct); return null;
         }
-        else await db.AuthSessions.Where(x => x.Id == sessionId)
-            .ExecuteUpdateAsync(s => s.SetProperty(x => x.LastSeenAt, now), ct);
-        var user = await db.Users.AsNoTracking().SingleOrDefaultAsync(x => x.Id == accountId, ct);
+        session.LastSeenAt = now;
+        await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
         if (user == null || !user.IsActive || await users.IsLockedOutAsync(user)) return null;
         return await CurrentAsync(user, ct);
     }
@@ -101,13 +94,11 @@ public sealed class AuthenticationService(DcmsDbContext db, UserManager<Applicat
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         var now = clock.GetUtcNow();
-        var changed = await db.AuthSessions.Where(x => x.Id == sessionId && x.AccountId == accountId && x.RevokedAt == null)
-            .ExecuteUpdateAsync(s => s.SetProperty(x => x.RevokedAt, now), ct);
-        if (changed > 0)
+        var user = await db.LockAccountAsync(accountId, ct);
+        var session = user?.Sessions.SingleOrDefault(x => x.Id == sessionId && x.RevokedAt == null);
+        if (session != null)
         {
-            // Thu hồi toàn bộ refresh của session này để tránh refresh sau khi đã sign-out.
-            await db.AuthRefreshTokens.Where(x => x.SessionId == sessionId && x.Status == "ACTIVE")
-                .ExecuteUpdateAsync(s => s.SetProperty(x => x.Status, "REVOKED").SetProperty(x => x.RevokedAt, now), ct);
+            AccountSessions.Revoke(session, now);
             db.AccountAudits.Add(new AccountAudit
             {
                 ActorId = accountId, TargetId = accountId, Action = "SignOut", Reason = "Đăng xuất",
@@ -122,7 +113,7 @@ public sealed class AuthenticationService(DcmsDbContext db, UserManager<Applicat
     {
         if (string.IsNullOrWhiteSpace(request.RefreshToken)) throw new BusinessException(401, SystemMessages.Get("MSG07"));
         var incomingHash = HashRefreshToken(request.RefreshToken);
-        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
         var now = DateTimeOffset.UtcNow;
         var existing = await db.AuthRefreshTokens
             .SingleOrDefaultAsync(x => x.TokenHash == incomingHash, ct);
@@ -132,9 +123,10 @@ public sealed class AuthenticationService(DcmsDbContext db, UserManager<Applicat
             throw new BusinessException(401, SystemMessages.Get("MSG07"));
         }
         // Tài khoản và session còn hiệu lực?
-        var session = await db.AuthSessions.FromSqlInterpolated(
-            $"SELECT * FROM \"AUTH_SESSION\" WHERE \"Id\" = {existing.SessionId} FOR UPDATE").SingleOrDefaultAsync(ct);
-        var user = await db.Users.SingleOrDefaultAsync(x => x.Id == existing.AccountId, ct);
+        var user = await db.LockAccountAsync(existing.AccountId, ct);
+        var session = user?.Sessions.SingleOrDefault(x => x.Id == existing.SessionId);
+        existing = session?.RefreshTokens.SingleOrDefault(x => x.TokenHash == incomingHash);
+        if (existing == null) throw new BusinessException(401, SystemMessages.Get("MSG07"));
         if (session?.ClientKind == "StaffWeb" && session.RevokedAt == null
             && session.LastInteractiveActivityAt.AddMinutes(await staffIdle.MinutesAsync(ct)) <= now)
         {
@@ -160,7 +152,8 @@ public sealed class AuthenticationService(DcmsDbContext db, UserManager<Applicat
         var accessExpires = now.AddMinutes(settings.Value.AccessTokenMinutes);
         var refreshExpires = now.AddDays(settings.Value.RefreshTokenDays);
         var (newRefresh, newRefreshPlaintext) = CreateRefreshToken(existing.AccountId, existing.SessionId, refreshExpires);
-        db.AuthRefreshTokens.Add(newRefresh);
+        newRefresh.Id = await db.NextAccountEntryIdAsync(ct);
+        session.RefreshTokens.Add(newRefresh);
         existing.Status = "REPLACED";
         existing.ReplacedById = newRefresh.Id;
         session.LastSeenAt = now;
@@ -178,12 +171,10 @@ public sealed class AuthenticationService(DcmsDbContext db, UserManager<Applicat
 
     public async Task SignOutAllAsync(int accountId, Guid currentSessionId, string? reason, CancellationToken ct)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
         var now = DateTimeOffset.UtcNow;
-        await db.AuthSessions.Where(x => x.AccountId == accountId && x.RevokedAt == null)
-            .ExecuteUpdateAsync(s => s.SetProperty(x => x.RevokedAt, now), ct);
-        await db.AuthRefreshTokens.Where(x => x.AccountId == accountId && x.Status == "ACTIVE")
-            .ExecuteUpdateAsync(s => s.SetProperty(x => x.Status, "REVOKED").SetProperty(x => x.RevokedAt, now), ct);
+        var owner = await db.Users.SingleAsync(x => x.Id == accountId, ct);
+        AccountSessions.Revoke(owner, now);
         db.AccountAudits.Add(new AccountAudit
         {
             ActorId = accountId, TargetId = accountId, Action = "SignOutAll",
@@ -265,10 +256,8 @@ public sealed class AuthenticationService(DcmsDbContext db, UserManager<Applicat
     private async Task RevokeChainAsync(AuthRefreshToken existing, string reason, DateTimeOffset now, CancellationToken ct)
     {
         // Thu hồi toàn bộ session cùng account (nếu chain reuse) — phòng token bị đánh cắp.
-        await db.AuthSessions.Where(x => x.AccountId == existing.AccountId && x.RevokedAt == null)
-            .ExecuteUpdateAsync(s => s.SetProperty(x => x.RevokedAt, now), ct);
-        await db.AuthRefreshTokens.Where(x => x.AccountId == existing.AccountId && x.Status == "ACTIVE")
-            .ExecuteUpdateAsync(s => s.SetProperty(x => x.Status, "REVOKED").SetProperty(x => x.RevokedAt, now), ct);
+        var owner = await db.Users.SingleAsync(x => x.Id == existing.AccountId, ct);
+        AccountSessions.Revoke(owner, now);
         db.AccountAudits.Add(new AccountAudit
         {
             ActorId = existing.AccountId, TargetId = existing.AccountId,

@@ -37,7 +37,7 @@ public sealed class TreatmentProgressionService(DcmsDbContext db, UserManager<Ap
             !AccountRoles.Effective(await users.GetRolesAsync(account)).Contains(AccountRoles.Dentist))
             throw Error("MSG06", 403);
         var employee = await db.Employees.AsNoTracking().SingleOrDefaultAsync(x => x.AccountId == actorId, ct);
-        if (employee == null || !await db.Set<SchedulingMember>().AsNoTracking().AnyAsync(x =>
+        if (employee == null || !await db.SchedulingMembers.AsNoTracking().AnyAsync(x =>
                 x.BranchId == branchId && x.EmployeeId == employee.Id && x.Active && x.CanDentist, ct))
             throw Error("MSG06", 403);
     }
@@ -142,7 +142,7 @@ public sealed class TreatmentProgressionService(DcmsDbContext db, UserManager<Ap
 
     public async Task<TreatmentTemplateDto> GetTemplateAsync(int actorId, Guid id, CancellationToken ct)
     {
-        var model = await db.TreatmentTemplates.Include(x => x.Versions).AsNoTracking()
+        var model = await db.TreatmentTemplates.AsNoTracking()
             .SingleOrDefaultAsync(x => x.Id == id && x.DefinitionKind == "LegacySteps" && x.DeletedAt == null, ct) ?? throw Error("MSG113", 404);
         await DentistAsync(actorId, model.BranchId, ct);
         return TemplateDto(model);
@@ -174,7 +174,7 @@ public sealed class TreatmentProgressionService(DcmsDbContext db, UserManager<Ap
         ValidateSteps(request.Steps, false);
         return await CommandAsync(actorId, request.RequestKey, "NewTemplateVersion", new { id, request }, async () =>
         {
-            var model = await db.TreatmentTemplates.Include(x => x.Versions).SingleOrDefaultAsync(x => x.Id == id && x.DefinitionKind == "LegacySteps" && x.DeletedAt == null, ct)
+            var model = await db.TreatmentTemplates.SingleOrDefaultAsync(x => x.Id == id && x.DefinitionKind == "LegacySteps" && x.DeletedAt == null, ct)
                 ?? throw Error("MSG113", 404);
             await DentistAsync(actorId, model.BranchId, ct);
             if (model.Version != request.ExpectedVersion) throw Error("MSG111", 409);
@@ -184,7 +184,6 @@ public sealed class TreatmentProgressionService(DcmsDbContext db, UserManager<Ap
             var draft = new TreatmentTemplateVersion { TemplateId = id, Number = number,
                 StepsJson = Serialize(request.Steps), CreatedBy = actorId, CreatedAt = clock.GetUtcNow() };
             model.Versions.Add(draft);
-            db.TreatmentTemplateVersions.Add(draft);
             Event(id, actorId, "template.version.created", new { number });
             await db.SaveChangesAsync(ct);
             return TemplateDto(model);
@@ -197,7 +196,7 @@ public sealed class TreatmentProgressionService(DcmsDbContext db, UserManager<Ap
         ValidateSteps(request.Steps, false);
         return await CommandAsync(actorId, request.RequestKey, "UpdateTemplateDraft", new { id, number, request }, async () =>
         {
-            var model = await db.TreatmentTemplates.Include(x => x.Versions).SingleOrDefaultAsync(x => x.Id == id && x.DefinitionKind == "LegacySteps" && x.DeletedAt == null, ct)
+            var model = await db.TreatmentTemplates.SingleOrDefaultAsync(x => x.Id == id && x.DefinitionKind == "LegacySteps" && x.DeletedAt == null, ct)
                 ?? throw Error("MSG113", 404);
             await DentistAsync(actorId, model.BranchId, ct);
             if (model.Version != request.ExpectedVersion) throw Error("MSG111", 409);
@@ -217,7 +216,7 @@ public sealed class TreatmentProgressionService(DcmsDbContext db, UserManager<Ap
         if (state is not ("Active" or "Retired")) throw Error("MSG04");
         return await CommandAsync(actorId, request.RequestKey, "TemplateState", new { id, number, state, request }, async () =>
         {
-            var model = await db.TreatmentTemplates.Include(x => x.Versions).SingleOrDefaultAsync(x => x.Id == id && x.DefinitionKind == "LegacySteps" && x.DeletedAt == null, ct)
+            var model = await db.TreatmentTemplates.SingleOrDefaultAsync(x => x.Id == id && x.DefinitionKind == "LegacySteps" && x.DeletedAt == null, ct)
                 ?? throw Error("MSG113", 404);
             await DentistAsync(actorId, model.BranchId, ct);
             if (model.Version != request.ExpectedVersion) throw Error("MSG111", 409);
@@ -242,8 +241,8 @@ public sealed class TreatmentProgressionService(DcmsDbContext db, UserManager<Ap
 
     private async Task<StepDto[]> StepDtosAsync(TreatmentDossier dossier, CancellationToken ct)
     {
-        var rows = await db.TreatmentSteps.Where(x => x.DossierId == dossier.Id)
-            .OrderBy(x => x.Name).ToListAsync(ct);
+        var rows = await db.LoadTreatmentStepsAsync(db.TreatmentSteps.Where(x => x.DossierId == dossier.Id)
+            .OrderBy(x => x.Name), ct);
         var byId = rows.ToDictionary(x => x.Id);
         var result = new List<StepDto>(rows.Count);
         foreach (var row in rows)
@@ -306,7 +305,7 @@ public sealed class TreatmentProgressionService(DcmsDbContext db, UserManager<Ap
             // Template IDs identify the source graph. Patient steps get their own stable IDs.
             var patientIds = request.Steps.ToDictionary(x => x.LogicalStepId, _ => Guid.NewGuid());
             foreach (var definition in request.Steps)
-                db.TreatmentSteps.Add(new TreatmentStep
+                await db.AddTreatmentDataAsync(new TreatmentStep
                 {
                     Id = patientIds[definition.LogicalStepId], DossierId = dossierId, PlanId = dossier.PlanId,
                     PlanVersion = dossier.PlanVersion + 1, ItemId = definition.ItemId!.Value,
@@ -356,8 +355,8 @@ public sealed class TreatmentProgressionService(DcmsDbContext db, UserManager<Ap
             if (dossier.State != "Open" || dossier.PlanState != "Committed"
                 || dossier.Items.All(x => x.Id != request.ItemId || x.Decision != "Agreed"))
                 throw Error("MSG240", 409);
-            var existing = await db.TreatmentSteps.Where(x => x.DossierId == dossierId &&
-                x.PlanVersion == dossier.PlanVersion).ToListAsync(ct);
+            var existing = await db.LoadTreatmentStepsAsync(db.TreatmentSteps.Where(x => x.DossierId == dossierId &&
+                x.PlanVersion == dossier.PlanVersion), ct);
             if (request.PredecessorIds.Any(id => existing.All(x => x.Id != id))) throw Error("MSG229");
             var now = clock.GetUtcNow();
             var step = new TreatmentStep
@@ -375,7 +374,7 @@ public sealed class TreatmentProgressionService(DcmsDbContext db, UserManager<Ap
                 TargetOffsetDays = request.TargetOffsetDays, LatestOffsetDays = request.LatestOffsetDays,
                 ChargingCoverage = request.ChargingCoverage
             };
-            db.TreatmentSteps.Add(step);
+            await db.AddTreatmentDataAsync(step);
             dossier.Version++; dossier.UpdatedAt = now;
             Event(dossierId, actorId, "step.added", new { step.Id, step.ItemId, request.Reason,
                 step.PlanVersion, step.EstimatedMinMinutes, step.EstimatedMaxMinutes,
@@ -392,7 +391,7 @@ public sealed class TreatmentProgressionService(DcmsDbContext db, UserManager<Ap
         var dossier = await DossierAsync(actorId, dossierId, ct);
         if (dossier.Version != expectedVersion) throw Error("MSG111", 409);
         if (dossier.State != "Open" || dossier.PlanState != "Committed") throw Error("MSG240", 409);
-        var step = await db.TreatmentSteps.SingleOrDefaultAsync(x => x.Id == stepId && x.DossierId == dossierId, ct)
+        var step = await db.LoadTreatmentStepAsync(db.TreatmentSteps.Where(x => x.Id == stepId && x.DossierId == dossierId), ct)
             ?? throw Error("MSG113", 404);
         if (step.Version != expectedStepVersion || step.PlanVersion != dossier.PlanVersion) throw Error("MSG111", 409);
         if (dossier.Items.SingleOrDefault(x => x.Id == step.ItemId)?.Decision != "Agreed") throw Error("MSG240", 409);
@@ -468,7 +467,7 @@ public sealed class TreatmentProgressionService(DcmsDbContext db, UserManager<Ap
             var completion = Guid.NewGuid();
             step.Outcome = "Completed"; step.CompletionEventId = completion; step.CompletedAt = now; step.Version++;
             dossier.Version++; dossier.UpdatedAt = now;
-            var sameItem = await db.TreatmentSteps.Where(x => x.DossierId == dossierId && x.ItemId == step.ItemId).ToListAsync(ct);
+            var sameItem = await db.LoadTreatmentStepsAsync(db.TreatmentSteps.Where(x => x.DossierId == dossierId && x.ItemId == step.ItemId), ct);
             if (sameItem.All(x => x.Outcome == "Completed"))
                 dossier.Items.Single(x => x.Id == step.ItemId).Progress = "Completed";
             var fulfilled = await db.FollowUpInstructions.Where(x => x.StepId == stepId &&
@@ -481,7 +480,7 @@ public sealed class TreatmentProgressionService(DcmsDbContext db, UserManager<Ap
             Event(dossierId, actorId, "step.completed", new { stepId, completion,
                 request.ActualEvidenceIds }, $"step-complete:{stepId}:{completion}");
             await db.SaveChangesAsync(ct);
-            var rows = await db.TreatmentSteps.Where(x => x.DossierId == dossierId).ToListAsync(ct);
+            var rows = await db.LoadTreatmentStepsAsync(db.TreatmentSteps.Where(x => x.DossierId == dossierId), ct);
             var generated = new List<Guid>();
             foreach (var successor in rows.Where(x => x.Outcome != "Completed"))
             {
@@ -546,7 +545,7 @@ public sealed class TreatmentProgressionService(DcmsDbContext db, UserManager<Ap
             throw Error("MSG06", 403);
         var employee = await db.Employees.AsNoTracking().SingleOrDefaultAsync(x => x.AccountId == actorId, ct);
         if (employee == null) throw Error("MSG06", 403);
-        var branches = db.Set<SchedulingMember>().AsNoTracking().Where(x => x.EmployeeId == employee.Id
+        var branches = db.SchedulingMembers.AsNoTracking().Where(x => x.EmployeeId == employee.Id
             && x.Active && x.CanDentist).Select(x => x.BranchId);
         var scope = await access.ResolveAsync(actorId, ct);
         if (scope.Assigned && !scope.Owner) branches = branches.Where(branch => scope.BranchIds.Contains(branch));
@@ -615,7 +614,7 @@ public sealed class TreatmentProgressionService(DcmsDbContext db, UserManager<Ap
                 if (!verified.Available) throw Error("MSG144", 503);
                 if (!verified.Matches) throw Error("MSG06", 403);
             }
-            if (request.DentistId.HasValue && !await db.Set<SchedulingMember>().AsNoTracking().AnyAsync(x =>
+            if (request.DentistId.HasValue && !await db.SchedulingMembers.AsNoTracking().AnyAsync(x =>
                     x.BranchId == request.BranchId && x.EmployeeId == request.DentistId && x.Active && x.CanDentist, ct))
                 throw Error("MSG06", 403);
             var now = clock.GetUtcNow();

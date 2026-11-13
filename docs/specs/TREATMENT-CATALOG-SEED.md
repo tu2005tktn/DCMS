@@ -37,6 +37,10 @@ Cách ngắn hơn: `& .\infrastructure\scripts\start-api.ps1 -SeedClinicCatalog`
 
 ## Kiểm thử
 
+### Tương thích dữ liệu cũ trùng tên (11/11/2026)
+
+Chi nhánh development có thể đã có nhiều bản ghi cùng tên dịch vụ (ví dụ "Khám"). Khi dựng ánh xạ để tạo dòng kế hoạch, nhóm theo tên và chọn ổn định: dịch vụ đang hoạt động trước, rồi dịch vụ khám ban đầu, dịch vụ cho phép đặt công khai, cuối cùng ID nhỏ hơn. Không xóa/gộp/sửa dịch vụ trùng, không thay tham chiếu lịch hẹn hoặc chứng từ cũ. Seeder vẫn phải hoàn tất và chạy lại không sinh thêm kế hoạch; bước khám tham chiếu dịch vụ khám ban đầu khi có.
+
 Test tích hợp trên schema cách ly: sau nạp, chi nhánh demo có đủ 17 kế hoạch, mỗi kế hoạch có ít nhất một dòng; mọi dòng tham chiếu dịch vụ tồn tại, thời gian dự kiến trong 1–480, chi phí ≥ 0; chạy lần hai không tạo thêm; dịch vụ đã đổi giá không bị ghi đè; kế hoạch bị xóa mềm sẽ được tạo lại khi nạp lại (vì chỉ khớp kế hoạch chưa xóa).
 
 ## Bỏ ghi chú chuyển tuyến và nạp lại (06/11/2026)

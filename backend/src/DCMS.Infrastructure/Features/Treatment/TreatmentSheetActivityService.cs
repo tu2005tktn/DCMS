@@ -41,7 +41,7 @@ public sealed partial class TreatmentDossierService
             if (row.Quantity != source.Quantity || row.DentistId != dossier.DentistId) throw Error("MSG04");
             var service = await db.Set<SchedulingService>().AsNoTracking().SingleOrDefaultAsync(s => s.Id == row.ServiceId && s.BranchId == dossier.BranchId && (s.Active || s.Id == before.ServiceId), ct) ?? throw Error("MSG04");
             if (!TreatmentSheetRules.ValidQuantity(row.Quantity, service.Unit)) throw Error("MSG04");
-            if (row.AssistantId.HasValue && !await db.Set<SchedulingMember>().AnyAsync(m => m.EmployeeId == row.AssistantId && m.BranchId == dossier.BranchId && m.Active && !m.CanDentist, ct)) throw Error("MSG04");
+            if (row.AssistantId.HasValue && !await db.SchedulingMembers.AnyAsync(m => m.EmployeeId == row.AssistantId && m.BranchId == dossier.BranchId && m.Active && !m.CanDentist, ct)) throw Error("MSG04");
             var price = row.UnitPriceVnd ?? checked((long)(row.CostVnd / row.Quantity));
             if (TreatmentPlanRules.Gross(row.Quantity, price) != row.CostVnd) throw Error("MSG04");
             var type = row.DiscountType == "VND" ? "Fixed" : row.DiscountType;
@@ -51,8 +51,6 @@ public sealed partial class TreatmentDossierService
             catch (ArgumentOutOfRangeException) { throw Error("MSG252"); }
             var moneyChanged = before.SheetDeleted || before.ServiceId != row.ServiceId || before.PriceSnapshotVnd != price || before.DiscountSnapshotVnd != discount;
             if (moneyChanged && discount > 0 && Clean(row.DiscountNote) == null) throw Error("MSG252");
-            // A recorded payment cannot exceed what the activity now costs.
-            if (await PaidForActivityAsync(source.Id, ct) is > 0 and var paid && row.CostVnd - discount < paid) throw Error("MSG111", 409);
             var after = before with { ServiceId = service.Id, ServiceNameSnapshot = service.Id == before.ServiceId ? before.ServiceNameSnapshot ?? service.Name : service.Name, Unit = service.Unit,
                 Region = Clean(string.Join(", ", row.Regions ?? [])), Outcome = Clean(row.Note) ?? "", PerformerId = row.DentistId,
                 AssistantId = row.AssistantId, LabWorkSnapshot = Clean(row.LabWork), PriceSnapshotVnd = price,
@@ -76,7 +74,6 @@ public sealed partial class TreatmentDossierService
         {
             var (_, before) = await EditableSheetActivityAsync(actorId, dossier, activityId, request.ExpectedVersion,
                 request.ExpectedActivityVersion, request.ExpectedSheetVersion, ct);
-            if (await PaidForActivityAsync(activityId, ct) > 0) throw Error("MSG111", 409);
             var after = before with { SheetVersion = before.SheetVersion + 1, SheetDeleted = true };
             dossier.Version++; dossier.UpdatedAt = clock.GetUtcNow();
             Event(dossier, actorId, "SheetActivityDeleted", new { activityId, after.SheetVersion, activity = after, before });

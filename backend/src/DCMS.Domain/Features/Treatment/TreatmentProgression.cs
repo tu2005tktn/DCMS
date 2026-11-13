@@ -11,6 +11,8 @@ public sealed class TreatmentTemplate
     public int CreatedBy { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public List<TreatmentTemplateVersion> Versions { get; set; } = [];
+    public List<TreatmentTemplateItem> Items { get; set; } = [];
+    public Guid StorageStamp { get; set; } = Guid.NewGuid();
 }
 
 public sealed class TreatmentTemplateItem
@@ -76,9 +78,8 @@ public sealed class TreatmentStep
     public int Version { get; set; } = 1;
 }
 
-public sealed class FollowUpInstruction
+public sealed class FollowUpInstruction : TreatmentProcessRecord
 {
-    public Guid Id { get; set; } = Guid.NewGuid();
     public int PatientId { get; set; }
     public int BranchId { get; set; }
     public Guid? DossierId { get; set; }
@@ -105,16 +106,13 @@ public sealed class FollowUpInstruction
     public DateTimeOffset UpdatedAt { get; set; }
 }
 
-public sealed class TreatmentProgressionReceipt
+public sealed class TreatmentProgressionReceipt : DCMS.Domain.Common.CommandReceiptRecord
 {
-    public Guid RequestKey { get; set; }
     public int ActorId { get; set; }
     public string Command { get; set; } = "";
-    public string Fingerprint { get; set; } = "";
-    public string ResultJson { get; set; } = "{}";
 }
 
-public sealed class TreatmentProgressionEvent
+public sealed class TreatmentProgressionEvent : DCMS.Domain.Common.AuditRecord
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid AggregateId { get; set; }

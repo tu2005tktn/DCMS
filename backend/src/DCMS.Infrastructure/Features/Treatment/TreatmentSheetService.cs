@@ -63,7 +63,7 @@ public sealed partial class TreatmentDossierService
         string kind, int draftVersion, int version, TreatmentDossier dossier, CancellationToken ct)
     {
         if (dossier.Version != version) throw Error("MSG111", 409);
-        var draft = await db.TreatmentSheetDrafts.SingleOrDefaultAsync(x => x.Id == id && x.DossierId == dossierId, ct)
+        var draft = await db.LoadSheetDraftAsync(db.TreatmentSheetDrafts.Where(x => x.Id == id && x.DossierId == dossierId), ct)
             ?? throw Error("MSG113", 404);
         if (draft.ActorId != actorId) throw Error("MSG06", 403);
         if (draft.Version != draftVersion || draft.Kind != kind)
@@ -90,7 +90,7 @@ public sealed partial class TreatmentDossierService
         if (row.DentistId != actorEmployee || dossier.DentistId != actorEmployee)
             throw Error("MSG06", 403);
         if (!TreatmentSheetRules.ValidQuantity(row.Quantity, service.Unit)) throw Error("MSG04");
-        if (row.AssistantId.HasValue && !await db.Set<SchedulingMember>().AnyAsync(x => x.BranchId == dossier.BranchId
+        if (row.AssistantId.HasValue && !await db.SchedulingMembers.AnyAsync(x => x.BranchId == dossier.BranchId
             && x.EmployeeId == row.AssistantId && x.Active && !x.CanDentist, ct)) throw Error("MSG04");
         if (decision.ConsentDocumentId.HasValue && !await db.Set<ClinicalDocument>().AnyAsync(x =>
             x.Id == decision.ConsentDocumentId && x.PatientId == dossier.PatientId && x.DossierId == dossier.Id
@@ -151,7 +151,7 @@ public sealed partial class TreatmentDossierService
             var source = await db.TreatmentTemplates.AsNoTracking().SingleOrDefaultAsync(x => x.Id == request.ItemPlanId && x.DefinitionKind == "ItemPlan" && x.DeletedAt == null, ct) ?? throw Error("MSG113", 404);
             if (source.BranchId != dossier.BranchId) throw Error("MSG06", 403);
             if (source.Version != request.ExpectedItemPlanVersion) throw Error("MSG111", 409);
-            var rows = await db.Set<TreatmentTemplateItem>().AsNoTracking().Where(x => x.TemplateId == source.Id && x.DeletedAt == null).OrderBy(x => x.Position).ThenBy(x => x.Id).ToListAsync(ct);
+            var rows = await db.TreatmentTemplateItems.AsNoTracking().Where(x => x.TemplateId == source.Id && x.DeletedAt == null).OrderBy(x => x.Position).ThenBy(x => x.Id).ToListAsync(ct);
             if (rows.Count == 0) throw Error("MSG04");
             var created = new List<Guid>();
             dossier.PlanVersion++;
@@ -178,7 +178,7 @@ public sealed partial class TreatmentDossierService
     private async Task CarryForwardUnchangedProgressionAsync(TreatmentDossier dossier, int actorId, CancellationToken ct)
     {
         var previousVersion = dossier.PlanVersion - 1;
-        var steps = await db.TreatmentSteps.Where(x => x.DossierId == dossier.Id && x.PlanVersion == previousVersion).ToListAsync(ct);
+        var steps = await db.LoadTreatmentStepsAsync(db.TreatmentSteps.Where(x => x.DossierId == dossier.Id && x.PlanVersion == previousVersion), ct);
         var instructions = await db.FollowUpInstructions.Where(x => x.DossierId == dossier.Id && x.PlanVersion == previousVersion
             && (x.Status == "NeedsBooking" || x.Status == "Booked")).ToListAsync(ct);
         foreach (var step in steps) { step.PlanVersion = dossier.PlanVersion; step.Version++; }
@@ -220,7 +220,7 @@ public sealed partial class TreatmentDossierService
             var snapshot = db.ChangeTracker.Entries<TreatmentEvent>().Single(x => x.Entity.DossierId == dossierId && x.Entity.Kind == "PlanCommitted" && x.State == EntityState.Added).Entity;
             snapshot.PayloadJson = JsonSerializer.Serialize(new { dossier.PlanId, dossier.PlanVersion, dossier.Goals,
                 dossier.PaymentTermsJson, Items = dossier.Items.OrderBy(x => x.PlannedOrder).Select(ItemDto).ToArray() }, Json);
-            db.TreatmentSheetDrafts.Remove(draft);
+            await db.RemoveTreatmentDataAsync(draft);
             await db.SaveChangesAsync(ct);
             return new TreatmentChange(await DetailAsync(dossier, ct), SystemMessages.Get(
                 request.Decision?.Decision is "Deferred" or "Refused" ? "MSG249" : "MSG222", "kế hoạch điều trị", value: dossier.Code));
@@ -250,7 +250,7 @@ public sealed partial class TreatmentDossierService
                     || row.CostVnd != Gross(directItem) || !TreatmentSheetRules.RegionWithinScope(directItem.Region, Clean(string.Join(", ", row.Regions ?? []))))) throw Error("MSG04");
                 var recorded = await RecordDossierActivityAsync(actorId, dossier, directItem, rowId,
                     row.Date, row.Note, false, request.RequestKey, ct, row.LabWork, row);
-                db.TreatmentSheetDrafts.Remove(draft);
+                await db.RemoveTreatmentDataAsync(draft);
                 dossier.Version++; dossier.UpdatedAt = clock.GetUtcNow();
                 Event(dossier, actorId, "DossierActualRecorded", new { ActivityId = recorded.Id, ItemId = directItem.Id });
                 await db.SaveChangesAsync(ct);
@@ -261,7 +261,7 @@ public sealed partial class TreatmentDossierService
             if (visit.Version != request.ExpectedVisitVersion) throw Error("MSG111", 409);
             if (visit.Status != "InProgress" || visit.DentistId != employee || row.DentistId != employee) throw Error("MSG230", 409);
             if (row.Date.HasValue && row.Date != DateOnly.FromDateTime(visit.ArrivalAt.ToOffset(TimeSpan.FromHours(7)).DateTime)) throw Error("MSG04");
-            if (row.AssistantId.HasValue && !await db.Set<SchedulingMember>().AnyAsync(x => x.BranchId == dossier.BranchId
+            if (row.AssistantId.HasValue && !await db.SchedulingMembers.AnyAsync(x => x.BranchId == dossier.BranchId
                 && x.EmployeeId == row.AssistantId && x.Active && !x.CanDentist, ct)) throw Error("MSG04");
             if (Clean(request.Outcome) is not { Length: <= 4000 }) throw Error("MSG04");
             TreatmentItem item;
@@ -306,7 +306,7 @@ public sealed partial class TreatmentDossierService
             else item.Progress = "InProgress";
             dossier.Version++; dossier.UpdatedAt = clock.GetUtcNow();
             Event(dossier, actorId, "ActualConfirmed", new { ActivityId = activity.Id, activity.VisitId, ItemId = item.Id, request.CompleteItem });
-            db.TreatmentSheetDrafts.Remove(draft);
+            await db.RemoveTreatmentDataAsync(draft);
             await db.SaveChangesAsync(ct);
             return new ConfirmSheetActualResult(await DetailAsync(dossier, ct), posted);
         }, ct);
@@ -318,7 +318,7 @@ public sealed partial class TreatmentDossierService
         var permissions = (await access.ResolveAsync(actorId, ct)).Permissions;
         var services = await db.Set<SchedulingService>().AsNoTracking().Where(x => x.BranchId == dossier.BranchId && x.Active)
             .OrderBy(x => x.Name).Select(x => new SheetService(x.Id, x.BranchId, x.Name, x.Unit, x.ReferenceUnitPriceVnd, x.PriceVersion)).ToListAsync(ct);
-        var members = await (from member in db.Set<SchedulingMember>().AsNoTracking()
+        var members = await (from member in db.SchedulingMembers.AsNoTracking()
             join staff in db.Employees on member.EmployeeId equals staff.Id
             where member.BranchId == dossier.BranchId && member.Active
             select new SheetMember(staff.Id, staff.FullName, member.CanDentist)).ToListAsync(ct);
@@ -442,7 +442,7 @@ public sealed partial class TreatmentDossierService
         // Reuse list authorization, then aggregate the entire authorized filter, not its first page.
         await ListAsync(actorId, patientId, branchId, 1, 20, ct);
         var employee = await db.Employees.AsNoTracking().SingleAsync(x => x.AccountId == actorId, ct);
-        var branches = db.Set<SchedulingMember>().Where(x => x.EmployeeId == employee.Id && x.Active && x.CanDentist).Select(x => x.BranchId);
+        var branches = db.SchedulingMembers.Where(x => x.EmployeeId == employee.Id && x.Active && x.CanDentist).Select(x => x.BranchId);
         var dossiers = await db.TreatmentDossiers.AsNoTracking().Include(x => x.Items).Where(x => x.PatientId == patientId
             && x.State != "Deleted" && branches.Contains(x.BranchId) && (!branchId.HasValue || x.BranchId == branchId)).ToListAsync(ct);
         var gross = 0L; var reduction = 0L; var summaries = new List<TreatmentFinancialSummary>();

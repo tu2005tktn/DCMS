@@ -52,7 +52,7 @@ public sealed partial class TreatmentDossierService
             var service = await db.Set<SchedulingService>().AsNoTracking().SingleOrDefaultAsync(x => x.Id == row.ServiceId && x.BranchId == dossier.BranchId && x.Active, ct)
                 ?? throw Error("MSG04");
             if (!TreatmentSheetRules.ValidQuantity(row.Quantity, service.Unit)) throw Error("MSG04");
-            if (row.AssistantId.HasValue && !await db.Set<SchedulingMember>().AnyAsync(x => x.EmployeeId == row.AssistantId && x.BranchId == dossier.BranchId && x.Active && !x.CanDentist, ct)) throw Error("MSG04");
+            if (row.AssistantId.HasValue && !await db.SchedulingMembers.AnyAsync(x => x.EmployeeId == row.AssistantId && x.BranchId == dossier.BranchId && x.Active && !x.CanDentist, ct)) throw Error("MSG04");
             var unitPrice = row.UnitPriceVnd ?? checked((long)(row.CostVnd / row.Quantity));
             if (unitPrice != item.AgreedUnitPriceVnd || row.DiscountValue != (item.DiscountValue ?? 0))
                 await access.RequireAsync(actorId, "treatment.items.price", ct);
@@ -135,7 +135,7 @@ public sealed partial class TreatmentDossierService
         try { reduction = discountValue > 0 ? TreatmentPlanRules.Discount(GrossInput(qty, price), discountType!, discountValue) : 0; }
         catch (ArgumentOutOfRangeException) { throw Error("MSG252"); }
         var assistant = input == null ? item.AssistantId : input.AssistantId;
-        if (assistant.HasValue && !await db.Set<SchedulingMember>().AnyAsync(x => x.BranchId == dossier.BranchId && x.EmployeeId == assistant && x.Active && !x.CanDentist, ct)) throw Error("MSG04");
+        if (assistant.HasValue && !await db.SchedulingMembers.AnyAsync(x => x.BranchId == dossier.BranchId && x.EmployeeId == assistant && x.Active && !x.CanDentist, ct)) throw Error("MSG04");
         var activity = new ClinicalActivity { Id = activityId, SourceKind = "Dossier", ServiceNameSnapshot = service == null || service.Id == item.ServiceId ? item.ServiceName : service.Name,
             LabWorkSnapshot = Clean(labWork), IsPlanTransfer = transfer, PatientId = dossier.PatientId, BranchId = dossier.BranchId, DossierId = dossier.Id,
             ItemId = item.Id, PlanVersion = dossier.PlanVersion, ServiceId = service?.Id ?? item.ServiceId, Unit = service?.Unit ?? item.Unit,

@@ -33,7 +33,7 @@ export default function PatientProfilePage() {
   const canReadExaminations = auth.user?.permissions.includes('examinations.read') ?? false;
   const canReadDocuments = auth.user?.permissions.includes('documents.read') ?? false;
   const canReadPrescriptions = auth.user?.permissions.includes('prescriptions.read') ?? false;
-  const canReadTreatment = auth.user?.permissions.some(key => key === 'treatment.read' || key === 'finance.read') ?? false;
+  const canReadTreatment = auth.user?.permissions.some(key => key === 'treatment.read') ?? false;
   const canReadAppointments = auth.user?.permissions.includes('appointments.read') ?? false;
   const [toast, toastContext] = message.useMessage();
   const [patient, setPatient] = useState<PatientDetail | null>(null);

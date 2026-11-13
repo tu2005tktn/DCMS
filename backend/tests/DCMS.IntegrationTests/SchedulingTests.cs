@@ -58,11 +58,11 @@ public sealed class SchedulingApiTests(ApiFixture fixture) : IClassFixture<ApiFi
         var employees = await (from e in db.Employees join a in db.Users on e.AccountId equals a.Id select new { e.Id, e.AccountId, a.UserName }).ToArrayAsync();
         var dentist = employees.Single(e => e.UserName == "dentist.demo"); var assistant = employees.Single(e => e.UserName == "assistant.demo");
         var other = employees.Single(e => e.UserName == "dual.demo"); var owner = employees.Single(e => e.UserName == "owner.demo");
-        db.AddRange(new SchedulingMember { BranchId = branch.Id, EmployeeId = dentist.Id, CanDentist = true }, new SchedulingMember { BranchId = branch.Id, EmployeeId = assistant.Id },
+        await db.AddSchedulingDataAsync(new SchedulingMember { BranchId = branch.Id, EmployeeId = dentist.Id, CanDentist = true }, new SchedulingMember { BranchId = branch.Id, EmployeeId = assistant.Id },
             new SchedulingMember { BranchId = branch.Id, EmployeeId = other.Id, CanDentist = true }, new SchedulingMember { BranchId = branch.Id, EmployeeId = owner.Id, CanDentist = true, CanManageSchedules = true });
         var service = new SchedulingService { BranchId = branch.Id, Name = "Khám", PublicDurationMinutes = 60, IsInitialExamination = true };
         var chair = new SchedulingChair { BranchId = branch.Id, Name = "Chair", OpenMinute = 480, CloseMinute = 1080 };
-        db.AddRange(service, chair); await db.SaveChangesAsync();
+        await db.AddSchedulingDataAsync(service, chair); await db.SaveChangesAsync();
         return new(branch.Id, dentist.Id, assistant.Id, other.Id, service.Id, chair.Id, dentist.AccountId, owner.AccountId, Date.AddDays(branch.Id * 7));
     }
     [Fact]
@@ -244,7 +244,7 @@ public sealed class SchedulingApiTests(ApiFixture fixture) : IClassFixture<ApiFi
         await Message(await client.PostAsJsonAsync("/api/working-schedules/publish", command), HttpStatusCode.Conflict, "MSG38");
         using var scope = fixture.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
         Assert.Equal(1, (await db.Set<WorkingWeek>().SingleAsync(w => w.BranchId == s.Branch)).Version);
-        Assert.Equal(480, (await db.Set<WorkingPeriod>().Where(p => p.WeekId == db.Set<WorkingWeek>().Where(w => w.BranchId == s.Branch).Select(w => w.Id).Single()).OrderBy(p => p.StartMinute).FirstAsync()).StartMinute);
+        Assert.Equal(480, (await db.Set<WorkingWeek>().Where(w => w.BranchId == s.Branch).SelectMany(w => w.Periods).OrderBy(p => p.StartMinute).FirstAsync()).StartMinute);
     }
     [Fact]
     public async Task ChairMainAssistantAndAttendeeConflictsAreCheckedForEntireInterval()
@@ -258,7 +258,7 @@ public sealed class SchedulingApiTests(ApiFixture fixture) : IClassFixture<ApiFi
         Assert.Equal("MSG28", (await Assert.ThrowsAsync<BusinessException>(() => service.CheckInTransactionAsync(request, default))).Response.Code);
         // Move occupancy to another chair: main's assistant remains unavailable, independent of chair capacity.
         var reservation = await db.Set<ResourceReservation>().SingleAsync(x => x.BranchId == s.Branch);
-        var extraChair = new SchedulingChair { BranchId = s.Branch, Name = "Other" }; db.Add(extraChair); await db.SaveChangesAsync();
+        var extraChair = new SchedulingChair { BranchId = s.Branch, Name = "Other" }; await db.AddSchedulingDataAsync(extraChair); await db.SaveChangesAsync();
         reservation.ChairId = extraChair.Id; reservation.AssistantId = s.Assistant; await db.SaveChangesAsync();
         await Assert.ThrowsAsync<BusinessException>(() => service.CheckInTransactionAsync(request, default));
         reservation.AssistantId = null; await db.SaveChangesAsync();
@@ -267,7 +267,7 @@ public sealed class SchedulingApiTests(ApiFixture fixture) : IClassFixture<ApiFi
         Assert.Equal(Start(s, 540), available.End); // adjacency at occupancy start is allowed
         await Assert.ThrowsAsync<BusinessException>(() => service.CheckInTransactionAsync(request with { AssistantId = s.Dentist }, default));
         await Assert.ThrowsAsync<BusinessException>(() => service.CheckInTransactionAsync(request with { ExpectedScheduleVersion = 0 }, default));
-        var member = await db.Set<SchedulingMember>().SingleAsync(x => x.BranchId == s.Branch && x.EmployeeId == s.Assistant); member.Active = false; await db.SaveChangesAsync();
+        var member = await db.LoadMemberAsync(s.Branch, s.Assistant); member.Active = false; await db.SaveChangesAsync();
         await Assert.ThrowsAsync<BusinessException>(() => service.CheckInTransactionAsync(request, default));
     }
     [Fact]
@@ -327,7 +327,7 @@ public sealed class SchedulingApiTests(ApiFixture fixture) : IClassFixture<ApiFi
         var request = new ResourceCheck(s.Branch, s.Dentist, s.Service, Start(s, 540), 60, s.Chair, s.Assistant, null, 1, 0);
         Assert.Equal("MSG111", (await Assert.ThrowsAsync<BusinessException>(() => service.CheckInTransactionAsync(request, default))).Response.Code);
         Assert.Equal("MSG26", (await Assert.ThrowsAsync<BusinessException>(() => service.CheckInTransactionAsync(request with { ExpectedAssistantScheduleVersion = 1, Start = Start(s, 690) }, default))).Response.Code);
-        var member = await db.Set<SchedulingMember>().SingleAsync(x => x.BranchId == s.Branch && x.EmployeeId == s.Dentist); member.CanDentist = false; await db.SaveChangesAsync();
+        var member = await db.LoadMemberAsync(s.Branch, s.Dentist); member.CanDentist = false; await db.SaveChangesAsync();
         await Assert.ThrowsAsync<BusinessException>(() => service.QueryAsync(query, null, default));
     }
     [Fact]

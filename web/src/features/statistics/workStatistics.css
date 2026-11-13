@@ -1,0 +1,20 @@
+/* Work/service statistics table (docs/specs/WORK-SERVICE-STATISTICS.md). */
+.work-stats-table .ant-table-cell { overflow-wrap:anywhere; }
+.work-stats-table table { width:100% !important; table-layout:auto; }
+@media screen and (max-width:900px) {
+  .work-stats-table .ant-table-thead, .work-stats-table .ant-table-measure-row { display:none; }
+  .work-stats-table table, .work-stats-table tbody, .work-stats-table tr.ant-table-row { display:block; width:100%; }
+  .work-stats-table tr.ant-table-row { margin:0 0 8px; padding:2px 8px; border:1px solid #e4e7ec; background:#fff; }
+  .work-stats-table td.ant-table-cell { display:grid; grid-template-columns:minmax(110px,40%) minmax(0,1fr); gap:8px; padding:6px 0!important; border:0!important; border-bottom:1px dashed #eceff3!important; text-align:left!important; }
+  .work-stats-table td.ant-table-cell:last-child { border-bottom:0!important; }
+  .work-stats-table td.ant-table-cell::before { color:#475467; font-weight:700; }
+  .work-stats-table td.ant-table-cell:nth-child(1)::before { content:"Ngày"; }
+  .work-stats-table td.ant-table-cell:nth-child(2)::before { content:"MSKH"; }
+  .work-stats-table td.ant-table-cell:nth-child(3)::before { content:"Khách hàng"; }
+  .work-stats-table td.ant-table-cell:nth-child(4)::before { content:"Lịch hẹn tiếp theo"; }
+  .work-stats-table td.ant-table-cell:nth-child(5)::before { content:"Điều trị/dịch vụ"; }
+  .work-stats-table td.ant-table-cell:nth-child(6)::before { content:"Bác sĩ & phụ tá"; }
+  .work-stats-table td.ant-table-cell:nth-child(7)::before { content:"Chi phí"; }
+  .work-stats-table td.ant-table-cell:nth-child(8)::before { content:"Đã trả"; }
+  .work-stats-table td.ant-table-cell:nth-child(9)::before { content:"Còn lại"; }
+}

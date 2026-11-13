@@ -22,14 +22,14 @@ public sealed class SettingsAccess(DcmsDbContext db, UserManager<ApplicationUser
         var employee = await db.Employees.AsNoTracking().SingleOrDefaultAsync(x => x.AccountId == actorId, ct);
         if (employee == null) throw Error("MSG06",403);
         var branches = owner ? await db.Set<SchedulingBranch>().Where(x => x.Active).Select(x => x.Id).ToArrayAsync(ct)
-            : await (from m in db.Set<SchedulingMember>() join b in db.Set<SchedulingBranch>() on m.BranchId equals b.Id
+            : await (from m in db.SchedulingMembers join b in db.Set<SchedulingBranch>() on m.BranchId equals b.Id
                      where m.EmployeeId == employee.Id && m.Active && b.Active select b.Id).ToArrayAsync(ct);
         var assignment = await db.Set<StaffAccessAssignment>().AsNoTracking().SingleOrDefaultAsync(x => x.AccountId == actorId,ct);
         string[] permissions;
         if (owner) permissions = SettingsGrants.Definitions.Where(x => SettingsGrants.RoleAllows(x.Key,roles)).Select(x => x.Key).ToArray();
         else if (assignment == null) permissions = SettingsGrants.Legacy(roles);
         else {
-            var group = await db.Set<AccessGroup>().AsNoTracking().Include(x => x.Grants).SingleOrDefaultAsync(x => x.Id == assignment.GroupId,ct);
+            var group = await db.Set<AccessGroup>().AsNoTracking().SingleOrDefaultAsync(x => x.Id == assignment.GroupId,ct);
             permissions = group is {Active:true} && roles.Contains(group.BaseRole)
                 ? group.Grants.Where(x => SettingsGrants.RoleAllows(x.Permission,roles)).Select(x => x.Permission).ToArray() : [];
             branches = branches.Intersect(assignment.BranchIds).ToArray();

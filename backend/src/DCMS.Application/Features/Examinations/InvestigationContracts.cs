@@ -1,4 +1,4 @@
-﻿namespace DCMS.Application.Features.Examinations;
+namespace DCMS.Application.Features.Examinations;
 
 public sealed record CreateInvestigation(int PatientId, int ExpectedVisitVersion, Guid RequestKey,
     string Kind, string Name, string? Region, string Reason, bool RequiredForDiagnosis = true,

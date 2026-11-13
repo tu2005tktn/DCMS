@@ -48,10 +48,7 @@ public sealed class WorkStatisticsService(DcmsDbContext db, TimeProvider clock, 
         var staffIds = activities.Where(a => a.AssistantId.HasValue).Select(a => a.AssistantId!.Value).Concat(dossiers.Select(d => d.DentistId)).Distinct().ToArray();
         var staff = await db.Employees.AsNoTracking().Where(e => staffIds.Contains(e.Id)).ToDictionaryAsync(e => e.Id, e => e.FullName, ct);
 
-        // Money follows the treatment sheet itself: price x quantity - discount, paid from the dossier payments recorded on the sheet.
-        var ids = activities.Select(a => a.Id).ToArray();
-        var paidByActivity = (await db.Set<DossierPaymentLine>().AsNoTracking().Where(x => ids.Contains(x.ActivityId))
-            .GroupBy(x => x.ActivityId).Select(g => new { g.Key, Total = g.Sum(x => x.AmountVnd) }).ToListAsync(ct)).ToDictionary(x => x.Key, x => x.Total);
+        // Money follows the treatment sheet itself: price x quantity - discount. No payments are recorded while the finance module is removed.
 
         var now = clock.GetUtcNow();
         var upcoming = await db.Set<Appointment>().AsNoTracking().Where(x => x.PatientId != null && patientIds.Contains(x.PatientId.Value) && x.Status == "Confirmed" && x.StartAt >= now)
@@ -68,8 +65,7 @@ public sealed class WorkStatisticsService(DcmsDbContext db, TimeProvider clock, 
             {
                 var gross = checked((long)Math.Round(a.Quantity * a.PriceSnapshotVnd, MidpointRounding.AwayFromZero));
                 var cost = a.ChargingBasis == "Included" ? 0 : gross - Math.Min(gross, a.DiscountSnapshotVnd);
-                var paid = paidByActivity.GetValueOrDefault(a.Id);
-                return new WorkStatisticsLine(a.Id, a.ServiceNameSnapshot ?? services.GetValueOrDefault(a.ServiceId, ""), cost, paid, Math.Max(0, cost - paid));
+                return new WorkStatisticsLine(a.Id, a.ServiceNameSnapshot ?? services.GetValueOrDefault(a.ServiceId, ""), cost, 0, 0);
             }).ToArray();
             if (search.Length > 0 && !(patient?.PatientCode.ToUpperInvariant().Contains(search) == true || patient?.FullName.ToUpperInvariant().Contains(search) == true
                 || lines.Any(l => l.ServiceName.ToUpperInvariant().Contains(search)))) continue;

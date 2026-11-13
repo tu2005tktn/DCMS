@@ -1,5 +1,7 @@
 # Giá thiết lập sẵn cho khám và cận lâm sàng
 
+> **Đã gỡ ngày 13/11/2026.** Phân hệ tài chính đã được xóa khỏi backend, web và database theo [CARE-LAB-FINANCE-STORAGE.vi.md](CARE-LAB-FINANCE-STORAGE.vi.md). Tài liệu này chỉ còn giá trị tham khảo khi đặc tả lại chức năng; không mô tả hành vi hiện tại.
+
 Quyết định người dùng 02/11/2026: chỉ chỉnh phần khám/CLS, phòng khám thiết lập giá cụ thể từ trước để minh bạch. **Không chỉnh phần điều trị của Vinh**, không thêm khoảng giá điều trị trong thay đổi này.
 
 ## Quy tắc giá danh mục

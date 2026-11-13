@@ -1,9 +1,6 @@
 import Workspace from './StaffWorkspace';
 import FamilyMembersPage from '../features/family-members/FamilyMembersPage';
 import VisitPage from '../features/examinations/ExaminationPage';
-import PaymentsPage from '../features/finance/PaymentsPage';
-import ReceiptPrintPage from '../features/finance/ReceiptPrintPage';
-import ClinicalServicesPage from '../features/finance/ClinicalServicesPage';
 import { Alert, Button, Card, Result, Typography } from 'antd';
 import { useState, type ReactNode } from 'react';
 import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom';
@@ -13,9 +10,7 @@ import SystemSettingsPage from '../features/system-settings/SystemSettingsPage';
 import MedicineManagementPage from '../features/system-settings/MedicineManagementPage';
 import LabWorkPage from '../features/lab-work/LabWorkPage';
 import MaterialsPage from '../features/system-settings/MaterialsPage';
-import WorkStatisticsPage from '../features/finance/WorkStatisticsPage';
-import RevenuePage from '../features/finance/RevenuePage';
-import FinanceOperationsPage from '../features/finance/FinanceOperationsPage';
+import WorkStatisticsPage from '../features/statistics/WorkStatisticsPage';
 import AccountsPage from '../features/accounts/AccountsPage';
 import WorkingSchedulesPage from '../features/working-schedules/WorkingSchedulesPage';
 import BookingSettingsPage from '../features/working-schedules/BookingSettingsPage';
@@ -83,13 +78,7 @@ export default function App() {
       <Route path="settings/:section" element={<Protected permission={['settings.read','treatment.prices.read','treatment.commercial.read']}><SystemSettingsPage /></Protected>} />
       <Route path="lab-orders" element={<Protected permission="treatment.lab.read"><LabWorkPage /></Protected>} />
       <Route path="materials" element={<Protected permission={['materials.purchases.read', 'materials.stock.read', 'materials.usage.read']}><MaterialsPage /></Protected>} />
-      <Route path="payments" element={<Navigate to="/patients" replace />} />
       <Route path="work-statistics" element={<Protected permission="finance.work-statistics.read"><WorkStatisticsPage /></Protected>} />
-      <Route path="revenue" element={<Protected permission="finance.revenue.read"><RevenuePage /></Protected>} />
-      <Route path="finance/operations" element={<Protected permission="finance.read"><FinanceOperationsPage /></Protected>} />
-      <Route path="visits/:visitId/payments" element={<Protected permission="finance.read"><PaymentsPage /></Protected>} />
-      <Route path="payments/:id/print" element={<Protected permission="finance.receipts.print"><ReceiptPrintPage /></Protected>} />
-      <Route path="clinical-services" element={<Protected permission="services.read"><ClinicalServicesPage /></Protected>} />
       <Route path="working-schedules" element={<Protected permission="working-schedules.read"><WorkingSchedulesPage /></Protected>} />
       <Route path="booking-settings" element={<Protected permission="booking-settings.read"><BookingSettingsPage /></Protected>} />
       <Route path="accounts" element={<Protected permission="accounts.read"><AccountsPage /></Protected>} />

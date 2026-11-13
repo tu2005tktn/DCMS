@@ -1,7 +1,7 @@
 import { Alert, Avatar, Button, Drawer, Layout, Menu, Typography } from 'antd';
 import type { MenuProps } from 'antd';
 import { CalendarOutlined, TeamOutlined, ScheduleOutlined, MedicineBoxOutlined, ExperimentOutlined, BarChartOutlined,
-  CreditCardOutlined, SettingOutlined, UserOutlined, FileTextOutlined, AuditOutlined, InboxOutlined,
+  SettingOutlined, UserOutlined, FileTextOutlined, AuditOutlined, InboxOutlined,
   LinkOutlined, MenuOutlined, LogoutOutlined, CloseOutlined, CustomerServiceOutlined } from '@ant-design/icons';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
@@ -34,11 +34,8 @@ export default function StaffWorkspace() {
     { key:'/commercial/treatment', title:'Giá và duyệt điều trị', icon:<MedicineBoxOutlined />, group:'Chuyên môn', visible:has('treatment.prices.read')||has('treatment.commercial.read') },
     { key:'/materials', title:'Dụng cụ - vật liệu', icon:<ExperimentOutlined />, group:'Chuyên môn', visible:['materials.purchases.read', 'materials.stock.read', 'materials.usage.read'].some(has) },
     { key:'/lab-orders', title:'Quản lý công việc labo', icon:<ExperimentOutlined />, group:'Chuyên môn', visible:has('treatment.lab.read') },
-    { key:'/clinical-services', title:'Dịch vụ cận lâm sàng', icon:<ExperimentOutlined />, group:'Chuyên môn', visible:has('services.read') },
     { key:'/medicines', title:'Quản lý thuốc', icon:<MedicineBoxOutlined />, group:'Quản trị', visible:has('catalog.medicines.read') },
-    { key:'/finance/operations', title:'Tài chính và công nợ', icon:<CreditCardOutlined />, group:'Quản trị', visible:has('finance.read') },
     { key:'/work-statistics', title:'Thống kê công việc/dịch vụ', icon:<BarChartOutlined />, group:'Quản trị', visible:has('finance.work-statistics.read') },
-    { key:'/revenue', title:'Doanh thu', icon:<BarChartOutlined />, group:'Quản trị', visible:has('finance.revenue.read') },
     { key:'/accounts', title:'Quản lý tài khoản', icon:<AuditOutlined />, group:'Quản trị', visible:has('accounts.read') },
     { key:'/settings', title:'Thiết lập hệ thống', icon:<SettingOutlined />, group:'Quản trị', visible:has('settings.read') },
     { key:'/booking-settings', title:'Cài đặt đặt lịch', icon:<ScheduleOutlined />, group:'Quản trị', visible:has('booking-settings.read') },
@@ -47,7 +44,7 @@ export default function StaffWorkspace() {
   const visible = links.filter(x=>x.visible);
   const path = location.pathname;
   const selected = visible.find(x=>path===x.key || path.startsWith(x.key+'/'))?.key
-    ?? (path.startsWith('/visits/') ? (path.endsWith('/payments') ? '/patients' : '/reception') : '/');
+    ?? (path.startsWith('/visits/') ? '/reception' : '/');
   const title = visible.find(x=>x.key===selected)?.title ?? 'Tài khoản của tôi';
   const items: MenuProps['items'] = ['Vận hành','Chuyên môn','Quản trị'].flatMap(group=> {
     const children = visible.filter(x=>x.group===group).map(x=>({key:x.key,icon:x.icon,label:<Link aria-label={x.title} title={x.title} to={x.key}>{x.title}</Link>}));

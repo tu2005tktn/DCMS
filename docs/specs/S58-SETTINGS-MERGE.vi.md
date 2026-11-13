@@ -24,7 +24,7 @@ Hệ quả:
   - Thiết lập chung dùng `CLINIC_SETTINGS_VERSION`.
   - Mọi danh mục phụ, gồm `diagnoses`, `patient-sources`, `occupations`, `intake-history`, `care-types`, `expense-categories` và `customer-groups`, dùng `REFERENCE_ENTRY`.
 - **Nhóm quyền giữ nguyên dữ liệu và logic:** chỉ đổi route sang `/api/system-settings`. `ISettingsAccess` và các grant không đổi, nên khám, thu ngân và tiếp nhận vẫn kiểm quyền như cũ.
-- **Bảng cũ không bị xóa:** `SETTINGS_VERSION` và `OPERATIONAL_REFERENCE_ENTRY` giữ nguyên dữ liệu ở dạng legacy chỉ đọc. Không còn API nào ghi vào hai bảng này.
+- **Bảng cũ không bị xóa:** `SETTINGS_VERSION` và `OPERATIONAL_REFERENCE_ENTRY` giữ nguyên dữ liệu ở dạng legacy chỉ đọc. Không còn API nào ghi vào hai bảng này. Từ 13/11/2026 hai bảng được bỏ; cấu trúc và dữ liệu được lưu thành snapshot `SettingsLegacyArchive` trong `AUDIT_LOG` và rollback dựng lại đúng như cũ ([SETTINGS-CATALOG-STORAGE.vi.md](SETTINGS-CATALOG-STORAGE.vi.md)).
 
 ### Đổi route
 
