@@ -1581,95 +1581,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.ToTable("SCHEDULING_BRANCH", (string)null);
                 });
 
-            modelBuilder.Entity("DCMS.Domain.Features.Settings.ReferenceEntry", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<bool>("Active")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("Code")
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("CreatedBy")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.Property<string>("Kind")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
-
-                    b.Property<string>("NormalizedCode")
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)");
-
-                    b.Property<string>("NormalizedName")
-                        .IsRequired()
-                        .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
-
-                    b.Property<bool>("Reserved")
-                        .HasColumnType("boolean");
-
-                    b.Property<int>("Version")
-                        .IsConcurrencyToken()
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Kind", "Active");
-
-                    b.HasIndex("Kind", "NormalizedCode")
-                        .IsUnique();
-
-                    b.HasIndex("Kind", "NormalizedName")
-                        .IsUnique();
-
-                    b.ToTable("OPERATIONAL_REFERENCE_ENTRY", (string)null);
-                });
-
-            modelBuilder.Entity("DCMS.Domain.Features.Settings.SettingsVersion", b =>
-                {
-                    b.Property<int>("Version")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("ActorId")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("ContentJson")
-                        .IsRequired()
-                        .HasColumnType("jsonb");
-
-                    b.Property<DateTimeOffset>("EffectiveAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Reason")
-                        .IsRequired()
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.HasKey("Version");
-
-                    b.HasIndex("ActorId");
-
-                    b.ToTable("SETTINGS_VERSION", (string)null);
-                });
-
             modelBuilder.Entity("DCMS.Domain.Features.Settings.StaffAccessAssignment", b =>
                 {
                     b.Property<int>("AccountId")
@@ -2268,44 +2179,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("REFERENCE_ENTRY", (string)null);
-                });
-
-            modelBuilder.Entity("DCMS.Domain.Features.SystemSettings.SystemCatalogChange", b =>
-                {
-                    b.Property<Guid>("RequestKey")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("ActorId")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("BeforeJson")
-                        .HasColumnType("jsonb");
-
-                    b.Property<string>("Command")
-                        .IsRequired()
-                        .HasMaxLength(48)
-                        .HasColumnType("character varying(48)");
-
-                    b.Property<string>("Fingerprint")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
-
-                    b.Property<DateTimeOffset>("OccurredAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("ResourceId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("ResultJson")
-                        .IsRequired()
-                        .HasColumnType("jsonb");
-
-                    b.HasKey("RequestKey");
-
-                    b.HasIndex("ResourceId", "OccurredAt");
-
-                    b.ToTable("SYSTEM_CATALOG_CHANGE", (string)null);
                 });
 
             modelBuilder.Entity("DCMS.Domain.Features.Treatment.CareTask", b =>
@@ -4368,6 +4241,19 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasDiscriminator().HasValue("SettingsAudit");
                 });
 
+            modelBuilder.Entity("DCMS.Domain.Features.Settings.SettingsLegacyArchive", b =>
+                {
+                    b.HasBaseType("DCMS.Domain.Common.AuditRecord");
+
+                    b.Property<string>("BeforeJson")
+                        .IsRequired()
+                        .ValueGeneratedOnUpdateSometimes()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("BeforeJson");
+
+                    b.HasDiscriminator().HasValue("SettingsLegacyArchive");
+                });
+
             modelBuilder.Entity("DCMS.Domain.Features.Treatment.TreatmentEvent", b =>
                 {
                     b.HasBaseType("DCMS.Domain.Common.AuditRecord");
@@ -4827,6 +4713,43 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasDiscriminator().HasValue("SettingsReceipt");
                 });
 
+            modelBuilder.Entity("DCMS.Domain.Features.SystemSettings.SystemCatalogChange", b =>
+                {
+                    b.HasBaseType("DCMS.Domain.Common.CommandReceiptRecord");
+
+                    b.Property<int>("ActorId")
+                        .ValueGeneratedOnUpdateSometimes()
+                        .HasColumnType("integer")
+                        .HasColumnName("ActorId");
+
+                    b.Property<string>("BeforeJson")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("BeforeJson");
+
+                    b.Property<string>("Command")
+                        .IsRequired()
+                        .ValueGeneratedOnUpdateSometimes()
+                        .HasMaxLength(48)
+                        .HasColumnType("character varying(48)")
+                        .HasColumnName("Command");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("OccurredAt");
+
+                    b.Property<Guid>("ResourceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("ResourceId");
+
+                    b.HasIndex("ResourceId", "OccurredAt");
+
+                    b.HasIndex(new[] { "ReceiptType", "RequestKey" }, "UX_SystemCatalogChange_Scope")
+                        .IsUnique()
+                        .HasDatabaseName("UX_RECEIPT_RequestKey");
+
+                    b.HasDiscriminator().HasValue("SystemCatalogChange");
+                });
+
             modelBuilder.Entity("DCMS.Domain.Features.Treatment.ClinicalCommandReceipt", b =>
                 {
                     b.HasBaseType("DCMS.Domain.Common.CommandReceiptRecord");
@@ -4839,8 +4762,8 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<string>("Command")
                         .IsRequired()
                         .ValueGeneratedOnUpdateSometimes()
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
+                        .HasMaxLength(48)
+                        .HasColumnType("character varying(48)")
                         .HasColumnName("Command");
 
                     b.Property<Guid>("ResultId")
@@ -4866,8 +4789,8 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<string>("Command")
                         .IsRequired()
                         .ValueGeneratedOnUpdateSometimes()
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
+                        .HasMaxLength(48)
+                        .HasColumnType("character varying(48)")
                         .HasColumnName("Command");
 
                     b.HasIndex(new[] { "ReceiptType", "RequestKey" }, "UX_TreatmentProgressionReceipt_Scope")
@@ -4889,8 +4812,8 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<string>("Command")
                         .IsRequired()
                         .ValueGeneratedOnUpdateSometimes()
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
+                        .HasMaxLength(48)
+                        .HasColumnType("character varying(48)")
                         .HasColumnName("Command");
 
                     b.Property<Guid>("DossierId")
@@ -6259,15 +6182,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasOne("DCMS.Domain.Features.Scheduling.SchedulingBranch", null)
                         .WithOne()
                         .HasForeignKey("DCMS.Domain.Features.Settings.BranchProfile", "Id")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("DCMS.Domain.Features.Settings.SettingsVersion", b =>
-                {
-                    b.HasOne("DCMS.Infrastructure.Features.Accounts.ApplicationUser", null)
-                        .WithMany()
-                        .HasForeignKey("ActorId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

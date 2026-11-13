@@ -40,13 +40,14 @@ Phát hiện ID đơn hoặc mẫu trùng giữa các nguồn phải làm migrat
 
 | Hạng mục | Trước | Sau |
 | --- | --- | --- |
-| Bảng trong relational model EF | 130 | 36 |
-| Base table trong schema `public` của DB phát triển | 132 | 37 |
+| Bảng trong relational model EF | 130 | 33 |
+| Base table trong schema `public` của DB phát triển | 132 | 34 |
 | Tài khoản và phân quyền | 15 | 2 |
 | Điều trị (phiếu, kế hoạch, quá trình, mẫu, sự kiện) | 14 | 4, sự kiện nằm trong kho audit chung |
 | Chăm sóc bệnh nhân | 3 | 1 |
 | Labo (phiếu, lịch sử, danh mục) | 3 | 2 |
 | Tài chính | 18 | 0, đã gỡ để đặc tả lại |
+| Thiết lập và danh mục | 6 | 3, lịch sử danh mục nằm trong kho receipt chung |
 | Kho receipt theo module | 18 | 1 |
 | Kho audit theo module | 10 | 1 |
 | Kho đơn và mẫu đơn | 3 | 1 |
@@ -76,3 +77,5 @@ Migration `20261112143714_ConsolidateExaminationStorage` đã gộp sáu bảng 
 Migration `20261113013443_ConsolidateTreatmentStorage` đã gộp mười bảng điều trị về `TREATMENT_DOSSIER`, `TREATMENT_PLAN_ITEM`, `CLINICAL_ACTIVITY` và `TREATMENT_TEMPLATE`; sự kiện phiếu và sự kiện tiến độ chuyển vào `AUDIT_LOG` với cột `EventActorId` riêng vì tác vụ hệ thống ghi actor `0`. DB phát triển giảm từ 68 xuống 58 bảng, model EF còn 57 bảng. Đã đối chiếu 2.160 dòng của 24 nguồn cả trên bản sao (Up, Up rồi Down, Down rồi Up) và trực tiếp sau áp dụng. Tổng hợp kiểm thử đạt 102 unit test và 568 integration test; hai NFR tùy chọn skip và test ClinicalWork lỗi cũ nêu trên vẫn trả 503. Backend/web build thành công, model/migration khớp, API và DB healthy. Xem [thiết kế và bằng chứng bốn bảng điều trị](TREATMENT-FOUR-TABLES.vi.md).
 
 Ngày 13/11/2026, migration `20261113022238_ConsolidateCareAndLabStorage` gộp chăm sóc bệnh nhân về `CARE_TASK` và labo về `LAB_ORDER` cùng danh mục `LAB_WORK_TYPE`; migration `20261113072340_RemoveFinanceStorage` gỡ 18 bảng tài chính theo yêu cầu chủ dự án, chức năng sẽ đặc tả và thêm lại sau. DB phát triển giảm từ 58 xuống 37 bảng, model EF còn 36 bảng. Đã đối chiếu 2.743 dòng của 39 nguồn được giữ trên bản sao (Up, Down, Up lại) và trực tiếp sau áp dụng. Lượt integration toàn bộ đạt 504/507, 2 skip; lỗi còn lại ở bước xóa phiếu labo đã sửa và chạy lại đạt. Có 100 unit test đạt. Xem [chăm sóc, labo và tài chính](CARE-LAB-FINANCE-STORAGE.vi.md).
+
+Migration `20261113081111_ConsolidateSettingsStorage` rút nhóm thiết lập và danh mục từ 6 xuống 3 bảng: lịch sử và chống gửi trùng của danh mục chuyển vào `COMMAND_RECEIPT`, hai bảng của module `/api/settings` cũ được lưu snapshot trong `AUDIT_LOG` rồi bỏ. DB phát triển giảm từ 37 xuống 34 bảng, model EF còn 33 bảng. Đã đối chiếu 2.740 dòng của 36 nguồn trên bản sao (Up, Down, Up lại) và trực tiếp sau áp dụng. Lượt integration toàn bộ đạt 509/511, 2 skip; 100 unit test đạt. Xem [thiết lập và danh mục trong ba bảng](SETTINGS-CATALOG-STORAGE.vi.md).

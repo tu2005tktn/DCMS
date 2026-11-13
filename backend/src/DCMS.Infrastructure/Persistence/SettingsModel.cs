@@ -9,19 +9,7 @@ public static class SettingsModel
 {
     public static void Configure(ModelBuilder model)
     {
-        model.Entity<SettingsVersion>(b => {
-            b.ToTable("SETTINGS_VERSION"); b.HasKey(x => x.Version); b.Property(x => x.Version).ValueGeneratedNever();
-            b.Property(x => x.ContentJson).HasColumnType("jsonb"); b.Property(x => x.Reason).HasMaxLength(1000);
-            b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.ActorId).OnDelete(DeleteBehavior.Restrict);
-        });
-        model.Entity<ReferenceEntry>(b => {
-            b.ToTable("OPERATIONAL_REFERENCE_ENTRY"); b.HasKey(x => x.Id); b.Property(x => x.Kind).HasMaxLength(40);
-            b.Property(x => x.Code).HasMaxLength(40); b.Property(x => x.NormalizedCode).HasMaxLength(40);
-            b.Property(x => x.Name).HasMaxLength(160); b.Property(x => x.NormalizedName).HasMaxLength(160);
-            b.Property(x => x.Description).HasMaxLength(1000); b.Property(x => x.Version).IsConcurrencyToken();
-            b.HasIndex(x => new {x.Kind,x.NormalizedName}).IsUnique(); b.HasIndex(x => new {x.Kind,x.NormalizedCode}).IsUnique();
-            b.HasIndex(x => new {x.Kind,x.Active});
-        });
+        model.Entity<SettingsLegacyArchive>();
         model.Entity<AccessGroup>(b => {
             b.ToTable("ACCESS_GROUP"); b.HasKey(x => x.Id); b.Property(x => x.Code).HasMaxLength(40); b.Property(x => x.NormalizedCode).HasMaxLength(40);
             b.Property(x => x.Name).HasMaxLength(160); b.Property(x => x.NormalizedName).HasMaxLength(160);

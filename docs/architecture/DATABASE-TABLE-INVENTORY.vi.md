@@ -1,6 +1,6 @@
 # Danh sách bảng sau rút gọn
 
-Cập nhật ngày 13/11/2026. Schema đã áp dụng có 36 bảng trong model EF và 37 bảng vật lý trong schema `public`. Bảng ngoài model là `__EFMigrationsHistory`. Các schema `dcms_test_*` là môi trường kiểm thử tách biệt.
+Cập nhật ngày 13/11/2026. Schema đã áp dụng có 33 bảng trong model EF và 34 bảng vật lý trong schema `public`. Bảng ngoài model là `__EFMigrationsHistory`. Các schema `dcms_test_*` là môi trường kiểm thử tách biệt.
 
 Riêng tài khoản và phân quyền chỉ có `USER_ACCOUNT` và `ACCESS_GROUP`. Riêng đơn thuốc và danh mục thuốc chỉ có `PRESCRIPTION` và `CATALOG_MEDICINE`. Nhật ký và kết quả chống ghi trùng dùng hai kho chung cho toàn hệ thống.
 
@@ -11,6 +11,8 @@ Phần khám đã gộp về `VISIT` và `CLINICAL_DOCUMENT`. Phiếu khám và 
 Phần điều trị đã gộp về `TREATMENT_DOSSIER`, `TREATMENT_PLAN_ITEM`, `CLINICAL_ACTIVITY` và `TREATMENT_TEMPLATE`. Bản nháp nằm trong phiếu, các bước nằm trong hạng mục, hạng mục và phiên bản mẫu nằm trong mẫu; đánh giá, ghi chú và hướng dẫn tái khám dùng chung bảng quá trình. Sự kiện điều trị và tiến độ nằm trong `AUDIT_LOG`. Xem [thiết kế và kiểm chứng bốn bảng điều trị](../specs/TREATMENT-FOUR-TABLES.vi.md).
 
 Chăm sóc bệnh nhân chỉ còn `CARE_TASK`; labo còn phiếu labo `LAB_ORDER` và danh mục labo `LAB_WORK_TYPE`. Phân hệ tài chính đã được gỡ cùng 18 bảng, sẽ đặc tả và thêm lại sau. Xem [chăm sóc, labo và tài chính](../specs/CARE-LAB-FINANCE-STORAGE.vi.md).
+
+Thiết lập và danh mục còn `CLINIC_SETTINGS_VERSION`, `REFERENCE_ENTRY`, `CATALOG_PROVIDER`; lịch sử thay đổi danh mục nằm trong kho receipt dùng chung. Xem [thiết lập và danh mục trong ba bảng](../specs/SETTINGS-CATALOG-STORAGE.vi.md).
 
 | Bảng | Lưu trữ |
 | --- | --- |
@@ -43,11 +45,8 @@ Chăm sóc bệnh nhân chỉ còn `CARE_TASK`; labo còn phiếu labo `LAB_ORDE
 | `MATERIAL_CATALOG_ITEM` | Danh mục vật tư, đơn vị và định mức liên quan. |
 | `MATERIAL_PURCHASE` | Lần nhập hoặc mua vật tư và chi phí. |
 | `MATERIAL_USAGE` | Lượng vật tư đã sử dụng cho nghiệp vụ. |
-| `CLINIC_SETTINGS_VERSION` | Các phiên bản cấu hình chung của phòng khám. |
+| `CLINIC_SETTINGS_VERSION` | Các phiên bản thiết lập chung của phòng khám; phiên bản mới nhất là thiết lập đang áp dụng. |
 | `REFERENCE_ENTRY` | Các mục danh mục tham chiếu hệ thống, phân loại theo loại danh mục. |
-| `SYSTEM_CATALOG_CHANGE` | Lịch sử thay đổi danh mục hệ thống. |
-| `SETTINGS_VERSION` | Kho phiên bản thiết lập vận hành cũ được giữ để tương thích dữ liệu. |
-| `OPERATIONAL_REFERENCE_ENTRY` | Kho danh mục vận hành cũ được giữ để tương thích dữ liệu. |
-| `AUDIT_LOG` | Nhật ký dùng chung cho các module, gồm người thao tác, thời điểm, thay đổi trước/sau, đổi/hủy lịch, xử lý yêu cầu hỗ trợ, sự kiện hồ sơ điều trị và sự kiện tiến độ điều trị. |
-| `COMMAND_RECEIPT` | Kết quả lệnh dùng chung để xử lý gửi lại và chống ghi trùng. |
+| `AUDIT_LOG` | Nhật ký dùng chung cho các module, gồm người thao tác, thời điểm, thay đổi trước/sau, đổi/hủy lịch, xử lý yêu cầu hỗ trợ, sự kiện hồ sơ điều trị và sự kiện tiến độ điều trị. Giữ cả snapshot cấu trúc và dữ liệu của hai bảng thiết lập cũ `SETTINGS_VERSION`, `OPERATIONAL_REFERENCE_ENTRY` để rollback. |
+| `COMMAND_RECEIPT` | Kết quả lệnh dùng chung để xử lý gửi lại và chống ghi trùng. Gồm cả lịch sử thay đổi danh mục, thiết lập chung và vật tư (`SystemCatalogChange`). |
 | `__EFMigrationsHistory` | Các phiên bản migration đã áp dụng vào database. |

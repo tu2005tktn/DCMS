@@ -1,27 +1,10 @@
 namespace DCMS.Domain.Features.Settings;
 
-public sealed class SettingsVersion
+// Structure and rows of a retired /api/settings table (SETTINGS_VERSION, OPERATIONAL_REFERENCE_ENTRY), kept so a rollback
+// can rebuild it (docs/specs/SETTINGS-CATALOG-STORAGE.vi.md). BeforeJson holds { table, columns, constraints, indexes, rows }.
+public sealed class SettingsLegacyArchive : DCMS.Domain.Common.AuditRecord
 {
-    public int Version { get; set; }
-    public string ContentJson { get; set; } = "{}";
-    public int ActorId { get; set; }
-    public string Reason { get; set; } = "";
-    public DateTimeOffset EffectiveAt { get; set; }
-}
-public sealed class ReferenceEntry
-{
-    public Guid Id { get; set; } = Guid.NewGuid();
-    public string Kind { get; set; } = "";
-    public string? Code { get; set; }
-    public string? NormalizedCode { get; set; }
-    public string Name { get; set; } = "";
-    public string NormalizedName { get; set; } = "";
-    public string? Description { get; set; }
-    public bool Reserved { get; set; }
-    public bool Active { get; set; } = true;
-    public int Version { get; set; } = 1;
-    public int CreatedBy { get; set; }
-    public DateTimeOffset CreatedAt { get; set; }
+    public string BeforeJson { get; set; } = "{}";
 }
 public sealed class AccessGroup
 {

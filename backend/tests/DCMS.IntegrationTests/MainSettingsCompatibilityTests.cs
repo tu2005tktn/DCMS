@@ -25,7 +25,12 @@ public sealed class MainSettingsCompatibilityTests(ReceptionFixture fixture):ICl
  {
   var reception=new ReceptionApiTests(fixture);using var dentist=await reception.Login("dentist.demo");
   using var scope=fixture.Services.CreateScope();var db=scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
-  var legacy=await db.Set<DCMS.Domain.Features.Settings.ReferenceEntry>().AsNoTracking().ToListAsync();
+  // The retired OPERATIONAL_REFERENCE_ENTRY table is kept as a snapshot in AUDIT_LOG (docs/specs/SETTINGS-CATALOG-STORAGE.vi.md).
+  var archives=await db.Set<DCMS.Domain.Features.Settings.SettingsLegacyArchive>().AsNoTracking().ToListAsync();
+  var snapshot=archives.Select(x=>JsonDocument.Parse(x.BeforeJson).RootElement).Single(x=>x.GetProperty("table").GetString()=="OPERATIONAL_REFERENCE_ENTRY");
+  static string? Text(JsonElement row,string name)=>row.GetProperty(name).ValueKind==JsonValueKind.Null?null:row.GetProperty(name).GetString();
+  var legacy=snapshot.GetProperty("rows").EnumerateArray().Select(r=>new{Id=r.GetProperty("Id").GetGuid(),Kind=Text(r,"Kind")!,Version=r.GetProperty("Version").GetInt32(),
+   Name=Text(r,"Name")!,NormalizedName=Text(r,"NormalizedName")!,NormalizedCode=Text(r,"NormalizedCode"),Active=r.GetProperty("Active").GetBoolean()}).ToList();
   var merged=await db.ReferenceEntries.AsNoTracking().ToListAsync();
   Assert.NotEmpty(legacy);
   foreach(var row in legacy)
