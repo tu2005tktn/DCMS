@@ -4,7 +4,6 @@ using DCMS.Domain.Features.Appointments;
 using DCMS.Domain.Features.Authentication;
 using DCMS.Domain.Features.Examinations;
 using DCMS.Domain.Features.FamilyMembers;
-using DCMS.Domain.Features.Finance;
 using DCMS.Domain.Features.PatientLinks;
 using DCMS.Domain.Features.Patients;
 using DCMS.Domain.Features.Prescriptions;
@@ -26,7 +25,6 @@ internal static class SharedStorageModel
         model.Ignore<PrescriptionTemplateLine>();
         model.Ignore<WorkingPeriod>();
         model.Ignore<AccessGroupGrant>();
-        model.Ignore<DossierPayOsOrderLine>();
 
         model.Entity<CommandReceiptRecord>(b =>
         {
@@ -62,7 +60,6 @@ internal static class SharedStorageModel
         model.Entity<PatientPrescription>().ComplexCollection(x => x.Items, collection => collection.ToJson("Items"));
         model.Entity<PrescriptionTemplate>().ComplexCollection(x => x.Lines, collection => collection.ToJson("TemplateLines"));
         model.Entity<AccessGroup>().ComplexCollection(x => x.Grants, collection => collection.ToJson("Grants"));
-        model.Entity<DossierPayOsOrder>().ComplexCollection(x => x.Lines, collection => collection.ToJson("Lines"));
 
         model.Entity<AppointmentChange>().HasIndex(new[] { "AuditType", "Id" }, "UX_AppointmentChange_LegacyId").IsUnique().HasDatabaseName("UX_AUDIT_LOG_Type_Id");
         model.Entity<AppointmentSupportHistory>().HasIndex(new[] { "AuditType", "Id" }, "UX_AppointmentSupportHistory_LegacyId").IsUnique().HasDatabaseName("UX_AUDIT_LOG_Type_Id");
@@ -70,7 +67,6 @@ internal static class SharedStorageModel
         model.Entity<RecoveryAudit>().HasIndex(new[] { "AuditType", "Id" }, "UX_RecoveryAudit_LegacyId").IsUnique().HasDatabaseName("UX_AUDIT_LOG_Type_Number");
         model.Entity<DocumentAudit>().HasIndex(new[] { "AuditType", "Id" }, "UX_DocumentAudit_LegacyId").IsUnique().HasDatabaseName("UX_AUDIT_LOG_Type_Number");
         model.Entity<FamilyRecordAudit>().HasIndex(new[] { "AuditType", "Id" }, "UX_FamilyRecordAudit_LegacyId").IsUnique().HasDatabaseName("UX_AUDIT_LOG_Type_Number");
-        model.Entity<FinanceAudit>().HasIndex(new[] { "AuditType", "Id" }, "UX_FinanceAudit_LegacyId").IsUnique().HasDatabaseName("UX_AUDIT_LOG_Type_Id");
         model.Entity<PatientLinkAudit>().HasIndex(new[] { "AuditType", "Id" }, "UX_PatientLinkAudit_LegacyId").IsUnique().HasDatabaseName("UX_AUDIT_LOG_Type_Number");
         model.Entity<PatientAudit>().HasIndex(new[] { "AuditType", "Id" }, "UX_PatientAudit_LegacyId").IsUnique().HasDatabaseName("UX_AUDIT_LOG_Type_Number");
         model.Entity<PrescriptionAudit>().HasIndex(new[] { "AuditType", "Id" }, "UX_PrescriptionAudit_LegacyId").IsUnique().HasDatabaseName("UX_AUDIT_LOG_Type_Id");
@@ -88,6 +84,8 @@ internal static class SharedStorageModel
                 if (root == typeof(AuditRecord) && column == "Id")
                     column = group.Key.Type == typeof(long) ? "LegacyNumber" : "LegacyId";
                 var maxLength = group.Max(property => property.GetMaxLength());
+                // AUDIT_LOG.Action keeps the 64-character width it had while finance history shared the column.
+                if (root == typeof(AuditRecord) && column == "Action") maxLength = Math.Max(maxLength ?? 0, 64);
                 foreach (var property in group)
                 {
                     var builder = model.Entity(property.DeclaringType.ClrType).Property(property.Name).HasColumnName(column);

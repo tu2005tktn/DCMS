@@ -33,15 +33,8 @@ public static class SettingsGrants
         new("appointments.support.handle", "Xử lý yêu cầu lịch hẹn", null, null),
         new("examinations.read", "Xem khám lâm sàng", null, null),
         new("examinations.manage", "Ghi và xác nhận khám", AccountRoles.Dentist, "examinations.read"),
-        new("finance.read", "Xem phí và thanh toán", null, null),
-        new("finance.quotes.manage", "Lập phí cận lâm sàng", null, "finance.read"),
-        new("investigations.perform", "Xác nhận thực hiện cận lâm sàng", null, "finance.read"),
-        new("finance.payments.create", "Lập phiếu thu", null, "finance.read"),
-        new("finance.payments.confirm", "Xác nhận chuyển khoản", null, "finance.read"),
-        new("finance.costs.read", "Xem chi phí thuê ngoài", null, "finance.read"),
-        new("finance.costs.manage", "Ghi chi phí thuê ngoài", null, "finance.costs.read"),
-        new("services.read", "Xem dịch vụ cận lâm sàng", null, null),
-        new("services.manage", "Quản lý dịch vụ cận lâm sàng", null, "services.read"),
+        new("finance.read", "Xem giá và chi phí dịch vụ", null, null),
+        new("finance.costs.read", "Xem chi phí trong nhật ký thiết lập", null, "finance.read"),
         .. ScreenGrants.Definitions,
         .. CatalogKinds.SelectMany(kind => new[] {
             new GrantDefinition($"catalog.{kind}.read", $"{CatalogLabels[Array.IndexOf(CatalogKinds,kind)]}: Xem", null, "settings.read"),
@@ -59,13 +52,10 @@ public static class SettingsGrants
         if (definition == null) return false;
         if (roles.Contains(AccountRoles.ClinicOwner) && IsSettings(permission)) return true;
         if (ScreenGrants.Allows(permission, roles) is { } allowed) return allowed;
-        if (permission.StartsWith("finance.") || permission == "investigations.perform" || permission.StartsWith("services.")) {
+        if (permission.StartsWith("finance.")) {
             if (roles.Contains(AccountRoles.ClinicOwner)) return true;
             if (permission == "finance.read" && roles.Contains(AccountRoles.Admin)) return true;
             if (permission.StartsWith("finance.costs.")) return roles.Contains(AccountRoles.Admin);
-            if (permission.StartsWith("finance.payments.")) return roles.Contains(AccountRoles.ClinicAssistant);
-            if (permission == "finance.quotes.manage") return roles.Contains(AccountRoles.Dentist);
-            if (permission.StartsWith("services.")) return roles.Contains(AccountRoles.Dentist) || roles.Contains(AccountRoles.Admin);
             return roles.Contains(AccountRoles.Dentist) || roles.Contains(AccountRoles.ClinicAssistant);
         }
         if (permission.StartsWith("branches.") || permission.StartsWith("chairs.")) {
@@ -83,9 +73,8 @@ public static class SettingsGrants
     public static bool IsSettings(string key) => key.StartsWith("settings.") || key.StartsWith("catalog.") || key.StartsWith("access-groups.") || key == "staff.access.assign" || key.StartsWith("branches.") || key.StartsWith("chairs.");
     public static string[] Legacy(string[] roles) => ScreenGrants.Expand(Definitions.Where(x =>
         (!IsSettings(x.Key) || ScreenGrants.LegacySettings(x.Key, roles))
-        && x.Key != "finance.receipt-sequence.manage"
         && (!x.Key.StartsWith("finance.costs.") || roles.Contains(AccountRoles.ClinicOwner))
-        && (x.Key is not ("finance.read" or "finance.revenue.read" or "finance.work-statistics.read") || roles.Any(role => role is AccountRoles.ClinicOwner or AccountRoles.Dentist or AccountRoles.ClinicAssistant))
+        && (x.Key is not ("finance.read" or "finance.work-statistics.read") || roles.Any(role => role is AccountRoles.ClinicOwner or AccountRoles.Dentist or AccountRoles.ClinicAssistant))
         && (!x.Key.StartsWith("materials.") || roles.Any(role => role is AccountRoles.ClinicOwner or AccountRoles.Dentist))
         && RoleAllows(x.Key, roles)).Select(x => x.Key));
 }

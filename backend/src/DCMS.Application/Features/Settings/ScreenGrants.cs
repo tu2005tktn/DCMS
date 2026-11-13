@@ -55,12 +55,7 @@ public static class ScreenGrants
         new("accounts.update", "Sửa tài khoản và vai trò", AccountRoles.Admin, "accounts.read"),
         new("accounts.state", "Khóa / mở khóa tài khoản", AccountRoles.Admin, "accounts.read"),
         new("accounts.audit", "Xem nhật ký tài khoản", AccountRoles.Admin, "accounts.read"),
-        new("finance.payments.cancel", "Hủy chuyển khoản đang chờ", null, "finance.read"),
-        new("finance.receipts.print", "In phiếu thu", null, "finance.read"),
-        new("finance.receipt-sequence.manage", "Thiết lập số phiếu thu tiếp theo", null, "finance.read"),
-        new("finance.revenue.read", "Xem doanh thu đã thu", null, "finance.read"),
         new("finance.work-statistics.read", "Xem thống kê công việc / dịch vụ", null, "finance.read"),
-        new("finance.payos.create", "Tạo QR chuyển khoản PayOS", null, "finance.payments.create"),
         new("treatment.lab.read", "Xem màn Quản lý công việc labo", null, "treatment.read"),
         new("treatment.lab.track", "Đổi trạng thái phiếu labo", null, "treatment.lab.read"),
         new("treatment.lab.manage", "Lập, sửa và xóa phiếu labo", AccountRoles.Dentist, "treatment.actuals.update"),
@@ -83,8 +78,7 @@ public static class ScreenGrants
     {
         bool Has(params string[] values) => roles.Any(values.Contains);
         if (permission.StartsWith("materials.")) return Has(AccountRoles.ClinicOwner, AccountRoles.Admin, AccountRoles.Dentist);
-        if (permission is "finance.revenue.read" or "finance.work-statistics.read") return Has(AccountRoles.ClinicOwner, AccountRoles.Admin, AccountRoles.Dentist, AccountRoles.ClinicAssistant);
-        if (permission == "finance.payos.create") return Has(AccountRoles.ClinicOwner, AccountRoles.ClinicAssistant);
+        if (permission == "finance.work-statistics.read") return Has(AccountRoles.ClinicOwner, AccountRoles.Admin, AccountRoles.Dentist, AccountRoles.ClinicAssistant);
         if (permission is "settings.general.read" or "settings.general.manage") return Has(AccountRoles.ClinicOwner, AccountRoles.Admin);
         if (permission.StartsWith("catalog.") && SupplyKinds.Any(kind => permission.StartsWith($"catalog.{kind}.")))
             return Has(AccountRoles.ClinicOwner, AccountRoles.Admin) || !permission.StartsWith("catalog.medicines.") && Has(AccountRoles.Dentist);
@@ -93,9 +87,7 @@ public static class ScreenGrants
             return permission == "documents.review" ? Has(AccountRoles.Dentist) : Has(AccountRoles.Dentist, AccountRoles.ClinicAssistant);
         if (permission.StartsWith("treatment.prices.") || permission.StartsWith("treatment.commercial.")) return Has(AccountRoles.Admin, AccountRoles.Dentist);
         if (permission.StartsWith("treatment.")) return Has(AccountRoles.Dentist);
-        if (permission == "finance.receipt-sequence.manage") return Has(AccountRoles.ClinicOwner, AccountRoles.Admin);
         if (permission == "investigations.results.receive") return Has(AccountRoles.Dentist, AccountRoles.ClinicAssistant);
-        if (permission == "finance.receipts.print") return Has(AccountRoles.Dentist, AccountRoles.ClinicAssistant);
         return null;
     }
 

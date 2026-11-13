@@ -61,10 +61,7 @@ public sealed partial class DcmsDbContext(DbContextOptions<DcmsDbContext> option
     public DbSet<TreatmentReceipt> TreatmentReceipts => Set<TreatmentReceipt>();
     public IQueryable<TreatmentSheetDraft> TreatmentSheetDrafts => TreatmentDossiers.AsNoTracking().SelectMany(x => x.SheetDrafts);
     public DbSet<LabOrder> LabOrders => Set<LabOrder>();
-    public DbSet<LabOrderStatusLog> LabOrderStatusLogs => Set<LabOrderStatusLog>();
-    public DbSet<DossierPayment> DossierPayments => Set<DossierPayment>();
-    public DbSet<DossierPaymentLine> DossierPaymentLines => Set<DossierPaymentLine>();
-    public DbSet<DossierPayOsOrder> DossierPayOsOrders => Set<DossierPayOsOrder>();
+    public IQueryable<LabOrderStatusLog> LabOrderStatusLogs => LabOrders.AsNoTracking().SelectMany(x => x.StatusLogs);
     public IQueryable<TreatmentRevisionDraft> TreatmentRevisionDrafts => TreatmentDossiers.AsNoTracking().SelectMany(x => x.RevisionDrafts);
     public DbSet<TreatmentTemplate> TreatmentTemplates => Set<TreatmentTemplate>();
     public IQueryable<TreatmentTemplateVersion> TreatmentTemplateVersions => TreatmentTemplates.AsNoTracking().SelectMany(x => x.Versions);
@@ -77,8 +74,8 @@ public sealed partial class DcmsDbContext(DbContextOptions<DcmsDbContext> option
     public DbSet<ClinicalCareNote> ClinicalCareNotes => Set<ClinicalCareNote>();
     public DbSet<ClinicalCommandReceipt> ClinicalCommandReceipts => Set<ClinicalCommandReceipt>();
     public DbSet<CareTask> CareTasks => Set<CareTask>();
-    public DbSet<CareContactAttempt> CareContactAttempts => Set<CareContactAttempt>();
-    public DbSet<CareEscalation> CareEscalations => Set<CareEscalation>();
+    public IQueryable<CareContactAttempt> CareContactAttempts => CareTasks.AsNoTracking().SelectMany(x => x.ContactAttempts);
+    public IQueryable<CareEscalation> CareEscalations => CareTasks.AsNoTracking().SelectMany(x => x.Escalations);
 
     public new IQueryable<IdentityRole<int>> Roles => Set<DCMS.Domain.Features.Settings.AccessGroup>()
         .IgnoreQueryFilters().Where(x => x.RecordKind == "IdentityRole")
@@ -147,8 +144,6 @@ public sealed partial class DcmsDbContext(DbContextOptions<DcmsDbContext> option
         VisitModel.Configure(model);
         ExaminationModel.Configure(model);
         SettingsModel.Configure(model);
-        FinanceModel.Configure(model);
-        FinanceSettlementModel.Configure(model);
         PrescriptionModel.Configure(model);
         TreatmentModel.Configure(model);
         SystemSettingsModel.Configure(model);

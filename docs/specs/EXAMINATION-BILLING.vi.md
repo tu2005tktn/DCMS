@@ -1,5 +1,7 @@
 # Phí khám và thu tiền sau khám — 27/10/2026
 
+> **Đã gỡ ngày 13/11/2026.** Phân hệ tài chính đã được xóa khỏi backend, web và database theo [CARE-LAB-FINANCE-STORAGE.vi.md](CARE-LAB-FINANCE-STORAGE.vi.md). Tài liệu này chỉ còn giá trị tham khảo khi đặc tả lại chức năng; không mô tả hành vi hiện tại.
+
 Bổ sung S19/S20 và INVESTIGATION-BILLING. Luồng: hoàn tất phiếu → kết thúc lượt khám → chốt phí khám + CLS đã thực hiện → thu ngân thu tiền; kế hoạch/actual điều trị tách riêng.
 
 Quyết định 02/11/2026: [giá khám/CLS thiết lập sẵn](CLINICAL-PRESET-PRICES.vi.md) yêu cầu một giá cụ thể khi lưu danh mục; không chỉnh phần điều trị.

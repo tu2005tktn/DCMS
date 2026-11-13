@@ -126,50 +126,6 @@ internal static class TreatmentModel
             b.Property(x => x.Status).HasMaxLength(20);
             b.Property(x => x.Version).IsConcurrencyToken(false);
         });
-        model.Entity<DossierPayment>(b =>
-        {
-            b.ToTable("TREATMENT_DOSSIER_PAYMENT"); b.HasKey(x => x.Id);
-            b.HasIndex(x => new { x.DossierId, x.PaidOn });
-            b.Property(x => x.Method).HasMaxLength(20);
-            b.Property(x => x.Note).HasMaxLength(1000);
-            b.HasOne<TreatmentDossier>().WithMany().HasForeignKey(x => x.DossierId).OnDelete(DeleteBehavior.Restrict);
-            b.HasMany(x => x.Lines).WithOne().HasForeignKey(x => x.PaymentId).OnDelete(DeleteBehavior.Cascade);
-            b.ToTable(t =>
-            {
-                t.HasCheckConstraint("CK_DOSSIER_PAYMENT_TOTAL", "\"TotalVnd\" > 0");
-                t.HasCheckConstraint("CK_DOSSIER_PAYMENT_METHOD", "\"Method\" IN ('Cash','Transfer')");
-            });
-        });
-        model.Entity<DossierPaymentLine>(b =>
-        {
-            b.ToTable("TREATMENT_DOSSIER_PAYMENT_LINE"); b.HasKey(x => new { x.PaymentId, x.ActivityId });
-            b.HasIndex(x => x.ActivityId);
-            b.HasOne<ClinicalActivity>().WithMany().HasForeignKey(x => x.ActivityId).OnDelete(DeleteBehavior.Restrict);
-            b.ToTable(t => t.HasCheckConstraint("CK_DOSSIER_PAYMENT_LINE_AMOUNT", "\"AmountVnd\" > 0"));
-        });
-        model.Entity<DossierPayOsOrder>(b =>
-        {
-            b.ToTable("TREATMENT_PAYOS_ORDER"); b.HasKey(x => x.Id);
-            b.HasIndex(x => x.OrderCode).IsUnique();
-            b.HasIndex(x => x.RequestKey).IsUnique();
-            b.HasIndex(x => x.PaymentLinkId).IsUnique().HasFilter("\"PaymentLinkId\" IS NOT NULL");
-            b.HasIndex(x => new { x.DossierId, x.Purpose }).IsUnique().HasDatabaseName("IX_TREATMENT_PAYOS_ORDER_ActiveDossierPurpose")
-                .HasFilter("\"State\" IN ('Creating','Pending','Review')");
-            b.Property(x => x.Purpose).HasMaxLength(20).HasDefaultValue("Treatment");
-            b.HasOne<DCMS.Domain.Features.Finance.FinanceAdvance>().WithMany().HasForeignKey(x => x.AdvanceId).OnDelete(DeleteBehavior.Restrict);
-            b.Property(x => x.Fingerprint).HasMaxLength(64);
-            b.Property(x => x.State).HasMaxLength(20);
-            b.Property(x => x.PaymentLinkId).HasMaxLength(100);
-            b.Property(x => x.BankBin).HasMaxLength(12);
-            b.Property(x => x.AccountNumber).HasMaxLength(40);
-            b.Property(x => x.AccountName).HasMaxLength(160);
-            b.Property(x => x.BankReference).HasMaxLength(100);
-            b.Property(x => x.Note).HasMaxLength(1000);
-            b.HasOne<TreatmentDossier>().WithMany().HasForeignKey(x => x.DossierId).OnDelete(DeleteBehavior.Restrict);
-
-            b.HasOne<DossierPayment>().WithMany().HasForeignKey(x => x.PaymentId).OnDelete(DeleteBehavior.Restrict);
-            b.ToTable(t => t.HasCheckConstraint("CK_TREATMENT_PAYOS_ORDER_AMOUNT", "\"AmountVnd\" > 0"));
-        });
 
         model.Entity<LabOrder>(b =>
         {
@@ -191,13 +147,6 @@ internal static class TreatmentModel
                 t.HasCheckConstraint("CK_LAB_ORDER_FEES", "\"TotalFeeVnd\" >= 0 AND \"PaidVnd\" >= 0 AND \"PaidVnd\" <= \"TotalFeeVnd\"");
                 t.HasCheckConstraint("CK_LAB_ORDER_QUANTITY", "\"Quantity\" BETWEEN 1 AND 999");
             });
-        });
-        model.Entity<LabOrderStatusLog>(b =>
-        {
-            b.ToTable("LAB_ORDER_STATUS_LOG"); b.HasKey(x => x.Id);
-            b.Property(x => x.FromStatus).HasMaxLength(20); b.Property(x => x.ToStatus).HasMaxLength(20); b.Property(x => x.Note).HasMaxLength(300);
-            b.HasIndex(x => new { x.LabOrderId, x.ChangedAt });
-            b.HasOne<LabOrder>().WithMany().HasForeignKey(x => x.LabOrderId).OnDelete(DeleteBehavior.Cascade);
         });
         model.Entity<TreatmentProgressionReceipt>(b =>
         {

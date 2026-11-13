@@ -1,5 +1,7 @@
 # Đề xuất tích hợp doanh thu, công nợ, nhận trước và hoàn tiền — 09/11/2026
 
+> **Đã gỡ ngày 13/11/2026.** Phân hệ tài chính đã được xóa khỏi backend, web và database theo [CARE-LAB-FINANCE-STORAGE.vi.md](CARE-LAB-FINANCE-STORAGE.vi.md). Tài liệu này chỉ còn giá trị tham khảo khi đặc tả lại chức năng; không mô tả hành vi hiện tại.
+
 ## Điều chỉnh điểm vào theo phiếu điều trị
 
 Nhân viên bắt đầu từ hồ sơ bệnh nhân, tab **Điều trị & Thanh toán**. Tại mỗi phiếu, khu vực cuối quá trình điều trị hiển thị số dư nhận trước của chính phiếu, nút **TRẢ TIỀN...**, **NHẬN TRƯỚC...** và **LỊCH SỬ**. Thu tiền cho việc đã làm vẫn dùng API dossier và bill PayOS tại chỗ; nhận tiền mặt trước dùng API `POST /api/finance/advances` với `patientId`, `branchId`, `dossierId` lấy từ phiếu, không nhập mã thủ công. Lịch sử hiển thị riêng giao dịch đã thu cho từng việc và các khoản nhận trước, số đã phân bổ, số còn lại. Nhận trước chưa phân bổ không làm giảm nợ dịch vụ hay tăng doanh thu thực hiện. Việc phân bổ khoản nhận trước vào dịch vụ, hoàn tiền và đối chiếu hóa đơn vẫn cần hoàn thiện trong chính luồng này; không được coi các thao tác đó là đã giải quyết chỉ vì có màn Tài chính riêng.

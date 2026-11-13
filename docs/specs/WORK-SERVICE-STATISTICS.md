@@ -1,5 +1,7 @@
 # Thống kê công việc/dịch vụ
 
+> **Cập nhật 13/11/2026.** Phân hệ tài chính đã được gỡ ([CARE-LAB-FINANCE-STORAGE.vi.md](CARE-LAB-FINANCE-STORAGE.vi.md)). Màn hình và API giữ nguyên route, quyền `finance.work-statistics.read`, bộ lọc và cấu trúc phản hồi. Chi phí mỗi dòng tính theo phiếu điều trị: số lượng × đơn giá − giảm giá đã duyệt, bằng 0 khi dòng tính gộp. Không còn thanh toán nên `paidVnd` và `dueVnd` luôn bằng 0. Danh sách chi nhánh của bộ lọc lấy từ `/api/appointments/options` như các màn hình vận hành khác. Các mục dưới đây về khoản thu và phiếu thu chỉ còn giá trị tham khảo.
+
 Ngày: 06/11/2026 (gom theo phiếu điều trị cập nhật cùng ngày). Màn hình `/work-statistics` ("Thống kê công việc/dịch vụ", nhóm Quản trị) liệt kê các dòng "Quá trình điều trị/dịch vụ" trong phần Điều trị và thanh toán của **mọi bệnh nhân**, **gom theo từng phiếu (hồ sơ) điều trị**, để xem nhanh công việc đã làm, chi phí và công nợ. Chỉ đọc, không ghi dữ liệu.
 
 ## Nguồn dữ liệu

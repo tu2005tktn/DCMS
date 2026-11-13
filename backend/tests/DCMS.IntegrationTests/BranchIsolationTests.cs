@@ -109,13 +109,11 @@ public sealed class BranchIsolationTests(ApiFixture fixture) : IClassFixture<Api
         using var dentistB = await Login("dentist.b.demo"); using var assistantB = await Login("assistant.b.demo");
         var w = await BuildAsync(dentistA);
 
-        // Lịch hẹn, tiếp nhận, thu ngân: chi nhánh khác bị từ chối.
+        // Lịch hẹn, tiếp nhận: chi nhánh khác bị từ chối.
         Assert.Equal(HttpStatusCode.Forbidden, (await dentistB.GetAsync($"/api/appointments/calendar?branchId={w.BranchA}&{Range}")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await dentistB.GetAsync($"/api/appointments?branchId={w.BranchA}&{Range}")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await assistantB.GetAsync($"/api/reception/appointments?branchId={w.BranchA}&date={Today}")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await assistantB.GetAsync($"/api/reception/queue?branchId={w.BranchA}&date={Today}")).StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, (await dentistB.GetAsync($"/api/finance/queue?branchId={w.BranchA}")).StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, (await dentistB.GetAsync($"/api/finance/revenue?branchId={w.BranchA}")).StatusCode);
 
         // Hồ sơ điều trị của chi nhánh A.
         Assert.Equal(HttpStatusCode.Forbidden, (await dentistB.GetAsync($"/api/dossiers/{w.DossierA}")).StatusCode);
@@ -148,7 +146,6 @@ public sealed class BranchIsolationTests(ApiFixture fixture) : IClassFixture<Api
         using var dentistA = await Login("dentist.demo"); using var assistantB = await Login("assistant.b.demo");
         var w = await BuildAsync(dentistA);
         Assert.Equal(HttpStatusCode.Forbidden, (await dentistA.GetAsync($"/api/appointments/calendar?branchId={w.BranchB}&{Range}")).StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, (await dentistA.GetAsync($"/api/finance/queue?branchId={w.BranchB}")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await dentistA.GetAsync($"/api/lab-orders?branchId={w.BranchB}")).StatusCode);
         // Trợ lý chi nhánh B không phải nha sĩ nên không có quyền điều trị và labo mặc định.
         Assert.Equal(HttpStatusCode.Forbidden, (await assistantB.GetAsync($"/api/dossiers/{w.DossierA}")).StatusCode);

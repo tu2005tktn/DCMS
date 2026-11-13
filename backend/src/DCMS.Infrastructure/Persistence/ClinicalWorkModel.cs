@@ -69,24 +69,5 @@ internal static class ClinicalWorkModel
             b.Property(x => x.Status).HasMaxLength(16);
             b.Property(x => x.Version).IsConcurrencyToken();
         });
-        model.Entity<CareContactAttempt>(b =>
-        {
-            b.ToTable("CARE_CONTACT_ATTEMPT"); b.HasKey(x => x.Id);
-            b.HasIndex(x => new { x.TaskId, x.OccurredAt });
-            b.Property(x => x.Channel).HasMaxLength(32);
-            b.Property(x => x.Result).HasMaxLength(40);
-            b.Property(x => x.NextAction).HasMaxLength(1000);
-            b.HasOne<CareTask>().WithMany().HasForeignKey(x => x.TaskId).OnDelete(DeleteBehavior.Restrict);
-        });
-        model.Entity<CareEscalation>(b =>
-        {
-            b.ToTable("CARE_ESCALATION"); b.HasKey(x => x.Id);
-            b.HasIndex(x => new { x.TaskId, x.CreatedAt });
-            b.Property(x => x.Reason).HasMaxLength(1000);
-            b.Property(x => x.Resolution).HasMaxLength(4000);
-            b.Property(x => x.Status).HasMaxLength(16);
-            b.Property(x => x.Version).IsConcurrencyToken();
-            b.HasOne<CareTask>().WithMany().HasForeignKey(x => x.TaskId).OnDelete(DeleteBehavior.Restrict);
-        });
     }
 }

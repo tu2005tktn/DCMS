@@ -103,6 +103,10 @@ public sealed class CareTask
     public int CreatedBy { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
+    // Contact attempts and escalations are stored on the task row.
+    public List<CareContactAttempt> ContactAttempts { get; set; } = [];
+    public List<CareEscalation> Escalations { get; set; } = [];
+    public Guid StorageStamp { get; set; } = Guid.NewGuid();
 }
 
 public sealed class CareContactAttempt

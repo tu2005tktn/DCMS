@@ -37,6 +37,9 @@ public sealed class LabOrder
     public int CreatedBy { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
     public int UpdatedBy { get; set; }
+    // Append-only status history, stored on the order row.
+    public List<LabOrderStatusLog> StatusLogs { get; set; } = [];
+    public Guid StorageStamp { get; set; } = Guid.NewGuid();
 }
 
 public static class LabOrderStatus

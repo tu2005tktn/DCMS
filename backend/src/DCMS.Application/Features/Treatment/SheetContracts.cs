@@ -46,17 +46,3 @@ public sealed record ClinicalFeeRequest(string SourceKey, Guid ActivityId, int A
     string? DiscountReason, Guid? QualifyingItemId, int? DiscountApprovedBy = null,
     DateTimeOffset? DiscountApprovedAt = null, int? RecorderAccountId = null);
 public sealed record ClinicalFeeResult(string Status, Guid? ChargeId = null, string? SourceVersion = null);
-
-// S38/S39 wire contract only. No collection implementation or mock runtime fallback.
-public sealed record FinancialCharge(Guid Id, int Version, string SourceCode, DateTimeOffset PostedAt,
-    string Service, string Dentist, long GrossVnd, long DiscountVnd, long TaxVnd, long NetVnd,
-    long ConfirmedAllocatedVnd, long DueVnd);
-public sealed record CollectionAllocation(Guid ChargeId, int ExpectedChargeVersion, long AmountVnd);
-public sealed record ConfirmCollectionRequest(Guid DossierId, DateTimeOffset ReceivedAt, string Method,
-    string? Payer, string? Note, long ReceivedVnd, long AcknowledgedAdvanceVnd,
-    CollectionAllocation[] Allocations, string ExpectedSourceVersion, Guid RequestKey);
-public sealed record FinancialDossier(Guid Id, string Code, string ClinicalState, TreatmentFinancialSummary? Summary);
-public interface ITreatmentFinancialWorkspace
-{
-    Task<IReadOnlyList<FinancialDossier>> ListAsync(int actorId, int patientId, CancellationToken ct);
-}

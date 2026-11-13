@@ -9,8 +9,6 @@ using DCMS.Domain.Features.Appointments;
 using DCMS.Domain.Features.Patients;
 using DCMS.Domain.Features.Scheduling;
 using DCMS.Domain.Features.Visits;
-using DCMS.Domain.Features.Finance;
-using DCMS.Application.Features.Finance;
 using DCMS.Infrastructure.Features.Accounts;
 using DCMS.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
@@ -188,7 +186,7 @@ public sealed class TreatmentSheetV25Tests(ApiFixture fixture) : IClassFixture<A
             var posted = await c.PostAsJsonAsync(url, request);
             Assert.True(posted.IsSuccessStatusCode, await posted.Content.ReadAsStringAsync());
             var result = (await posted.Content.ReadFromJsonAsync<ConfirmSheetActualResult>())!;
-            Assert.Equal("Posted", result.Activity.FeeStatus); Assert.Equal(50000, result.Activity.DiscountSnapshotVnd);
+            Assert.Equal("Pending", result.Activity.FeeStatus); Assert.Equal(50000, result.Activity.DiscountSnapshotVnd);
             var retry = await c.PostAsJsonAsync(url, request);
             Assert.Equal(result.Activity.Id, (await retry.Content.ReadFromJsonAsync<ConfirmSheetActualResult>())!.Activity.Id);
             dossier = result.Dossier;
@@ -197,15 +195,15 @@ public sealed class TreatmentSheetV25Tests(ApiFixture fixture) : IClassFixture<A
         Assert.Equal(2, page!.Total); Assert.Equal(2, page.Items.Select(x => x.VisitId).Distinct().Count());
         var close = await c.PostAsJsonAsync($"/api/dossiers/{dossier.Id}/close", new CloseDossierRequest(dossier.Version, "CompletedAsAgreed", null, [], Guid.NewGuid()));
         Assert.True(close.IsSuccessStatusCode, await close.Content.ReadAsStringAsync());
-        Assert.True((await close.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier.FinancialSummaryAvailable);
+        Assert.False((await close.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier.FinancialSummaryAvailable);
         using var scope = fixture.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
         var ids = page.Items.Select(x => x.Id).ToArray();
-        Assert.Equal(2, await db.Set<FinanceCharge>().CountAsync(x => x.ActivityId.HasValue && ids.Contains(x.ActivityId.Value)));
+        Assert.Equal(2, await db.TreatmentProgressionEvents.CountAsync(x => x.Kind == "clinical.fee.requested" && ids.Contains(x.AggregateId)));
         Assert.All(await db.Visits.Where(x => s.Visits.Contains(x.Id)).ToListAsync(), v => Assert.Equal("InProgress", v.Status));
     }
 
     [Fact]
-    public async Task DirectAgreementCreatesOneSourceAndWrongVisitRollsBackAndAssistantNeedsExplicitFinanceGrant()
+    public async Task DirectAgreementCreatesOneSourceAndWrongVisitRollsBack()
     {
         using var c = await Login(); var s = await Prepare(); var other = await Prepare(); var dossier = await Create(c, s);
         var row = await Draft(c, s, dossier.Id, "Actual", unitPrice: 0);
@@ -217,16 +215,8 @@ public sealed class TreatmentSheetV25Tests(ApiFixture fixture) : IClassFixture<A
         var result = (await posted.Content.ReadFromJsonAsync<ConfirmSheetActualResult>())!;
         Assert.Equal(row.Id, Assert.Single(result.Dossier.Items).Id); Assert.Equal("Free", result.Activity.FeeStatus);
         using var assistant = await Login("assistant.demo");
-        Assert.Equal(HttpStatusCode.Forbidden, (await assistant.GetAsync($"/api/patients/{s.Patient}/dossiers/financial-context")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await assistant.GetAsync($"/api/dossiers/{dossier.Id}")).StatusCode);
         using var scope = fixture.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
-        var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>(); var user = (await users.FindByNameAsync("assistant.demo"))!;
-        await users.AddClaimAsync(user, new Claim("permission", "finance.read"));
-        var employee = await db.Employees.SingleAsync(x => x.AccountId == user.Id);
-        await db.AddSchedulingDataAsync(new SchedulingMember { BranchId = s.Branch, EmployeeId = employee.Id }); await db.SaveChangesAsync();
-        var projection = await assistant.GetAsync($"/api/patients/{s.Patient}/dossiers/financial-context");
-        Assert.Equal(HttpStatusCode.OK, projection.StatusCode);
-        var json = await projection.Content.ReadAsStringAsync(); Assert.DoesNotContain("counseling", json); Assert.DoesNotContain("diagnosis", json);
     }
 
     [Fact]
@@ -301,7 +291,7 @@ public sealed class TreatmentSheetV25Tests(ApiFixture fixture) : IClassFixture<A
         Assert.Equal(result.Activity.Id, (await responses[1].Content.ReadFromJsonAsync<ConfirmSheetActualResult>())!.Activity.Id);
         Assert.Null(result.Activity.VisitId); Assert.Equal("Dossier", result.Activity.SourceKind);
         Assert.Equal(item.ServiceName, result.Activity.ServiceNameSnapshot); Assert.Equal(100000, result.Activity.DiscountSnapshotVnd);
-        Assert.Equal("Posted", result.Activity.FeeStatus); Assert.True(result.Dossier.Items[0].DisplayCompleted);
+        Assert.Equal("Pending", result.Activity.FeeStatus); Assert.True(result.Dossier.Items[0].DisplayCompleted);
         Assert.Equal("NotStarted", result.Dossier.Items[0].Progress); Assert.Equal("Open", result.Dossier.State);
         dossier = result.Dossier;
         var again = await c.PostAsJsonAsync(url, new SheetItemActionRequest(dossier.Version, Guid.NewGuid()));
@@ -330,11 +320,11 @@ public sealed class TreatmentSheetV25Tests(ApiFixture fixture) : IClassFixture<A
         Assert.Single((await c.GetFromJsonAsync<TreatmentActivityPage>($"/api/dossiers/{dossier.Id}/activities"))!.Items);
         using var scope = fixture.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
         Assert.False(await db.Visits.AnyAsync(v => v.PatientId == s.Patient));
-        Assert.Equal(1, await db.Set<FinanceCharge>().CountAsync(e => e.ActivityId == actual.Id && e.DossierId == dossier.Id));
+        Assert.Equal(1, await db.TreatmentProgressionEvents.CountAsync(x => x.Kind == "clinical.fee.requested" && x.AggregateId == actual.Id));
     }
 
     [Fact]
-    public async Task WorkStatisticsListsPerformedSheetActivitiesWithCostPaidAndDue()
+    public async Task WorkStatisticsListsPerformedSheetActivitiesWithCostAndNoCollections()
     {
         using var dentist = await Login(); using var cashier = await Login("owner.demo");
         var setup = await Prepare(false); var dossier = await Create(dentist, setup);
@@ -346,22 +336,13 @@ public sealed class TreatmentSheetV25Tests(ApiFixture fixture) : IClassFixture<A
         var performed = await dentist.PostAsJsonAsync($"/api/dossiers/{dossier.Id}/sheet-items/{item.Id}/perform", new SheetItemActionRequest(dossier.Version, Guid.NewGuid()));
         Assert.True(performed.IsSuccessStatusCode, await performed.Content.ReadAsStringAsync());
         var activity = (await performed.Content.ReadFromJsonAsync<ConfirmSheetActualResult>())!.Activity;
-        // The sheet's own Trả tiền button records dossier payments (needs finance.payments.create, so seed one directly); the statistics must follow them.
-        var context = (await dentist.GetFromJsonAsync<DossierPaymentContext>($"/api/dossiers/{dossier.Id}/payments/context"))!;
-        var source = Assert.Single(context.Lines); var part = source.DueVnd / 2; Assert.True(part > 0);
-        using (var scope = fixture.Services.CreateScope())
-        {
-            var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
-            var payment = new DCMS.Domain.Features.Treatment.DossierPayment { DossierId = dossier.Id, PatientId = dossier.PatientId, BranchId = dossier.BranchId,
-                PaidOn = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7)), Method = "Cash", CollectorEmployeeId = context.DefaultCollectorId ?? context.Collectors[0].Id, TotalVnd = part, CreatedBy = 1, CreatedAt = DateTimeOffset.UtcNow };
-            payment.Lines = [new DCMS.Domain.Features.Treatment.DossierPaymentLine { PaymentId = payment.Id, ActivityId = activity.Id, AmountVnd = part }];
-            db.Add(payment); await db.SaveChangesAsync();
-        }
 
         var page = (await cashier.GetFromJsonAsync<WorkStatisticsPage>($"/api/work-statistics?q={Uri.EscapeDataString(item.ServiceName)}&pageSize=100"))!;
         var group = Assert.Single(page.Items, x => x.DossierId == dossier.Id);
         var row = Assert.Single(group.Lines); Assert.Equal(activity.Id, row.ActivityId); Assert.False(string.IsNullOrEmpty(row.ServiceName));
-        Assert.Equal(dossier.Code, group.DossierCode); Assert.Equal(source.CostVnd - source.DiscountVnd, row.CostVnd); Assert.Equal(part, row.PaidVnd); Assert.Equal(source.DueVnd - part, row.DueVnd);
+        var expectedCost = activity.ChargingBasis == "Included" ? 0 : (long)Math.Round(activity.Quantity * activity.PriceSnapshotVnd, MidpointRounding.AwayFromZero) - activity.DiscountSnapshotVnd;
+        // No payments exist while the finance module is removed.
+        Assert.Equal(dossier.Code, group.DossierCode); Assert.Equal(expectedCost, row.CostVnd); Assert.Equal(0, row.PaidVnd); Assert.Equal(0, row.DueVnd);
         Assert.Equal(page.Items.Sum(x => x.Lines.Count), page.LineCount); Assert.Equal(row.CostVnd, group.CostVnd); Assert.Equal(row.DueVnd, group.DueVnd);
         Assert.Equal(setup.Patient, group.PatientId);
         Assert.False(string.IsNullOrEmpty(group.PatientCode)); Assert.False(string.IsNullOrEmpty(group.DentistName));
@@ -508,63 +489,6 @@ public sealed class TreatmentSheetV25Tests(ApiFixture fixture) : IClassFixture<A
     }
 
     [Fact]
-    public async Task DirectTreatmentChargeCanBeCollectedInPartsAndSummaryUsesConfirmedAllocations()
-    {
-        using var dentist = await Login(); using var cashier = await Login("owner.demo");
-        var setup = await Prepare(false); var dossier = await Create(dentist, setup);
-        var draft = await Draft(dentist, setup, dossier.Id, "Plan");
-        var plan = await dentist.PostAsJsonAsync($"/api/dossiers/{dossier.Id}/sheet-drafts/{draft.Id}/confirm-plan",
-            new ConfirmSheetPlanRequest(dossier.Version, draft.Version, null, Guid.NewGuid()));
-        Assert.True(plan.IsSuccessStatusCode, await plan.Content.ReadAsStringAsync());
-        dossier = (await plan.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
-        var item = Assert.Single(dossier.Items);
-        var performed = await dentist.PostAsJsonAsync($"/api/dossiers/{dossier.Id}/sheet-items/{item.Id}/perform",
-            new SheetItemActionRequest(dossier.Version, Guid.NewGuid()));
-        Assert.True(performed.IsSuccessStatusCode, await performed.Content.ReadAsStringAsync());
-        var activity = (await performed.Content.ReadFromJsonAsync<ConfirmSheetActualResult>())!.Activity;
-        Assert.Equal("Posted", activity.FeeStatus);
-        var url = $"/api/finance/dossiers/{dossier.Id}";
-        var bill = (await cashier.GetFromJsonAsync<DossierBillDto>(url))!;
-        var charge = Assert.Single(bill.Charges);
-        Assert.Equal(activity.Id, charge.ActivityId);
-        Assert.Equal(charge.AmountVnd, bill.RemainingVnd);
-        var snapshot = (await cashier.GetFromJsonAsync<TreatmentFinanceSnapshot>($"/api/dossiers/{dossier.Id}/finance"))!;
-        Assert.True(snapshot.Available); Assert.Single(snapshot.Charges);
-        var firstAmount = charge.AmountVnd / 2;
-        var cash = new ConfirmCollectionRequest(dossier.Id, DateTimeOffset.UtcNow, "Cash", "SYNTHETIC payer",
-            null, firstAmount, 0, [new CollectionAllocation(charge.Id, 1, firstAmount)], snapshot.SourceVersion, Guid.NewGuid());
-        var cashResponse = await cashier.PostAsJsonAsync($"/api/dossiers/{dossier.Id}/collections", cash);
-        Assert.True(cashResponse.IsSuccessStatusCode, await cashResponse.Content.ReadAsStringAsync());
-        var receipt = (await cashResponse.Content.ReadFromJsonAsync<TreatmentFinanceReceipt>())!;
-        Assert.Equal("Confirmed", receipt.Status);
-        Assert.Equal(System.Net.HttpStatusCode.Conflict, (await cashier.PostAsJsonAsync(url + "/payments",
-            new CollectPayment(setup.Patient, bill.AccountVersion, Guid.NewGuid(), "Cash", "SYNTHETIC payer",
-                [new AllocationInput(Guid.NewGuid(), 1)]))).StatusCode);
-        var print = await cashier.GetAsync($"/api/finance/payments/{receipt.Id}/print");
-        Assert.True(print.IsSuccessStatusCode, await print.Content.ReadAsStringAsync());
-        Assert.Equal(receipt.Id, (await (await cashier.PostAsJsonAsync($"/api/dossiers/{dossier.Id}/collections", cash)).Content.ReadFromJsonAsync<TreatmentFinanceReceipt>())!.Id);
-        bill = (await cashier.GetFromJsonAsync<DossierBillDto>(url))!;
-        Assert.Equal(firstAmount, bill.PaidVnd);
-        var transfer = new CollectPayment(setup.Patient, bill.AccountVersion, Guid.NewGuid(), "Transfer", "SYNTHETIC payer",
-            [new AllocationInput(charge.Id, bill.RemainingVnd)], DeclaredReference: "TREATMENT-TEST");
-        var transferResponse = await cashier.PostAsJsonAsync(url + "/payments", transfer);
-        Assert.True(transferResponse.IsSuccessStatusCode, await transferResponse.Content.ReadAsStringAsync());
-        var pending = (await transferResponse.Content.ReadFromJsonAsync<PaymentDto>())!;
-        Assert.Equal("Pending", pending.State);
-        bill = (await cashier.GetFromJsonAsync<DossierBillDto>(url))!;
-        Assert.Equal(firstAmount, bill.PaidVnd);
-        var confirmedResponse = await cashier.PostAsJsonAsync($"/api/finance/payments/{pending.Id}/confirm",
-            new ConfirmPayment(pending.Version, bill.AccountVersion, Guid.NewGuid(), "TREATMENT-TEST", "SYNTHETIC reconciled"));
-        Assert.True(confirmedResponse.IsSuccessStatusCode, await confirmedResponse.Content.ReadAsStringAsync());
-        bill = (await cashier.GetFromJsonAsync<DossierBillDto>(url))!;
-        Assert.Equal(0, bill.RemainingVnd);
-        var detail = (await dentist.GetFromJsonAsync<TreatmentDossierDto>($"/api/dossiers/{dossier.Id}"))!;
-        Assert.True(detail.FinancialSummary!.Available);
-        Assert.Equal(charge.AmountVnd, detail.FinancialSummary.AllocatedVnd);
-        Assert.Equal(0, detail.FinancialSummary.OutstandingVnd);
-    }
-
-    [Fact]
     public async Task DirectActualNeedsNoPlanOrVisitAndDisplayFlagHasNoClinicalEffect()
     {
         using var c = await Login(); var s = await Prepare(false); var dossier = await Create(c, s);
@@ -660,8 +584,8 @@ public sealed class TreatmentSheetV25Tests(ApiFixture fixture) : IClassFixture<A
         using var scope = fixture.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
         Assert.Single(await db.ClinicalActivities.Where(a => a.DossierId == dossier.Id).ToListAsync());
         Assert.Empty(await db.TreatmentSheetDrafts.Where(a => a.DossierId == dossier.Id).ToListAsync());
-        var fee = Assert.Single(await db.Set<FinanceCharge>().Where(e => e.ActivityId == result.Activity.Id).ToListAsync());
-        Assert.Equal(dossier.Id, fee.DossierId); Assert.Equal(700000, fee.AmountVnd);
+        Assert.Equal("Pending", result.Activity.FeeStatus);
+        Assert.Equal(1, await db.TreatmentProgressionEvents.CountAsync(x => x.Kind == "clinical.fee.requested" && x.AggregateId == result.Activity.Id));
     }
 
     [Fact]

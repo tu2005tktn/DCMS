@@ -83,7 +83,7 @@ public sealed partial class TreatmentDossierService
         {
             order = new LabOrder { ActivityId = activityId, DossierId = dossierId, PatientId = activity.PatientId, BranchId = dossier.BranchId, CreatedAt = now, CreatedBy = actorId };
             db.Add(order);
-            db.Add(new LabOrderStatusLog { LabOrderId = order.Id, ToStatus = LabOrderStatus.NotSent, ChangedAt = now, ChangedBy = actorId });
+            order.StatusLogs.Add(new LabOrderStatusLog { LabOrderId = order.Id, ToStatus = LabOrderStatus.NotSent, ChangedAt = now, ChangedBy = actorId });
         }
         else if (r.ExpectedVersion != order.Version) throw Error("MSG111", 409);
         else order.Version++;
@@ -102,7 +102,9 @@ public sealed partial class TreatmentDossierService
     {
         await access.RequireAsync(actorId, "treatment.lab.manage", ct);
         await DossierAsync(actorId, dossierId, ct);
-        var order = await db.LabOrders.SingleOrDefaultAsync(x => x.ActivityId == activityId && x.DossierId == dossierId, ct) ?? throw Error("MSG113", 404);
-        db.Remove(order); await db.SaveChangesAsync(ct);
+        var order = await db.LabOrders.AsNoTracking().SingleOrDefaultAsync(x => x.ActivityId == activityId && x.DossierId == dossierId, ct) ?? throw Error("MSG113", 404);
+        // EF cannot delete a tracked row whose JSONB status history has entries, so delete directly and keep the stamp check.
+        if (await db.LabOrders.Where(x => x.Id == order.Id && x.StorageStamp == order.StorageStamp).ExecuteDeleteAsync(ct) == 0)
+            throw Error("MSG111", 409);
     }
 }

@@ -33,7 +33,7 @@ type StateTarget = { kind: 'branch'; branch: BranchDto } | { kind: 'chair'; chai
 
 const base = '/api/settings/branches';
 
-const blockerLabels: Record<string, string> = { Appointments: 'Lịch hẹn', Visits: 'Lượt khám', Reservations: 'Giữ chỗ', Finance: 'Tài chính', PayOsOrders: 'Chuyển khoản PayOS', TreatmentDossiers: 'Hồ sơ điều trị', LabOrders: 'Phiếu labo' };
+const blockerLabels: Record<string, string> = { Appointments: 'Lịch hẹn', Visits: 'Lượt khám', Reservations: 'Giữ chỗ', TreatmentDossiers: 'Hồ sơ điều trị', LabOrders: 'Phiếu labo' };
 
 function BlockerList({ blockers }: { blockers: Blocker[] }) {
   return (

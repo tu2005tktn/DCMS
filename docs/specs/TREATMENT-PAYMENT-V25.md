@@ -1,5 +1,7 @@
 # Điều trị và Thanh toán v2.5
 
+> **Đã gỡ ngày 13/11/2026.** Phân hệ tài chính đã được xóa khỏi backend, web và database theo [CARE-LAB-FINANCE-STORAGE.vi.md](CARE-LAB-FINANCE-STORAGE.vi.md). Tài liệu này chỉ còn giá trị tham khảo khi đặc tả lại chức năng; không mô tả hành vi hiện tại.
+
 **Cập nhật 02/11/2026:** Phần ghi phí và thu tiền điều trị đã nối với ledger chung theo [TREATMENT-LEDGER-INTEGRATION.vi.md](TREATMENT-LEDGER-INTEGRATION.vi.md). Các đoạn bên dưới ghi lại trạng thái và phạm vi từng đợt triển khai trước đó; khi nói adapter tài chính chưa sẵn sàng, áp dụng đặc tả tích hợp mới cho runtime hiện tại.
 
 ## Nguồn và quyết định

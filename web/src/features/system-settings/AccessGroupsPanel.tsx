@@ -118,7 +118,7 @@ export default function AccessGroupsPanel() {
   const matches = (option: GrantOption) => `${option.label} ${option.key}`.toLocaleLowerCase('vi').includes(query.toLocaleLowerCase('vi'));
   const visible = (option: GrantOption): boolean => !query || matches(option) || data.options.some(child => child.parent === option.key && visible(child));
   function tree(parent: string | null, parentMatches = false): ReactNode {
-    const order = ['appointments.read','working-schedules.read','booking-settings.read','patients.read','reception.read','appointments.support.handle','examinations.read','treatment.read','treatment.templates.read','treatment.prices.read','finance.read','services.read','care-tasks.read','notifications.read','accounts.read','settings.read'];
+    const order = ['appointments.read','working-schedules.read','booking-settings.read','patients.read','reception.read','appointments.support.handle','examinations.read','treatment.read','treatment.templates.read','treatment.prices.read','finance.read','care-tasks.read','notifications.read','accounts.read','settings.read'];
     const entries = data!.options.filter(option => option.parent === parent && (parentMatches || visible(option)));
     if (parent === null) entries.sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key));
     return entries.map(option => <div className={parent ? 'access-grant-child' : 'access-grant-section'} key={option.key}>

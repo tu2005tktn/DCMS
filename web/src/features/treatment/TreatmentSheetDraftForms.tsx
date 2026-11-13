@@ -96,7 +96,6 @@ export default function TreatmentSheetDraftRow({ kind, dossier, options, context
     <td data-col="discount">{field('discountValue', <InputNumber min={0} precision={0} size="small" aria-label="Giảm giá" disabled={!!initial && !has('treatment.items.price')} />)}
       {field('discountType', <Select size="small" aria-label="Loại giảm giá" options={[{ value: 'VND', label: '₫' }, { value: 'Percent', label: '%' }]} />)}
       {field('discountNote', <Input size="small" aria-label="Ghi chú giảm giá" placeholder="Lý do giảm trừ" maxLength={1000} />)}</td>
-    {kind === 'actual' && <td>—</td>}
     <td><div className="treatment-sheet-edit-actions">{error && <small role="alert">{error}</small>}
       {error && <Button size="small" onClick={() => { setBusy(true); void onReload().then(() => { pending.current = null; setError(undefined); }).catch(e => setError(e.message)).finally(() => setBusy(false)); }}>Đọc lại phiên bản</Button>}
       <Button size="small" type="primary" loading={busy} aria-label="Đồng ý" title="Đồng ý" onClick={() => void submit()}>✓</Button>

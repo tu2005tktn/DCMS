@@ -257,8 +257,9 @@ public sealed class TreatmentDossierApiTests(ApiFixture fixture) : IClassFixture
         Assert.Equal(HttpStatusCode.OK, committedResponse.StatusCode);
         var committed = (await committedResponse.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
         Assert.Equal(1300000, committed.FinancialSummary!.PlannedVnd);
-        Assert.True(committed.FinancialSummary.Available);
-        Assert.Equal(0, committed.FinancialSummary.PostedChargeVnd);
+        // The finance module is removed, so only the planned amount is summarized.
+        Assert.False(committed.FinancialSummary.Available);
+        Assert.Null(committed.FinancialSummary.PostedChargeVnd);
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
         Assert.Equal(0, await db.Appointments.CountAsync(x => x.PatientId == setup.PatientId));

@@ -11,7 +11,6 @@ import SettingsAuditPanel from './SettingsAuditPanel';
 import { downloadExport } from './exportFile';
 import AccessGroupsPanel from './AccessGroupsPanel';
 import BranchesPanel from './BranchesPanel';
-import ClinicalServicesPage from '../finance/ClinicalServicesPage';
 import type { SettingsCapabilities } from './generalSettings';
 import './systemSettings.css';
 
@@ -69,11 +68,6 @@ export default function SystemSettingsPage() {
     // 2. diagnoses
     ...(has('catalog.diagnoses.read') || has('settings.read')
       ? [{ key: 'diagnoses', label: '2. Chẩn đoán / Tên bệnh', children: <ReferenceCatalogPanel initialKind="diagnoses" /> }]
-      : []),
-
-    // 3. services
-    ...(has('services.read')
-      ? [{ key: 'services', label: '3. Dịch vụ, sản phẩm & giá', children: <ClinicalServicesPage /> }]
       : []),
 
     // 12. treatment-services (moved from the Chuyên môn menu)

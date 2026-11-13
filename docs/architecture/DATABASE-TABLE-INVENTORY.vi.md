@@ -1,6 +1,6 @@
 # Danh sách bảng sau rút gọn
 
-Cập nhật ngày 13/11/2026. Schema đã áp dụng có 57 bảng trong model EF và 58 bảng vật lý trong schema `public`. Bảng ngoài model là `__EFMigrationsHistory`. Các schema `dcms_test_*` là môi trường kiểm thử tách biệt.
+Cập nhật ngày 13/11/2026. Schema đã áp dụng có 36 bảng trong model EF và 37 bảng vật lý trong schema `public`. Bảng ngoài model là `__EFMigrationsHistory`. Các schema `dcms_test_*` là môi trường kiểm thử tách biệt.
 
 Riêng tài khoản và phân quyền chỉ có `USER_ACCOUNT` và `ACCESS_GROUP`. Riêng đơn thuốc và danh mục thuốc chỉ có `PRESCRIPTION` và `CATALOG_MEDICINE`. Nhật ký và kết quả chống ghi trùng dùng hai kho chung cho toàn hệ thống.
 
@@ -9,6 +9,8 @@ Chi nhánh, lịch làm việc và lịch hẹn đã gộp về ba bảng `SCHED
 Phần khám đã gộp về `VISIT` và `CLINICAL_DOCUMENT`. Phiếu khám và chỉ định nằm trong lượt khám, các lần đọc tài liệu nằm trong tài liệu. Snapshot bảng tham chiếu cũ nằm trong audit chuyển đổi dùng chung. Xem [thiết kế và kiểm chứng hai bảng khám](../specs/EXAMINATION-TWO-TABLES.vi.md).
 
 Phần điều trị đã gộp về `TREATMENT_DOSSIER`, `TREATMENT_PLAN_ITEM`, `CLINICAL_ACTIVITY` và `TREATMENT_TEMPLATE`. Bản nháp nằm trong phiếu, các bước nằm trong hạng mục, hạng mục và phiên bản mẫu nằm trong mẫu; đánh giá, ghi chú và hướng dẫn tái khám dùng chung bảng quá trình. Sự kiện điều trị và tiến độ nằm trong `AUDIT_LOG`. Xem [thiết kế và kiểm chứng bốn bảng điều trị](../specs/TREATMENT-FOUR-TABLES.vi.md).
+
+Chăm sóc bệnh nhân chỉ còn `CARE_TASK`; labo còn phiếu labo `LAB_ORDER` và danh mục labo `LAB_WORK_TYPE`. Phân hệ tài chính đã được gỡ cùng 18 bảng, sẽ đặc tả và thêm lại sau. Xem [chăm sóc, labo và tài chính](../specs/CARE-LAB-FINANCE-STORAGE.vi.md).
 
 | Bảng | Lưu trữ |
 | --- | --- |
@@ -33,31 +35,10 @@ Phần điều trị đã gộp về `TREATMENT_DOSSIER`, `TREATMENT_PLAN_ITEM`,
 | `TREATMENT_PLAN_ITEM` | Các mục dịch vụ trong kế hoạch điều trị với giá đã thỏa thuận; các bước thực hiện và trạng thái tiến độ trong JSONB. |
 | `TREATMENT_TEMPLATE` | Mẫu kế hoạch điều trị dùng lại; dòng dịch vụ, nhân sự và các phiên bản mẫu cũ trong JSONB. |
 | `CLINICAL_ACTIVITY` | Quá trình điều trị phân theo loại bản ghi: hoạt động điều trị thực tế, phiếu đánh giá lâm sàng, ghi chú chăm sóc và hướng dẫn tái khám kèm liên kết lịch hẹn. |
-| `CARE_TASK` | Công việc chăm sóc hoặc theo dõi bệnh nhân. |
-| `CARE_CONTACT_ATTEMPT` | Các lần liên hệ bệnh nhân và kết quả. |
-| `CARE_ESCALATION` | Chuyển cấp xử lý công việc chăm sóc. |
-| `LAB_ORDER` | Phiếu labo theo hồ sơ điều trị. |
-| `LAB_ORDER_STATUS_LOG` | Lịch sử trạng thái phiếu labo. |
-| `LAB_WORK_TYPE` | Danh mục loại công việc labo. |
+| `CARE_TASK` | Công việc chăm sóc hoặc theo dõi bệnh nhân; các lần liên hệ và các lần chuyển cấp xử lý trong JSONB. |
+| `LAB_ORDER` | Phiếu labo theo hoạt động điều trị: xưởng, loại công việc, răng, màu, ngày gửi/nhận/giao, trạng thái và phí labo; lịch sử trạng thái trong JSONB. |
+| `LAB_WORK_TYPE` | Danh mục labo: loại công việc theo xưởng, đơn vị, giá tham khảo và bảo hành. |
 | `CATALOG_PROVIDER` | Danh mục nhà cung cấp dùng trong thiết lập danh mục hệ thống. |
-| `PROVIDER` | Nhà cung cấp phục vụ nghiệp vụ chi phí và công nợ hiện có. |
-| `PROVIDER_PAYABLE` | Khoản phải trả nhà cung cấp. |
-| `FINANCIAL_ACCOUNT` | Tài khoản hoặc quỹ ghi nhận tài chính. |
-| `FINANCE_PAYMENT_METHOD` | Danh mục phương thức thanh toán trong phân hệ tài chính. |
-| `FINANCE_CHARGE` | Khoản tính phí dịch vụ hoặc phát sinh. |
-| `EXAMINATION_FEE` | Phí khám gắn với lượt khám. |
-| `FINANCE_INVOICE` | Hóa đơn và tổng tiền. |
-| `FINANCE_INVOICE_LINE` | Các dòng dịch vụ hoặc khoản phí trên hóa đơn. |
-| `FINANCE_ADVANCE` | Khoản tiền bệnh nhân ứng trước. |
-| `FINANCE_ADVANCE_ALLOCATION` | Phân bổ khoản ứng trước vào nghĩa vụ thanh toán. |
-| `FINANCE_REFUND` | Khoản hoàn tiền và lý do. |
-| `PAYMENT_RECEIPT` | Phiếu thu tiền và thông tin xác nhận thu. |
-| `PAYMENT_ALLOCATION` | Phân bổ tiền thu vào các khoản phí hoặc hóa đơn. |
-| `RECEIPT_PRINT_EVENT` | Lịch sử in và in lại phiếu thu. |
-| `BRANCH_RECEIPT_SEQUENCE` | Bộ đếm số phiếu thu theo chi nhánh. |
-| `TREATMENT_DOSSIER_PAYMENT` | Khoản thanh toán ghi theo hồ sơ điều trị. |
-| `TREATMENT_DOSSIER_PAYMENT_LINE` | Phân bổ khoản thanh toán hồ sơ vào các dòng điều trị. |
-| `TREATMENT_PAYOS_ORDER` | Đơn thanh toán PayOS; lựa chọn dòng thanh toán nằm trong JSONB. |
 | `MATERIAL_CATEGORY` | Nhóm vật tư. |
 | `MATERIAL_CATALOG_ITEM` | Danh mục vật tư, đơn vị và định mức liên quan. |
 | `MATERIAL_PURCHASE` | Lần nhập hoặc mua vật tư và chi phí. |

@@ -99,7 +99,7 @@ public sealed partial class DcmsDbContext
         foreach (var activity in ChangeTracker.Entries<ClinicalActivity>().Where(x => x.State == EntityState.Added).ToArray())
             activity.Entity.StorageId = activity.Entity.Id;
         foreach (var entry in ChangeTracker.Entries().Where(x => x.State == EntityState.Modified
-            && x.Entity is TreatmentDossier or TreatmentItem or TreatmentTemplate or TreatmentProcessRecord).ToArray())
+            && x.Entity is TreatmentDossier or TreatmentItem or TreatmentTemplate or TreatmentProcessRecord or CareTask or LabOrder).ToArray())
             entry.Property("StorageStamp").CurrentValue = Guid.NewGuid();
     }
 }

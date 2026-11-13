@@ -4,7 +4,7 @@ Người phụ trách: Ngô Minh Trí (phần giao diện S25/S60 theo [S22-S63-
 
 Tài liệu tham chiếu:
 - Màn "Customer cares" của oDental (ảnh chụp do người dùng cung cấp). Chỉ tham khảo bố cục, không dùng dữ liệu oDental.
-- Backend công việc chăm sóc đã có: `CARE_TASK`, `CARE_CONTACT_ATTEMPT`, `CARE_ESCALATION`, `/api/care-tasks`.
+- Backend công việc chăm sóc đã có: `CARE_TASK` (từ 13/11/2026 các lần liên hệ và chuyển cấp nằm trong JSONB của dòng, xem [CARE-LAB-FINANCE-STORAGE.vi.md](CARE-LAB-FINANCE-STORAGE.vi.md)), `/api/care-tasks`.
 - Danh mục `care-types` "Loại chăm sóc khách hàng" của [S58-REFERENCE-CATALOGS.md](S58-REFERENCE-CATALOGS.md).
 
 ## 1. Mục tiêu

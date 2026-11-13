@@ -5,7 +5,6 @@ using DCMS.Application.Features.Authentication;
 using DCMS.Application.Features.Treatment;
 using DCMS.Domain.Features.Scheduling;
 using DCMS.Domain.Features.Treatment;
-using DCMS.Domain.Features.Finance;
 using DCMS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -41,7 +40,7 @@ public sealed class ItemPlanApiTests(ApiFixture fixture) : IClassFixture<ApiFixt
     private async Task<int[]> Counts() {
         using var scope = fixture.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
         return [await db.Patients.CountAsync(), await db.TreatmentDossiers.CountAsync(), await db.ClinicalActivities.CountAsync(), await db.Appointments.CountAsync(),
-            await db.Set<ResourceReservation>().CountAsync(), await db.Set<FinanceCharge>().CountAsync(), await db.Set<PaymentReceipt>().CountAsync()];
+            await db.Set<ResourceReservation>().CountAsync(), await db.TreatmentProgressionEvents.CountAsync(x => x.Kind == "clinical.fee.requested")];
     }
     [Fact]
     public async Task CrudSnapshotsSoftDeleteAndNoClinicalOrFinancialSideEffects() {

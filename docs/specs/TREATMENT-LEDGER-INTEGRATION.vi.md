@@ -1,5 +1,7 @@
 # Tích hợp phí điều trị vào ledger chung
 
+> **Đã gỡ ngày 13/11/2026.** Phân hệ tài chính đã được xóa khỏi backend, web và database theo [CARE-LAB-FINANCE-STORAGE.vi.md](CARE-LAB-FINANCE-STORAGE.vi.md). Tài liệu này chỉ còn giá trị tham khảo khi đặc tả lại chức năng; không mô tả hành vi hiện tại.
+
 ## Nguồn phí
 
 Chỉ `ClinicalActivity` đã được xác nhận thực hiện, `ChargingBasis=Separate`, giá dương và đơn vị khác `gói` mới ghi một `FinanceCharge`. Phí ròng bằng gross trừ discount snapshot đã được service lâm sàng kiểm tra. Kế hoạch, mẫu, bước, lịch hẹn, đơn thuốc và các giá tham khảo chỉ là dự toán; không tự tạo charge hoặc payment. `Free`, `Included`, giá 0 và gói chưa có quy tắc phân bổ giữ trạng thái lâm sàng hiện hành. Không hồi tố hoạt động cũ một cách ngầm định.

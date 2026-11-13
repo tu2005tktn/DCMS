@@ -14,7 +14,7 @@ using static DCMS.Infrastructure.Features.Examinations.ClinicalAccess;
 namespace DCMS.Infrastructure.Features.Examinations;
 
 public sealed class ExaminationService(DcmsDbContext db, ClinicalAccess access, IReceptionService reception,
-    IClinicalDocumentService documents, TimeProvider clock, IInvestigationService investigations, DCMS.Application.Features.Finance.IExaminationFeeService fees, DCMS.Application.Features.Settings.ISettingsAccess permissions) : IExaminationService
+    IClinicalDocumentService documents, TimeProvider clock, IInvestigationService investigations, DCMS.Application.Features.Settings.ISettingsAccess permissions) : IExaminationService
 {
     internal static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     internal static string Hash(object value) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(value, Json))));
@@ -93,9 +93,6 @@ public sealed class ExaminationService(DcmsDbContext db, ClinicalAccess access, 
                 throw new BusinessException(409, SystemMessages.Get("MSG239",field:"còn chỉ định cận lâm sàng chưa được bác sĩ đọc hoặc hủy") with { Field = "investigations" });
             var content = Dto(e).Content;
             if (!HasDiagnosis(content) || string.IsNullOrWhiteSpace(content.Disposition)) throw new BusinessException(409, SystemMessages.Get("MSG239", field: "phiếu khám còn thiếu chẩn đoán hoặc hướng xử trí"));
-            if (await db.Investigations.AnyAsync(x => x.VisitId == visitId && x.State != "Cancelled" && (x.BillingMode == "Clinic" || x.BillingMode == "OutsourcedClinic") && x.PerformedAt == null,ct))
-                throw new BusinessException(409, SystemMessages.Get("MSG42") with { Message = "Còn dịch vụ cận lâm sàng đã lập phí chưa xác nhận thực hiện. Hãy xác nhận thực hiện hoặc hủy chỉ định." });
-            await fees.OnCompletionAsync(actorId,v,request.ExaminationFee,ct);
             v.Status = VisitStatuses.Completed; a.Status = "Completed"; a.Version++;
         } else if (save == null) {
             if (v.Status != VisitStatuses.Queued || a.Status != "CheckedIn") throw Error("MSG42", 409);

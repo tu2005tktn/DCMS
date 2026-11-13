@@ -11,9 +11,6 @@ public static class TreatmentEndpoints
 
     public static void MapTreatmentEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapGet("/api/patients/{patientId:int}/dossiers/financial-context", async (HttpContext context,
-            int patientId, ITreatmentFinancialWorkspace service, CancellationToken ct) => Results.Ok(await service.ListAsync(
-                AuthenticationEndpoints.AccountId(context.User), patientId, ct))).RequireAuthorization();
         var prices = endpoints.MapGroup("/api/service-prices").RequireAuthorization().WithTags("S21 reference prices");
         prices.MapGet("/", async (HttpContext context, IServicePriceService service, CancellationToken ct) =>
             Results.Ok(await service.ListAsync(AuthenticationEndpoints.AccountId(context.User), ct)));
@@ -54,37 +51,6 @@ public static class TreatmentEndpoints
             Results.Ok(await service.GetAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, ct)));
         dossier.MapGet("/sheet-context", async (HttpContext context, Guid dossierId, ITreatmentDossierService service, CancellationToken ct) =>
             Results.Ok(await service.SheetContextAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, ct)));
-        dossier.MapGet("/payments/context", async (HttpContext context, Guid dossierId, ITreatmentDossierService service, CancellationToken ct) =>
-            Results.Ok(await service.PaymentContextAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, ct)));
-        dossier.MapGet("/payments", async (HttpContext context, Guid dossierId, ITreatmentDossierService service, CancellationToken ct) =>
-            Results.Ok(await service.PaymentsAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, ct)));
-        dossier.MapPost("/payments", async (HttpContext context, Guid dossierId, CreateDossierPaymentRequest request,
-            ITreatmentDossierService service, CancellationToken ct) => Results.Ok(await service.CreatePaymentAsync(
-                AuthenticationEndpoints.AccountId(context.User), dossierId, request, ct)));
-        dossier.MapPost("/payos-orders", async (HttpContext context, Guid dossierId, CreatePayOsOrderRequest request,
-            IPayOsOrderService service, CancellationToken ct) => Results.Ok(await service.CreateAsync(
-                AuthenticationEndpoints.AccountId(context.User), dossierId, request, ct)));
-        dossier.MapGet("/payos-orders/active", async (HttpContext context, Guid dossierId,
-            IPayOsOrderService service, CancellationToken ct) =>
-        {
-            var order = await service.ActiveAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, ct);
-            return order is null ? Results.Text("null", "application/json") : Results.Json(order);
-        });
-        dossier.MapGet("/payos-orders/{orderId:guid}", async (HttpContext context, Guid dossierId, Guid orderId,
-            IPayOsOrderService service, CancellationToken ct) => Results.Ok(await service.GetAsync(
-                AuthenticationEndpoints.AccountId(context.User), dossierId, orderId, ct)));
-        dossier.MapPost("/advance-payos-orders", async (HttpContext context, Guid dossierId, CreateAdvancePayOsOrderRequest request,
-            IPayOsOrderService service, CancellationToken ct) => Results.Ok(await service.CreateAdvanceAsync(
-                AuthenticationEndpoints.AccountId(context.User), dossierId, request, ct)));
-        dossier.MapGet("/advance-payos-orders/active", async (HttpContext context, Guid dossierId,
-            IPayOsOrderService service, CancellationToken ct) =>
-        {
-            var order = await service.ActiveAdvanceAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, ct);
-            return order is null ? Results.Text("null", "application/json") : Results.Json(order);
-        });
-        dossier.MapGet("/advance-payos-orders/{orderId:guid}", async (HttpContext context, Guid dossierId, Guid orderId,
-            IPayOsOrderService service, CancellationToken ct) => Results.Ok(await service.GetAdvanceAsync(
-                AuthenticationEndpoints.AccountId(context.User), dossierId, orderId, ct)));
         dossier.MapGet("/activities", async (HttpContext context, Guid dossierId, Guid? visitId, DateOnly? from, DateOnly? to,
             int? page, int? pageSize, ITreatmentDossierService service, CancellationToken ct) => Results.Ok(await service.ActivitiesAsync(
                 AuthenticationEndpoints.AccountId(context.User), dossierId, visitId, from, to, page ?? 1, pageSize ?? 20, ct)));

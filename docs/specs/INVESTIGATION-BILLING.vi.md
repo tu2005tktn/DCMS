@@ -1,5 +1,7 @@
 # Cận lâm sàng → ghi phí → thanh toán
 
+> **Đã gỡ ngày 13/11/2026.** Phân hệ tài chính đã được xóa khỏi backend, web và database theo [CARE-LAB-FINANCE-STORAGE.vi.md](CARE-LAB-FINANCE-STORAGE.vi.md). Tài liệu này chỉ còn giá trị tham khảo khi đặc tả lại chức năng; không mô tả hành vi hiện tại.
+
 Chốt theo yêu cầu người dùng 27/10/2026. Đối chiếu UC-20/21 v2.5: chỉ Cash/Transfer, Pending chưa tăng Paid, collection/allocations/receipt commit nguyên tử, lịch sử bất biến. Đây là phần triển khai mới; không suy ra toàn bộ tài chính/điều trị/kho đã hoàn chỉnh.
 
 ## Nguồn dữ liệu và phạm vi

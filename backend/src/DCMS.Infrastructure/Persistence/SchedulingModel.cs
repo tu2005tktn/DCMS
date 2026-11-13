@@ -29,6 +29,9 @@ internal static class SchedulingModel
 
         model.Entity<SchedulingService>(b =>
         {
+            // Examination and investigation service fields stay on the shared catalog row after the finance screens were removed.
+            b.Property(x => x.InvestigationKind).HasMaxLength(16);
+            b.Property(x => x.BillingUnit).HasMaxLength(40);
             b.Property(x => x.Unit).HasMaxLength(40).HasDefaultValue("lần");
             b.HasIndex(x => x.BranchId).IsUnique().HasFilter("\"IsInitialExamination\" = TRUE");
             b.Property(x => x.PublicBookable).HasDefaultValue(true);

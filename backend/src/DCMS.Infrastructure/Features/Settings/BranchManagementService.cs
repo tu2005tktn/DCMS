@@ -5,7 +5,6 @@ using System.Text.RegularExpressions;
 using DCMS.Application.Common;
 using DCMS.Application.Features.Settings;
 using DCMS.Domain.Features.Appointments;
-using DCMS.Domain.Features.Finance;
 using DCMS.Domain.Features.Scheduling;
 using DCMS.Domain.Features.Settings;
 using DCMS.Domain.Features.Treatment;
@@ -252,20 +251,6 @@ public sealed partial class BranchManagementService(DcmsDbContext db, ISettingsA
             .CountAsync(r => r.BranchId == id && r.End > now && r.Status == "Confirmed", ct);
         if (reservations > 0)
             blockers.Add(new("Reservations", $"Còn {reservations} giữ chỗ ghế/bác sĩ chưa kết thúc.", reservations, $"/appointments?branchId={id}"));
-
-        var pendingReceipts = await db.Set<PaymentReceipt>().AsNoTracking().CountAsync(r => r.BranchId == id && r.State == "Pending", ct);
-        var outstanding = await db.Set<FinanceCharge>().AsNoTracking()
-            .Where(ch => ch.BranchId == id)
-            .CountAsync(ch => ch.AmountVnd > (db.Set<PaymentAllocation>()
-                .Where(a => a.ChargeId == ch.Id && db.Set<PaymentReceipt>().Any(r => r.Id == a.PaymentId && r.State == "Posted"))
-                .Sum(a => (long?)a.AmountVnd) ?? 0), ct);
-        if (pendingReceipts + outstanding > 0)
-            blockers.Add(new("Finance", $"Còn {outstanding} khoản phí chưa thu đủ và {pendingReceipts} phiếu thu chờ xác nhận.", pendingReceipts + outstanding, $"/payments?branchId={id}"));
-
-        var payOs = await db.Set<DossierPayOsOrder>().AsNoTracking()
-            .CountAsync(o => o.BranchId == id && (o.State == "Creating" || o.State == "Pending" || o.State == "Review"), ct);
-        if (payOs > 0)
-            blockers.Add(new("PayOsOrders", $"Còn {payOs} đơn chuyển khoản PayOS chưa hoàn tất.", payOs, $"/payments?branchId={id}"));
 
         var dossiers = await db.Set<TreatmentDossier>().AsNoTracking().CountAsync(d => d.BranchId == id && d.State == "Open", ct);
         if (dossiers > 0)

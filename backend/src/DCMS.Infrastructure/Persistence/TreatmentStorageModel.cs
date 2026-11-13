@@ -8,7 +8,8 @@ internal static class TreatmentStorageModel
     internal static void Configure(ModelBuilder model)
     {
         foreach (var type in new[] { typeof(TreatmentStep), typeof(TreatmentSheetDraft), typeof(TreatmentRevisionDraft),
-            typeof(TreatmentTemplateItem), typeof(TreatmentTemplateVersion) }) model.Ignore(type);
+            typeof(TreatmentTemplateItem), typeof(TreatmentTemplateVersion),
+            typeof(CareContactAttempt), typeof(CareEscalation), typeof(LabOrderStatusLog) }) model.Ignore(type);
 
         model.Entity<TreatmentDossier>(b =>
         {
@@ -26,6 +27,17 @@ internal static class TreatmentStorageModel
             b.Property(x => x.StorageStamp).IsConcurrencyToken();
             b.ComplexCollection(x => x.Items).ToJson();
             b.ComplexCollection(x => x.Versions).ToJson();
+        });
+        model.Entity<CareTask>(b =>
+        {
+            b.Property(x => x.StorageStamp).IsConcurrencyToken();
+            b.ComplexCollection(x => x.ContactAttempts).ToJson();
+            b.ComplexCollection(x => x.Escalations).ToJson();
+        });
+        model.Entity<LabOrder>(b =>
+        {
+            b.Property(x => x.StorageStamp).IsConcurrencyToken();
+            b.ComplexCollection(x => x.StatusLogs).ToJson();
         });
         model.Entity<TreatmentProcessRecord>(b =>
         {

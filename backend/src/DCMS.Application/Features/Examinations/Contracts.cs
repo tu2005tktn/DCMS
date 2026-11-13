@@ -14,7 +14,7 @@ public sealed record SaveExamination(int PatientId, int ExpectedVersion, Guid Re
 public sealed record ExaminationDto(ExaminationContent Content, bool Confirmed, int UpdatedBy, DateTimeOffset UpdatedAt,
     Guid Id = default, int Version = 0);
 public sealed record AmendExamination(int PatientId, int ExpectedVersion, Guid RequestKey, ExaminationContent Content, string Reason);
-public sealed record CompleteExaminationVisit(int PatientId, int ExpectedVersion, Guid RequestKey, bool WorkReviewed, DCMS.Application.Features.Finance.ExaminationFeeChoice? ExaminationFee = null);
+public sealed record CompleteExaminationVisit(int PatientId, int ExpectedVersion, Guid RequestKey, bool WorkReviewed);
 public sealed record PatientExamination(Guid VisitId, string AppointmentCode, int BranchId, string BranchName,
     string DentistName, DateTimeOffset ArrivalAt, string VisitStatus, ExaminationDto? Examination, DateTimeOffset? CompletedAt = null);
 public sealed record ExaminationVersion(int Version, ExaminationContent Content, bool Confirmed, int ActorId,

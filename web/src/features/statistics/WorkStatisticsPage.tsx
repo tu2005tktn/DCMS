@@ -1,7 +1,7 @@
 import { Alert, Button, Input, Select, Table, Typography } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import './finance.css';
+import './workStatistics.css';
 import { api } from '../../services/api';
 import { clinicToday, formatDate } from '../appointments/types';
 import { useCanPickBranch } from '../authentication/useCanPickBranch';
@@ -47,7 +47,7 @@ export default function WorkStatisticsPage() {
   const [period, setPeriod] = useState<Period>('all');
   const [page, setPage] = useState(1), [pageSize, setPageSize] = useState(20), [attempt, setAttempt] = useState(0);
   const [data, setData] = useState<Result>(), [loading, setLoading] = useState(true), [error, setError] = useState<string>();
-  useEffect(() => { api<{ branches: { id: number; name: string }[] }>('/api/finance/capabilities').then(c => setBranches(c.branches)).catch(() => undefined); }, []);
+  useEffect(() => { if (canPickBranch) api<{ branches: { id: number; name: string }[] }>('/api/appointments/options').then(o => setBranches(o.branches)).catch(() => setBranches([])); }, [canPickBranch]);
   useEffect(() => { const t = window.setTimeout(() => setSearch(q.trim()), 300); return () => window.clearTimeout(t); }, [q]);
   useEffect(() => setPage(1), [from, to, branchId, search]);
   useEffect(() => {

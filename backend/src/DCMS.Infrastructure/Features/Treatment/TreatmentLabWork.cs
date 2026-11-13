@@ -77,11 +77,12 @@ public sealed partial class TreatmentDossierService
     {
         var scope = await access.RequireAsync(actorId, "treatment.lab.read", ct);
         await ScopedLabOrderAsync(scope, id, false, ct);
-        var rows = await (from l in db.LabOrderStatusLogs.AsNoTracking() where l.LabOrderId == id
-            join e in db.Employees on l.ChangedBy equals e.AccountId into es from emp in es.DefaultIfEmpty()
-            orderby l.ChangedAt descending, l.Id
-            select new LabStatusLogItem(l.FromStatus, l.ToStatus, l.ChangedAt, emp == null ? "" : emp.FullName, l.Note)).ToListAsync(ct);
-        return rows;
+        var logs = (await db.LabOrders.AsNoTracking().SingleAsync(x => x.Id == id, ct)).StatusLogs;
+        var actorIds = logs.Select(x => x.ChangedBy).Distinct().ToArray();
+        var names = await db.Employees.AsNoTracking().Where(x => actorIds.Contains(x.AccountId))
+            .ToDictionaryAsync(x => x.AccountId, x => x.FullName, ct);
+        return logs.OrderByDescending(x => x.ChangedAt).ThenBy(x => x.Id)
+            .Select(x => new LabStatusLogItem(x.FromStatus, x.ToStatus, x.ChangedAt, names.GetValueOrDefault(x.ChangedBy, ""), x.Note)).ToList();
     }
 
     public async Task<LabWorkItem> ChangeLabStatusAsync(int actorId, Guid id, ChangeLabStatusRequest r, CancellationToken ct)
@@ -93,7 +94,7 @@ public sealed partial class TreatmentDossierService
         if (order.Version != r.ExpectedVersion) throw Error("MSG111", 409);
         if (!LabOrderStatus.CanMove(order.Status, r.Status)) throw Error("MSG04");
         var today = VnToday(); var now = clock.GetUtcNow();
-        db.Add(new LabOrderStatusLog { LabOrderId = id, FromStatus = order.Status, ToStatus = r.Status, ChangedAt = now, ChangedBy = actorId, Note = note });
+        order.StatusLogs.Add(new LabOrderStatusLog { LabOrderId = id, FromStatus = order.Status, ToStatus = r.Status, ChangedAt = now, ChangedBy = actorId, Note = note });
         switch (r.Status)
         {
             case LabOrderStatus.Sent: order.SentOn = today; order.ReceivedOn = null; order.DeliveredOn = null; break;

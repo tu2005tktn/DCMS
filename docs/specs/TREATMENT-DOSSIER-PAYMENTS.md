@@ -1,5 +1,7 @@
 # Thanh toán theo phiếu điều trị — 03/11/2026
 
+> **Đã gỡ ngày 13/11/2026.** Phân hệ tài chính đã được xóa khỏi backend, web và database theo [CARE-LAB-FINANCE-STORAGE.vi.md](CARE-LAB-FINANCE-STORAGE.vi.md). Tài liệu này chỉ còn giá trị tham khảo khi đặc tả lại chức năng; không mô tả hành vi hiện tại.
+
 Cập nhật lưu trữ 12/11/2026 theo [hợp đồng rút gọn database](DATABASE-SIMPLIFICATION.vi.md). Đơn PayOS lưu các dòng được chọn trong `Lines` JSONB của `TREATMENT_PAYOS_ORDER`; ID hoạt động và số tiền tiếp tục dùng để đối chiếu kết quả thanh toán.
 
 ## Bỏ hàng chờ Thanh toán độc lập (09/11/2026)
