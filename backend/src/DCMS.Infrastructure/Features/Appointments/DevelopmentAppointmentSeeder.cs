@@ -36,7 +36,7 @@ public sealed class DevelopmentAppointmentSeeder(DcmsDbContext db, TimeProvider 
 
         if (await db.Appointments.AnyAsync(x => x.Code == "AP-S12-DEMO-1", ct)) return;
         var guest = await db.Users.SingleOrDefaultAsync(x => x.UserName == "guest.demo", ct);
-        var chair = await db.Set<SchedulingChair>().Where(x => x.BranchId == branch.Id).OrderBy(x => x.Id).FirstOrDefaultAsync(ct);
+        var chair = await db.SchedulingChairs.Where(x => x.BranchId == branch.Id).OrderBy(x => x.Id).FirstOrDefaultAsync(ct);
         var service = await db.Set<SchedulingService>().Where(x => x.BranchId == branch.Id).OrderBy(x => x.Id).FirstOrDefaultAsync(ct);
         if (guest == null || chair == null || service == null) return;
         var localDate = today.AddDays(1);
@@ -65,7 +65,7 @@ public sealed class DevelopmentAppointmentSeeder(DcmsDbContext db, TimeProvider 
                 ServiceId = service.Id, StartAt = start, EndAt = start.AddMinutes(30), Status = "Confirmed",
                 CreatedAt = clock.GetUtcNow()
             });
-            db.AppointmentSupportRequests.Add(new AppointmentSupportRequest
+            db.Appointments.Local.Single(a => a.Id == id).SupportRequests.Add(new AppointmentSupportRequest
             {
                 Code = example.RequestCode, AppointmentId = id, Kind = example.Kind, Status = example.Status,
                 RequestKey = Guid.NewGuid(), RequesterAccountId = guest.Id, RequesterName = guest.FullName,

@@ -21,7 +21,7 @@ public sealed class TreatmentPaymentMigrationTests(ApiFixture fixture) : IClassF
         var branch = new SchedulingBranch { Name = "SYNTHETIC migration" };
         db.AddRange(patient, branch); await db.SaveChangesAsync();
         var service = new SchedulingService { BranchId = branch.Id, Name = "SYNTHETIC legacy", Unit = "răng" };
-        db.AddRange(service, new SchedulingMember { BranchId = branch.Id, EmployeeId = dentist.Id, CanDentist = true }); await db.SaveChangesAsync();
+        await db.AddSchedulingDataAsync(service, new SchedulingMember { BranchId = branch.Id, EmployeeId = dentist.Id, CanDentist = true }); await db.SaveChangesAsync();
         var dossier = new TreatmentDossier { PatientId = patient.Id, BranchId = branch.Id, DentistId = dentist.Id,
             Code = "OLD-" + Guid.NewGuid().ToString("N"), StartedOn = new DateOnly(2026, 10, 26), Diagnosis = "SYNTHETIC old source",
             State = "Open", DisplayCompleted = true, Version = 4, PlanVersion = 2, PlanState = "Committed", CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow };

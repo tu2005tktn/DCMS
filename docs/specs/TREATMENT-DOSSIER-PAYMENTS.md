@@ -1,5 +1,7 @@
 # Thanh toán theo phiếu điều trị — 03/11/2026
 
+Cập nhật lưu trữ 12/11/2026 theo [hợp đồng rút gọn database](DATABASE-SIMPLIFICATION.vi.md). Đơn PayOS lưu các dòng được chọn trong `Lines` JSONB của `TREATMENT_PAYOS_ORDER`; ID hoạt động và số tiền tiếp tục dùng để đối chiếu kết quả thanh toán.
+
 ## Bỏ hàng chờ Thanh toán độc lập (09/11/2026)
 
 Không còn menu **Thanh toán** và trang `/payments` có tiêu đề **Danh sách cần thu**. Nhân viên mở bệnh nhân và dùng tab **Điều trị & Thanh toán** để thu theo phiếu. URL `/payments` cũ chuyển về danh sách bệnh nhân. Màn chi tiết thanh toán lượt khám `/visits/{visitId}/payments` và API thu tiền vẫn được giữ cho quy trình khám/cận lâm sàng, nhưng không còn điều hướng về hàng chờ cũ. Các liên kết từ màn dịch vụ và in phiếu thu dẫn về nơi có ngữ cảnh phù hợp.

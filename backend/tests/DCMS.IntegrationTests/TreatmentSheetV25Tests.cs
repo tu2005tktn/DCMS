@@ -42,14 +42,14 @@ public sealed class TreatmentSheetV25Tests(ApiFixture fixture) : IClassFixture<A
         db.AddRange(branch, patient); await db.SaveChangesAsync();
         var service = new SchedulingService { BranchId = branch.Id, Name = "SYNTHETIC Trám", Unit = "răng", ReferenceUnitPriceVnd = 350000, PublicBookable = false };
         var chair = new SchedulingChair { BranchId = branch.Id, Name = "SYNTHETIC chair" };
-        db.AddRange(service, chair, new SchedulingMember { BranchId = branch.Id, EmployeeId = staff.Id, CanDentist = true });
+        await db.AddSchedulingDataAsync(service, chair, new SchedulingMember { BranchId = branch.Id, EmployeeId = staff.Id, CanDentist = true });
         await db.SaveChangesAsync();
         var visits = new List<Guid>();
         for (var i = 0; i < (createVisits ? 2 : 0); i++)
         {
             var start = DateTimeOffset.UtcNow.AddDays(-i).AddMinutes(-30);
             var id = Guid.NewGuid();
-            db.Add(new ResourceReservation { Id = id, Code = "RV-" + id.ToString("N"), BranchId = branch.Id, DentistId = staff.Id,
+            await db.AddSchedulingDataAsync(new ResourceReservation { Id = id, Code = "RV-" + id.ToString("N"), BranchId = branch.Id, DentistId = staff.Id,
                 ChairId = chair.Id, ServiceId = service.Id, Start = start, End = start.AddHours(1), AttendeeKey = $"patient:{patient.Id}", AttendeeLabel = patient.FullName });
             var appointment = new Appointment { Id = id, ReservationId = id, Code = "AP-" + id.ToString("N"), BranchId = branch.Id,
                 PatientId = patient.Id, DentistId = staff.Id, ChairId = chair.Id, ServiceId = service.Id, BookerName = "SYNTHETIC", BookerPhone = "0900000000",
@@ -123,7 +123,7 @@ public sealed class TreatmentSheetV25Tests(ApiFixture fixture) : IClassFixture<A
         Assert.Equal(HttpStatusCode.Conflict, (await c.PostAsJsonAsync(url, command with { ExpectedItemPlanVersion = plan.Version - 1, ExpectedVersion = imported.Dossier.Version, RequestKey = Guid.NewGuid() })).StatusCode);
         using (var scope = fixture.Services.CreateScope()) {
             var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
-            var row = await db.Set<DCMS.Domain.Features.Treatment.TreatmentTemplateItem>().FindAsync(plan.Items[1].Id); row!.TeethJson = "[\"99\"]"; await db.SaveChangesAsync();
+            var row = await db.LoadTemplateItemAsync(plan.Items[1].Id); row!.TeethJson = "[\"99\"]"; await db.SaveChangesAsync();
         }
         Assert.Equal(HttpStatusCode.BadRequest, (await c.PostAsJsonAsync(url, command with { ExpectedVersion = imported.Dossier.Version, RequestKey = Guid.NewGuid() })).StatusCode);
         var after = (await c.GetFromJsonAsync<TreatmentDossierDto>($"/api/dossiers/{dossier.Id}"))!; Assert.Equal(2, after.Items.Count); Assert.Equal(imported.Dossier.Version, after.Version);
@@ -158,12 +158,12 @@ public sealed class TreatmentSheetV25Tests(ApiFixture fixture) : IClassFixture<A
         Assert.Equal(350000, read!.Items[0].ReferenceUnitPriceVnd);
         var step = new DCMS.Domain.Features.Treatment.TreatmentStep { DossierId = dossier.Id, ItemId = a.Id,
             PlanId = saved.PlanId, PlanVersion = saved.PlanVersion, Name = "SYNTHETIC unchanged", EstimatedMinutes = 25, ReservedMinutes = 30 };
-        db.Add(step); await db.SaveChangesAsync();
+        await db.AddTreatmentDataAsync(step); await db.SaveChangesAsync();
         var deferred = await c.PostAsJsonAsync($"/api/dossiers/{dossier.Id}/sheet-drafts/{b.Id}/confirm-plan",
             new ConfirmSheetPlanRequest(saved.Version, b.Version, new("Deferred", "SYNTHETIC hoãn", "SYNTHETIC"), Guid.NewGuid()));
         Assert.True(deferred.IsSuccessStatusCode, await deferred.Content.ReadAsStringAsync());
         var next = (await deferred.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
-        await db.Entry(step).ReloadAsync(); Assert.Equal(next.PlanVersion, step.PlanVersion); Assert.Equal(2, step.Version);
+        db.ChangeTracker.Clear(); step = await db.TreatmentSteps.SingleAsync(x => x.Id == step.Id); Assert.Equal(next.PlanVersion, step.PlanVersion); Assert.Equal(2, step.Version);
         var unagreed = await Draft(c, s, dossier.Id, "Actual", b.Id);
         Assert.Equal(HttpStatusCode.Conflict, (await c.PostAsJsonAsync($"/api/dossiers/{dossier.Id}/sheet-drafts/{unagreed.Id}/confirm-actual",
             new ConfirmSheetActualRequest(next.Version, unagreed.Version, s.Visits[0], 1, "SYNTHETIC", "Separate", null, false, null, Guid.NewGuid()))).StatusCode);
@@ -223,7 +223,7 @@ public sealed class TreatmentSheetV25Tests(ApiFixture fixture) : IClassFixture<A
         var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>(); var user = (await users.FindByNameAsync("assistant.demo"))!;
         await users.AddClaimAsync(user, new Claim("permission", "finance.read"));
         var employee = await db.Employees.SingleAsync(x => x.AccountId == user.Id);
-        db.Add(new SchedulingMember { BranchId = s.Branch, EmployeeId = employee.Id }); await db.SaveChangesAsync();
+        await db.AddSchedulingDataAsync(new SchedulingMember { BranchId = s.Branch, EmployeeId = employee.Id }); await db.SaveChangesAsync();
         var projection = await assistant.GetAsync($"/api/patients/{s.Patient}/dossiers/financial-context");
         Assert.Equal(HttpStatusCode.OK, projection.StatusCode);
         var json = await projection.Content.ReadAsStringAsync(); Assert.DoesNotContain("counseling", json); Assert.DoesNotContain("diagnosis", json);
@@ -248,7 +248,7 @@ public sealed class TreatmentSheetV25Tests(ApiFixture fixture) : IClassFixture<A
             var step = new DCMS.Domain.Features.Treatment.TreatmentStep { DossierId = dossier.Id, ItemId = item.Id,
                 PlanId = dossier.PlanId, PlanVersion = dossier.PlanVersion, 
                 Name = "SYNTHETIC held", EstimatedMinutes = 30, ReservedMinutes = 30, HoldReason = "SYNTHETIC hold" };
-            db.Add(step); await db.SaveChangesAsync(); stepId = step.Id;
+            await db.AddTreatmentDataAsync(step); await db.SaveChangesAsync(); stepId = step.Id;
         }
         var actual = await Draft(c, s, dossier.Id, "Actual", item.Id);
         var request = new ConfirmSheetActualRequest(dossier.Version, actual.Version, s.Visits[0], 1,

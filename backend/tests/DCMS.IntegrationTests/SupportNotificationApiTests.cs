@@ -53,11 +53,11 @@ public sealed class SupportNotificationApiTests(SupportNotificationFixture fixtu
             where u.UserName == "dentist.demo" select e).SingleAsync();
         var branch = new SchedulingBranch { Name = "S12 fixture " + Guid.NewGuid() };
         db.Add(branch); await db.SaveChangesAsync();
-        db.AddRange(new SchedulingMember { BranchId = branch.Id, EmployeeId = assistant.Id },
+        await db.AddSchedulingDataAsync(new SchedulingMember { BranchId = branch.Id, EmployeeId = assistant.Id },
             new SchedulingMember { BranchId = branch.Id, EmployeeId = dentist.Id, CanDentist = true });
         var chair = new SchedulingChair { BranchId = branch.Id, Name = "Ghế S12", OpenMinute = 0, CloseMinute = 1440 };
         var service = new SchedulingService { BranchId = branch.Id, Name = "Khám S12", PublicDurationMinutes = 30 };
-        db.AddRange(chair, service); await db.SaveChangesAsync();
+        await db.AddSchedulingDataAsync(chair, service); await db.SaveChangesAsync();
         var id = Guid.NewGuid(); var start = DateTimeOffset.UtcNow.AddDays(3);
         db.Set<ResourceReservation>().Add(new ResourceReservation { Id = id, Code = "RS-" + id.ToString("N"),
             BranchId = branch.Id, DentistId = dentist.Id, ChairId = chair.Id, ServiceId = service.Id,
@@ -72,9 +72,35 @@ public sealed class SupportNotificationApiTests(SupportNotificationFixture fixtu
             AppointmentId = id, Kind = kind, Status = "Pending", RequestKey = Guid.NewGuid(),
             RequesterAccountId = guest.Id, RequesterName = guest.FullName, RequesterPhone = guest.PhoneNumber,
             Reason = "Synthetic request", CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow };
-        db.AppointmentSupportRequests.Add(request);
+        appointment.SupportRequests.Add(request);
         await db.SaveChangesAsync();
         return new(id, appointment.Code, request.Code, guest.Id, branch.Id);
+    }
+
+    [Fact]
+    public async Task ConcurrentCustomerSupportRetryCommitsOnePendingRequestAndOneReceipt()
+    {
+        var seed = await SeedAsync("General");
+        using (var scope = fixture.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
+            var owner = await db.Appointments.SingleAsync(x => x.Id == seed.AppointmentId);
+            owner.SupportRequests.Single().Status = "Resolved";
+            await db.SaveChangesAsync();
+        }
+        var command = new CustomerSupportRequestCommand(Guid.NewGuid(), "Cancel", "SYNTHETIC request");
+        async Task<SupportCustomerResult> Send()
+        {
+            using var scope = fixture.Services.CreateScope();
+            return await scope.ServiceProvider.GetRequiredService<ISupportRequestService>()
+                .CreateCustomerRequestAsync(seed.GuestId, seed.AppointmentCode, command, default);
+        }
+        var results = await Task.WhenAll(Send(), Send());
+        Assert.Equal(results[0].Request.Id, results[1].Request.Id);
+        using var check = fixture.Services.CreateScope();
+        var context = check.ServiceProvider.GetRequiredService<DcmsDbContext>();
+        Assert.Single(await context.AppointmentSupportRequests.Where(x => x.AppointmentId == seed.AppointmentId && x.Status == "Pending").ToArrayAsync());
+        Assert.Single(await context.SupportRequestReceipts.Where(x => x.ActorAccountId == seed.GuestId && x.RequestKey == command.RequestKey).ToArrayAsync());
     }
 
     [Fact]
@@ -96,7 +122,7 @@ public sealed class SupportNotificationApiTests(SupportNotificationFixture fixtu
             var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
             var employee = await (from e in db.Employees join u in db.Users on e.AccountId equals u.Id
                 where u.UserName == "assistant.demo" select e).SingleAsync();
-            var member = await db.Set<SchedulingMember>().SingleAsync(x => x.BranchId == other.BranchId && x.EmployeeId == employee.Id);
+            var member = await db.LoadMemberAsync(other.BranchId, employee.Id);
             member.Active = false;
             await db.SaveChangesAsync();
         }
@@ -191,7 +217,7 @@ public sealed class SupportNotificationApiTests(SupportNotificationFixture fixtu
         using var scope = fixture.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
         var row = await db.Appointments.FindAsync(seed.AppointmentId);
         row!.Status = "NoShow"; row.Version++;
-        db.AppointmentReminders.Add(new AppointmentReminder { AppointmentId = row.Id, AppointmentVersion = 1, AccountId = seed.GuestId,
+        row!.Reminders.Add(new AppointmentReminder { AppointmentId = row.Id, AppointmentVersion = 1, AccountId = seed.GuestId,
             LeadMinutes = 120, DueAt = DateTimeOffset.UtcNow.AddMinutes(-1), CreatedAt = DateTimeOffset.UtcNow.AddDays(-1) });
         db.AppointmentOutboxEvents.Add(new AppointmentOutboxEvent { AggregateId = row.Id, EventType = "appointment.no_show", OccurredAt = DateTimeOffset.UtcNow, PayloadJson = "{}" });
         await db.SaveChangesAsync();

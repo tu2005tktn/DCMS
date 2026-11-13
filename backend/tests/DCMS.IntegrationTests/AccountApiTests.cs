@@ -490,7 +490,9 @@ public sealed class AccountApiTests(ApiFixture fixture) : IClassFixture<ApiFixtu
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
-        await db.AuthSessions.Where(x => x.AccountId == session.User.Id).ExecuteUpdateAsync(s => s.SetProperty(x => x.ExpiresAt, DateTimeOffset.UtcNow.AddSeconds(-1)));
+        var owner = await db.Users.SingleAsync(x => x.Id == session.User.Id);
+        foreach (var value in owner.Sessions) value.ExpiresAt = DateTimeOffset.UtcNow.AddSeconds(-1);
+        await db.SaveChangesAsync();
         await AssertMessage(await client.GetAsync("/api/auth/me"), HttpStatusCode.Unauthorized, "MSG07");
     }
 

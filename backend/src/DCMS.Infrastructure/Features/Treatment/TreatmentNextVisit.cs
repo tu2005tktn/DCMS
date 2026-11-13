@@ -19,7 +19,7 @@ public sealed partial class TreatmentDossierService
         if (account is not { IsActive: true, AccountType: "Staff" }
             || !AccountRoles.Effective(await users.GetRolesAsync(account)).Contains(AccountRoles.Dentist)) throw Error("MSG06", 403);
         var employee = await db.Employees.AsNoTracking().SingleOrDefaultAsync(x => x.AccountId == actorId, ct) ?? throw Error("MSG06", 403);
-        var branches = await db.Set<SchedulingMember>().AsNoTracking().Where(x => x.EmployeeId == employee.Id && x.Active && x.CanDentist)
+        var branches = await db.SchedulingMembers.AsNoTracking().Where(x => x.EmployeeId == employee.Id && x.Active && x.CanDentist)
             .Select(x => x.BranchId).ToListAsync(ct);
         var scope = await access.ResolveAsync(actorId, ct);
         if (scope.Assigned && !scope.Owner) branches = branches.Where(scope.BranchIds.Contains).ToList();

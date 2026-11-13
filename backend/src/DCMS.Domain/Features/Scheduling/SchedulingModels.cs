@@ -2,6 +2,10 @@ namespace DCMS.Domain.Features.Scheduling;
 
 public sealed class SchedulingBranch
 {
+    public Guid StorageStamp { get; set; } = Guid.NewGuid();
+    public List<SchedulingMember> Members { get; set; } = [];
+    public List<SchedulingChair> Chairs { get; set; } = [];
+    public List<DCMS.Domain.Features.Settings.BranchAsset> Assets { get; set; } = [];
     public int SlotIntervalMinutes { get; set; } = 15;
     public int BookingSettingsVersion { get; set; } = 1;
     public int Id { get; set; }
@@ -18,6 +22,8 @@ public sealed class SchedulingMember
 }
 public sealed class SchedulingChair
 {
+    public string? Code { get; set; }
+    public int Version { get; set; } = 1;
     public int Id { get; set; }
     public int BranchId { get; set; }
     public string Name { get; set; } = "";
@@ -41,44 +47,25 @@ public sealed class SchedulingService
     public long? ReferenceUnitPriceVnd { get; set; }
     public int PriceVersion { get; set; } = 1;
 }
-public sealed class WorkingWeek
+public sealed class WorkingWeek : WorkingScheduleRecord
 {
-    public Guid Id { get; set; } = Guid.NewGuid();
     public int BranchId { get; set; }
-    public int EmployeeId { get; set; }
     public DateOnly WeekStart { get; set; }
-    public int Version { get; set; } = 1;
-    public int PublishedBy { get; set; }
-    public DateTimeOffset PublishedAt { get; set; }
-    public List<WorkingPeriod> Periods { get; set; } = [];
+
 }
 
 // Immutable publications; a later revision on the same effective date supersedes the earlier one.
-public sealed class WorkingScheduleRevision
+public sealed class WorkingScheduleRevision : WorkingScheduleRecord
 {
-    public Guid Id { get; set; } = Guid.NewGuid();
-    public int EmployeeId { get; set; }
-    public int Version { get; set; }
     public DateOnly Date { get; set; }
     public string Kind { get; set; } = "Template";
     public string Reason { get; set; } = "";
-    public int PublishedBy { get; set; }
-    public DateTimeOffset PublishedAt { get; set; }
-    public List<RevisionPeriod> Periods { get; set; } = [];
-}
-public sealed class RevisionPeriod
-{
-    public Guid Id { get; set; } = Guid.NewGuid();
-    public Guid RevisionId { get; set; }
-    public int BranchId { get; set; }
-    public int Day { get; set; }
-    public int StartMinute { get; set; }
-    public int EndMinute { get; set; }
-    public string Kind { get; set; } = "Work";
-    public string Reason { get; set; } = "";
+
 }
 public sealed class WorkingPeriod
 {
+    public int BranchId { get; set; }
+    public Guid RevisionId { get; set; }
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid WeekId { get; set; }
     public int Day { get; set; }
@@ -90,6 +77,8 @@ public sealed class WorkingPeriod
 // Shared persistence seam for TV2; no appointment creation API is exposed by S09.
 public sealed class ResourceReservation
 {
+    public Guid AppointmentKey { get; set; } = Guid.NewGuid();
+    public Guid StorageStamp { get; set; } = Guid.NewGuid();
     public Guid Id { get; set; } = Guid.NewGuid();
     public string Code { get; set; } = "";
     public int BranchId { get; set; }
@@ -103,12 +92,9 @@ public sealed class ResourceReservation
     public string AttendeeLabel { get; set; } = "";
     public string Status { get; set; } = "Confirmed";
 }
-public sealed class ScheduleReceipt
+public sealed class ScheduleReceipt : DCMS.Domain.Common.CommandReceiptRecord
 {
     public int ActorId { get; set; }
-    public Guid RequestKey { get; set; }
-    public string Fingerprint { get; set; } = "";
-    public string ResultJson { get; set; } = "";
 }
 
 public readonly record struct SchedulePeriod(int Day, int StartMinute, int EndMinute, string Kind, string Reason = "");
@@ -135,4 +121,14 @@ public static class ScheduleRules
     public static bool Covers(IEnumerable<SchedulePeriod> periods, int day, int start, int end) =>
         periods.Any(p => p.Day == day && p.Kind == "Work" && p.StartMinute <= start && p.EndMinute >= end)
         && !periods.Any(p => p.Day == day && p.Kind != "Work" && Overlaps(start, end, p.StartMinute, p.EndMinute));
+}
+
+public abstract class WorkingScheduleRecord
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public int EmployeeId { get; set; }
+    public int Version { get; set; } = 1;
+    public int PublishedBy { get; set; }
+    public DateTimeOffset PublishedAt { get; set; }
+    public List<WorkingPeriod> Periods { get; set; } = [];
 }

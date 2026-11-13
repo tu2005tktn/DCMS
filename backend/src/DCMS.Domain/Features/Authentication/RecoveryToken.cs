@@ -17,7 +17,7 @@ public sealed class RecoveryToken
     public DateTimeOffset? LastResentAt { get; set; }
 }
 
-public sealed class RecoveryAudit
+public sealed class RecoveryAudit : DCMS.Domain.Common.AuditRecord
 {
     public long Id { get; set; }
     public int? ActorId { get; set; }

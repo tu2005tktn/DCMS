@@ -12,4 +12,5 @@ public sealed class AuthSession
     public DateTimeOffset LastInteractiveActivityAt { get; set; }
     public int ActivityVersion { get; set; } = 1;
     public DateTimeOffset? RevokedAt { get; set; }
+    public List<AuthRefreshToken> RefreshTokens { get; set; } = [];
 }

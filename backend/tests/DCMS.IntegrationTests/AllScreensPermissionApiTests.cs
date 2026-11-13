@@ -34,7 +34,7 @@ public sealed class AllScreensPermissionApiTests(ReceptionFixture fixture) : ICl
         var user = new ApplicationUser { UserName = name, FullName = "SYNTHETIC screen staff", AccountType = "Staff", IsActive = true, CreatedAt = fixture.Clock.Now, UpdatedAt = fixture.Clock.Now };
         Assert.True((await users.CreateAsync(user, fixture.Password)).Succeeded); Assert.True((await users.AddToRoleAsync(user, role)).Succeeded);
         var employee = new EmployeeProfile { AccountId = user.Id, FullName = user.FullName, EmployeeCode = name }; db.Add(employee); await db.SaveChangesAsync();
-        db.Add(new SchedulingMember { BranchId = branch, EmployeeId = employee.Id, CanDentist = role == AccountRoles.Dentist }); await db.SaveChangesAsync();
+        await db.AddSchedulingDataAsync(new SchedulingMember { BranchId = branch, EmployeeId = employee.Id, CanDentist = role == AccountRoles.Dentist }); await db.SaveChangesAsync();
         return (new(employee.Id, user.Id, user.FullName, true, user.Version, null, 0, [branch]), name);
     }
     async Task<GroupDto> Assign(HttpClient owner, StaffAccessDto staff, string role, params string[] grants) {
@@ -99,7 +99,7 @@ public sealed class AllScreensPermissionApiTests(ReceptionFixture fixture) : ICl
     [Fact] public async Task AssignedScheduleScopeFiltersOptionsAndDeniesAnotherBranch() {
         var first = await reception.Prepare(); var second = await reception.Prepare(); using var owner = await reception.Login("owner.demo");
         var (staff, name) = await Staff(first.BranchId, AccountRoles.Dentist);
-        using (var scope = fixture.Services.CreateScope()) { var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>(); db.Add(new SchedulingMember { BranchId = second.BranchId, EmployeeId = staff.EmployeeId, CanDentist = true }); await db.SaveChangesAsync(); }
+        using (var scope = fixture.Services.CreateScope()) { var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>(); await db.AddSchedulingDataAsync(new SchedulingMember { BranchId = second.BranchId, EmployeeId = staff.EmployeeId, CanDentist = true }); await db.SaveChangesAsync(); }
         await Assign(owner, staff, AccountRoles.Dentist, "working-schedules.read", "appointments.read", "booking-settings.read"); using var user = await reception.Login(name);
         var options = await Ok<DCMS.Application.Features.Scheduling.ScheduleOptions>(await user.GetAsync("/api/working-schedules/options"));
         Assert.Equal(first.BranchId, Assert.Single(options.Branches).Id); Assert.All(options.Employees, employee => Assert.False(employee.CanEdit));
@@ -122,7 +122,7 @@ public sealed class AllScreensPermissionApiTests(ReceptionFixture fixture) : ICl
             var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
             Assert.True((await users.AddToRoleAsync((await users.FindByIdAsync(staff.AccountId.ToString()))!, AccountRoles.Dentist)).Succeeded);
             var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
-            (await db.Set<SchedulingMember>().SingleAsync(x => x.EmployeeId == staff.EmployeeId)).CanDentist = true;
+            (await db.LoadMemberAsync(staff.EmployeeId)).CanDentist = true;
             await db.SaveChangesAsync();
         }
         using var user = await reception.Login(name);

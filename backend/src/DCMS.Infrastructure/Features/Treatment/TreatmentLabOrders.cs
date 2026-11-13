@@ -50,7 +50,7 @@ public sealed partial class TreatmentDossierService
     }
 
     private async Task<List<LabOrderDentist>> DentistOptionsAsync(int branchId, CancellationToken ct) =>
-        await (from member in db.Set<SchedulingMember>().AsNoTracking()
+        await (from member in db.SchedulingMembers.AsNoTracking()
             join staff in db.Employees.AsNoTracking() on member.EmployeeId equals staff.Id
             where member.BranchId == branchId && member.Active && member.CanDentist orderby staff.FullName
             select new LabOrderDentist(staff.Id, staff.FullName)).ToListAsync(ct);

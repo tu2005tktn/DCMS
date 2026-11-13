@@ -28,6 +28,8 @@ public sealed class Visit
     public int DentistId { get; set; }
     public string Status { get; set; } = VisitStatuses.Queued;
     public int Version { get; set; } = 1;
+    public Guid StorageStamp { get; set; } = Guid.NewGuid();
+    public List<DCMS.Domain.Features.Examinations.InvestigationOrder> Investigations { get; set; } = [];
     public DateTimeOffset ArrivalAt { get; set; }
     public DateTimeOffset RecordedAt { get; set; }
     public int RecordedBy { get; set; }
@@ -38,20 +40,20 @@ public sealed class Visit
     public bool RequiresClinicalSourceReview { get; set; }
 }
 
-public sealed class ReceptionReceipt
+public sealed class ReceptionReceipt : DCMS.Domain.Common.CommandReceiptRecord
 {
     public int ActorAccountId { get; set; }
-    public Guid RequestKey { get; set; }
     public Guid VisitId { get; set; }
-    public string Fingerprint { get; set; } = "";
 }
 
-public sealed class VisitAudit
+public sealed class VisitAudit : DCMS.Domain.Common.AuditRecord
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid VisitId { get; set; }
     public int ActorAccountId { get; set; }
+    public int? DecidingDentistId { get; set; }
     public string Action { get; set; } = "CheckIn";
+    public string Reason { get; set; } = "";
     public DateTimeOffset OccurredAt { get; set; }
     public string BeforeJson { get; set; } = "{}";
     public string AfterJson { get; set; } = "{}";

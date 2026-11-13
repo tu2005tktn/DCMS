@@ -30,7 +30,7 @@ public sealed class ServicePriceService(DcmsDbContext db, UserManager<Applicatio
         if (roles.Contains(AccountRoles.Admin)) return;
         var isOwner = roles.Contains(AccountRoles.ClinicOwner);
         var employee = await db.Employees.AsNoTracking().SingleOrDefaultAsync(x => x.AccountId == actorId, ct);
-        if (employee == null || !await db.Set<SchedulingMember>().AsNoTracking().AnyAsync(x =>
+        if (employee == null || !await db.SchedulingMembers.AsNoTracking().AnyAsync(x =>
                 x.BranchId == branchId && x.EmployeeId == employee.Id && x.Active &&
                 (!manage || isOwner || x.CanDentist), ct))
             throw Error("MSG06", 403);
@@ -53,7 +53,7 @@ public sealed class ServicePriceService(DcmsDbContext db, UserManager<Applicatio
             var employeeId = await db.Employees.AsNoTracking().Where(x => x.AccountId == actorId)
                 .Select(x => (int?)x.Id).SingleOrDefaultAsync(ct);
             if (employeeId == null) throw Error("MSG06", 403);
-            var branches = db.Set<SchedulingMember>().AsNoTracking().Where(x =>
+            var branches = db.SchedulingMembers.AsNoTracking().Where(x =>
                 x.EmployeeId == employeeId.Value && x.Active &&
                 (isOwner || x.CanDentist)).Select(x => x.BranchId);
             query = query.Where(x => branches.Contains(x.BranchId));

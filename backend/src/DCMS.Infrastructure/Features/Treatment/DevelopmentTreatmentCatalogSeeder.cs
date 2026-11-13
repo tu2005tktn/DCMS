@@ -99,7 +99,9 @@ public sealed class DevelopmentTreatmentCatalogSeeder(DcmsDbContext db, TimeProv
             db.Add(row); existing.Add(row); addedServices++;
         }
         await db.SaveChangesAsync(ct);
-        var byName = existing.ToDictionary(x => x.Name, x => x);
+        var byName = existing.GroupBy(x => x.Name).ToDictionary(g => g.Key, g => g
+            .OrderByDescending(x => x.Active).ThenByDescending(x => x.IsInitialExamination)
+            .ThenByDescending(x => x.PublicBookable).ThenBy(x => x.Id).First());
 
         if (refresh)
         {
@@ -117,7 +119,7 @@ public sealed class DevelopmentTreatmentCatalogSeeder(DcmsDbContext db, TimeProv
             foreach (var step in plan.Steps)
             {
                 if (!byName.TryGetValue(step.Service, out var service)) continue;
-                db.Add(new TreatmentTemplateItem { TemplateId = template.Id, Position = ++position, TeethJson = JsonSerializer.Serialize(Array.Empty<string>()), ServiceId = service.Id,
+                await db.AddTreatmentDataAsync(new TreatmentTemplateItem { TemplateId = template.Id, Position = ++position, TeethJson = JsonSerializer.Serialize(Array.Empty<string>()), ServiceId = service.Id,
                     ServiceName = service.Name, EstimatedMinutes = step.Minutes ?? service.PublicDurationMinutes, Note = step.Note.Length > 1000 ? step.Note[..1000] : step.Note,
                     CostVnd = (service.ReferenceUnitPriceVnd ?? 0) * step.Quantity });
             }

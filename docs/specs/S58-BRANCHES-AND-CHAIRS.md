@@ -1,5 +1,7 @@
 # DCMS-124 / DCMS-120: Quản lý Chi nhánh, Ghế vật lý & Điều hướng Thiết lập 11 nhóm
 
+Cập nhật lưu trữ 12/11/2026 theo [hợp đồng gộp lịch](SCHEDULING-STORAGE-REVIEW.vi.md): thông tin chi nhánh, nhân sự, ghế và metadata logo nằm trong `SCHEDULING_BRANCH`. Danh sách ghế, nhân sự và logo là collection JSONB; các bảng `SCHEDULING_CHAIR`, `SCHEDULING_MEMBER`, `BRANCH_ASSET` đã được gộp. ID, trạng thái, phiên bản hiệu lực, route và DTO hiện có tiếp tục được giữ. Các tên bảng cũ bên dưới là cấu trúc lịch sử.
+
 Ngày cập nhật: 07/11/2026. Trạng thái: Đặc tả thiết kế và kiến trúc triển khai.
 Tài liệu liên quan: [S58-SYSTEM-SETTINGS.vi.md](S58-SYSTEM-SETTINGS.vi.md), [S58-SETTINGS-MERGE.vi.md](S58-SETTINGS-MERGE.vi.md).
 

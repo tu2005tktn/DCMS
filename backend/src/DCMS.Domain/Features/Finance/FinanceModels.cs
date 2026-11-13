@@ -97,7 +97,7 @@ public sealed class ReceiptPrintEvent
     public Guid RequestKey { get; set; }
     public DateTimeOffset PrintedAt { get; set; }
 }
-public sealed class FinanceAudit
+public sealed class FinanceAudit : DCMS.Domain.Common.AuditRecord
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public int ActorId { get; set; }
@@ -108,10 +108,7 @@ public sealed class FinanceAudit
     public string PayloadJson { get; set; } = "{}";
     public DateTimeOffset At { get; set; }
 }
-public sealed class FinanceCommandReceipt
+public sealed class FinanceCommandReceipt : DCMS.Domain.Common.CommandReceiptRecord
 {
     public int ActorId { get; set; }
-    public Guid RequestKey { get; set; }
-    public string Fingerprint { get; set; } = "";
-    public string ResultJson { get; set; } = "{}";
 }

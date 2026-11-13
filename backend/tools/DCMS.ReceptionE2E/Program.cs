@@ -34,18 +34,18 @@ var branch = await db.Set<SchedulingBranch>().SingleAsync();
 // A one-minute test grid keeps same-day walk-in tests runnable near midnight; this is fixture-only.
 branch.SlotIntervalMinutes = 1;
 foreach (var service in await db.Set<SchedulingService>().Where(x => x.IsInitialExamination).ToArrayAsync()) service.PublicDurationMinutes = 1;
-if (await db.Set<SchedulingChair>().CountAsync() != 3) throw new InvalidOperationException("Three fixture chairs required.");
+if (await db.SchedulingChairs.CountAsync() != 3) throw new InvalidOperationException("Three fixture chairs required.");
 var now = DateTimeOffset.UtcNow; var date = DateOnly.FromDateTime(now.ToOffset(TimeSpan.FromHours(7)).DateTime);
 var monday = date.AddDays(-(((int)date.DayOfWeek + 6) % 7));
 foreach (var weekStart in new[] { monday, monday.AddDays(7) })
-foreach (var member in await db.Set<SchedulingMember>().ToArrayAsync())
+foreach (var member in await db.SchedulingMembers.ToArrayAsync())
 {
     var week = new WorkingWeek { BranchId = branch.Id, EmployeeId = member.EmployeeId, WeekStart = weekStart,
         PublishedBy = (await db.Employees.SingleAsync(x => x.Id == member.EmployeeId)).AccountId, PublishedAt = now };
     for (var day = 0; day < 7; day++) week.Periods.Add(new WorkingPeriod { WeekId = week.Id, Day = day, StartMinute = 0, EndMinute = 1440 });
     db.Add(week);
 }
-foreach (var chair in await db.Set<SchedulingChair>().ToArrayAsync()) { chair.OpenMinute = 0; chair.CloseMinute = 1440; }
+foreach (var chair in await db.SchedulingChairs.ToArrayAsync()) { chair.OpenMinute = 0; chair.CloseMinute = 1440; }
 await db.SaveChangesAsync(); Console.WriteLine($"Prepared synthetic schema {schema}; branch {branch.Id}; chairs 3; clinic date {date:yyyy-MM-dd}");
 
 sealed class DevelopmentEnvironment : IHostEnvironment

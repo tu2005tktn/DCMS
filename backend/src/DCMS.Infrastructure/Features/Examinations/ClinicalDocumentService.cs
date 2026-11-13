@@ -58,11 +58,11 @@ public sealed class ClinicalDocumentService(DcmsDbContext db, ClinicalAccess acc
     {
         var uploader = await db.Users.Where(x => x.Id == d.UploaderId).Select(x => x.FullName).SingleAsync(ct);
         var dossier = d.DossierId.HasValue ? await db.TreatmentDossiers.AsNoTracking().SingleAsync(x => x.Id == d.DossierId, ct) : null;
-        var reviews = await db.Set<DocumentReview>().AsNoTracking().Where(x => x.DocumentId == d.Id)
+        var reviews = await db.DocumentReviews.AsNoTracking().Where(x => x.DocumentId == d.Id)
             .Select(x => new DocumentReviewDto(x.VisitId, x.ReviewedBy, x.ReviewedAt)).ToArrayAsync(ct);
         return new(d.Id, d.Version, d.FileName, d.ContentType, d.SizeBytes, d.DocumentType, d.Source, d.SourceDate,
             d.Description, new(d.VisitId, d.VisitId.HasValue ? $"Lượt {d.VisitId.Value.ToString()[..8]}" : null, d.DossierId, dossier?.Code, d.PlanId,
-                d.PlanId.HasValue ? "Kế hoạch điều trị" : null, d.InvestigationId, d.InvestigationId.HasValue ? await db.Set<InvestigationOrder>().Where(x => x.Id == d.InvestigationId).Select(x => x.Name).SingleAsync(ct) : null), uploader, d.UploadedAt, d.FileState, d.RejectReason,
+                d.PlanId.HasValue ? "Kế hoạch điều trị" : null, d.InvestigationId, d.InvestigationId.HasValue ? await db.Investigations.Where(x => x.Id == d.InvestigationId).Select(x => x.Name).SingleAsync(ct) : null), uploader, d.UploadedAt, d.FileState, d.RejectReason,
             d.FileState == "Ready" ? ["view", "download"] : [], reviews);
     }
     public async Task<object> ContextsAsync(int actorId, int patientId, CancellationToken ct)
@@ -127,7 +127,7 @@ public sealed class ClinicalDocumentService(DcmsDbContext db, ClinicalAccess acc
         InvestigationOrder? investigation = null;
         if (m.InvestigationId.HasValue) {
             if (visit == null) throw Error("MSG04");
-            investigation = await db.Set<InvestigationOrder>().SingleOrDefaultAsync(x => x.Id == m.InvestigationId && x.VisitId == m.VisitId,ct) ?? throw Error("MSG113",404);
+            investigation = await db.Investigations.SingleOrDefaultAsync(x => x.Id == m.InvestigationId && x.VisitId == m.VisitId,ct) ?? throw Error("MSG113",404);
             var dentist = await access.BranchAsync(actorId,visit.BranchId,false,ct);
             if (dentist && !await db.Employees.AnyAsync(x => x.Id == visit.DentistId && x.AccountId == actorId,ct)) throw Error("MSG06",403);
         }
@@ -201,8 +201,8 @@ public sealed class ClinicalDocumentService(DcmsDbContext db, ClinicalAccess acc
         if (receipt == null) {
             if (d.Version != r.ExpectedVersion) throw Error("MSG111", 409);
             if (v.Status != VisitStatuses.InProgress) throw Error("MSG42", 409);
-            if (!await db.Set<DocumentReview>().AnyAsync(x => x.DocumentId == d.Id && x.VisitId == v.Id, ct)) {
-                db.Add(new DocumentReview { DocumentId = d.Id, VisitId = v.Id, ReviewedBy = actorId, ReviewedAt = clock.GetUtcNow() });
+            if (!d.Reviews.Any(x => x.VisitId == v.Id)) {
+                d.Reviews.Add(new DocumentReview { DocumentId = d.Id, VisitId = v.Id, ReviewedBy = actorId, ReviewedAt = clock.GetUtcNow() });
                 d.Version++; Audit(d.Id, actorId, "ClinicallyReviewed");
             }
             db.Add(new DocumentReceipt { ActorId = actorId, RequestKey = r.RequestKey, Fingerprint = hash });

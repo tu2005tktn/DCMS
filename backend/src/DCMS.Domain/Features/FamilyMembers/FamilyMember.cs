@@ -15,11 +15,8 @@ public sealed class FamilyMember
     public DateTimeOffset? DeletedAt { get; set; }
 }
 
-public sealed class FamilyMemberReceipt
+public sealed class FamilyMemberReceipt : DCMS.Domain.Common.CommandReceiptRecord
 {
     public int OwnerAccountId { get; set; }
-    public Guid RequestKey { get; set; }
-    public string Fingerprint { get; set; } = "";
-    public string ResultJson { get; set; } = "";
     public DateTimeOffset CreatedAt { get; set; }
 }

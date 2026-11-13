@@ -39,11 +39,11 @@ public sealed class RecurringSchedulingTests(ApiFixture fixture) : IClassFixture
         var employee = await db.Employees.SingleAsync(e => e.AccountId == account.Id);
         var branch = new SchedulingBranch { Name = "Recurring A " + suffix };
         var other = new SchedulingBranch { Name = "Recurring B " + suffix }; db.AddRange(branch, other); await db.SaveChangesAsync();
-        db.AddRange(new SchedulingMember { BranchId = branch.Id, EmployeeId = employee.Id, CanDentist = true }, new SchedulingMember { BranchId = other.Id, EmployeeId = employee.Id, CanDentist = true });
+        await db.AddSchedulingDataAsync(new SchedulingMember { BranchId = branch.Id, EmployeeId = employee.Id, CanDentist = true }, new SchedulingMember { BranchId = other.Id, EmployeeId = employee.Id, CanDentist = true });
         var service = new SchedulingService { BranchId = branch.Id, Name = "30", PublicDurationMinutes = 30, IsInitialExamination = true };
         var otherService = new SchedulingService { BranchId = other.Id, Name = "30", PublicDurationMinutes = 30, IsInitialExamination = true };
         var chair = new SchedulingChair { BranchId = branch.Id, Name = "Chair A" };
-        db.AddRange(service, otherService, chair, new SchedulingChair { BranchId = other.Id, Name = "Chair B" });
+        await db.AddSchedulingDataAsync(service, otherService, chair, new SchedulingChair { BranchId = other.Id, Name = "Chair B" });
         await db.SaveChangesAsync();
         return new(await Login(name), employee.Id, account.Id, branch.Id, other.Id, service.Id, otherService.Id, chair.Id);
     }
@@ -149,10 +149,10 @@ public sealed class RecurringSchedulingTests(ApiFixture fixture) : IClassFixture
         {
             var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
             var owner = await (from e in db.Employees join a in db.Users on e.AccountId equals a.Id where a.UserName == "owner.demo" select e).SingleAsync();
-            db.Add(new SchedulingMember { EmployeeId = owner.Id, BranchId = s.Branch, CanDentist = true, CanManageSchedules = true }); await db.SaveChangesAsync();
+            await db.AddSchedulingDataAsync(new SchedulingMember { EmployeeId = owner.Id, BranchId = s.Branch, CanDentist = true, CanManageSchedules = true }); await db.SaveChangesAsync();
             // Chủ phòng khám quản lý lịch mọi chi nhánh, không cần là thành viên (docs/specs/S58-BRANCHES-AND-CHAIRS.md §5).
             Assert.Equal(HttpStatusCode.OK, (await manager.GetAsync($"/api/working-schedules/recurring?dentistId={s.Employee}&date=2032-01-05")).StatusCode);
-            db.Add(new SchedulingMember { EmployeeId = owner.Id, BranchId = s.OtherBranch, CanDentist = true, CanManageSchedules = true }); await db.SaveChangesAsync();
+            await db.AddSchedulingDataAsync(new SchedulingMember { EmployeeId = owner.Id, BranchId = s.OtherBranch, CanDentist = true, CanManageSchedules = true }); await db.SaveChangesAsync();
         }
         Assert.Equal(HttpStatusCode.OK, (await manager.GetAsync($"/api/working-schedules/recurring?dentistId={s.Employee}&date=2032-01-05")).StatusCode);
     }

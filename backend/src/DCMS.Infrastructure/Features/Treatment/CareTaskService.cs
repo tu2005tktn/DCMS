@@ -36,7 +36,7 @@ public sealed class CareTaskService(DcmsDbContext db, UserManager<ApplicationUse
             throw Error("MSG06", 403);
         var employeeId = await db.Employees.AsNoTracking().Where(x => x.AccountId == actorId)
             .Select(x => (int?)x.Id).SingleOrDefaultAsync(ct);
-        if (!employeeId.HasValue || !await db.Set<SchedulingMember>().AsNoTracking().AnyAsync(x =>
+        if (!employeeId.HasValue || !await db.SchedulingMembers.AsNoTracking().AnyAsync(x =>
             x.BranchId == branchId && x.EmployeeId == employeeId && x.Active, ct))
             throw Error("MSG06", 403);
         return roles.Contains(AccountRoles.Dentist);
@@ -316,7 +316,7 @@ public sealed class CareTaskService(DcmsDbContext db, UserManager<ApplicationUse
         foreach (var branch in scope.Branches.Select(x => new { Id = x.Key, Name = x.Value }))
         {
             var canCreate = await StaffRolesAsync(actorId, branch.Id, ct) != null;
-            var members = await (from m in db.Set<SchedulingMember>().AsNoTracking()
+            var members = await (from m in db.SchedulingMembers.AsNoTracking()
                                  join e in db.Employees.AsNoTracking() on m.EmployeeId equals e.Id
                                  where m.BranchId == branch.Id && m.Active
                                  orderby e.FullName

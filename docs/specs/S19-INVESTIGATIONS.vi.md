@@ -60,3 +60,5 @@ Kiểm chứng PendingScan trên fixture browser riêng cần chế độ antivi
 
 
 Bổ sung giá và thực hiện/thanh toán ngày 27/10: [INVESTIGATION-BILLING.vi.md](INVESTIGATION-BILLING.vi.md). Chỉ định/nhận/đọc không tự tạo phí; xác nhận dịch vụ đã thực hiện theo báo giá mới tạo source charge duy nhất.
+
+Cập nhật lưu trữ ngày 12/11/2026 theo [thiết kế hai bảng](EXAMINATION-TWO-TABLES.vi.md). Chỉ định nằm trong collection JSONB của `VISIT`. Đọc/ghi báo giá, thực hiện và xử lý kết quả nạp lượt khám có tracking; giữ toàn bộ ID chỉ định, snapshot tài chính, phiên bản và khóa giao dịch.

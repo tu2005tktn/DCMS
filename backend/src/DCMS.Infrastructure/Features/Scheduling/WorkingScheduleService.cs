@@ -20,10 +20,10 @@ public sealed partial class WorkingScheduleService(DcmsDbContext db, TimeProvide
     private static ScheduleDto Dto(WorkingWeek? week, int branchId, int employeeId, DateOnly date) => new(week?.Id, branchId, employeeId, date,
         week?.Version ?? 0, week == null ? "Unpublished" : "Published", Periods(week), week?.PublishedBy, week?.PublishedAt);
     private Task<WorkingWeek?> Week(int branchId, int employeeId, DateOnly date, CancellationToken ct) => db.Set<WorkingWeek>().AsNoTracking()
-        .Include(x => x.Periods).SingleOrDefaultAsync(x => x.BranchId == branchId && x.EmployeeId == employeeId && x.WeekStart == date, ct);
+        .SingleOrDefaultAsync(x => x.BranchId == branchId && x.EmployeeId == employeeId && x.WeekStart == date, ct);
 
     private async Task<SchedulingMember[]> ActiveMembers(CancellationToken ct) => await (
-        from member in db.Set<SchedulingMember>().AsNoTracking()
+        from member in db.SchedulingMembers.AsNoTracking()
         join employee in db.Employees on member.EmployeeId equals employee.Id
         join account in db.Users on employee.AccountId equals account.Id
         join branch in db.Set<SchedulingBranch>() on member.BranchId equals branch.Id
@@ -68,7 +68,7 @@ public sealed partial class WorkingScheduleService(DcmsDbContext db, TimeProvide
             members.Where(x => branches.Contains(x.BranchId)).Select(x => new EmployeeOption(x.EmployeeId, x.BranchId, employees[x.EmployeeId].FullName,
                 x.CanDentist, scope.Permissions.Contains("working-schedules.manage") && (mine.Any(m => m.BranchId == x.BranchId && m.CanManageSchedules) || x.EmployeeId == own!.Id), x.EmployeeId == own!.Id,
                 mine.Any(m => m.BranchId == x.BranchId && m.CanManageSchedules) || x.EmployeeId == own!.Id)).ToArray(),
-            await db.Set<SchedulingChair>().Where(x => branches.Contains(x.BranchId) && x.Active).Select(x => new ChairOption(x.Id, x.BranchId, x.Name)).ToArrayAsync(ct),
+            await db.SchedulingChairs.Where(x => branches.Contains(x.BranchId) && x.Active).Select(x => new ChairOption(x.Id, x.BranchId, x.Name)).ToArrayAsync(ct),
             await db.Set<SchedulingService>().Where(x => branches.Contains(x.BranchId) && x.Active).Select(x => new ServiceOption(x.Id, x.BranchId, x.Name, x.PublicDurationMinutes)).ToArrayAsync(ct));
     }
     public async Task<ScheduleOptions> PublicOptionsAsync(int branchId, CancellationToken ct)
@@ -132,13 +132,12 @@ public sealed partial class WorkingScheduleService(DcmsDbContext db, TimeProvide
         var week = previous ?? new WorkingWeek { BranchId = command.BranchId, EmployeeId = command.DentistId, WeekStart = command.WeekStart };
         if (previous != null)
         {
-            db.Attach(week); db.RemoveRange(week.Periods); week.Periods = []; week.Version++;
+            db.Attach(week); week.Periods = []; week.Version++;
         }
         else db.Add(week);
         week.PublishedBy = actorId; week.PublishedAt = clock.GetUtcNow();
         var newPeriods = command.Intervals.Select(p => new WorkingPeriod { WeekId = week.Id, Day = p.Day, StartMinute = p.StartMinute, EndMinute = p.EndMinute, Kind = p.Kind, Reason = p.Reason.Trim() }).ToArray();
         week.Periods.AddRange(newPeriods);
-        db.AddRange(newPeriods);
         var result = new PublishResult(Dto(week, command.BranchId, command.DentistId, command.WeekStart), SystemMessages.Get("MSG39"));
         db.Add(new ScheduleReceipt { ActorId = actorId, RequestKey = command.RequestKey, Fingerprint = fingerprint, ResultJson = JsonSerializer.Serialize(result) });
         await db.SaveChangesAsync(ct); await transaction.CommitAsync(ct); return result;
@@ -216,7 +215,7 @@ public sealed partial class WorkingScheduleService(DcmsDbContext db, TimeProvide
         return new(branch, main, assistant,
             draft != null && draft.DentistId == q.DentistId ? draft.Intervals : Periods(main),
             draft != null && draft.DentistId == q.AssistantId ? draft.Intervals : Periods(assistant),
-            await db.Set<SchedulingChair>().AsNoTracking().Where(x => x.BranchId == q.BranchId && x.Active).OrderBy(x => x.Id).ToArrayAsync(ct),
+            await db.SchedulingChairs.AsNoTracking().Where(x => x.BranchId == q.BranchId && x.Active).OrderBy(x => x.Id).ToArrayAsync(ct),
             await db.Set<ResourceReservation>().AsNoTracking().Where(x => (x.Status == "Confirmed" || x.Status == "Checked-in") && x.Start < to && x.End > from).ToArrayAsync(ct));
     }
     private AvailabilitySlot? Evaluate(AvailabilityQuery q, bool isPublic, DateTimeOffset start, int? chairId, string? attendeeKey, Guid? exclude, Resources data, bool throwOnConflict = false)

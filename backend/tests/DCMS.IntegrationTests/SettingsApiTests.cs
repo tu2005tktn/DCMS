@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using DCMS.Application.Features.Authentication;
@@ -32,7 +32,7 @@ public sealed class SettingsApiTests(ReceptionFixture fixture) : IClassFixture<R
         using var scope=fixture.Services.CreateScope();var db=scope.ServiceProvider.GetRequiredService<DcmsDbContext>();var users=scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         var name="s58-"+Guid.NewGuid().ToString("N");var user=new ApplicationUser {UserName=name,FullName="SYNTHETIC nhân viên",AccountType="Staff",IsActive=!locked,CreatedAt=DateTimeOffset.UtcNow,UpdatedAt=DateTimeOffset.UtcNow};
         Assert.True((await users.CreateAsync(user,fixture.Password)).Succeeded);Assert.True((await users.AddToRoleAsync(user,role)).Succeeded);
-        var employee=new EmployeeProfile {AccountId=user.Id,FullName=user.FullName,EmployeeCode=name};db.Add(employee);await db.SaveChangesAsync();db.Add(new SchedulingMember {BranchId=branchId,EmployeeId=employee.Id,CanDentist=role==AccountRoles.Dentist});await db.SaveChangesAsync();
+        var employee=new EmployeeProfile {AccountId=user.Id,FullName=user.FullName,EmployeeCode=name};db.Add(employee);await db.SaveChangesAsync();await db.AddSchedulingDataAsync(new SchedulingMember {BranchId=branchId,EmployeeId=employee.Id,CanDentist=role==AccountRoles.Dentist});await db.SaveChangesAsync();
         return new(employee.Id,user.Id,name,user.IsActive,user.Version,null,0,[branchId]);
     }
     Task<GroupDto> CreateGroup(HttpClient c,string[] grants,string role=AccountRoles.ClinicAssistant)=>CreateGroup(c,NewGroup(grants,role));

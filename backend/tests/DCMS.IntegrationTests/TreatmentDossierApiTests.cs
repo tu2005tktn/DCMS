@@ -43,7 +43,7 @@ public sealed class TreatmentDossierApiTests(ApiFixture fixture) : IClassFixture
         await db.SaveChangesAsync();
         var member = new SchedulingMember { BranchId = branch.Id, EmployeeId = dentistId, CanDentist = true };
         var service = new SchedulingService { BranchId = branch.Id, Name = "Trám răng tổng hợp", PublicDurationMinutes = 30 };
-        db.AddRange(member, service);
+        await db.AddSchedulingDataAsync(member, service);
         await db.SaveChangesAsync();
         return (patient.Id, branch.Id, dentistId, service.Id);
     }

@@ -9,6 +9,8 @@ public static class AppointmentRules
 
 public sealed class Appointment
 {
+    public List<AppointmentSupportRequest> SupportRequests { get; set; } = [];
+    public List<AppointmentReminder> Reminders { get; set; } = [];
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid ReservationId { get; set; }
     public string Code { get; set; } = "";
@@ -72,7 +74,7 @@ public sealed class AppointmentSupportRequest
     public DateTimeOffset UpdatedAt { get; set; }
 }
 
-public sealed class AppointmentSupportHistory
+public sealed class AppointmentSupportHistory : DCMS.Domain.Common.AuditRecord
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid RequestId { get; set; }
@@ -84,18 +86,14 @@ public sealed class AppointmentSupportHistory
     public DateTimeOffset OccurredAt { get; set; }
 }
 
-public sealed class SupportRequestReceipt
+public sealed class SupportRequestReceipt : DCMS.Domain.Common.CommandReceiptRecord
 {
     public int ActorAccountId { get; set; }
-    public Guid RequestKey { get; set; }
-    public string Fingerprint { get; set; } = "";
     public Guid SupportRequestId { get; set; }
-    public string ResultJson { get; set; } = "";
 }
 
-public sealed class InAppNotification
+public sealed class InAppNotification : NotificationRecord
 {
-    public Guid Id { get; set; } = Guid.NewGuid();
     public string PublicId { get; set; } = "";
     public int? AccountId { get; set; }
     public int? BranchId { get; set; }
@@ -150,7 +148,7 @@ public sealed class StaffHandlingItem
     public DateTimeOffset CreatedAt { get; set; }
 }
 
-public sealed class AppointmentChange
+public sealed class AppointmentChange : DCMS.Domain.Common.AuditRecord
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid AppointmentId { get; set; }
@@ -171,31 +169,29 @@ public sealed class AppointmentChange
     public DateTimeOffset OccurredAt { get; set; }
 }
 
-public sealed class AppointmentChangeReceipt
+public sealed class AppointmentChangeReceipt : DCMS.Domain.Common.CommandReceiptRecord
 {
     public int ActorAccountId { get; set; }
-    public Guid RequestKey { get; set; }
     public Guid AppointmentId { get; set; }
-    public string Fingerprint { get; set; } = "";
-    public string ResultJson { get; set; } = "";
 }
 
-public sealed class AppointmentReceipt
+public sealed class AppointmentReceipt : DCMS.Domain.Common.CommandReceiptRecord
 {
-    public Guid RequestKey { get; set; }
     public string ActorScope { get; set; } = "";
-    public string Fingerprint { get; set; } = "";
     public Guid AppointmentId { get; set; }
-    public string ResultJson { get; set; } = "";
 }
 
 // Written with the booking transaction; the dispatcher is owned by TV5.
-public sealed class AppointmentOutboxEvent
+public sealed class AppointmentOutboxEvent : NotificationRecord
 {
-    public Guid Id { get; set; } = Guid.NewGuid();
     public Guid AggregateId { get; set; }
     public string EventType { get; set; } = "AppointmentConfirmed";
     public string PayloadJson { get; set; } = "";
     public DateTimeOffset OccurredAt { get; set; }
     public DateTimeOffset? DispatchedAt { get; set; }
+}
+
+public abstract class NotificationRecord
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
 }

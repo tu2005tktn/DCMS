@@ -65,7 +65,7 @@ public sealed class TreatmentProgressionApiTests(ProgressionFixture fixture) : I
         db.Add(branch); await db.SaveChangesAsync();
         var member = new SchedulingMember { BranchId = branch.Id, EmployeeId = dentist, CanDentist = true };
         var service = new SchedulingService { BranchId = branch.Id, Name = "Điều trị thử", PublicDurationMinutes = 30 };
-        db.AddRange(member, service,
+        await db.AddSchedulingDataAsync(member, service,
             new SchedulingChair { BranchId = branch.Id, Name = "Ghế 1" },
             new SchedulingChair { BranchId = branch.Id, Name = "Ghế 2" },
             new SchedulingChair { BranchId = branch.Id, Name = "Ghế 3" });
@@ -266,7 +266,7 @@ public sealed class TreatmentProgressionApiTests(ProgressionFixture fixture) : I
 
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
-        Assert.Equal(3, await db.Set<SchedulingChair>().CountAsync(x => x.BranchId == setup.Branch));
+        Assert.Equal(3, await db.SchedulingChairs.CountAsync(x => x.BranchId == setup.Branch));
         Assert.False(await db.Appointments.AnyAsync(x => x.PatientId == setup.Patient));
         Assert.Equal(2, await db.TreatmentSteps.CountAsync(x => x.DossierId == dossier.Id));
         Assert.Equal(1, await db.TreatmentProgressionEvents.CountAsync(x => x.Kind == "followup.due"

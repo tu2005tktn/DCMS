@@ -70,7 +70,7 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
         if (roles.Contains(AccountRoles.Admin)) return;
         var isOwner = roles.Contains(AccountRoles.ClinicOwner);
         var employee = await db.Employees.AsNoTracking().SingleOrDefaultAsync(x => x.AccountId == actorId, ct);
-        if (employee == null || !await db.Set<SchedulingMember>().AsNoTracking().AnyAsync(x =>
+        if (employee == null || !await db.SchedulingMembers.AsNoTracking().AnyAsync(x =>
             x.BranchId == branchId && x.EmployeeId == employee.Id && x.Active &&
             (isOwner || x.CanDentist), ct))
             throw Error("MSG06", 403);
@@ -85,7 +85,7 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
         var roles = AccountRoles.Effective(await users.GetRolesAsync(account));
         if (!roles.Contains(AccountRoles.Dentist)) throw Error("MSG06", 403);
         var employee = await db.Employees.AsNoTracking().SingleOrDefaultAsync(x => x.AccountId == actorId, ct);
-        if (employee == null || !await db.Set<SchedulingMember>().AsNoTracking().AnyAsync(x =>
+        if (employee == null || !await db.SchedulingMembers.AsNoTracking().AnyAsync(x =>
                 x.BranchId == branchId && x.EmployeeId == employee.Id && x.Active && x.CanDentist, ct))
             throw Error("MSG06", 403);
         return employee.Id;
@@ -182,7 +182,7 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
                 !AccountRoles.Effective(await users.GetRolesAsync(account)).Contains(AccountRoles.Dentist))
                 throw Error("MSG06", 403);
         }
-        var allowed = db.Set<SchedulingMember>().AsNoTracking().Where(x =>
+        var allowed = db.SchedulingMembers.AsNoTracking().Where(x =>
             x.EmployeeId == employee.Id && x.Active && x.CanDentist).Select(x => x.BranchId);
         var query = db.TreatmentDossiers.AsNoTracking().Where(x => x.PatientId == patientId
             && x.State != "Deleted" && allowed.Contains(x.BranchId));
@@ -271,13 +271,13 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
         var dentistId = typed.DentistId;
         if (!await db.Set<SchedulingService>().AsNoTracking().AnyAsync(x => x.Id == serviceId
             && x.BranchId == dossier.BranchId && x.Active, ct)
-            || !await db.Set<SchedulingMember>().AsNoTracking().AnyAsync(x => x.EmployeeId == dentistId
+            || !await db.SchedulingMembers.AsNoTracking().AnyAsync(x => x.EmployeeId == dentistId
                 && x.BranchId == dossier.BranchId && x.Active && x.CanDentist, ct)) throw Error("MSG04");
         if (request.VisitId.HasValue && !await db.Visits.AsNoTracking().AnyAsync(x =>
             x.Id == request.VisitId.Value && x.PatientId == dossier.PatientId
             && x.BranchId == dossier.BranchId, ct)) throw Error("MSG113", 404);
         var fingerprint = Hash(new { dossierId, rowId, request });
-        var existing = await db.TreatmentSheetDrafts.SingleOrDefaultAsync(x => x.Id == rowId, ct);
+        var existing = await db.LoadSheetDraftAsync(db.TreatmentSheetDrafts.Where(x => x.Id == rowId), ct);
         if (existing is not null && existing.LastRequestKey == request.RequestKey)
         {
             if (existing.LastFingerprint != fingerprint) throw Error("MSG111", 409);
@@ -288,7 +288,7 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
             if (request.ExpectedVersion != 0) throw Error("MSG111", 409);
             existing = new TreatmentSheetDraft { Id = rowId, DossierId = dossierId,
                 ActorId = actorId, Kind = request.Kind, VisitId = request.VisitId };
-            db.TreatmentSheetDrafts.Add(existing);
+            await db.AddTreatmentDataAsync(existing);
         }
         else
         {
@@ -311,11 +311,11 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
         int expectedVersion, CancellationToken ct)
     {
         await DossierAsync(actorId, dossierId, ct);
-        var row = await db.TreatmentSheetDrafts.SingleOrDefaultAsync(x => x.Id == rowId
-            && x.DossierId == dossierId, ct) ?? throw Error("MSG113", 404);
+        var row = await db.LoadSheetDraftAsync(db.TreatmentSheetDrafts.Where(x => x.Id == rowId
+            && x.DossierId == dossierId), ct) ?? throw Error("MSG113", 404);
         if (row.ActorId != actorId) throw Error("MSG06", 403);
         if (row.Version != expectedVersion) throw Error("MSG111", 409);
-        db.TreatmentSheetDrafts.Remove(row);
+        await db.RemoveTreatmentDataAsync(row);
         await db.SaveChangesAsync(ct);
     }
 
@@ -359,7 +359,7 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
         if (account == null || !account.IsActive || account.AccountType != "Staff" || !AccountRoles.Effective(await users.GetRolesAsync(account)).Contains(AccountRoles.Dentist)) throw Error("MSG06",403);
         if (!await db.Patients.AnyAsync(x => x.Id == patientId && !x.IsArchived, ct)) throw Error("MSG113",404);
         var employee = await db.Employees.AsNoTracking().SingleOrDefaultAsync(x => x.AccountId == actorId, ct) ?? throw Error("MSG06",403);
-        var branches = await (from m in db.Set<SchedulingMember>() join b in db.Set<SchedulingBranch>() on m.BranchId equals b.Id
+        var branches = await (from m in db.SchedulingMembers join b in db.Set<SchedulingBranch>() on m.BranchId equals b.Id
             where m.EmployeeId == employee.Id && m.Active && m.CanDentist && b.Active orderby b.Name select new DossierCreateBranch(b.Id,b.Name)).ToListAsync(ct);
         var scope = await access.ResolveAsync(actorId, ct);
         if (scope.Assigned && !scope.Owner) branches = branches.Where(x => scope.BranchIds.Contains(x.Id)).ToList();
@@ -386,7 +386,7 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
         if ((!quick && diagnosis == null) || diagnosis?.Length > 4000 || Clean(request.Note)?.Length > 4000) throw Error("MSG04");
         if (!await db.Patients.AsNoTracking().AnyAsync(x => x.Id == patientId && !x.IsArchived, ct))
             throw Error("MSG113", 404);
-        if (!await db.Set<SchedulingMember>().AsNoTracking().AnyAsync(x => x.BranchId == request.BranchId
+        if (!await db.SchedulingMembers.AsNoTracking().AnyAsync(x => x.BranchId == request.BranchId
                 && x.EmployeeId == request.DentistId && x.Active && x.CanDentist, ct)) throw Error("MSG06", 403);
         var now = clock.GetUtcNow();
         var dossier = new TreatmentDossier
@@ -674,7 +674,7 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
             (x.Status == "NeedsBooking" || x.Status == "Booked"), ct)) throw Error("MSG233", 409);
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
         foreach (var item in unresolved) item.Progress = dispositions[item.Id].Outcome;
-        var openSteps = await db.TreatmentSteps.Where(x => x.DossierId == dossierId && x.Outcome != "Completed").ToListAsync(ct);
+        var openSteps = await db.LoadTreatmentStepsAsync(db.TreatmentSteps.Where(x => x.DossierId == dossierId && x.Outcome != "Completed"), ct);
         foreach (var step in openSteps.Where(x => dispositions.ContainsKey(x.ItemId)))
         {
             step.Outcome = dispositions[step.ItemId].Outcome;
@@ -803,7 +803,7 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
             var employeeId = await db.Employees.AsNoTracking().Where(x => x.AccountId == actorId)
                 .Select(x => (int?)x.Id).SingleOrDefaultAsync(ct);
             if (employeeId == null) throw Error("MSG06", 403);
-            var branches = db.Set<SchedulingMember>().AsNoTracking().Where(x =>
+            var branches = db.SchedulingMembers.AsNoTracking().Where(x =>
                 x.EmployeeId == employeeId.Value && x.Active &&
                 (isOwner || x.CanDentist)).Select(x => x.BranchId);
             query = query.Where(x => branches.Contains(x.BranchId));

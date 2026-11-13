@@ -67,9 +67,9 @@ public sealed class ReceptionApiTests(ReceptionFixture fixture) : IClassFixture<
         var assistant = await (from e in db.Employees join u in db.Users on e.AccountId equals u.Id where u.UserName == "assistant.demo" select e).SingleAsync();
         var dual = await (from e in db.Employees join u in db.Users on e.AccountId equals u.Id where u.UserName == "dual.demo" select e).SingleAsync();
         var branch = new SchedulingBranch { Name = "SYNTHETIC reception " + Guid.NewGuid().ToString("N") }; db.Add(branch); await db.SaveChangesAsync();
-        db.AddRange(new SchedulingMember { BranchId = branch.Id, EmployeeId = dentist.Id, CanDentist = true },
+        await db.AddSchedulingDataAsync(new SchedulingMember { BranchId = branch.Id, EmployeeId = dentist.Id, CanDentist = true },
             new SchedulingMember { BranchId = branch.Id, EmployeeId = assistant.Id }, new SchedulingMember { BranchId = branch.Id, EmployeeId = dual.Id, CanDentist = true });
-        var chairs = Enumerable.Range(1, 3).Select(n => new SchedulingChair { BranchId = branch.Id, Name = $"Ghế {n}", OpenMinute = 0, CloseMinute = 1440 }).ToArray(); db.AddRange(chairs);
+        var chairs = Enumerable.Range(1, 3).Select(n => new SchedulingChair { BranchId = branch.Id, Name = $"Ghế {n}", OpenMinute = 0, CloseMinute = 1440 }).ToArray(); await db.AddSchedulingDataAsync(chairs);
         var service = new SchedulingService { BranchId = branch.Id, Name = "Khám", IsInitialExamination = true }; db.Add(service);
         var patient = new PatientProfile { PatientCode = "RX-" + Guid.NewGuid().ToString("N"), FullName = "SYNTHETIC người đến", Phone = "0912345678", CreatedAt = fixture.Clock.Now, UpdatedAt = fixture.Clock.Now };
         db.Add(patient); await db.SaveChangesAsync();
@@ -201,7 +201,7 @@ public sealed class ReceptionApiTests(ReceptionFixture fixture) : IClassFixture<
         using var owner = await Login("owner.demo"); Assert.Equal(HttpStatusCode.OK, (await owner.GetAsync($"/api/visits/{v.VisitId}")).StatusCode); // chủ phòng khám xem mọi chi nhánh (S58-BRANCHES-AND-CHAIRS §4)
         using var dual = await Login("dual.demo"); using var dentist = await Login("dentist.demo");
         var queue = await dentist.GetFromJsonAsync<ReceptionPage<VisitResult>>($"/api/reception/queue?branchId={s.BranchId}&date={Today:yyyy-MM-dd}&dentistId={s.AssistantId}"); Assert.Single(queue!.Items);
-        using (var scope = fixture.Services.CreateScope()) { var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>(); (await db.Set<SchedulingMember>().SingleAsync(x => x.BranchId == s.BranchId && x.EmployeeId == s.AssistantId)).Active = false; await db.SaveChangesAsync(); }
+        using (var scope = fixture.Services.CreateScope()) { var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>(); (await db.LoadMemberAsync(s.BranchId, s.AssistantId)).Active = false; await db.SaveChangesAsync(); }
         await Error(await client.GetAsync($"/api/visits/{v.VisitId}"), HttpStatusCode.Forbidden); await Error(await client.PostAsJsonAsync(Path(s), command), HttpStatusCode.Forbidden);
     }
     [Theory] [InlineData("chair")] [InlineData("dentist")] [InlineData("assistant")] [InlineData("patient")]
@@ -210,7 +210,7 @@ public sealed class ReceptionApiTests(ReceptionFixture fixture) : IClassFixture<
         var s = await Prepare(); using var client = await Login();
         using var scope = fixture.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>(); var a = await db.Appointments.SingleAsync(x => x.Id == s.AppointmentId);
         var dual = await (from e in db.Employees join u in db.Users on e.AccountId equals u.Id where u.UserName == "dual.demo" select e.Id).SingleAsync();
-        var otherChair = await db.Set<SchedulingChair>().Where(x => x.BranchId == s.BranchId && x.Id != s.ChairId).Select(x => x.Id).FirstAsync();
+        var otherChair = await db.SchedulingChairs.Where(x => x.BranchId == s.BranchId && x.Id != s.ChairId).Select(x => x.Id).FirstAsync();
         db.Add(new ResourceReservation { Code = "RX-" + Guid.NewGuid().ToString("N"), BranchId = s.BranchId, DentistId = kind == "dentist" ? s.DentistId : dual,
             AssistantId = kind == "assistant" ? s.AssistantId : null, ChairId = kind == "chair" ? s.ChairId : otherChair,
             Start = a.StartAt, End = a.EndAt, AttendeeKey = kind == "patient" ? $"patient:{s.PatientId}" : null }); await db.SaveChangesAsync();
@@ -255,7 +255,7 @@ public sealed class ReceptionApiTests(ReceptionFixture fixture) : IClassFixture<
         await db.Database.ExecuteSqlRawAsync("""
             CREATE FUNCTION reception_fail_audit() RETURNS trigger LANGUAGE plpgsql AS $fn$
             BEGIN RAISE EXCEPTION 'SYNTHETIC audit failure'; END $fn$;
-            CREATE TRIGGER reception_fail BEFORE INSERT ON "VISIT_AUDIT" FOR EACH ROW EXECUTE FUNCTION reception_fail_audit();
+            CREATE TRIGGER reception_fail BEFORE INSERT ON "AUDIT_LOG" FOR EACH ROW WHEN (NEW."AuditType" = 'VisitAudit') EXECUTE FUNCTION reception_fail_audit();
             """);
         try
         {
@@ -264,7 +264,7 @@ public sealed class ReceptionApiTests(ReceptionFixture fixture) : IClassFixture<
             Assert.Equal("Confirmed", (await db.Appointments.AsNoTracking().SingleAsync(x => x.Id == s.AppointmentId)).Status);
             Assert.Equal(0, await db.AppointmentChanges.CountAsync(x => x.AppointmentId == s.AppointmentId));
         }
-        finally { await db.Database.ExecuteSqlRawAsync("DROP TRIGGER reception_fail ON \"VISIT_AUDIT\"; DROP FUNCTION reception_fail_audit();"); }
+        finally { await db.Database.ExecuteSqlRawAsync("DROP TRIGGER reception_fail ON \"AUDIT_LOG\"; DROP FUNCTION reception_fail_audit();"); }
         await Check(client, s);
     }
 
@@ -282,6 +282,8 @@ public sealed class ReceptionApiTests(ReceptionFixture fixture) : IClassFixture<
         var original = await Check(client, s, command);
         using var scope = legacy.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
         var source = Guid.NewGuid();
+        db.ChangeTracker.Clear();
+        await db.GetService<IMigrator>().MigrateAsync("20261109101904_AdvancePayOs20261109");
         // Arrange the exact old column/constraint names in a private schema, with an existing attendance.
         await db.Database.ExecuteSqlRawAsync("""
             ALTER TABLE "VISIT" RENAME COLUMN "ArrivalAt" TO "ActualArrivalAt";
@@ -297,7 +299,7 @@ public sealed class ReceptionApiTests(ReceptionFixture fixture) : IClassFixture<
             ALTER TABLE "VISIT" ADD COLUMN "QueueOrder" bigint NOT NULL DEFAULT 1;
             ALTER TABLE "VISIT" ADD COLUMN "DossierId" uuid, ADD COLUMN "ItemId" uuid, ADD COLUMN "StepId" uuid, ADD COLUMN "ActivityId" uuid, ADD COLUMN "AdditionalConcern" varchar(1000);
             ALTER TABLE "VISIT" DROP COLUMN "SourceJson", DROP COLUMN "RequiresClinicalSourceReview";
-            ALTER TABLE "VISIT_AUDIT" ADD COLUMN "Reason" varchar(500) NOT NULL DEFAULT 'Legacy audit';
+            ALTER TABLE "VISIT_AUDIT" ADD COLUMN IF NOT EXISTS "Reason" varchar(500) NOT NULL DEFAULT 'Legacy audit';
             ALTER TABLE "RECEPTION_RECEIPT" RENAME TO "RECEPTION_COMMAND_RECEIPT";
             ALTER TABLE "RECEPTION_COMMAND_RECEIPT" RENAME CONSTRAINT "PK_RECEPTION_RECEIPT" TO "PK_RECEPTION_COMMAND_RECEIPT";
             ALTER TABLE "RECEPTION_COMMAND_RECEIPT" RENAME CONSTRAINT "FK_RECEPTION_RECEIPT_USER_ACCOUNT_ActorAccountId" TO "FK_RECEPTION_COMMAND_RECEIPT_USER_ACCOUNT_ActorAccountId";

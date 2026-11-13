@@ -140,7 +140,7 @@ public sealed class BranchAssetStore(DcmsDbContext db, IConfiguration config)
 
     public async Task<(BranchAsset Asset, byte[] Bytes)?> ReadAsync(int branchId, Guid assetId, CancellationToken ct)
     {
-        var asset = await db.Set<BranchAsset>().AsNoTracking().SingleOrDefaultAsync(x => x.Id == assetId && x.BranchId == branchId, ct);
+        var asset = await db.BranchAssets.AsNoTracking().SingleOrDefaultAsync(x => x.Id == assetId && x.BranchId == branchId, ct);
         if (asset == null) return null;
         try { return (asset, await File.ReadAllBytesAsync(PathFor(assetId), ct)); }
         catch (IOException) { return null; }

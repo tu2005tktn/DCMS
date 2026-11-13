@@ -111,7 +111,7 @@ public sealed class GoogleApiTests(GoogleApiFixture fixture) : IClassFixture<Goo
         var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
         Assert.Equal(1, await db.Users.CountAsync(x => x.NormalizedEmail == email.ToUpperInvariant()));
         Assert.False((await db.Users.SingleAsync(x => x.Id == local.User.Id)).EmailConfirmed);
-        Assert.False(await db.UserLogins.AnyAsync(x => x.LoginProvider == "Google" && x.ProviderKey == googleSubject));
+        Assert.False(await db.Users.AnyAsync(x => x.Logins.Any(login => login.Provider == "Google" && login.Key == googleSubject)));
         await fixture.AssertPatientUnchangedAsync();
     }
 

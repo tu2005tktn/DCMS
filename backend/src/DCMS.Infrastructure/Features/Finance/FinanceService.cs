@@ -64,7 +64,7 @@ public sealed class FinanceService(DcmsDbContext db, ISettingsAccess access, Tim
     }
     public async Task<ProviderDto[]> ProvidersAsync(int actor, CancellationToken ct) { await access.RequireAsync(actor, "finance.costs.read", ct); return await db.Set<Provider>().Where(x => x.Active && x.Kind == "ClinicalFacility").OrderBy(x => x.Name).Select(x => new ProviderDto(x.Id, x.Code, x.Name, x.Version)).ToArrayAsync(ct); }
     public async Task<ProviderDto> CreateProviderAsync(int actor, CreateProvider c, CancellationToken ct) { await access.RequireAsync(actor, "finance.costs.manage", ct); return await Run(actor, c.RequestKey, "CreateProvider", "new", c, 0, null, async () => { await access.RequireAsync(actor, "finance.costs.manage", ct); var code = Text(c.Code, 40); var name = Text(c.Name, 160); if (await db.Set<Provider>().AnyAsync(x => x.NormalizedCode == code.ToUpper() || x.NormalizedName == name.ToUpper(), ct)) throw Invalid("Đơn vị thực hiện đã tồn tại.", 409); var row = new Provider { Code = code, Name = name, NormalizedCode = code.ToUpperInvariant(), NormalizedName = name.ToUpperInvariant() }; db.Add(row); return new ProviderDto(row.Id, row.Code, row.Name, row.Version); }, ct); }
-    async Task<InvestigationOrder> Order(Guid visit, Guid id, CancellationToken ct) => await db.Set<InvestigationOrder>().SingleOrDefaultAsync(x => x.Id == id && x.VisitId == visit, ct) ?? throw Error("MSG113", 404);
+    async Task<InvestigationOrder> Order(Guid visit, Guid id, CancellationToken ct) => await db.LoadInvestigationAsync(visit, id, ct) ?? throw Error("MSG113", 404);
     async Task<InvestigationBillingDto> BillingDto(int actor, Visit v, InvestigationOrder o, CancellationToken ct)
     {
         var s = await access.ResolveAsync(actor, ct); var cost = s.Permissions.Contains("finance.costs.read"); var own = s.Owner || !s.Roles.Contains("Dentist") || await db.Employees.AnyAsync(x => x.Id == v.DentistId && x.AccountId == actor, ct);
@@ -79,7 +79,7 @@ public sealed class FinanceService(DcmsDbContext db, ISettingsAccess access, Tim
         // Return a fresh, permission-filtered projection on replay as well.
         await Run(actor, c.RequestKey, "Quote", id.ToString(), c, v.BranchId, v.Id, async () =>
         {
-            await access.OperationalAsync(actor, "finance.quotes.manage", v.BranchId, ct); await db.Entry(v).ReloadAsync(ct); await Own(actor, v, ct); var o = await Order(visitId, id, ct);
+            await access.OperationalAsync(actor, "finance.quotes.manage", v.BranchId, ct); v = await db.ReloadVisitAsync(v.Id, ct) ?? throw Error("MSG113", 404); await Own(actor, v, ct); var o = await Order(visitId, id, ct);
             ValidateOrder(v, o, c.PatientId, c.ExpectedVisitVersion, c.ExpectedVersion);
             if (!new[] { "Clinic", "OutsourcedClinic", "ExternalSelfPay", "ExistingResult" }.Contains(c.Mode)) throw Error("MSG04");
             o.BillingMode = c.Mode; o.ServiceId = null; o.ServiceNameSnapshot = null; o.UnitSnapshot = null; o.UnitPriceSnapshotVnd = null; o.PriceVersionSnapshot = null; o.ProviderId = null; o.ProviderNameSnapshot = null; o.ProviderUnitCostSnapshotVnd = null; o.QuoteEvidence = null; o.Quantity = 1;
@@ -110,7 +110,7 @@ public sealed class FinanceService(DcmsDbContext db, ISettingsAccess access, Tim
         var v = await Visit(actor, visitId, "investigations.perform", ct); await Own(actor, v, ct);
         await Run(actor, c.RequestKey, "Perform", id.ToString(), c, v.BranchId, v.Id, async () =>
         {
-            await access.OperationalAsync(actor, "investigations.perform", v.BranchId, ct); await db.Entry(v).ReloadAsync(ct); await Own(actor, v, ct); var o = await Order(visitId, id, ct); ValidateOrder(v, o, c.PatientId, c.ExpectedVisitVersion, c.ExpectedVersion);
+            await access.OperationalAsync(actor, "investigations.perform", v.BranchId, ct); v = await db.ReloadVisitAsync(v.Id, ct) ?? throw Error("MSG113", 404); await Own(actor, v, ct); var o = await Order(visitId, id, ct); ValidateOrder(v, o, c.PatientId, c.ExpectedVisitVersion, c.ExpectedVersion);
             if (o.BillingMode is not ("Clinic" or "OutsourcedClinic") || o.ServiceId == null || o.UnitPriceSnapshotVnd == null) throw Invalid("Lập phí dịch vụ trước khi xác nhận thực hiện.", 409);
             var charge = new FinanceCharge { VisitId = v.Id, PatientId = v.PatientId, BranchId = v.BranchId, SourceKind = "Investigation", SourceId = o.Id, InvestigationId = o.Id, ServiceId = o.ServiceId.Value, Name = o.ServiceNameSnapshot!, Unit = o.UnitSnapshot!, Quantity = o.Quantity, UnitPriceVnd = o.UnitPriceSnapshotVnd.Value, AmountVnd = checked(o.UnitPriceSnapshotVnd.Value * o.Quantity), PriceVersion = o.PriceVersionSnapshot!.Value, PostedBy = actor, PostedAt = clock.GetUtcNow() };
             await AddCharge(charge, ct);
@@ -171,7 +171,7 @@ public sealed class FinanceService(DcmsDbContext db, ISettingsAccess access, Tim
     {
         var v = await Visit(actor, visitId, "finance.read", ct); var caps = await access.ResolveAsync(actor, ct); var charges = await Charges(visitId, ct); var payments = await db.Set<PaymentReceipt>().Include(x => x.Allocations).Where(x => x.VisitId == visitId).OrderByDescending(x => x.CreatedAt).ToArrayAsync(ct); var patient = await db.Set<PatientProfile>().SingleAsync(x => x.Id == v.PatientId, ct); var branch = await db.Set<SchedulingBranch>().SingleAsync(x => x.Id == v.BranchId, ct); var json = await db.Set<ClinicSettingsVersion>().OrderByDescending(x => x.Version).Select(x => x.ContentJson).FirstOrDefaultAsync(ct); var settings = json == null ? DCMS.Application.Features.SystemSettings.GeneralSettings.Default : JsonSerializer.Deserialize<DCMS.Application.Features.SystemSettings.GeneralSettings>(json, DCMS.Infrastructure.Features.SystemSettings.ClinicSettingsStore.Json)!;
         var ids = charges.Select(x => x.Id).ToArray(); var costs = caps.Permissions.Contains("finance.costs.read") ? await db.Set<ProviderPayable>().Where(x => ids.Contains(x.ChargeId)).Select(x => new PayableDto(x.Id, x.ChargeId, x.ProviderName, x.AmountVnd)).ToArrayAsync(ct) : null;
-        return new(v.Id, v.PatientId, patient.FullName, v.BranchId, branch.Name, await Version(v.PatientId, v.BranchId, ct), charges.Sum(x => x.AmountVnd), charges.Sum(x => x.PaidVnd), charges.Sum(x => x.RemainingVnd), charges, (await MapPayments(payments,ct)), costs, settings.ReceiptPrint.DefaultPayerToPatient ? patient.FullName : null, caps.Permissions.Where(x => x.StartsWith("finance.payments.")).ToArray(), await db.Set<InvestigationOrder>().Where(x => x.VisitId == visitId).OrderBy(x => x.CreatedAt).Select(x => new BillInvestigation(x.Id, x.Name, x.Kind, x.State, x.BillingMode, x.PerformedAt)).ToArrayAsync(ct));
+        return new(v.Id, v.PatientId, patient.FullName, v.BranchId, branch.Name, await Version(v.PatientId, v.BranchId, ct), charges.Sum(x => x.AmountVnd), charges.Sum(x => x.PaidVnd), charges.Sum(x => x.RemainingVnd), charges, (await MapPayments(payments,ct)), costs, settings.ReceiptPrint.DefaultPayerToPatient ? patient.FullName : null, caps.Permissions.Where(x => x.StartsWith("finance.payments.")).ToArray(), await db.Investigations.Where(x => x.VisitId == visitId).OrderBy(x => x.CreatedAt).Select(x => new BillInvestigation(x.Id, x.Name, x.Kind, x.State, x.BillingMode, x.PerformedAt)).ToArrayAsync(ct));
     }
     public async Task<DossierBillDto> DossierBillAsync(int actor, Guid dossierId, CancellationToken ct)
     {
@@ -226,7 +226,7 @@ public sealed class FinanceService(DcmsDbContext db, ISettingsAccess access, Tim
     public async Task<QueueBill[]> QueueAsync(int actor,int branchId,CancellationToken ct)
     {
         await access.OperationalAsync(actor,"finance.read",branchId,ct);
-        var pendingOrders=from o in db.Set<InvestigationOrder>() join v in db.Set<Visit>() on o.VisitId equals v.Id
+        var pendingOrders=from o in db.Investigations join v in db.Set<Visit>() on o.VisitId equals v.Id
             where v.BranchId==branchId && v.Status=="InProgress" && o.State!="Cancelled" && o.PerformedAt==null
                 && (o.BillingMode==null || o.BillingMode=="Clinic" || o.BillingMode=="OutsourcedClinic") select o.VisitId;
         var feeVisits=db.Set<ExaminationFee>().Where(x=>x.State=="Pending").Join(db.Visits.Where(x=>x.BranchId==branchId),x=>x.VisitId,x=>x.Id,(f,v)=>v.Id);

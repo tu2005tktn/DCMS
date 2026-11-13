@@ -47,7 +47,7 @@ public sealed class AppointmentService(DcmsDbContext db, IAvailabilityService av
             if (request.ReplacesAppointmentId.HasValue) await access.RequireAsync(accountId!.Value, "appointments.create", ct);
             if (!request.ReplacesAppointmentId.HasValue && !treatmentFollowUp && !await users.IsInRoleAsync(account!, AccountRoles.ClinicAssistant)) throw Error("MSG06", 403);
             var employee = await db.Employees.AsNoTracking().SingleOrDefaultAsync(x => x.AccountId == accountId, ct);
-            if (employee == null || !await db.Set<SchedulingMember>().AsNoTracking().AnyAsync(x =>
+            if (employee == null || !await db.SchedulingMembers.AsNoTracking().AnyAsync(x =>
                     x.BranchId == request.BranchId && x.EmployeeId == employee.Id && x.Active, ct)) throw Error("MSG06", 403);
         }
 

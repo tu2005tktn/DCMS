@@ -43,7 +43,7 @@ public static class PatientGenders
 }
 
 // PATIENT_AUDIT: administrative change history (GBR-081). Never deleted.
-public sealed class PatientAudit
+public sealed class PatientAudit : DCMS.Domain.Common.AuditRecord
 {
     public long Id { get; set; }
     public int PatientId { get; set; }
@@ -55,11 +55,9 @@ public sealed class PatientAudit
 }
 
 // DCMS-122: a create retried with the same actor + requestKey returns this patient instead of issuing a second code.
-public sealed class PatientCreateReceipt
+public sealed class PatientCreateReceipt : DCMS.Domain.Common.CommandReceiptRecord
 {
     public int ActorId { get; set; }
-    public Guid RequestKey { get; set; }
-    public string Fingerprint { get; set; } = "";
     public int PatientId { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
 }

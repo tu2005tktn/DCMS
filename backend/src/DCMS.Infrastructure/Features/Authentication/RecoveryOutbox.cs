@@ -16,8 +16,11 @@ public sealed class RecoveryOutboxWriter(DcmsDbContext db) : IRecoveryOutbox
     public async Task RecordAsync(int accountId, RecoveryChannel channel, string destination, string provider,
         string status, string? providerMessageId, CancellationToken ct = default)
     {
-        db.RecoveryOutbox.Add(new RecoveryOutbox
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        var user = (await db.LockAccountAsync(accountId, ct))!;
+        user.RecoveryDeliveries.Add(new RecoveryOutbox
         {
+            Id = await db.NextAccountEntryIdAsync(ct),
             AccountId = accountId,
             ChannelType = channel.ToString(),
             Destination = destination,
@@ -27,5 +30,6 @@ public sealed class RecoveryOutboxWriter(DcmsDbContext db) : IRecoveryOutbox
             OccurredAt = DateTimeOffset.UtcNow
         });
         await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
     }
 }

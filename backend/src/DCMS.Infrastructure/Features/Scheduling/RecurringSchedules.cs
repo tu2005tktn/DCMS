@@ -12,7 +12,7 @@ public sealed partial class WorkingScheduleService
 {
     private DateOnly ClinicToday => DateOnly.FromDateTime(clock.GetUtcNow().ToOffset(TimeSpan.FromHours(7)).DateTime);
     private Task<List<WorkingScheduleRevision>> Revisions(int employee, CancellationToken ct) =>
-        db.Set<WorkingScheduleRevision>().AsNoTracking().Include(x => x.Periods)
+        db.Set<WorkingScheduleRevision>().AsNoTracking()
             .Where(x => x.EmployeeId == employee).ToListAsync(ct);
     private static int Head(IEnumerable<WorkingScheduleRevision> revisions) => revisions.Select(x => x.Version).DefaultIfEmpty().Max();
     private async Task<int> HeadVersion(int employee, IEnumerable<WorkingScheduleRevision> revisions, CancellationToken ct) =>
@@ -25,7 +25,7 @@ public sealed partial class WorkingScheduleService
     private static WorkingScheduleRevision Proposed(RecurringCommand c, int version) => new()
     {
         EmployeeId = c.DentistId, Date = c.Date, Kind = c.Kind, Version = version, Reason = c.Reason.Trim(),
-        Periods = c.Intervals.Select(p => new RevisionPeriod { BranchId = p.BranchId, Day = p.Day,
+        Periods = c.Intervals.Select(p => new WorkingPeriod { BranchId = p.BranchId, Day = p.Day,
             StartMinute = p.StartMinute, EndMinute = p.EndMinute, Kind = p.Kind, Reason = p.Reason.Trim() }).ToList()
     };
     private async Task AuthorizeRecurring(int actor, int employee, CancellationToken ct)
@@ -34,8 +34,8 @@ public sealed partial class WorkingScheduleService
         if (branches.Length == 0) throw Error("MSG06", 403);
         foreach (var branch in branches) await Authorize(actor, branch, employee, ct);
         // An aggregate edit must not erase work at a branch outside the editor's rights.
-        var publishedBranches = await db.Set<RevisionPeriod>().Where(p => db.Set<WorkingScheduleRevision>()
-            .Any(r => r.Id == p.RevisionId && r.EmployeeId == employee)).Select(p => p.BranchId)
+        var publishedBranches = await db.Set<WorkingScheduleRevision>().Where(r => r.EmployeeId == employee)
+            .SelectMany(r => r.Periods).Select(p => p.BranchId)
             .Union(db.Set<WorkingWeek>().Where(w => w.EmployeeId == employee).Select(w => w.BranchId)).Distinct().ToArrayAsync(ct);
         foreach (var branch in publishedBranches) await Authorize(actor, branch, employee, ct);
     }
@@ -52,7 +52,7 @@ public sealed partial class WorkingScheduleService
             .OrderByDescending(x => x.Date).ThenByDescending(x => x.Version).FirstOrDefault();
         var exception = revisions.Where(x => x.Kind == "Exception" && x.Date == date).MaxBy(x => x.Version);
         var monday = Monday(date);
-        var legacy = await db.Set<WorkingWeek>().AsNoTracking().Include(x => x.Periods)
+        var legacy = await db.Set<WorkingWeek>().AsNoTracking()
             .Where(x => x.EmployeeId == employee && x.WeekStart == monday).ToArrayAsync(ct);
         return new(employee, await HeadVersion(employee, revisions, ct), template == null ? null : Revision(template), exception == null ? null : Revision(exception),
             revisions.Where(x => x.Date > date).GroupBy(x => new { x.Kind, x.Date }).Select(g => g.MaxBy(x => x.Version)!)

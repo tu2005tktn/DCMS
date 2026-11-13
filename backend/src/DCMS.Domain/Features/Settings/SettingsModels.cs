@@ -25,6 +25,10 @@ public sealed class ReferenceEntry
 }
 public sealed class AccessGroup
 {
+    public string RecordKind { get; set; } = "PermissionGroup";
+    public int? IdentityRoleId { get; set; }
+    public string? RoleConcurrencyStamp { get; set; }
+    public List<DCMS.Domain.Features.Authentication.AccountClaim> RoleClaims { get; set; } = [];
     public Guid Id { get; set; } = Guid.NewGuid();
     public string Code { get; set; } = "";
     public string Name { get; set; } = "";
@@ -48,7 +52,7 @@ public sealed class StaffAccessAssignment
     public int[] BranchIds { get; set; } = [];
     public int Version { get; set; } = 1;
 }
-public sealed class SettingsAudit
+public sealed class SettingsAudit : DCMS.Domain.Common.AuditRecord
 {
     public int[] BranchIds { get; set; } = [];
     public Guid Id { get; set; } = Guid.NewGuid();
@@ -62,12 +66,9 @@ public sealed class SettingsAudit
     public string AfterJson { get; set; } = "{}";
     public DateTimeOffset At { get; set; }
 }
-public sealed class SettingsReceipt
+public sealed class SettingsReceipt : DCMS.Domain.Common.CommandReceiptRecord
 {
     public int ActorId { get; set; }
-    public Guid RequestKey { get; set; }
-    public string Fingerprint { get; set; } = "";
-    public string ResultJson { get; set; } = "{}";
 }
 
 public sealed class BranchProfile

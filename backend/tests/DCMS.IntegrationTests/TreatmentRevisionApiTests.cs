@@ -45,7 +45,7 @@ public sealed class TreatmentRevisionApiTests(ApiFixture fixture) : IClassFixtur
             branchId = branch.Id;
             var member = new SchedulingMember { BranchId = branchId, EmployeeId = dentistId, CanDentist = true };
             var service = new SchedulingService { BranchId = branchId, Name = "Trám răng S62", PublicDurationMinutes = 30 };
-            db.AddRange(member, service);
+            await db.AddSchedulingDataAsync(member, service);
             await db.SaveChangesAsync();
             serviceId = service.Id;
         }

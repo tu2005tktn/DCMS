@@ -49,3 +49,7 @@ web/public/models/*
 *.bat
 .claude/settings.local.json
 web/package-lock.json
+
+# Local agent instructions.
+/AGENTS.md
+/agent.md

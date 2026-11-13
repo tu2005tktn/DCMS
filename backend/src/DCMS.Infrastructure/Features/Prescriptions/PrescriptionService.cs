@@ -241,7 +241,7 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
             .OrderByDescending(x => x.Revision).ToArrayAsync(ct);
         if (revisions.Length == 0) return new(null, []);
         var ids = revisions.Select(x => x.Id).ToArray();
-        var lines = await db.Set<ExternalPrescriptionLine>().AsNoTracking().Where(x => ids.Contains(x.PrescriptionId)).ToArrayAsync(ct);
+        var lines = revisions.SelectMany(x => x.Lines).ToArray();
         var names = await NamesAsync(revisions.Select(x => x.PrescribedByDoctorId), ct);
         var current = revisions[0];
         var history = revisions.Select(x => new PrescriptionSummaryDto(x.Id, x.Revision, x.Status, names.GetValueOrDefault(x.PrescribedByDoctorId),
@@ -257,7 +257,7 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
         var visit = await ReadableVisitAsync(actor, visitId, ct);
         var current = await db.Set<ExternalPrescription>().AsNoTracking().Where(x => x.VisitId == visitId).OrderByDescending(x => x.Revision).FirstOrDefaultAsync(ct);
         if (current == null) return [];
-        var lines = await db.Set<ExternalPrescriptionLine>().AsNoTracking().Where(x => x.PrescriptionId == current.Id).ToArrayAsync(ct);
+        var lines = current.Lines.ToArray();
         if (lines.Length == 0) return [];
 
         var patient = await db.Set<PatientProfile>().AsNoTracking().SingleOrDefaultAsync(p => p.Id == visit.PatientId, ct);
@@ -357,8 +357,8 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
         var before = "{}";
         if (lineId is { } id)
         {
-            line = await db.Set<ExternalPrescriptionLine>().SingleOrDefaultAsync(x => x.Id == id && x.VisitId == visitId, ct) ?? throw Fail("MSG113", 404);
-            rx = await db.Set<ExternalPrescription>().SingleAsync(x => x.Id == line.PrescriptionId, ct);
+            rx = await db.Set<ExternalPrescription>().SingleOrDefaultAsync(x => x.VisitId == visitId && x.Lines.Any(l => l.Id == id), ct) ?? throw Fail("MSG113", 404);
+            line = rx.Lines.Single(l => l.Id == id);
             EnsureEditable(visit, rx);
             if (line.Version != c.ExpectedVersion) throw Fail("MSG111", 409, currentVersion: line.Version);
             before = JsonSerializer.Serialize(LineDto(line, null), Json);
@@ -390,7 +390,7 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
                 var medicine = await PrescribableAsync(c.MedicineId!.Value, ct) ?? throw Fail("MSG113", 404, "medicineId");
                 Apply(line, medicine, values);
             }
-            db.Add(line);
+            rx.Lines.Add(line);
         }
         line.UpdatedBy = actor;
         line.UpdatedAt = clock.GetUtcNow();
@@ -413,13 +413,13 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
         if ((await ReplayAsync<JsonElement>(actor, requestKey, hash, ct)).Found) return;
 
         var visit = await WritableVisitAsync(actor, visitId, ct);
-        var line = await db.Set<ExternalPrescriptionLine>().SingleOrDefaultAsync(x => x.Id == lineId && x.VisitId == visitId, ct) ?? throw Fail("MSG113", 404);
-        var rx = await db.Set<ExternalPrescription>().SingleAsync(x => x.Id == line.PrescriptionId, ct);
+        var rx = await db.Set<ExternalPrescription>().SingleOrDefaultAsync(x => x.VisitId == visitId && x.Lines.Any(l => l.Id == lineId), ct) ?? throw Fail("MSG113", 404);
+        var line = rx.Lines.Single(l => l.Id == lineId);
         EnsureEditable(visit, rx);
         if (line.Version != expectedVersion) throw Fail("MSG111", 409, currentVersion: line.Version);
 
         var before = JsonSerializer.Serialize(LineDto(line, null), Json);
-        db.Remove(line);
+        rx.Lines.Remove(line);
         Touch(rx, actor);
         Record(actor, visit, null, "LineDelete", "Xóa dòng thuốc khỏi đơn nháp", before, new { }, requestKey, hash, new { });
         await db.SaveChangesAsync(ct);
@@ -446,7 +446,7 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
         rx.GeneralAdvice = advice;
         Touch(rx, actor);
 
-        var lines = await db.Set<ExternalPrescriptionLine>().Where(x => x.PrescriptionId == rx.Id).ToArrayAsync(ct);
+        var lines = rx.Lines.ToArray();
         var result = await DtoAsync(rx, lines, ct);
         Record(actor, visit, null, "AdviceUpdate", "Cập nhật lời dặn chung", before, new { rx.GeneralAdvice }, c.RequestKey, hash, result);
         await db.SaveChangesAsync(ct);
@@ -464,7 +464,7 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
         if (replay.Found) return replay.Result!;
 
         var visit = await WritableVisitAsync(actor, visitId, ct);
-        var template = await db.Set<PrescriptionTemplate>().AsNoTracking().Include(t => t.Lines)
+        var template = await db.Set<PrescriptionTemplate>().AsNoTracking()
             .SingleOrDefaultAsync(t => t.Id == c.TemplateId && t.IsActive, ct) ?? throw Fail("MSG113", 404, "templateId");
         var current = await CurrentAsync(visitId, ct);
         if ((current?.Version ?? 0) != c.ExpectedVersion) throw Fail("MSG111", 409, currentVersion: current?.Version ?? 0);
@@ -488,12 +488,12 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
             };
             Apply(line, medicine, new LineValues(t.Route, t.MorningDose, t.NoonDose, t.AfternoonDose, t.EveningDose, t.MealTiming, t.Days, t.Quantity,
                 string.IsNullOrWhiteSpace(t.Instructions) ? null : t.Instructions));
-            db.Add(line);
+            rx.Lines.Add(line);
         }
         Touch(rx, actor);
 
         await db.SaveChangesAsync(ct);
-        var lines = await db.Set<ExternalPrescriptionLine>().Where(x => x.PrescriptionId == rx.Id).ToArrayAsync(ct);
+        var lines = rx.Lines.ToArray();
         var result = new ApplyTemplateResult(await DtoAsync(rx, lines, ct), skipped);
         Record(actor, visit, template.Id, "TemplateApply", $"Áp dụng mẫu đơn thuốc: {template.Name}", "{}", result.Prescription, c.RequestKey, hash, result);
         await db.SaveChangesAsync(ct);
@@ -515,7 +515,7 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
         var rx = await CurrentAsync(visitId, ct) ?? throw Fail("MSG113", 404);
         if (rx.Version != c.ExpectedVersion) throw Fail("MSG111", 409, currentVersion: rx.Version);
         EnsureEditable(visit, rx);
-        var lines = await db.Set<ExternalPrescriptionLine>().Where(x => x.PrescriptionId == rx.Id).ToArrayAsync(ct);
+        var lines = rx.Lines.ToArray();
         if (lines.Length == 0) throw Fail("MSG04", field: "lines", label: "Danh sách thuốc");
 
         var now = clock.GetUtcNow();
@@ -542,7 +542,7 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
             var previous = await db.Set<ExternalPrescription>().SingleAsync(x => x.Id == previousId, ct);
             previous.Status = PrescriptionStatuses.Superseded;
             previous.Version++;
-            var previousLines = await db.Set<ExternalPrescriptionLine>().Where(x => x.PrescriptionId == previousId).ToArrayAsync(ct);
+            var previousLines = previous.Lines.ToArray();
             foreach (var l in previousLines) { l.Status = PrescriptionStatuses.Superseded; l.Version++; }
         }
 
@@ -575,7 +575,7 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
         draft.SupersedesId = signed.Id;
         draft.CorrectionReason = reason;
         draft.GeneralAdvice = signed.GeneralAdvice;
-        var source = await db.Set<ExternalPrescriptionLine>().AsNoTracking().Where(x => x.PrescriptionId == signed.Id).OrderBy(x => x.CreatedAt).ToArrayAsync(ct);
+        var source = signed.Lines.OrderBy(x => x.CreatedAt).ToArray();
         var now = clock.GetUtcNow();
         var copies = source.Select((s, i) => new ExternalPrescriptionLine
         {
@@ -586,7 +586,7 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
             Instructions = s.Instructions, Status = PrescriptionStatuses.Draft, Version = 1,
             CreatedBy = actor, CreatedAt = now.AddTicks(i), UpdatedBy = actor, UpdatedAt = now
         }).ToArray();
-        db.AddRange(copies);
+        draft.Lines.AddRange(copies);
 
         var result = await DtoAsync(draft, copies, ct);
         Record(actor, visit, null, "CorrectionCreate", reason, JsonSerializer.Serialize(new { signed.Id, signed.Revision }, Json), result, c.RequestKey, hash, result);
@@ -612,8 +612,7 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
         var profile = await db.Set<BranchProfile>().AsNoTracking().SingleOrDefaultAsync(b => b.Id == rx.BranchId, ct);
         var doctorId = rx.FinalizedBy ?? rx.PrescribedByDoctorId;
         var doctor = (await NamesAsync([doctorId], ct)).GetValueOrDefault(doctorId);
-        var lines = await db.Set<ExternalPrescriptionLine>().AsNoTracking().Where(x => x.PrescriptionId == rx.Id)
-            .OrderBy(x => x.CreatedAt).ThenBy(x => x.Id).ToArrayAsync(ct);
+        var lines = rx.Lines.OrderBy(x => x.CreatedAt).ThenBy(x => x.Id).ToArray();
         var diagnosis = rx.Diagnosis ?? DiagnosisText(await ExaminationAsync(visit.Id, ct));
 
         var items = lines.Select((l, i) => new PrescriptionPrintItem(i + 1, l.MedicineName, l.ActiveIngredient, l.Strength, l.DosageForm,
@@ -653,7 +652,7 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
         var q = search?.Trim().ToUpper() ?? "";
         var d = diagnosis?.Trim().ToUpper() ?? "";
 
-        var query = db.Set<PrescriptionTemplate>().AsNoTracking().Include(t => t.Lines).AsQueryable();
+        var query = db.Set<PrescriptionTemplate>().AsNoTracking().AsQueryable();
         query = (status ?? "Active") switch
         {
             "Active" => query.Where(t => t.IsActive),
@@ -670,7 +669,7 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
     public async Task<PrescriptionTemplateDto> TemplateAsync(int actor, Guid id, CancellationToken ct)
     {
         await access.RequireAsync(actor, "prescriptions.manage", ct);
-        var template = await db.Set<PrescriptionTemplate>().AsNoTracking().Include(t => t.Lines).SingleOrDefaultAsync(t => t.Id == id, ct)
+        var template = await db.Set<PrescriptionTemplate>().AsNoTracking().SingleOrDefaultAsync(t => t.Id == id, ct)
             ?? throw Fail("MSG113", 404);
         return TemplateDto(template);
     }
@@ -701,7 +700,7 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
         var now = clock.GetUtcNow();
         if (id.HasValue)
         {
-            template = await db.Set<PrescriptionTemplate>().Include(t => t.Lines).SingleOrDefaultAsync(t => t.Id == id, ct) ?? throw Fail("MSG113", 404);
+            template = await db.Set<PrescriptionTemplate>().SingleOrDefaultAsync(t => t.Id == id, ct) ?? throw Fail("MSG113", 404);
             if (template.Version != c.ExpectedVersion) throw Fail("MSG111", 409, currentVersion: template.Version);
             if (!string.Equals(template.Code, code, StringComparison.Ordinal)) throw Fail("MSG04", field: "code", label: "Mã mẫu");
             before = JsonSerializer.Serialize(TemplateDto(template), Json);
@@ -760,7 +759,7 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
         var replay = await ReplayAsync<PrescriptionTemplateDto>(actor, c.RequestKey, hash, ct);
         if (replay.Found) return replay.Result!;
 
-        var template = await db.Set<PrescriptionTemplate>().Include(t => t.Lines).SingleOrDefaultAsync(t => t.Id == id, ct) ?? throw Fail("MSG113", 404);
+        var template = await db.Set<PrescriptionTemplate>().SingleOrDefaultAsync(t => t.Id == id, ct) ?? throw Fail("MSG113", 404);
         if (template.Version != c.ExpectedVersion) throw Fail("MSG111", 409, currentVersion: template.Version);
         var before = JsonSerializer.Serialize(TemplateDto(template), Json);
         template.IsActive = c.Active;
@@ -783,9 +782,8 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
         var profile = await db.Set<BranchProfile>().AsNoTracking().SingleOrDefaultAsync(x => x.Id == rx.BranchId, ct);
         var employee = await db.Employees.AsNoTracking().SingleAsync(x => x.Id == rx.PrescriberEmployeeId, ct);
         var patient = await db.Set<PatientProfile>().AsNoTracking().SingleAsync(x => x.Id == rx.PatientId, ct);
-        var items = await db.Set<PatientPrescriptionItem>().AsNoTracking().Where(x => x.PrescriptionId == rx.Id)
-            .OrderBy(x => x.Position).Select(x => new PatientProfilePrescriptionItemDto(x.Id, x.MedicineId, x.MedicineName,
-                x.MedicineCode, x.Strength, x.DosageForm, x.Unit, x.Quantity, x.Instructions)).ToArrayAsync(ct);
+        var items = rx.Items.OrderBy(x => x.Position).Select(x => new PatientProfilePrescriptionItemDto(x.Id, x.MedicineId, x.MedicineName,
+                x.MedicineCode, x.Strength, x.DosageForm, x.Unit, x.Quantity, x.Instructions)).ToArray();
         return new(rx.Id, rx.PatientId, rx.BranchId, NonEmpty(profile?.Name) ?? branch.Name, rx.PrescribedOn, rx.Diagnosis, rx.OtherDiagnosis,
             rx.Advice, employee.FullName, rx.Version, items, employee.Id, NonEmpty(profile?.Address), NonEmpty(profile?.Phone),
             NonEmpty(profile?.Email), patient.PatientCode, patient.FullName, patient.BirthDate, patient.Gender);
@@ -797,7 +795,7 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
 
     // Active members allowed to examine (CanDentist) in the given branches, with an active account.
     private async Task<PrescriptionDoctorOption[]> DoctorOptionsAsync(int[] branchIds, CancellationToken ct) =>
-        await (from m in db.Set<SchedulingMember>().AsNoTracking()
+        await (from m in db.SchedulingMembers.AsNoTracking()
                join e in db.Employees.AsNoTracking() on m.EmployeeId equals e.Id
                join u in db.Users.AsNoTracking() on e.AccountId equals u.Id
                where branchIds.Contains(m.BranchId) && m.Active && m.CanDentist && u.IsActive
@@ -882,7 +880,7 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
         var beforeJson = "{}";
         if (id.HasValue)
         {
-            rx = await db.Set<PatientPrescription>().Include(x => x.Items).SingleOrDefaultAsync(x => x.Id == id && x.PatientId == patientId, ct) ?? throw Fail("MSG113", 404);
+            rx = await db.Set<PatientPrescription>().SingleOrDefaultAsync(x => x.Id == id && x.PatientId == patientId, ct) ?? throw Fail("MSG113", 404);
             if (!state.BranchIds.Contains(rx.BranchId)) throw Fail("MSG06", 403);
             if (rx.Version != c.ExpectedVersion) throw Fail("MSG111", 409, currentVersion: rx.Version);
             beforeJson = JsonSerializer.Serialize(rx, Json);
@@ -963,8 +961,7 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
     {
         if (rows.Length == 0) return [];
         var ids = rows.Select(x => x.Id).ToArray();
-        var lines = await db.Set<ExternalPrescriptionLine>().AsNoTracking().Where(x => ids.Contains(x.PrescriptionId))
-            .OrderBy(x => x.CreatedAt).ThenBy(x => x.Id).ToArrayAsync(ct);
+        var lines = rows.SelectMany(x => x.Lines).OrderBy(x => x.CreatedAt).ThenBy(x => x.Id).ToArray();
         var branchIds = rows.Select(x => x.BranchId).Distinct().ToArray();
         var profiles = await db.Set<BranchProfile>().AsNoTracking().Where(x => branchIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.Name, ct);
         var branches = await db.Set<SchedulingBranch>().AsNoTracking().Where(x => branchIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.Name, ct);

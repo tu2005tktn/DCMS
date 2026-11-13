@@ -24,7 +24,7 @@ public sealed class TreatmentFinancialWorkspace(DcmsDbContext db, UserManager<Ap
             throw new BusinessException(403, SystemMessages.Get("MSG06"));
         var employee = await db.Employees.SingleOrDefaultAsync(x => x.AccountId == actorId, ct);
         if (employee == null) throw new BusinessException(403, SystemMessages.Get("MSG06"));
-        var branches = db.Set<SchedulingMember>().Where(x => x.EmployeeId == employee.Id && x.Active && (!scope.Assigned || scope.Owner || scope.BranchIds.Contains(x.BranchId))).Select(x => x.BranchId);
+        var branches = db.SchedulingMembers.Where(x => x.EmployeeId == employee.Id && x.Active && (!scope.Assigned || scope.Owner || scope.BranchIds.Contains(x.BranchId))).Select(x => x.BranchId);
         var rows = await db.TreatmentDossiers.AsNoTracking().Where(x => x.PatientId == patientId
             && x.State != "Deleted" && branches.Contains(x.BranchId)).OrderByDescending(x => x.UpdatedAt)
             .Select(x => new { x.Id, x.Code, x.State, x.BranchId }).ToListAsync(ct);

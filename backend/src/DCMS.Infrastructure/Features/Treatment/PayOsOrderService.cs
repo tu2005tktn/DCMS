@@ -55,7 +55,7 @@ public sealed class PayOsOrderService(DcmsDbContext db, ITreatmentDossierService
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
         await db.Database.ExecuteSqlRawAsync($"SELECT pg_advisory_xact_lock({DCMS.Infrastructure.Features.Scheduling.WorkingScheduleService.TransactionLock})", ct);
         var dossier = await dossiers.GetAsync(actorId, dossierId, ct);
-        var old = await db.DossierPayOsOrders.AsNoTracking().Include(x => x.Lines)
+        var old = await db.DossierPayOsOrders.AsNoTracking()
             .SingleOrDefaultAsync(x => x.RequestKey == request.RequestKey, ct);
         if (old != null)
         {
@@ -64,7 +64,7 @@ public sealed class PayOsOrderService(DcmsDbContext db, ITreatmentDossierService
                 new SystemMessage("PAYOS_LINK_FAILED", "Không tạo được QR PayOS. Vui lòng thử lại."));
             return Dto(old);
         }
-        var active = await db.DossierPayOsOrders.AsNoTracking().Include(x => x.Lines).SingleOrDefaultAsync(x => x.DossierId == dossierId && x.Purpose == "Treatment"
+        var active = await db.DossierPayOsOrders.AsNoTracking().SingleOrDefaultAsync(x => x.DossierId == dossierId && x.Purpose == "Treatment"
             && (x.State == "Creating" || x.State == "Pending" || x.State == "Review"), ct);
         if (active != null)
         {
@@ -130,7 +130,7 @@ public sealed class PayOsOrderService(DcmsDbContext db, ITreatmentDossierService
             || request.AmountVnd is < 1 or > 2_000_000_000 || string.IsNullOrWhiteSpace(request.Payer)
             || request.Payer.Length > 160 || request.Note?.Length > 1000) throw Bad();
         var fingerprint = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(request, Json))));
-        var old = await db.DossierPayOsOrders.AsNoTracking().Include(x => x.Lines)
+        var old = await db.DossierPayOsOrders.AsNoTracking()
             .SingleOrDefaultAsync(x => x.RequestKey == request.RequestKey, ct);
         if (old != null)
         {
@@ -180,7 +180,7 @@ public sealed class PayOsOrderService(DcmsDbContext db, ITreatmentDossierService
     public async Task<PayOsOrderDto> GetAdvanceAsync(int actorId, Guid dossierId, Guid orderId, CancellationToken ct)
     {
         await dossiers.GetAsync(actorId, dossierId, ct);
-        var order = await db.DossierPayOsOrders.Include(x => x.Lines)
+        var order = await db.DossierPayOsOrders
             .SingleOrDefaultAsync(x => x.Id == orderId && x.DossierId == dossierId && x.Purpose == "Advance", ct)
             ?? throw Missing();
         return await RefreshAsync(order, ct);
@@ -189,7 +189,7 @@ public sealed class PayOsOrderService(DcmsDbContext db, ITreatmentDossierService
     public async Task<PayOsOrderDto> GetAsync(int actorId, Guid dossierId, Guid orderId, CancellationToken ct)
     {
         await dossiers.GetAsync(actorId, dossierId, ct);
-        var order = await db.DossierPayOsOrders.Include(x => x.Lines)
+        var order = await db.DossierPayOsOrders
             .SingleOrDefaultAsync(x => x.Id == orderId && x.DossierId == dossierId && x.Purpose == "Treatment", ct)
             ?? throw Missing();
         return await RefreshAsync(order, ct);
@@ -256,7 +256,7 @@ public sealed class PayOsOrderService(DcmsDbContext db, ITreatmentDossierService
     {
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
         await db.Database.ExecuteSqlRawAsync($"SELECT pg_advisory_xact_lock({DCMS.Infrastructure.Features.Scheduling.WorkingScheduleService.TransactionLock})", ct);
-        var order = await db.DossierPayOsOrders.Include(x => x.Lines).SingleAsync(x => x.Id == orderId, ct);
+        var order = await db.DossierPayOsOrders.SingleAsync(x => x.Id == orderId, ct);
         await db.Entry(order).ReloadAsync(ct);
         if (order.State == "Paid") return;
         if (order.State != "Pending") return;

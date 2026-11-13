@@ -50,12 +50,12 @@ public sealed class BranchIsolationTests(ApiFixture fixture) : IClassFixture<Api
             db.AddRange(branch, p); await db.SaveChangesAsync();
             var svc = new SchedulingService { BranchId = branch.Id, Name = "SYNTHETIC Trám iso " + Guid.NewGuid().ToString("N")[..6], Unit = "răng", ReferenceUnitPriceVnd = 350000, PublicBookable = false };
             var chair = new SchedulingChair { BranchId = branch.Id, Name = "SYNTHETIC chair" };
-            db.AddRange(svc, chair, new SchedulingMember { BranchId = branch.Id, EmployeeId = staff.Id, CanDentist = true });
+            await db.AddSchedulingDataAsync(svc, chair, new SchedulingMember { BranchId = branch.Id, EmployeeId = staff.Id, CanDentist = true });
             await db.SaveChangesAsync();
             var start = DateTimeOffset.UtcNow.AddDays(2); var id = Guid.NewGuid();
-            db.Add(new ResourceReservation { Id = id, Code = "RV-" + id.ToString("N"), BranchId = branch.Id, DentistId = staff.Id, ChairId = chair.Id, ServiceId = svc.Id,
+            await db.AddSchedulingDataAsync(new ResourceReservation { Id = id, Code = "RV-" + id.ToString("N"), BranchId = branch.Id, DentistId = staff.Id, ChairId = chair.Id, ServiceId = svc.Id,
                 Start = start, End = start.AddHours(1), AttendeeKey = $"patient:{p.Id}", AttendeeLabel = p.FullName });
-            db.Add(new Appointment { Id = id, ReservationId = id, Code = "AP-" + id.ToString("N"), BranchId = branch.Id, PatientId = p.Id, DentistId = staff.Id, ChairId = chair.Id,
+            await db.AddSchedulingDataAsync(new Appointment { Id = id, ReservationId = id, Code = "AP-" + id.ToString("N"), BranchId = branch.Id, PatientId = p.Id, DentistId = staff.Id, ChairId = chair.Id,
                 ServiceId = svc.Id, BookerName = "SYNTHETIC", BookerPhone = "0900000000", AttendeeName = p.FullName, StartAt = start, EndAt = start.AddHours(1), CreatedAt = DateTimeOffset.UtcNow });
             await db.SaveChangesAsync();
             patient = p.Id; branchA = branch.Id; dentist = staff.Id; service = svc.Id;
@@ -94,7 +94,7 @@ public sealed class BranchIsolationTests(ApiFixture fixture) : IClassFixture<Api
         using var dentistB = await Login("dentist.b.demo"); using var assistantB = await Login("assistant.b.demo");
         using var scope = fixture.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
         var branchB = await db.Set<SchedulingBranch>().SingleAsync(x => x.Name == "S09 - Chi nhánh B");
-        var rows = await (from m in db.Set<SchedulingMember>() join e in db.Employees on m.EmployeeId equals e.Id join u in db.Users on e.AccountId equals u.Id
+        var rows = await (from m in db.SchedulingMembers join e in db.Employees on m.EmployeeId equals e.Id join u in db.Users on e.AccountId equals u.Id
             where u.UserName == "dentist.b.demo" || u.UserName == "assistant.b.demo" select new { u.UserName, m.BranchId, m.CanDentist }).ToListAsync();
         Assert.Equal(2, rows.Count); Assert.All(rows, r => Assert.Equal(branchB.Id, r.BranchId));
         Assert.True(rows.Single(r => r.UserName == "dentist.b.demo").CanDentist); Assert.False(rows.Single(r => r.UserName == "assistant.b.demo").CanDentist);

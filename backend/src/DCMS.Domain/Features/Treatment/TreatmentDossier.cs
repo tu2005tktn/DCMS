@@ -35,10 +35,15 @@ public sealed class TreatmentDossier
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
     public List<TreatmentItem> Items { get; set; } = [];
+    public List<TreatmentSheetDraft> SheetDrafts { get; set; } = [];
+    public List<TreatmentRevisionDraft> RevisionDrafts { get; set; } = [];
+    public Guid StorageStamp { get; set; } = Guid.NewGuid();
 }
 
 public sealed class TreatmentItem
 {
+    public List<TreatmentStep> Steps { get; set; } = [];
+    public Guid StorageStamp { get; set; } = Guid.NewGuid();
     public string? EntrySource { get; set; }
     public int? EntryRecordedBy { get; set; }
     public DateTimeOffset? EntryRecordedAt { get; set; }
@@ -105,7 +110,7 @@ public sealed class TreatmentItem
 }
 
 // One append-only source for plan snapshots, clinical state changes and warranty confirmation.
-public sealed class TreatmentEvent
+public sealed class TreatmentEvent : DCMS.Domain.Common.AuditRecord
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid DossierId { get; set; }
@@ -116,14 +121,11 @@ public sealed class TreatmentEvent
     public int DossierVersion { get; set; }
 }
 
-public sealed class TreatmentReceipt
+public sealed class TreatmentReceipt : DCMS.Domain.Common.CommandReceiptRecord
 {
-    public Guid RequestKey { get; set; }
     public int ActorId { get; set; }
     public string Command { get; set; } = "";
-    public string Fingerprint { get; set; } = "";
     public Guid DossierId { get; set; }
-    public string ResultJson { get; set; } = "{}";
 }
 
 // Editable sheet rows are saved independently of agreed plan items and posted clinical activities.

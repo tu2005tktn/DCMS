@@ -70,7 +70,7 @@ public sealed class ClinicalWorkApiTests(ClinicalWorkFixture fixture) : IClassFi
             where user.UserName == "assistant.demo" select employee.Id).SingleAsync();
         var branch = new SchedulingBranch { Name = "SYNTHETIC clinical " + Guid.NewGuid().ToString("N") };
         db.Add(branch); await db.SaveChangesAsync();
-        db.AddRange(new SchedulingMember { BranchId = branch.Id, EmployeeId = dentistId, CanDentist = true },
+        await db.AddSchedulingDataAsync(new SchedulingMember { BranchId = branch.Id, EmployeeId = dentistId, CanDentist = true },
             new SchedulingMember { BranchId = branch.Id, EmployeeId = assistantId },
             new SchedulingService { BranchId = branch.Id, Name = "SYNTHETIC trám", PublicDurationMinutes = 30 });
         await db.SaveChangesAsync();

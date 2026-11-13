@@ -108,7 +108,7 @@ public sealed partial class TreatmentDossierService
     {
         var dossier = await DossierAsync(actorId, dossierId, ct);
         var (lines, paid) = await PaymentLinesAsync(actorId, dossierId, ct);
-        var collectors = await (from member in db.Set<SchedulingMember>().AsNoTracking()
+        var collectors = await (from member in db.SchedulingMembers.AsNoTracking()
             join staff in db.Employees.AsNoTracking() on member.EmployeeId equals staff.Id
             where member.BranchId == dossier.BranchId && member.Active
             orderby staff.FullName
@@ -147,7 +147,7 @@ public sealed partial class TreatmentDossierService
         {
             var today = DateOnly.FromDateTime(clock.GetUtcNow().ToOffset(TimeSpan.FromHours(7)).DateTime);
             if (request.PaidOn > today || request.PaidOn.Year < 2000) throw Error("MSG04");
-            var collector = await (from member in db.Set<SchedulingMember>().AsNoTracking()
+            var collector = await (from member in db.SchedulingMembers.AsNoTracking()
                 join staff in db.Employees.AsNoTracking() on member.EmployeeId equals staff.Id
                 where member.BranchId == dossier.BranchId && member.Active && staff.Id == request.CollectorId
                 select staff.FullName).FirstOrDefaultAsync(ct) ?? throw Error("MSG04");

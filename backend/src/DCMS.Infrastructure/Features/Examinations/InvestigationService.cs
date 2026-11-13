@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using DCMS.Application.Common;
 using DCMS.Application.Features.Examinations;
 using DCMS.Domain.Features.Examinations;
@@ -21,7 +21,7 @@ public sealed class InvestigationService(DcmsDbContext db, ClinicalAccess access
         var own = await db.Employees.AnyAsync(x => x.Id == visit.DentistId && x.AccountId == actorId, ct);
         var active = visit.Status == VisitStatuses.InProgress;
         var confirmed = await db.Set<VisitExamination>().AnyAsync(x => x.VisitId == visitId && x.Confirmed, ct);
-        var rows = await db.Set<InvestigationOrder>().AsNoTracking().Where(x => x.VisitId == visitId).OrderBy(x => x.CreatedAt).ThenBy(x => x.Id).ToArrayAsync(ct);
+        var rows = await db.Investigations.AsNoTracking().Where(x => x.VisitId == visitId).OrderBy(x => x.CreatedAt).ThenBy(x => x.Id).ToArrayAsync(ct);
         var users = await db.Users.Where(x => rows.Select(r => r.CreatedBy).Contains(x.Id)
             || rows.Select(r => r.ResultBy).Contains(x.Id) || rows.Select(r => r.ReviewedBy).Contains(x.Id))
             .Select(x => new { x.Id, x.FullName }).ToDictionaryAsync(x => x.Id, x => x.FullName, ct);
@@ -66,7 +66,7 @@ public sealed class InvestigationService(DcmsDbContext db, ClinicalAccess access
             var dentist = await access.BranchAsync(actorId, visit.BranchId, false, ct);
             if (dentist && !await db.Employees.AnyAsync(x => x.Id == visit.DentistId && x.AccountId == actorId, ct)) throw Error("MSG06", 403);
         }
-        var row = id.HasValue ? await db.Set<InvestigationOrder>().SingleOrDefaultAsync(x => x.Id == id && x.VisitId == visitId, ct) ?? throw Error("MSG113",404) : null;
+        var row = id.HasValue ? visit.Investigations.SingleOrDefault(x => x.Id == id) ?? throw Error("MSG113",404) : null;
         var fingerprint = ExaminationService.Hash(new { visitId, id, action, payload });
         var receipt = await db.Set<ExaminationReceipt>().SingleOrDefaultAsync(x => x.ActorId == actorId && x.RequestKey == key, ct);
         if (receipt != null) {
@@ -87,11 +87,11 @@ public sealed class InvestigationService(DcmsDbContext db, ClinicalAccess access
             }
             if (!new[] {"XRay","Imaging","Lab","Pathology","Other"}.Contains(create.Kind) || string.IsNullOrWhiteSpace(create.Name) || create.Name.Length > 160
                 || create.Region?.Length > 200 || string.IsNullOrWhiteSpace(create.Reason) || create.Reason.Length > 1000
-                || await db.Set<InvestigationOrder>().CountAsync(x => x.VisitId == visitId, ct) >= 100) throw Error("MSG04");
+                || await db.Investigations.CountAsync(x => x.VisitId == visitId, ct) >= 100) throw Error("MSG04");
             row = new InvestigationOrder { VisitId = visitId, Kind = create.Kind, Name = create.Name.Trim(), Region = create.Region?.Trim(),
                 Reason = create.Reason.Trim(), RequiredForDiagnosis = create.RequiredForDiagnosis, CreatedBy = actorId,
                 CreatedAt = clock.GetUtcNow(), CreateRequestKey = key };
-            db.Add(row);
+            visit.Investigations.Add(row);
         } else if (payload is ReceiveInvestigationResult result) {
             if (row!.State != "Ordered") throw Error("MSG42",409);
             if (result.ResultText?.Length > 4000) throw Error("MSG04");
@@ -108,8 +108,8 @@ public sealed class InvestigationService(DcmsDbContext db, ClinicalAccess access
             if (await db.Set<ClinicalDocument>().CountAsync(x => fileIds.Contains(x.Id) && x.InvestigationId == row.Id && x.FileState == "Ready",ct) != fileIds.Length
                 || fileIds.Length == 0 && string.IsNullOrWhiteSpace(row.ResultText)) throw Error("MSG42",409);
             foreach (var file in await db.Set<ClinicalDocument>().Where(x => fileIds.Contains(x.Id)).ToArrayAsync(ct)) {
-                if (!await db.Set<DocumentReview>().AnyAsync(x => x.DocumentId == file.Id && x.VisitId == visitId,ct)) {
-                    db.Add(new DocumentReview { DocumentId = file.Id, VisitId = visitId, ReviewedBy = actorId, ReviewedAt = clock.GetUtcNow() });
+                if (!file.Reviews.Any(x => x.VisitId == visitId)) {
+                    file.Reviews.Add(new DocumentReview { DocumentId = file.Id, VisitId = visitId, ReviewedBy = actorId, ReviewedAt = clock.GetUtcNow() });
                     file.Version++; db.Add(new DocumentAudit { DocumentId = file.Id, ActorId = actorId, Action = "ClinicallyReviewed", OccurredAt = clock.GetUtcNow() });
                 }
             }

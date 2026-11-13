@@ -9,12 +9,10 @@ public sealed class VisitExamination
     public DateTimeOffset UpdatedAt { get; set; }
 }
 
-public sealed class ExaminationReceipt
+public sealed class ExaminationReceipt : DCMS.Domain.Common.CommandReceiptRecord
 {
     public int ActorId { get; set; }
-    public Guid RequestKey { get; set; }
     public Guid VisitId { get; set; }
-    public string Fingerprint { get; set; } = "";
 }
 
 public sealed class ClinicalDocument
@@ -38,6 +36,7 @@ public sealed class ClinicalDocument
     public int UploaderId { get; set; }
     public DateTimeOffset UploadedAt { get; set; }
     public int Version { get; set; } = 1;
+    public List<DocumentReview> Reviews { get; set; } = [];
 }
 
 public sealed class DocumentReview
@@ -48,7 +47,7 @@ public sealed class DocumentReview
     public DateTimeOffset ReviewedAt { get; set; }
 }
 
-public sealed class DocumentAudit
+public sealed class DocumentAudit : DCMS.Domain.Common.AuditRecord
 {
     public long Id { get; set; }
     public Guid DocumentId { get; set; }
@@ -58,10 +57,12 @@ public sealed class DocumentAudit
     public string? Note { get; set; }
 }
 
-public sealed class DocumentReceipt
+public sealed class DocumentReceipt : DCMS.Domain.Common.CommandReceiptRecord
 {
     public int ActorId { get; set; }
-    public Guid RequestKey { get; set; }
-    public string Fingerprint { get; set; } = "";
-    public string ResultJson { get; set; } = "[]";
+}
+
+public sealed class ClinicalSourceArchive : DCMS.Domain.Common.AuditRecord
+{
+    public string BeforeJson { get; set; } = "{}";
 }

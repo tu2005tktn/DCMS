@@ -64,10 +64,10 @@ public sealed class FamilyRecordApiTests(ApiFixture fixture) : IClassFixture<Api
         db.AddRange(branch, patient); await db.SaveChangesAsync();
         var service = new SchedulingService { BranchId = branch.Id, Name = "Khám", PublicDurationMinutes = 30, IsInitialExamination = true };
         var chair = new SchedulingChair { BranchId = branch.Id, Name = "SYNTHETIC chair", OpenMinute = 0, CloseMinute = 1440 };
-        db.AddRange(service, chair, new SchedulingMember { BranchId = branch.Id, EmployeeId = dentist.Id, CanDentist = true }, new SchedulingMember { BranchId = branch.Id, EmployeeId = assistantId }); await db.SaveChangesAsync();
+        await db.AddSchedulingDataAsync(service, chair, new SchedulingMember { BranchId = branch.Id, EmployeeId = dentist.Id, CanDentist = true }, new SchedulingMember { BranchId = branch.Id, EmployeeId = assistantId }); await db.SaveChangesAsync();
         var id = Guid.NewGuid(); var now = DateTimeOffset.UtcNow;
-        db.Add(new ResourceReservation { Id = id, Code = "RV-" + id.ToString("N"), BranchId = branch.Id, DentistId = dentist.Id, ChairId = chair.Id, ServiceId = service.Id, Start = now.AddDays(-1), End = now.AddDays(-1).AddHours(1), AttendeeLabel = name });
-        db.Add(new Appointment { Id = id, ReservationId = id, Code = "AP-" + id.ToString("N"), BranchId = branch.Id, PatientId = patient.Id, DentistId = dentist.Id, ChairId = chair.Id, ServiceId = service.Id, BookerName = "SYNTHETIC", AttendeeName = name, StartAt = now.AddDays(-1), EndAt = now.AddDays(-1).AddHours(1), CreatedAt = now,
+        await db.AddSchedulingDataAsync(new ResourceReservation { Id = id, Code = "RV-" + id.ToString("N"), BranchId = branch.Id, DentistId = dentist.Id, ChairId = chair.Id, ServiceId = service.Id, Start = now.AddDays(-1), End = now.AddDays(-1).AddHours(1), AttendeeLabel = name });
+        await db.AddSchedulingDataAsync(new Appointment { Id = id, ReservationId = id, Code = "AP-" + id.ToString("N"), BranchId = branch.Id, PatientId = patient.Id, DentistId = dentist.Id, ChairId = chair.Id, ServiceId = service.Id, BookerName = "SYNTHETIC", AttendeeName = name, StartAt = now.AddDays(-1), EndAt = now.AddDays(-1).AddHours(1), CreatedAt = now,
             BookerAccountId = linkedBooking ? ownerId : null, FamilyMemberId = linkedBooking ? member.Id : null, AttendeeBirthDate = linkedBooking ? member.BirthDate : null });
         await db.SaveChangesAsync();
         var visit = new Visit { AppointmentId = id, PatientId = patient.Id, BranchId = branch.Id, DentistId = dentist.Id, Status = VisitStatuses.Completed, ArrivalAt = now.AddDays(-1), RecordedAt = now, RecordedBy = (await db.Employees.Where(e => e.Id == assistantId).Select(e => e.AccountId).SingleAsync()), Note = "SYNTHETIC INTERNAL VISIT NOTE" };
@@ -163,7 +163,7 @@ public sealed class FamilyRecordApiTests(ApiFixture fixture) : IClassFixture<Api
                 case "PatientName": patient.FullName = "SYNTHETIC different patient"; break;
                 case "Archived": patient.IsArchived = true; break;
                 case "WrongPatient": appointment.PatientId = null; break;
-                case "WrongBranch": appointment.BranchId = await db.Set<SchedulingBranch>().Where(x => x.Id != s.BranchId).Select(x => x.Id).FirstAsync(); break;
+                case "WrongBranch": visit.BranchId = await db.Set<SchedulingBranch>().Where(x => x.Id != s.BranchId).Select(x => x.Id).FirstAsync(); break;
                 case "Cancelled": visit.Status = VisitStatuses.Cancelled; break;
             }
             await db.SaveChangesAsync();
@@ -337,7 +337,7 @@ public sealed class FamilyRecordApiTests(ApiFixture fixture) : IClassFixture<Api
             var code = "LIMIT-" + Guid.NewGuid().ToString("N");
             var group = new AccessGroup { Code = code, Name = code, NormalizedCode = code.ToUpperInvariant(), NormalizedName = code.ToUpperInvariant(), BaseRole = "ClinicAssistant" };
             group.Grants.Add(new AccessGroupGrant { GroupId = group.Id, Permission = "patient-links.read" });
-            db.AddRange(group, new StaffAccessAssignment { AccountId = actor, GroupId = group.Id, BranchIds = [s.BranchId] }, new SchedulingMember { BranchId = s.BranchId, EmployeeId = employee.Id });
+            await db.AddSchedulingDataAsync(group, new StaffAccessAssignment { AccountId = actor, GroupId = group.Id, BranchIds = [s.BranchId] }, new SchedulingMember { BranchId = s.BranchId, EmployeeId = employee.Id });
             await db.SaveChangesAsync();
         }
         using var client = await Client(userName);

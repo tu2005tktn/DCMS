@@ -32,7 +32,7 @@ public sealed class FamilyRecordAccess
     public int Version { get; set; } = 1;
 }
 
-public sealed class FamilyRecordAudit
+public sealed class FamilyRecordAudit : DCMS.Domain.Common.AuditRecord
 {
     public long Id { get; set; }
     public Guid AccessId { get; set; }
@@ -42,11 +42,8 @@ public sealed class FamilyRecordAudit
     public DateTimeOffset OccurredAt { get; set; }
 }
 
-public sealed class FamilyRecordReceipt
+public sealed class FamilyRecordReceipt : DCMS.Domain.Common.CommandReceiptRecord
 {
     public int ActorAccountId { get; set; }
-    public Guid RequestKey { get; set; }
     public Guid AccessId { get; set; }
-    public string Fingerprint { get; set; } = "";
-    public string ResultJson { get; set; } = "";
 }

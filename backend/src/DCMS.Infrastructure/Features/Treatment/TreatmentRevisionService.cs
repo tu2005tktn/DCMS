@@ -86,7 +86,7 @@ public sealed class TreatmentRevisionService(DcmsDbContext db, UserManager<Appli
             throw Error("MSG06", 403);
         var employeeId = await db.Employees.Where(x => x.AccountId == actorId).Select(x => (int?)x.Id)
             .SingleOrDefaultAsync(ct);
-        if (!employeeId.HasValue || !await db.Set<SchedulingMember>().AnyAsync(x =>
+        if (!employeeId.HasValue || !await db.SchedulingMembers.AnyAsync(x =>
                 x.BranchId == dossier.BranchId && x.EmployeeId == employeeId && x.Active && x.CanDentist, ct))
             throw Error("MSG06", 403);
         if (!await db.Patients.AnyAsync(x => x.Id == dossier.PatientId && !x.IsArchived, ct) ||
@@ -132,8 +132,8 @@ public sealed class TreatmentRevisionService(DcmsDbContext db, UserManager<Appli
     private async Task<(List<TreatmentStep> Steps, List<FollowUpInstruction> Instructions,
         List<Appointment> Bookings)> ImpactsAsync(Guid dossierId, Guid itemId, CancellationToken ct)
     {
-        var steps = await db.TreatmentSteps.Where(x => x.DossierId == dossierId && x.ItemId == itemId)
-            .OrderBy(x => x.Id).ToListAsync(ct);
+        var steps = await db.LoadTreatmentStepsAsync(db.TreatmentSteps.Where(x => x.DossierId == dossierId && x.ItemId == itemId)
+            .OrderBy(x => x.Id), ct);
         var instructions = await db.FollowUpInstructions.Where(x => x.DossierId == dossierId &&
             x.ItemId == itemId && (x.Status == "NeedsBooking" || x.Status == "Booked"))
             .OrderBy(x => x.Id).ToListAsync(ct);
@@ -180,8 +180,8 @@ public sealed class TreatmentRevisionService(DcmsDbContext db, UserManager<Appli
 
     private async Task<TreatmentRevisionDraft> DraftRowAsync(int actorId, Guid dossierId,
         Guid itemId, CancellationToken ct) =>
-        await db.TreatmentRevisionDrafts.SingleOrDefaultAsync(x => x.DossierId == dossierId &&
-            x.ItemId == itemId && x.ActorId == actorId, ct) ?? throw Error("MSG113", 404);
+        await db.LoadRevisionDraftAsync(db.TreatmentRevisionDrafts.Where(x => x.DossierId == dossierId &&
+            x.ItemId == itemId && x.ActorId == actorId), ct) ?? throw Error("MSG113", 404);
 
     public async Task<RevisionDraftDto> DraftAsync(int actorId, Guid dossierId, Guid itemId,
         CancellationToken ct)
@@ -233,14 +233,14 @@ public sealed class TreatmentRevisionService(DcmsDbContext db, UserManager<Appli
         var inTransactionReplay = await ReplayAsync<RevisionDraftDto>(actorId, request.RequestKey,
             "RevisionDraft", input, ct);
         if (inTransactionReplay != null) return inTransactionReplay;
-        var row = await db.TreatmentRevisionDrafts.SingleOrDefaultAsync(x => x.DossierId == dossierId &&
-            x.ItemId == itemId && x.ActorId == actorId, ct);
+        var row = await db.LoadRevisionDraftAsync(db.TreatmentRevisionDrafts.Where(x => x.DossierId == dossierId &&
+            x.ItemId == itemId && x.ActorId == actorId), ct);
         if (row == null)
         {
             if (request.ExpectedDraftVersion != 0) throw Error("MSG111", 409);
             row = new TreatmentRevisionDraft { DossierId = dossierId, ItemId = itemId,
                 ActorId = actorId, BasePlanVersion = request.BasePlanVersion };
-            db.TreatmentRevisionDrafts.Add(row);
+            await db.AddTreatmentDataAsync(row);
         }
         else
         {
@@ -286,9 +286,9 @@ public sealed class TreatmentRevisionService(DcmsDbContext db, UserManager<Appli
     public async Task DeleteDraftAsync(int actorId, Guid dossierId, Guid itemId, CancellationToken ct)
     {
         RequireOpen(await ScopedAsync(actorId, dossierId, itemId, ct));
-        var row = await db.TreatmentRevisionDrafts.SingleOrDefaultAsync(x => x.DossierId == dossierId &&
-            x.ItemId == itemId && x.ActorId == actorId, ct);
-        if (row != null) { db.TreatmentRevisionDrafts.Remove(row); await db.SaveChangesAsync(ct); }
+        var row = await db.LoadRevisionDraftAsync(db.TreatmentRevisionDrafts.Where(x => x.DossierId == dossierId &&
+            x.ItemId == itemId && x.ActorId == actorId), ct);
+        if (row != null) { await db.RemoveTreatmentDataAsync(row); await db.SaveChangesAsync(ct); }
     }
 
     private async Task<RevisionPreviewDto> BuildPreviewAsync(TreatmentDossier dossier,
@@ -471,7 +471,7 @@ public sealed class TreatmentRevisionService(DcmsDbContext db, UserManager<Appli
                     Items = detailBeforeSave.Items
                 }, Json)
             });
-            db.TreatmentRevisionDrafts.Remove(row);
+            await db.RemoveTreatmentDataAsync(row);
             await db.SaveChangesAsync(ct);
             var detail = await dossiers.GetAsync(actorId, dossierId, ct);
             var result = new RevisionChange(detail, item.Id, dossier.PlanVersion,

@@ -36,7 +36,7 @@ public static class DependencyInjection
         {
             configuration.GetSection("Identity:Password").Bind(options.Password);
             options.User.AllowedUserNameCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._";
-        }).AddRoles<IdentityRole<int>>().AddEntityFrameworkStores<DcmsDbContext>()
+        }).AddRoles<IdentityRole<int>>().AddUserStore<AccountUserStore>().AddRoleStore<AccountRoleStore>()
             // Password reset issues a security token, so the default token providers must be
             // registered; AddIdentityCore alone does not add them.
             .AddDefaultTokenProviders();

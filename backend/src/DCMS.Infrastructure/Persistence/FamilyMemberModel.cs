@@ -15,7 +15,7 @@ internal static class FamilyMemberModel
             b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.OwnerAccountId).OnDelete(DeleteBehavior.Restrict);
         });
         model.Entity<FamilyMemberReceipt>(b => {
-            b.ToTable("CUSTOMER_FAMILY_RECEIPT"); b.HasKey(x => new { x.OwnerAccountId, x.RequestKey });
+            b.HasIndex(new[] { "ReceiptType", "OwnerAccountId", "RequestKey" }, "UX_FamilyMemberReceipt_Scope").IsUnique().HasDatabaseName("UX_RECEIPT_OwnerAccountId_RequestKey");
             b.Property(x => x.Fingerprint).HasMaxLength(64); b.Property(x => x.ResultJson).HasColumnType("jsonb");
             b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.OwnerAccountId).OnDelete(DeleteBehavior.Restrict);
         });

@@ -27,7 +27,9 @@ internal static class VisitModel
             b.Property(x => x.ArrivalReason).HasMaxLength(500);
             b.Property(x => x.Note).HasMaxLength(1000);
             b.Property(x => x.SourceJson).HasColumnType("jsonb");
-            b.Property(x => x.Version).IsConcurrencyToken();
+            b.Property(x => x.Version).IsConcurrencyToken(false);
+            b.Property(x => x.StorageStamp).IsConcurrencyToken();
+            b.ComplexCollection(x => x.Investigations).ToJson();
             b.HasOne<Appointment>().WithOne().HasForeignKey<Visit>(x => x.AppointmentId).OnDelete(DeleteBehavior.Restrict);
             b.HasOne<PatientProfile>().WithMany().HasForeignKey(x => x.PatientId).OnDelete(DeleteBehavior.Restrict);
             b.HasOne<SchedulingBranch>().WithMany().HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Restrict);
@@ -36,15 +38,15 @@ internal static class VisitModel
         });
         model.Entity<ReceptionReceipt>(b =>
         {
-            b.ToTable("RECEPTION_RECEIPT");
-            b.HasKey(x => new { x.ActorAccountId, x.RequestKey });
+            b.HasIndex(new[] { "ReceiptType", "ActorAccountId", "RequestKey" }, "UX_ReceptionReceipt_Scope").IsUnique().HasDatabaseName("UX_RECEIPT_ActorAccountId_RequestKey");
             b.Property(x => x.Fingerprint).HasMaxLength(64);
             b.HasOne<Visit>().WithMany().HasForeignKey(x => x.VisitId).OnDelete(DeleteBehavior.Restrict);
             b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.ActorAccountId).OnDelete(DeleteBehavior.Restrict);
         });
         model.Entity<VisitAudit>(b =>
         {
-            b.ToTable("VISIT_AUDIT");
+            b.HasOne<DCMS.Domain.Features.Accounts.EmployeeProfile>().WithMany()
+                .HasForeignKey(x => x.DecidingDentistId).OnDelete(DeleteBehavior.Restrict);
             b.Property(x => x.Action).HasMaxLength(32);
             b.Property(x => x.BeforeJson).HasColumnType("jsonb");
             b.Property(x => x.AfterJson).HasColumnType("jsonb");

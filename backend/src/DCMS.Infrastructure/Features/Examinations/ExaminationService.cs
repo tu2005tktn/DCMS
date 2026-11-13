@@ -89,11 +89,11 @@ public sealed class ExaminationService(DcmsDbContext db, ClinicalAccess access, 
             var request = (CompleteExaminationVisit)payload;
             if (!request.WorkReviewed || e?.Confirmed != true || v.Status != VisitStatuses.InProgress || a.Status != "InProgress") throw new BusinessException(409, SystemMessages.Get("MSG239", field: "hoàn tất phiếu khám và kiểm tra công việc trước khi kết thúc lượt"));
             if (await db.ClinicalActivities.AnyAsync(x => x.VisitId == visitId && x.State == "Draft", ct)) throw new BusinessException(409, SystemMessages.Get("MSG239", field: "lượt còn hoạt động điều trị nháp"));
-            if (await db.Set<InvestigationOrder>().AnyAsync(x => x.VisitId == visitId && x.State != "Reviewed" && x.State != "Cancelled", ct))
+            if (await db.Investigations.AnyAsync(x => x.VisitId == visitId && x.State != "Reviewed" && x.State != "Cancelled", ct))
                 throw new BusinessException(409, SystemMessages.Get("MSG239",field:"còn chỉ định cận lâm sàng chưa được bác sĩ đọc hoặc hủy") with { Field = "investigations" });
             var content = Dto(e).Content;
             if (!HasDiagnosis(content) || string.IsNullOrWhiteSpace(content.Disposition)) throw new BusinessException(409, SystemMessages.Get("MSG239", field: "phiếu khám còn thiếu chẩn đoán hoặc hướng xử trí"));
-            if (await db.Set<InvestigationOrder>().AnyAsync(x => x.VisitId == visitId && x.State != "Cancelled" && (x.BillingMode == "Clinic" || x.BillingMode == "OutsourcedClinic") && x.PerformedAt == null,ct))
+            if (await db.Investigations.AnyAsync(x => x.VisitId == visitId && x.State != "Cancelled" && (x.BillingMode == "Clinic" || x.BillingMode == "OutsourcedClinic") && x.PerformedAt == null,ct))
                 throw new BusinessException(409, SystemMessages.Get("MSG42") with { Message = "Còn dịch vụ cận lâm sàng đã lập phí chưa xác nhận thực hiện. Hãy xác nhận thực hiện hoặc hủy chỉ định." });
             await fees.OnCompletionAsync(actorId,v,request.ExaminationFee,ct);
             v.Status = VisitStatuses.Completed; a.Status = "Completed"; a.Version++;
@@ -106,7 +106,7 @@ public sealed class ExaminationService(DcmsDbContext db, ClinicalAccess access, 
                 if (e?.Confirmed != true || (v.Status != VisitStatuses.InProgress && v.Status != VisitStatuses.Completed)) throw Error("MSG42", 409);
                 if (string.IsNullOrWhiteSpace(amendment.Reason) || amendment.Reason.Length > 1000) throw new BusinessException(400, SystemMessages.Get("MSG04", field: "Lý do đính chính (tối đa 1000 ký tự)"));
             } else if (v.Status != VisitStatuses.InProgress || a.Status != "InProgress" || e?.Confirmed == true) throw Error("MSG42", 409);
-            if (save.Confirm && await db.Set<InvestigationOrder>().AnyAsync(x => x.VisitId == visitId && x.RequiredForDiagnosis && x.State != "Reviewed" && x.State != "Cancelled", ct))
+            if (save.Confirm && await db.Investigations.AnyAsync(x => x.VisitId == visitId && x.RequiredForDiagnosis && x.State != "Reviewed" && x.State != "Cancelled", ct))
                 throw new BusinessException(409, SystemMessages.Get("MSG239",field:"cần nhận và đọc kết quả cận lâm sàng trước khi hoàn tất khám") with { Field = "investigations" });
             Validate(save.Content, save.Confirm);
             await ValidateDiagnosisReferences(save.Content,e == null ? null : JsonSerializer.Deserialize<ExaminationContent>(e.ContentJson,Json),ct);

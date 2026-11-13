@@ -1,5 +1,7 @@
 # Kế hoạch điều trị dùng lại trong chi nhánh
 
+Cập nhật lưu trữ ngày 12/11/2026 theo [thiết kế bốn bảng điều trị](TREATMENT-FOUR-TABLES.vi.md). Kế hoạch mẫu chứa danh sách hạng mục và phiên bản trong JSONB. Áp dụng vào phiếu tạo các hạng mục riêng cho bệnh nhân trong `TREATMENT_PLAN_ITEM`, cho phép nha sĩ chỉnh sửa theo quy trình hiện tại.
+
 ## Áp dụng vào phiếu — 02/11/2026
 Gỡ màn hình/link Mẫu tiến trình cũ và picker legacy trong tab Steps; route legacy redirect trang kế hoạch, giữ API/dữ liệu cũ và quản lý bước bệnh nhân. Bỏ Lịch sử phiếu trên TreatmentSheet, giữ audit backend/lịch sử thanh toán. Nút Kế hoạch điều trị ở đầu bảng mở Modal tìm/phân trang theo đúng branch, xem snapshot và tổng; Áp dụng thêm toàn bộ cuối bảng, không thay hàng cũ. Không mở khi đang sửa hàng; giữ ghi chú cuối phiếu đang nhập. Ngày/răng/phút/note/assistant/cost lấy nguồn, dentist dùng bác sĩ của phiếu, quantity1/discount0. Không thay giá theo catalog. Nguồn inactive/sai branch/dữ liệu không phù hợp phiếu chặn toàn bộ, chỉ rõ hàng lỗi.
 
