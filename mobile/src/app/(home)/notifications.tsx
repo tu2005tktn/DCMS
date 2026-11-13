@@ -91,7 +91,6 @@ export default function NotificationListScreen() {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.title}>Thông báo</Text>
-        <Text style={styles.subtitle}>Chỉ thông báo lịch hẹn của tài khoản hiện tại.</Text>
         <View style={styles.filters}>
           <Pressable onPress={() => setUnreadOnly(false)} style={[styles.filter, !unreadOnly && styles.filterActive]} accessibilityRole="button"><Text style={[styles.filterText, !unreadOnly && styles.filterTextActive]}>Tất cả</Text></Pressable>
           <Pressable onPress={() => setUnreadOnly(true)} style={[styles.filter, unreadOnly && styles.filterActive]} accessibilityRole="button"><Text style={[styles.filterText, unreadOnly && styles.filterTextActive]}>Chưa đọc</Text></Pressable>

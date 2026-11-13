@@ -233,7 +233,12 @@ export type NotificationKind =
   | 'SupportRequestCreated'  // gửi yêu cầu hỗ trợ / đổi lịch < 12h
   | 'SupportRequestUpdate'   // staff phản hồi request
   | 'NoShow'                 // staff đánh dấu không đến
-  | 'ScheduleReduced';       // lịch bị ảnh hưởng
+  | 'ScheduleReduced'       // lịch bị ảnh hưởng
+  | 'FollowUpBookingRequested'
+  | 'MedicalRecordUpdated'
+  | 'PrescriptionReady'
+  | 'TreatmentUpdated'
+  | 'PaymentRecorded';
 
 /** Kênh dispatch — in-app authoritative, external qua adapter. */
 export type NotificationChannel = 'InApp' | 'Email' | 'Push' | 'Sms';

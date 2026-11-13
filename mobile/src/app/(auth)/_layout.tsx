@@ -22,7 +22,10 @@ export default function AuthLayout() {
     // Ở đó user sẽ thấy mục "Trang chủ tài khoản" mới xuất hiện.
     return <Redirect href="/(home)/" />;
   }
-  return <Stack screenOptions={{ headerTitle: 'Tài khoản' }} />;
+  return <Stack screenOptions={{ headerTitle: 'Tài khoản', headerTintColor: colors.primary }}>
+    <Stack.Screen name="sign-in" options={{ headerShown: false }} />
+    <Stack.Screen name="register" options={{ headerShown: false }} />
+  </Stack>;
 }
 
 const styles = StyleSheet.create({

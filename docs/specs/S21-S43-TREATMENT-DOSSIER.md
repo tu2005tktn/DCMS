@@ -84,6 +84,7 @@ Giá catalog của `SchedulingService` thêm `referenceUnitPriceVnd?` và `price
 `GET /api/dossiers/{id}` trả `financialSummary` có `available`, `plannedVnd`, và khi có ledger DCMS-101: postedCharge, received, allocated, outstanding, sourceVersion. Production hiện chưa có ledger, vì vậy các số sau chỉ hiển thị `unavailable`, không được suy từ plan/payment terms. SourceDiagnosisId DCMS-94 vẫn fail closed khi adapter chưa có; Web giữ lối vào từ Patient. Commit nháp, chốt plan, phê duyệt và bảo hành dùng version + request receipt; lỗi stale MSG111 giữ form. Snapshot plan cũ, actual và tiền đã post không bị viết lại.
 
 AT30/31/33/34/36/39 và yêu cầu task: dossier nhiều lượt/item; đồng ý trám 25 và hoãn chữa tủy 46; snapshot giá; dự kiến không tạo Appointment; MSG243 khi còn agreed item chưa xử lý; closure StoppedIncomplete không xóa actual/debt; bảo hành xác nhận riêng, không suy từ Labo; quyền Patient/branch, retry và conflict giữ draft. Kiểm thử API trên PostgreSQL schema cách ly, Web bằng mock DTO chung, sau đó API thật khi các module nguồn sẵn sàng. Không ghi hoàn tất các ca phụ thuộc nguồn thật nếu chưa có bằng chứng.
+- Cổng bệnh nhân web có màn Hồ sơ điều trị chỉ đọc, lấy `GET /api/patients/me/treatment-summary` bằng phiên khách hàng. Mỗi hồ sơ hiển thị hạng mục bác sĩ đã thực hiện từ `performedItems` và kế hoạch đã đồng ý; không hiển thị nháp hoặc hồ sơ của người không có liên kết VERIFIED.
 
 ## Màn "Dịch vụ" thay cho "Giá và duyệt điều trị" (06/11/2026)
 

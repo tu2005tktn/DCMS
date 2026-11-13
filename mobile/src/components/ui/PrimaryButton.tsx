@@ -48,7 +48,7 @@ export function PrimaryButton({ label, onPress, loading = false, disabled = fals
 const styles = StyleSheet.create({
   button: {
     backgroundColor: colors.primary,
-    borderRadius: 8,
+    borderRadius: 12,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
     minHeight: 48,

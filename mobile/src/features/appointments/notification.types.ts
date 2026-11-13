@@ -25,7 +25,12 @@ export type NotificationKind =
   | 'SupportRequestCreated'
   | 'SupportRequestUpdate'
   | 'NoShow'
-  | 'ScheduleReduced';
+  | 'ScheduleReduced'
+  | 'FollowUpBookingRequested'
+  | 'MedicalRecordUpdated'
+  | 'PrescriptionReady'
+  | 'TreatmentUpdated'
+  | 'PaymentRecorded';
 
 /** Kênh dispatch. In-app authoritative; external tuỳ adapter/cấu hình. */
 export type NotificationChannel = 'InApp' | 'Email' | 'Push' | 'Sms';
