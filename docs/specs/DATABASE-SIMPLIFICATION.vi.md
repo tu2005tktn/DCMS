@@ -40,14 +40,15 @@ Phát hiện ID đơn hoặc mẫu trùng giữa các nguồn phải làm migrat
 
 | Hạng mục | Trước | Sau |
 | --- | --- | --- |
-| Bảng trong relational model EF | 130 | 33 |
-| Base table trong schema `public` của DB phát triển | 132 | 34 |
+| Bảng trong relational model EF | 130 | 31 |
+| Base table trong schema `public` của DB phát triển | 132 | 32 |
 | Tài khoản và phân quyền | 15 | 2 |
 | Điều trị (phiếu, kế hoạch, quá trình, mẫu, sự kiện) | 14 | 4, sự kiện nằm trong kho audit chung |
 | Chăm sóc bệnh nhân | 3 | 1 |
 | Labo (phiếu, lịch sử, danh mục) | 3 | 2 |
 | Tài chính | 18 | 0, đã gỡ để đặc tả lại |
 | Thiết lập và danh mục | 6 | 3, lịch sử danh mục nằm trong kho receipt chung |
+| Thông báo | 3 | 1, lượt gửi và việc xử lý là loại dòng riêng |
 | Kho receipt theo module | 18 | 1 |
 | Kho audit theo module | 10 | 1 |
 | Kho đơn và mẫu đơn | 3 | 1 |
@@ -79,3 +80,5 @@ Migration `20261113013443_ConsolidateTreatmentStorage` đã gộp mười bảng
 Ngày 13/11/2026, migration `20261113022238_ConsolidateCareAndLabStorage` gộp chăm sóc bệnh nhân về `CARE_TASK` và labo về `LAB_ORDER` cùng danh mục `LAB_WORK_TYPE`; migration `20261113072340_RemoveFinanceStorage` gỡ 18 bảng tài chính theo yêu cầu chủ dự án, chức năng sẽ đặc tả và thêm lại sau. DB phát triển giảm từ 58 xuống 37 bảng, model EF còn 36 bảng. Đã đối chiếu 2.743 dòng của 39 nguồn được giữ trên bản sao (Up, Down, Up lại) và trực tiếp sau áp dụng. Lượt integration toàn bộ đạt 504/507, 2 skip; lỗi còn lại ở bước xóa phiếu labo đã sửa và chạy lại đạt. Có 100 unit test đạt. Xem [chăm sóc, labo và tài chính](CARE-LAB-FINANCE-STORAGE.vi.md).
 
 Migration `20261113081111_ConsolidateSettingsStorage` rút nhóm thiết lập và danh mục từ 6 xuống 3 bảng: lịch sử và chống gửi trùng của danh mục chuyển vào `COMMAND_RECEIPT`, hai bảng của module `/api/settings` cũ được lưu snapshot trong `AUDIT_LOG` rồi bỏ. DB phát triển giảm từ 37 xuống 34 bảng, model EF còn 33 bảng. Đã đối chiếu 2.740 dòng của 36 nguồn trên bản sao (Up, Down, Up lại) và trực tiếp sau áp dụng. Lượt integration toàn bộ đạt 509/511, 2 skip; 100 unit test đạt. Xem [thiết lập và danh mục trong ba bảng](SETTINGS-CATALOG-STORAGE.vi.md).
+
+Migration `20261113084455_ConsolidateNotificationStorage` gộp thông báo về `IN_APP_NOTIFICATION`: lượt gửi theo kênh và việc nhân viên xử lý thành các loại dòng của bảng, giữ khóa ngoại và index (lọc theo loại dòng). Nhóm bệnh nhân và gia đình giữ bốn bảng theo quyết định của chủ dự án. DB phát triển giảm từ 34 xuống 32 bảng, model EF còn 31 bảng. Đã đối chiếu 2.708 dòng của 33 nguồn trên bản sao (Up, Down, Up lại) và trực tiếp sau áp dụng. Lượt integration toàn bộ đạt 511/513, 2 skip; 100 unit test đạt. Xem [thông báo trong một bảng](NOTIFICATION-STORAGE.vi.md).

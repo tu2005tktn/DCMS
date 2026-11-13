@@ -110,9 +110,10 @@ public sealed class InAppNotification : NotificationRecord
     public List<NotificationDelivery> Deliveries { get; set; } = [];
 }
 
-public sealed class NotificationDelivery
+// One delivery attempt record per notification and channel; stored as a row kind of IN_APP_NOTIFICATION
+// (docs/specs/NOTIFICATION-STORAGE.vi.md).
+public sealed class NotificationDelivery : NotificationRecord
 {
-    public Guid Id { get; set; } = Guid.NewGuid();
     public Guid NotificationId { get; set; }
     public string Channel { get; set; } = "InApp";
     public string Status { get; set; } = "Pending";
@@ -135,9 +136,9 @@ public sealed class AppointmentReminder
     public DateTimeOffset? ProcessedAt { get; set; }
 }
 
-public sealed class StaffHandlingItem
+// Work item for staff after an external delivery failed; stored as a row kind of IN_APP_NOTIFICATION.
+public sealed class StaffHandlingItem : NotificationRecord
 {
-    public Guid Id { get; set; } = Guid.NewGuid();
     public string Kind { get; set; } = "ExternalDeliveryFailed";
     public int? BranchId { get; set; }
     public Guid? AppointmentId { get; set; }

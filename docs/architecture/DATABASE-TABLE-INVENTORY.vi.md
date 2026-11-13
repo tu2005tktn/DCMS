@@ -1,6 +1,6 @@
 # Danh sách bảng sau rút gọn
 
-Cập nhật ngày 13/11/2026. Schema đã áp dụng có 33 bảng trong model EF và 34 bảng vật lý trong schema `public`. Bảng ngoài model là `__EFMigrationsHistory`. Các schema `dcms_test_*` là môi trường kiểm thử tách biệt.
+Cập nhật ngày 13/11/2026. Schema đã áp dụng có 31 bảng trong model EF và 32 bảng vật lý trong schema `public`. Bảng ngoài model là `__EFMigrationsHistory`. Các schema `dcms_test_*` là môi trường kiểm thử tách biệt.
 
 Riêng tài khoản và phân quyền chỉ có `USER_ACCOUNT` và `ACCESS_GROUP`. Riêng đơn thuốc và danh mục thuốc chỉ có `PRESCRIPTION` và `CATALOG_MEDICINE`. Nhật ký và kết quả chống ghi trùng dùng hai kho chung cho toàn hệ thống.
 
@@ -14,6 +14,8 @@ Chăm sóc bệnh nhân chỉ còn `CARE_TASK`; labo còn phiếu labo `LAB_ORDE
 
 Thiết lập và danh mục còn `CLINIC_SETTINGS_VERSION`, `REFERENCE_ENTRY`, `CATALOG_PROVIDER`; lịch sử thay đổi danh mục nằm trong kho receipt dùng chung. Xem [thiết lập và danh mục trong ba bảng](../specs/SETTINGS-CATALOG-STORAGE.vi.md).
 
+Thông báo chỉ còn `IN_APP_NOTIFICATION`; lượt gửi và việc nhân viên xử lý là các loại dòng trong bảng. Nhóm bệnh nhân và gia đình giữ bốn bảng. Xem [thông báo trong một bảng](../specs/NOTIFICATION-STORAGE.vi.md).
+
 | Bảng | Lưu trữ |
 | --- | --- |
 | `USER_ACCOUNT` | Tài khoản, mật khẩu băm, thông tin nhân viên, vai trò, nhóm được gán, chi nhánh, claims, Google, phiên đăng nhập, refresh token, xác minh email và khôi phục. |
@@ -26,9 +28,7 @@ Thiết lập và danh mục còn `CLINIC_SETTINGS_VERSION`, `REFERENCE_ENTRY`, 
 | `SCHEDULING_SERVICE` | Danh mục dịch vụ điều trị dùng chung cho điều trị và đặt lịch; gồm thời lượng, giá tham chiếu, chi nhánh và điều kiện cho khách tự đặt. |
 | `WORKING_SCHEDULE` | Lịch tuần cũ và các lần công bố lịch lặp/ngoại lệ; giữ ngày hiệu lực, phiên bản và các khoảng giờ JSONB. |
 | `APPOINTMENT` | Lịch hẹn và giữ chỗ dùng chung dòng; gồm người đặt/người khám, nhân sự, ghế, dịch vụ, thời gian, trạng thái, yêu cầu hỗ trợ và kế hoạch nhắc lịch. |
-| `IN_APP_NOTIFICATION` | Thông báo hiển thị cho tài khoản và sự kiện chờ xử lý; phân biệt loại bản ghi để xử lý/gửi lại. |
-| `NOTIFICATION_DELIVERY` | Lần gửi thông báo, số lần thử và kết quả gửi. |
-| `STAFF_HANDLING_ITEM` | Việc cần nhân viên xử lý từ lịch hẹn và thông báo. |
+| `IN_APP_NOTIFICATION` | Thông báo cho tài khoản, sự kiện chờ gửi của lịch hẹn, từng lượt gửi theo kênh (trạng thái, số lần thử, lỗi) và việc nhân viên cần xử lý khi gửi thất bại; phân biệt bằng loại dòng. |
 | `VISIT` | Lượt đến khám, tiếp nhận, bác sĩ phụ trách, trạng thái, nội dung khám và kết luận; các chỉ định, kết quả và snapshot báo giá trong JSONB. |
 | `CLINICAL_DOCUMENT` | Metadata tài liệu lâm sàng, liên kết tệp và trạng thái xử lý; các lần bác sĩ đọc tài liệu theo lượt khám trong JSONB. |
 | `PRESCRIPTION` | Đơn thuốc, mẫu đơn và phiên bản đơn; danh sách thuốc nằm trong JSONB. |

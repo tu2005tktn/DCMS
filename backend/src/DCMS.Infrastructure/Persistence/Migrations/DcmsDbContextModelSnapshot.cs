@@ -419,48 +419,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("DCMS.Domain.Features.Appointments.NotificationDelivery", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("AttemptCount")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Channel")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
-
-                    b.Property<DateTimeOffset?>("LastAttemptAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("LastError")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.Property<DateTimeOffset?>("NextRetryAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("NotificationId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("NotificationId", "Channel")
-                        .IsUnique();
-
-                    b.HasIndex("Status", "NextRetryAt");
-
-                    b.ToTable("NOTIFICATION_DELIVERY", (string)null);
-                });
-
             modelBuilder.Entity("DCMS.Domain.Features.Appointments.NotificationRecord", b =>
                 {
                     b.Property<Guid>("Id")
@@ -479,53 +437,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasDiscriminator<string>("NotificationRecordKind").HasValue("NotificationRecord");
 
                     b.UseTphMappingStrategy();
-                });
-
-            modelBuilder.Entity("DCMS.Domain.Features.Appointments.StaffHandlingItem", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("AppointmentId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("AttemptCount")
-                        .HasColumnType("integer");
-
-                    b.Property<int?>("BranchId")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Error")
-                        .IsRequired()
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.Property<string>("Kind")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)");
-
-                    b.Property<Guid?>("NotificationId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AppointmentId");
-
-                    b.HasIndex("NotificationId");
-
-                    b.HasIndex("Status", "CreatedAt");
-
-                    b.ToTable("STAFF_HANDLING_ITEM", (string)null);
                 });
 
             modelBuilder.Entity("DCMS.Domain.Features.Examinations.ClinicalDocument", b =>
@@ -5318,7 +5229,9 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer");
 
                     b.Property<Guid?>("AppointmentId")
-                        .HasColumnType("uuid");
+                        .ValueGeneratedOnUpdateSometimes()
+                        .HasColumnType("uuid")
+                        .HasColumnName("AppointmentId");
 
                     b.Property<string>("Body")
                         .IsRequired()
@@ -5326,10 +5239,14 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(1000)");
 
                     b.Property<int?>("BranchId")
-                        .HasColumnType("integer");
+                        .ValueGeneratedOnUpdateSometimes()
+                        .HasColumnType("integer")
+                        .HasColumnName("BranchId");
 
                     b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .ValueGeneratedOnUpdateSometimes()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreatedAt");
 
                     b.Property<string>("DedupeKey")
                         .IsRequired()
@@ -5345,8 +5262,10 @@ namespace DCMS.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Kind")
                         .IsRequired()
+                        .ValueGeneratedOnUpdateSometimes()
                         .HasMaxLength(40)
-                        .HasColumnType("character varying(40)");
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("Kind");
 
                     b.Property<string>("PublicId")
                         .IsRequired()
@@ -5375,6 +5294,110 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasIndex("AccountId", "CreatedAt");
 
                     b.HasDiscriminator().HasValue("InAppNotification");
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Appointments.NotificationDelivery", b =>
+                {
+                    b.HasBaseType("DCMS.Domain.Features.Appointments.NotificationRecord");
+
+                    b.Property<int>("AttemptCount")
+                        .ValueGeneratedOnUpdateSometimes()
+                        .HasColumnType("integer")
+                        .HasColumnName("AttemptCount");
+
+                    b.Property<string>("Channel")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<DateTimeOffset?>("LastAttemptAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTimeOffset?>("NextRetryAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("NotificationId")
+                        .ValueGeneratedOnUpdateSometimes()
+                        .HasColumnType("uuid")
+                        .HasColumnName("NotificationId");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnUpdateSometimes()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("Status");
+
+                    b.HasIndex("NotificationId", "Channel")
+                        .IsUnique()
+                        .HasFilter("\"NotificationRecordKind\" = 'NotificationDelivery'");
+
+                    b.HasIndex("Status", "NextRetryAt")
+                        .HasFilter("\"NotificationRecordKind\" = 'NotificationDelivery'");
+
+                    b.HasDiscriminator().HasValue("NotificationDelivery");
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Appointments.StaffHandlingItem", b =>
+                {
+                    b.HasBaseType("DCMS.Domain.Features.Appointments.NotificationRecord");
+
+                    b.Property<Guid?>("AppointmentId")
+                        .ValueGeneratedOnUpdateSometimes()
+                        .HasColumnType("uuid")
+                        .HasColumnName("AppointmentId");
+
+                    b.Property<int>("AttemptCount")
+                        .ValueGeneratedOnUpdateSometimes()
+                        .HasColumnType("integer")
+                        .HasColumnName("AttemptCount");
+
+                    b.Property<int?>("BranchId")
+                        .ValueGeneratedOnUpdateSometimes()
+                        .HasColumnType("integer")
+                        .HasColumnName("BranchId");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnUpdateSometimes()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreatedAt");
+
+                    b.Property<string>("Error")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .ValueGeneratedOnUpdateSometimes()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("Kind");
+
+                    b.Property<Guid?>("NotificationId")
+                        .ValueGeneratedOnUpdateSometimes()
+                        .HasColumnType("uuid")
+                        .HasColumnName("NotificationId");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnUpdateSometimes()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("Status");
+
+                    b.HasIndex("AppointmentId");
+
+                    b.HasIndex("NotificationId");
+
+                    b.HasIndex("Status", "CreatedAt")
+                        .HasFilter("\"NotificationRecordKind\" = 'StaffHandlingItem'");
+
+                    b.HasDiscriminator().HasValue("StaffHandlingItem");
                 });
 
             modelBuilder.Entity("DCMS.Domain.Features.Scheduling.WorkingScheduleRevision", b =>
@@ -5982,29 +6005,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasForeignKey("DCMS.Domain.Features.Appointments.Appointment", "ReservationId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-                });
-
-            modelBuilder.Entity("DCMS.Domain.Features.Appointments.NotificationDelivery", b =>
-                {
-                    b.HasOne("DCMS.Domain.Features.Appointments.InAppNotification", null)
-                        .WithMany("Deliveries")
-                        .HasForeignKey("NotificationId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("DCMS.Domain.Features.Appointments.StaffHandlingItem", b =>
-                {
-                    b.HasOne("DCMS.Domain.Features.Appointments.Appointment", null)
-                        .WithMany()
-                        .HasForeignKey("AppointmentId")
-                        .HasPrincipalKey("Id")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("DCMS.Domain.Features.Appointments.InAppNotification", null)
-                        .WithMany()
-                        .HasForeignKey("NotificationId")
-                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("DCMS.Domain.Features.Examinations.ClinicalDocument", b =>
@@ -6723,6 +6723,29 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("AppointmentId")
                         .HasPrincipalKey("Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Appointments.NotificationDelivery", b =>
+                {
+                    b.HasOne("DCMS.Domain.Features.Appointments.InAppNotification", null)
+                        .WithMany("Deliveries")
+                        .HasForeignKey("NotificationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Appointments.StaffHandlingItem", b =>
+                {
+                    b.HasOne("DCMS.Domain.Features.Appointments.Appointment", null)
+                        .WithMany()
+                        .HasForeignKey("AppointmentId")
+                        .HasPrincipalKey("Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("DCMS.Domain.Features.Appointments.InAppNotification", null)
+                        .WithMany()
+                        .HasForeignKey("NotificationId")
                         .OnDelete(DeleteBehavior.Restrict);
                 });
 
