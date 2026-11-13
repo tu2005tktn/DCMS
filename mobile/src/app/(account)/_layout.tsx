@@ -9,6 +9,7 @@ import { Stack } from 'expo-router';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { useAuthGuard } from '@/features/auth/session/useAuthGuard';
 import { colors } from '@/theme/colors';
+import PatientBottomNav from '@/components/PatientBottomNav';
 
 export default function AccountLayout() {
   const { ready, authorized } = useAuthGuard();
@@ -20,7 +21,9 @@ export default function AccountLayout() {
     );
   }
   if (!authorized) return null;
-  return <Stack screenOptions={{ headerTitle: 'Tài khoản' }} />;
+  return <View style={{ flex: 1 }}><Stack screenOptions={{ headerTitle: 'Tài khoản', headerTintColor: colors.primary }}>
+    <Stack.Screen name="home" options={{ headerShown: false }} />
+  </Stack><PatientBottomNav /></View>;
 }
 
 const styles = StyleSheet.create({

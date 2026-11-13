@@ -135,7 +135,7 @@ export default function VisitResultDetailScreen() {
       </Card>}
 
       {visit.hasPrescription && <Card title="Đơn thuốc mua ngoài">
-        <Button title="Xem đơn thuốc của lượt này" variant="secondary" onPress={() => router.push(`/(account)/prescriptions/${visit.visitId}`)} />
+        <Button title="Xem đơn thuốc" variant="secondary" onPress={() => router.push('/(account)/prescriptions')} />
       </Card>}
 
       <Card title={`Hình ảnh & tài liệu (${documentTotal})`}>

@@ -891,8 +891,19 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
         var dossiers = await db.TreatmentDossiers.AsNoTracking().Include(x => x.Items)
             .Where(x => patientIds.Contains(x.PatientId) && x.PlanState == "Committed" && x.State != "Deleted")
             .OrderByDescending(x => x.StartedOn).ToListAsync(ct);
+        var dossierIds = dossiers.Select(x => x.Id).ToArray();
+        var activities = await db.ClinicalActivities.AsNoTracking()
+            .Where(x => x.DossierId.HasValue && dossierIds.Contains(x.DossierId.Value) && x.State == "Posted")
+            .OrderByDescending(x => x.PerformedAt).ToArrayAsync(ct);
         return dossiers.Select(x => new OwnTreatmentSummaryItem(x.Id, x.Code, x.State, x.StartedOn,
             x.Diagnosis, x.PlanVersion, x.Items.Where(item => item.Decision == "Agreed")
-                .OrderBy(item => item.PlannedOrder).Select(ItemDto).ToArray())).ToArray();
+                .OrderBy(item => item.PlannedOrder).Select(ItemDto).ToArray(),
+            activities.Where(activity => activity.DossierId == x.Id).Select(activity =>
+                new PerformedTreatmentItem(activity.Id, activity.PerformedAt,
+                    activity.ServiceNameSnapshot ?? x.Items.FirstOrDefault(item => item.Id == activity.ItemId)?.ServiceName ?? "Dịch vụ điều trị",
+                    activity.Region, activity.Quantity, activity.Unit,
+                    string.IsNullOrWhiteSpace(activity.Outcome) ? null : activity.Outcome)).ToArray(),
+            // Finance is removed (docs/specs/S41-MOBILE-MEDICAL-RECORDS.md): no payments until it is added back.
+            Array.Empty<OwnTreatmentPaymentItem>())).ToArray();
     }
 }

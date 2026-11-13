@@ -1,8 +1,4 @@
-/**
- * App entry — luôn điều hướng về menu trung tâm.
- * Menu trung tâm sẽ tự hiển thị "Đăng nhập" hoặc "Trang chủ tài khoản"
- * tuỳ trạng thái phiên (xem (home)/index.tsx).
- */
+/** App entry: restore the session before choosing sign-in or the authenticated home. */
 
 import { Redirect } from 'expo-router';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
@@ -20,7 +16,7 @@ export default function IndexRoute() {
       </View>
     );
   }
-  return <Redirect href="/(home)/" />;
+  return <Redirect href={state.status === 'authenticated' ? '/(home)/' : '/(auth)/sign-in'} />;
 }
 
 const styles = StyleSheet.create({

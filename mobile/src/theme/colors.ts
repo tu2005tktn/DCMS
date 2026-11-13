@@ -1,14 +1,14 @@
-// Starter palette; align with approved designs before implementing screens.
+// Shared customer palette; see docs/specs/MOBILE-CUSTOMER-EXPERIENCE.vi.md.
 export const colors = {
-  primary: '#176B87',
+  primary: '#175CD3',
   onPrimary: '#FFFFFF',
-  background: '#FFFFFF',
-  surface: '#F4F6F8',
-  text: '#172B4D',
-  muted: '#526477',
-  border: '#D9DFE6',
-  danger: '#B3261E',
+  background: '#F4F7FB',
+  surface: '#FFFFFF',
+  text: '#17233D',
+  muted: '#617187',
+  border: '#DCE5F0',
+  danger: '#B42318',
   onDanger: '#FFFFFF',
   dangerSoft: '#FDECEA',
-  infoSoft: '#E6F1F8',
+  infoSoft: '#EAF2FF',
 } as const;

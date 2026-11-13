@@ -16,6 +16,7 @@ import { AppState, type AppStateStatus, Platform } from 'react-native';
 import { ApiError } from '@/services/api/api-error';
 import { signInApi } from '@/features/auth/sign-in/sign-in.api';
 import { tokenStorage } from '@/services/storage/token-storage';
+import { unregisterPushDevice } from '@/features/appointments/push-notifications';
 import type { SessionContextValue, SessionState } from './session.types';
 
 export const SessionContext = createContext<SessionContextValue | undefined>(undefined);
@@ -162,6 +163,7 @@ export function SessionProvider({ children, enableAutoRefresh = true }: SessionP
     const current = state;
     debug('signOut called', { reason, status: current.status });
     if (current.status === 'authenticated') {
+      await unregisterPushDevice(current.accessToken).catch(() => undefined);
       try {
         const result = await signInApi.signOut(current.accessToken);
         debug('signOut API response', { revoked: result.revoked, status: result.status });

@@ -586,7 +586,7 @@ public partial class ConsolidateSchedulingStorage : Migration
             
             CREATE INDEX "IX_APPOINTMENT_REMINDER_AccountId" ON "APPOINTMENT_REMINDER" ("AccountId");
             
-            CREATE UNIQUE INDEX "IX_APPOINTMENT_REMINDER_AppointmentId_AppointmentVersion_LeadM~" ON "APPOINTMENT_REMINDER" ("AppointmentId", "AppointmentVersion", "LeadMinutes");
+            CREATE UNIQUE INDEX "IX_APPOINTMENT_REMINDER_AppointmentId_AppointmentVersion_LeadM~" ON "APPOINTMENT_REMINDER" ("AppointmentId", "AppointmentVersion", "LeadMinutes", "AccountId");
             
             CREATE INDEX "IX_APPOINTMENT_REMINDER_Status_DueAt" ON "APPOINTMENT_REMINDER" ("Status", "DueAt");
             

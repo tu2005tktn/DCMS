@@ -1,5 +1,5 @@
 import { Alert, Button, Card, Empty, Spin, Tag } from 'antd';
-import { CalendarOutlined, ClockCircleOutlined, RightOutlined, UserOutlined, LinkOutlined, MedicineBoxOutlined } from '@ant-design/icons';
+import { CalendarOutlined, ClockCircleOutlined, RightOutlined, UserOutlined, LinkOutlined, MedicineBoxOutlined, FileTextOutlined } from '@ant-design/icons';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ApiError } from '../../services/api';
@@ -85,6 +85,8 @@ export default function CustomerDashboard() {
           <span><strong>Đơn thuốc của tôi</strong><span>Xem thuốc, liều dùng và lời dặn của bác sĩ.</span></span><RightOutlined aria-hidden="true" /></Link>
         <Link to="/customer/patient-link" aria-label="Liên kết hồ sơ của tôi" className="customer-dashboard-shortcut"><span className="customer-dashboard-shortcut-icon"><LinkOutlined aria-hidden="true" /></span>
           <span><strong>Liên kết hồ sơ của tôi</strong><span>Gửi yêu cầu và theo dõi việc xác minh hồ sơ.</span></span><RightOutlined aria-hidden="true" /></Link>
+        <Link to="/customer/treatment-records" className="customer-dashboard-shortcut"><span className="customer-dashboard-shortcut-icon"><FileTextOutlined aria-hidden="true" /></span>
+          <span><strong>Hồ sơ điều trị</strong><span>Xem hạng mục bác sĩ đã thực hiện.</span></span><RightOutlined aria-hidden="true" /></Link>
       </div>
     </section>
   </div>;

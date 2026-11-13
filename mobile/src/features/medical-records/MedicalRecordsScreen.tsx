@@ -30,6 +30,24 @@ const linkMessages: Record<Exclude<LinkStatus, 'VERIFIED'>, string> = {
 
 const visitScopeLabels: Record<VisitScope, string> = { HISTORY: 'Lịch sử khám', UPCOMING: 'Lịch sắp tới' };
 
+function paymentMethodLabel(method: string) {
+  if (method === 'Cash') return 'Tiền mặt';
+  if (method === 'Transfer' || method === 'BankTransfer') return 'Chuyển khoản';
+  return method;
+}
+
+function paymentHistory(dossiers: OwnTreatmentSummaryItem[]) {
+  const seen = new Set<string>();
+  return dossiers.flatMap(dossier => (dossier.payments ?? []).map(payment => ({ ...payment, dossierCode: dossier.code })))
+    .filter(payment => {
+      const key = `${payment.source}:${payment.id}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .sort((a, b) => b.paidOn.localeCompare(a.paidOn) || b.id.localeCompare(a.id));
+}
+
 export default function MedicalRecordsScreen() {
   const router = useRouter();
   const session = useSession();
@@ -49,6 +67,7 @@ export default function MedicalRecordsScreen() {
   const [syncError, setSyncError] = useState<string | null>(null);
   const [denied, setDenied] = useState(false);
   const [showContact, setShowContact] = useState(false);
+  const [showAllPayments, setShowAllPayments] = useState(false);
   const loadOrder = useRef(0);
   const hasLoadedOnce = useRef(false);
 
@@ -155,11 +174,12 @@ export default function MedicalRecordsScreen() {
     </ScrollView>;
   }
 
+  const transactions = summary ? paymentHistory(summary) : [];
+
   return (
     <ScrollView contentContainerStyle={styles.container} refreshControl={
       <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={palette.primary} />}>
-      <Text style={styles.heading}>Hồ sơ y tế chính thức</Text>
-      <Text style={styles.muted}>Chỉ đọc — dữ liệu do phòng khám phát hành; ứng dụng không chỉnh sửa nguồn lâm sàng hay tài chính.</Text>
+      <Text style={styles.heading}>Bệnh án của tôi</Text>
 
       {denied && <View style={styles.block}>
         <Banner tone="error" message="Quyền xem hồ sơ vừa bị thu hồi — dữ liệu đang hiển thị đã được xóa."
@@ -181,13 +201,6 @@ export default function MedicalRecordsScreen() {
           <Row label="Ngày sinh" value={record.birthDate ?? 'Chưa rõ'} />
           <Row label="Ngày liên kết" value={formatTime(record.linkedAt)} />
         </View> : <Text style={styles.muted}>Đang tải thông tin nhận diện…</Text>}
-      </Card>
-
-      <Card title="Lịch sử sức khỏe & dị ứng">
-        <Text style={styles.muted}>
-          Chưa có nguồn dữ liệu sức khỏe/dị ứng từ máy chủ (DCMS-95 — Tư). Mục này không hiển thị dữ liệu suy diễn;
-          sẽ tự cập nhật khi API cung cấp.
-        </Text>
       </Card>
 
       <Card title="Các lượt khám">
@@ -222,9 +235,6 @@ export default function MedicalRecordsScreen() {
                   </Pressable>
                 );
               })}
-        <Text style={styles.note}>
-          Lượt khám hoàn thành khác với đợt điều trị hoàn tất: trạng thái từng đợt hiển thị ở danh sách hồ sơ bên dưới.
-        </Text>
       </Card>
 
       <Card title="Hồ sơ chính thức của tôi">
@@ -237,7 +247,7 @@ export default function MedicalRecordsScreen() {
                 <View style={styles.recordMain}>
                   <Text style={styles.recordCode}>{item.code}</Text>
                   <Text style={styles.muted}>{item.diagnosis}</Text>
-                  <Text style={styles.muted}>Bắt đầu {item.startedOn} · Kế hoạch v{item.planVersion} · {item.agreedItems.length} hạng mục đã đồng ý</Text>
+                  <Text style={styles.muted}>Bắt đầu {formatDate(item.startedOn)} · {item.agreedItems.length} hạng mục điều trị đã đồng ý</Text>
                 </View>
                 <View style={[styles.pill, { backgroundColor: item.state === 'Open' ? '#EFF8FF' : '#F2F4F7' }]}>
                   <Text style={[styles.pillText, { color: item.state === 'Open' ? '#175CD3' : '#344054' }]}>
@@ -245,26 +255,32 @@ export default function MedicalRecordsScreen() {
                 </View>
               </Pressable>
             ))}
-        <Text style={styles.note}>
-          “Đang điều trị” nghĩa là đợt còn mở; nguồn chính thức tự hiển thị theo UC-55, không cần bấm xuất bản.
-        </Text>
       </Card>
 
       <Card title="Kết quả khám theo lượt">
-        <Text style={styles.muted}>Kết quả khám bác sĩ đã xác nhận, chẩn đoán, dặn dò, kết quả cận lâm sàng và hình ảnh của từng lượt.</Text>
         <Button title="Xem kết quả khám" onPress={() => router.push('/(account)/visit-results')} />
       </Card>
 
       <Card title="Đơn thuốc">
-        <Text style={styles.muted}>Đơn thuốc mua ngoài bác sĩ đã hoàn tất, kèm liều dùng và lời dặn.</Text>
         <Button title="Xem đơn thuốc" variant="secondary" onPress={() => router.push('/(account)/prescriptions')} />
       </Card>
 
-      <Card title="Nguồn chưa kết nối">
-        <Text style={styles.muted}>
-          • Lịch sử phiên bản, đồng bộ chi tiết và hóa đơn (DCMS-95 / S42)
-        </Text>
-        <Text style={styles.note}>Phần này hiển thị trạng thái trung thực; ứng dụng không tự tạo dữ liệu khi API chưa có.</Text>
+      <Card title="Lịch sử giao dịch">
+        {summary === null ? <Text style={styles.muted}>Đang tải giao dịch…</Text>
+          : transactions.length === 0 ? <Text style={styles.muted}>Chưa có khoản thanh toán nào được ghi nhận.</Text>
+            : <View>
+              {transactions.slice(0, showAllPayments ? undefined : 10).map(payment => (
+                <View key={`${payment.source}:${payment.id}`} style={styles.paymentRow}>
+                  <View style={styles.paymentInfo}>
+                    <Text style={styles.paymentMethod}>{paymentMethodLabel(payment.method)}</Text>
+                    <Text style={styles.muted}>{formatDate(payment.paidOn)} · Hồ sơ {payment.dossierCode}</Text>
+                  </View>
+                  <Text style={styles.paymentAmount}>{payment.totalVnd.toLocaleString('vi-VN')} đ</Text>
+                </View>
+              ))}
+              {transactions.length > 10 && <Button title={showAllPayments ? 'Thu gọn' : `Xem tất cả ${transactions.length} giao dịch`}
+                variant="secondary" onPress={() => setShowAllPayments(value => !value)} />}
+            </View>}
       </Card>
 
       {showContact
@@ -293,7 +309,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background, gap: spacing.sm },
   container: { padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xl * 2, backgroundColor: colors.background },
   block: { gap: spacing.sm },
-  heading: { fontSize: 20, fontWeight: '700', color: palette.text },
+  heading: { fontSize: 26, fontWeight: '800', color: palette.text },
   muted: { color: palette.muted, fontSize: 14, lineHeight: 20 },
   note: { color: palette.muted, fontSize: 12, lineHeight: 18, fontStyle: 'italic' },
   badgeRow: { flexDirection: 'row' },
@@ -301,7 +317,7 @@ const styles = StyleSheet.create({
   rowLabel: { color: palette.muted, fontSize: 14 },
   rowValue: { color: palette.text, fontSize: 14, fontWeight: '600', flexShrink: 1, textAlign: 'right' },
   chipRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
-  chip: { borderWidth: 1, borderColor: palette.border, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#fff' },
+  chip: { borderWidth: 1, borderColor: palette.border, borderRadius: 999, minHeight: 44, justifyContent: 'center', paddingHorizontal: 12, backgroundColor: '#fff' },
   chipSelected: { backgroundColor: palette.primary, borderColor: palette.primary },
   chipText: { fontSize: 13, color: palette.text },
   chipTextSelected: { color: '#fff', fontWeight: '600' },
@@ -313,6 +329,11 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm, borderTopWidth: 1, borderTopColor: palette.border },
   recordMain: { gap: 2, flexShrink: 1 },
   recordCode: { fontSize: 15, fontWeight: '700', color: palette.text },
+  paymentRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.sm,
+    paddingVertical: spacing.sm, borderTopWidth: 1, borderTopColor: palette.border },
+  paymentInfo: { flex: 1, gap: 3 },
+  paymentMethod: { color: palette.text, fontSize: 14, fontWeight: '700' },
+  paymentAmount: { color: palette.primary, fontSize: 15, fontWeight: '800' },
   pill: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
   pillText: { fontSize: 12, fontWeight: '600' },
   syncText: { fontSize: 12, color: palette.muted, textAlign: 'center' },

@@ -123,6 +123,15 @@ public sealed class NotificationDelivery : NotificationRecord
     public string? LastError { get; set; }
 }
 
+public sealed class PushDevice
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public int AccountId { get; set; }
+    public string Token { get; set; } = "";
+    public string Platform { get; set; } = "android";
+    public DateTimeOffset UpdatedAt { get; set; }
+}
+
 public sealed class AppointmentReminder
 {
     public Guid Id { get; set; } = Guid.NewGuid();

@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json;
 using DCMS.Application.Features.Notifications;
 using DCMS.Domain.Features.Appointments;
+using DCMS.Domain.Features.PatientLinks;
 using DCMS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -72,7 +73,7 @@ public sealed class AppointmentNotificationDispatcher(
             var cancelled = item.EventType.Contains("cancel", StringComparison.OrdinalIgnoreCase)
                 || appointment.Status == "Cancelled";
             var noShow = item.EventType.Equals("appointment.no_show", StringComparison.OrdinalIgnoreCase) || appointment.Status == "NoShow";
-            if (!cancelled && !noShow && appointment.Status == "Confirmed" && appointment.BookerAccountId.HasValue)
+            if (!cancelled && !noShow && appointment.Status == "Confirmed")
                 await ScheduleRemindersAsync(appointment, ct);
 
             if (item.EventType.Equals("appointment.attendance", StringComparison.OrdinalIgnoreCase))
@@ -80,7 +81,8 @@ public sealed class AppointmentNotificationDispatcher(
                 item.DispatchedAt = clock.GetUtcNow(); await db.SaveChangesAsync(ct); processed++; continue;
             }
 
-            if (appointment.BookerAccountId.HasValue)
+            var recipients = await RecipientsAsync(appointment, ct);
+            if (recipients.Count > 0)
             {
                 var kind = noShow ? NotificationKind.NoShow : cancelled ? NotificationKind.AppointmentCancelled
                     : item.EventType.Contains("resched", StringComparison.OrdinalIgnoreCase)
@@ -98,9 +100,10 @@ public sealed class AppointmentNotificationDispatcher(
                     : kind == NotificationKind.AppointmentCancelled
                     ? $"Lịch {appointment.Code} đã được huỷ."
                     : $"Lịch {appointment.Code} vào {when}.";
-                await notifications.CreateAsync(appointment.BookerAccountId, appointment.BranchId, kind,
-                    title, body, appointment.Id.ToString(), null, $"/appointments/{appointment.Code}",
-                    [NotificationChannel.InApp], $"appointment-event:{item.Id}", ct);
+                foreach (var accountId in recipients)
+                    await notifications.CreateAsync(accountId, appointment.BranchId, kind,
+                        title, body, appointment.Id.ToString(), null, $"/appointments/{appointment.Code}",
+                        [NotificationChannel.InApp], $"appointment-event:{item.Id}:account:{accountId}", ct);
             }
             item.DispatchedAt = clock.GetUtcNow();
             await db.SaveChangesAsync(ct);
@@ -115,7 +118,8 @@ public sealed class AppointmentNotificationDispatcher(
             var appointment = await db.Appointments.SingleAsync(x => x.Id == candidate.AppointmentId, ct);
             var reminder = appointment.Reminders.Single(x => x.Id == candidate.Id);
             if (appointment == null || appointment.Version != reminder.AppointmentVersion
-                || appointment.Status != "Confirmed" || appointment.BookerAccountId != reminder.AccountId)
+                || appointment.Status != "Confirmed" ||
+                !(await RecipientsAsync(appointment, ct)).Contains(reminder.AccountId))
             {
                 reminder.Status = "Superseded"; reminder.ProcessedAt = now;
             }
@@ -179,19 +183,37 @@ public sealed class AppointmentNotificationDispatcher(
 
     private async Task ScheduleRemindersAsync(Appointment appointment, CancellationToken ct)
     {
+        var recipients = await RecipientsAsync(appointment, ct);
         foreach (var lead in ReminderMinutes)
         {
             var dueAt = appointment.StartAt.AddMinutes(-lead);
             if (dueAt <= clock.GetUtcNow()) continue;
-            if (await db.AppointmentReminders.AnyAsync(x => x.AppointmentId == appointment.Id
-                && x.AppointmentVersion == appointment.Version && x.LeadMinutes == lead, ct)) continue;
-            appointment.Reminders.Add(new AppointmentReminder
+            // One reminder per appointment version, lead time and recipient account (S26); reminders live in the appointment's JSONB.
+            foreach (var accountId in recipients)
             {
-                AppointmentId = appointment.Id, AppointmentVersion = appointment.Version,
-                AccountId = appointment.BookerAccountId!.Value, LeadMinutes = lead,
-                DueAt = dueAt, CreatedAt = clock.GetUtcNow()
-            });
+                if (await db.AppointmentReminders.AnyAsync(x => x.AppointmentId == appointment.Id
+                    && x.AppointmentVersion == appointment.Version && x.LeadMinutes == lead
+                    && x.AccountId == accountId, ct)) continue;
+                appointment.Reminders.Add(new AppointmentReminder
+                {
+                    AppointmentId = appointment.Id, AppointmentVersion = appointment.Version,
+                    AccountId = accountId, LeadMinutes = lead,
+                    DueAt = dueAt, CreatedAt = clock.GetUtcNow()
+                });
+            }
         }
+    }
+
+    private async Task<IReadOnlyList<int>> RecipientsAsync(Appointment appointment, CancellationToken ct)
+    {
+        var recipients = new HashSet<int>();
+        if (appointment.BookerAccountId is { } booker) recipients.Add(booker);
+        if (appointment.PatientId is { } patientId)
+            foreach (var accountId in await db.PatientAccountLinks.AsNoTracking()
+                .Where(x => x.PatientId == patientId && x.Status == PatientLinkStatus.Verified)
+                .Select(x => x.AccountId).ToListAsync(ct))
+                recipients.Add(accountId);
+        return recipients.ToArray();
     }
 }
 

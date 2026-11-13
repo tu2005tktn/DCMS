@@ -40,8 +40,8 @@ Phát hiện ID đơn hoặc mẫu trùng giữa các nguồn phải làm migrat
 
 | Hạng mục | Trước | Sau |
 | --- | --- | --- |
-| Bảng trong relational model EF | 130 | 31 |
-| Base table trong schema `public` của DB phát triển | 132 | 32 |
+| Bảng trong relational model EF | 130 | 32 (31 sau rút gọn, thêm `PUSH_DEVICE` khi gộp `main`) |
+| Base table trong schema `public` của DB phát triển | 132 | 33 |
 | Tài khoản và phân quyền | 15 | 2 |
 | Điều trị (phiếu, kế hoạch, quá trình, mẫu, sự kiện) | 14 | 4, sự kiện nằm trong kho audit chung |
 | Chăm sóc bệnh nhân | 3 | 1 |
@@ -82,3 +82,7 @@ Ngày 13/11/2026, migration `20261113022238_ConsolidateCareAndLabStorage` gộp 
 Migration `20261113081111_ConsolidateSettingsStorage` rút nhóm thiết lập và danh mục từ 6 xuống 3 bảng: lịch sử và chống gửi trùng của danh mục chuyển vào `COMMAND_RECEIPT`, hai bảng của module `/api/settings` cũ được lưu snapshot trong `AUDIT_LOG` rồi bỏ. DB phát triển giảm từ 37 xuống 34 bảng, model EF còn 33 bảng. Đã đối chiếu 2.740 dòng của 36 nguồn trên bản sao (Up, Down, Up lại) và trực tiếp sau áp dụng. Lượt integration toàn bộ đạt 509/511, 2 skip; 100 unit test đạt. Xem [thiết lập và danh mục trong ba bảng](SETTINGS-CATALOG-STORAGE.vi.md).
 
 Migration `20261113084455_ConsolidateNotificationStorage` gộp thông báo về `IN_APP_NOTIFICATION`: lượt gửi theo kênh và việc nhân viên xử lý thành các loại dòng của bảng, giữ khóa ngoại và index (lọc theo loại dòng). Nhóm bệnh nhân và gia đình giữ bốn bảng theo quyết định của chủ dự án. DB phát triển giảm từ 34 xuống 32 bảng, model EF còn 31 bảng. Đã đối chiếu 2.708 dòng của 33 nguồn trên bản sao (Up, Down, Up lại) và trực tiếp sau áp dụng. Lượt integration toàn bộ đạt 511/513, 2 skip; 100 unit test đạt. Xem [thông báo trong một bảng](NOTIFICATION-STORAGE.vi.md).
+
+### Gộp `main` ngày 13/11/2026
+
+`main` thêm push Firebase và thông báo cho bệnh nhân. Migration `20261110090642_FirebasePushDevices` tạo bảng `PUSH_DEVICE`, nên model EF có 32 bảng và `public` có 33 bảng. Migration `20261110093606_PatientNotificationRecipients` đổi index duy nhất của `APPOINTMENT_REMINDER` sang thêm `AccountId`; trên schema đã gộp, bảng này không còn nên migration chỉ chạy khi bảng tồn tại, và quy tắc một lịch nhắc cho mỗi (phiên bản lịch hẹn, số phút, tài khoản) được kiểm khi lập lịch nhắc. Down của `ConsolidateSchedulingStorage` dựng lại index có `AccountId`. Phần thanh toán trong tóm tắt điều trị của bệnh nhân và thông báo "thanh toán đã được ghi nhận" tạm ngưng vì tài chính đã bị xóa. Đã áp dụng vào DB phát triển sau khi sao lưu `public` (`.tools/main-merge-push/before-main-merge-20261113.dump`, Git ignore, SHA-256 `f5ceec91198a4aa47bc19e26f3d8f30bf62603337fd5611959460eded331a0d7`); 31 nguồn với 2.710 dòng khớp số lượng và digest trước và sau. Model EF khớp migration; 100 unit test và 512/514 integration đạt, 2 NFR tùy chọn skip; web build và type-check mobile đạt; `GET /health` healthy.

@@ -90,7 +90,9 @@ export default function MyAppointmentsScreen() {
 
   return <ScrollView contentContainerStyle={styles.container}
     refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void load(1, 'refresh')} />}>
-    {usingMockAppointments && <Banner tone="info" message="Dữ liệu minh họa (mock) — API lịch hẹn chưa sẵn sàng. Thao tác chỉ lưu tạm trên ứng dụng." />}
+    <Text style={styles.title}>Lịch hẹn của tôi</Text>
+    <Text style={styles.muted}>Theo dõi lịch sắp tới và các lần khám trước của bạn.</Text>
+    {usingMockAppointments && <Banner tone="info" message="Đang dùng dữ liệu minh họa; thao tác chỉ lưu trên thiết bị này." />}
     {notice && <Banner tone="info" message={notice} />}
     <View style={styles.tabs}>
       {(['UPCOMING', 'HISTORY'] as AppointmentScope[]).map(value =>
@@ -99,7 +101,7 @@ export default function MyAppointmentsScreen() {
           <Text style={[styles.tabText, scope === value && styles.tabTextSelected]}>{value === 'UPCOMING' ? 'Sắp tới' : 'Lịch sử'}</Text>
         </Pressable>)}
     </View>
-    <Text style={styles.muted}>Bạn xem được lịch do mình đặt và lịch của chính mình qua liên kết hồ sơ đã xác minh. Giờ hẹn theo giờ Việt Nam.</Text>
+    <Text style={styles.hint}>Giờ hẹn theo giờ Việt Nam. Lịch khám của bạn hiển thị sau khi hồ sơ được xác minh.</Text>
     <View style={styles.toolbar}>
       <Pressable accessibilityRole="button" onPress={() => setShowFilters(value => !value)}>
         <Text style={styles.link}>{showFilters ? 'Ẩn bộ lọc' : 'Bộ lọc'}{filters.status !== 'ALL' || filters.from || filters.to ? ' •' : ''}</Text>
@@ -124,7 +126,7 @@ export default function MyAppointmentsScreen() {
     {loading && items.length === 0 ? <View style={styles.center}><ActivityIndicator size="large" color={palette.primary} /><Text style={styles.muted}>Đang tải…</Text></View>
       : error ? <Banner tone="error" message={error.message} action={{ label: 'Thử lại', onPress: () => void load(1, 'replace') }} />
       : items.length === 0 ? <Card>
-        <Text style={styles.emptyTitle}>Không có lịch hẹn phù hợp với bộ lọc đã chọn.</Text>
+        <Text style={styles.emptyTitle}>{filters.status !== 'ALL' || filters.from || filters.to ? 'Không có lịch hẹn phù hợp với bộ lọc.' : scope === 'UPCOMING' ? 'Bạn chưa có lịch hẹn sắp tới.' : 'Chưa có lịch sử hẹn.'}</Text>
         <Button title="Đặt lịch mới" onPress={() => router.push('/book-appointment')} />
         {!verified && <Text style={styles.muted}>Lịch khám của chính bạn chỉ hiển thị sau khi tài khoản được liên kết với hồ sơ tại phòng khám.</Text>}
         {!verified && <Button title="Liên kết hồ sơ của tôi" variant="secondary" onPress={() => router.push('/account-link')} />}
@@ -146,29 +148,31 @@ export default function MyAppointmentsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { padding: spacing.md, gap: spacing.md, backgroundColor: palette.background },
+  container: { padding: spacing.lg, gap: spacing.md, backgroundColor: palette.background, flexGrow: 1 },
   center: { alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xl },
-  muted: { color: palette.muted },
-  tabs: { flexDirection: 'row', backgroundColor: '#EEF1F5', borderRadius: 10, padding: 4 },
-  tab: { flex: 1, paddingVertical: 10, borderRadius: 8, alignItems: 'center' },
+  title: { color: palette.text, fontSize: 28, fontWeight: '800' },
+  muted: { color: palette.muted, lineHeight: 21 },
+  hint: { color: palette.muted, fontSize: 13, lineHeight: 19 },
+  tabs: { flexDirection: 'row', backgroundColor: '#E8EEF6', borderRadius: 14, padding: 4 },
+  tab: { flex: 1, minHeight: 44, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
   tabSelected: { backgroundColor: '#fff' },
   tabText: { color: palette.muted, fontWeight: '600' },
   tabTextSelected: { color: palette.primary },
-  toolbar: { flexDirection: 'row', justifyContent: 'space-between' },
+  toolbar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   link: { color: palette.primary, fontWeight: '600', fontSize: 15 },
   label: { fontWeight: '600', color: palette.text },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  chip: { borderWidth: 1, borderColor: palette.border, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#fff' },
+  chip: { borderWidth: 1, borderColor: palette.border, borderRadius: 999, paddingHorizontal: 12, minHeight: 40, justifyContent: 'center', backgroundColor: '#fff' },
   chipSelected: { borderColor: palette.primary, backgroundColor: '#EFF8FF' },
   chipText: { color: palette.text, fontSize: 13 },
   chipTextSelected: { color: palette.primary, fontWeight: '600' },
   emptyTitle: { fontWeight: '600', color: palette.text },
-  card: { backgroundColor: '#fff', borderRadius: 12, padding: spacing.md, gap: 4, borderWidth: 1, borderColor: palette.border },
+  card: { backgroundColor: '#fff', borderRadius: 16, padding: spacing.md, gap: 7, borderWidth: 1, borderColor: palette.border, minHeight: 120 },
   pressed: { opacity: 0.85 },
   cardHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   code: { fontWeight: '700', color: palette.text, fontSize: 16 },
-  when: { color: palette.text, fontWeight: '600' },
-  line: { color: palette.text },
+  when: { color: palette.text, fontWeight: '700', fontSize: 15 },
+  line: { color: palette.muted },
   access: { color: palette.muted, fontSize: 12, marginTop: 2 },
   pill: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 },
   pillText: { fontSize: 12, fontWeight: '600' },

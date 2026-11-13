@@ -12,7 +12,7 @@ import { genderLabel, type PatientProfilePrescription } from './prescriptions.ty
 const formatDate = (value: string) => new Date(value).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
 
 export default function PrescriptionDetailScreen() {
-  const { visitId: prescriptionId } = useLocalSearchParams<{ visitId: string }>();
+  const { id: prescriptionId } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const session = useSession();
   const token = session.state.status === 'authenticated' ? session.state.accessToken : null;
