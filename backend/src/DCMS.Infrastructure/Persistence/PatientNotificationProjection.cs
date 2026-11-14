@@ -115,7 +115,6 @@ public sealed partial class DcmsDbContext
             }
 
         // Payment notifications (NotificationKind.PaymentRecorded) return with the finance module.
-
         if (events.Count == 0) return;
         var patientIds = events.Select(x => x.PatientId).Distinct().ToArray();
         var links = await PatientAccountLinks.AsNoTracking().Where(x => x.Status == PatientLinkStatus.Verified

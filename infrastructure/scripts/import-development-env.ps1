@@ -6,7 +6,7 @@ if (-not (Test-Path -LiteralPath $environmentFile)) {
 }
 $settings = @{}
 foreach ($line in Get-Content -LiteralPath $environmentFile) {
-    if ($line -match '^\s*(POSTGRES_DB|POSTGRES_USER|POSTGRES_PASSWORD|POSTGRES_PORT|JWT_SIGNING_KEY|DEV_SEED_PASSWORD|GOOGLE_WEB_CLIENT_ID|SMTP_HOST|SMTP_PORT|SMTP_ENABLE_SSL|SMTP_USERNAME|SMTP_PASSWORD|SMTP_FROM_ADDRESS|SMTP_FROM_NAME|CLINICAL_DOCUMENTS_STORAGE_PATH|CLAMAV_HOST|CLAMAV_PORT)=(.*)$') {
+    if ($line -match '^\s*(POSTGRES_DB|POSTGRES_USER|POSTGRES_PASSWORD|POSTGRES_PORT|JWT_SIGNING_KEY|DEV_SEED_PASSWORD|GOOGLE_WEB_CLIENT_ID|SMTP_HOST|SMTP_PORT|SMTP_ENABLE_SSL|SMTP_USERNAME|SMTP_PASSWORD|SMTP_FROM_ADDRESS|SMTP_FROM_NAME|CLINICAL_DOCUMENTS_STORAGE_PATH|BRANCH_ASSETS_STORAGE_PATH|CLAMAV_HOST|CLAMAV_PORT|PAYOS_CLIENT_ID|PAYOS_API_KEY|PAYOS_CHECKSUM_KEY|FIREBASE_SERVICE_ACCOUNT_PATH)=(.*)$') {
         $settings[$Matches[1]] = $Matches[2].Trim()
     }
 }
@@ -26,6 +26,9 @@ if ($settings['CLAMAV_HOST']) { $env:ClinicalDocuments__ClamAvHost = $settings['
 if ($settings['CLAMAV_PORT']) { $env:ClinicalDocuments__ClamAvPort = $settings['CLAMAV_PORT'] }
 if ($settings['JWT_SIGNING_KEY']) { $env:Jwt__SigningKey = $settings['JWT_SIGNING_KEY'] }
 if ($settings['DEV_SEED_PASSWORD']) { $env:DevSeed__Password = $settings['DEV_SEED_PASSWORD'] }
+if ($settings['PAYOS_CLIENT_ID']) { $env:PayOs__ClientId = $settings['PAYOS_CLIENT_ID'] }
+if ($settings['PAYOS_API_KEY']) { $env:PayOs__ApiKey = $settings['PAYOS_API_KEY'] }
+if ($settings['PAYOS_CHECKSUM_KEY']) { $env:PayOs__ChecksumKey = $settings['PAYOS_CHECKSUM_KEY'] }
 if ($settings['FIREBASE_SERVICE_ACCOUNT_PATH']) { $env:Firebase__ServiceAccountPath = $settings['FIREBASE_SERVICE_ACCOUNT_PATH'] }
 if ($settings['GOOGLE_WEB_CLIENT_ID']) { $env:Google__WebClientId = $settings['GOOGLE_WEB_CLIENT_ID'] }
 # Optional SMTP for S03 recovery email; values stay in the untracked .env.

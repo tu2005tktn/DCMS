@@ -31,6 +31,8 @@ builder.Logging.AddConsole();
 builder.Logging.AddDebug();
 
 builder.Services.AddInfrastructure(builder.Configuration, builder.Environment);
+builder.Services.AddSingleton<DCMS.Api.Features.Finance.TreatmentPayOsGateway>();
+builder.Services.AddHostedService<DCMS.Api.Features.Finance.TreatmentPayOsWorker>();
 builder.Services.AddOpenApi();
 builder.Services.Configure<RouteHandlerOptions>(options => options.ThrowOnBadRequest = true);
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
@@ -189,6 +191,9 @@ DCMS.Api.Features.FamilyMembers.FamilyMemberEndpoints.MapFamilyMemberEndpoints(a
 DCMS.Api.Features.FamilyMembers.FamilyRecordEndpoints.MapFamilyRecordEndpoints(app);
 app.MapPatientEndpoints();
 app.MapTreatmentEndpoints();
+DCMS.Api.Features.Finance.FinanceStatisticsEndpoints.MapFinanceStatisticsEndpoints(app);
+DCMS.Api.Features.Finance.TreatmentPaymentEndpoints.MapTreatmentPaymentEndpoints(app);
+DCMS.Api.Features.Finance.TreatmentPayOsEndpoints.MapWebhook(app);
 DCMS.Api.Features.Treatment.ItemPlanEndpoints.MapItemPlanEndpoints(app);
 DCMS.Api.Features.SystemSettings.SystemSettingsEndpoints.MapSystemSettingsEndpoints(app);
 app.MapClinicalWorkEndpoints();

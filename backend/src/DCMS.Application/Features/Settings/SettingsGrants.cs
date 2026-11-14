@@ -34,6 +34,7 @@ public static class SettingsGrants
         new("examinations.read", "Xem khám lâm sàng", null, null),
         new("examinations.manage", "Ghi và xác nhận khám", AccountRoles.Dentist, "examinations.read"),
         new("finance.read", "Xem giá và chi phí dịch vụ", null, null),
+        new("finance.payments.create", "Ghi nhận thanh toán điều trị", null, "finance.read"),
         new("finance.costs.read", "Xem chi phí trong nhật ký thiết lập", null, "finance.read"),
         .. ScreenGrants.Definitions,
         .. CatalogKinds.SelectMany(kind => new[] {
