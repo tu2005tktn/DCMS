@@ -53,3 +53,6 @@
   .working-period-reason { grid-column: 2 / 4; grid-row: 3; }
   .working-period-remove { grid-column: 3; grid-row: 1; }
 }
+.ws-filters { margin-bottom: 12px; }
+.ws-filters .ws-field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: #475467; }
+.ws-filters .ws-field .ant-input { width: 230px; }

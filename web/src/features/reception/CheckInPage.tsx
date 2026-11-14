@@ -1,3 +1,4 @@
+import { ArrowLeftOutlined } from '@ant-design/icons';
 import { Alert, Button, Checkbox, Descriptions, Form, Input, Modal, Select, Space, Spin, Typography } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
@@ -85,7 +86,7 @@ export default function CheckInPage() {
   }
   if (!detail && loading) return <Spin tip="Đang tải thông tin tiếp nhận" />;
   return <>
-    {modalContext}<Space wrap><Typography.Title level={2}>Tiếp nhận bệnh nhân</Typography.Title><Button onClick={back}>Về danh sách tiếp nhận</Button></Space>
+    {modalContext}<div className="page-heading"><Typography.Title level={2} style={{ margin: 0 }}>Tiếp nhận bệnh nhân</Typography.Title><Button icon={<ArrowLeftOutlined />} onClick={back}>Về danh sách tiếp nhận</Button></div>
     <div ref={feedback} tabIndex={-1} role="region" aria-label="Kết quả tiếp nhận">{error && <Alert type="error" showIcon message={error.message}
       action={<Button onClick={() => void load()}>Tải lại lịch</Button>}
       description={error instanceof ApiError && error.code === 'MSG111' ? 'Dữ liệu đã thay đổi. Tải lại, đối chiếu và xác nhận danh tính lại; thông tin đang nhập được giữ.' : undefined} />}</div>

@@ -43,3 +43,20 @@
   .rx-line-top { flex-wrap: wrap; }
   .rx-medicine { flex-basis: 100%; }
 }
+
+/* Gọn lại để vừa màn hình, nội dung cuộn trong hộp thoại, nút Lưu luôn thấy (14/11/2026) */
+@media (min-width: 641px) {
+  .rx-modal .ant-modal-content { padding: 18px 24px 14px; }
+  .rx-modal .ant-modal-body { max-height: calc(100vh - 170px); overflow-y: auto; padding-right: 6px; }
+  .rx-prescription-heading { min-height: 0; }
+  .rx-title { margin: 0; font-size: 20px; }
+  .rx-head { padding-bottom: 6px; }
+  .rx-section { margin-top: 12px; }
+  .rx-section > h3 { margin-bottom: 8px; }
+  .rx-row { min-height: 32px; margin-bottom: 4px; }
+  .rx-lines { padding: 8px; gap: 8px; }
+  .rx-line { padding: 8px; }
+  .rx-line-body { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 8px; }
+  .rx-line-body > .rx-line-top { grid-column: 1 / -1; }
+  .rx-index { margin-top: 3px; }
+}

@@ -96,3 +96,12 @@ Một lần bấm gửi lưu nháp và command chuyển nguồn hiện có, có 
 ## Luồng nhập trực tiếp mới — 27/10/2026 (thay các hướng dẫn nhập cũ)
 
 Theo yêu cầu đã chốt, form nhập chỉ còn Răng, bỏ Vùng/SL; kế hoạch thêm số phút dự kiến nullable 1–480. Ghi chú chỉ text, không chọn quyết định/tư vấn. ✓ lưu trực tiếp, không tự lưu. Nguồn ClinicianEntry không phải Agreed/consent. Thực hiện trong menu lưu ngay actual Dossier không Visit và gạch ngang nguồn; Hoàn tất/Bỏ hoàn tất chỉ đổi DisplayCompleted item; Sửa mở inline; Xóa hiện Đồng ý/Không đồng ý rồi soft-delete, không cascade dữ liệu đã làm/tiền. Không có filter Visit/ngày ở quá trình. Thêm việc đã làm cho nhập trực tiếp từ catalog không cần item/Visit trước. Đã trả là số ConfirmedAllocated từ ledger, không có dữ liệu hiện Chưa có dữ liệu. Snapshot giá/tên dịch vụ/răng/note actual giữ độc lập khỏi sửa kế hoạch. Chi tiết API/schema/test xem TREATMENT-PAYMENT-V25.md, mục Luồng nhập trực tiếp.
+
+
+## Bỏ nút in trên thẻ phiếu điều trị (08/11/2026)
+
+Trong danh sách phiếu điều trị của hồ sơ bệnh nhân, thẻ mỗi phiếu không còn nút in ("In phiếu đang mở"). Các nút Xóa phiếu, trạng thái và thu/mở phiếu giữ nguyên.
+
+Hồ sơ khách hàng (14/11/2026): vùng nội dung các tab dùng gần hết bề rộng màn hình, lề trong thu còn 12px (trước 30px) để các thẻ thông tin dàn kín; màn hình hẹp giữ lề riêng.
+
+Phiếu điều trị: nút "Kế hoạch điều trị" (chọn kế hoạch mẫu) nằm ngay cạnh tiêu đề "KẾ HOẠCH ĐIỀU TRỊ/DỊCH VỤ" ở bên trái; các số tổng dự toán, giảm giá, thành tiền giữ bên phải.

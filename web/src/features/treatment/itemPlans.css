@@ -55,3 +55,14 @@
   .item-plan-list .ant-table-thead > tr > th:last-child, .item-plan-list .ant-table-tbody > tr > td:last-child { border-inline-end:0; }
   .item-plan-list .ant-table-tbody > tr:last-child > td { border-bottom:0; }
 }
+
+/* Dàn kín, gọn (14/11/2026) */
+@media screen and (min-width:769px) {
+  .item-plans-page { gap: 12px; }
+  .item-plans-page > .ant-card > .ant-card-head { min-height: 48px; padding: 0 16px; }
+  .item-plans-page > .ant-card > .ant-card-body { padding: 12px 16px; }
+  .item-plan-search { width: min(100%, 420px); margin-bottom: 12px; }
+  .item-plans-page .item-plan-list .ant-btn { min-height: 32px; }
+  .item-plans-page .item-plan-list .ant-table-tbody > tr > td, .item-plans-page .item-plan-list .ant-table-thead > tr > th { padding: 8px 12px; }
+  .item-plans-page .ant-pagination { margin-top: 12px; }
+}

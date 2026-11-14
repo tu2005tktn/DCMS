@@ -176,3 +176,19 @@ Bộ lọc, thẻ chuyển Lịch hẹn / Hàng chờ và lượt khám và bả
 
 
 Bảng không cuộn ngang: chữ trong ô tự xuống dòng; từ 1000px trở xuống mỗi dòng là một thẻ, mỗi trường một dòng "nhãn: giá trị" (cả hai tab Lịch hẹn và Hàng chờ và lượt khám).
+
+## Điều chỉnh giao diện bảng Lịch hẹn (14/11/2026)
+
+- Cột "Lịch": giờ hẹn in đậm; mã lịch rút gọn 8 ký tự đầu (đầy đủ khi rê chuột).
+- Kiểu bảng: bỏ kẻ dọc, đầu bảng nền xám nhạt, hàng sáng lên khi rê chuột.
+- Trạng thái dùng màu theo `statusColors` (Đã xác nhận xanh lá, Đang khám xanh dương đậm, Hoàn thành xám...).
+- Cột "Thao tác": "Tiếp nhận" khi đủ điều kiện check-in; "Mở lượt khám" khi đã có lượt; còn lại "Xem" (chi tiết điều kiện tiếp nhận).
+- Ẩn phân trang khi chỉ có một trang. Không đổi dữ liệu, API hay quyền.
+
+## Bỏ khung bao quanh nội dung (14/11/2026)
+
+Bộ lọc, tab và bảng của trang Tiếp nhận không còn nằm trong một thẻ (card) trắng có viền; nội dung dàn trực tiếp trên nền trang để tận dụng bề rộng. Chỉ đổi CSS, không đổi dữ liệu hay quyền.
+
+Trang Tiếp nhận dùng toàn bộ bề rộng vùng nội dung (bỏ giới hạn 1680px, lề ngoài còn 12px, tiêu đề và khoảng cách dọc thu gọn) để bảng chiếm hết màn hình.
+
+Trang tiếp nhận bệnh nhân (check-in): tiêu đề bên trái, nút "Về danh sách tiếp nhận" (có mũi tên) nằm cùng hàng ở góc phải.

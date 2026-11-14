@@ -3,9 +3,10 @@ import FamilyMembersPage from '../features/family-members/FamilyMembersPage';
 import VisitPage from '../features/examinations/ExaminationPage';
 import { Alert, Button, Card, Result, Typography } from 'antd';
 import { useState, type ReactNode } from 'react';
-import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { Link, Navigate, Route, Routes } from 'react-router-dom';
 import { useAuth } from '../features/authentication/AuthContext';
 import SignInPage from '../features/authentication/SignInPage';
+import CommercialTreatmentPage from '../features/treatment/CommercialTreatmentPage';
 import SystemSettingsPage from '../features/system-settings/SystemSettingsPage';
 import MedicineManagementPage from '../features/system-settings/MedicineManagementPage';
 import LabWorkPage from '../features/lab-work/LabWorkPage';
@@ -39,11 +40,6 @@ import RevisionPage from '../features/treatment/RevisionPage';
 
 import ItemPlansPage from '../features/treatment/ItemPlansPage';
 import CustomerPrescriptionsPage, { CustomerPrescriptionDetailPage } from '../features/customer-prescriptions/CustomerPrescriptionsPage';
-
-function LegacyCommercialRedirect() {
-  const { search } = useLocation();
-  return <Navigate to={'/settings/treatment-services' + search} replace />;
-}
 
 export default function App() {
   return <Routes>
@@ -90,7 +86,7 @@ export default function App() {
       <Route path="patients/:id/dossiers/:dossierId/plan/revise/:itemId" element={<Protected permission="treatment.revisions.manage"><RevisionPage /></Protected>} />
       <Route path="treatment-templates" element={<Protected permission="treatment.templates.read"><ItemPlansPage /></Protected>} />
       <Route path="treatment-templates/legacy" element={<Navigate to="/treatment-templates" replace />} />
-      <Route path="commercial/treatment" element={<LegacyCommercialRedirect />} />
+      <Route path="commercial/treatment" element={<Protected permission={['treatment.prices.read','treatment.commercial.read']}><CommercialTreatmentPage /></Protected>} />
       <Route path="appointments" element={<Protected permission="appointments.read"><AppointmentCalendarPage /></Protected>} />
       <Route path="reception" element={<Protected permission="reception.read"><ReceptionPage /></Protected>} />
       <Route path="reception/appointments/:appointmentId" element={<Protected permission="reception.read"><CheckInPage /></Protected>} />

@@ -114,3 +114,7 @@ Tồn kho và xuất dùng theo `MATERIAL-STOCK.md`: sửa/xóa dòng nhập là
 ## Số lô (06/11/2026)
 
 Mỗi dòng nhập có thêm **Số lô** (`lotNumber`): không bắt buộc, ghi theo nhãn trên bao bì, trim, tối đa 60 ký tự, lỗi → MSG04 `field=lotNumber`. Cột "Số lô" nằm cạnh Hạn dùng trong bảng nhập hàng; ô "Số lô" nằm cạnh Hạn dùng trong modal. DTO, `POST` và `PUT` thêm `lotNumber` (null = để trống). Thẻ Tồn kho (`MATERIAL-STOCK.md`) hiển thị số lô của từng lần nhập. Số lô không có ràng buộc duy nhất; xuất dùng vẫn chưa gắn với lô cụ thể.
+
+## Màn hình hẹp: không cuộn ngang (06/11/2026)
+
+Bảng nhập hàng không có thanh cuộn ngang ở mọi độ rộng; chữ trong ô tự xuống dòng. Từ 1200px trở xuống (bảng có 10 cột nên cần rộng hơn), mỗi lần nhập là một thẻ, mỗi trường một dòng "nhãn: giá trị" (Ngày nhập, Ngày nhận, Hạn dùng, Số lô, Tên dụng cụ/vật liệu, SL, Đơn giá, Tổng cộng, Đã thanh toán) kèm nút Sửa/Xóa ở cuối thẻ; không đổi dữ liệu hay API.

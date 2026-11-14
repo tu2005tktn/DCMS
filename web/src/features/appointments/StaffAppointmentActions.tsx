@@ -125,7 +125,7 @@ function ChangeForm({ appointment, mode, onClose, onChanged }: {
   if (mode === 'no-show') return <Modal open title="Khách không tới" onCancel={() => { if (!busy) onClose(); }} maskClosable={!busy} closable={!busy}
     okText="Xác nhận khách không tới" cancelText="Giữ nguyên" confirmLoading={busy} okButtonProps={{ 'aria-label': 'Xác nhận khách không tới', disabled: busy || !valid }}
     cancelButtonProps={{ disabled: busy }} onOk={() => void submit()}>
-    {feedback}<Alert className="form-alert" type="info" showIcon message="Giữ lịch sử khách không tới và giải phóng khung giờ. Bạn có thể đặt lịch thay thế nếu còn thời gian phù hợp." />
+    {feedback}
     {summary}{reasonField}
   </Modal>;
   return <Drawer open title="Chỉnh sửa lịch hẹn" aria-label="Chỉnh sửa lịch hẹn" width={560} styles={{ wrapper: { maxWidth: '100vw' } }} closable={!busy} maskClosable={!busy} onClose={() => { if (!busy) onClose(); }}

@@ -86,7 +86,7 @@ export default function CustomerCarePage() {
     } catch (e) { setExportError((e as Error).message); } finally { setExporting(false); }
   }
 
-  return <main className="page">
+  return <main className="page care-page">
     <Space style={{ width: '100%', justifyContent: 'space-between' }} wrap>
       <Typography.Title level={2} style={{ margin: 0 }}>Chăm sóc khách hàng</Typography.Title>
       {canManage && creatable.length > 0 && <Button type="primary" icon={<PlusOutlined />} onClick={() => setEditor({})}>TẠO MỚI</Button>}

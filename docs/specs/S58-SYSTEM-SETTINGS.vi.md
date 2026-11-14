@@ -283,3 +283,9 @@ Tiêu chí chi tiết, thứ tự công việc, khoảng trống code đã đố
 ## Cập nhật 08/11/2026: đưa "Dịch vụ" vào Thiết lập hệ thống
 
 Màn giá và duyệt giảm trừ điều trị (trước đây menu "Dịch vụ", `/commercial/treatment`) chuyển thành mục **"Dịch vụ điều trị"** trong Thiết lập hệ thống, nhóm **Danh mục**, đường dẫn `/settings/treatment-services`. Menu trái không còn mục "Dịch vụ". Mục hiện khi có `treatment.prices.read` hoặc `treatment.commercial.read`; các đường dẫn `/settings` cho phép vào nếu có một trong các quyền này hoặc `settings.read`. Đường dẫn cũ `/commercial/treatment` chuyển hướng sang đường dẫn mới và giữ tham số `?dossier=`. Nội dung màn, API và quyền giữ nguyên.
+
+## Điều chỉnh (14/11/2026): thẻ mục lục và bỏ cột menu danh mục
+
+- Trang mục lục Thiết lập hệ thống hiển thị mỗi mục thành một thẻ riêng (biểu tượng, tên, mô tả), gồm cả "Công ty cung cấp vật liệu", "Công ty labo", "Loại công việc labo".
+- Khi vào một mục, chỉ hiển thị danh mục đó; bỏ cột menu danh mục bên trái (Công ty cung cấp vật liệu / Công ty labo / Loại công việc labo).
+- Không đổi API hay quyền.

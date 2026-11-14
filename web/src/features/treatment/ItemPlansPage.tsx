@@ -79,9 +79,9 @@ function ItemPlansWorkspace() {
       <Space wrap>{canPickBranch && branches.length > 1 && <Select aria-label="Chi nhánh" value={branch} disabled={busy}
         options={branches.map(x => ({ value: x.id, label: x.name }))} onChange={id => { if (canLeave()) { setBranch(id); setPlan(null); setEditing(null); setDirty(false); setPage(1); setData(null); setOptions(null); setError(null); } }} />}</Space></div>
     {listError && <Alert showIcon type="error" message={listError} action={<Button onClick={() => branch ? setRevision(r => r + 1) : window.location.reload()}>Thử lại</Button>} />}
-    {error && <Alert showIcon type="error" message={`${error.code ?? ''}: ${error.message}`} description={error.code === 'MSG111' ? 'Bản nhập vẫn được giữ. Đọc phiên bản mới để đối chiếu trước khi lưu lại.' : undefined}
+    {!plan && error && <Alert showIcon type="error" message={`${error.code ?? ''}: ${error.message}`} description={error.code === 'MSG111' ? 'Bản nhập vẫn được giữ. Đọc phiên bản mới để đối chiếu trước khi lưu lại.' : undefined}
       action={error.code === 'MSG111' && plan ? <Button disabled={busy} onClick={readLatest}>Xem phiên bản mới</Button> : undefined} />}
-    {!nameDialog && comparison}
+    {!plan && !nameDialog && comparison}
     <Card title="Danh sách kế hoạch" extra={<Button type="primary" disabled={!canManage || !branch || busy} onClick={() => { if (canLeave()) { setEditing(null); setName(''); setNameDialog('create'); setDirty(false); setError(null); } }}>Tạo kế hoạch</Button>}>
       <Space.Compact className="item-plan-search"><Input aria-label="Tìm tên kế hoạch" value={search} maxLength={160} allowClear onChange={e => setSearch(e.target.value)} onPressEnter={() => { setKeyword(search.trim()); setPage(1); }} /><Button onClick={() => { setKeyword(search.trim()); setPage(1); }}>Tìm kiếm</Button></Space.Compact>
       {loading && !data ? <Skeleton active /> : <Table className="item-plan-list" rowKey="id" pagination={false} loading={loading} dataSource={data?.items ?? []}
@@ -91,10 +91,18 @@ function ItemPlansWorkspace() {
         ]} />}
       {!!data?.total && <Pagination current={page} total={data.total} pageSize={20} showSizeChanger={false} onChange={setPage} />}
     </Card>
-    {plan && <Card title={plan.name} extra={<Space wrap><Button disabled={!canManage || busy || !!editing} onClick={() => { setName(plan.name); setNameDialog('rename'); setDirty(false); setError(null); }}>Sửa tên</Button>
-      <Popconfirm title="Bạn có muốn xóa kế hoạch điều trị này không?" okText="Đồng ý" cancelText="Không đồng ý" onConfirm={() => void write(`${itemPlanApi}/${plan.id}`, 'DELETE', { expectedVersion: plan.version }, true)}>
-        <Button danger disabled={!canManage || busy || !!editing}>Xóa kế hoạch</Button></Popconfirm></Space>}>
-      <p>{plan.itemCount} hạng mục · Tổng chi phí: <strong>{planMoney(plan.totalCostVnd)}</strong></p>
+    <Modal open={!!plan} centered width={1180} destroyOnClose title={plan?.name} footer={null} styles={{ body: { maxHeight: '75vh', overflowY: 'auto' } }}
+      onCancel={() => { if (!busy && canLeave()) { setPlan(null); setEditing(null); setDirty(false); setError(null); setLatest(null); } }}>
+      {plan && <>
+      {error && !nameDialog && <Alert showIcon type="error" message={`${error.code ?? ''}: ${error.message}`} description={error.code === 'MSG111' ? 'Bản nhập vẫn được giữ. Đọc phiên bản mới để đối chiếu trước khi lưu lại.' : undefined}
+        action={error.code === 'MSG111' ? <Button disabled={busy} onClick={readLatest}>Xem phiên bản mới</Button> : undefined} style={{ marginBottom: 12 }} />}
+      {!nameDialog && comparison}
+      <Space wrap style={{ marginBottom: 12, justifyContent: 'space-between', width: '100%' }}>
+        <span>{plan.itemCount} hạng mục · Tổng chi phí: <strong>{planMoney(plan.totalCostVnd)}</strong></span>
+        <Space wrap><Button disabled={!canManage || busy || !!editing} onClick={() => { setName(plan.name); setNameDialog('rename'); setDirty(false); setError(null); }}>Sửa tên</Button>
+          <Popconfirm title="Bạn có muốn xóa kế hoạch điều trị này không?" okText="Đồng ý" cancelText="Không đồng ý" onConfirm={() => void write(`${itemPlanApi}/${plan.id}`, 'DELETE', { expectedVersion: plan.version }, true)}>
+            <Button danger disabled={!canManage || busy || !!editing}>Xóa kế hoạch</Button></Popconfirm></Space>
+      </Space>
       <div className="item-plan-table-scroll"><table className="item-plan-table">{heading}<tbody>
         {plan.items.map(row => editing !== 'new' && editing?.id === row.id && options ?
           <ItemPlanRowEditor key={row.id} initial={row} options={options} busy={!canManage || busy} onDirty={() => setDirty(true)} onSave={saveRow} onCancel={cancelEditing} /> :
@@ -108,7 +116,8 @@ function ItemPlansWorkspace() {
         {!plan.items.length && editing !== 'new' && <tr><td colSpan={8}><Empty description="Chưa có hạng mục. Bấm Thêm hạng mục để nhập." /></td></tr>}
       </tbody></table></div>
       <Button type="primary" disabled={!canManage || busy || !!editing || !options || plan.itemCount >= 100} onClick={() => { setEditing('new'); setDirty(false); setError(null); }}>+ Thêm hạng mục</Button>
-    </Card>}
+      </>}
+    </Modal>
     <Modal title={nameDialog === 'create' ? 'Tạo kế hoạch điều trị' : 'Sửa tên kế hoạch'} open={!!nameDialog} onCancel={() => { if (!busy && canLeave()) { setNameDialog(null); setDirty(false); } }}
       footer={<Space><Button disabled={busy} onClick={() => { if (canLeave()) { setNameDialog(null); setDirty(false); } }}>Hủy</Button><Button type="primary" loading={busy} disabled={!canManage || !name.trim() || name.trim().length > 160} onClick={() => {
         if (nameDialog === 'create') void write(itemPlanApi, 'POST', { branchId: branch, name: name.trim() });

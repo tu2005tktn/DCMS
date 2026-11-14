@@ -2,7 +2,7 @@ import { Alert, Avatar, Button, Drawer, Layout, Menu, Typography } from 'antd';
 import type { MenuProps } from 'antd';
 import { CalendarOutlined, TeamOutlined, ScheduleOutlined, MedicineBoxOutlined, ExperimentOutlined, BarChartOutlined,
   SettingOutlined, UserOutlined, FileTextOutlined, AuditOutlined, InboxOutlined,
-  LinkOutlined, MenuOutlined, LogoutOutlined, CloseOutlined, CustomerServiceOutlined } from '@ant-design/icons';
+  LinkOutlined, MenuOutlined, MenuFoldOutlined, MenuUnfoldOutlined, LogoutOutlined, CloseOutlined, CustomerServiceOutlined } from '@ant-design/icons';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../features/authentication/AuthContext';
@@ -14,6 +14,8 @@ export default function StaffWorkspace() {
   const location = useLocation();
   const [busy, setBusy] = useState(false), [error, setError] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => { try { return localStorage.getItem("dcms.staff.sidebar.collapsed") === "1"; } catch { return false; } });
+  function toggleCollapsed() { setCollapsed(value => { const next = !value; try { localStorage.setItem("dcms.staff.sidebar.collapsed", next ? "1" : "0"); } catch { /* storage unavailable */ } return next; }); }
   useEffect(() => { setMobileOpen(false); }, [location.pathname]);
   async function signOut() {
     setBusy(true); setError(null);
@@ -58,9 +60,9 @@ export default function StaffWorkspace() {
   const navigation = <><div className="staff-brand-wrap">{brand}</div>
     <nav aria-label="Chức năng nhân viên" className="staff-navigation"><Menu mode="inline" theme="dark" selectedKeys={[selected]} items={items} onClick={()=>setMobileOpen(false)} /></nav>
     <Link to="/" aria-label="Tài khoản của tôi" className={`staff-account-link${selected==='/'?' is-current':''}`} onClick={()=>setMobileOpen(false)}><UserOutlined aria-hidden="true" /> Tài khoản của tôi</Link></>;
-  return <Layout className="workspace staff-workspace">
+  return <Layout className={`workspace staff-workspace${collapsed ? " is-collapsed" : ""}`}>
     <a className="staff-skip" href="#staff-content">Đến nội dung chính</a>
-    <aside className="staff-sidebar">{navigation}</aside>
+    <aside className="staff-sidebar">{navigation}<Button className="staff-sidebar-toggle" type="text" icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />} aria-label={collapsed ? "Mở rộng menu" : "Thu gọn menu"} title={collapsed ? "Mở rộng menu" : "Thu gọn menu"} aria-pressed={collapsed} onClick={toggleCollapsed} /></aside>
     <Drawer className="staff-mobile-navigation" title="Điều hướng nhân viên" placement="left" width={280} open={mobileOpen} onClose={()=>setMobileOpen(false)} closeIcon={<CloseOutlined />} destroyOnClose>{navigation}</Drawer>
     <Layout className="staff-main">
       <Layout.Header className="workspace-header staff-header">

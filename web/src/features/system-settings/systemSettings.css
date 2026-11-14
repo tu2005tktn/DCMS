@@ -91,3 +91,13 @@
 .settings-breadcrumb a { cursor: pointer; }
 .settings-switch { max-width: 100%; overflow-x: auto; margin-bottom: 16px; }
 .settings-back { margin-bottom: 12px; }
+
+/* Trang mục lục thiết lập: thẻ có biểu tượng + mô tả, dàn kín (14/11/2026) */
+.settings-search { max-width: 480px; }
+.settings-card-grid { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+.settings-card { display: flex; gap: 14px; align-items: center; min-height: 96px; }
+.settings-card-icon { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 10px; background: #eff4ff; color: #175cd3; font-size: 20px; }
+.settings-card-text { display: grid; gap: 4px; min-width: 0; }
+.settings-card-text strong { font-size: 15px; color: #1d2939; }
+.settings-card-text small { font-size: 13px; font-weight: 400; line-height: 1.4; color: #667085; }
+.settings-card:hover .settings-card-icon, .settings-card:focus-visible .settings-card-icon { background: #d1e0ff; }

@@ -7,3 +7,11 @@
 .care-table .ant-tag { margin-inline-end: 0; font-size: 12px; }
 .care-table .ant-typography { font-size: 13px; }
 .care-table .care-content { white-space: pre-wrap; }
+
+/* Trang dàn kín: bỏ kiểu căn giữa toàn màn hình của lớp .page chung (14/11/2026) */
+.care-page.page { display: block; min-height: 0; padding: 0; place-items: normal; }
+.care-page > .ant-card { margin-top: 12px !important; }
+.care-page > .ant-space:last-of-type { margin: 10px 0 !important; }
+.staff-content .care-page > .ant-card { background: transparent; border: 0; }
+.staff-content .care-page > .ant-card > .ant-card-body { padding: 0; }
+.care-page > .ant-card .ant-space { width: 100%; }

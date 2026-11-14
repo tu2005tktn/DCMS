@@ -12,11 +12,11 @@ Tài liệu liên quan: [S19-OPTIONAL-PRESCRIPTION.vi.md](S19-OPTIONAL-PRESCRIPT
 ### Sửa tích hợp sau PR #53 (10/11/2026)
 
 - Router chỉ import một lần trang danh sách đơn thuốc bệnh nhân bằng default export và trang chi tiết bằng named export; giữ hai route `/customer/prescriptions` và `/customer/prescriptions/:id` trong vùng xác thực khách hàng hiện hữu.
-- `/commercial/treatment` tiếp tục chuyển tới `/settings/treatment-services`, giữ nguyên query string; khai báo hàm chuyển hướng độc lập với default export `App`.
+- `/commercial/treatment` (menu "Giá và duyệt điều trị") mở trang riêng trong workspace nhân viên, không còn chuyển sang `/settings/treatment-services` (cập nhật 14/11/2026); mục "Dịch vụ điều trị" trong Thiết lập hệ thống vẫn dùng được qua `/settings/treatment-services`.
 - Giữ luồng kê đơn trực tiếp S23 và quyết định ẩn mẫu đơn/luồng Visit trong PR #53. Các ghi chú khôi phục menu mẫu ngày 08–09/11 bên dưới là lịch sử, không tái bật menu/route trong lần sửa tích hợp này. Không thay đổi API hoặc quyền truy cập.
 
 - Mục **Mẫu đơn thuốc** mở `/prescriptions/templates` trong workspace nhân viên, yêu cầu đăng nhập và quyền `prescriptions.manage`, giống điều kiện hiển thị menu. Truy cập trực tiếp cũng phải kiểm tra quyền; không có quyền thì hiển thị 403.
-- Entry point web phải render router `App` qua default export của `App.tsx`. Hàm chuyển hướng `/commercial/treatment` là hàm riêng, giữ nguyên query string khi chuyển tới `/settings/treatment-services`.
+- Entry point web phải render router `App` qua default export của `App.tsx`.
 - Bản sửa khôi phục route bị mất khi merge và default export của router; không thay đổi API hoặc hợp đồng dữ liệu đơn thuốc.
 - Tích hợp main ngày 09/11/2026: khi giữ route `/prescriptions/templates`, router phải import `PrescriptionTemplatesPage` từ trang quản lý mẫu đơn hiện có để build TypeScript thành công; giữ nguyên kiểm tra quyền `prescriptions.manage`.
 Điều hướng web nhân viên: mục "Mẫu đơn thuốc" trong nhóm Chuyên môn mở `/prescriptions/templates`, yêu cầu quyền `prescriptions.manage` và hiển thị `PrescriptionTemplatesPage`. Tuyến này phải được khai báo trong router để menu hoạt động và bản build web thành công.

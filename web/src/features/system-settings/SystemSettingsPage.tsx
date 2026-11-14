@@ -1,6 +1,7 @@
+import { BankOutlined, ExperimentOutlined, FileSearchOutlined, HistoryOutlined, MedicineBoxOutlined, SafetyCertificateOutlined, SettingOutlined, ShopOutlined, TeamOutlined } from '@ant-design/icons';
 import { Alert, Button, Card, Form, Input, Modal, Result, Select, Space, Table, Typography, Breadcrumb, Segmented } from 'antd';
 import CommercialTreatmentPage from '../treatment/CommercialTreatmentPage';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { api } from '../../services/api';
 import { useAuth } from '../authentication/AuthContext';
@@ -62,62 +63,62 @@ export default function SystemSettingsPage() {
   const tabs = [
     // 1. general
     ...(capabilities.sections.some(x => x.key === 'general') || has('settings.general.read')
-      ? [{ key: 'general', label: '1. Thiết lập chung', children: <GeneralSettingsPanel onDirtyChange={v => { dirty.current = v; }} /> }]
+      ? [{ key: 'general', label: 'Thiết lập chung', children: <GeneralSettingsPanel onDirtyChange={v => { dirty.current = v; }} /> }]
       : []),
 
     // 2. diagnoses
     ...(has('catalog.diagnoses.read') || has('settings.read')
-      ? [{ key: 'diagnoses', label: '2. Chẩn đoán / Tên bệnh', children: <ReferenceCatalogPanel initialKind="diagnoses" /> }]
+      ? [{ key: 'diagnoses', label: 'Chẩn đoán / Tên bệnh', children: <ReferenceCatalogPanel initialKind="diagnoses" /> }]
       : []),
 
     // 12. treatment-services (moved from the Chuyên môn menu)
     ...(has('treatment.prices.read') || has('treatment.commercial.read')
-      ? [{ key: 'treatment-services', label: '12. Dịch vụ điều trị', children: <CommercialTreatmentPage /> }]
+      ? [{ key: 'treatment-services', label: 'Dịch vụ điều trị', children: <CommercialTreatmentPage /> }]
       : []),
 
     // 4. material-suppliers
     ...(has('catalog.material-suppliers.read')
-      ? [{ key: 'material-suppliers', label: '4. Công ty cung cấp vật liệu', children: <SupplyCatalogPanel initialKey="suppliers" /> }]
+      ? [{ key: 'material-suppliers', label: 'Công ty cung cấp vật liệu', children: <SupplyCatalogPanel initialKey="suppliers" /> }]
       : []),
 
     // 5. materials
     ...(has('catalog.materials.read')
-      ? [{ key: 'materials', label: '5. Loại dụng cụ / Vật liệu', children: <MaterialCatalog /> }]
+      ? [{ key: 'materials', label: 'Loại dụng cụ / Vật liệu', children: <MaterialCatalog /> }]
       : []),
 
     // 6. lab-providers
     ...(has('catalog.lab-work-types.read') || has('catalog.material-suppliers.read')
-      ? [{ key: 'lab-providers', label: '6. Công ty labo', children: <SupplyCatalogPanel initialKey="labs" /> }]
+      ? [{ key: 'lab-providers', label: 'Công ty labo', children: <SupplyCatalogPanel initialKey="labs" /> }]
       : []),
 
     // 7. lab-work-types
     ...(has('catalog.lab-work-types.read')
-      ? [{ key: 'lab-work-types', label: '7. Loại công việc labo', children: <SupplyCatalogPanel initialKey="lab-work-types" /> }]
+      ? [{ key: 'lab-work-types', label: 'Loại công việc labo', children: <SupplyCatalogPanel initialKey="lab-work-types" /> }]
       : []),
 
     // 8. customer-groups
     ...(has('catalog.customer-groups.read') || owner
-      ? [{ key: 'customer-groups', label: '8. Nhóm khách hàng', children: <ReferenceCatalogPanel initialKind="customer-groups" /> }]
+      ? [{ key: 'customer-groups', label: 'Nhóm khách hàng', children: <ReferenceCatalogPanel initialKind="customer-groups" /> }]
       : []),
 
     // 9. medicines
     ...(has('catalog.medicines.read')
-      ? [{ key: 'medicines', label: '9. Thuốc / Dược phẩm', children: <SupplyCatalogPanel initialKey="medicines" /> }]
+      ? [{ key: 'medicines', label: 'Thuốc / Dược phẩm', children: <SupplyCatalogPanel initialKey="medicines" /> }]
       : []),
 
     // 10. access-groups
     ...(user?.permissions.includes('access-groups.read') || owner
-      ? [{ key: 'access-groups', label: '10. Phân quyền truy cập', children: <AccessGroupsPanel /> }]
+      ? [{ key: 'access-groups', label: 'Phân quyền truy cập', children: <AccessGroupsPanel /> }]
       : []),
 
     // 11. branches
     ...(has('branches.read') || owner
-      ? [{ key: 'branches', label: '11. Chi nhánh & Ghế điều trị', children: <BranchesPanel /> }]
+      ? [{ key: 'branches', label: 'Chi nhánh & Ghế điều trị', children: <BranchesPanel /> }]
       : []),
 
     // 12. settings history (DCMS-132)
     ...(capabilities.sections.some(x => x.key === 'audit') || has('settings.audit.read')
-      ? [{ key: 'audit', label: '12. Lịch sử thiết lập', children: <SettingsAuditPanel /> }]
+      ? [{ key: 'audit', label: 'Lịch sử thiết lập', children: <SettingsAuditPanel /> }]
       : []),
   ];
 
@@ -147,12 +148,26 @@ export default function SystemSettingsPage() {
     });
   }
 
+  const meta: Record<string, { icon: ReactNode; desc: string }> = {
+    general: { icon: <SettingOutlined />, desc: 'Thời gian chờ phiên, tiền tố mã và các tùy chọn chung của phòng khám' },
+    branches: { icon: <BankOutlined />, desc: 'Chi nhánh, ghế điều trị và thông tin liên hệ' },
+    'customer-groups': { icon: <TeamOutlined />, desc: 'Phân nhóm khách hàng để chăm sóc và thống kê' },
+    diagnoses: { icon: <FileSearchOutlined />, desc: 'Danh mục chẩn đoán, tên bệnh và loại chăm sóc khách hàng' },
+    'treatment-services': { icon: <MedicineBoxOutlined />, desc: 'Giá tham chiếu và duyệt giảm trừ cho dịch vụ điều trị' },
+    medicines: { icon: <MedicineBoxOutlined />, desc: 'Danh mục thuốc, hoạt chất và đơn vị tính' },
+    'material-suppliers': { icon: <ShopOutlined />, desc: 'Công ty cung cấp dụng cụ và vật liệu cho phòng khám' },
+    materials: { icon: <ExperimentOutlined />, desc: 'Loại dụng cụ, vật liệu và nhóm vật tư' },
+    'lab-providers': { icon: <ShopOutlined />, desc: 'Công ty labo hợp tác làm răng giả, phục hình' },
+    'lab-work-types': { icon: <ExperimentOutlined />, desc: 'Các loại công việc đặt labo và đơn giá tham chiếu' },
+    'access-groups': { icon: <SafetyCertificateOutlined />, desc: 'Nhóm quyền và phân quyền truy cập cho nhân viên' },
+    audit: { icon: <HistoryOutlined />, desc: 'Lịch sử thay đổi các thiết lập hệ thống' },
+  };
   const plain = (label: string) => label.replace(/^\d+\.\s*/, '');
   const groups = [
     { name: 'Phòng khám', keys: ['general', 'branches', 'customer-groups'] },
     { name: 'Danh mục', keys: ['diagnoses', 'services', 'treatment-services', 'medicines'] },
     { name: 'Vật liệu và labo', keys: ['material-suppliers', 'materials', 'lab-providers', 'lab-work-types'] },
-    { name: 'Bảo mật', keys: ['access-groups'] },
+    { name: 'Bảo mật và lịch sử', keys: ['access-groups', 'audit'] },
   ].map(g => ({ ...g, items: g.keys.map(k => tabs.find(t => t.key === k)).filter((t): t is (typeof tabs)[number] => !!t) })).filter(g => g.items.length > 0);
   const fold = (v: string) => v.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').toLowerCase();
   const needle = fold(query.trim());
@@ -169,7 +184,7 @@ export default function SystemSettingsPage() {
         {shown.map(g => <section key={g.name} className="settings-group">
           <Typography.Title level={4}>{g.name}</Typography.Title>
           <div className="settings-card-grid">
-            {g.items.map(t => <button key={t.key} type="button" className="settings-card" onClick={() => change(t.key)}>{plain(t.label)}</button>)}
+            {g.items.map(t => <button key={t.key} type="button" className="settings-card" onClick={() => change(t.key)}><span className="settings-card-icon" aria-hidden="true">{meta[t.key]?.icon}</span><span className="settings-card-text"><strong>{plain(t.label)}</strong><small>{meta[t.key]?.desc}</small></span></button>)}
           </div>
         </section>)}
       </> : <>

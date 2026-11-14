@@ -86,7 +86,8 @@ const sections: Section[] = [
 const base = '/api/system-settings/settings/catalogs';
 const commandLabels: Record<string, string> = { create: 'Tạo mới', update: 'Sửa', state: 'Đổi trạng thái' };
 
-export default function SupplyCatalogPanel({ onlyMedicines = false, initialKey }: { onlyMedicines?: boolean; initialKey?: SectionKey } = {}) {
+export default function SupplyCatalogPanel({ onlyMedicines = false, initialKey, hideTitle = false }: { onlyMedicines?: boolean; initialKey?: SectionKey; hideTitle?: boolean } = {}) {
+  const single = onlyMedicines || !!initialKey;
   // Static message does not render under React 19 + antd 5 (errors were silently lost); use the hook instance.
   const [toast, toastContext] = message.useMessage();
   const { user } = useAuth();
@@ -200,11 +201,11 @@ export default function SupplyCatalogPanel({ onlyMedicines = false, initialKey }
     }, failure => void toast.error(failure.message));
   }
 
-  return <div className={`reference-catalogs${onlyMedicines ? ' reference-catalogs--single' : ''}`}>
+  return <div className={`reference-catalogs${single ? ' reference-catalogs--single' : ''}`}>
     {toastContext}
-    {!onlyMedicines && <Menu className="reference-catalogs-menu" mode="inline" selectedKeys={[key]} onClick={e => select(e.key as SectionKey)} items={visibleSections.map(x => ({ key: x.key, label: x.title }))} />}
+    {!single && <Menu className="reference-catalogs-menu" mode="inline" selectedKeys={[key]} onClick={e => select(e.key as SectionKey)} items={visibleSections.map(x => ({ key: x.key, label: x.title }))} />}
     <div className="reference-catalogs-body">
-      <Typography.Title level={4}>{section.title}</Typography.Title>
+      {!hideTitle && <Typography.Title level={4}>{section.title}</Typography.Title>}
       {section.help && <Typography.Paragraph type="secondary">{section.help}</Typography.Paragraph>}
       <div className="system-settings-toolbar">
         <Input.Search aria-label="Tìm theo tên hoặc mã" placeholder="Tìm theo tên hoặc mã" maxLength={100} allowClear value={search}
@@ -217,22 +218,22 @@ export default function SupplyCatalogPanel({ onlyMedicines = false, initialKey }
         {section.exportable && can(section.resource, 'export') && <Button disabled={busy} onClick={() => void exportExcel()}>Xuất Excel</Button>}
       </div>
       {error && <Alert type="error" showIcon message={error} action={<Button onClick={() => setRevision(v => v + 1)}>Thử lại</Button>} />}
-      <Table<Row> rowKey="id" loading={loading} dataSource={data?.items ?? []} scroll={{ x: 900 }}
+      <Table<Row> rowKey="id" className="supply-catalog-table" loading={loading} dataSource={data?.items ?? []}
         locale={{ emptyText: <Empty description={query ? 'Không có kết quả phù hợp.' : 'Chưa có dữ liệu.'} /> }}
         pagination={{ current: page, pageSize: size, total: data?.total ?? 0, showSizeChanger: true, pageSizeOptions: [20, 50, 100],
           onChange: (p, s) => { setPage(s !== size ? 1 : p); setSize(s); } }}
-        columns={[
+        columns={([
           { title: 'Mã', dataIndex: 'code', width: 130 },
           { title: 'Tên', dataIndex: 'name' },
           ...section.columns,
           { title: 'Trạng thái', dataIndex: 'active', width: 110, render: (v: boolean) => v ? <Tag color="green">Đang dùng</Tag> : <Tag>Ngừng dùng</Tag> },
-          { title: 'Thao tác', key: 'actions', width: 240, fixed: 'right', render: (_, row) => <Space wrap>
+          { title: 'Thao tác', key: 'actions', width: 240, render: (_, row) => <Space wrap>
             {section.key === 'medicines' && <Button size="small" onClick={() => void viewMedicine(row)}>Xem</Button>}
             {can(section.resource, 'update') && <Button size="small" aria-label={`Sửa ${row.name}`} onClick={() => open(row)}>Sửa</Button>}
             {can(section.resource, 'deactivate') && <Button size="small" danger={row.active} disabled={busy} onClick={() => void previewState(row)}>{row.active ? 'Ngừng dùng' : 'Khôi phục'}</Button>}
             <Button size="small" type="link" onClick={() => void openHistory(row)}>Lịch sử</Button>
           </Space> },
-        ]} />
+        ] as ColumnsType<Row>).map(c => ({ ...c, onCell: () => ({ 'data-label': typeof c.title === 'string' ? c.title : '' }) as React.HTMLAttributes<HTMLElement> }))} />
     </div>
 
     <Drawer open={!!editing} width={560} title={`${editing?.row ? 'Sửa' : 'Thêm'} · ${section.title}`} forceRender

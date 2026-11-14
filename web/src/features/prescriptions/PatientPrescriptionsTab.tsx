@@ -127,7 +127,7 @@ export default function PatientPrescriptionsTab({ patient, active }: { patient: 
       </Space> },
     ]} /> : <Empty description={canManage ? 'Chưa có đơn thuốc. Bấm Kê đơn thuốc để bắt đầu.' : 'Chưa có đơn thuốc.'} />}
 
-    <Modal open={!!sheet} onCancel={close} width={780} destroyOnClose className="rx-modal" maskClosable={false}
+    <Modal open={!!sheet} onCancel={close} width={920} centered destroyOnClose className="rx-modal" maskClosable={false}
       title={null} footer={sheet?.mode === 'view'
         ? <Button onClick={close}>Đóng</Button>
         : <Space><Button disabled={busy} onClick={close}>Hủy</Button><Button type="primary" loading={busy} onClick={() => form.submit()}>Lưu đơn thuốc</Button></Space>}>
@@ -203,7 +203,7 @@ export default function PatientPrescriptionsTab({ patient, active }: { patient: 
 
             <section className="rx-section">
               <h3>GHI CHÚ/LỜI DẶN</h3>
-              <Form.Item name="advice" noStyle rules={[{ max: 4000 }]}><Input.TextArea rows={3} maxLength={4000} aria-label="Ghi chú, lời dặn" /></Form.Item>
+              <Form.Item name="advice" noStyle rules={[{ max: 4000 }]}><Input.TextArea rows={2} maxLength={4000} aria-label="Ghi chú, lời dặn" /></Form.Item>
             </section>
 
             <section className="rx-section">

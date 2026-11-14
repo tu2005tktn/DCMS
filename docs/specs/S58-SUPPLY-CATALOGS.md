@@ -77,3 +77,11 @@ Tích hợp workspace 53d3e2e: các API `/api/settings/*` của module trong tà
 Triển khai theo kế hoạch đã duyệt: Dentist hiệu lực được quản lý Provider, vật liệu, nhóm, đơn vị và loại công việc Labo; không mở quyền thuốc. Provider Both dùng một ID ở hai tab. Giữ mã/giá/đơn vị và nguồn vật liệu hiện có; không tạo nguồn thứ hai. Material thêm code, đơn vị gốc, supplier mặc định, giá tham khảo và định nghĩa chuyển đổi versioned; bản cũ thiếu cấu hình vẫn đọc được, không suy đơn vị từ tên. Hệ số là decimal string dương, quy đổi vật liệu tối đa 3 số lẻ và thuốc ra đơn vị nguyên, không làm tròn. Bản đã dùng giữ snapshot. Đổi đơn vị gốc cần kiểm movement/số dư; nguồn chưa có trả MSG144. Category manager lưu riêng không rollback khi hủy vật liệu.
 
 API typed dưới /api/system-settings/settings/catalogs, đọc/thêm/sửa/state-preview/state/history; API material cũ đọc cùng ID và không bypass dependency khi ngừng. expectedVersion/requestKey, audit/receipt cùng transaction, quyền kiểm trước replay; lỗi field/currentVersion/blockers phân biệt MSG201/205/111/144. Không tạo ledger/đơn labo/payable; integration thật còn phụ thuộc DCMS-100/S48–50. Migration additive, giữ ID dữ liệu cũ. Kiểm PostgreSQL cách ly, UI mock và API thật được báo riêng. Không chạy Git hay migration development khi chưa được duyệt riêng.
+
+## Màn hình hẹp: không cuộn ngang (06/11/2026)
+
+Bảng của bốn tab (Công ty cung cấp vật liệu, Công ty labo, Loại công việc labo, Thuốc) không còn thanh cuộn ngang và không còn cột dính bên phải; chữ trong ô tự xuống dòng. Từ 1100px trở xuống, mỗi dòng là một thẻ, mỗi cột một dòng "nhãn: giá trị" (nhãn lấy từ tiêu đề cột), nút Sửa/Ngừng dùng/Lịch sử ở cuối thẻ. Không đổi dữ liệu hay API.
+
+## Mã của dữ liệu mẫu labo (06/11/2026)
+
+Dữ liệu mẫu labo (`LAB-CATALOG-SEED.md`) dùng mã không có chữ "DEMO": công ty `LAB-01`, `LAB-02`; loại công việc `LW-01..LW-07`.
