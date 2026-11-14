@@ -691,7 +691,6 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
         if (c.Description?.Trim().Length > 1000) throw Fail("MSG04", field: "description", label: "Mô tả");
         if (c.Lines is not { Length: > 0 }) throw Fail("MSG02", field: "lines", label: "Danh sách thuốc");
         if (c.Lines.Length > PrescriptionRules.MaxTemplateLines) throw Fail("MSG04", field: "lines", label: "Danh sách thuốc");
-        var values = c.Lines.Select(l => Validate(l.Route, l.MorningDose, l.NoonDose, l.AfternoonDose, l.EveningDose, l.MealTiming, l.Days, l.Quantity, l.Instructions)).ToArray();
         var hash = Hash(new { op = "template.save", id, c });
 
         await using var tx = await BeginAsync(ct);
@@ -729,8 +728,8 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
         for (var i = 0; i < c.Lines.Length; i++)
         {
             var input = c.Lines[i];
-            var v = values[i];
             if (!medicines.TryGetValue(input.MedicineId, out var med)) throw Fail("MSG113", 404, $"lines[{i}].medicineId");
+            var v = Validate(input.Route, input.MorningDose, input.NoonDose, input.AfternoonDose, input.EveningDose, input.MealTiming, input.Days, input.Quantity, input.Instructions, med.BaseUnit);
             template.Lines.Add(new PrescriptionTemplateLine
             {
                 TemplateId = template.Id, MedicineId = med.Id, MedicineCode = med.Code, MedicineName = med.Name,
