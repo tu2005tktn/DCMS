@@ -391,7 +391,7 @@ export default function PrescriptionTemplatesPage() {
                 loading={medicineLoading}
                 onSearch={v => setMedicineQuery(v.slice(0, 100))}
                 placeholder="Tìm mã, tên biệt dược hoặc hoạt chất..."
-                options={medicineOptions.map(o => ({ value: o.id, label: [o.code, o.name, o.activeIngredient, o.strength, o.dosageForm].filter(Boolean).join(' · ') }))}
+                options={medicineOptions.map(o => ({ value: o.id, label: [o.code, o.name, o.activeIngredient, o.strength].filter(Boolean).join(' · ') }))}
                 onChange={id => {
                   const opt = medicineOptions.find(o => o.id === id);
                   if (opt) lineForm.setFieldsValue({ route: opt.route || undefined, instructions: opt.defaultInstructions ?? '' });

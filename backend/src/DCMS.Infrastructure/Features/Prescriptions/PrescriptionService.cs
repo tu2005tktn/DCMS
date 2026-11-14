@@ -149,9 +149,9 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
         rx.UpdatedAt = clock.GetUtcNow();
     }
 
-    private sealed record LineValues(string Route, string Morning, string Noon, string Afternoon, string Evening, string Meal, int Days, int Quantity, string? Instructions);
+    private sealed record LineValues(string Route, string Morning, string Noon, string Afternoon, string Evening, string Meal, int Days, int Quantity, string? Instructions, string? Unit);
 
-    private static LineValues Validate(string? route, string? morning, string? noon, string? afternoon, string? evening, string? meal, int? days, int quantity, string? instructions)
+    private static LineValues Validate(string? route, string? morning, string? noon, string? afternoon, string? evening, string? meal, int? days, int quantity, string? instructions, string? unit)
     {
         static string Dose(string? value, string field)
         {
@@ -167,8 +167,10 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
         var r = route?.Trim() ?? "";
         if (r.Length > 40) throw Fail("MSG04", field: "route", label: "Đường dùng");
         if (instructions?.Length > 1000) throw Fail("MSG04", field: "instructions", label: "Lời dặn");
+        if (string.IsNullOrWhiteSpace(unit)) throw Fail("MSG04", field: "unit", label: "Đơn vị thuốc");
+        if (unit?.Length > 40) throw Fail("MSG04", field: "unit", label: "Đơn vị thuốc");
         return new(r, Dose(morning, "morningDose"), Dose(noon, "noonDose"), Dose(afternoon, "afternoonDose"), Dose(evening, "eveningDose"),
-            mealTiming, d, quantity, string.IsNullOrWhiteSpace(instructions) ? null : instructions.Trim());
+            mealTiming, d, quantity, string.IsNullOrWhiteSpace(instructions) ? null : instructions.Trim(), unit?.Trim());
     }
 
     private static void Apply(ExternalPrescriptionLine line, CatalogMedicine medicine, LineValues v)
@@ -178,8 +180,8 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
         line.MedicineName = medicine.Name;
         line.ActiveIngredient = medicine.ActiveIngredient;
         line.Strength = medicine.Strength;
-        line.DosageForm = medicine.DosageForm;
-        line.Unit = medicine.BaseUnit;
+        line.DosageForm = null;
+        line.Unit = v.Unit ?? "";
         line.Route = v.Route.Length > 0 ? v.Route : string.IsNullOrWhiteSpace(medicine.Route) ? "Uống" : medicine.Route;
         line.MorningDose = v.Morning;
         line.NoonDose = v.Noon;
@@ -199,7 +201,7 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
         line.ActiveIngredient = null;
         line.Strength = null;
         line.DosageForm = null;
-        line.Unit = unit.Trim();
+        line.Unit = v.Unit ?? unit.Trim();
         line.Route = v.Route.Length > 0 ? v.Route : "Uống";
         line.MorningDose = v.Morning;
         line.NoonDose = v.Noon;
@@ -341,10 +343,11 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
         var catalogMedicine = c.MedicineId is { } medicineId && medicineId != Guid.Empty;
         var customMedicine = !string.IsNullOrWhiteSpace(c.CustomMedicineName);
         var hasCustomPayload = c.CustomMedicineName is not null || c.CustomUnit is not null;
+        var customUnitTooLong = c.CustomUnit is { } customUnit && customUnit.Trim().Length > 40;
         if (catalogMedicine == customMedicine || (catalogMedicine && hasCustomPayload)) throw Fail("MSG04", field: "medicineId", label: "Thuốc");
-        if (customMedicine && (c.CustomMedicineName!.Trim().Length > 200 || string.IsNullOrWhiteSpace(c.CustomUnit) || c.CustomUnit.Trim().Length > 100))
-            throw Fail("MSG04", field: string.IsNullOrWhiteSpace(c.CustomUnit) ? "customUnit" : "customMedicineName", label: "Thuốc tùy chỉnh");
-        var values = Validate(c.Route, c.MorningDose, c.NoonDose, c.AfternoonDose, c.EveningDose, c.MealTiming, c.Days, c.Quantity, c.Instructions);
+        if (customMedicine && (c.CustomMedicineName!.Trim().Length > 200 || customUnitTooLong))
+            throw Fail("MSG04", field: customUnitTooLong ? "customUnit" : "customMedicineName", label: "Thuốc tùy chỉnh");
+        var values = Validate(c.Route, c.MorningDose, c.NoonDose, c.AfternoonDose, c.EveningDose, c.MealTiming, c.Days, c.Quantity, c.Instructions, c.Unit);
         var hash = Hash(new { op = "line.save", visitId, lineId, c });
 
         await using var tx = await BeginAsync(ct);
@@ -487,7 +490,7 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
                 CreatedBy = actor, CreatedAt = now.AddTicks(offset++), UpdatedBy = actor, UpdatedAt = now
             };
             Apply(line, medicine, new LineValues(t.Route, t.MorningDose, t.NoonDose, t.AfternoonDose, t.EveningDose, t.MealTiming, t.Days, t.Quantity,
-                string.IsNullOrWhiteSpace(t.Instructions) ? null : t.Instructions));
+                string.IsNullOrWhiteSpace(t.Instructions) ? null : t.Instructions, medicine.BaseUnit));
             rx.Lines.Add(line);
         }
         Touch(rx, actor);
@@ -688,7 +691,6 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
         if (c.Description?.Trim().Length > 1000) throw Fail("MSG04", field: "description", label: "Mô tả");
         if (c.Lines is not { Length: > 0 }) throw Fail("MSG02", field: "lines", label: "Danh sách thuốc");
         if (c.Lines.Length > PrescriptionRules.MaxTemplateLines) throw Fail("MSG04", field: "lines", label: "Danh sách thuốc");
-        var values = c.Lines.Select(l => Validate(l.Route, l.MorningDose, l.NoonDose, l.AfternoonDose, l.EveningDose, l.MealTiming, l.Days, l.Quantity, l.Instructions)).ToArray();
         var hash = Hash(new { op = "template.save", id, c });
 
         await using var tx = await BeginAsync(ct);
@@ -723,6 +725,13 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
         var medicineIds = c.Lines.Select(l => l.MedicineId).Distinct().ToArray();
         var medicines = await db.Set<CatalogMedicine>().AsNoTracking()
             .Where(m => medicineIds.Contains(m.Id) && m.IsActive && m.PrescriptionEligible).ToDictionaryAsync(m => m.Id, ct);
+        var values = c.Lines.Select((line, index) =>
+        {
+            if (!medicines.TryGetValue(line.MedicineId, out var medicine))
+                throw Fail("MSG113", 404, $"lines[{index}].medicineId");
+            return Validate(line.Route, line.MorningDose, line.NoonDose, line.AfternoonDose,
+                line.EveningDose, line.MealTiming, line.Days, line.Quantity, line.Instructions, medicine.BaseUnit);
+        }).ToArray();
         for (var i = 0; i < c.Lines.Length; i++)
         {
             var input = c.Lines[i];
@@ -862,7 +871,7 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
         if (c.RequestKey == Guid.Empty || c.Items is not { Length: > 0 and <= 30 }) throw Fail("MSG04", field: "items", label: "Danh sách thuốc");
         if (c.Diagnosis?.Length > 1000 || c.OtherDiagnosis?.Length > 1000 || c.Advice?.Length > 4000)
             throw Fail("MSG04", field: "diagnosis");
-        if (c.Items.Any(x => x.MedicineId == Guid.Empty || x.Quantity is < 1 or > 10000 || x.Instructions?.Length > 1000)) throw Fail("MSG04", field: "items");
+        if (c.Items.Any(x => x.MedicineId == Guid.Empty || x.Quantity is < 1 or > 10000 || x.Instructions?.Length > 1000 || string.IsNullOrWhiteSpace(x.Unit) || x.Unit.Trim().Length > 40)) throw Fail("MSG04", field: "items");
         if (c.PrescribedOn > ClinicToday() || c.PrescribedOn.Year < 2000) throw Fail("MSG04", field: "prescribedOn", label: "Ngày kê đơn");
         var prescriberId = c.PrescriberEmployeeId ?? employee.Id;
         if (prescriberId != employee.Id && !(await DoctorOptionsAsync([c.BranchId], ct)).Any(x => x.EmployeeId == prescriberId))
@@ -900,7 +909,8 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
         {
             var input = c.Items[index]; var med = meds[input.MedicineId];
             rx.Items.Add(new PatientPrescriptionItem { PrescriptionId = rx.Id, MedicineId = med.Id, MedicineCode = med.Code,
-                MedicineName = med.Name, Strength = med.Strength, DosageForm = med.DosageForm, Unit = med.BaseUnit,
+                MedicineName = med.Name, Strength = med.Strength, DosageForm = null,
+                Unit = input.Unit?.Trim() ?? "",
                 Quantity = input.Quantity, Instructions = input.Instructions?.Trim() ?? med.Instructions ?? "", Position = index });
         }
         db.Add(new PatientPrescriptionReceipt { ActorId = actor, RequestKey = c.RequestKey, Fingerprint = hash, PrescriptionId = rx.Id });

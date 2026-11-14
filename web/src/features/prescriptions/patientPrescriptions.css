@@ -3,8 +3,8 @@
 .rx-sheet { color: #262626; }
 .rx-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap;
   padding-bottom: 10px; border-bottom: 3px solid #e4e8ec; margin-bottom: 4px; }
+.rx-prescription-heading { min-height: 68px; }
 .rx-title { margin: 0 0 8px; font-size: 24px; font-weight: 500; letter-spacing: .5px; color: #2f3b45; }
-.rx-national.ant-btn[disabled] { background: #2f4553; color: #fff; border-color: #2f4553; opacity: .55; font-size: 11px; height: 24px; }
 .rx-clinic { text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
 .rx-clinic strong { font-size: 14px; }
 .rx-contact { display: flex; gap: 14px; flex-wrap: wrap; justify-content: flex-end; font-size: 12px; color: #595959; }
@@ -26,7 +26,6 @@
 .rx-line .ant-form-item { margin-bottom: 0; }
 .rx-medicine { flex: 1; min-width: 0; }
 .rx-qty { width: 96px; flex: none; }
-.rx-unit { flex: none; min-width: 44px; line-height: 32px; color: #595959; font-size: 13px; }
 .rx-add { padding: 2px 0; }
 .rx-add-btn.ant-btn { background: #28a745; border-color: #28a745; color: #fff; font-weight: 600; font-size: 12px; }
 .rx-add-btn.ant-btn:not(:disabled):hover { background: #218838 !important; border-color: #218838 !important; color: #fff !important; }

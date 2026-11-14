@@ -93,7 +93,8 @@ public sealed record SavePrescriptionLine(
     int? Days,
     string? Instructions,
     string? CustomMedicineName = null,
-    string? CustomUnit = null);
+    string? CustomUnit = null,
+    string? Unit = null);
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record SavePrescriptionAdvice(Guid RequestKey, int ExpectedVersion, string? GeneralAdvice);
@@ -249,7 +250,7 @@ public sealed record PatientPrescriptionDetailDto(PatientPrescriptionDto Prescri
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record SavePatientPrescription(Guid RequestKey, int ExpectedVersion, int BranchId, DateOnly PrescribedOn,
     string Diagnosis, string? OtherDiagnosis, string? Advice, SavePatientPrescriptionItem[] Items, int? PrescriberEmployeeId = null);
-public sealed record SavePatientPrescriptionItem(Guid MedicineId, int Quantity, string? Instructions);
+public sealed record SavePatientPrescriptionItem(Guid MedicineId, int Quantity, string? Instructions, string? Unit = null);
 public sealed record PrescriptionBranchOption(int Id, string Name, string? Address, string? Phone, string? Email);
 public sealed record PrescriptionDoctorOption(int EmployeeId, string Name, int BranchId);
 public sealed record PatientPrescriptionContext(int[] BranchIds, string PrescriberName, int PrescriberEmployeeId,

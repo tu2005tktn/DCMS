@@ -14,6 +14,7 @@ type FormValues = {
   medicineId?: string;
   customMedicineName?: string;
   customUnit?: string;
+  unit?: string;
   route: string;
   morningDose: string;
   noonDose: string;
@@ -103,7 +104,7 @@ export default function PrescriptionPanel({
   const [safetyWarnings, setSafetyWarnings] = useState<ClinicalAllergyWarning[]>([]);
 
   const [form] = Form.useForm<FormValues>();
-  const [quickAddForm] = Form.useForm<{ name: string; unit: string; instructions?: string }>();
+  const [quickAddForm] = Form.useForm<{ name: string; unit?: string; instructions?: string }>();
   const [catalogMedicineForm] = Form.useForm<QuickMedicineValues>();
   const watchedMedicineId = Form.useWatch('medicineId', form);
   const watchedCustomName = Form.useWatch('customMedicineName', form);
@@ -243,6 +244,7 @@ export default function PrescriptionPanel({
       medicineId: line.medicineId ?? undefined,
       customMedicineName: line.medicineId ? undefined : line.medicineName,
       customUnit: line.medicineId ? undefined : line.unit,
+      unit: line.unit ?? '',
       route: line.route, morningDose: line.morningDose, noonDose: line.noonDose,
       afternoonDose: line.afternoonDose, eveningDose: line.eveningDose, mealTiming: line.mealTiming,
       days: line.days, quantity: line.quantity, instructions: line.instructions,
@@ -274,6 +276,7 @@ export default function PrescriptionPanel({
       medicineId: values.medicineId || null,
       customMedicineName: values.medicineId ? null : values.customMedicineName,
       customUnit: values.medicineId ? null : values.customUnit,
+      unit: values.unit?.trim() ?? '',
       route: values.route || '',
       morningDose: values.morningDose || '0',
       noonDose: values.noonDose || '0',
@@ -344,6 +347,7 @@ export default function PrescriptionPanel({
         medicineId: option.id,
         customMedicineName: undefined,
         customUnit: undefined,
+        unit: '',
         route: option.route,
         instructions: option.defaultInstructions ?? '',
       });
@@ -565,12 +569,12 @@ export default function PrescriptionPanel({
                           notFoundContent={optionsLoading ? <Spin size="small" /> : 'Không có thuốc phù hợp'}
                           options={selectedOptions.map(o => ({
                             value: o.id,
-                            label: [o.code, o.name, o.activeIngredient, o.strength, o.dosageForm].filter(Boolean).join(' · '),
+                            label: [o.code, o.name, o.activeIngredient, o.strength].filter(Boolean).join(' · '),
                           }))}
                           onChange={medicineId => {
                             const opt = options.find(item => item.id === medicineId);
                             form.setFieldsValue({ customMedicineName: undefined, customUnit: undefined });
-                            if (opt) form.setFieldsValue({ route: opt.route || '', instructions: opt.defaultInstructions ?? '' });
+                            form.setFieldsValue({ unit: '', route: opt?.route || '', instructions: opt?.defaultInstructions ?? '' });
                           }}
                         />
                       </Form.Item>
@@ -618,7 +622,12 @@ export default function PrescriptionPanel({
                     <Col xs={12} sm={6}>
                       <Form.Item name="quantity" label="Tổng số lượng" tooltip="Tự tính từ liều số × số ngày; có thể sửa tay."
                         rules={[{ required: true, message: 'Nhập số lượng.' }, { type: 'integer', min: 1, max: 10000, message: '1–10.000' }]}>
-                        <InputNumber min={1} max={10000} precision={0} style={{ width: '100%' }} addonAfter={selectedMedicine?.baseUnit ?? (watchedCustomName ? watchedCustomUnit : undefined)} />
+                        <InputNumber min={1} max={10000} precision={0} style={{ width: '100%' }} />
+                      </Form.Item>
+                    </Col>
+                    <Col flex="150px">
+                      <Form.Item name="unit" label="Đơn vị thuốc" rules={[{ required: true, whitespace: true, message: 'Nhập đơn vị thuốc.' }, { max: 40, message: 'Tối đa 40 ký tự.' }]}>
+                        <Input maxLength={40} placeholder={watchedCustomName ? watchedCustomUnit : selectedMedicine?.baseUnit || 'Tự nhập đơn vị thuốc'} />
                       </Form.Item>
                     </Col>
                   </Row>
@@ -724,18 +733,18 @@ export default function PrescriptionPanel({
         onCancel={() => setQuickAddOpen(false)}
         onOk={async () => {
           const values = await quickAddForm.validateFields();
-          form.setFieldsValue({ medicineId: '', customMedicineName: values.name.trim(), customUnit: values.unit.trim(), instructions: values.instructions?.trim() || '' });
+          form.setFieldsValue({ medicineId: '', customMedicineName: values.name.trim(), customUnit: values.unit?.trim() || '', unit: values.unit?.trim() || '', instructions: values.instructions?.trim() || '' });
           setDirty(true);
           setQuickAddOpen(false);
           form.submit();
         }}
       >
-        <Form form={quickAddForm} layout="vertical" initialValues={{ unit: 'viên' }}>
+        <Form form={quickAddForm} layout="vertical">
           <Form.Item name="name" label="Tên thuốc tùy chỉnh" rules={[{ required: true, whitespace: true, message: 'Nhập tên thuốc.' }, { max: 200, message: 'Tối đa 200 ký tự.' }]}>
             <Input autoFocus maxLength={200} placeholder="Nhập tên thuốc" />
           </Form.Item>
-          <Form.Item name="unit" label="Đơn vị" rules={[{ required: true, whitespace: true, message: 'Nhập đơn vị tính.' }, { max: 100, message: 'Tối đa 100 ký tự.' }]}>
-            <Input maxLength={100} placeholder="Ví dụ: viên, gói, ml" />
+          <Form.Item name="unit" label="Đơn vị" rules={[{ required: true, whitespace: true, message: 'Nhập đơn vị thuốc.' }, { max: 40, message: 'Tối đa 40 ký tự.' }]}>
+            <Input maxLength={40} placeholder="Tự nhập, ví dụ: viên, tuýp, ml" />
           </Form.Item>
           <Form.Item name="instructions" label="Hướng dẫn / ghi chú riêng cho thuốc này" rules={[{ max: 1000, message: 'Tối đa 1.000 ký tự.' }]}>
             <Input.TextArea rows={3} maxLength={1000} placeholder="Ví dụ: Uống sau khi ăn no; dùng khi đau nhiều." />
