@@ -155,6 +155,69 @@ public sealed class SchedulingApiTests(ApiFixture fixture) : IClassFixture<ApiFi
         await Message(await anonymous.GetAsync(query.Replace("durationMinutes=35", "durationMinutes=55")), HttpStatusCode.BadRequest, "MSG110");
     }
 
+    // docs/specs/CHAIR-CAPACITY-ANY-DENTIST-BOOKING.vi.md: chairs are branch capacity; "any dentist" assigns a free on-shift
+    // dentist and a free chair, prefers the dentist with the fewest bookings that day and stops at N chairs per slot.
+    [Fact]
+    public async Task AnyDentistBookingFillsFreeChairsAcrossDentistsSharingAShift()
+    {
+        var s = await Create(); using var owner = await Login("owner.demo");
+        await Publish(owner, Command(s)); await Publish(owner, Command(s, employee: s.Other));
+        await Publish(owner, Command(s, employee: (await OwnerEmployee())));
+        int secondChair;
+        using (var scope = fixture.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
+            var chair = new SchedulingChair { BranchId = s.Branch, Name = "Chair 2" };
+            await db.AddSchedulingDataAsync(chair); await db.SaveChangesAsync(); secondChair = chair.Id;
+        }
+        using var anonymous = fixture.CreateClient();
+        var any = $"/api/availability?branchId={s.Branch}&serviceId={s.Service}&date={s.Date:yyyy-MM-dd}&durationMinutes=60";
+        async Task<AvailabilitySlot[]> Slots(string query) => (await anonymous.GetFromJsonAsync<AvailabilityResult>(query))!.Slots;
+        CreateAppointmentRequest Booking(AvailabilitySlot value, string attendee) => new(s.Branch, new("Synthetic booker", "0987654321", null),
+            new(null, attendee, null), "Self", "Standard", "App", s.Service, null, value.DentistId, null, null,
+            value.Start, 60, null, null, Guid.NewGuid(), value.ScheduleVersion, null, value.BookingSettingsVersion);
+
+        // Omitted dentistId and dentistId=0 are the same query; one slot per start, matching a single dentist's grid.
+        var initial = await Slots(any);
+        Assert.Equal(initial.Select(x => (x.Start, x.DentistId, x.ChairId)), (await Slots(any + "&dentistId=0")).Select(x => (x.Start, x.DentistId, x.ChairId)));
+        Assert.Equal(initial.Length, initial.Select(x => x.Start).Distinct().Count());
+        Assert.Equal((await Slots(any + $"&dentistId={s.Dentist}")).Select(x => x.Start), initial.Select(x => x.Start));
+        await Message(await anonymous.GetAsync(any + $"&assistantId={s.Assistant}"), HttpStatusCode.BadRequest, "MSG110");
+
+        var nine = Start(s, 540);
+        var first = initial.Single(x => x.Start == nine);
+        Assert.Equal(s.Chair, first.ChairId);
+        Assert.Equal(HttpStatusCode.Created, (await anonymous.PostAsJsonAsync("/api/appointments", Booking(first, "Attendee one"))).StatusCode);
+
+        // Same time: next free chair, a different dentist. Another time: least-loaded dentist is preferred.
+        var afterFirst = await Slots(any);
+        var second = afterFirst.Single(x => x.Start == nine);
+        Assert.NotEqual(first.DentistId, second.DentistId); Assert.Equal(secondChair, second.ChairId);
+        Assert.NotEqual(first.DentistId, afterFirst.Single(x => x.Start == Start(s, 600)).DentistId);
+        Assert.Equal(HttpStatusCode.Created, (await anonymous.PostAsJsonAsync("/api/appointments", Booking(second, "Attendee two"))).StatusCode);
+
+        // Two chairs are full at 09:00 although a third dentist is on shift: no slot, for any dentist or that dentist.
+        Assert.DoesNotContain(await Slots(any), x => x.Start < nine.AddMinutes(60) && x.End > nine);
+        var third = new[] { s.Dentist, s.Other, await OwnerEmployee() }.Single(x => x != first.DentistId && x != second.DentistId);
+        Assert.DoesNotContain(await Slots(any + $"&dentistId={third}"), x => x.Start == nine);
+        await Message(await anonymous.PostAsJsonAsync("/api/appointments", Booking(first with { DentistId = third,
+            ScheduleVersion = 1 }, "Attendee three")), HttpStatusCode.Conflict, "MSG28");
+
+        using (var scope = fixture.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
+            var booked = await db.Set<ResourceReservation>().AsNoTracking().Where(x => x.BranchId == s.Branch && x.Start == nine.ToUniversalTime()).ToArrayAsync();
+            Assert.Equal(2, booked.Length);
+            Assert.Equal(2, booked.Select(x => x.ChairId).Distinct().Count());
+            Assert.Equal(2, booked.Select(x => x.DentistId).Distinct().Count());
+        }
+    }
+    private async Task<int> OwnerEmployee()
+    {
+        using var scope = fixture.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
+        return await (from e in db.Employees join a in db.Users on e.AccountId equals a.Id where a.UserName == "owner.demo" select e.Id).SingleAsync();
+    }
+
     private async Task<HttpClient> Login(string name = "dentist.demo")
     {
         var client = fixture.CreateClient(); var response = await client.PostAsJsonAsync("/api/auth/sign-in", new SignInRequest(name, fixture.Password));

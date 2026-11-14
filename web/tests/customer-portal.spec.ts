@@ -184,6 +184,55 @@ test('signed-in customer booking retains form after a slot conflict and confirms
   expect(requestKeys[0]).not.toBe(requestKeys[1]);
 });
 
+// docs/specs/CHAIR-CAPACITY-ANY-DENTIST-BOOKING.vi.md: "any dentist" queries with dentistId=0 and books the slot's dentist.
+test('customer books any dentist with a free chair and sees the assigned dentist', async ({ page }) => {
+  await mockCommon(page);
+  await page.addInitScript(() => sessionStorage.setItem('dcms.customer.accessToken', 'public-token'));
+  const first = new Date(Date.now() + 3 * 86_400_000).toISOString();
+  const second = new Date(Date.now() + 3 * 86_400_000 + 3_600_000).toISOString();
+  await page.route('**/api/availability/options', route => route.fulfill(json({
+    branches: [{ id: 1, name: 'Chi nhánh A' }],
+    employees: [{ id: 2, branchId: 1, name: 'Bác sĩ B', canDentist: true }, { id: 7, branchId: 1, name: 'Bác sĩ C', canDentist: true }],
+    services: [{ id: 3, branchId: 1, name: 'Khám tổng quát', publicDurationMinutes: 30 }],
+  })));
+  const queries: URLSearchParams[] = [];
+  await page.route('**/api/availability?*', route => {
+    queries.push(new URL(route.request().url()).searchParams);
+    return route.fulfill(json({ timeZone: 'Asia/Ho_Chi_Minh', date: '2026-10-20',
+      slots: [{ start: first, end: first, chairId: 4, dentistId: 2, scheduleVersion: 3, assistantScheduleVersion: null, bookingSettingsVersion: 1 },
+        { start: second, end: second, chairId: 5, dentistId: 7, scheduleVersion: 9, assistantScheduleVersion: null, bookingSettingsVersion: 1 }] }));
+  });
+  let booking: Record<string, unknown> | null = null;
+  await page.route('**/api/appointments', route => {
+    booking = route.request().postDataJSON() as Record<string, unknown>;
+    return route.fulfill(json({ appointmentId: 'id-2', code: 'AP-456', version: 1, status: 'Confirmed',
+      startAt: second, endAt: second, notification: { code: 'MSG29', message: 'Đặt lịch thành công.' } }, 201));
+  });
+  await page.goto('/customer/book');
+  await page.getByRole('button', { name: 'Tiếp tục' }).click();
+  await page.locator('.ant-select').nth(0).click();
+  await page.getByText('Chi nhánh A').last().click();
+  await page.locator('.ant-select').nth(1).click();
+  await page.getByText('Bất kỳ bác sĩ (ghế trống)').last().click();
+  const summary = page.getByRole('complementary', { name: 'Lịch đã chọn' });
+  await expect(summary).toContainText('Bất kỳ bác sĩ (ghế trống)');
+  await expect(page.locator('.customer-slots button')).toHaveCount(2);
+  expect(queries.at(-1)?.get('dentistId')).toBe('0');
+  await page.locator('.customer-slots button').last().click();
+  await expect(summary).toContainText('Bác sĩ C');
+  await page.getByRole('button', { name: 'Tiếp tục' }).click();
+  await page.getByLabel('Họ tên người đặt').fill('Khách A');
+  await page.getByLabel('Số điện thoại Việt Nam hoặc email').fill('0912345678');
+  await page.getByLabel('Họ tên người khám').fill('Người thân B');
+  await page.getByRole('button', { name: 'Xem lại' }).click();
+  await expect(page.locator('.customer-review-grid').first()).toContainText('Bác sĩ C');
+  await page.getByRole('button', { name: 'Xác nhận đặt lịch' }).click();
+  await expect(page.getByText('AP-456')).toBeVisible();
+  expect(booking?.dentistId).toBe(7);
+  expect(booking?.scheduleVersion).toBe(9);
+  expect(booking?.chairId).toBeNull();
+});
+
 test('verified customer sees only own linked record', async ({ page }) => {
   await mockCommon(page);
   await page.route('**/api/auth/sign-in', route => route.fulfill(json({ accessToken: 'public-token', user: publicUser })));
