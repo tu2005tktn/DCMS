@@ -46,8 +46,9 @@ const writes=(state:Awaited<ReturnType<typeof prepare>>)=>state.requests.filter(
 async function choose(page:Page){
   const panel=page.getByRole('region',{name:'Đơn thuốc khám'});await panel.getByRole('button',{name:'Kê đơn thuốc',exact:true}).click();
   const input=panel.getByRole('combobox',{name:'Thuốc kê đơn',exact:true});await input.fill('SYNTHETIC');
-  await page.locator('.ant-select-dropdown:visible').getByText(`${medicine.code} · ${medicine.name} · ${medicine.strength} · ${medicine.dosageForm}`,{exact:true}).click();
+  await page.locator('.ant-select-dropdown:visible').getByText(`${medicine.code} · ${medicine.name} · ${medicine.strength}`,{exact:true}).click();
   await expect(panel.getByLabel('Lời dặn dùng thuốc',{exact:true})).toHaveValue(medicine.defaultInstructions);
+  await expect(panel.getByLabel('Đơn vị thuốc',{exact:true})).toHaveValue('');
   return panel;
 }
 
@@ -60,10 +61,14 @@ test('prescription loading failure does not require a prescription to confirm or
 
 test('inline add and edit preserve unsaved conclusion; saved lines survive reload and standalone route',async({page})=>{
   const state=await prepare(page);await page.getByLabel('Dặn dò / lời khuyên',{exact:true}).fill('SYNTHETIC kết luận cần giữ');const panel=await choose(page);
-  await panel.getByLabel('Số lượng thuốc',{exact:true}).fill('3');await panel.getByLabel('Lời dặn dùng thuốc',{exact:true}).fill('SYNTHETIC chỉ dẫn riêng');await panel.getByRole('button',{name:'Thêm vào đơn',exact:true}).click();
-  await expect(panel.getByText('3 Viên',{exact:true})).toBeVisible();await expect(page.getByLabel('Dặn dò / lời khuyên',{exact:true})).toHaveValue('SYNTHETIC kết luận cần giữ');
+  await panel.getByLabel('Số lượng thuốc',{exact:true}).fill('3');await panel.getByLabel('Đơn vị thuốc',{exact:true}).fill('Tuýp');await panel.getByLabel('Lời dặn dùng thuốc',{exact:true}).fill('SYNTHETIC chỉ dẫn riêng');await panel.getByRole('button',{name:'Thêm vào đơn',exact:true}).click();
+  expect(writes(state)[0].body.unit).toBe('Tuýp');
+  await expect(panel.getByText('3 Tuýp',{exact:true})).toBeVisible();await expect(page.getByLabel('Dặn dò / lời khuyên',{exact:true})).toHaveValue('SYNTHETIC kết luận cần giữ');
   expect(state.requests.filter(r=>r.path.endsWith('/examination')&&r.method==='PUT')).toHaveLength(0);
-  await panel.getByRole('button',{name:`Sửa thuốc ${medicine.name}`,exact:true}).click();await panel.getByLabel('Lời dặn dùng thuốc',{exact:true}).fill('SYNTHETIC lời dặn đã sửa');await panel.getByRole('button',{name:'Lưu thay đổi thuốc',exact:true}).click();
+  await panel.getByRole('button',{name:`Sửa thuốc ${medicine.name}`,exact:true}).click();await panel.getByLabel('Đơn vị thuốc',{exact:true}).fill('');await panel.getByLabel('Lời dặn dùng thuốc',{exact:true}).fill('SYNTHETIC lời dặn đã sửa');await panel.getByRole('button',{name:'Lưu thay đổi thuốc',exact:true}).click();
+  await expect(panel.getByText('Nhập đơn vị thuốc.',{exact:true})).toBeVisible();expect(writes(state)).toHaveLength(1);
+  await panel.getByLabel('Đơn vị thuốc',{exact:true}).fill('Viên');await panel.getByRole('button',{name:'Lưu thay đổi thuốc',exact:true}).click();
+  expect(writes(state)[1].body.unit).toBe('Viên');
   await expect(panel.getByRole('cell',{name:'SYNTHETIC lời dặn đã sửa',exact:true})).toBeVisible();await page.getByRole('button',{name:'Hoàn tất khám',exact:true}).click();
   await expect(page.getByRole('button',{name:'Kết thúc lượt khám',exact:true})).toBeVisible();await page.reload();await page.getByRole('tab',{name:'Tổng kết khám',exact:true}).click();await expect(panel.getByText('SYNTHETIC lời dặn đã sửa',{exact:true})).toBeVisible();
   await page.goto(`/visits/${visitId}/prescription`);await expect(panel.getByText('SYNTHETIC lời dặn đã sửa',{exact:true})).toBeVisible();

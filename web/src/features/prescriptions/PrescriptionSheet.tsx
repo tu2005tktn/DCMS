@@ -39,7 +39,7 @@ export function ReadOnlySheet({ doc, person }: { doc: Prescription; person: Pers
       <h3>CHỈ ĐỊNH</h3>
       <ol className="rx-read-lines">
         {doc.items.map(item => <li key={item.id ?? item.medicineId}>
-          <div className="rx-read-top"><strong>{item.medicineName}{item.strength ? ` · ${item.strength}` : ''}</strong><span>{item.quantity} {item.unit}</span></div>
+          <div className="rx-read-top"><strong>{item.medicineName}{item.strength ? ` · ${item.strength}` : ''}</strong><span>{[item.quantity, item.unit].filter(Boolean).join(' ')}</span></div>
           {item.instructions && <Typography.Text type="secondary">{item.instructions}</Typography.Text>}
         </li>)}
       </ol>
