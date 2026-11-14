@@ -1,4 +1,4 @@
-import { Alert, Button, Card, DatePicker, Empty, Form, Input, InputNumber, Modal, Select, Space, Spin, Table, Tooltip, message } from 'antd';
+import { Alert, Button, Card, DatePicker, Empty, Form, Input, InputNumber, Modal, Select, Space, Spin, Table, message } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../services/api';
@@ -8,7 +8,7 @@ import { formatDate, PatientGrid, ReadOnlySheet, type Item, type Prescription } 
 import './patientPrescriptions.css';
 
 // Contract: docs/specs/S23-PATIENT-PRESCRIPTIONS.vi.md — form "Đơn thuốc" kê từ hồ sơ bệnh nhân.
-type Medicine = { id: string; code: string; name: string; strength?: string | null; baseUnit: string; defaultInstructions?: string | null };
+type Medicine = { id: string; code: string; name: string; strength?: string | null; dosageForm?: string | null; baseUnit: string; defaultInstructions?: string | null };
 type Branch = { id: number; name: string; address?: string | null; phone?: string | null; email?: string | null };
 type Doctor = { employeeId: number; name: string; branchId: number };
 type Context = { branchIds: number[]; prescriberName: string; prescriberEmployeeId: number; branches: Branch[]; doctors: Doctor[] };
@@ -16,7 +16,7 @@ type DiagnosisOption = { id: string; name: string; code?: string | null };
 type Values = { branchId: number; diagnoses: string[]; otherDiagnosis?: string; items: Item[]; advice?: string; prescribedOn: Dayjs; prescriberEmployeeId: number };
 type Sheet = { mode: 'create' | 'edit' | 'view'; doc?: Prescription; initial?: Partial<Values> };
 
-const emptyItem = (): Item => ({ medicineId: '', quantity: 1, instructions: '' });
+const emptyItem = (): Item => ({ medicineId: '', unit: '', quantity: 1, instructions: '' });
 const splitDiagnoses = (value?: string | null) => (value ?? '').split(';').map(x => x.trim()).filter(Boolean);
 
 export default function PatientPrescriptionsTab({ patient, active }: { patient: PatientDetail; active: boolean }) {
@@ -97,7 +97,7 @@ export default function PatientPrescriptionsTab({ patient, active }: { patient: 
           prescribedOn: values.prescribedOn.format('YYYY-MM-DD'), diagnosis: (values.diagnoses ?? []).map(x => x.trim()).filter(Boolean).join('; '),
           otherDiagnosis: values.otherDiagnosis?.trim() || null, advice: values.advice?.trim() || null,
           prescriberEmployeeId: values.prescriberEmployeeId,
-          items: values.items.map(x => ({ medicineId: x.medicineId, quantity: x.quantity, instructions: x.instructions ?? '' })),
+          items: values.items.map(x => ({ medicineId: x.medicineId, unit: x.unit ?? '', quantity: x.quantity, instructions: x.instructions ?? '' })),
         }),
       });
       setSheet(null); void notice.success('Đã lưu đơn thuốc'); await refresh();
@@ -134,11 +134,8 @@ export default function PatientPrescriptionsTab({ patient, active }: { patient: 
       {sheet && (() => {
         const multiBranch = sheet.mode !== 'view' && (context?.branches.length ?? 0) > 1;
         const head = <header className="rx-head">
-          <div>
+          <div className="rx-prescription-heading">
             <h2 className="rx-title">ĐƠN THUỐC</h2>
-            <Tooltip title="Chưa tích hợp — hệ thống không gửi đơn ra ngoài.">
-              <span><Button size="small" className="rx-national" disabled>GỬI LÊN DONTHUOCQUOCGIA.VN</Button></span>
-            </Tooltip>
           </div>
           <div className="rx-clinic">
             {multiBranch
@@ -181,15 +178,17 @@ export default function PatientPrescriptionsTab({ patient, active }: { patient: 
                         <Select showSearch optionFilterProp="label" placeholder="Tên thuốc" aria-label={`Tên thuốc dòng ${index + 1}`} options={medicineOptions}
                           onChange={id => {
                             const m = medicines.find(x => x.id === id);
-                            form.setFieldValue(['items', field.name, 'unit'], m?.baseUnit);
+                            form.setFieldValue(['items', field.name, 'unit'], '');
                             if (!form.getFieldValue(['items', field.name, 'instructions'])) form.setFieldValue(['items', field.name, 'instructions'], m?.defaultInstructions ?? '');
                           }} />
                       </Form.Item>
                       <Form.Item name={[field.name, 'quantity']} rules={[{ required: true, message: 'Nhập số lượng' }, { type: 'integer', min: 1, max: 10000, message: '1–10.000' }]} className="rx-qty">
                         <InputNumber min={1} max={10000} precision={0} placeholder="SL" aria-label={`Số lượng dòng ${index + 1}`} style={{ width: '100%' }} />
                       </Form.Item>
-                      <Form.Item noStyle shouldUpdate>{() => <span className="rx-unit">{form.getFieldValue(['items', field.name, 'unit']) ?? ''}</span>}</Form.Item>
                     </div>
+                    <Form.Item name={[field.name, 'unit']} rules={[{ required: true, whitespace: true, message: 'Nhập đơn vị thuốc' }, { max: 40 }]} className="rx-usage">
+                      <Input maxLength={40} placeholder="Đơn vị thuốc (tự nhập), ví dụ: viên, tuýp" aria-label={`Đơn vị thuốc tùy chọn dòng ${index + 1}`} />
+                    </Form.Item>
                     <Form.Item name={[field.name, 'instructions']} rules={[{ max: 1000 }]} className="rx-usage">
                       <Input maxLength={1000} placeholder="Hướng dẫn sử dụng" aria-label={`Hướng dẫn sử dụng dòng ${index + 1}`} />
                     </Form.Item>

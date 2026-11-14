@@ -18,9 +18,9 @@ Cập nhật 09/11/2026: form kê đơn dạng "tờ đơn thuốc", chọn bác
 
 Form mở trong hộp thoại dạng tờ đơn, theo thứ tự:
 
-1. **Tiêu đề**: chữ "ĐƠN THUỐC"; bên phải là tên phòng khám (chi nhánh kê đơn), số điện thoại và email của chi nhánh nếu có trong hồ sơ chi nhánh. Nút "Gửi lên donthuocquocgia.vn" chỉ hiển thị ở trạng thái **vô hiệu** kèm chú thích "Chưa tích hợp"; hệ thống không gửi đơn ra ngoài. Khi bác sĩ thuộc nhiều chi nhánh, có ô chọn chi nhánh kê đơn; một chi nhánh thì tự chọn.
+1. **Tiêu đề**: chữ "ĐƠN THUỐC"; bên phải là tên phòng khám (chi nhánh kê đơn), số điện thoại và email của chi nhánh nếu có trong hồ sơ chi nhánh. Không có chức năng gửi đơn lên donthuocquocgia.vn. Khi bác sĩ thuộc nhiều chi nhánh, có ô chọn chi nhánh kê đơn; một chi nhánh thì tự chọn.
 2. **BỆNH NHÂN**: Họ và tên, Mã BN, Ngày sinh, Giới tính (chỉ đọc). Chẩn đoán: chọn một hoặc nhiều mục từ danh mục Chẩn đoán đang hoạt động (`/api/system-settings/reference-options?kind=diagnoses`) và được gõ thêm nội dung riêng; lưu thành chuỗi nối bằng `; `. Chẩn đoán khác: ô nhập tự do.
-3. **CHỈ ĐỊNH**: mỗi dòng gồm Tên thuốc (chọn từ danh mục, tìm theo tên/mã), Số lượng (nguyên 1–10.000) kèm đơn vị tự lấy từ danh mục, và Hướng dẫn sử dụng (tự điền hướng dẫn mặc định của thuốc, sửa được, ≤1000 ký tự); nút xóa dòng khi có hơn một dòng. Nút xanh **+ THÊM** thêm dòng. Tối đa 30 dòng.
+3. **CHỈ ĐỊNH**: mỗi dòng gồm Tên thuốc (chọn từ danh mục, tìm theo tên/mã), Số lượng (nguyên 1–10.000), Đơn vị thuốc bắt buộc do bác sĩ tự nhập (đơn vị danh mục chỉ hiện làm gợi ý, không tự điền), và Hướng dẫn sử dụng (tự điền hướng dẫn mặc định của thuốc, sửa được, ≤1000 ký tự); nút xóa dòng khi có hơn một dòng. Nút xanh **+ THÊM** thêm dòng. Tối đa 30 dòng.
 4. **GHI CHÚ/LỜI DẶN**: ô nhiều dòng, tùy chọn (≤4000 ký tự).
 5. **NGÀY & BÁC SĨ KÊ ĐƠN**: Ngày kê (mặc định hôm nay, không cho chọn ngày tương lai) và Bác sĩ (mặc định bác sĩ đang đăng nhập; danh sách gồm nhân sự có vai trò bác sĩ đang hoạt động tại chi nhánh kê đơn).
 
@@ -29,7 +29,7 @@ Nút **Lưu đơn thuốc** / **Hủy** ở chân form. Danh sách đơn trong t
 ## UI và quyền
 
 - Tab đơn thuốc nằm trong hồ sơ bệnh nhân. `prescriptions.read` xem danh sách/chi tiết; `prescriptions.manage` + vai trò Dentist tạo và sửa.
-- Trường tối thiểu khi lưu: ít nhất một thuốc và số lượng nguyên dương. Chi nhánh/ngày kê/bác sĩ tự điền; chẩn đoán, chẩn đoán khác, hướng dẫn và lời dặn tùy chọn.
+- Trường tối thiểu khi lưu: ít nhất một thuốc, đơn vị thuốc bác sĩ nhập và số lượng nguyên dương. Chi nhánh/ngày kê/bác sĩ tự điền; chẩn đoán, chẩn đoán khác, hướng dẫn và lời dặn tùy chọn.
 - **Bác sĩ kê đơn** được chọn trên form (`prescriberEmployeeId`). Server chỉ nhận bác sĩ là thành viên đang hoạt động, có quyền khám (`CanDentist`) của chi nhánh kê đơn; bỏ trống thì dùng nhân sự của tài khoản đang thao tác. Audit luôn ghi tài khoản thực hiện thao tác, kể cả khi ghi đơn dưới tên bác sĩ khác.
 - Không hiển thị mẫu đơn, modal tạo thuốc từ form, in/QR, bước finalize, hiệu chỉnh phiên bản hay cảnh báo nhiều tầng trong luồng thường dùng.
 
@@ -38,7 +38,7 @@ Nút **Lưu đơn thuốc** / **Hủy** ở chân form. Danh sách đơn trong t
 - `GET /api/prescriptions/patients/{patientId}`: danh sách trong phạm vi chi nhánh của staff.
 - `GET /api/prescriptions/patients/{patientId}/context` → `{ branchIds, prescriberName, prescriberEmployeeId, branches: [{ id, name, address, phone, email }], doctors: [{ employeeId, name, branchId }] }`. `branches` là chi nhánh trong phạm vi của bác sĩ (tên/điện thoại/email ưu tiên hồ sơ chi nhánh, nếu chưa có thì tên chi nhánh lịch); `doctors` là thành viên `CanDentist` đang hoạt động của các chi nhánh đó.
 - `GET /api/prescriptions/patients/{patientId}/{id}`: chi tiết đơn và dòng thuốc.
-- `POST /api/prescriptions/patients/{patientId}` và `PUT /api/prescriptions/patients/{patientId}/{id}` nhận `{ requestKey, expectedVersion, branchId, prescribedOn, diagnosis, otherDiagnosis, advice, prescriberEmployeeId?, items: [{ medicineId, quantity, instructions }] }`. `prescribedOn` không được sau ngày hiện tại (giờ Việt Nam) → `400 MSG04 field=prescribedOn`. Bác sĩ không hợp lệ → `400 MSG04 field=prescriberEmployeeId`.
+- `POST /api/prescriptions/patients/{patientId}` và `PUT /api/prescriptions/patients/{patientId}/{id}` nhận `{ requestKey, expectedVersion, branchId, prescribedOn, diagnosis, otherDiagnosis, advice, prescriberEmployeeId?, items: [{ medicineId, unit, quantity, instructions }] }`. `unit` là đơn vị thuốc bắt buộc do bác sĩ tự nhập, tối đa 40 ký tự; giá trị danh mục chỉ dùng làm gợi ý, không tự lưu. `prescribedOn` không được sau ngày hiện tại (giờ Việt Nam) → `400 MSG04 field=prescribedOn`. Bác sĩ không hợp lệ → `400 MSG04 field=prescriberEmployeeId`.
 - DTO đơn (`PatientProfilePrescriptionDto`) gồm thêm `prescriberEmployeeId`, thông tin phòng khám (`branchAddress`, `branchPhone`, `branchEmail`) và bệnh nhân (`patientCode`, `patientName`, `patientBirthDate`, `patientGender`) để web/mobile hiển thị cùng bố cục tờ đơn.
 - `GET /api/prescriptions/medicine-options?branchId=...&q=...`: danh mục thuốc hợp lệ trong phạm vi chi nhánh. Server xác thực quyền, vai trò bác sĩ và phạm vi chi nhánh.
 
