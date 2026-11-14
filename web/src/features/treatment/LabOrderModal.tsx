@@ -5,7 +5,7 @@ import { clinicToday } from '../appointments/types';
 import './labOrder.css';
 
 // Phiếu labo của một dòng quá trình điều trị. Quy tắc: docs/specs/LAB-ORDER.md.
-export type LabOrderSummary = { activityId: string; workName: string; dueOn: string | null; deliveredOn: string | null };
+export type LabOrderSummary = { activityId: string; workName: string; totalFeeVnd: number; dueOn: string | null; deliveredOn: string | null };
 type Order = { activityId: string; code: string | null; orderedOn: string; dueOn: string | null; deliveredOn: string | null; dentistId: number; labProviderId: string | null; labWorkTypeId: string | null;
   workName: string; marginOuter: string | null; marginInner: string | null; marginSide: string | null; bridgeShapes: string[]; isChild: boolean; teeth: string[]; shade: Record<string, string>;
   note: string | null; material: string | null; quantity: number; totalFeeVnd: number; paidVnd: number; warranty: string | null; version: number };

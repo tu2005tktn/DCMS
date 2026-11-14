@@ -1,5 +1,29 @@
 # Chăm sóc một bảng, labo hai bảng, tạm gỡ tài chính
 
+## Điều chỉnh 13/11/2026: tài chính trên schema rút gọn
+
+### Phạm vi nghiệp vụ đã chốt
+
+- Không có giảm giá, hoàn tiền hoặc chỉ số “tiền thu ròng” trong luồng mới. Dữ liệu lịch sử tương ứng vẫn nằm trong bản lưu để đối chiếu, không bị sửa hoặc xóa.
+- Báo cáo gộp “giá dịch vụ” và “tiền thực thu” thành **Tiền thực thu**: tổng các khoản thu đã xác nhận và đã gắn với dịch vụ thực tế đã làm. Khoản thu Pending và tiền nhận trước chưa phân bổ không được tính vào chỉ số này. Ngày báo cáo là ngày xác nhận thu; ngày làm dịch vụ được lưu riêng cho bộ lọc nghiệp vụ.
+- **Tiền nhận trước** là khoản đã xác nhận nhận từ bệnh nhân nhưng chưa gắn với dịch vụ đã làm. Nhận trước không đòi hỏi chọn một dịch vụ chưa làm; chỉ gắn bệnh nhân/chi nhánh, có thể gắn phiếu điều trị. Khi có dịch vụ Posted, nhân viên mới phân bổ từ số dư nhận trước vào chi phí dịch vụ. Mỗi đồng chỉ nằm ở một trong hai nơi: số dư nhận trước hoặc tiền thực thu của dịch vụ. Phân bổ không tạo thêm dòng tiền vào phòng khám.
+- Phí dịch vụ đã làm lấy từ hoạt động lâm sàng Posted và giá được chốt tại thời điểm làm. Phí phát sinh sau khi bệnh nhân đã trả đủ làm tăng công nợ; các khoản đã thu không được tự ý viết lại. Thu nhiều lần được phép tới mức phí còn phải thu. Tiền nhận trước chưa phân bổ không tự động giảm công nợ.
+- API đọc phiếu trả các khoản phí, số đã thu, số dư nhận trước, khoản đã phân bổ và công nợ; API ghi thu tiền mặt hoặc tạo QR PayOS ghi Pending trước, chỉ chuyển Posted sau xác thực PayOS. API phân bổ tiền nhận trước phải kiểm tra số dư và phí chưa thanh toán trong cùng giao dịch, có request key chống lặp. Mọi API lọc bệnh nhân/chi nhánh và quyền trên server.
+
+Đặc tả này thay thế các phần nói về giảm giá, hoàn tiền, nhận trước cho dịch vụ chưa làm và tiền thu ròng trong tài liệu kế hoạch tài chính cũ. Phần nghiệp vụ cũ vẫn được giữ làm lịch sử tham khảo, không phải yêu cầu triển khai hiện hành.
+
+Trạng thái triển khai tại thời điểm rút gọn: database đã áp đủ migration và có đúng 33 bảng vật lý (bao gồm `__EFMigrationsHistory`); 18 bảng tài chính cũ cùng hai loại dòng dùng chung đã được lưu thành 20 snapshot trong `AUDIT_LOG`. API hồ sơ bệnh nhân đọc được các khoản thu lịch sử theo liên kết đã xác minh. Màn thống kê tài chính bên dưới chỉ đọc chứng từ lịch sử đã lưu. Các lệnh ghi thu mới, nhận trước, phân bổ, hoàn tiền, hóa đơn, PayOS và báo cáo doanh thu trên sổ mới **chưa được triển khai**; giao diện thu tiền không được mở lại cho đến khi các lệnh này và công nợ được kiểm thử. Bản sao lưu trước migration nằm ngoài Git tại `.artifacts/database-backups/`.
+
+### Thống kê tài chính tối giản theo yêu cầu 13/11/2026
+
+Màn thống kê chỉ trình bày **Tiền thực thu** và **Tiền nhận trước**, có lọc ngày nhận tiền theo múi giờ Asia/Ho_Chi_Minh và chi nhánh. Bỏ các chỉ số/luồng trên màn này: Giá dịch vụ, Giảm giá, Hoàn tiền, Tiền thu ròng và Nhận trước cho dịch vụ chưa làm. Tiền thực thu là phần tiền đã xác nhận và gắn với dịch vụ đã làm; không cộng khoản cọc/nhận trước, kể cả khi khoản đó sau này được phân bổ. Tiền nhận trước là tổng khoản cọc/ứng trước đã xác nhận, chỉ hiển thị trong chỉ số này. Chờ chuyển khoản PayOS không tính ở cả hai chỉ số. API `GET /api/finance/statistics?from=yyyy-MM-dd&to=yyyy-MM-dd&branchId=` chỉ trả các khoản xác định được nguồn và trạng thái từ archive; khi sổ mới triển khai, API phải hợp nhất theo cùng quy tắc và không nhân đôi chứng từ. Quyền đọc dành cho chủ phòng khám; mọi filter chi nhánh áp dụng tại server.
+
+Yêu cầu mới: khôi phục thanh toán và tài chính trên schema rút gọn, **không tạo thêm bảng vật lý**. `AUDIT_LOG` là sổ chứng từ tài chính phân loại bằng `AuditType=FinanceLedger`; mỗi dòng bất biến chứa `PatientId`, `BranchId`, thời điểm, loại nghiệp vụ và payload JSONB. `COMMAND_RECEIPT` lưu request key, fingerprint và kết quả để chống ghi trùng. `TREATMENT_DOSSIER`, `CLINICAL_ACTIVITY`, `VISIT`, `PATIENT_PROFILE` và `SCHEDULING_BRANCH` vẫn là nguồn hồ sơ, dịch vụ đã làm, lượt khám, bệnh nhân và chi nhánh. Các thông tin phương thức/QR PayOS là payload của dòng tài chính, không sinh bảng mới. Mọi query tài chính phải lọc theo bệnh nhân/chi nhánh và quyền ở server; khách hàng chỉ đọc chứng từ của liên kết VERIFIED.
+
+Trước migration `RemoveFinanceStorage`, phải chạy các migration gộp trước đó rồi sao lưu nguyên trạng **tất cả** 18 bảng tài chính cũ vào `AUDIT_LOG` dưới `AuditType=FinanceLegacyArchive`, mỗi bảng một snapshot JSONB với tên bảng, số dòng và dữ liệu. Script dùng khóa định danh cố định để chạy lại không nhân bản; kiểm tra số dòng snapshot bằng số dòng nguồn trước khi áp migration xóa bảng. Đây là lưu trữ lịch sử để đối chiếu, không tự suy hai nguồn thu cũ là cùng giao dịch. Dữ liệu thanh toán cũ được chiếu thành giao dịch có nguồn, ID và trạng thái rõ ràng; chỉ Posted mới cộng vào số đã thu. Bản `pg_dump` bên ngoài Git là phương án khôi phục cuối cùng.
+
+Các lệnh thu tiền mặt, tạo chuyển khoản PayOS, xác nhận webhook/polling, nhận trước, phân bổ, hóa đơn, hoàn tiền và điều chỉnh phải ghi dòng sổ cái bất biến trong giao dịch PostgreSQL với kiểm tra version/idempotency. Pending không tính đã thu; nhận trước chưa phân bổ không tính doanh thu; hoàn tiền hoàn tất trừ tiền thu ròng. Giá trị dịch vụ lấy từ hoạt động đã Posted, không lấy tổng kế hoạch. API/UI cũ chỉ được mở lại khi phép tính và quyền tương ứng đã kiểm thử trên schema mới. Mọi thay đổi cấu trúc chỉ được thêm cột/chỉ mục vào bảng hiện có nếu thật cần thiết; tổng số bảng vật lý không được tăng.
+
 Ngày 13/11/2026. Yêu cầu của chủ dự án sau bước gộp điều trị: phần chăm sóc bệnh nhân chỉ giữ một bảng, phần labo còn hai bảng là phiếu labo và danh mục labo, phần tài chính xóa toàn bộ để thiết kế và thêm lại sau.
 
 ## Chăm sóc bệnh nhân

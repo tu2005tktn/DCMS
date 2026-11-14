@@ -215,7 +215,7 @@ export default function PlanPage() {
     <div className="treatment-page-heading"><div><Typography.Title level={2}>Kế hoạch điều trị</Typography.Title>
       <Typography.Paragraph>{dossier.diagnosis}</Typography.Paragraph></div>
       <Space wrap><Tag>{dossier.planState === 'Committed' ? `Đã chốt · phiên bản ${dossier.planVersion}` : dossier.planState === 'Draft' ? 'Bản nháp' : 'Chưa có kế hoạch'}</Tag>
-        {editable && <Link to={`/settings/treatment-services?dossier=${dossier.id}`}><Button>Giá và duyệt giảm trừ</Button></Link>}</Space></div>
+        {editable && <Link to={`/commercial/treatment?dossier=${dossier.id}`}><Button>Giá và duyệt giảm trừ</Button></Link>}</Space></div>
     {(notice || revisionNotice) && <Alert type="success" showIcon className="form-alert"
       message={notice || revisionNotice} />}
     {saveError && <Alert type="error" showIcon className="form-alert" message={saveError.message}
