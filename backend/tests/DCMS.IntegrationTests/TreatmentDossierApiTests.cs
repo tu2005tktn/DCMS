@@ -757,7 +757,8 @@ public sealed class TreatmentDossierApiTests(ApiFixture fixture) : IClassFixture
         using var owner = await Login("owner.demo");
         var ownerProfile = await owner.GetFromJsonAsync<CurrentUser>("/api/auth/me");
         Assert.Contains("ClinicOwner", ownerProfile!.EffectiveRoles);
-        var statisticsResponse = await owner.GetAsync("/api/finance/statistics");
+        // Scoped to this test's own branch: the unscoped total also counts money recorded by the other tests of this class.
+        var statisticsResponse = await owner.GetAsync($"/api/finance/statistics?branchId={setup.BranchId}");
         Assert.True(statisticsResponse.IsSuccessStatusCode, await statisticsResponse.Content.ReadAsStringAsync());
         var statistics = (await statisticsResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>());
         Assert.Equal(150000, statistics.GetProperty("actualReceivedVnd").GetInt64());

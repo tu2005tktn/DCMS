@@ -1,8 +1,10 @@
 import { test, expect, type Page } from '@playwright/test';
 
 const dossier = { dossierId: 'd-1', dossierCode: 'HS-001', startedOn: '2026-11-02', patientId: 1, patientCode: 'BN001', patientName: 'SYNTHETIC Patient 1', nextAppointmentAt: '2026-11-20T02:30:00+00:00',
-  dentistName: 'SYNTHETIC Dentist', assistantNames: ['SYNTHETIC Assistant'], costVnd: 300000, paidVnd: 100000, dueVnd: 200000,
-  lines: [{ activityId: 'a-1', serviceName: 'Trám răng', costVnd: 300000, paidVnd: 100000, dueVnd: 200000 }, { activityId: 'a-2', serviceName: 'Nhổ răng', costVnd: 50000, paidVnd: 0, dueVnd: 50000 }] };
+  dentistName: 'SYNTHETIC Dentist', assistantNames: ['SYNTHETIC Assistant'], costVnd: 350000, paidVnd: 100000, dueVnd: 250000,
+  state: 'Open', note: 'SYNTHETIC ghi chú phiếu', createdByName: 'SYNTHETIC Creator',
+  lines: [{ activityId: 'a-1', serviceName: 'Trám răng', costVnd: 300000, paidVnd: 100000, dueVnd: 200000, performedAt: '2026-11-02T03:00:00+00:00', quantity: 1, unitPriceVnd: 320000, discountVnd: 20000 },
+    { activityId: 'a-2', serviceName: 'Nhổ răng', costVnd: 50000, paidVnd: 0, dueVnd: 50000, performedAt: '2026-11-03T03:00:00+00:00', quantity: 1, unitPriceVnd: 50000, discountVnd: 0 }] };
 
 async function prepare(page: Page) {
   const user = { id: 7, userName: 'synthetic', fullName: 'SYNTHETIC Owner', accountType: 'Staff', roles: ['ClinicOwner'], effectiveRoles: ['ClinicOwner'], permissions: ['finance.read', 'finance.work-statistics.read'] };
@@ -15,7 +17,7 @@ async function prepare(page: Page) {
     if (path === '/api/work-statistics') {
       if (state.fail) { return route.fulfill({ status: 400, json: { code: 'MSG04', message: 'Không thể tải thử nghiệm.' } }); }
       state.queries.push(url.searchParams);
-      return ok({ items: [dossier], lineCount: 2, total: 1, page: 1, pageSize: 20, totals: { costVnd: 300000, paidVnd: 100000, dueVnd: 200000 } });
+      return ok({ items: [dossier], lineCount: 2, total: 1, page: 1, pageSize: 20, totals: { costVnd: 350000, paidVnd: 100000, dueVnd: 250000 } });
     }
     return route.fulfill({ status: 404, json: { code: 'NOT_MOCKED', message: path } });
   });
@@ -25,24 +27,42 @@ async function prepare(page: Page) {
   return state;
 }
 
-test('thống kê công việc/dịch vụ: lỗi thử lại, đủ cột, tổng và bộ lọc gửi lên máy chủ', async ({ page }) => {
+test('thống kê công việc/dịch vụ: lỗi thử lại, dòng thu gọn xổ chi tiết chỉ đọc, tổng và bộ lọc gửi lên máy chủ', async ({ page }) => {
   const state = await prepare(page);
   await expect(page.getByText('Không thể tải thử nghiệm.')).toBeVisible();
   state.fail = false; await page.getByRole('button', { name: 'Thử lại', exact: true }).click();
-  for (const title of ['Ngày', 'MSKH', 'Khách hàng', 'Lịch hẹn tiếp theo', 'Điều trị/dịch vụ', 'Bác sĩ & phụ tá', 'Chi phí', 'Đã trả', 'Còn lại'])
+  for (const title of ['Mã phiếu', 'Ngày', 'MSKH', 'Khách hàng', 'Bác sĩ', 'Chi phí', 'Đã trả', 'Còn lại'])
     await expect(page.getByRole('columnheader', { name: title, exact: true })).toBeVisible();
-  // Dossier-level cells appear once (merged); each service has its own row with money.
-  await expect(page.getByText('SYNTHETIC Patient 1', { exact: true })).toHaveCount(1);
-  await expect(page.getByText('BN001', { exact: true })).toHaveCount(1);
-  await expect(page.getByText('Phụ tá: SYNTHETIC Assistant')).toHaveCount(1);
-  await expect(page.getByRole('link', { name: 'SYNTHETIC Patient 1' })).toHaveAttribute('href', '/patients/1');
-  await expect(page.getByRole('columnheader', { name: 'Ghi chú' })).toHaveCount(0);
-  const first = page.getByRole('row', { name: /Trám răng/ }), second = page.getByRole('row', { name: /Nhổ răng/ });
+  // Collapsed: one summary row per dossier with its totals; services stay hidden until the row is opened.
+  const summary = page.locator('tr.work-stats-row', { hasText: 'HS-001' });
+  await expect(summary).toHaveCount(1);
+  await expect(summary).toContainText('BN001'); await expect(summary).toContainText('SYNTHETIC Patient 1'); await expect(summary).toContainText('SYNTHETIC Dentist');
+  await expect(summary).toContainText('350.000'); await expect(summary).toContainText('100.000'); await expect(summary).toContainText('250.000');
+  await expect(summary).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.getByText('Trám răng')).toHaveCount(0);
+  // Expanded: read-only detail with creator, dentist, services, note and what the patient owes and has paid.
+  await summary.click();
+  await expect(summary).toHaveAttribute('aria-expanded', 'true');
+  const detail = page.getByLabel('Chi tiết phiếu HS-001', { exact: true });
+  await expect(detail.getByRole('link', { name: 'BN001 - SYNTHETIC Patient 1' })).toHaveAttribute('href', '/patients/1');
+  await expect(detail.getByRole('link', { name: 'Mở phiếu điều trị' })).toHaveAttribute('href', '/patients/1?tab=treatment&dossierId=d-1');
+  await expect(detail).toContainText('Đang điều trị'); await expect(detail).toContainText('SYNTHETIC Creator'); await expect(detail).toContainText('SYNTHETIC Dentist');
+  await expect(detail).toContainText('SYNTHETIC Assistant'); await expect(detail).toContainText('SYNTHETIC ghi chú phiếu');
+  const first = detail.getByRole('row', { name: /Trám răng/ }), second = detail.getByRole('row', { name: /Nhổ răng/ });
+  await expect(first).toContainText('02/11/2026'); await expect(first).toContainText('320.000'); await expect(first).toContainText('20.000');
   await expect(first).toContainText('300.000'); await expect(first).toContainText('100.000'); await expect(first).toContainText('200.000');
-  await expect(second).toContainText('50.000'); await expect(first).not.toContainText('Răng 36');
+  await expect(second).toContainText('50.000');
+  const sum = detail.locator('.work-stats-sum');
+  await expect(sum).toContainText('Tổng tiền dịch vụ (2)'); await expect(sum).toContainText('370.000');
+  await expect(sum.locator('div', { hasText: 'Khách cần trả' })).toContainText('350.000');
+  await expect(sum.locator('div', { hasText: 'Khách đã trả' })).toContainText('100.000');
+  await expect(detail.getByRole('button')).toHaveCount(0); await expect(detail.getByRole('textbox')).toHaveCount(0);
+  // Keyboard and second click collapse the detail again.
+  await summary.focus(); await page.keyboard.press('Enter');
+  await expect(detail).toBeHidden(); await expect(summary).toHaveAttribute('aria-expanded', 'false');
   // Summary strip: totals on the left, number of service lines on the right.
   const strip = page.getByLabel('Tổng hợp', { exact: true });
-  await expect(strip).toContainText('Tổng cộng:'); await expect(strip).toContainText('300.000'); await expect(strip).toContainText('Đã trả:'); await expect(strip).toContainText('Còn lại:');
+  await expect(strip).toContainText('Tổng cộng:'); await expect(strip).toContainText('350.000'); await expect(strip).toContainText('Đã trả:'); await expect(strip).toContainText('Còn lại:');
   await expect(strip).toContainText('Tìm thấy 2 công việc/dịch vụ.');
   // One period dropdown sends from/to for the chosen period; custom reveals the date inputs.
   const pick = async (name: string) => { await page.locator('div.ant-select[aria-label="Thời gian"]').click(); await page.locator('.ant-select-item-option', { hasText: new RegExp('^' + name + '$') }).click(); };

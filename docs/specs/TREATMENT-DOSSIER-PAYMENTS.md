@@ -93,3 +93,9 @@ Các bảng trong nhóm màn Thanh toán/Doanh thu/Dịch vụ cận lâm sàng/
 - Khoản bệnh nhân trả cho labo được lưu riêng trong `AUDIT_LOG` `FinanceLedger.labLines`, theo `labOrderId`. Tiền labo đã thu và còn nợ được tính từ các dòng này và các dòng `labPriority` cũ. Khoản thu labo có trong **Tiền thực thu** (dòng tiền đã nhận) nhưng không phải doanh thu dịch vụ; phần cọc đã dùng trả labo không còn trong số dư **Tiền nhận trước**.
 - Trước khi thu dịch vụ, bệnh nhân cần trả tối thiểu 30% tổng phí của mỗi phiếu labo. Có thể chỉ thu labo một phần. Tiền cọc mới được phân bổ cho mốc 30% labo trước, phần còn lại mới là tiền nhận trước. Chuyển khoản chỉ được ghi nhận sau khi payOS xác nhận đúng số tiền.
 - Không được giảm phí labo xuống dưới số bệnh nhân đã trả hoặc xóa phiếu labo đã có khoản thu. Không tạo bảng dữ liệu mới.
+
+## Hủy phiếu: phạm vi chi nhánh — 16/11/2026
+
+`POST /api/dossiers/{dossierId}/payments/cancel-dossier` cho phép chủ phòng khám hoặc người có quyền `treatment.dossiers.update` hủy phiếu điều trị. Vì người không phải chủ phòng khám cũng gọi được, API kiểm tra thêm **chi nhánh của phiếu phải nằm trong các chi nhánh người gọi được phân công**; ngoài phạm vi trả 403 và phiếu giữ nguyên trạng thái. Phiếu không tồn tại hoặc đã xóa trả 404. Kiểm chứng: `BranchIsolationTests.BranchBStaffCannotReadOrChangeBranchAData` (nha sĩ chi nhánh B không hủy được phiếu chi nhánh A).
+
+Phiếu đã hủy (`Cancelled`) giữ các khoản đã thu, phần chưa thu được xóa nợ. Thống kê công việc/dịch vụ áp cùng quy tắc, xem [WORK-SERVICE-STATISTICS.md](WORK-SERVICE-STATISTICS.md).

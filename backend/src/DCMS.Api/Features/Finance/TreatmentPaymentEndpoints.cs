@@ -250,10 +250,17 @@ public static class TreatmentPaymentEndpoints
             return Results.Ok(new { forfeitedVnd = current.AdvanceReceivedVnd });
         });
         group.MapPost("/cancel-dossier", async (HttpContext context, Guid dossierId,
-            CancelTreatmentDossier request, DcmsDbContext db, CancellationToken ct) =>
+            CancelTreatmentDossier request, DcmsDbContext db,
+            DCMS.Application.Features.Settings.ISettingsAccess access, CancellationToken ct) =>
         {
             if (!IsOwner(context) && (context.Items["CurrentUser"] is not CurrentUser currentUser
                 || !currentUser.Permissions.Contains("treatment.dossiers.update"))) return Results.Forbid();
+            // Non-owners reach this endpoint, so the dossier must belong to a branch the caller is assigned to.
+            var dossierBranchId = await db.TreatmentDossiers.AsNoTracking().Where(x => x.Id == dossierId && x.State != "Deleted")
+                .Select(x => (int?)x.BranchId).SingleOrDefaultAsync(ct);
+            if (dossierBranchId is null) return Results.NotFound();
+            var scope = await access.ResolveAsync(((CurrentUser)context.Items["CurrentUser"]!).Id, ct);
+            if (!scope.BranchIds.Contains(dossierBranchId.Value)) return Results.Forbid();
             var reason = string.IsNullOrWhiteSpace(request.Reason) ? "Hủy phiếu" : request.Reason.Trim();
             if (request.RequestKey == Guid.Empty || request.ExpectedVersion < 1 || reason.Length > 1000)
                 return Results.BadRequest("Cần nhập lý do hủy phiếu.");

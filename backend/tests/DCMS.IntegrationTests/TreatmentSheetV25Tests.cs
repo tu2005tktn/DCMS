@@ -324,7 +324,7 @@ public sealed class TreatmentSheetV25Tests(ApiFixture fixture) : IClassFixture<A
     }
 
     [Fact]
-    public async Task WorkStatisticsListsPerformedSheetActivitiesWithCostAndNoCollections()
+    public async Task WorkStatisticsListsPerformedSheetActivitiesWithCostPaidAndDue()
     {
         using var dentist = await Login(); using var cashier = await Login("owner.demo");
         var setup = await Prepare(false); var dossier = await Create(dentist, setup);
@@ -341,8 +341,9 @@ public sealed class TreatmentSheetV25Tests(ApiFixture fixture) : IClassFixture<A
         var group = Assert.Single(page.Items, x => x.DossierId == dossier.Id);
         var row = Assert.Single(group.Lines); Assert.Equal(activity.Id, row.ActivityId); Assert.False(string.IsNullOrEmpty(row.ServiceName));
         var expectedCost = activity.ChargingBasis == "Included" ? 0 : (long)Math.Round(activity.Quantity * activity.PriceSnapshotVnd, MidpointRounding.AwayFromZero) - activity.DiscountSnapshotVnd;
-        // No payments exist while the finance module is removed.
-        Assert.Equal(dossier.Code, group.DossierCode); Assert.Equal(expectedCost, row.CostVnd); Assert.Equal(0, row.PaidVnd); Assert.Equal(0, row.DueVnd);
+        // Nothing has been collected for this dossier yet, so the whole cost is still due.
+        Assert.Equal(dossier.Code, group.DossierCode); Assert.Equal(expectedCost, row.CostVnd); Assert.Equal(0, row.PaidVnd); Assert.Equal(expectedCost, row.DueVnd);
+        Assert.Equal("Open", group.State); Assert.False(string.IsNullOrEmpty(group.CreatedByName));
         Assert.Equal(page.Items.Sum(x => x.Lines.Count), page.LineCount); Assert.Equal(row.CostVnd, group.CostVnd); Assert.Equal(row.DueVnd, group.DueVnd);
         Assert.Equal(setup.Patient, group.PatientId);
         Assert.False(string.IsNullOrEmpty(group.PatientCode)); Assert.False(string.IsNullOrEmpty(group.DentistName));
@@ -351,6 +352,26 @@ public sealed class TreatmentSheetV25Tests(ApiFixture fixture) : IClassFixture<A
         Assert.Empty((await cashier.GetFromJsonAsync<WorkStatisticsPage>("/api/work-statistics?from=2000-01-01&to=2000-01-02"))!.Items);
         using var guest = await Login("guest.demo");
         Assert.Equal(HttpStatusCode.Forbidden, (await guest.GetAsync("/api/work-statistics")).StatusCode);
+
+        // A cash payment recorded on the dossier payment screen shows up as paid, and the rest stays due.
+        Assert.True(expectedCost > 1, "The synthetic service needs a price to check collections.");
+        var part = expectedCost / 2;
+        var paidResponse = await cashier.PostAsJsonAsync($"/api/dossiers/{dossier.Id}/payments", new DCMS.Api.Features.Finance.RecordTreatmentCashPayment(
+            Guid.NewGuid(), DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7)), [new(activity.Id, part)], null));
+        Assert.True(paidResponse.IsSuccessStatusCode, await paidResponse.Content.ReadAsStringAsync());
+        async Task<WorkStatisticsDossier> Current() => Assert.Single((await cashier.GetFromJsonAsync<WorkStatisticsPage>(
+            $"/api/work-statistics?q={Uri.EscapeDataString(item.ServiceName)}&pageSize=100"))!.Items, x => x.DossierId == dossier.Id);
+        var afterPayment = await Current();
+        Assert.Equal(expectedCost, afterPayment.CostVnd); Assert.Equal(part, afterPayment.PaidVnd); Assert.Equal(expectedCost - part, afterPayment.DueVnd);
+        Assert.Equal(part, Assert.Single(afterPayment.Lines).PaidVnd);
+
+        // A cancelled dossier keeps what was collected and writes off the unpaid part.
+        var latest = (await dentist.GetFromJsonAsync<TreatmentDossierDto>($"/api/dossiers/{dossier.Id}"))!;
+        var cancelled = await cashier.PostAsJsonAsync($"/api/dossiers/{dossier.Id}/payments/cancel-dossier",
+            new DCMS.Api.Features.Finance.CancelTreatmentDossier(Guid.NewGuid(), latest.Version, "SYNTHETIC hủy phiếu"));
+        Assert.True(cancelled.IsSuccessStatusCode, await cancelled.Content.ReadAsStringAsync());
+        var afterCancel = await Current();
+        Assert.Equal("Cancelled", afterCancel.State); Assert.Equal(part, afterCancel.CostVnd); Assert.Equal(part, afterCancel.PaidVnd); Assert.Equal(0, afterCancel.DueVnd);
     }
 
     [Fact]

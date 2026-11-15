@@ -36,6 +36,8 @@ export default function DossierList({ patientId, visitId, initialDossierId, sour
   const deleteKey = useRef(crypto.randomUUID());
   const [statusError, setStatusError] = useState<{ id: string; message: string } | null>(null);
   const [statusBusyId, setStatusBusyId] = useState<string | null>(null);
+  // Cancelling cannot be undone, so it is confirmed first instead of running straight from the status menu.
+  const [cancelTarget, setCancelTarget] = useState<DossierListItem | null>(null);
   const [clinicalTarget, setClinicalTarget] = useState<{ dossier: TreatmentDossier; completed: boolean } | null>(null);
   const [createContext,setCreateContext] = useState<{dentistId:number;branches:{id:number;name:string}[]} | null>(null);
   const [branchId,setBranchId] = useState<number>();
@@ -170,7 +172,7 @@ export default function DossierList({ patientId, visitId, initialDossierId, sour
               <Dropdown trigger={['click']} menu={{ items: [
                 { key: 'pending', label: 'Chưa xong', disabled: item.state === 'Cancelled', onClick: () => void changeStatus(item, false) },
                 { key: 'complete', label: 'Hoàn tất', disabled: item.state === 'Cancelled', onClick: () => void changeStatus(item, true) },
-                { key: 'cancel', label: 'Hủy phiếu', disabled: item.state === 'Cancelled', onClick: () => void cancelDossier(item) },
+                { key: 'cancel', label: 'Hủy phiếu', disabled: item.state === 'Cancelled', onClick: () => setCancelTarget(item) },
               ] }}><button type="button"
                 className={`treatment-sheet-state ${item.state === 'Completed' ? 'is-complete' : item.state === 'Cancelled' ? 'is-cancelled' : 'is-pending'}`}
                 aria-label={`Trạng thái phiếu: ${item.state === 'Completed' ? 'Hoàn tất' : item.state === 'Cancelled' ? 'Hủy phiếu' : item.state === 'Stopped' ? 'Đã ngừng' : 'Chưa xong'}`}
@@ -217,6 +219,12 @@ export default function DossierList({ patientId, visitId, initialDossierId, sour
       onOk={() => void deleteDossier()} onCancel={() => { if (!deleteBusy) setDeleteTarget(null); }}>
       <Typography.Paragraph>Chỉ xóa được phiếu còn trống, chưa có kế hoạch hoặc dữ liệu điều trị. Phiếu đã có nghiệp vụ cần dùng quy trình đóng hồ sơ.</Typography.Paragraph>
       {deleteError && <Alert type="error" showIcon message={deleteError} />}
+    </Modal>
+    <Modal open={!!cancelTarget} title={`Hủy phiếu ${cancelTarget?.code ?? ''}?`}
+      okText="Hủy phiếu" cancelText="Không hủy" okButtonProps={{ danger: true }}
+      onOk={() => { const target = cancelTarget; setCancelTarget(null); if (target) void cancelDossier(target); }}
+      onCancel={() => setCancelTarget(null)}>
+      <Typography.Paragraph>Phiếu đã hủy không mở lại được. Các khoản đã thu được giữ nguyên, phần chưa thu sẽ được xóa nợ.</Typography.Paragraph>
     </Modal>
 
   </section>;

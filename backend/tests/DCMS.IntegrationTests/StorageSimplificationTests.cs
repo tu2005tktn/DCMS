@@ -62,7 +62,7 @@ public sealed class StorageSimplificationTests(ApiFixture fixture) : IClassFixtu
         var path = $"/api/prescriptions/patients/{patient.Id}";
         var command = new SavePatientPrescription(Guid.NewGuid(), 0, branch.Id,
             DateOnly.FromDateTime(now.ToOffset(TimeSpan.FromHours(7)).DateTime), "SYNTHETIC", null, null,
-            [new SavePatientPrescriptionItem(medicine.Id, 2, "SYNTHETIC instructions")]);
+            [new SavePatientPrescriptionItem(medicine.Id, 2, "SYNTHETIC instructions", "unit")]);
         var response = await dentist.PostAsJsonAsync(path, command);
         response.EnsureSuccessStatusCode();
         var saved = (await response.Content.ReadFromJsonAsync<PatientProfilePrescriptionDto>())!;
@@ -187,7 +187,7 @@ public sealed class LegacyPrescriptionStorageTests(ReceptionFixture fixture) : I
         using var dentist = await reception.Login("dentist.demo");
         var path = $"/api/prescriptions/visits/{visit.VisitId}";
         var command = new SavePrescriptionLine(Guid.NewGuid(), 0, null, 1, "Uống", "1", "0", "0", "0",
-            "AfterMeal", 1, "SYNTHETIC instructions", "SYNTHETIC custom medicine", "unit");
+            "AfterMeal", 1, "SYNTHETIC instructions", "SYNTHETIC custom medicine", "unit", "unit");
         var created = await dentist.PostAsJsonAsync($"{path}/lines", command);
         Assert.True(created.IsSuccessStatusCode, await created.Content.ReadAsStringAsync());
         var line = (await created.Content.ReadFromJsonAsync<PrescriptionLineDto>())!;

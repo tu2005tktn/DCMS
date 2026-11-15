@@ -63,3 +63,29 @@ Nút "Trả tiền" trong Quá trình điều trị/dịch vụ ghi vào thanh t
 - **Chi phí** = giá trị − giảm giá; dòng `ChargingBasis = Included` (đã gồm trong gói) có Chi phí 0.
 - **Đã trả** = tổng `DossierPaymentLine.AmountVnd` của dòng; **Còn lại** = Chi phí − Đã trả (không âm).
 - Không còn nhãn "Chưa lập khoản thu"; mọi dòng đều có Chi phí theo giá trên phiếu. API bỏ `hasCharge`.
+
+## Thu gọn theo phiếu, bấm để xem chi tiết (16/11/2026)
+
+Bảng không còn trải mọi dòng dịch vụ ra màn hình. Mỗi phiếu điều trị là **một dòng tóm tắt**; bấm vào dòng thì phần chi tiết xổ xuống ngay bên dưới, bấm lần nữa thì thu lại. Mỗi lúc chỉ mở một phiếu. Màn hình vẫn **chỉ đọc**: không có nút đổi trạng thái, không sửa ghi chú.
+
+**Dòng tóm tắt** (8 cột): Mã phiếu, Ngày, MSKH, Khách hàng, Bác sĩ, Chi phí, Đã trả, Còn lại. Tên khách hàng ở dòng tóm tắt là chữ thường; liên kết mở hồ sơ bệnh nhân nằm trong phần chi tiết.
+
+**Phần chi tiết** gồm:
+
+- Tiêu đề: `MSKH - tên bệnh nhân` (liên kết `/patients/{id}`), mã phiếu và nhãn trạng thái phiếu (`Open` → "Đang điều trị", `Completed` → "Hoàn thành", `Stopped` → "Đã dừng", `Cancelled` → "Hủy phiếu"). Bên phải có liên kết **Mở phiếu điều trị** tới `/patients/{id}?tab=treatment&dossierId={dossierId}`, là nơi thu tiền của phiếu.
+- Thông tin: Người tạo, Bác sĩ, Phụ tá (nếu có), Ngày tạo phiếu, Lịch hẹn tiếp theo.
+- Bảng dịch vụ của phiếu: Điều trị/dịch vụ, Ngày thực hiện, Số lượng, Đơn giá, Giảm giá, Thành tiền, Đã trả, Còn lại.
+- Ô **Ghi chú** của phiếu, chỉ đọc; trống thì hiện "Không có ghi chú".
+- Khối tổng: Tổng tiền dịch vụ (kèm số dòng), Giảm giá, **Khách cần trả**, **Khách đã trả**, Còn lại.
+
+**Nguồn dữ liệu bổ sung**
+
+- Người tạo: người thực hiện sự kiện `DossierCreated` của phiếu trong `AUDIT_LOG`; không tìm thấy thì để trống.
+- Ghi chú: `TreatmentDossier.Note`. Trạng thái: `TreatmentDossier.State`.
+- Tổng tiền dịch vụ = tổng `Quantity × PriceSnapshotVnd` (làm tròn); Giảm giá = phần chênh so với Thành tiền; Khách cần trả = tổng Thành tiền (Chi phí).
+- **Đã trả không còn luôn bằng 0.** Từ khi thu tiền theo phiếu điều trị được giữ lại (13/11/2026), Đã trả của mỗi dòng lấy theo đúng quy tắc của màn thu tiền phiếu điều trị (`GET /api/dossiers/{id}/payments/context`): các khoản thu tiền mặt/chuyển khoản trong sổ `AUDIT_LOG` (`AuditType = FinanceLedger`) và tiền cọc đã phân bổ vào dòng dịch vụ (`AdvanceApplied`), trừ phần ưu tiên cho labo, cộng các khoản đã thu được lưu trữ từ các bảng tài chính cũ (`FinanceLegacyArchive`). Giá trị bị chặn trong khoảng 0 đến Thành tiền của dòng; Còn lại = Thành tiền − Đã trả. Tiền cọc chưa phân bổ vào dòng dịch vụ không tính vào Đã trả.
+- **Phiếu đã hủy** (`Cancelled`, thêm 16/11/2026): giữ số đã thu, phần chưa thu được xóa nợ như ở Thống kê tài chính. Vì vậy Thành tiền của mỗi dòng bằng Đã trả và Còn lại bằng 0; cột Giảm giá vẫn là giảm giá gốc của dòng.
+
+**API** giữ nguyên route, quyền và bộ lọc. Phản hồi thêm cho mỗi phiếu `state`, `note`, `createdByName`; thêm cho mỗi dòng `performedAt`, `quantity`, `unitPriceVnd`, `discountVnd`. Thanh tổng hợp phía trên và phân trang theo phiếu không đổi.
+
+**Màn hình hẹp** (≤ 900px): mỗi phiếu là một thẻ có nhãn cột; bảng dịch vụ trong phần chi tiết cuộn ngang.
