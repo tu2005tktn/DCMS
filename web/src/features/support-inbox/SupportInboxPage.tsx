@@ -32,8 +32,7 @@ type LoadState =
  * trình desktop (bảng, drawer, command bar).
  *
  * Trang đọc/ghi qua API thật (`supportInbox.api.ts` → `GET/POST /api/support-requests/...`, xem
- * docs/implementation/S26-Staff-Support-Inbox.md §API) và tự cập nhật qua realtime SignalR;
- * `supportInbox.mock.ts` chỉ là repo in-memory dành cho phát triển offline, trang này không dùng nó.
+ * docs/implementation/S26-Staff-Support-Inbox.md §API) và tự cập nhật qua realtime SignalR.
  */
 export default function SupportInboxPage() {
   const auth = useAuth();

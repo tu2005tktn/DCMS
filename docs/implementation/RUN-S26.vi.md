@@ -86,7 +86,7 @@ npm.cmd start
 
 ### SC2 — Staff web: Hộp thư hỗ trợ (mock UI)
 
-> ✅ Web đã có UI staff inbox tại `/support-inbox` (route + menu). Tới khi backend TV5 triển khai, UI đọc/ghi qua `web/src/features/support-inbox/supportInbox.mock.ts` (in-memory) — DTO bám sát `mobile/.../appointment.types.ts`.
+> ✅ Web đã có UI staff inbox tại `/support-inbox` (route + menu). UI đọc/ghi qua API thật (`supportInbox.api.ts`); mock in-memory `supportInbox.mock.ts` trước đây đã được xoá vì không còn dùng — DTO bám sát `mobile/.../appointment.types.ts`.
 > Spec: [`S26-Staff-Support-Inbox.md`](../implementation/S26-Staff-Support-Inbox.md).
 
 1. Mở web `http://localhost:5173`, đăng nhập `assistant.demo` / mật khẩu `DEV_SEED_PASSWORD`.

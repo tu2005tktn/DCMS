@@ -48,7 +48,6 @@ Tài liệu này mô tả UI web và API TV5. Web gọi `supportInbox.api.ts`; m
 ```
 web/src/features/support-inbox/
 ├── types.ts                # DTO + enum, bám sát mobile/.../appointment.types.ts
-├── supportInbox.mock.ts    # mock repo cho staff (list/detail/commands)
 └── SupportInboxPage.tsx    # trang /support-inbox
 ```
 

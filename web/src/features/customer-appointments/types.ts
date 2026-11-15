@@ -28,7 +28,6 @@ export type AppointmentDetail = AppointmentCard & {
 export type Slot = { start: string; end: string; chairId: number; dentistId: number; assistantId: number | null;
   scheduleVersion: number; assistantScheduleVersion: number | null; bookingSettingsVersion?: number };
 export type DentistOption = { id: number; branchId: number; name: string; canDentist: boolean };
-export type AvailabilityOptions = { employees: DentistOption[] };
 export type ChangeResult = { appointment: AppointmentDetail; notification: { code: string; message: string } };
 export type SupportResult = { request: CustomerSupportRequest; notification: { code: string; message: string } };
 export const statusLabels: Record<AppointmentStatus, string> = {

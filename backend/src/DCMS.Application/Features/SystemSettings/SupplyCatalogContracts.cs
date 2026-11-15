@@ -62,12 +62,4 @@ public static class SupplyCatalogPermissions
         if (set.Contains("ClinicOwner")) return resource is "providers" or "lab-work-types" or "materials" or "material-categories" or "units" or "medicines";
         return set.Contains("Dentist") && resource is "providers" or "lab-work-types" or "materials" or "material-categories" or "units";
     }
-
-    public static string Manage(string resource) => resource switch
-    {
-        "providers" => "catalog.material-suppliers.manage",
-        "lab-work-types" => "catalog.lab-work-types.manage",
-        "medicines" => "catalog.medicines.manage",
-        _ => throw new ArgumentException(resource)
-    };
 }

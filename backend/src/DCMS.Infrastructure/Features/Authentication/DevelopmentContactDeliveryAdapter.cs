@@ -42,11 +42,6 @@ public sealed class DevelopmentContactDeliveryAdapter(
         lock (Gate) { return Delivered.TryGetValue(accountId, out var proof) ? proof : null; }
     }
 
-    public void Forget(int accountId)
-    {
-        lock (Gate) { Delivered.Remove(accountId); }
-    }
-
     public async Task<bool> SendRecoveryAsync(int accountId, RecoveryChannel channel, string destination,
         string proof, string resetLink, CancellationToken ct)
     {
