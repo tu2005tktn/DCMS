@@ -50,3 +50,44 @@
   .customer-dashboard-shortcut { padding: 19px; }
   .customer-dashboard-appointment-footer { flex-wrap: wrap; }
 }
+
+/* Compact empty state, tighter booking card, higher-contrast secondary text, compact shortcuts. */
+.customer-dashboard-heading p, .customer-dashboard-loading, .customer-dashboard-appointment-footer > span, .customer-dashboard-shortcut strong + span { color: #475467; }
+.customer-dashboard-empty { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; padding: 4px 0 2px; }
+.customer-dashboard-empty-icon { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 14px; background: #eaf2ff; color: #175cd3; font-size: 22px; }
+.customer-dashboard-empty p { flex: 1 1 180px; margin: 0; color: #475467; font-size: 15px; }
+.customer-dashboard-empty .customer-link-button { margin-left: auto; }
+.customer-dashboard-upcoming .ant-card-body { padding: 22px 24px; }
+.customer-dashboard-section-heading { margin-bottom: 16px; }
+.customer-dashboard-booking { padding: 24px; justify-content: space-between; }
+.customer-dashboard-booking-icon { margin-bottom: 14px; }
+.customer-dashboard-booking p { margin: 10px 0 20px; font-size: 15px; line-height: 1.6; }
+.customer-dashboard-shortcuts { margin-top: 24px; }
+.customer-dashboard-shortcuts > h2 { margin-bottom: 14px; }
+.customer-dashboard-shortcut-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.customer-dashboard-shortcut { min-height: 88px; padding: 16px; gap: 12px; }
+.customer-dashboard-shortcut-icon { width: 40px; height: 40px; font-size: 20px; }
+.customer-dashboard-shortcut strong { margin-bottom: 3px; font-size: 15px; }
+.customer-dashboard-shortcut strong + span { font-size: 13px; line-height: 1.45; }
+@media (max-width: 1000px) { .customer-dashboard-shortcut-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 680px) { .customer-dashboard-shortcut-grid { grid-template-columns: minmax(0, 1fr); } .customer-dashboard-empty .customer-link-button { margin-left: 0; } }
+
+/* Desktop: the whole dashboard fits one screen (no page scroll at ~700px height). */
+@media (min-width: 1001px) {
+  .customer-content:has(.customer-dashboard) { padding-top: 20px; padding-bottom: 20px; }
+  .customer-dashboard-heading { margin-bottom: 14px; }
+  .customer-dashboard-heading h1 { margin-bottom: 4px; font-size: 28px; }
+  .customer-dashboard-heading p { font-size: 15px; }
+  .customer-dashboard-main { gap: 18px; }
+  .customer-dashboard-upcoming .ant-card-body { padding: 18px 22px; }
+  .customer-dashboard-section-heading { margin-bottom: 10px; }
+  .customer-dashboard-section-heading > a { min-height: 32px; }
+  .customer-dashboard-booking { padding: 18px 22px; }
+  .customer-dashboard-booking-icon { width: 40px; height: 40px; margin-bottom: 8px; font-size: 21px; }
+  .customer-dashboard-booking h2 { font-size: 19px; }
+  .customer-dashboard-booking p { margin: 6px 0 14px; font-size: 14px; line-height: 1.5; }
+  .customer-dashboard-shortcuts { margin-top: 16px; }
+  .customer-dashboard-shortcuts > h2 { margin-bottom: 10px; font-size: 18px; }
+  .customer-dashboard-shortcut-grid { gap: 12px; }
+  .customer-dashboard-shortcut { min-height: 72px; padding: 12px 14px; }
+}

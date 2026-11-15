@@ -1,3 +1,4 @@
+import { ArrowLeftOutlined } from '@ant-design/icons';
 import { Alert, Button, Card, Form, Input, Typography } from 'antd';
 import { useState } from 'react';
 import { Navigate, Link, useNavigate } from 'react-router-dom';
@@ -16,6 +17,7 @@ export default function SignInPage() {
     finally { setBusy(false); }
   }
   return <main className="page"><div className="content login-content">
+    <Link to="/access" className="login-back"><ArrowLeftOutlined /> Chọn cổng đăng nhập</Link>
     <Typography.Text className="eyebrow">DCMS · Phòng khám nha khoa</Typography.Text>
     <Typography.Title level={1}>Đăng nhập</Typography.Title>
     <Typography.Paragraph>Truy cập các chức năng theo vai trò được cấp cho tài khoản của bạn.</Typography.Paragraph>

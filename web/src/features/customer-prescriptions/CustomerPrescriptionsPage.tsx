@@ -37,10 +37,9 @@ function useCustomerLoad<T>(path: string | null) {
 export default function CustomerPrescriptionsPage() {
   const { data, busy, error, reload } = useCustomerLoad<Prescription[]>('/api/patients/me/prescriptions');
   return <section className="customer-prescriptions-page">
-    <div className="customer-page-heading"><span className="customer-kicker">Sức khỏe</span>
+    <div className="customer-page-heading">
       <Typography.Title level={2}>Đơn thuốc của tôi</Typography.Title>
-      <Typography.Paragraph>Xem thuốc, liều dùng và lời dặn bác sĩ đã kê cho hồ sơ bạn đã liên kết.</Typography.Paragraph></div>
-    <Alert type="info" showIcon message={notice} style={{ marginBottom: 16 }} />
+    </div>
     {busy ? <div className="customer-rx-loading" role="status"><Spin /><span>Đang tải đơn thuốc…</span></div>
       : error ? <Alert type="error" showIcon message={error.message} action={<Button onClick={reload}>Thử lại</Button>} />
         : data?.length ? <div className="customer-rx-list">
@@ -62,7 +61,7 @@ export function CustomerPrescriptionDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { data, busy, error, reload } = useCustomerLoad<Prescription>(id ? `/api/patients/me/prescriptions/${encodeURIComponent(id)}` : null);
   const missing = error instanceof ApiError && (error.status === 404 || error.status === 403);
-  return <section className="customer-prescriptions-page">
+  return <section className="customer-prescriptions-page customer-prescription-detail">
     <Space style={{ marginBottom: 16 }}><Link to="/customer/prescriptions">← Đơn thuốc của tôi</Link></Space>
     {busy ? <div className="customer-rx-loading" role="status"><Spin /><span>Đang tải đơn thuốc…</span></div>
       : missing ? <Alert type="error" showIcon message="Không tìm thấy đơn thuốc trong hồ sơ đã liên kết của bạn." />

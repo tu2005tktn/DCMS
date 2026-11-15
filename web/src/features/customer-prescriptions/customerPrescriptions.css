@@ -1,4 +1,4 @@
-.customer-prescriptions-page { max-width: 860px; margin: 0 auto; }
+.customer-prescriptions-page { max-width: none; margin: 0; }
 .customer-rx-loading { display: flex; align-items: center; gap: 12px; padding: 24px 0; }
 .customer-rx-list { display: grid; gap: 12px; }
 .customer-rx-card { display: flex; flex-direction: column; gap: 4px; padding: 16px 18px; border: 1px solid #e4e8ec; border-radius: 12px;
@@ -12,3 +12,4 @@
 .customer-rx-card .customer-text-action { margin-top: 6px; color: #1677ff; font-weight: 600; }
 .customer-rx-sheet-card .ant-card-body { padding: 24px 28px; }
 @media (max-width: 640px) { .customer-rx-sheet-card .ant-card-body { padding: 16px; } }
+.customer-prescriptions-page.customer-prescription-detail { max-width: 860px; margin: 0 auto; }

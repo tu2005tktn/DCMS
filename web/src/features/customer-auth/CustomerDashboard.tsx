@@ -1,4 +1,4 @@
-import { Alert, Button, Card, Empty, Spin, Tag } from 'antd';
+import { Alert, Button, Card, Spin, Tag } from 'antd';
 import { CalendarOutlined, ClockCircleOutlined, RightOutlined, UserOutlined, LinkOutlined, MedicineBoxOutlined, FileTextOutlined } from '@ant-design/icons';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -55,7 +55,9 @@ function UpcomingAppointment() {
             <Link to={`/customer/appointments/${encodeURIComponent(appointment.code)}`} className="customer-link-button customer-link-button-primary">Xem lịch hẹn</Link>
             <span>Giờ Việt Nam</span>
           </div>
-        </> : <Empty description="Bạn chưa có lịch hẹn sắp tới." />}
+        </> : <div className="customer-dashboard-empty"><span className="customer-dashboard-empty-icon" aria-hidden="true"><CalendarOutlined /></span>
+          <p>Bạn chưa có lịch hẹn sắp tới.</p>
+          <Link to="/customer/book" className="customer-link-button customer-link-button-primary">Đặt lịch ngay</Link></div>}
   </Card>;
 }
 

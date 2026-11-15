@@ -74,7 +74,7 @@ export default function CustomerTreatmentRecordsPage() {
     } catch (failure) { setError((failure as Error).message); }
   }
 
-  return <section className="customer-page" style={{ maxWidth: 1050, margin: '0 auto', padding: 24 }}>
+  return <section className="customer-page" style={{ maxWidth: 'none', margin: 0, padding: 0 }}>
     <Modal open={!!previewUrl} footer={null} onCancel={() => { if (previewUrl) URL.revokeObjectURL(previewUrl); setPreviewUrl(null); }}>
       {previewUrl && <img src={previewUrl} alt="Hình ảnh hồ sơ bệnh án" style={{ width: '100%' }} />}
     </Modal>

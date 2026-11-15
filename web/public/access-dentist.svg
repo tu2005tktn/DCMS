@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 560" role="img" aria-label="Bác sĩ nha khoa">
+  <defs>
+    <path id="tooth" d="M31.9 10.8C24.6 6.6 14.7 7.5 10.7 15.2c-4.2 8.1-.8 17.1 2.5 25.5 2.5 6.4 5.8 14.5 10.2 14.5 4.6 0 4.1-13.5 8.6-13.5s4 13.5 8.6 13.5c4.4 0 7.7-8.1 10.2-14.5 3.3-8.4 6.7-17.4 2.5-25.5-4-7.7-13.9-8.6-21.2-4.4"/>
+    <linearGradient id="coat" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#dce8fb"/></linearGradient>
+  </defs>
+  <circle cx="260" cy="290" r="215" fill="#fff" fill-opacity=".10"/>
+  <circle cx="260" cy="290" r="165" fill="#fff" fill-opacity=".08"/>
+  <g fill="#fff" fill-opacity=".9">
+    <use href="#tooth" transform="translate(40 90) scale(1.1)" fill-opacity=".22"/>
+    <use href="#tooth" transform="translate(430 150) scale(.8) rotate(14 32 32)" fill-opacity=".22"/>
+    <use href="#tooth" transform="translate(405 395) scale(.6) rotate(-10 32 32)" fill-opacity=".18"/>
+  </g>
+  <!-- raised arm with dental mirror -->
+  <path d="M410 560 C452 500 462 430 440 360" stroke="url(#coat)" stroke-width="64" stroke-linecap="round" fill="none"/>
+  <circle cx="437" cy="350" r="25" fill="#f6cfae"/>
+  <path d="M440 335 L478 262" stroke="#cbd5e1" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="486" cy="246" r="24" fill="#e0f2fe" stroke="#fff" stroke-width="5"/>
+  <path d="M474 240 q8 -10 18 -6" stroke="#fff" stroke-width="3" stroke-linecap="round" fill="none" opacity=".9"/>
+  <!-- body -->
+  <path d="M60 560 C60 450 118 402 196 384 L324 384 C402 402 460 450 460 560 Z" fill="url(#coat)"/>
+  <path d="M212 384 L260 468 L308 384 Z" fill="#12b3a6"/>
+  <path d="M196 384 L252 478 L236 560 M324 384 L268 478 L284 560" stroke="#b6c8e6" stroke-width="3" fill="none"/>
+  <rect x="118" y="470" width="72" height="40" rx="8" fill="#fff" stroke="#c7d7f2" stroke-width="2"/>
+  <path d="M154 479v22M143 490h22" stroke="#175cd3" stroke-width="5" stroke-linecap="round"/>
+  <!-- neck + head -->
+  <rect x="234" y="346" width="52" height="52" rx="22" fill="#e9b996"/>
+  <ellipse cx="190" cy="272" rx="11" ry="17" fill="#f1c4a3"/>
+  <ellipse cx="330" cy="272" rx="11" ry="17" fill="#f1c4a3"/>
+  <ellipse cx="260" cy="268" rx="70" ry="80" fill="#f6cfae"/>
+  <!-- surgical cap -->
+  <path d="M188 262 C178 168 342 168 332 262 C312 228 208 228 188 262 Z" fill="#12b3a6"/>
+  <path d="M196 238 C240 218 280 218 324 238" stroke="#0e8f85" stroke-width="3" fill="none"/>
+  <!-- glasses + eyes -->
+  <g fill="none" stroke="#175cd3" stroke-width="4"><circle cx="232" cy="270" r="19"/><circle cx="288" cy="270" r="19"/><path d="M251 268h18"/></g>
+  <circle cx="232" cy="271" r="5.5" fill="#1d2939"/><circle cx="288" cy="271" r="5.5" fill="#1d2939"/>
+  <path d="M214 246q18-9 36 0M270 246q18-9 36 0" stroke="#7a4a2e" stroke-width="4" stroke-linecap="round" fill="none"/>
+  <!-- mask -->
+  <path d="M196 292 C228 312 292 312 324 292 L322 336 C296 364 224 364 198 336 Z" fill="#cdeef2" stroke="#9fd8df" stroke-width="2"/>
+  <path d="M206 308h108M208 322h104M212 336h96" stroke="#9fd8df" stroke-width="2" opacity=".8"/>
+  <path d="M196 294 C188 288 184 282 184 278M324 294 C332 288 336 282 336 278" stroke="#9fd8df" stroke-width="3" fill="none"/>
+</svg>

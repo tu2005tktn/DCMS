@@ -30,6 +30,7 @@
   min-height: 44px;
   border-radius: 10px;
 }
+.customer-portal .ant-input-affix-wrapper > .ant-input { min-height: 0; }
 .customer-portal .ant-card {
   border: 1px solid var(--customer-line);
   border-radius: 16px;
@@ -137,10 +138,15 @@
 .customer-action-card p { min-height: 52px; margin: 0 0 14px; }
 
 /* Booking, appointments and record link. */
-.customer-booking { padding-top: 36px; }
+.customer-booking { padding-top: 0; }
 .customer-booking-header { margin-bottom: 25px; }
 .customer-booking-header h1 { margin: 5px 0 8px; font-size: clamp(29px, 3.5vw, 40px); }
 .customer-booking .customer-back { margin-bottom: 14px; }
+.customer-back-button { display: inline-flex; align-items: center; gap: 8px; height: 38px; margin: 0 0 14px; padding: 0 16px 0 12px; border: 1px solid var(--customer-line); border-radius: 10px; background: #fff; color: var(--customer-ink); font-weight: 600; text-decoration: none; box-shadow: 0 1px 2px rgba(16, 24, 40, .05); transition: border-color .15s ease, color .15s ease, transform .15s ease; }
+.customer-back-button:hover { border-color: var(--customer-blue); color: var(--customer-blue); }
+.customer-back-button:hover .anticon { transform: translateX(-2px); }
+.customer-back-button:focus-visible { outline: 2px solid var(--customer-blue); outline-offset: 2px; }
+.customer-back-button .anticon { transition: transform .15s ease; }
 .customer-booking .ant-steps { margin-bottom: 25px; }
 .customer-booking-progress { display: none; }
 .customer-booking-progress-bar { display: none; }
@@ -227,7 +233,6 @@
 .customer-portal .customer-booking .ant-alert, .customer-portal .customer-link .ant-alert { border-radius: 10px; }
 .customer-appointments-page .calendar-toolbar { align-items: flex-start; }
 .customer-appointments-page .calendar-toolbar h2 { margin: 0 0 6px; }
-.customer-appointment-scope-note { margin: -7px 0 18px; font-size: 14px; }
 .customer-appointment-filters .ant-card-head-title { font-size: 17px; }
 .customer-appointment-mobile-list { display: none; }
 .customer-appointment-mobile-card { margin-bottom: 12px; }
@@ -382,3 +387,76 @@
 @media (prefers-reduced-motion: reduce) {
   .customer-portal *, .customer-portal *::before, .customer-portal *::after { scroll-behavior: auto !important; transition-duration: 0ms !important; animation-duration: 0ms !important; }
 }
+
+/* Access page: split layout, brand panel + role choice (docs: S01 access). */
+.customer-access-page { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); place-items: stretch; width: min(100% - 48px, 1160px); height: min(680px, calc(100vh - 48px)); min-height: 0; position: fixed; inset: 0; margin: auto; padding: 0; overflow: hidden; border-radius: 28px; background: #fff; box-shadow: 0 30px 80px rgba(16, 40, 90, .18); }
+html:has(.customer-access-page), body:has(.customer-access-page) { overflow: hidden; background: radial-gradient(circle at 15% 10%, #dbe8ff, transparent 45%), radial-gradient(circle at 90% 90%, #d6f3ef, transparent 40%), #eef3fb; background-attachment: fixed; min-height: 100vh; }
+.access-hero { position: relative; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start; gap: 12px; padding: clamp(28px, 5vw, 64px); overflow: hidden; color: #fff; background: radial-gradient(circle at 85% 10%, rgba(94, 180, 255, .45), transparent 45%), radial-gradient(circle at 10% 95%, rgba(18, 179, 166, .35), transparent 45%), linear-gradient(150deg, #0e438f, #175cd3 55%, #0b2f6b); }
+.access-hero::after { content: ''; position: absolute; right: -120px; top: -120px; width: 420px; height: 420px; border: 1px solid rgba(255, 255, 255, .18); border-radius: 50%; box-shadow: 0 0 0 70px rgba(255, 255, 255, .04), 0 0 0 140px rgba(255, 255, 255, .03); }
+.access-hero > * { position: relative; z-index: 1; }
+.access-hero-photo { align-self: center; width: min(100%, 360px); max-height: 46vh; object-fit: contain; margin: 0 auto; }
+.access-hero-kicker { display: inline-block; padding: 6px 14px; border: 1px solid rgba(255, 255, 255, .35); border-radius: 999px; font-size: 13px; font-weight: 600; background: rgba(255, 255, 255, .1); }
+.access-hero h2 { display: flex; flex-direction: column; gap: 10px; margin: 0; color: #fff; }
+.access-hero h2 strong { font-size: clamp(36px, 4.2vw, 54px); font-weight: 800; line-height: 1.08; letter-spacing: -.035em; }
+.access-hero h2 span { max-width: 360px; font-size: clamp(17px, 1.6vw, 21px); font-weight: 500; line-height: 1.4; color: #d6e4ff; text-wrap: balance; }
+.access-hero-points { display: grid; gap: 14px; margin: 0; padding: 0; list-style: none; max-width: 460px; }
+.access-hero-points li { display: flex; align-items: center; gap: 14px; color: #e1ecff; font-size: 16px; }
+.access-hero-points li span { display: grid; place-items: center; flex: 0 0 34px; height: 34px; border-radius: 10px; background: rgba(255, 255, 255, .16); color: #fff; font-size: 13px; font-weight: 700; }
+.access-hero .access-hero-tooth { position: absolute; right: -40px; bottom: -50px; width: clamp(220px, 28vw, 380px); height: auto; color: rgba(255, 255, 255, .13); transform: rotate(-12deg); z-index: 0; }
+.access-choice { display: grid; place-items: center; padding: clamp(28px, 5vw, 64px); background: linear-gradient(180deg, #f9fbff, #eef4ff); }
+.access-choice-inner { width: min(100%, 480px); }
+.customer-access-heading { margin-bottom: 24px; }
+.access-sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.customer-access-heading h1 { max-width: none; margin: 8px 0 0; font-size: clamp(28px, 3.2vw, 40px); }
+.customer-access-heading p { font-size: 16px; }
+.customer-access-options { grid-template-columns: 1fr; gap: 14px; }
+.customer-access-option { align-items: center; min-height: 0; padding: 22px 24px; transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+.customer-access-option:hover { transform: translateY(-3px); }
+.customer-access-option-primary { box-shadow: 0 18px 40px rgba(23, 92, 211, .28); }
+.customer-option-arrow { transition: transform .18s ease; }
+.customer-access-option:hover .customer-option-arrow { transform: translateX(4px); }
+@media (max-width: 900px) {
+  .customer-access-page { grid-template-columns: 1fr; position: static; width: 100%; height: auto; min-height: 100vh; margin: 0; border-radius: 0; box-shadow: none; }
+  html:has(.customer-access-page), body:has(.customer-access-page) { overflow: auto; }
+  .access-hero { padding: 26px 20px 34px; gap: 20px; }
+  .access-hero .access-hero-tooth { display: none; }
+  .access-hero-photo { width: 150px; max-height: none; position: absolute; right: 12px; bottom: 0; margin: 0; }
+  .access-hero h2 strong { font-size: 28px; }
+  .access-hero h2 span { font-size: 15px; }
+  .access-choice { padding: 28px 20px 44px; place-items: start center; }
+}
+
+/* Customer auth pages: illustrated intro panel, same look as the access page. */
+html:has(.customer-auth-page), body:has(.customer-auth-page) { background: radial-gradient(circle at 15% 10%, #dbe8ff, transparent 45%), radial-gradient(circle at 90% 90%, #d6f3ef, transparent 40%), #eef3fb; background-attachment: fixed; }
+.customer-auth-layout { border-radius: 28px; box-shadow: 0 30px 80px rgba(16, 40, 90, .18); }
+.customer-auth-intro { gap: 12px; background: radial-gradient(circle at 85% 10%, rgba(94, 180, 255, .45), transparent 45%), radial-gradient(circle at 10% 95%, rgba(18, 179, 166, .35), transparent 45%), linear-gradient(150deg, #0e438f, #175cd3 55%, #0b2f6b); }
+.customer-auth-photo { align-self: center; width: min(100%, 330px); max-height: 44vh; object-fit: contain; margin: auto; position: relative; z-index: 1; }
+.customer-auth-intro .customer-auth-slogan { position: relative; z-index: 1; max-width: 330px; margin: 0; font-size: clamp(30px, 3.4vw, 42px); font-weight: 800; line-height: 1.1; letter-spacing: -.035em; text-wrap: balance; }
+@media (max-width: 900px) {
+  .customer-auth-photo { display: none; }
+  .customer-auth-intro .customer-auth-slogan { font-size: 23px; margin-top: 8px; }
+}
+
+/* Customer shell: one shared left edge, tab-style menu, light sign-out (docs: S-customer portal layout). */
+.customer-header { padding: 0 24px; }
+.customer-header-inner, .customer-navigation { width: min(100%, 1072px); }
+.customer-header-inner { min-height: 60px; }
+.customer-header-account { gap: 10px; }
+.customer-header-name { padding-right: 6px; }
+.customer-signout.ant-btn { min-height: 36px; padding-inline: 10px; color: var(--customer-muted); border-radius: 8px; }
+.customer-signout.ant-btn:hover { color: var(--customer-blue) !important; background: var(--customer-tint) !important; }
+@media (min-width: 901px) {
+  .customer-navigation { border-top: 1px solid var(--customer-line); }
+  .customer-nav-inner { display: flex; gap: 4px; }
+  .customer-nav-link { flex: 0 0 auto; min-height: 46px; padding: 0 16px; border-radius: 0; border-bottom: 3px solid transparent; margin-bottom: -1px; }
+  .customer-nav-link:first-child { padding-left: 0; }
+  .customer-nav-link:hover { background: transparent; }
+  .customer-nav-link.active { background: transparent; box-shadow: none; border-bottom-color: var(--customer-blue); }
+}
+
+/* Booking notice: slim, calm information strip instead of the default tall blue alert. */
+.customer-booking-notice.ant-alert { align-items: center; margin: 14px 0 10px; padding: 12px 16px; border: 1px solid #d3e3fb; border-left: 4px solid var(--customer-blue); border-radius: 12px; background: #f4f8ff; }
+.customer-booking-notice .ant-alert-icon { margin-inline-end: 12px; font-size: 18px; color: var(--customer-blue); }
+.customer-booking-notice .ant-alert-message { margin: 0 0 2px; color: var(--customer-ink); font-size: 15px; font-weight: 700; }
+.customer-booking-notice .ant-alert-description { color: var(--customer-muted); font-size: 14px; line-height: 1.5; }
+.customer-booking-header > p { margin: 0 0 8px; }
