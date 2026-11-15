@@ -54,6 +54,7 @@ body:has(.patient-treatment-shell) .workspace-content { width: 100%; max-width: 
 .treatment-sheet-state { display: inline-flex; align-items: center; gap: 5px; min-height: 26px; padding: 2px 9px; border: 1px solid transparent; border-radius: 13px; font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer; }
 .treatment-sheet-state.is-pending { color: #8a4b04; background: #fff2d8; }
 .treatment-sheet-state.is-complete { color: #146c31; background: #e1f5e8; }
+.treatment-sheet-state.is-cancelled { color: #b42318; background: #fee4e2; }
 .treatment-sheet-toggle { position: absolute; top: 0; right: 0; border: 0; background: #f9f9f9; width: 28px; height: 19px; font-size: 19px; font-weight: 600; line-height: 1; cursor: pointer; }
 .treatment-sheet-toggle:hover { background: #ecf5fc; }
 .treatment-sheet-body { min-width: 0; padding: 0 13px 4px; }

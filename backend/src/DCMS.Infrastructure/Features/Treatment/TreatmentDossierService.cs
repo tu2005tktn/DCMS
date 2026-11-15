@@ -85,8 +85,8 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
         var roles = AccountRoles.Effective(await users.GetRolesAsync(account));
         if (!roles.Contains(AccountRoles.Dentist)) throw Error("MSG06", 403);
         var employee = await db.Employees.AsNoTracking().SingleOrDefaultAsync(x => x.AccountId == actorId, ct);
-        if (employee == null || !await db.SchedulingMembers.AsNoTracking().AnyAsync(x =>
-                x.BranchId == branchId && x.EmployeeId == employee.Id && x.Active && x.CanDentist, ct))
+        if (employee == null || (scope.Owner ? !scope.BranchIds.Contains(branchId) : !await db.SchedulingMembers.AsNoTracking().AnyAsync(x =>
+                x.BranchId == branchId && x.EmployeeId == employee.Id && x.Active && x.CanDentist, ct)))
             throw Error("MSG06", 403);
         return employee.Id;
     }
@@ -182,11 +182,11 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
                 !AccountRoles.Effective(await users.GetRolesAsync(account)).Contains(AccountRoles.Dentist))
                 throw Error("MSG06", 403);
         }
+        var scope = await access.ResolveAsync(actorId, ct);
         var allowed = db.SchedulingMembers.AsNoTracking().Where(x =>
             x.EmployeeId == employee.Id && x.Active && x.CanDentist).Select(x => x.BranchId);
         var query = db.TreatmentDossiers.AsNoTracking().Where(x => x.PatientId == patientId
-            && x.State != "Deleted" && allowed.Contains(x.BranchId));
-        var scope = await access.ResolveAsync(actorId, ct);
+            && x.State != "Deleted" && (scope.Owner ? scope.BranchIds.Contains(x.BranchId) : allowed.Contains(x.BranchId)));
         if (scope.Assigned && !scope.Owner) query = query.Where(x => scope.BranchIds.Contains(x.BranchId));
         if (branchId.HasValue) query = query.Where(x => x.BranchId == branchId.Value);
         var total = await query.CountAsync(ct);
@@ -329,6 +329,13 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
         var dossier = await DossierAsync(actorId, dossierId, ct);
         if (dossier.Version != request.ExpectedVersion) throw Error("MSG111", 409);
+        // A paid deposit is an accounting record even when the clinical sheet is otherwise empty.
+        // Keep the sheet so its receipt remains visible in finance and can be reconciled.
+        if (await db.Database.SqlQuery<int>($"""
+            SELECT 1 AS "Value" FROM "AUDIT_LOG"
+            WHERE "AuditType" = 'FinanceLedger' AND "Target" = {dossierId.ToString()}
+            LIMIT 1
+            """).AnyAsync(ct)) throw Error("MSG233", 409);
         if (dossier.State != "Open" || dossier.PlanState != "None" || dossier.PlanVersion != 0
             || dossier.Items.Count != 0 || dossier.Goals != null || dossier.PaymentTermsJson != "[]"
             || dossier.DepositExceptionReason != null
@@ -703,7 +710,7 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
         if (replay != null) return replay;
         if (dossier.Version != request.ExpectedVersion) throw Error("MSG111", 409);
         var reason = Clean(request.Reason);
-        if (dossier.State == "Open" || reason is not { Length: > 0 and <= 1000 }) throw Error("MSG122");
+        if (dossier.State is "Open" or "Cancelled" || reason is not { Length: > 0 and <= 1000 }) throw Error("MSG122");
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
         dossier.State = "Open";
         dossier.ClosureOutcome = null;

@@ -13,7 +13,7 @@ type Status = 'NotSent' | 'Sent' | 'Received' | 'Delivered' | 'Rework';
 type Item = { id: string; code: string | null; dossierId: string; dossierCode: string; activityId: string; patientId: number; patientCode: string; patientName: string;
   workName: string; labProviderId: string | null; labName: string | null; dentistId: number; dentistName: string; orderedOn: string; dueOn: string | null;
   sentOn: string | null; receivedOn: string | null; deliveredOn: string | null; quantity: number; material: string | null; teeth: string[]; note: string | null;
-  totalFeeVnd: number; paidVnd: number; status: Status; overdue: boolean; version: number };
+  totalFeeVnd: number; paidVnd: number; patientPaidVnd: number; patientPaymentStatus: 'NoFee' | 'Unpaid' | 'Partial' | 'Paid'; status: Status; overdue: boolean; version: number };
 type Counts = { notSent: number; sent: number; received: number; delivered: number; rework: number; overdue: number };
 type Page = { items: Item[]; total: number; page: number; pageSize: number; counts: Counts; labs: { id: string; name: string }[]; dentists: { id: number; name: string }[] };
 type Log = { fromStatus: Status | null; toStatus: Status; changedAt: string; changedByName: string; note: string | null };
@@ -29,6 +29,9 @@ const vnd = (n: number) => `${n.toLocaleString('vi-VN')} ₫`;
 const day = (d: string | null) => d ? formatDate(d) : '—';
 const stamp = (v: string) => new Date(v).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' });
 const message = (e: unknown) => e instanceof Error ? e.message : 'Không thể hoàn tất thao tác. Vui lòng thử lại.';
+const paymentLabels = { NoFee: 'Không có phí', Unpaid: 'Chưa thanh toán', Partial: 'Thanh toán một phần', Paid: 'Đã thanh toán' };
+const paymentColors = { NoFee: 'default', Unpaid: 'default', Partial: 'orange', Paid: 'green' };
+const patientPayment = (item: Item) => <><Tag color={paymentColors[item.patientPaymentStatus]}>{paymentLabels[item.patientPaymentStatus]}</Tag><div className="lab-work-sub">{vnd(item.patientPaidVnd)} / {vnd(item.totalFeeVnd)}</div></>;
 
 export default function LabWorkPage() {
   const has = usePermissions();
@@ -57,6 +60,16 @@ export default function LabWorkPage() {
     return () => { current = false; };
   }, [status, branch, search, lab, dentist, from, to, page, pageSize, attempt]);
 
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') setAttempt(value => value + 1);
+    }, 15000);
+    return () => window.clearInterval(timer);
+  }, []);
+  useEffect(() => {
+    if (data) setOpen(current => data.items.find(item => item.id === current?.id) ?? current);
+  }, [data]);
+
   const loadHistory = useCallback((id: string) => {
     setHistory(undefined);
     api<Log[]>(`/api/lab-orders/${id}/history`).then(setHistory).catch(() => setHistory([]));
@@ -82,7 +95,8 @@ export default function LabWorkPage() {
     { title: 'Công việc', render: (_v, r) => <><strong>{r.workName}</strong><div className="lab-work-sub">SL {r.quantity}{r.material ? ` · ${r.material}` : ''}</div></> },
     { title: 'Công ty labo', render: (_v, r) => r.labName ?? '—' },
     { title: 'Hẹn', render: (_v, r) => <span className={r.overdue ? 'lab-work-overdue' : undefined}>{day(r.dueOn)}{r.overdue ? ' (quá hạn)' : ''}</span> },
-    { title: 'Phí / Đã trả', render: (_v, r) => `${vnd(r.totalFeeVnd)} / ${vnd(r.paidVnd)}` },
+    { title: 'Bệnh nhân thanh toán', render: (_v, r) => patientPayment(r) },
+    { title: 'Đã trả xưởng labo', render: (_v, r) => vnd(r.paidVnd) },
     { title: 'Trạng thái', render: (_v, r) => <Tag color={colors[r.status]}>{labels[r.status]}</Tag> },
   ];
 
@@ -110,7 +124,7 @@ export default function LabWorkPage() {
       onRow={r => ({ onClick: () => show(r), onKeyDown: e => { if (e.key === 'Enter') show(r); }, tabIndex: 0, role: 'button', 'aria-label': `Mở phiếu labo ${r.workName} của ${r.patientName}` })} />}
     <Drawer open={!!open} width={460} title={open ? `Phiếu labo ${open.code ?? ''}`.trim() : ''} onClose={() => setOpen(undefined)} destroyOnClose>
       {open ? <div className="lab-work-detail">
-        <Tag color={colors[open.status]}>{labels[open.status]}</Tag>{open.overdue ? <Tag color="red">Quá hạn hẹn</Tag> : null}
+        <Tag color={colors[open.status]}>{labels[open.status]}</Tag><Tag color={paymentColors[open.patientPaymentStatus]}>{paymentLabels[open.patientPaymentStatus]}</Tag>{open.overdue ? <Tag color="red">Quá hạn hẹn</Tag> : null}
         <dl>
           <dt>Bệnh nhân</dt><dd>{open.patientName} ({open.patientCode})</dd>
           <dt>Công việc</dt><dd>{open.workName} · SL {open.quantity}{open.material ? ` · ${open.material}` : ''}</dd>
@@ -118,7 +132,8 @@ export default function LabWorkPage() {
           <dt>Công ty labo</dt><dd>{open.labName ?? '—'}</dd><dt>Bác sĩ</dt><dd>{open.dentistName}</dd>
           <dt>Ngày lập</dt><dd>{day(open.orderedOn)}</dd><dt>Hẹn</dt><dd>{day(open.dueOn)}</dd><dt>Đã gửi</dt><dd>{day(open.sentOn)}</dd>
           <dt>Đã nhận về</dt><dd>{day(open.receivedOn)}</dd><dt>Đã giao</dt><dd>{day(open.deliveredOn)}</dd>
-          <dt>Phí / Đã trả</dt><dd>{vnd(open.totalFeeVnd)} / {vnd(open.paidVnd)}</dd><dt>Ghi chú</dt><dd>{open.note ?? '—'}</dd>
+          <dt>Bệnh nhân thanh toán</dt><dd>{vnd(open.patientPaidVnd)} / {vnd(open.totalFeeVnd)}</dd>
+          <dt>Đã trả xưởng labo</dt><dd>{vnd(open.paidVnd)}</dd><dt>Ghi chú</dt><dd>{open.note ?? '—'}</dd>
         </dl>
         <div className="lab-work-links">
           <Button onClick={() => setEditing(true)}>{canManage ? 'Sửa phiếu' : 'Xem phiếu đầy đủ'}</Button>

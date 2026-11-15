@@ -21,7 +21,8 @@ public sealed record SaveLabOrderRequest(string? Code, DateOnly OrderedOn, DateO
 public sealed record LabWorkItem(Guid Id, string? Code, Guid DossierId, string DossierCode, Guid ActivityId, int PatientId, string PatientCode,
     string PatientName, string WorkName, Guid? LabProviderId, string? LabName, int DentistId, string DentistName, DateOnly OrderedOn, DateOnly? DueOn,
     DateOnly? SentOn, DateOnly? ReceivedOn, DateOnly? DeliveredOn, int Quantity, string? Material, IReadOnlyList<string> Teeth, string? Note,
-    long TotalFeeVnd, long PaidVnd, string Status, bool Overdue, int Version);
+    long TotalFeeVnd, long PaidVnd, string Status, bool Overdue, int Version,
+    long PatientPaidVnd = 0, string PatientPaymentStatus = "Unpaid");
 public sealed record LabWorkCounts(int NotSent, int Sent, int Received, int Delivered, int Rework, int Overdue);
 public sealed record LabWorkPage(IReadOnlyList<LabWorkItem> Items, int Total, int Page, int PageSize, LabWorkCounts Counts,
     IReadOnlyList<LabOrderLab> Labs, IReadOnlyList<LabOrderDentist> Dentists);

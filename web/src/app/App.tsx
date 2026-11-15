@@ -34,9 +34,6 @@ import CustomerPatientLinkPage from '../features/customer-patient-link/CustomerP
 import CustomerAppointmentsPage from '../features/customer-appointments/CustomerAppointmentsPage';
 import CustomerAppointmentDetailPage from '../features/customer-appointments/CustomerAppointmentDetailPage';
 import CustomerTreatmentRecordsPage from '../features/customer-treatment/CustomerTreatmentRecordsPage';
-import DossierPage from '../features/treatment/DossierPage';
-import PlanPage from '../features/treatment/PlanPage';
-import RevisionPage from '../features/treatment/RevisionPage';
 import CommercialTreatmentPage from '../features/treatment/CommercialTreatmentPage';
 
 import ItemPlansPage from '../features/treatment/ItemPlansPage';
@@ -89,9 +86,6 @@ export default function App() {
       <Route path="patients" element={<Protected permission="patients.read"><PatientSearchPage /></Protected>} />
       <Route path="patients/:id" element={<Protected permission="patients.read"><PatientProfilePage /></Protected>} />
       <Route path="patients/:id/documents" element={<Protected permission="documents.read"><PatientDocumentsPage /></Protected>} />
-      <Route path="patients/:id/dossiers/:dossierId" element={<Protected permission="treatment.read"><DossierPage /></Protected>} />
-      <Route path="patients/:id/dossiers/:dossierId/plan" element={<Protected permission="treatment.read"><PlanPage /></Protected>} />
-      <Route path="patients/:id/dossiers/:dossierId/plan/revise/:itemId" element={<Protected permission="treatment.revisions.manage"><RevisionPage /></Protected>} />
       <Route path="treatment-templates" element={<Protected permission="treatment.templates.read"><ItemPlansPage /></Protected>} />
       <Route path="treatment-templates/legacy" element={<Navigate to="/treatment-templates" replace />} />
       <Route path="commercial/treatment" element={<Protected permission={['treatment.prices.read','treatment.commercial.read']}><CommercialTreatmentPage /></Protected>} />

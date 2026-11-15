@@ -171,7 +171,7 @@ export default function ExaminationPage() {
     finally { if (token === generation.current) setBusy(false); }
   }
   if (!w || !content) return error ? <Alert type="error" message={error} /> : <Spin />;
-  if(w.visit.purpose === 'TreatmentContinuation') return w.visit.source?.priorCourseId ? <Navigate replace to={`/patients/${w.visit.patientId}/dossiers/${w.visit.source.priorCourseId}`} /> : <Alert type="info" message="Lượt điều trị chưa được liên kết hồ sơ khi tiếp nhận. Cần chọn đúng hồ sơ điều trị, không tạo thêm phiếu khám mới." description={<Link to={`/patients/${w.visit.patientId}?tab=treatment`}>Mở các hồ sơ điều trị</Link>}/>;
+  if(w.visit.purpose === 'TreatmentContinuation') return w.visit.source?.priorCourseId ? <Navigate replace to={`/patients/${w.visit.patientId}?tab=treatment&dossierId=${w.visit.source.priorCourseId}`} /> : <Alert type="info" message="Lượt điều trị chưa được liên kết hồ sơ khi tiếp nhận. Cần chọn đúng hồ sơ điều trị, không tạo thêm phiếu khám mới." description={<Link to={`/patients/${w.visit.patientId}?tab=treatment`}>Mở các hồ sơ điều trị</Link>}/>;
   const v = w.visit; const editable = w.allowedActions.includes('save') || amending; const handoff = w.allowedActions.includes('handoff');
   const findings = content.findings;
   function applyTeeth(teeth: number[], condition: string, surfaces: string[], diagnoses: string[], references: ReferenceSnapshot[]) {

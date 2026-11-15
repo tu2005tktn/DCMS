@@ -336,7 +336,7 @@ public sealed partial class TreatmentDossierService
             if (permissions.Contains("treatment.items.update")) actions.Add("Decide");
             if (permissions.Contains("treatment.actuals.create")) actions.Add("Perform");
             if (permissions.Contains("treatment.dossiers.update")) actions.Add("Close");
-        } else if (permissions.Contains("treatment.dossiers.update")) actions.Add("Reopen");
+        } else if (dossier.State != "Cancelled" && permissions.Contains("treatment.dossiers.update")) actions.Add("Reopen");
         return new(services, members, visits, actions.ToArray(), steps, permissions.Contains("documents.read") ? documents : []);
     }
 

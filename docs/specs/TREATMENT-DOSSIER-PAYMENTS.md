@@ -1,5 +1,13 @@
 # Thanh toán theo phiếu điều trị — 03/11/2026
 
+## Dùng cọc để thanh toán dịch vụ và labo — 15/11/2026
+
+Chỉ số **Tiền thực thu** trên màn Tài chính cộng toàn bộ tiền bệnh nhân đã trả thành công cho dịch vụ, labo và cọc, tính mỗi giao dịch thu một lần. **Tiền nhận trước** là số dư cọc chưa phân bổ. Khi dùng cọc, Tiền nhận trước và công nợ cùng giảm; Tiền thực thu không cộng lại khoản đã nhận. Chỉ các phiếu đã phân bổ đủ mới đóng góp phần thu trừ phí labo vào lãi. Ô **Tiền dụng cụ vật liệu** cộng toàn bộ giá trị các lần nhập hàng chưa xóa theo ngày nhập; khoản này được trừ một lần khỏi tổng lãi, không trừ thêm giá vật liệu dùng theo phiếu. Khoản nhập chưa có chi nhánh nên chỉ số này là toàn phòng khám.
+
+Trong popup **Trả tiền** của một phiếu, tab **Cần thanh toán** cho phép nhập tiền vào từng dịch vụ đã làm hoặc phí labo rồi bấm **Dùng cọc**. API `POST /api/dossiers/{dossierId}/payments/advance-allocations` nhận `{requestKey, lines:[{activityId,amountVnd}], labLines:[{labOrderId,amountVnd}]}`. Chỉ chủ phòng khám được dùng. Số tiền phân bổ không được vượt số dư cọc đã xác nhận, số còn nợ của từng hạng mục hoặc giới hạn tiền; vẫn phải đáp ứng ưu tiên thu tối thiểu 30% phí labo. Lệnh khóa phiếu, ghi `FinanceLedger/AdvanceApplied` với request key chống ghi lặp và cập nhật số dư/nợ trong cùng giao dịch.
+
+Phân bổ cọc **không tạo thêm tiền thu**. Tổng cọc đã nhận nằm trong Tiền thực thu; chỉ số dư chưa phân bổ nằm trong Tiền nhận trước và có thể dùng tiếp. Công nợ dịch vụ/labo và điều kiện tính lãi chỉ giảm khi khoản cọc được phân bổ. Trạng thái thanh toán trên trang quản lý labo đọc cả các dòng `AdvanceApplied`; trạng thái gửi/nhận labo không đổi.
+
 ## Cập nhật popup thu tiền trên schema 33 bảng — 13/11/2026
 
 Trong hồ sơ bệnh nhân, chủ phòng khám mở **Trả tiền** của đúng phiếu điều trị. Popup có hai tab: **Cần thanh toán** chỉ chứa các hoạt động điều trị đã Posted còn nợ (`dueVnd > 0`); **Lịch sử dịch vụ đã thanh toán** chứa các hoạt động đã Posted có giá trị dương và `dueVnd = 0`. Mỗi hàng hiển thị giá dịch vụ sau giảm trừ đã duyệt, tổng đã trả và còn nợ; khi một khoản thu được ghi nhận đủ, hàng rời tab đầu và xuất hiện ở tab lịch sử ngay lần tải lại tiếp theo. Hoạt động chưa Posted và khoản cọc chưa phân bổ không được coi là đã thanh toán dịch vụ. Hàng không được nhân đôi giữa hai tab, tính trạng thái từ server theo từng `activityId`, không dựa trên state cũ của client.
@@ -82,6 +90,6 @@ Các bảng trong nhóm màn Thanh toán/Doanh thu/Dịch vụ cận lâm sàng/
 ## Thu phí labo riêng (14/11/2026)
 
 - Phiếu labo có `TotalFeeVnd > 0` là một khoản chi phí thêm của bệnh nhân trên phiếu điều trị. Tổng chi phí thanh toán gồm giá dịch vụ đã làm và phí labo. `LabOrder.PaidVnd` vẫn là số tiền phòng khám trả cho đơn vị labo, không phải số tiền bệnh nhân đã trả.
-- Khoản bệnh nhân trả cho labo được lưu riêng trong `AUDIT_LOG` `FinanceLedger.labLines`, theo `labOrderId`. Tiền labo đã thu và còn nợ được tính từ các dòng này và các dòng `labPriority` cũ. Không cộng khoản thu labo vào **Tiền thực thu** (doanh thu dịch vụ); không cộng phần cọc đã dùng trả labo vào **Tiền nhận trước**.
+- Khoản bệnh nhân trả cho labo được lưu riêng trong `AUDIT_LOG` `FinanceLedger.labLines`, theo `labOrderId`. Tiền labo đã thu và còn nợ được tính từ các dòng này và các dòng `labPriority` cũ. Khoản thu labo có trong **Tiền thực thu** (dòng tiền đã nhận) nhưng không phải doanh thu dịch vụ; phần cọc đã dùng trả labo không còn trong số dư **Tiền nhận trước**.
 - Trước khi thu dịch vụ, bệnh nhân cần trả tối thiểu 30% tổng phí của mỗi phiếu labo. Có thể chỉ thu labo một phần. Tiền cọc mới được phân bổ cho mốc 30% labo trước, phần còn lại mới là tiền nhận trước. Chuyển khoản chỉ được ghi nhận sau khi payOS xác nhận đúng số tiền.
 - Không được giảm phí labo xuống dưới số bệnh nhân đã trả hoặc xóa phiếu labo đã có khoản thu. Không tạo bảng dữ liệu mới.
