@@ -165,7 +165,7 @@ export default function SystemSettingsPage() {
   const plain = (label: string) => label.replace(/^\d+\.\s*/, '');
   const groups = [
     { name: 'Phòng khám', keys: ['general', 'branches', 'customer-groups'] },
-    { name: 'Danh mục', keys: ['diagnoses', 'services', 'treatment-services', 'medicines'] },
+    { name: 'Danh mục', keys: ['diagnoses', 'services', 'medicines'] },
     { name: 'Vật liệu và labo', keys: ['material-suppliers', 'materials', 'lab-providers', 'lab-work-types'] },
     { name: 'Bảo mật và lịch sử', keys: ['access-groups', 'audit'] },
   ].map(g => ({ ...g, items: g.keys.map(k => tabs.find(t => t.key === k)).filter((t): t is (typeof tabs)[number] => !!t) })).filter(g => g.items.length > 0);

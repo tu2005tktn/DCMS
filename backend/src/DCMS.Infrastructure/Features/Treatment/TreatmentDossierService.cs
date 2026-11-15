@@ -892,9 +892,40 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
             .Where(x => patientIds.Contains(x.PatientId) && x.PlanState == "Committed" && x.State != "Deleted")
             .OrderByDescending(x => x.StartedOn).ToListAsync(ct);
         var dossierIds = dossiers.Select(x => x.Id).ToArray();
+        var verifiedPatientIds = await patientIds.ToArrayAsync(ct);
         var activities = await db.ClinicalActivities.AsNoTracking()
             .Where(x => x.DossierId.HasValue && dossierIds.Contains(x.DossierId.Value) && x.State == "Posted")
             .OrderByDescending(x => x.PerformedAt).ToArrayAsync(ct);
+        // Legacy finance rows are archived before the compact-schema migration drops their tables.
+        var archived = dossierIds.Length == 0 ? [] : await db.Database.SqlQuery<string>($"""
+            SELECT jsonb_build_object('source', a."Target", 'row', item.row)::text AS "Value"
+            FROM "AUDIT_LOG" a CROSS JOIN LATERAL jsonb_array_elements(a."PayloadJson"->'rows') AS item(row)
+            WHERE a."AuditType" = 'FinanceLegacyArchive'
+              AND a."Target" IN ('TREATMENT_DOSSIER_PAYMENT', 'PAYMENT_RECEIPT')
+              AND (item.row->>'PatientId')::integer = ANY({verifiedPatientIds})
+              AND (item.row->>'DossierId')::uuid = ANY({dossierIds})
+            """).ToArrayAsync(ct);
+        var payments = new List<(Guid DossierId, int PatientId, OwnTreatmentPaymentItem Item)>();
+        foreach (var snapshot in archived)
+        {
+            using var document = JsonDocument.Parse(snapshot);
+            var root = document.RootElement;
+            var source = root.GetProperty("source").GetString();
+            var row = root.GetProperty("row");
+                var dossierValue = row.GetProperty("DossierId");
+                if (dossierValue.ValueKind == JsonValueKind.Null) continue;
+                var dossierId = dossierValue.GetGuid();
+                var patientId = row.GetProperty("PatientId").GetInt32();
+                if (!dossierIds.Contains(dossierId) || !verifiedPatientIds.Contains(patientId)) continue;
+                if (source == "PAYMENT_RECEIPT" && row.GetProperty("State").GetString() != "Posted") continue;
+                var date = source == "PAYMENT_RECEIPT"
+                    ? DateOnly.FromDateTime((row.TryGetProperty("ConfirmedAt", out var confirmed) && confirmed.ValueKind != JsonValueKind.Null
+                        ? confirmed : row.GetProperty("CreatedAt")).GetDateTimeOffset().UtcDateTime)
+                    : DateOnly.Parse(row.GetProperty("PaidOn").GetString()!);
+                payments.Add((dossierId, patientId, new OwnTreatmentPaymentItem(row.GetProperty("Id").GetGuid(), date,
+                    row.GetProperty("Method").GetString() ?? "", row.GetProperty(source == "PAYMENT_RECEIPT" ? "AmountVnd" : "TotalVnd").GetInt64(),
+                    source == "PAYMENT_RECEIPT" ? "PaymentReceipt" : "DossierPayment")));
+        }
         return dossiers.Select(x => new OwnTreatmentSummaryItem(x.Id, x.Code, x.State, x.StartedOn,
             x.Diagnosis, x.PlanVersion, x.Items.Where(item => item.Decision == "Agreed")
                 .OrderBy(item => item.PlannedOrder).Select(ItemDto).ToArray(),
@@ -903,7 +934,7 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
                     activity.ServiceNameSnapshot ?? x.Items.FirstOrDefault(item => item.Id == activity.ItemId)?.ServiceName ?? "Dịch vụ điều trị",
                     activity.Region, activity.Quantity, activity.Unit,
                     string.IsNullOrWhiteSpace(activity.Outcome) ? null : activity.Outcome)).ToArray(),
-            // Finance is removed (docs/specs/S41-MOBILE-MEDICAL-RECORDS.md): no payments until it is added back.
-            Array.Empty<OwnTreatmentPaymentItem>())).ToArray();
+            payments.Where(payment => payment.DossierId == x.Id).Select(payment => payment.Item)
+                .OrderByDescending(payment => payment.PaidOn).ToArray())).ToArray();
     }
 }

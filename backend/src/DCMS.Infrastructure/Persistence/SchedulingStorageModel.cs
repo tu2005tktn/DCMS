@@ -72,6 +72,15 @@ internal static class SchedulingStorageModel
         foreach (var fk in model.Model.GetEntityTypes().SelectMany(x => x.GetForeignKeys()).Where(x => x.PrincipalEntityType == appointment).ToArray())
             model.Entity(fk.DeclaringEntityType.ClrType).HasOne(typeof(Appointment)).WithMany()
                 .HasForeignKey(fk.Properties.Select(x => x.Name).ToArray()).HasPrincipalKey(nameof(Appointment.Id));
+        model.Entity<PushDevice>(b =>
+        {
+            b.ToTable("PUSH_DEVICE");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.Token).HasMaxLength(512);
+            b.Property(x => x.Platform).HasMaxLength(16);
+            b.HasIndex(x => x.AccountId);
+            b.HasIndex(x => x.Token).IsUnique();
+        });
         model.Entity<NotificationRecord>(b =>
         {
             b.ToTable("IN_APP_NOTIFICATION");

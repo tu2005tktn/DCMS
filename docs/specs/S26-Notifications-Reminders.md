@@ -1,5 +1,9 @@
 # S26 Notifications & Appointment Reminders
 
+## Sửa lỗi biên dịch sau gộp main (13/11/2026)
+
+Với mỗi mốc nhắc lịch hợp lệ, hệ thống duyệt từng tài khoản nhận đã tính từ người đặt và liên kết bệnh nhân VERIFIED. Một tài khoản chỉ có một nhắc lịch cho cùng lịch hẹn, phiên bản và mốc; thay đổi này khôi phục đúng vòng lặp nhận nhắc và cho phép backend build trước migration, không thay đổi API.
+
 ## Thông báo theo sự kiện của bệnh nhân (bổ sung 10/11/2026)
 
 | Sự kiện đã lưu thành công | Người nhận | Nội dung và đích mở |

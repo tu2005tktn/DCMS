@@ -20,6 +20,7 @@ public static class ScreenEndpointPermissions
         if (p.StartsWith("/api/admin/recovery/") || p.StartsWith("/api/dev/recovery/proof/")) return Need(read && !p.StartsWith("/api/dev/") ? "accounts.read" : "accounts.update");
         if (p is "/api/test/realtime/ping" or "/api/test/realtime/state") return ScreenEndpointRule.Open("Integration fixture realtime probes; not registered by the application");
         if (p == "/health" || p.StartsWith("/openapi/") || p.StartsWith("/api/auth") || p.StartsWith("/api/recovery") || p.StartsWith("/api/email-verification") || p.StartsWith("/api/development") || p.StartsWith("/api/dev/")
+            || p == "/api/payments/payos/webhook"
             || p.StartsWith("/api/customer/recovery/") || p.StartsWith("/api/me/") || p.StartsWith("/api/patients/me") || p.StartsWith("/api/patient-links/me") || p.StartsWith("/hubs/"))
             return ScreenEndpointRule.Open("Authentication, self ownership, health or authenticated realtime transport");
         if (p == "/api/system-settings/settings/capabilities") return ScreenEndpointRule.Open("Capabilities contain no operational records");
@@ -33,6 +34,7 @@ public static class ScreenEndpointPermissions
             var kind = p.Split('/')[5]; if (kind.StartsWith('{')) kind = values?.GetValueOrDefault("kind") ?? "{kind}";
             return Need($"catalog.{kind}.{(read ? p.EndsWith("/export") ? "export" : "read" : p.Contains("/state") ? "deactivate" : method == "POST" ? "create" : "update")}");
         }
+        if (p == "/api/finance/statistics") return Need("finance.read");
         if (p == "/api/work-statistics") return Need("finance.work-statistics.read");
         if (p.StartsWith("/api/system-settings/material-purchases")) return Need($"materials.purchases.{(read ? "read" : method == "DELETE" ? "delete" : method == "POST" ? "create" : "update")}");
         if (p == "/api/system-settings/material-stock") return Need("materials.stock.read");
@@ -73,6 +75,11 @@ public static class ScreenEndpointPermissions
         if (p.StartsWith("/api/follow-up-instructions")) return Need(read ? "treatment.read" : "treatment.progress.manage");
         if (p.StartsWith("/api/lab-orders")) return Need(read ? "treatment.lab.read" : "treatment.lab.track");
         if (p.StartsWith("/api/dossiers")) {
+            if (p.Contains("/payments/payos-orders") || p.Contains("/payments/advance-payos-orders"))
+                return Need(read ? "finance.read" : "finance.payments.create");
+            if (p.EndsWith("/payments/advances")) return Need(read ? "finance.read" : "finance.payments.create");
+            if (p.EndsWith("/payments/context")) return Need("finance.read");
+            if (p.EndsWith("/payments")) return Need(read ? "finance.read" : "finance.payments.create");
             if (p.EndsWith("/sheet-items/from-item-plan")) return Need("treatment.items.create");
             if (p.EndsWith("/plan/planned-dates")) return Need("treatment.items.update");
             if (p.EndsWith("/materials") && p.Contains("/sheet-activities/")) return Need("treatment.actuals.update");

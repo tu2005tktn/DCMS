@@ -12,6 +12,7 @@ import MedicineManagementPage from '../features/system-settings/MedicineManageme
 import LabWorkPage from '../features/lab-work/LabWorkPage';
 import MaterialsPage from '../features/system-settings/MaterialsPage';
 import WorkStatisticsPage from '../features/statistics/WorkStatisticsPage';
+import FinanceStatisticsPage from '../features/finance/FinanceStatisticsPage';
 import AccountsPage from '../features/accounts/AccountsPage';
 import WorkingSchedulesPage from '../features/working-schedules/WorkingSchedulesPage';
 import BookingSettingsPage from '../features/working-schedules/BookingSettingsPage';
@@ -37,9 +38,15 @@ import CustomerTreatmentRecordsPage from '../features/customer-treatment/Custome
 import DossierPage from '../features/treatment/DossierPage';
 import PlanPage from '../features/treatment/PlanPage';
 import RevisionPage from '../features/treatment/RevisionPage';
+import CommercialTreatmentPage from '../features/treatment/CommercialTreatmentPage';
 
 import ItemPlansPage from '../features/treatment/ItemPlansPage';
 import CustomerPrescriptionsPage, { CustomerPrescriptionDetailPage } from '../features/customer-prescriptions/CustomerPrescriptionsPage';
+
+function LegacyCommercialRedirect() {
+  const { search } = useLocation();
+  return <Navigate to={'/commercial/treatment' + search} replace />;
+}
 
 export default function App() {
   return <Routes>
@@ -71,10 +78,12 @@ export default function App() {
       <Route path="medicines" element={<Protected permission="catalog.medicines.read"><MedicineManagementPage /></Protected>} />
       <Route path="system-settings" element={<Protected permission={['settings.read','treatment.prices.read','treatment.commercial.read']}><SystemSettingsPage /></Protected>} />
       <Route path="settings" element={<Protected permission={['settings.read','treatment.prices.read','treatment.commercial.read']}><SystemSettingsPage /></Protected>} />
+      <Route path="settings/treatment-services" element={<LegacyCommercialRedirect />} />
       <Route path="settings/:section" element={<Protected permission={['settings.read','treatment.prices.read','treatment.commercial.read']}><SystemSettingsPage /></Protected>} />
       <Route path="lab-orders" element={<Protected permission="treatment.lab.read"><LabWorkPage /></Protected>} />
       <Route path="materials" element={<Protected permission={['materials.purchases.read', 'materials.stock.read', 'materials.usage.read']}><MaterialsPage /></Protected>} />
       <Route path="work-statistics" element={<Protected permission="finance.work-statistics.read"><WorkStatisticsPage /></Protected>} />
+      <Route path="finance/statistics" element={<FinanceStatisticsPage />} />
       <Route path="working-schedules" element={<Protected permission="working-schedules.read"><WorkingSchedulesPage /></Protected>} />
       <Route path="booking-settings" element={<Protected permission="booking-settings.read"><BookingSettingsPage /></Protected>} />
       <Route path="accounts" element={<Protected permission="accounts.read"><AccountsPage /></Protected>} />

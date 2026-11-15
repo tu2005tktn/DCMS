@@ -1,7 +1,7 @@
 namespace DCMS.Application.Features.Treatment;
 
 // Rules: docs/specs/LAB-ORDER.md.
-public sealed record LabOrderSummary(Guid ActivityId, string WorkName, DateOnly? DueOn, DateOnly? DeliveredOn);
+public sealed record LabOrderSummary(Guid ActivityId, string WorkName, long TotalFeeVnd, DateOnly? DueOn, DateOnly? DeliveredOn);
 public sealed record LabOrderDto(Guid Id, Guid ActivityId, string? Code, DateOnly OrderedOn, DateOnly? DueOn, DateOnly? DeliveredOn, int DentistId,
     Guid? LabProviderId, Guid? LabWorkTypeId, string WorkName, string? MarginOuter, string? MarginInner, string? MarginSide,
     IReadOnlyList<string> BridgeShapes, bool IsChild, IReadOnlyList<string> Teeth, IReadOnlyDictionary<string, string> Shade,

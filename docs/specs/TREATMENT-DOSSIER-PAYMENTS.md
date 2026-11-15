@@ -1,6 +1,20 @@
 # Thanh toán theo phiếu điều trị — 03/11/2026
 
-> **Đã gỡ ngày 13/11/2026.** Phân hệ tài chính đã được xóa khỏi backend, web và database theo [CARE-LAB-FINANCE-STORAGE.vi.md](CARE-LAB-FINANCE-STORAGE.vi.md). Tài liệu này chỉ còn giá trị tham khảo khi đặc tả lại chức năng; không mô tả hành vi hiện tại.
+## Cập nhật popup thu tiền trên schema 33 bảng — 13/11/2026
+
+Trong hồ sơ bệnh nhân, chủ phòng khám mở **Trả tiền** của đúng phiếu điều trị. Popup có hai tab: **Cần thanh toán** chỉ chứa các hoạt động điều trị đã Posted còn nợ (`dueVnd > 0`); **Lịch sử dịch vụ đã thanh toán** chứa các hoạt động đã Posted có giá trị dương và `dueVnd = 0`. Mỗi hàng hiển thị giá dịch vụ sau giảm trừ đã duyệt, tổng đã trả và còn nợ; khi một khoản thu được ghi nhận đủ, hàng rời tab đầu và xuất hiện ở tab lịch sử ngay lần tải lại tiếp theo. Hoạt động chưa Posted và khoản cọc chưa phân bổ không được coi là đã thanh toán dịch vụ. Hàng không được nhân đôi giữa hai tab, tính trạng thái từ server theo từng `activityId`, không dựa trên state cũ của client.
+
+API `GET /api/dossiers/{id}/payments/context` trả `{lines:[{activityId,performedAt,serviceName,priceVnd,paidVnd,dueVnd}]}` cho đúng bệnh nhân/chi nhánh/phiếu. Dữ liệu thu cũ lấy từ archive trong `AUDIT_LOG`; khoản thu mới phải ghi sổ trong các bảng dùng chung của schema 33 bảng, có request key và giao dịch nguyên tử. `POST /api/dossiers/{id}/payments` nhận khoản thu tiền mặt theo từng `activityId`, từ chối số tiền âm, vượt nợ, hoạt động chưa Posted hoặc thuộc phiếu khác. Quyền ghi dành cho chủ phòng khám. Việc thanh toán chuyển khoản PayOS tiếp tục là luồng riêng, chỉ đánh dấu đã trả khi PayOS xác nhận đúng số tiền; không dựa vào thao tác mở QR.
+
+## Khôi phục chuyển khoản và cọc trên schema 33 bảng — 14/11/2026
+
+Popup thu tiền trong phiếu có thêm phương thức **Chuyển khoản PayOS** ở tab dịch vụ còn nợ và tab **Nhận trước (cọc)**. Cọc tiền mặt ghi nhận ngay; cọc PayOS và tiền dịch vụ chuyển khoản hiển thị bill và QR trong popup. Mở QR không ghi nhận đã trả. Backend chỉ ghi sổ sau khi tra cứu payOS trả `PAID`, mã đơn, payment link, số tiền yêu cầu và số đã thanh toán đều khớp. Client kiểm tra trạng thái mỗi 5 giây; webhook ký hợp lệ và worker kiểm tra nền cũng có thể chốt khi popup đã đóng. Lệnh PayOS được lưu ở `AUDIT_LOG` với `AuditType=FinancePayOsOrder`; khoản thu đã chốt lưu `FinanceLedger`. Không tạo bảng mới. Endpoint cọc tiền mặt là `POST /api/dossiers/{id}/payments/advances`; QR dịch vụ và cọc lần lượt là `POST /api/dossiers/{id}/payments/payos-orders` và `/advance-payos-orders`, kèm GET trạng thái. Thống kê cộng thu mới theo `FinanceLedger`, cọc chỉ vào Tiền nhận trước.
+
+Các phần bên dưới mô tả nghiệp vụ và API trước đợt rút gọn, giữ để đối chiếu lịch sử. Các đường dẫn `/api/finance/advances` và bảng `FINANCE_ADVANCE` ở phần cũ hiện không còn trong schema 33 bảng.
+
+## Ưu tiên 30% phí labo — 14/11/2026
+
+Với phiếu labo gắn một việc điều trị đã Posted và `TotalFeeVnd > 0`, mức ưu tiên là `ceil(TotalFeeVnd × 30%)`. Số còn cần dành bằng mức này trừ `LabOrder.PaidVnd` đã ghi trên phiếu và phần đã dành từ các khoản thu mới, tối thiểu bằng 0. Khoản bệnh nhân trả cho việc có phiếu labo được dành vào mốc này trước. Khi vẫn còn thiếu mốc, hệ thống chỉ cho thu từng phần dành toàn bộ cho labo; khoản thu cho dịch vụ khác phải chờ đủ mốc. Tiền cọc mới cũng được dành vào mốc labo trước, nhưng vẫn là **Tiền nhận trước**, chưa giảm nợ dịch vụ. Phần dành cho labo nằm trong `labPriority` của `FinanceLedger` trên `AUDIT_LOG`, không cộng thêm vào doanh thu hay tự đổi `LabOrder.PaidVnd`: trường đó biểu thị tiền phòng khám đã trả nhà labo, không phải tiền bệnh nhân nộp. Cả tiền mặt và PayOS dùng cùng phép kiểm tra ở server; với PayOS kiểm tra lại khi xác nhận `PAID`.
 
 Cập nhật lưu trữ 12/11/2026 theo [hợp đồng rút gọn database](DATABASE-SIMPLIFICATION.vi.md). Đơn PayOS lưu các dòng được chọn trong `Lines` JSONB của `TREATMENT_PAYOS_ORDER`; ID hoạt động và số tiền tiếp tục dùng để đối chiếu kết quả thanh toán.
 
@@ -65,3 +79,9 @@ Thanh tiêu đề "Danh sách cần thu" (tiêu đề, nút Tải lại thanh to
 ## Bảng có đường viền (08/11/2026)
 
 Các bảng trong nhóm màn Thanh toán/Doanh thu/Dịch vụ cận lâm sàng/Thống kê (vùng `.finance-page`) có viền ngoài và đường kẻ giữa các ô, tiêu đề cột nền nhạt. Dữ liệu không đổi.
+## Thu phí labo riêng (14/11/2026)
+
+- Phiếu labo có `TotalFeeVnd > 0` là một khoản chi phí thêm của bệnh nhân trên phiếu điều trị. Tổng chi phí thanh toán gồm giá dịch vụ đã làm và phí labo. `LabOrder.PaidVnd` vẫn là số tiền phòng khám trả cho đơn vị labo, không phải số tiền bệnh nhân đã trả.
+- Khoản bệnh nhân trả cho labo được lưu riêng trong `AUDIT_LOG` `FinanceLedger.labLines`, theo `labOrderId`. Tiền labo đã thu và còn nợ được tính từ các dòng này và các dòng `labPriority` cũ. Không cộng khoản thu labo vào **Tiền thực thu** (doanh thu dịch vụ); không cộng phần cọc đã dùng trả labo vào **Tiền nhận trước**.
+- Trước khi thu dịch vụ, bệnh nhân cần trả tối thiểu 30% tổng phí của mỗi phiếu labo. Có thể chỉ thu labo một phần. Tiền cọc mới được phân bổ cho mốc 30% labo trước, phần còn lại mới là tiền nhận trước. Chuyển khoản chỉ được ghi nhận sau khi payOS xác nhận đúng số tiền.
+- Không được giảm phí labo xuống dưới số bệnh nhân đã trả hoặc xóa phiếu labo đã có khoản thu. Không tạo bảng dữ liệu mới.
