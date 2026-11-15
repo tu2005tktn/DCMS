@@ -13,10 +13,6 @@ export type SheetActivity = {
   sheetVersion?: number; sheetDeleted?: boolean; sheetDiscountType?: string; sheetDiscountValue?: number; sheetDiscountReason?: string; sourceKind?: string; serviceNameSnapshot?: string; labWorkSnapshot?: string; chargingBasis: string; feeStatus: string; discountSnapshotVnd: number; assistantId?: number;
 };
 export type ActivityPage = { items: SheetActivity[]; total: number; page: number; pageSize: number };
-export type SheetDecision = { decision: string; counseling?: string; decisionMaker?: string; representativeBasis?: string };
-export type DossierTotals = { dossierCount: number; plannedGrossVnd: number; plannedDiscountVnd: number;
-  plannedNetVnd: number; financialAvailable: boolean; postedNetVnd: number | null;
-  confirmedAllocatedVnd: number | null; outstandingVnd: number | null; unusedAdvanceVnd: number | null; pendingFeeCount: number };
 
 export function isFdi(value: string) {
   const n = Number(value), quadrant = Math.floor(n / 10), position = n % 10;

@@ -1,3 +1,4 @@
+import { ArrowLeftOutlined } from '@ant-design/icons';
 import { Alert, Button, Card, Empty, Input, Select, Spin, Steps } from 'antd';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -109,7 +110,9 @@ function BookingForm() {
   const dentists = useMemo(() => options?.employees.filter(item => item.branchId === branchId && item.canDentist) ?? [], [options, branchId]);
   const service = services[0];
   const serviceId = service?.id ?? null;
-  const dentist = dentists.find(item => item.id === dentistId);
+  // 0 = "Bất kỳ bác sĩ": the dentist comes from the chosen slot (docs/specs/CHAIR-CAPACITY-ANY-DENTIST-BOOKING.vi.md).
+  const dentist = dentists.find(item => item.id === (dentistId === 0 ? slot?.dentistId : dentistId));
+  const dentistText = dentist?.name ?? (dentistId === 0 ? "Bất kỳ bác sĩ (ghế trống)" : undefined);
   const branch = options?.branches.find(item => item.id === branchId);
   const slotGroups = useMemo(() => [
     { label: 'Buổi sáng', items: slots.filter(item => Number(formatClock(item.start).slice(0, 2)) < 12) },
@@ -134,7 +137,7 @@ function BookingForm() {
 
   useEffect(() => {
     setSlots([]); setSlot(null); retryRef.current = null;
-    if (!branchId || !dentistId || !service || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
+    if (!branchId || dentistId == null || !service || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
     let active = true;
     setSlotsBusy(true); setError(null);
     const query = new URLSearchParams({ branchId: String(branchId), dentistId: String(dentistId),
@@ -159,7 +162,7 @@ function BookingForm() {
   }
 
   async function confirm() {
-    if (!token || !slot || !service || !branchId || !dentistId || submittingRef.current || authExpired || !validateContact()) return;
+    if (!token || !slot || !service || !branchId || dentistId == null || submittingRef.current || authExpired || !validateContact()) return;
     submittingRef.current = true; setSubmitting(true); setError(null);
     const cleanContact = contact.trim();
     const payload = {
@@ -168,7 +171,7 @@ function BookingForm() {
       attendee: { patientId: null, name: attendeeName.trim(), birthDate: relation === 'Relative' ? attendeeBirthDate || null : null },
       attendeeRelation: relation, kind: 'Standard', source: 'App', serviceId: service.id, reason: reason.trim() || null,
       ...(relation === 'Relative' && selectedMember ? { familyMemberId: selectedMember.id } : {}),
-      dentistId, assistantId: null, chairId: null, startAt: slot.start,
+      dentistId: slot.dentistId, assistantId: null, chairId: null, startAt: slot.start,
       durationMinutes: service.publicDurationMinutes, followUpId: null, exceptionReason: null, bookingSettingsVersion: slot.bookingSettingsVersion,
       scheduleVersion: slot.scheduleVersion, assistantScheduleVersion: null,
     };
@@ -198,16 +201,13 @@ function BookingForm() {
     } finally { submittingRef.current = false; setSubmitting(false); }
   }
 
-  if (state.status === 'initializing') return <main className="customer-portal page"><Spin size="large" /></main>;
-  if (state.status === 'error') return <main className="customer-portal page"><Alert type="error" showIcon message={state.message}
-    action={<Button onClick={() => void reload()}>Thử lại</Button>} /></main>;
+  if (state.status === 'initializing') return <div className="page"><Spin size="large" /></div>;
+  if (state.status === 'error') return <div className="page"><Alert type="error" showIcon message={state.message}
+    action={<Button onClick={() => void reload()}>Thử lại</Button>} /></div>;
 
-  return <main className="customer-portal"><div className="customer-content customer-booking">
-    <div className="customer-booking-header"><Link to={state.status === 'authenticated' ? '/customer/home' : '/customer/sign-in'} className="customer-back">← Quay lại</Link>
-      <span className="customer-kicker">Đặt lịch trực tuyến</span><h1>Đặt lịch khám</h1>
-      <Alert type="info" showIcon message="Khám lần đầu hoặc đợt khám mới"
-        description="Dịch vụ cho lần khám này là Khám. Nếu đang tiếp tục một phác đồ điều trị, hãy liên hệ phòng khám để đặt buổi theo chỉ định của nha sĩ." />
-      <p>Chọn khung giờ phù hợp. Phòng khám sẽ xác nhận lịch ngay khi đặt thành công.</p></div>
+  return <div className="customer-booking">
+    <div className="customer-booking-header"><Link to={state.status === 'authenticated' ? '/customer/home' : '/customer/sign-in'} className="customer-back-button"><ArrowLeftOutlined aria-hidden="true" />Quay lại</Link>
+      <h1>Đặt lịch khám</h1></div>
     <div className="customer-booking-progress"><span>Bước {step + 1}/5</span><strong>{stepNames[step]}</strong></div>
     <progress className="customer-booking-progress-bar" max={stepNames.length} value={step + 1} aria-label="Tiến độ đặt lịch" />
     <Steps current={step} size="small" items={stepNames.map(title => ({ title }))} />
@@ -244,7 +244,7 @@ function BookingForm() {
               <div><label htmlFor="booking-service">Dịch vụ</label><Input id="booking-service" readOnly className="customer-field"
                 value={service ? `Khám · ${service.publicDurationMinutes} phút` : 'Chưa có dịch vụ Khám khả dụng tại chi nhánh này'} /></div>
               <div><label htmlFor="booking-dentist">Bác sĩ</label><Select id="booking-dentist" className="customer-field" value={dentistId} placeholder="Chọn bác sĩ"
-                options={dentists.map(item => ({ value: item.id, label: item.name }))} onChange={setDentistId} /></div>
+                options={[{ value: 0, label: "Bất kỳ bác sĩ (ghế trống)" }, ...dentists.map(item => ({ value: item.id, label: item.name }))]} onChange={setDentistId} /></div>
               <div><label htmlFor="booking-date">Ngày khám</label><Input id="booking-date" className="customer-field" type="date" lang="vi-VN"
                 aria-describedby="booking-date-hint" value={date} onChange={event => setDate(event.target.value)} />
                 <span className="customer-booking-date-hint" id="booking-date-hint">Ngày đã chọn: {formatBookingDate(date)} · Giờ Việt Nam</span></div>
@@ -260,7 +260,7 @@ function BookingForm() {
                   <div className="customer-slots" role="group" aria-label={`Khung giờ ${group.label.toLowerCase()}`}>
                     {group.items.map(item => <Button key={`${item.start}-${item.chairId}`} type={slot === item ? 'primary' : 'default'}
                       aria-pressed={slot === item} onClick={() => { setSlot(item); retryRef.current = null; }}>{formatClock(item.start)}–{formatClock(item.end)}</Button>)}
-                  </div></section>) : branchId && serviceId && dentistId ?
+                  </div></section>) : branchId && serviceId && dentistId != null ?
                   <Empty description="Không có khung giờ phù hợp. Hãy chọn ngày hoặc bác sĩ khác." /> :
                   <p>Chọn chi nhánh, bác sĩ và ngày để xem khung giờ khám.</p>}
             </div>
@@ -270,7 +270,7 @@ function BookingForm() {
             <dl>
               <div><dt>Chi nhánh</dt><dd>{branch?.name ?? 'Chưa chọn'}</dd></div>
               <div><dt>Dịch vụ</dt><dd>{service ? `${service.name} · ${service.publicDurationMinutes} phút` : 'Chưa chọn'}</dd></div>
-              <div><dt>Bác sĩ</dt><dd>{dentist?.name ?? 'Chưa chọn'}</dd></div>
+              <div><dt>Bác sĩ</dt><dd>{dentistText ?? 'Chưa chọn'}</dd></div>
               <div><dt>Ngày khám</dt><dd>{formatBookingDate(date)}</dd></div>
               <div className="customer-schedule-summary-time"><dt>Giờ khám</dt><dd>{slot ? formatClock(slot.start) : 'Chưa chọn giờ'}</dd></div>
             </dl>
@@ -293,7 +293,7 @@ function BookingForm() {
             <li key={key}><a href={`#${id}`}>{fieldErrors[key]}</a></li>)}</ul>
         </div>}
         {slot && <div className="customer-booking-selection"><span>Lịch đang đặt</span><strong>{formatTime(slot.start)}</strong>
-          <span>{branch?.name} · {dentist?.name}</span></div>}
+          <span>{branch?.name} · {dentistText}</span></div>}
         <div className="customer-booking-contact-grid">
           <fieldset className="customer-booking-person"><legend>Người đặt lịch</legend><p>Người phòng khám sẽ liên hệ khi cần.</p>
             <div className="customer-booking-fields">
@@ -328,7 +328,7 @@ function BookingForm() {
         <dl className="customer-review-grid">
           <div className="customer-review-item"><dt>Chi nhánh</dt><dd>{branch?.name}</dd></div>
           <div className="customer-review-item"><dt>Dịch vụ</dt><dd>{service?.name}</dd></div>
-          <div className="customer-review-item"><dt>Bác sĩ</dt><dd>{dentist?.name}</dd></div>
+          <div className="customer-review-item"><dt>Bác sĩ</dt><dd>{dentistText}</dd></div>
           <div className="customer-review-item"><dt>Thời gian</dt><dd>{slot && formatTime(slot.start)}</dd></div>
         </dl>
         <h3 className="customer-review-heading">Người đặt và người khám</h3>
@@ -352,5 +352,5 @@ function BookingForm() {
         </div>
       </div>}
     </Card>}
-  </div></main>;
+  </div>;
 }

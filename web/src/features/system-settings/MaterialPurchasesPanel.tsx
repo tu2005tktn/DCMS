@@ -3,6 +3,7 @@ import { Alert, AutoComplete, Button, Empty, Form, Input, InputNumber, Modal, Se
 import { useEffect, useRef, useState } from 'react';
 import { api, ApiError } from '../../services/api';
 import { clinicToday, formatDate } from '../appointments/types';
+import './systemSettings.css';
 import { useAuth } from '../authentication/AuthContext';
 
 // Purchase log of materials/instruments. Rules and API: docs/specs/MATERIAL-PURCHASES.md.
@@ -165,7 +166,7 @@ export default function MaterialPurchasesPanel() {
     {materialError && <Alert type="error" showIcon message={materialError} action={<Button onClick={() => setRevision(v => v + 1)}>Thử lại danh mục</Button>} />}
     {materials?.length === 0 && <Alert type="info" showIcon message="Chưa có dụng cụ/vật liệu trong danh mục. Hãy thêm danh mục trước khi ghi nhập hàng." />}
     {error && <Alert type="error" showIcon message={error} action={<Button onClick={() => setRevision(v => v + 1)}>Thử lại</Button>} />}
-    <Table<Purchase> rowKey="id" size="small" bordered loading={loading} dataSource={data?.items ?? []} scroll={{ x: 1020 }}
+    <Table<Purchase> rowKey="id" size="small" bordered className="purchase-table" loading={loading} dataSource={data?.items ?? []}
       locale={{ emptyText: <Empty description="Chưa có lần nhập hàng nào." /> }}
       pagination={{ current: page, pageSize: size, total: data?.total ?? 0, showSizeChanger: true, pageSizeOptions: [20, 50, 100], showTotal: total => `Có ${total} kết quả.`, onChange: (p, s) => { setPage(s !== size ? 1 : p); setSize(s); } }}
       columns={[

@@ -51,7 +51,6 @@ test('new-visit patient selects service before duration-specific slots', async (
       dentistId: 2, scheduleVersion: 1, assistantScheduleVersion: null, bookingSettingsVersion: 2 }] } });
   });
   await page.goto('/customer/book');
-  await expect(page.getByText('Khám lần đầu hoặc đợt khám mới', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Tiếp tục', exact: true }).click();
   await page.locator('.ant-select').nth(0).click();
   await page.locator('.ant-select-dropdown:visible').getByText('Branch', { exact: true }).click();

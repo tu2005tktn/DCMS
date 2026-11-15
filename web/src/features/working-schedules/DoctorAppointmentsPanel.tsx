@@ -1,4 +1,4 @@
-import { Alert, Button, Card, Empty, Input, Space, Table, Tag, Typography } from 'antd';
+import { Alert, Button, Card, Empty, Input, Space, Table, Tag } from 'antd';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../services/api';
@@ -36,7 +36,6 @@ export default function DoctorAppointmentsPanel({ dentistId, date }: { dentistId
       <Input type="date" aria-label="Xem lịch hẹn theo ngày" value={selected} onChange={event => { if (event.target.value) setSelected(event.target.value); }} />
       <Button aria-label="Tuần sau của lịch hẹn" onClick={() => setSelected(addDays(from, 7))}>Tuần sau</Button>
       <Button loading={loading} onClick={() => setRevision(value => value + 1)}>Tải lại lịch hẹn</Button>
-      <Typography.Text>{formatDate(from)} – {formatDate(to)}</Typography.Text>
     </Space>
     {error && <Alert type="error" showIcon message={error} action={<Button onClick={() => setRevision(value => value + 1)}>Thử lại lịch hẹn</Button>} />}
     <Table<Booking> rowKey="id" size="small" loading={loading} dataSource={items} scroll={{ x: 900 }} pagination={{ pageSize: 10, hideOnSinglePage: true }}

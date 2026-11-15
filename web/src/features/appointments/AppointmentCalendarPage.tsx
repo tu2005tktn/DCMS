@@ -1,5 +1,5 @@
 import { usePermissions } from '../authentication/usePermissions';
-import { Alert, Button, Card, Drawer, Empty, Radio, Select, Space, Spin, Tag, Typography, message } from 'antd';
+import { Alert, Button, Card, Empty, Modal, Radio, Select, Space, Spin, Tag, Typography, message } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../services/api';
 import { Link } from 'react-router-dom';
@@ -101,9 +101,7 @@ export default function AppointmentCalendarPage() {
 
   return <>
     {toastContext}
-    <div className="page-heading"><div><Typography.Title level={2}>Lịch hẹn</Typography.Title>
-      <Typography.Paragraph>Lưới 15 phút theo giờ phòng khám. Bấm ô trống trong giờ làm để đặt lịch tại quầy; bấm lịch để xem và thao tác.
-        {options.ownScheduleOnly && ' Bạn chỉ thấy lịch của chính mình.'}</Typography.Paragraph></div>
+    <div className="page-heading"><div><Typography.Title level={2}>Lịch hẹn</Typography.Title></div>
       <Button type="primary" disabled={!has('appointments.create')} onClick={() => setBooking({ branchId: branchId!, dentistId: mode === 'WEEK' ? weekDentist : dentistId, date })}>Đặt lịch</Button></div>
     <Card>
       <div className="calendar-toolbar">
@@ -162,11 +160,12 @@ export default function AppointmentCalendarPage() {
           </div>
         </Spin>}
     </Card>
-    <Drawer open={selectedId !== null} title="Thông tin lịch hẹn" aria-label="Thông tin lịch hẹn" width={640} styles={{ wrapper: { maxWidth: '100vw' } }}
-      onClose={() => setSelectedId(null)} destroyOnClose
-      extra={selectedId ? <Link to={`/appointments/${selectedId}`}>Mở chi tiết đầy đủ</Link> : undefined}>
+    <Modal open={selectedId !== null} title="Thông tin lịch hẹn" centered width={720} footer={null}
+      styles={{ body: { maxHeight: "70vh", overflowY: "auto" } }}
+      onCancel={() => setSelectedId(null)} destroyOnClose>
+      {selectedId && <div style={{ textAlign: "right", marginBottom: 8 }}><Link to={`/appointments/${selectedId}`}>Mở chi tiết đầy đủ</Link></div>}
       {selectedId && <AppointmentDetailContent key={selectedId} id={selectedId} revision={revision} onChanged={() => setRevision(value => value + 1)} />}
-    </Drawer>
+    </Modal>
     <BookingDrawer open={booking !== null} prefill={booking} options={options} onClose={() => setBooking(null)} onBooked={result => {
       setBooking(null);
       void toast.success(`${result.notification.message} Mã lịch: ${result.code}`);

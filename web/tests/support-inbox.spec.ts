@@ -33,7 +33,7 @@ test('staff sees inbox menu, can filter and open a request drawer', async ({ pag
   await firstRow.click();
   await expect(page.getByRole('dialog')).toBeVisible();
   await expect(page.getByText('Tổng quan', { exact: true })).toBeVisible();
-  await expect(page.getByText('Lịch hẹn', { exact: true })).toBeVisible();
+  await expect(page.locator('.ant-descriptions-title', { hasText: 'Lịch hẹn' })).toBeVisible();
 
   // Tabs lịch sử.
   await page.getByRole('tab', { name: /^Lịch sử/ }).click();

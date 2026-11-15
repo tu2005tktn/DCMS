@@ -38,12 +38,13 @@ public static class SchedulingEndpoints
             Results.Ok(await service.PreviewAvailabilityAsync(AuthenticationEndpoints.AccountId(context.User), request, ct)));
         endpoints.MapGet("/api/availability/options", async (int? branchId, IWorkingScheduleService service, CancellationToken ct) =>
             Results.Ok(await service.PublicOptionsAsync(branchId ?? 0, ct))).AllowAnonymous().WithTags("Shared availability");
-        endpoints.MapGet("/api/availability", async (HttpContext context, int branchId, int dentistId, int? serviceId, DateOnly date,
+        endpoints.MapGet("/api/availability", async (HttpContext context, int branchId, int? dentistId, int? serviceId, DateOnly date,
             int durationMinutes, int? assistantId, IAvailabilityService service, CancellationToken ct) =>
         {
             var current = context.Items["CurrentUser"] as CurrentUser;
             int? staffId = current?.AccountType == "Staff" ? current.Id : null;
-            return Results.Ok(await service.QueryAsync(new(branchId, dentistId, serviceId, date, durationMinutes, assistantId), staffId, ct));
+            // dentistId omitted or 0 = any on-shift dentist with a free chair (CHAIR-CAPACITY-ANY-DENTIST-BOOKING.vi.md).
+            return Results.Ok(await service.QueryAsync(new(branchId, dentistId ?? 0, serviceId, date, durationMinutes, assistantId), staffId, ct));
         }).AllowAnonymous().WithTags("Shared availability");
     }
 }

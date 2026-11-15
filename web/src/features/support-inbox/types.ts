@@ -275,19 +275,3 @@ export const formatDateTime = (value: string | null | undefined): string => {
     hour: '2-digit', minute: '2-digit', hour12: false,
   }).format(date);
 };
-
-export const formatDate = (value: string | null | undefined): string => {
-  if (!value) return '—';
-  // Giữ nguyên YYYY-MM-DD; không chuyển timezone vì đây là local date.
-  return value.split('-').reverse().join('/');
-};
-
-export const formatTime = (value: string | null | undefined): string => {
-  if (!value) return '—';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat('vi-VN', {
-    timeZone: 'Asia/Ho_Chi_Minh',
-    hour: '2-digit', minute: '2-digit', hour12: false,
-  }).format(date);
-};

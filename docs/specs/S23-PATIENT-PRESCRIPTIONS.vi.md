@@ -65,3 +65,9 @@ Nút **Lưu đơn thuốc** / **Hủy** ở chân form. Danh sách đơn trong t
 - Đơn demo: 2 đơn cho `BN-DEMO-0001` và 1 đơn cho `BN-DEMO-0002`, kê bởi `dentist.demo` tại "S09 - Chi nhánh thử nghiệm", dùng thuốc danh mục demo. Mỗi đơn có Id cố định để chạy lặp an toàn (đã có thì bỏ qua) và lời dặn ghi rõ "Dữ liệu minh họa". Không phải hướng dẫn điều trị thực tế.
 - Kịch bản demo: đăng nhập web `dentist.demo` → hồ sơ `BN-DEMO-0001` → tab Đơn thuốc → xem đơn demo hoặc **Kê đơn thuốc** mới; đăng nhập mobile hoặc cổng bệnh nhân web (`/customer/sign-in`) bằng `patient.demo` → Đơn thuốc của tôi → thấy cùng đơn vừa lưu.
 - Danh sách đơn thuốc trong hồ sơ bệnh nhân mở chi tiết bằng ID của `PatientPrescription` qua `GET /api/patients/me/prescriptions/{id}`. Route mobile không được khai báo hai tham số động ở cùng một cấp; liên kết từ lượt khám phải dùng API đơn theo lượt khám riêng. Chi tiết hiển thị đúng thuốc và lời dặn của đơn được chọn, kể cả khi có nhiều đơn.
+
+## Điều chỉnh giao diện form Đơn thuốc (14/11/2026)
+
+- Hộp thoại rộng 920px, hiện giữa màn hình; phần nội dung cuộn bên trong hộp thoại, nút Hủy / Lưu đơn thuốc luôn thấy được mà không phải kéo cả trang.
+- Khoảng cách giữa các mục thu gọn; trong mỗi dòng thuốc, "Đơn vị thuốc" và "Hướng dẫn sử dụng" nằm cạnh nhau (một hàng, hai cột); ô Ghi chú/Lời dặn mặc định 2 dòng.
+- Màn hình hẹp (≤ 640px) giữ bố cục một cột như cũ. Không đổi dữ liệu hay quyền.

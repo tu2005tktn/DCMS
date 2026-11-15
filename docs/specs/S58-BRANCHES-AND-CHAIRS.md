@@ -81,7 +81,7 @@ Tài liệu liên quan: [S58-SYSTEM-SETTINGS.vi.md](S58-SYSTEM-SETTINGS.vi.md), 
 
 **Validation (400 MSG02/MSG04, có `field`)**
 - `code` 1–40 ký tự `[A-Za-z0-9_-]`, `name` 1–160, `address` ≤1000, `phone` ≤20, `email` ≤254 đúng định dạng, `website` ≤255 http/https, `timeZoneId` phải là IANA timezone hợp lệ, `bankCode` ≤20, `accountNumber` ≤50 chỉ chữ số, `payeeName` ≤160. Ba trường ngân hàng nhập đủ cả ba hoặc để trống cả ba.
-- Ghế (thay đổi 10/11/2026): ghế chỉ là điều kiện sức chứa để nhiều bác sĩ có thể cùng làm trong một slot (N ghế hoạt động → tối đa N bác sĩ cùng slot). Giờ làm việc chỉ lấy từ lịch đăng ký của bác sĩ. UI không còn nhập giờ mở/đóng; API bỏ qua `openMinute`/`closeMinute` nếu gửi lên và lưu 0/1440. Mã ghế unique trong chi nhánh cả khi tạo và khi đổi mã (`409 MSG201`). Chi nhánh ngừng hoạt động không nhận ghế mới (`409 MSG205`).
+- Ghế (thay đổi 10/11/2026): ghế chỉ là điều kiện sức chứa để nhiều bác sĩ có thể cùng làm trong một slot (N ghế hoạt động → tối đa N bác sĩ cùng slot). Giờ làm việc chỉ lấy từ lịch đăng ký của bác sĩ. UI không còn nhập giờ mở/đóng; API bỏ qua `openMinute`/`closeMinute` nếu gửi lên và lưu 0/1440. Mã ghế unique trong chi nhánh cả khi tạo và khi đổi mã (`409 MSG201`). Chi nhánh ngừng hoạt động không nhận ghế mới (`409 MSG205`). Ghế không gắn cố định với nha sĩ; đặt lịch "Bất kỳ nha sĩ" theo ghế trống: [CHAIR-CAPACITY-ANY-DENTIST-BOOKING.vi.md](CHAIR-CAPACITY-ANY-DENTIST-BOOKING.vi.md).
 - `logoAssetId` phải là asset đã upload cho đúng chi nhánh đó (`404 MSG113` nếu không).
 
 **Kiểm tra tác động (blockers)**

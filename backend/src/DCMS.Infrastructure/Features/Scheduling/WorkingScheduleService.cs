@@ -147,7 +147,33 @@ public sealed partial class WorkingScheduleService(DcmsDbContext db, TimeProvide
     public async Task<AvailabilityResult> QueryAsync(AvailabilityQuery query, int? staffActorId, CancellationToken ct)
     {
         if (staffActorId.HasValue) await Authorize(staffActorId.Value, query.BranchId, null, ct);
-        return await Query(query, !staffActorId.HasValue, null, ct);
+        return query.DentistId > 0
+            ? await Query(query, !staffActorId.HasValue, null, ct)
+            : await QueryAnyDentist(query, !staffActorId.HasValue, ct);
+    }
+    // docs/specs/CHAIR-CAPACITY-ANY-DENTIST-BOOKING.vi.md: chairs are branch capacity, not tied to a dentist. Each start time gets
+    // at most one slot, assigned to the free on-shift dentist with the fewest active bookings that day (ties: lower Id).
+    private async Task<AvailabilityResult> QueryAnyDentist(AvailabilityQuery q, bool isPublic, CancellationToken ct)
+    {
+        if (q.AssistantId.HasValue) throw Error("MSG110");
+        var dentists = (await ActiveMembers(ct)).Where(x => x.BranchId == q.BranchId && x.CanDentist)
+            .Select(x => x.EmployeeId).Distinct().ToArray();
+        if (dentists.Length == 0) return new("Asia/Ho_Chi_Minh", q.Date, []);
+        // Service/duration/date rules do not depend on the dentist, so a bad query still fails loudly.
+        await ValidateQuery(q with { DentistId = dentists[0] }, isPublic, ct);
+        var from = Local(q.Date).ToUniversalTime(); var to = from.AddDays(1);
+        var load = await db.Set<ResourceReservation>().AsNoTracking()
+            .Where(x => x.BranchId == q.BranchId && (x.Status == "Confirmed" || x.Status == "Checked-in") && x.Start < to && x.End > from)
+            .GroupBy(x => x.DentistId).Select(g => new { g.Key, Count = g.Count() }).ToDictionaryAsync(x => x.Key, x => x.Count, ct);
+        var chosen = new Dictionary<DateTimeOffset, AvailabilitySlot>();
+        foreach (var dentistId in dentists.OrderBy(id => load.GetValueOrDefault(id)).ThenBy(id => id))
+        {
+            AvailabilityResult result;
+            try { result = await Query(q with { DentistId = dentistId }, isPublic, null, ct); }
+            catch (BusinessException) { continue; }
+            foreach (var slot in result.Slots) chosen.TryAdd(slot.Start, slot);
+        }
+        return new("Asia/Ho_Chi_Minh", q.Date, chosen.Values.OrderBy(x => x.Start).ToArray());
     }
     public async Task<AvailabilityResult> QueryForReservationAsync(AvailabilityQuery query, Guid reservationId, string? attendeeKey, CancellationToken ct)
     {

@@ -18,3 +18,16 @@
   .support-inbox-table .ant-table-placeholder > td { border-inline-end:0; }
   .support-inbox-table th:nth-child(3), .support-inbox-table td:nth-child(3) { min-width:160px; }
 }
+
+/* Bố cục toolbar + nội dung dàn kín (14/11/2026) */
+.support-inbox-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.support-inbox-toolbar .support-inbox-tabs { margin: 0; }
+.staff-content .support-inbox-panel.ant-card { background: transparent; border: 0; }
+.staff-content .support-inbox-panel.ant-card > .ant-card-body { padding: 0; }
+@media screen and (min-width:1001px) {
+  .support-inbox-table .ant-table { background: #fff; }
+  .support-inbox-table table { table-layout: fixed !important; }
+}
+.support-inbox-tabs.ant-space-compact { width: auto; }
+.support-inbox-tab.ant-btn { display: inline-flex; align-items: center; gap: 6px; }
+.support-inbox-count { min-width: 20px; padding: 0 6px; border-radius: 10px; background: rgba(255, 255, 255, .25); font-size: 12px; line-height: 20px; text-align: center; }

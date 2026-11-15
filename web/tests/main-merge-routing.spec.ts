@@ -44,10 +44,10 @@ test('customer prescription list opens detail and survives direct reload', async
   expect(errors).toEqual([]);
 });
 
-test('legacy commercial URL keeps query and destination permission guard', async ({ page }) => {
+test('commercial URL stays on its own page and keeps the permission guard', async ({ page }) => {
   await session(page, 'Staff');
   await page.goto('/commercial/treatment?dossier=SYNTHETIC&branchId=1');
-  await expect(page).toHaveURL(/\/settings\/treatment-services\?dossier=SYNTHETIC&branchId=1$/);
+  await expect(page).toHaveURL(/\/commercial\/treatment\?dossier=SYNTHETIC&branchId=1$/);
   await expect(page.getByText('Bạn không có quyền thực hiện thao tác này.', { exact: true })).toBeVisible();
 });
 

@@ -1,7 +1,7 @@
 import CustomerDashboard from './CustomerDashboard';
 import { Alert, Button, Card, Form, Input, Spin, Typography } from 'antd';
 import { useEffect, useState, type ReactNode } from 'react';
-import { CalendarOutlined, FileTextOutlined, HomeOutlined, LinkOutlined, MedicineBoxOutlined, PlusCircleOutlined, TeamOutlined } from '@ant-design/icons';
+import { CalendarOutlined, FileTextOutlined, HomeOutlined, LinkOutlined, LogoutOutlined, MedicineBoxOutlined, PlusCircleOutlined, TeamOutlined } from '@ant-design/icons';
 import { Link, Navigate, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { ApiError } from '../../services/api';
 import { customerApi } from '../../services/customerApi';
@@ -38,12 +38,8 @@ function CustomerAuthFrame({ title, description, children, footer }: {
     <div className="customer-auth-layout">
       <aside className="customer-auth-intro">
         <Link to="/access" className="customer-brand customer-brand-light">DCMS <span>Cổng bệnh nhân</span></Link>
-        <div className="customer-auth-intro-copy">
-          <span className="customer-kicker">Phòng khám nha khoa</span>
-          <h2>Chủ động chăm sóc nụ cười của bạn</h2>
-          <p>Đặt lịch khám, theo dõi lịch hẹn và quản lý yêu cầu liên kết hồ sơ tại một nơi.</p>
-          <div className="customer-auth-note">Sau khi đăng nhập, bạn có thể đặt lịch cho bản thân hoặc người thân.</div>
-        </div>
+        <img className="customer-auth-photo" src="/auth-customer.svg" alt="" />
+        <h2 className="customer-auth-slogan">Chủ động chăm sóc nụ cười của bạn</h2>
       </aside>
       <section className="customer-auth-panel">
         <div className="customer-auth-heading"><span className="customer-kicker">Dành cho khách hàng</span>
@@ -57,25 +53,32 @@ function CustomerAuthFrame({ title, description, children, footer }: {
 
 export function AccessPage() {
   return <main className="customer-portal customer-access-page">
-    <div className="customer-access-wrap">
-      <div className="customer-access-header"><span className="customer-brand">DCMS <span>Phòng khám nha khoa</span></span></div>
-      <div className="customer-access-heading">
-        <h1>Bạn muốn vào khu vực nào?</h1>
-        <p>Chọn Khách hàng để đặt lịch hoặc Nhân viên để làm việc tại phòng khám.</p></div>
-      <div className="customer-access-options">
-        <Link to="/customer/sign-in" aria-label="Khách hàng" className="customer-access-option customer-access-option-primary">
-          <span className="customer-option-icon"><ToothMark /></span>
-          <span className="customer-option-copy"><strong>Khách hàng</strong><span>Đặt lịch khám và xem lịch hẹn của bạn</span></span>
-          <span className="customer-option-arrow" aria-hidden="true">→</span>
-        </Link>
-        <Link to="/sign-in" aria-label="Nhân viên" className="customer-access-option">
-          <span className="customer-option-icon" aria-hidden="true">+</span>
-          <span className="customer-option-copy"><strong>Nhân viên</strong><span>Vào khu vực làm việc của phòng khám</span></span>
-          <span className="customer-option-arrow" aria-hidden="true">→</span>
-        </Link>
+    <section className="access-hero" aria-hidden="true">
+      <span className="customer-brand customer-brand-light">DCMS <span>Phòng khám nha khoa</span></span>
+      <img className="access-hero-photo" src="/access-dentist.svg" alt="" />
+      <h2><strong>Nụ cười khỏe,</strong><span>bắt đầu từ một lịch hẹn.</span></h2>
+      <ToothMark className="access-hero-tooth" />
+    </section>
+    <section className="access-choice">
+      <div className="access-choice-inner">
+        <div className="customer-access-heading">
+          <span className="customer-kicker">Chào mừng đến DCMS</span>
+          <h1 className="access-sr-only">Bạn muốn vào khu vực nào?</h1></div>
+        <div className="customer-access-options">
+          <Link to="/customer/sign-in" aria-label="Khách hàng" className="customer-access-option customer-access-option-primary">
+            <span className="customer-option-icon"><ToothMark /></span>
+            <span className="customer-option-copy"><strong>Khách hàng</strong><span>Đặt lịch khám và xem lịch hẹn của bạn</span></span>
+            <span className="customer-option-arrow" aria-hidden="true">→</span>
+          </Link>
+          <Link to="/sign-in" aria-label="Nhân viên" className="customer-access-option">
+            <span className="customer-option-icon" aria-hidden="true">+</span>
+            <span className="customer-option-copy"><strong>Nhân viên</strong><span>Vào khu vực làm việc của phòng khám</span></span>
+            <span className="customer-option-arrow" aria-hidden="true">→</span>
+          </Link>
+        </div>
+        <p className="customer-access-help">Chưa có tài khoản? <Link to="/customer/register">Tạo tài khoản khách hàng</Link>.</p>
       </div>
-      <p className="customer-access-help">Chưa có tài khoản? <Link to="/customer/register">Tạo tài khoản khách hàng</Link>.</p>
-    </div>
+    </section>
   </main>;
 }
 
@@ -105,7 +108,7 @@ export function CustomerShell() {
     <header className="customer-header"><div className="customer-header-inner">
       <Link to="/customer/home" className="customer-brand"><span className="customer-brand-mark" aria-hidden="true">D</span>DCMS <span>Cổng bệnh nhân</span></Link>
       <div className="customer-header-account"><span className="customer-avatar" aria-hidden="true">{initials}</span><span className="customer-header-name">{fullName}</span>
-        <Button loading={busy} onClick={() => void leave()}>Đăng xuất</Button></div>
+        <Button type="text" className="customer-signout" loading={busy} icon={<LogoutOutlined aria-hidden="true" />} onClick={() => void leave()}>Đăng xuất</Button></div>
     </div><nav aria-label="Điều hướng khách hàng" className="customer-navigation"><div className="customer-nav-inner">
           <NavLink to="/customer/home" end className={({ isActive }) => `customer-nav-link${isActive ? ' active' : ''}`}><HomeOutlined className="customer-nav-icon" aria-hidden="true" /><span className="customer-nav-long">Trang chủ</span><span className="customer-nav-short" aria-hidden="true">Trang chủ</span></NavLink>
           <NavLink to="/customer/book" aria-label="Đặt lịch" className={({ isActive }) => `customer-nav-link${isActive ? ' active' : ''}`}><PlusCircleOutlined className="customer-nav-icon" aria-hidden="true" /><span className="customer-nav-long">Đặt lịch</span><span className="customer-nav-short" aria-hidden="true">Đặt lịch</span></NavLink>

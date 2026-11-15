@@ -38,17 +38,14 @@ export default function CustomerAppointmentsPage() {
   }, [token, scope, filters, page, revision, expire]);
 
   return <section className="customer-appointments-page">
-    <div className="calendar-toolbar"><div className="customer-page-heading"><span className="customer-kicker">Lịch khám</span>
+    <div className="calendar-toolbar"><div className="customer-page-heading">
       <Typography.Title level={2}>Lịch hẹn của tôi</Typography.Title>
-      <Typography.Paragraph>Bạn xem được lịch do mình đặt và lịch của chính mình qua liên kết hồ sơ đã xác minh. Giờ hẹn theo giờ Việt Nam.</Typography.Paragraph></div>
+    </div>
       <Space><Button loading={busy} onClick={() => setRevision(value => value + 1)}>Tải lại</Button>
         <Link to="/customer/book" className="customer-link-button customer-link-button-primary">Đặt lịch mới</Link></Space></div>
     <Tabs activeKey={scope} onChange={value => { setScope(value); setPage(1); }} items={[
       { key: 'UPCOMING', label: 'Sắp tới' }, { key: 'HISTORY', label: 'Lịch sử' },
     ]} />
-    <p className="customer-appointment-scope-note">{scope === 'UPCOMING'
-      ? 'Các lịch sắp tới được xếp theo thời gian khám.'
-      : 'Xem lại lịch đã khám, đã hủy hoặc đã qua ngày hẹn.'}</p>
     <Card className="customer-appointment-filters" title="Tìm lịch hẹn">
       <Form form={form} layout="vertical" initialValues={{ status: 'ALL' }} onFinish={value => { setFilters(value); setPage(1); }}>
         <div className="customer-appointment-filter-grid">

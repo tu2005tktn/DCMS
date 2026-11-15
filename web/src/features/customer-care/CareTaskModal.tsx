@@ -117,7 +117,7 @@ export default function CareTaskModal({ open, options, branches, initialBranchId
       {editing
         ? <Form.Item label="Loại chăm sóc"><Typography.Text>{editing.typeName}</Typography.Text></Form.Item>
         : <Form.Item label="Loại chăm sóc" required
-            extra={manualTypes.length ? undefined : 'Chưa có loại chăm sóc. Nhờ Chủ phòng khám thêm ở Thiết lập hệ thống › 2. Chẩn đoán / Tên bệnh › Loại chăm sóc khách hàng.'}>
+            extra={manualTypes.length ? undefined : 'Chưa có loại chăm sóc. Nhờ Chủ phòng khám thêm ở Thiết lập hệ thống › Chẩn đoán / Tên bệnh › Loại chăm sóc khách hàng.'}>
             <Space.Compact style={{ width: '100%' }}>
               <Form.Item name="type" noStyle rules={[{ required: true, message: 'Vui lòng chọn loại chăm sóc.' }]}>
                 <Select aria-label="Loại chăm sóc" placeholder="Chọn loại chăm sóc" options={manualTypes.map(x => ({ value: x.code, label: x.name }))} />

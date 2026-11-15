@@ -1,6 +1,6 @@
 # Thao tác tại lưới Lịch hẹn — 09/11/2026
 
-Trên `/appointments`, bấm thẻ trong chế độ Ngày hoặc Tuần để mở drawer **Thông tin lịch hẹn**. Ngay trong drawer có Chỉnh sửa lịch, Hủy lịch, Khách không tới hoặc Đặt lịch thay thế theo quyền/trạng thái/thời gian. Drawer giữ mở sau commit, cập nhật chi tiết và lưới từ server, giữ ngày/bộ lọc; có liên kết tới trang chi tiết đầy đủ.
+Trên `/appointments`, bấm thẻ trong chế độ Ngày hoặc Tuần để mở hộp thoại **Thông tin lịch hẹn** hiện ở giữa màn hình (không còn ngăn kéo bên phải). Ngay trong hộp thoại có Chỉnh sửa lịch, Hủy lịch, Khách không tới hoặc Đặt lịch thay thế theo quyền/trạng thái/thời gian. Hộp thoại giữ mở sau commit, cập nhật chi tiết và lưới từ server, giữ ngày/bộ lọc; có liên kết tới trang chi tiết đầy đủ.
 
 API options thêm `currentDentistId` do server suy từ Employee của actor trong tập nha sĩ được phép. Khi mở màn, ưu tiên chi nhánh của người đó và tự chọn đúng nha sĩ. Không so tên hoặc dùng AccountId làm EmployeeId. Trợ lý không phải nha sĩ giữ lọc Tất cả ở chế độ Ngày. Đổi lựa chọn thủ công không bị ghi đè khi tải lại/đổi ngày. Đổi chi nhánh áp dụng lại mặc định nếu có nha sĩ đó.
 

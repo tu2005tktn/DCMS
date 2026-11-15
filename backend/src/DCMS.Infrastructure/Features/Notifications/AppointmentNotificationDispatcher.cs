@@ -22,12 +22,6 @@ public interface IExternalNotificationAdapter
     Task<ExternalDeliveryResult> SendAsync(NotificationChannel channel, NotificationDto notification, CancellationToken ct);
 }
 
-public sealed class UnavailableExternalNotificationAdapter : IExternalNotificationAdapter
-{
-    public Task<ExternalDeliveryResult> SendAsync(NotificationChannel channel, NotificationDto notification, CancellationToken ct) =>
-        Task.FromResult(new ExternalDeliveryResult(false, null, $"{channel} adapter is not configured."));
-}
-
 /// <summary>
 /// Consumes appointment outbox events only after their booking transaction commits.
 /// Reprocessing is safe through notification/reminder unique dedupe keys.

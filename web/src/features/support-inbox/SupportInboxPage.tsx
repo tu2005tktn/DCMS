@@ -1,3 +1,4 @@
+import { ReloadOutlined } from '@ant-design/icons';
 import { Alert, Button, Card, Empty, Space, Table, Tag, Typography } from 'antd';
 import type { ColumnType } from 'antd/es/table';
 import { useEffect, useMemo, useState } from 'react';
@@ -31,8 +32,7 @@ type LoadState =
  * trình desktop (bảng, drawer, command bar).
  *
  * Trang đọc/ghi qua API thật (`supportInbox.api.ts` → `GET/POST /api/support-requests/...`, xem
- * docs/implementation/S26-Staff-Support-Inbox.md §API) và tự cập nhật qua realtime SignalR;
- * `supportInbox.mock.ts` chỉ là repo in-memory dành cho phát triển offline, trang này không dùng nó.
+ * docs/implementation/S26-Staff-Support-Inbox.md §API) và tự cập nhật qua realtime SignalR.
  */
 export default function SupportInboxPage() {
   const auth = useAuth();
@@ -98,13 +98,11 @@ export default function SupportInboxPage() {
       <div>
         <Typography.Title level={2}>Hộp thư hỗ trợ</Typography.Title>
       </div>
-      <Space>
-        <Button onClick={() => setRevision(value => value + 1)} loading={load.kind === 'loading'}>Tải lại</Button>
-      </Space>
     </div>
 
-    <Card>
-      <div className="support-inbox-tabs">
+    <Card className="support-inbox-panel">
+      <div className="support-inbox-toolbar">
+      <Space.Compact className="support-inbox-tabs" role="group" aria-label="Lọc theo trạng thái">
         {statusFilterOptions.map(option => (
           <Button
             key={option.value}
@@ -113,8 +111,11 @@ export default function SupportInboxPage() {
             className="support-inbox-tab"
           >
             {option.label}
+            {filter === option.value && load.kind === 'ready' && <span className="support-inbox-count" aria-hidden="true">{total}</span>}
           </Button>
         ))}
+      </Space.Compact>
+        <Button type="text" icon={<ReloadOutlined />} aria-label="Tải lại" title="Tải lại" onClick={() => setRevision(value => value + 1)} loading={load.kind === 'loading'} />
       </div>
 
       {load.kind === 'error' && <Alert className="form-alert" type="error" showIcon
@@ -137,19 +138,19 @@ export default function SupportInboxPage() {
         }}
         columns={([
           {
-            title: 'Mã lịch', dataIndex: 'appointmentCode', width: 130,
-            render: code => <Typography.Text strong>{code}</Typography.Text>,
+            title: 'Mã lịch', dataIndex: 'appointmentCode', width: '14%',
+            render: (code: string) => <Typography.Text strong title={code}>{code.length > 14 ? code.slice(0, 11) + '…' : code}</Typography.Text>,
           },
           {
-            title: 'Loại yêu cầu', dataIndex: 'kind', width: 180,
+            title: 'Loại yêu cầu', dataIndex: 'kind', width: '14%',
             render: (_, item) => <Tag>{kindLabels[item.kind]}</Tag>,
           },
           {
-            title: 'Lý do', dataIndex: 'reason',
+            title: 'Lý do', dataIndex: 'reason', width: '30%',
             render: value => value || <Typography.Text type="secondary">—</Typography.Text>,
           },
           {
-            title: 'Người yêu cầu', width: 200,
+            title: 'Người yêu cầu', width: '16%',
             render: (_, item) => {
               const name = item.requester.name || '—';
               return <Space direction="vertical" size={0}>
@@ -159,11 +160,11 @@ export default function SupportInboxPage() {
             },
           },
           {
-            title: 'Trạng thái', dataIndex: 'status', width: 160,
+            title: 'Trạng thái', dataIndex: 'status', width: '12%',
             render: (_, item) => <Tag color={statusColors[item.status]}>{statusLabels[item.status]}</Tag>,
           },
           {
-            title: 'Cập nhật', dataIndex: 'updatedAt', width: 160,
+            title: 'Cập nhật', dataIndex: 'updatedAt', width: '14%',
             render: value => formatDateTime(value),
           },
         ] as ColumnType<SupportRequestDto>[]).map(c => ({ ...c, onCell: () => ({ 'data-label': String(c.title) } as object) }))}

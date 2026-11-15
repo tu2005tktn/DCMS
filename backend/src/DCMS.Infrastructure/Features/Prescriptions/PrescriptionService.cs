@@ -735,8 +735,8 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
         for (var i = 0; i < c.Lines.Length; i++)
         {
             var input = c.Lines[i];
-            var v = values[i];
             if (!medicines.TryGetValue(input.MedicineId, out var med)) throw Fail("MSG113", 404, $"lines[{i}].medicineId");
+            var v = Validate(input.Route, input.MorningDose, input.NoonDose, input.AfternoonDose, input.EveningDose, input.MealTiming, input.Days, input.Quantity, input.Instructions, med.BaseUnit);
             template.Lines.Add(new PrescriptionTemplateLine
             {
                 TemplateId = template.Id, MedicineId = med.Id, MedicineCode = med.Code, MedicineName = med.Name,
