@@ -91,6 +91,28 @@ export default function DossierPaymentModal({ dossierId, open, onClose, onSaved 
     } finally { setSaving(false); }
   }
 
+  async function applyAdvance() {
+    if (saving || total <= 0 || violatesLabPriority || total > (context?.advanceReceivedVnd ?? 0)
+      || order?.status === 'PENDING') return;
+    setSaving(true); setError('');
+    try {
+      const signature = JSON.stringify({ action: 'AdvanceApplied', selected, selectedLabs });
+      if (pending.current?.signature !== signature) pending.current = { signature, key: crypto.randomUUID() };
+      const value = await api<PaymentContext>(`/api/dossiers/${dossierId}/payments/advance-allocations`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestKey: pending.current.key, lines: selected, labLines: selectedLabs }),
+      });
+      pending.current = null;
+      setContext(value); setAmounts({}); setLabAmounts({});
+      if (selected.some(item => value.lines.some(line => line.activityId === item.activityId && line.dueVnd === 0))
+        || selectedLabs.some(item => value.labFees.some(lab => lab.labOrderId === item.labOrderId && lab.dueVnd === 0)))
+        setTab('paid');
+      onSaved();
+    } catch (reason) {
+      setError(reason instanceof ApiError ? reason.message : 'Không thể dùng cọc để thanh toán. Vui lòng thử lại.');
+    } finally { setSaving(false); }
+  }
+
   const columns = (lines: PaymentLine[], editable: boolean) => lines.length ? <div style={{ overflowX: 'auto' }}><table className="treatment-sheet-table" style={{ width: '100%' }}>
     <thead><tr><th>Ngày điều trị</th><th>Dịch vụ</th><th>Chi phí</th><th>Đã trả</th><th>Còn nợ</th>{editable && <th>Thu lần này (₫)</th>}</tr></thead>
     <tbody>{lines.map(line => <tr key={line.activityId}>
@@ -126,11 +148,15 @@ export default function DossierPaymentModal({ dossierId, open, onClose, onSaved 
         </div>}
         {columns(due, true)}{violatesLabPriority && <Alert type="warning" showIcon message="Cần thu đủ ít nhất 30% phí labo trước khi thu dịch vụ." style={{ marginTop: 12 }} />}
         <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 16, marginTop: 20 }}>
-        <strong>Tổng thu: {money(total)}</strong><Segmented value={method} onChange={value => setMethod(value as 'Cash' | 'Transfer')} options={[{ label: 'Tiền mặt', value: 'Cash' }, { label: 'Chuyển khoản', value: 'Transfer' }]} />
+        <strong>Phân bổ lần này: {money(total)}</strong>
+        <span>Số dư cọc: {money(context?.advanceReceivedVnd ?? 0)}</span>
+        <Button loading={saving} disabled={total <= 0 || total > (context?.advanceReceivedVnd ?? 0) || violatesLabPriority || order?.status === 'PENDING'}
+          onClick={() => void applyAdvance()}>Dùng cọc</Button>
+        <Segmented value={method} onChange={value => setMethod(value as 'Cash' | 'Transfer')} options={[{ label: 'Tiền mặt', value: 'Cash' }, { label: 'Chuyển khoản', value: 'Transfer' }]} />
         <Button type="primary" loading={saving} disabled={total <= 0 || violatesLabPriority || order?.status === 'PENDING'} onClick={() => void save()}>{method === 'Cash' ? 'Xác nhận thu tiền mặt' : 'Tạo QR và xem bill'}</Button>
       </div></> },
       { key: 'paid', label: `Lịch sử dịch vụ đã thanh toán (${paid.length + paidLabs.length})`, children: <>{columns(paid, false)}{paidLabs.length > 0 && <div><h4>Phí labo đã thanh toán</h4><ul>{paidLabs.map(lab => <li key={lab.labOrderId}>{lab.workName}: {money(lab.paidVnd)}</li>)}</ul></div>}</> },
-      { key: 'advance', label: 'Nhận trước (cọc)', children: <><p>Tiền nhận trước đã xác nhận: <strong>{money(context?.advanceReceivedVnd ?? 0)}</strong>. Khoản này chưa trừ nợ dịch vụ.</p>
+      { key: 'advance', label: 'Nhận trước (cọc)', children: <><p>Số dư cọc có thể dùng: <strong>{money(context?.advanceReceivedVnd ?? 0)}</strong>. Để dùng cọc, chọn số tiền cho từng dịch vụ hoặc labo tại tab Cần thanh toán rồi bấm Dùng cọc.</p>
         {!!labFees.length && <p>Khoản nhận trước mới sẽ ưu tiên thu riêng tối đa {money(labRemaining)} phí labo; phần còn lại ghi là tiền cọc.</p>}
         <InputNumber aria-label="Số tiền cọc" min={1} precision={0} value={advanceAmount} onChange={value => setAdvanceAmount(value ?? 0)} style={{ width: 180 }} />
         <Segmented value={method} onChange={value => setMethod(value as 'Cash' | 'Transfer')} options={[{ label: 'Tiền mặt', value: 'Cash' }, { label: 'Chuyển khoản', value: 'Transfer' }]} style={{ margin: '0 12px' }} />

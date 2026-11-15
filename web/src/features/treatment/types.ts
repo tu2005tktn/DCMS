@@ -39,7 +39,7 @@ export type TreatmentEvent = { id: string; kind: string; dossierVersion: number;
 export type TreatmentDossier = {
   sourceExaminationId?: string | null; sourceExaminationVersion?: number | null;
   id: string; code: string; patientId: number; branchId: number; dentistId: number;
-  startedOn: string; diagnosis: string; note: string | null; state: 'Open' | 'Completed' | 'Stopped';
+  startedOn: string; diagnosis: string; note: string | null; state: 'Open' | 'Completed' | 'Stopped' | 'Cancelled';
   closureOutcome: string | null; closureReason: string | null; version: number;
   planId: string; planVersion: number; planState: 'None' | 'Draft' | 'Committed'; goals: string | null;
   items: TreatmentItem[]; paymentTerms: PaymentTerm[]; timeline: TreatmentEvent[];
@@ -64,12 +64,12 @@ export const decisionLabel: Record<TreatmentItem['decision'], string> = {
   Proposed: 'Đề xuất', Agreed: 'Đã đồng ý', Refused: 'Từ chối', Deferred: 'Hoãn quyết định',
 };
 export const stateLabel: Record<TreatmentDossier['state'], string> = {
-  Open: 'Đang điều trị', Completed: 'Đã kết thúc', Stopped: 'Đã dừng',
+  Open: 'Đang điều trị', Completed: 'Đã kết thúc', Stopped: 'Đã dừng', Cancelled: 'Hủy phiếu',
 };
 export const progressLabel: Record<string, string> = {
   NotStarted: 'Chưa thực hiện', InProgress: 'Đang thực hiện', Partial: 'Đã làm một phần', Completed: 'Đã hoàn tất', Stopped: 'Đã dừng',
 };
 export const closureOutcomeLabel: Record<string, string> = {
-  CompletedAsAgreed: 'Hoàn tất đúng phần đã đồng ý', StoppedIncomplete: 'Dừng khi còn phần chưa thực hiện',
+  CompletedAsAgreed: 'Hoàn tất đúng phần đã đồng ý', StoppedIncomplete: 'Dừng khi còn phần chưa thực hiện', Cancelled: 'Hủy phiếu',
 };
 export const money = (amount: number) => `${new Intl.NumberFormat('vi-VN').format(amount)} ₫`;

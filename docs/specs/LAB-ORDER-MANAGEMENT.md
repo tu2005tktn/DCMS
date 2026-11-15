@@ -1,5 +1,11 @@
 # Quản lý công việc labo
 
+## Thanh toán của bệnh nhân (15/11/2026)
+
+Trang quản lý labo hiển thị riêng số tiền bệnh nhân đã trả cho **từng phiếu labo** và trạng thái `Chưa thanh toán`, `Thanh toán một phần`, `Đã thanh toán` (hoặc `Không có phí`). Số đã trả được tổng hợp từ các phân bổ labo trong `FinanceLedger` đã xác nhận, gồm tiền mặt, chuyển khoản PayOS đã hoàn tất và phần cọc đã dành cho phiếu labo. QR đang chờ thanh toán không được tính. Trang tự tải lại khi đang mở.
+
+`LabOrder.PaidVnd` là tiền phòng khám đã trả **xưởng labo**; cột này giữ riêng. Trạng thái công việc `NotSent/Sent/Received/Delivered/Rework` cũng giữ riêng, không tự đổi theo thanh toán của bệnh nhân. Không thêm bảng mới.
+
 Ngày: 08/11/2026. Liên quan: [LAB-ORDER.md](LAB-ORDER.md) (phiếu labo lập trong quá trình điều trị), [LAB-CATALOG-SEED.md](LAB-CATALOG-SEED.md), [ALL-SCREENS-DYNAMIC-PERMISSIONS.vi.md](ALL-SCREENS-DYNAMIC-PERMISSIONS.vi.md).
 
 ## Mục tiêu

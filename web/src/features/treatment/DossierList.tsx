@@ -13,8 +13,8 @@ const displayTime = (value: string) => new Intl.DateTimeFormat('vi-VN', {
   dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Ho_Chi_Minh',
 }).format(new Date(value));
 
-export default function DossierList({ patientId, visitId, sourceVisitVersion, branchId: contextBranchId,
-  patientName, patientCode, patientAge }: { patientId: number; visitId?: string; diagnosis?: string | null;
+export default function DossierList({ patientId, visitId, initialDossierId, sourceVisitVersion, branchId: contextBranchId,
+  patientName, patientCode, patientAge }: { patientId: number; visitId?: string; initialDossierId?: string; diagnosis?: string | null;
   branchId?: number; dentistId?: number; sourceVisitVersion?: number; patientName?: string; patientCode?: string; patientAge?: number | null }) {
   const has = usePermissions();
   const auth = useAuth();
@@ -46,19 +46,39 @@ export default function DossierList({ patientId, visitId, sourceVisitVersion, br
   const createPayload = useRef('');
   const createKey = useRef(crypto.randomUUID());
 
-  const canUse = has('treatment.read') && (auth.user?.effectiveRoles.includes('Dentist') ?? false);
+  const canUse = has('treatment.read') && ((auth.user?.effectiveRoles.includes('Dentist') || auth.user?.effectiveRoles.includes('ClinicOwner')) ?? false);
   const canCreate = has('treatment.dossiers.create');
 
   useEffect(() => {
     if (!canUse) return;
     let active = true;
-    setActiveId(created.current?.patientId===patientId && pageNumber===1 ? created.current.id : null); setSelected(null);
-    if(!(created.current?.patientId===patientId && pageNumber===1))setPage(null); setError(null);
-    api<DossierPage>(`/api/patients/${patientId}/dossiers?page=${pageNumber}&pageSize=20`)
-      .then(result => { if (active) { const pinned = created.current?.patientId === patientId ? created.current : null; const items = pinned && pageNumber === 1 && !result.items.some(x=>x.id===pinned.id) ? [pinned,...result.items] : result.items; setPage({...result,items}); setActiveId(pinned && pageNumber === 1 ? pinned.id : result.items[0]?.id ?? null); } })
-      .catch(failure => { if (active) setError(failure as ApiError); });
+    setSelected(null);
+    if (!(created.current?.patientId === patientId && pageNumber === 1)) setPage(null);
+    setError(null);
+    void (async () => {
+      try {
+        const result = await api<DossierPage>(`/api/patients/${patientId}/dossiers?page=${pageNumber}&pageSize=20`);
+        if (!active) return;
+        const pinned = created.current?.patientId === patientId ? created.current : null;
+        let items = pinned && pageNumber === 1 && !result.items.some(x => x.id === pinned.id) ? [pinned, ...result.items] : result.items;
+        if (initialDossierId && pageNumber === 1 && !items.some(x => x.id === initialDossierId)) {
+          const target = await api<TreatmentDossier>(`/api/dossiers/${initialDossierId}`).catch(() => null);
+          if (!active) return;
+          if (target && target.patientId === patientId) items = [target, ...items];
+        }
+        setPage({ ...result, items });
+        setActiveId(current => {
+          if (pinned && pageNumber === 1) return pinned.id;
+          if (current && items.some(x => x.id === current)) return current;
+          if (initialDossierId && items.some(x => x.id === initialDossierId)) return initialDossierId;
+          return items[0]?.id ?? null;
+        });
+      } catch (failure) {
+        if (active) setError(failure as ApiError);
+      }
+    })();
     return () => { active = false; };
-  }, [patientId, pageNumber, revision, canUse]);
+  }, [patientId, pageNumber, revision, canUse, initialDossierId]);
   useEffect(() => {
     if (!canUse) return;
     let active = true;
@@ -88,7 +108,7 @@ export default function DossierList({ patientId, visitId, sourceVisitVersion, br
       createKey.current=crypto.randomUUID();createPayload.current='';
     } catch(e){setSaveError((e as Error).message);}finally{sending.current=false;setBusy(false);}
   }
-  useEffect(()=>{if(activeId && created.current?.id===activeId && page?.items.some(x=>x.id===activeId))document.getElementById(`treatment-sheet-${activeId}`)?.scrollIntoView({behavior:'smooth',block:'start'});},[activeId,page]);
+  useEffect(()=>{if(activeId && (created.current?.id===activeId || initialDossierId===activeId) && page?.items.some(x=>x.id===activeId))document.getElementById(`treatment-sheet-${activeId}`)?.scrollIntoView({behavior:'smooth',block:'start'});},[activeId,page,initialDossierId]);
   async function deleteDossier() {
     if (!deleteTarget || deleteBusy) return;
     setDeleteBusy(true); setDeleteError(null);
@@ -105,11 +125,28 @@ export default function DossierList({ patientId, visitId, sourceVisitVersion, br
   }
 
   async function changeStatus(item: DossierListItem, completed: boolean) {
-    if ((item.state === 'Open' && !completed) || statusBusyId) return;
+    if ((item.state === 'Open' && !completed) || item.state === 'Cancelled' || statusBusyId) return;
     setStatusBusyId(item.id); setStatusError(null);
     try { const value = await api<TreatmentDossier>(`/api/dossiers/${item.id}`); setClinicalTarget({ dossier: value, completed }); }
     catch (failure) { setStatusError({ id: item.id, message: (failure as Error).message }); }
     finally { setStatusBusyId(null); }
+  }
+
+  async function cancelDossier(item: DossierListItem) {
+    if (item.state === 'Cancelled' || statusBusyId) return;
+    setStatusBusyId(item.id); setStatusError(null);
+    try {
+      const value = await api<TreatmentDossier>(`/api/dossiers/${item.id}`);
+      await api(`/api/dossiers/${item.id}/payments/cancel-dossier`, {
+        method: 'POST',
+        body: JSON.stringify({ requestKey: crypto.randomUUID(), expectedVersion: value.version, reason: 'Hủy phiếu' }),
+      });
+      setRevision(v => v + 1);
+    } catch (failure) {
+      setStatusError({ id: item.id, message: (failure as Error).message });
+    } finally {
+      setStatusBusyId(null);
+    }
   }
 
   if (!canUse) return <Alert type="info" message="Bạn chưa được cấp quyền xem hồ sơ điều trị." />;
@@ -131,14 +168,15 @@ export default function DossierList({ patientId, visitId, sourceVisitVersion, br
               {activeId === item.id && selected?.id === item.id ? displayTime(selected.createdAt) : `Phiếu ${item.code}`}</span>
             <div className="treatment-sheet-card-actions">
               <Dropdown trigger={['click']} menu={{ items: [
-                { key: 'pending', label: 'Chưa xong', onClick: () => void changeStatus(item, false) },
-                { key: 'complete', label: 'Hoàn tất', onClick: () => void changeStatus(item, true) },
+                { key: 'pending', label: 'Chưa xong', disabled: item.state === 'Cancelled', onClick: () => void changeStatus(item, false) },
+                { key: 'complete', label: 'Hoàn tất', disabled: item.state === 'Cancelled', onClick: () => void changeStatus(item, true) },
+                { key: 'cancel', label: 'Hủy phiếu', disabled: item.state === 'Cancelled', onClick: () => void cancelDossier(item) },
               ] }}><button type="button"
-                className={`treatment-sheet-state ${item.state === 'Completed' ? 'is-complete' : 'is-pending'}`}
-                aria-label={`Trạng thái phiếu: ${item.state === 'Completed' ? 'Hoàn tất' : item.state === 'Stopped' ? 'Đã ngừng' : 'Chưa xong'}`}
+                className={`treatment-sheet-state ${item.state === 'Completed' ? 'is-complete' : item.state === 'Cancelled' ? 'is-cancelled' : 'is-pending'}`}
+                aria-label={`Trạng thái phiếu: ${item.state === 'Completed' ? 'Hoàn tất' : item.state === 'Cancelled' ? 'Hủy phiếu' : item.state === 'Stopped' ? 'Đã ngừng' : 'Chưa xong'}`}
                 aria-busy={statusBusyId === item.id} disabled={!has('treatment.dossiers.update') || statusBusyId === item.id}
                 title="Chọn trạng thái phiếu">
-                {item.state === 'Completed' ? 'Hoàn tất' : item.state === 'Stopped' ? 'Đã ngừng' : 'Chưa xong'} <span aria-hidden="true">⌄</span>
+                {item.state === 'Completed' ? 'Hoàn tất' : item.state === 'Cancelled' ? 'Hủy phiếu' : item.state === 'Stopped' ? 'Đã ngừng' : 'Chưa xong'} <span aria-hidden="true">⌄</span>
               </button></Dropdown>
               <Button disabled={!has('treatment.dossiers.delete')} aria-label={`Xóa phiếu ${item.code}`} onClick={() => {
                 setDeleteTarget(item); setDeleteError(null); deleteKey.current = crypto.randomUUID();
