@@ -26,7 +26,7 @@ body:has(.patient-treatment-shell) .workspace-content { width: 100%; max-width: 
 .patient-treatment-shell .patient-treatment-tabs .ant-tabs-tab { min-height: 54px; margin: 0 14px; padding: 13px 0 7px; font-size: 15px; font-weight: 400; color: #9b9b9b; }
 .patient-treatment-shell .patient-treatment-tabs .ant-tabs-tab-active .ant-tabs-tab-btn { color: #262c31; font-weight: 400; }
 .patient-treatment-shell .patient-treatment-tabs .ant-tabs-ink-bar { height: 2px; background: var(--sheet-blue); }
-.patient-treatment-shell .patient-treatment-tabs .ant-tabs-content-holder { padding: 24px 30px 56px; }
+.patient-treatment-shell .patient-treatment-tabs .ant-tabs-content-holder { padding: 12px 12px 24px; }
 .patient-treatment-toolbar { display: flex; align-items: center; gap: 4px; white-space: nowrap; min-width: 290px; }
 .patient-treatment-toolbar .ant-btn { border: 0; box-shadow: none; width: 31px; height: 44px; font-size: 27px; color: #071322; padding: 0; }
 .patient-treatment-toolbar .ant-typography { margin: 0; font-size: 18px; font-weight: 400; }
@@ -321,3 +321,5 @@ body:has(.patient-treatment-shell) .workspace-content { width: 100%; max-width: 
   .patient-list-table .ant-table-tbody > tr:last-child > td { border-bottom:0; }
   .patient-list-table .ant-table-placeholder > td { border-inline-end:0; }
 }
+.treatment-sheet-band > .treatment-sheet-band-title { display: flex; flex-wrap: nowrap; justify-content: flex-start; align-items: center; gap: 12px; }
+@media (max-width: 950px) { .treatment-sheet-band > .treatment-sheet-band-title { flex-wrap: wrap; } }

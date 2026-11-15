@@ -3,9 +3,10 @@ import FamilyMembersPage from '../features/family-members/FamilyMembersPage';
 import VisitPage from '../features/examinations/ExaminationPage';
 import { Alert, Button, Card, Result, Typography } from 'antd';
 import { useState, type ReactNode } from 'react';
-import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { Link, Navigate, Route, Routes } from 'react-router-dom';
 import { useAuth } from '../features/authentication/AuthContext';
 import SignInPage from '../features/authentication/SignInPage';
+import CommercialTreatmentPage from '../features/treatment/CommercialTreatmentPage';
 import SystemSettingsPage from '../features/system-settings/SystemSettingsPage';
 import MedicineManagementPage from '../features/system-settings/MedicineManagementPage';
 import LabWorkPage from '../features/lab-work/LabWorkPage';
@@ -54,10 +55,10 @@ export default function App() {
     <Route path="/customer/sign-in" element={<CustomerSignInPage />} />
     <Route path="/customer/register" element={<CustomerRegisterPage />} />
     <Route path="/customer/recover" element={<RecoverAccountPage customer />} />
-    <Route path="/customer/book" element={<CustomerGuard><CustomerBookingPage /></CustomerGuard>} />
     <Route path="/customer" element={<CustomerGuard><CustomerShell /></CustomerGuard>}>
       <Route index element={<Navigate to="/customer/home" replace />} />
       <Route path="home" element={<CustomerHomePage />} />
+      <Route path="book" element={<CustomerBookingPage />} />
       <Route path="family-members" element={<FamilyMembersPage />} />
       <Route path="verify-email" element={<Navigate to="/customer/home" replace />} />
       <Route path="patient-link" element={<CustomerPatientLinkPage />} />

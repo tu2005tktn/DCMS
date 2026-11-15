@@ -1,3 +1,4 @@
+import { ReloadOutlined } from '@ant-design/icons';
 import type { ColumnType } from 'antd/es/table';
 import { Alert, Button, Card, Input, Select, Space, Table, Tabs, Tag, Typography } from 'antd';
 import { useEffect, useState } from 'react';
@@ -51,11 +52,11 @@ export default function ReceptionPage() {
     onChange: (p: number, size: number) => { setPage(size === pageSize ? p : 1); setPageSize(size); } };
   function reset() { setPage(1); setStatus(undefined); }
   return <>
-    <Space wrap style={{ justifyContent: 'space-between', width: '100%' }}>
-      <Typography.Title level={2}>Tiếp nhận {date && (date === clinicDate ? 'hôm nay' : formatDate(date))}</Typography.Title>
-      <Space><Button onClick={() => setRevision(x => x + 1)}>Tải lại</Button>{has('appointments.create') && options?.canCheckIn && branchId &&
+    <div className="page-heading">
+      <Typography.Title level={2} style={{ margin: 0 }}>Tiếp nhận {date && (date === clinicDate ? 'hôm nay' : formatDate(date))}</Typography.Title>
+      <Space><Button icon={<ReloadOutlined />} onClick={() => setRevision(x => x + 1)}>Tải lại</Button>{has('appointments.create') && options?.canCheckIn && branchId &&
         <Button type="primary" onClick={() => setBooking({ branchId, date, dentistId, kind: 'WalkIn', source: 'InPerson' })}>Xếp lịch khách vãng lai</Button>}</Space>
-    </Space>
+    </div>
     <Card className="reception-panel"><Space wrap>
       {canPickBranch && (options?.calendar.branches.length ?? 0) > 1 && <Select aria-label="Chi nhánh tiếp nhận" placeholder="Chi nhánh" style={{ minWidth: 220 }} value={branchId}
         options={options?.calendar.branches.map(x => ({ value: x.id, label: x.name }))} onChange={value => { setBranch(value); setDentist(undefined); reset(); }} />}

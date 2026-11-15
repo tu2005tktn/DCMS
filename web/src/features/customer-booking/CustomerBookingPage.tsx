@@ -1,3 +1,4 @@
+import { ArrowLeftOutlined } from '@ant-design/icons';
 import { Alert, Button, Card, Empty, Input, Select, Spin, Steps } from 'antd';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -200,16 +201,13 @@ function BookingForm() {
     } finally { submittingRef.current = false; setSubmitting(false); }
   }
 
-  if (state.status === 'initializing') return <main className="customer-portal page"><Spin size="large" /></main>;
-  if (state.status === 'error') return <main className="customer-portal page"><Alert type="error" showIcon message={state.message}
-    action={<Button onClick={() => void reload()}>Thử lại</Button>} /></main>;
+  if (state.status === 'initializing') return <div className="page"><Spin size="large" /></div>;
+  if (state.status === 'error') return <div className="page"><Alert type="error" showIcon message={state.message}
+    action={<Button onClick={() => void reload()}>Thử lại</Button>} /></div>;
 
-  return <main className="customer-portal"><div className="customer-content customer-booking">
-    <div className="customer-booking-header"><Link to={state.status === 'authenticated' ? '/customer/home' : '/customer/sign-in'} className="customer-back">← Quay lại</Link>
-      <span className="customer-kicker">Đặt lịch trực tuyến</span><h1>Đặt lịch khám</h1>
-      <Alert type="info" showIcon message="Khám lần đầu hoặc đợt khám mới"
-        description="Dịch vụ cho lần khám này là Khám. Nếu đang tiếp tục một phác đồ điều trị, hãy liên hệ phòng khám để đặt buổi theo chỉ định của nha sĩ." />
-      <p>Chọn khung giờ phù hợp. Phòng khám sẽ xác nhận lịch ngay khi đặt thành công.</p></div>
+  return <div className="customer-booking">
+    <div className="customer-booking-header"><Link to={state.status === 'authenticated' ? '/customer/home' : '/customer/sign-in'} className="customer-back-button"><ArrowLeftOutlined aria-hidden="true" />Quay lại</Link>
+      <h1>Đặt lịch khám</h1></div>
     <div className="customer-booking-progress"><span>Bước {step + 1}/5</span><strong>{stepNames[step]}</strong></div>
     <progress className="customer-booking-progress-bar" max={stepNames.length} value={step + 1} aria-label="Tiến độ đặt lịch" />
     <Steps current={step} size="small" items={stepNames.map(title => ({ title }))} />
@@ -354,5 +352,5 @@ function BookingForm() {
         </div>
       </div>}
     </Card>}
-  </div></main>;
+  </div>;
 }

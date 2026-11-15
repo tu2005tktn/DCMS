@@ -1,4 +1,4 @@
-import { Alert, Button, Drawer, Empty, Spin } from 'antd';
+import { Alert, Button, Empty, Modal, Spin } from 'antd';
 import { useEffect, useState } from 'react';
 import { api } from '../../services/api';
 import BookingDrawer, { type BookingPrefill } from './BookingDrawer';
@@ -27,8 +27,8 @@ export default function ReplacementBooking({ source, onClose, onBooked }: {
     return () => { active = false; controller.abort(); };
   }, [source.id, revision]);
   if (data) return <BookingDrawer open prefill={data.prefill} options={data.options} replacement={source} onClose={onClose} onBooked={result => onBooked(`${result.notification.message} Mã lịch mới: ${result.code}`)} />;
-  return <Drawer open title="Đặt lịch thay thế" aria-label="Đặt lịch thay thế" width={640} styles={{ wrapper: { maxWidth: '100vw' } }} onClose={onClose}>
+  return <Modal open title="Đặt lịch thay thế" width={560} centered footer={null} onCancel={onClose}>
     {error ? <Alert type="error" message={error} action={<Button onClick={() => setRevision(value => value + 1)}>Thử lại</Button>} />
       : empty ? <Empty description="Khung giờ còn lại không đủ để đặt lịch thay thế. Bạn có thể đặt một lịch mới trên lịch chung." /> : <Spin />}
-  </Drawer>;
+  </Modal>;
 }

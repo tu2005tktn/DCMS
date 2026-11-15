@@ -154,3 +154,9 @@ Xuất Excel chứa SĐT của bệnh nhân, nên dùng cùng quyền đọc dan
 5. Excel có đúng các dòng theo bộ lọc. Chi nhánh khác: 403.
 6. Ghi nhận liên hệ tạo lịch sử, tăng phiên bản phiếu. Sửa với phiên bản cũ: 409 MSG111. Đã xong thì không sửa được.
 7. Bằng chứng tách riêng: API trên PostgreSQL thật (schema test riêng) và trình duyệt chạy với API thật. Không tính đạt chỉ từ mock.
+
+## Điều chỉnh bố cục (14/11/2026)
+
+Trang Chăm sóc khách hàng không còn dùng kiểu căn giữa toàn màn hình của lớp `.page` chung (gây khoảng trống lớn giữa tiêu đề, bộ lọc và bảng). Nay bố cục xếp dọc liền mạch: tiêu đề và nút "Tạo mới", thẻ bộ lọc, dòng "Tìm thấy n phiếu" kèm [Excel] / Tải lại, bảng dàn hết bề rộng.
+
+Thẻ bộ lọc không còn khung trắng và lề trong, các ô lọc dàn trực tiếp trên nền trang theo hết bề rộng để nội dung chiếm đủ màn hình.

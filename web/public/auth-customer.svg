@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 560" role="img" aria-label="Khách hàng mỉm cười">
+  <defs>
+    <path id="tooth" d="M31.9 10.8C24.6 6.6 14.7 7.5 10.7 15.2c-4.2 8.1-.8 17.1 2.5 25.5 2.5 6.4 5.8 14.5 10.2 14.5 4.6 0 4.1-13.5 8.6-13.5s4 13.5 8.6 13.5c4.4 0 7.7-8.1 10.2-14.5 3.3-8.4 6.7-17.4 2.5-25.5-4-7.7-13.9-8.6-21.2-4.4"/>
+    <linearGradient id="shirt" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fde68a"/><stop offset="1" stop-color="#fbbf24"/></linearGradient>
+  </defs>
+  <circle cx="250" cy="290" r="215" fill="#fff" fill-opacity=".10"/>
+  <circle cx="250" cy="290" r="165" fill="#fff" fill-opacity=".08"/>
+  <use href="#tooth" transform="translate(36 100) scale(1.1)" fill="#fff" fill-opacity=".22"/>
+  <use href="#tooth" transform="translate(430 140) scale(.7) rotate(14 32 32)" fill="#fff" fill-opacity=".2"/>
+  <!-- back hair -->
+  <path d="M170 250 C160 150 340 150 330 250 C340 330 345 380 330 400 L170 400 C155 380 160 330 170 250 Z" fill="#3b2a24"/>
+  <!-- raised arm + phone -->
+  <path d="M395 560 C440 500 450 450 438 410" stroke="url(#shirt)" stroke-width="62" stroke-linecap="round" fill="none"/>
+  <circle cx="436" cy="398" r="24" fill="#f3c9a5"/>
+  <g transform="rotate(-8 440 330)">
+    <rect x="404" y="258" width="74" height="132" rx="14" fill="#0f2f6b"/>
+    <rect x="410" y="270" width="62" height="108" rx="8" fill="#fff"/>
+    <rect x="410" y="270" width="62" height="24" rx="8" fill="#175cd3"/>
+    <path d="M426 330l10 10 18-22" stroke="#12b3a6" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    <rect x="418" y="352" width="46" height="6" rx="3" fill="#dbe6f7"/>
+  </g>
+  <!-- body -->
+  <path d="M50 560 C50 450 110 405 190 388 L310 388 C390 405 450 450 450 560 Z" fill="url(#shirt)"/>
+  <path d="M205 388 L250 440 L295 388 Z" fill="#fff"/>
+  <path d="M205 388 L250 440 L295 388" stroke="#e5b53a" stroke-width="3" fill="none"/>
+  <!-- neck + head -->
+  <rect x="226" y="346" width="48" height="52" rx="22" fill="#e9b996"/>
+  <ellipse cx="182" cy="280" rx="10" ry="16" fill="#f1c4a3"/>
+  <ellipse cx="318" cy="280" rx="10" ry="16" fill="#f1c4a3"/>
+  <ellipse cx="250" cy="274" rx="68" ry="78" fill="#f6cfae"/>
+  <!-- hair front -->
+  <path d="M180 270 C172 170 332 160 322 268 C310 228 262 214 232 196 C226 226 196 246 180 270 Z" fill="#3b2a24"/>
+  <!-- face -->
+  <path d="M214 262 q12 -13 24 0M262 262 q12 -13 24 0" stroke="#1d2939" stroke-width="5" stroke-linecap="round" fill="none"/>
+  <circle cx="206" cy="298" r="12" fill="#f9a8a0" fill-opacity=".55"/><circle cx="294" cy="298" r="12" fill="#f9a8a0" fill-opacity=".55"/>
+  <path d="M216 294 Q250 350 284 294 Q250 306 216 294 Z" fill="#fff" stroke="#c0504d" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M232 303 Q250 308 268 303" stroke="#e2e8f0" stroke-width="3" fill="none"/>
+</svg>

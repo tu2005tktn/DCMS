@@ -1,3 +1,10 @@
+.staff-brand-wrap { order: 0; }
+.staff-sidebar-toggle.ant-btn { order: 1; display: flex; align-items: center; gap: 12px; width: calc(100% - 24px); margin: 0 12px 6px; height: 40px; padding: 0 14px; color: #c2d3e4; border-radius: 7px; justify-content: flex-start; }
+.staff-sidebar-toggle.ant-btn:hover { color: #fff !important; background: #1e3c57 !important; }
+.staff-sidebar-toggle .anticon { font-size: 18px; }
+.staff-navigation { order: 2; }
+.staff-account-link { order: 3; }
+@media(max-width:991px) { .staff-sidebar-toggle.ant-btn { display: none; } }
 .staff-workspace.ant-layout { display: block; min-height: 100vh; background: #f4f7fb; color: #17233d; }
 .staff-sidebar { position: fixed; inset: 0 auto 0 0; width: 258px; background: #102a43; display: flex; flex-direction: column; z-index: 25; overflow-y: auto; }
 .staff-main.ant-layout { margin-left: 258px; min-height: 100vh; min-width: 0; background: #f4f7fb; }
@@ -26,8 +33,9 @@
 .staff-user-label strong { overflow-wrap: anywhere; }
 .staff-user-label .ant-typography { font-size: 12px; }
 .staff-user .ant-btn { min-height: 40px; margin-left: 6px; }
-.staff-content.workspace-content { width: 100%; max-width: 1680px; padding: 30px 28px; min-width: 0; }
-.staff-content > h2.ant-typography, .staff-content .page-heading h2 { margin-top: 0; color: #17233d; font-size: 28px; letter-spacing: -.6px; }
+.staff-content.workspace-content { width: 100%; max-width: none; padding: 12px 12px 16px; min-width: 0; }
+.staff-content > h2.ant-typography, .staff-content .page-heading h2 { margin-top: 0; color: #17233d; font-size: 22px; letter-spacing: -.4px; margin-bottom: 8px; }
+.staff-content .page-heading { margin-bottom: 12px; }
 .staff-content .ant-card { border-color: #e4eaf2; box-shadow: none; }
 .staff-content .ant-table-thead > tr > th { background: #f4f7fb; color: #4b5d76; font-size: 12px; font-weight: 600; }
 .staff-content .ant-table-tbody > tr > td { border-bottom-color: #edf0f5; }
@@ -67,7 +75,7 @@
 @media(max-width:1100px) {
   .staff-sidebar { width: 232px; }
   .staff-main.ant-layout { margin-left: 232px; }
-  .staff-content.workspace-content { padding: 24px 20px; }
+  .staff-content.workspace-content { padding: 12px; }
   .staff-header.ant-layout-header { padding: 12px 20px; }
   .staff-user-label { max-width: 150px; }
 }
@@ -77,10 +85,10 @@
   .staff-sidebar .staff-brand-wrap { padding: 20px 13px; }
   .staff-sidebar .staff-brand > span { display: none; }
   .staff-sidebar .staff-navigation .ant-menu-item-group-title { display: none; }
-  .staff-sidebar .staff-navigation .ant-menu-item { width: 48px; margin: 6px 8px; padding: 0 !important; text-align: center; position: relative; }
-  .staff-sidebar .ant-menu-title-content { margin: 0 !important; }
+  .staff-sidebar .staff-navigation .ant-menu-item { width: 48px; margin: 6px 8px; padding: 0 !important; text-align: center; position: relative; display: flex; align-items: center; justify-content: center; }
+  .staff-sidebar .ant-menu-title-content { margin: 0 !important; position: absolute; inset: 0; width: auto; }
   .staff-sidebar .ant-menu-title-content a { font-size: 0; position: absolute; inset: 0; display: block; }
-  .staff-sidebar .ant-menu-item-icon { pointer-events: none; }
+  .staff-sidebar .ant-menu-item-icon { pointer-events: none; margin: 0 !important; }
   .staff-sidebar .staff-account-link { font-size: 0; gap: 0; justify-content: center; padding: 16px 0; }
   .staff-sidebar .staff-account-link .anticon { font-size: 18px; }
   .staff-menu-toggle.ant-btn { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; }
@@ -108,6 +116,22 @@ body:has(.patient-treatment-shell) .staff-header { display: flex; }
   .staff-main.ant-layout { margin-left: 0 !important; background: #fff; }
   .staff-content.workspace-content { padding: 0; max-width: none; }
 }
+@media(min-width:992px) {
+  .staff-sidebar, .staff-main.ant-layout { transition: width .18s ease, margin-left .18s ease; }
+  .is-collapsed .staff-sidebar { width: 64px; }
+  .is-collapsed .staff-main.ant-layout { margin-left: 64px; }
+  .is-collapsed .staff-sidebar .staff-brand-wrap { padding: 20px 13px; }
+  .is-collapsed .staff-sidebar .staff-brand > span { display: none; }
+  .is-collapsed .staff-sidebar .staff-navigation .ant-menu-item-group-title { display: none; }
+  .is-collapsed .staff-sidebar .staff-navigation .ant-menu-item { width: 48px; margin: 6px 8px; padding: 0 !important; text-align: center; position: relative; display: flex; align-items: center; justify-content: center; }
+  .is-collapsed .staff-sidebar .ant-menu-item-icon { margin: 0 !important; }
+  .is-collapsed .staff-sidebar-toggle.ant-btn { width: 48px; margin: 0 8px 6px; padding: 0; justify-content: center; }
+  .is-collapsed .staff-sidebar .ant-menu-title-content { margin: 0 !important; position: absolute; inset: 0; width: auto; }
+  .is-collapsed .staff-sidebar .ant-menu-title-content a { font-size: 0; position: absolute; inset: 0; display: block; }
+  .is-collapsed .staff-sidebar .ant-menu-item-icon { pointer-events: none; }
+  .is-collapsed .staff-sidebar .staff-account-link { font-size: 0; gap: 0; justify-content: center; padding: 16px 0; }
+  .is-collapsed .staff-sidebar .staff-account-link .anticon { font-size: 18px; }
+}
 @media(prefers-reduced-motion:reduce) { .staff-workspace *, .staff-mobile-navigation * { transition: none !important; animation: none !important; } }
 
 /* Kiểu bảng dùng chung: viền đậm, chữ đậm (08/11/2026) — xem docs/specs/TABLE-STYLE.md */
@@ -120,3 +144,9 @@ body:has(.patient-treatment-shell) .staff-header { display: flex; }
 .staff-content .ant-table-wrapper .ant-table-placeholder > td { border-inline-end: 0; font-weight: 400; }
 
 .staff-content .ant-table-wrapper .ant-table-thead > tr > th::before { display: none; }
+
+/* Đường kẻ dọc giữa các cột rõ hơn (14/11/2026); chỉ ở dạng bảng, không áp cho dạng thẻ trên màn hình hẹp */
+@media screen and (min-width: 1001px) {
+  .staff-content .ant-table-wrapper .ant-table .ant-table-thead > tr > th:not(:last-child),
+  .staff-content .ant-table-wrapper .ant-table .ant-table-tbody > tr:not(.ant-table-placeholder) > td:not(:last-child) { border-inline-end: 1px solid #98a2b3 !important; }
+}

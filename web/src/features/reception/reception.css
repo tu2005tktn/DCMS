@@ -16,3 +16,6 @@
   .reception-table td.ant-table-cell:last-child { border-bottom: 0 !important; }
   .reception-table td.ant-table-cell::before { content: attr(data-label); color: #475467; font-weight: 700; }
 }
+.staff-content .reception-panel.ant-card { background: transparent; border: 0; }
+.staff-content .reception-panel.ant-card > .ant-card-body { padding: 0; }
+.reception-panel .ant-tabs { margin-top: 8px; }

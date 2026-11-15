@@ -59,7 +59,7 @@ async function fillRow(page: Page) {
 }
 test('tạo tên trước, CRUD hàng và tên; xóa xác nhận; không autosave', async ({ page }) => {
   const calls = await mock(page); await page.goto('/treatment-templates');
-  await page.getByRole('button', { name: 'Tạo kế hoạch', exact: true }).click(); const modal = page.getByRole('dialog');
+  await page.getByRole('button', { name: 'Tạo kế hoạch', exact: true }).click(); const modal = page.getByRole('dialog', { name: 'Tạo kế hoạch điều trị' });
   await modal.getByLabel('Tên kế hoạch', { exact: true }).fill('Kế hoạch mới'); expect(calls).toHaveLength(0);
   await modal.getByRole('button', { name: 'Lưu', exact: true }).click(); await expect(modal).not.toBeVisible();
   await expect(page.getByText('Chưa có hạng mục. Bấm Thêm hạng mục để nhập.')).toBeVisible();
@@ -73,7 +73,7 @@ test('tạo tên trước, CRUD hàng và tên; xóa xác nhận; không autosav
   const edit = page.getByRole('row', { name: 'Sửa hạng mục' }); await expect(edit.getByLabel('Chi phí', { exact: true })).toHaveValue('600000');
   await edit.getByLabel('Ghi chú', { exact: true }).fill('Đã sửa'); await edit.getByRole('button', { name: 'Đồng ý', exact: true }).click();
   await expect(page.locator('.item-plan-table')).toContainText('Đã sửa');
-  await page.getByRole('button', { name: 'Sửa tên', exact: true }).click(); await modal.getByLabel('Tên kế hoạch', { exact: true }).fill('Đổi tên'); await modal.getByRole('button', { name: 'Lưu', exact: true }).click();
+  await page.getByRole('button', { name: 'Sửa tên', exact: true }).click(); const rename = page.getByRole('dialog', { name: 'Sửa tên kế hoạch' }); await rename.getByLabel('Tên kế hoạch', { exact: true }).fill('Đổi tên'); await rename.getByRole('button', { name: 'Lưu', exact: true }).click();
   await page.locator('.item-plan-table').getByRole('button', { name: 'Xóa', exact: true }).click(); await page.getByRole('button', { name: 'Không đồng ý', exact: true }).click(); await expect(page.locator('.item-plan-table')).toContainText('Đã sửa');
   await page.locator('.item-plan-table').getByRole('button', { name: 'Xóa', exact: true }).click(); await page.getByRole('button', { name: 'Đồng ý', exact: true }).click(); await expect(page.getByText('Chưa có hạng mục. Bấm Thêm hạng mục để nhập.')).toBeVisible();
   await page.getByRole('button', { name: 'Xóa kế hoạch', exact: true }).click(); await page.getByRole('button', { name: 'Đồng ý', exact: true }).click(); await expect(page.getByText('Chưa có kế hoạch điều trị.', { exact: true })).toBeVisible();

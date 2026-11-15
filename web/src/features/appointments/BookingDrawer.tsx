@@ -1,4 +1,4 @@
-import { Alert, Button, Descriptions, Drawer, Form, Input, InputNumber, Radio, Select, Space, Spin, Tag, Tooltip, Typography } from 'antd';
+import { Alert, Button, Descriptions, Form, Input, InputNumber, Modal, Radio, Select, Space, Spin, Tag, Tooltip, Typography } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { api, ApiError } from '../../services/api';
 import { useAuth } from '../authentication/AuthContext';
@@ -167,9 +167,9 @@ export default function BookingDrawer({ open, prefill, options, followUp, replac
   const dentistName = slot ? dentistLabel(slot.dentistId) : branchDentists.find(x => x.id === values?.dentistId)?.name;
   const chairName = (id: number) => branchChairs.find(x => x.id === id)?.name ?? `Ghế ${id}`;
 
-  return <Drawer open={open} onClose={() => { if (!busy) onClose(); }} width={640} styles={{ wrapper: { maxWidth: '100vw' } }} destroyOnClose
+  return <Modal open={open} onCancel={() => { if (!busy) onClose(); }} width={760} centered maskClosable={false} destroyOnClose styles={{ body: { maxHeight: '70vh', overflowY: 'auto', paddingRight: 4 } }}
     title={replacement ? 'Đặt lịch thay thế' : 'Đặt lịch tại quầy (S11)'} aria-label={replacement ? 'Đặt lịch thay thế' : 'Đặt lịch tại quầy (S11)'}
-    extra={<Space><Button onClick={onClose} disabled={busy}>Hủy</Button>
+    footer={<Space><Button onClick={onClose} disabled={busy}>Hủy</Button>
       {reviewing ? <Button type="primary" loading={busy} onClick={() => void confirm()}>Xác nhận đặt lịch</Button>
         : <Button type="primary" disabled={!slot} onClick={() => void review()}>Xem lại</Button>}</Space>}>
     {replacement && <Alert className="form-alert" type="info" showIcon message={`Lịch ${replacement.code}: khách không tới. Nhập thông tin khách mới; thời gian phải kết thúc trước ${formatClock(replacement.endAt)}.`} />}
@@ -179,14 +179,14 @@ export default function BookingDrawer({ open, prefill, options, followUp, replac
         : error.code === 'MSG127' ? 'Chỉ định đã gắn với lịch hẹn khác — tải lại danh sách chỉ định trong S24.'
         : error.code === 'MSG06' ? 'Phiên bản không còn quyền với chỉ định hoặc bệnh nhân này — dữ liệu được giữ nguyên.'
         : undefined} />}
-    <Form<Values> form={form} layout="vertical" disabled={reviewing || busy} style={{ display: reviewing ? 'none' : undefined }}>      <div className="patient-form-grid">
+    <Form<Values> className="booking-form" form={form} layout="vertical"disabled={reviewing || busy} style={{ display: reviewing ? 'none' : undefined }}>      <div className="patient-form-grid">
         {followUp ? <div><Typography.Text type="secondary">Loại lịch</Typography.Text>
           <div><Tag color="purple">{kindLabels.FollowUp}</Tag> <Typography.Text type="secondary">
             Theo chỉ định {followUp.instructionId.slice(0, 8)} · v{followUp.version}</Typography.Text></div></div>
           : <Form.Item name="kind" label="Loại lịch"><Radio.Group disabled={!!replacement} optionType="button" options={[
             { value: 'Standard', label: kindLabels.Standard }, { value: 'WalkIn', label: kindLabels.WalkIn },
             { value: 'FollowUp', label: <Tooltip title="Chỉ mở từ chỉ định quay lại S24">{kindLabels.FollowUp}</Tooltip>, disabled: !followUp }]} /></Form.Item>}
-        <Form.Item name="source" label="Nguồn" extra="Chỉ ghi nhận nguồn, không kết nối kênh.">
+        <Form.Item name="source" label="Nguồn">
           <Select disabled={!!replacement} options={Object.entries(sourceLabels).map(([value, label]) => ({ value, label }))} />
         </Form.Item>
       </div>
@@ -240,7 +240,7 @@ export default function BookingDrawer({ open, prefill, options, followUp, replac
         </Form.Item>
         {followUp ? <div><Typography.Text type="secondary">Thời lượng</Typography.Text>
           <div>{followUp.durationMinutes} phút (khóa theo chỉ định)</div></div>
-          : <Form.Item name="duration" label="Thời lượng (phút)" extra="1–480 phút. Mặc định theo dịch vụ; có thể điều chỉnh cho ca này." rules={[{ required: true, message: 'Vui lòng nhập Thời lượng.' },
+          : <Form.Item name="duration" label="Thời lượng (phút)" rules={[{ required: true, message: 'Vui lòng nhập Thời lượng.' },
             { validator: (_, v?: number) => !v || (Number.isInteger(v) && v >= 1 && v <= 480) ? Promise.resolve() : Promise.reject(new Error('Thời lượng không đúng định dạng.')) }]}>
             <InputNumber min={1} max={480} precision={0} step={1} style={{ width: '100%' }} />
           </Form.Item>}
@@ -259,7 +259,7 @@ export default function BookingDrawer({ open, prefill, options, followUp, replac
         : <div className="booking-slots">{shownSlots.map(s => {
           const selected = slot?.start === s.start && slot.chairId === s.chairId;
           return <Button key={`${s.start}-${s.chairId}`} type={selected ? 'primary' : 'default'} onClick={() => setSlot(s)}>
-            {formatClock(s.start)}{anyDentist && <Typography.Text type={selected ? undefined : 'secondary'} style={{ marginLeft: 6, color: selected ? '#fff' : undefined }}>{dentistLabel(s.dentistId)}</Typography.Text>}{values?.chairId ? '' : <Typography.Text type={selected ? undefined : 'secondary'} style={{ marginLeft: 6, color: selected ? '#fff' : undefined }}>{chairName(s.chairId)}</Typography.Text>}</Button>;
+            {formatClock(s.start)}{anyDentist && <Typography.Text type={selected ? undefined : 'secondary'} style={{ marginLeft: 6, color: selected ? '#fff' : undefined }}>{dentistLabel(s.dentistId)}</Typography.Text>}{values?.chairId ? null : <Typography.Text type={selected ? undefined : 'secondary'} style={{ marginLeft: 6, color: selected ? '#fff' : undefined }}>{chairName(s.chairId)}</Typography.Text>}</Button>;
         })}</div>}
       {slot && <Typography.Paragraph className="patient-section">Đã chọn {formatClock(slot.start)}–{formatClock(slot.end)} · {dentistLabel(slot.dentistId)} · {chairName(slot.chairId)} · kết thúc dự kiến {clock(localMinute(slot.end))}</Typography.Paragraph>}
       {needsException && <Form.Item name="exceptionReason" label="Lý do ngoại lệ (bắt đầu trong vòng 60 phút)" rules={[{ max: 500, message: 'Lý do ngoại lệ không được vượt quá 500 ký tự.' }]}>
@@ -281,5 +281,5 @@ export default function BookingDrawer({ open, prefill, options, followUp, replac
       ]} />
       <Button className="patient-section" disabled={busy} onClick={() => setReviewing(false)}>Sửa thông tin</Button>
     </>}
-  </Drawer>;
+  </Modal>;
 }

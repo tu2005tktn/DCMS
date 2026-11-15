@@ -224,3 +224,9 @@
     flex-direction: column;
   }
 }
+
+/* Nhóm nút ở đầu trang Khám: liên kết hiển thị như nút, cùng cỡ với nút "Tải lại phiên bản" */
+.examination-heading > .ant-space { gap: 8px !important; }
+.examination-heading > .ant-space a { display: inline-flex; align-items: center; height: 32px; padding: 0 15px; border: 1px solid #d0d5dd; border-radius: 10px; background: #fff; color: #1d2939; text-decoration: none; }
+.examination-heading > .ant-space a:hover, .examination-heading > .ant-space a:focus-visible { border-color: #175cd3; color: #175cd3; }
+.examination-heading .ant-typography { margin-bottom: 0; }
