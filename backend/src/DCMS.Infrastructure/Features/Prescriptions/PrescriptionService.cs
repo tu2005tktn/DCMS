@@ -691,7 +691,6 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
         if (c.Description?.Trim().Length > 1000) throw Fail("MSG04", field: "description", label: "Mô tả");
         if (c.Lines is not { Length: > 0 }) throw Fail("MSG02", field: "lines", label: "Danh sách thuốc");
         if (c.Lines.Length > PrescriptionRules.MaxTemplateLines) throw Fail("MSG04", field: "lines", label: "Danh sách thuốc");
-        var values = c.Lines.Select(l => Validate(l.Route, l.MorningDose, l.NoonDose, l.AfternoonDose, l.EveningDose, l.MealTiming, l.Days, l.Quantity, l.Instructions)).ToArray();
         var hash = Hash(new { op = "template.save", id, c });
 
         await using var tx = await BeginAsync(ct);
@@ -726,6 +725,13 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
         var medicineIds = c.Lines.Select(l => l.MedicineId).Distinct().ToArray();
         var medicines = await db.Set<CatalogMedicine>().AsNoTracking()
             .Where(m => medicineIds.Contains(m.Id) && m.IsActive && m.PrescriptionEligible).ToDictionaryAsync(m => m.Id, ct);
+        var values = c.Lines.Select((line, index) =>
+        {
+            if (!medicines.TryGetValue(line.MedicineId, out var medicine))
+                throw Fail("MSG113", 404, $"lines[{index}].medicineId");
+            return Validate(line.Route, line.MorningDose, line.NoonDose, line.AfternoonDose,
+                line.EveningDose, line.MealTiming, line.Days, line.Quantity, line.Instructions, medicine.BaseUnit);
+        }).ToArray();
         for (var i = 0; i < c.Lines.Length; i++)
         {
             var input = c.Lines[i];

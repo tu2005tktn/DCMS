@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import { router } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import { useSession } from '@/features/auth/session/useSession';
@@ -39,6 +39,7 @@ export function PushNotificationsProvider() {
     if (Platform.OS !== 'android' || !accessToken) return;
     let cancelled = false;
     let pendingToken: string | null = null;
+    let permissionRequested = false;
     const syncToken = async (nativeToken: string) => {
       if (cancelled || !nativeToken || pendingToken === nativeToken) return;
       if (registeredToken === nativeToken && registeredAccessToken === accessToken) return;
@@ -63,23 +64,30 @@ export function PushNotificationsProvider() {
         importance: Notifications.AndroidImportance.HIGH,
       });
       const current = await Notifications.getPermissionsAsync();
-      const permission = current.granted ? current : await Notifications.requestPermissionsAsync();
+      const mayAsk = !permissionRequested;
+      permissionRequested = true;
+      const permission = current.granted || !mayAsk ? current : await Notifications.requestPermissionsAsync();
       if (!permission.granted || cancelled) return;
       const nativeToken = (await Notifications.getDevicePushTokenAsync()).data;
       if (typeof nativeToken !== 'string' || cancelled) return;
       await syncToken(nativeToken);
     };
-    void register().catch(() => undefined);
+    const retry = () => { void register().catch(() => undefined); };
+    retry();
+    // Mạng có thể chưa sẵn sàng lúc đăng nhập. Đăng ký lại khi app trở về nền trước
+    // và thử định kỳ để token FCM không bị bỏ lỡ cho cả phiên đăng nhập.
+    const appState = AppState.addEventListener('change', state => { if (state === 'active') retry(); });
+    const timer = setInterval(retry, 60_000);
     const tokenListener = Notifications.addPushTokenListener(token => {
       if (typeof token.data === 'string') void syncToken(token.data).catch(() => undefined);
     });
-    return () => { cancelled = true; tokenListener.remove(); };
+    return () => { cancelled = true; tokenListener.remove(); appState.remove(); clearInterval(timer); };
   }, [accessToken]);
 
   useEffect(() => {
     if (Platform.OS !== 'android' || !accessToken) return;
     const open = () => {
-      router.push('/notifications');
+      router.push('/(home)/notifications');
       void Notifications.clearLastNotificationResponseAsync();
     };
     const listener = Notifications.addNotificationResponseReceivedListener(open);

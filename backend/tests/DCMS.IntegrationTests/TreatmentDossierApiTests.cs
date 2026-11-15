@@ -386,6 +386,130 @@ public sealed class TreatmentDossierApiTests(ApiFixture fixture) : IClassFixture
     }
 
     [Fact]
+    public async Task OwnerCashPaymentMovesFullyPaidServiceOutOfOutstandingList()
+    {
+        var setup = await Prepare();
+        using var dentist = await Login("dentist.demo");
+        var createdResponse = await dentist.PostAsJsonAsync($"/api/patients/{setup.PatientId}/dossiers",
+            new CreateDossierRequest(setup.BranchId, setup.DentistId, "SYNTHETIC payment tabs", null,
+                null, Guid.NewGuid()));
+        Assert.Equal(HttpStatusCode.Created, createdResponse.StatusCode);
+        var dossierId = (await createdResponse.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier.Id;
+        Guid activityId, labOrderId;
+        using (var scope = fixture.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
+            var activity = new ClinicalActivity
+            {
+                DossierId = dossierId, PatientId = setup.PatientId, BranchId = setup.BranchId,
+                ServiceId = setup.ServiceId, ServiceNameSnapshot = "SYNTHETIC paid service",
+                Unit = "lần", Quantity = 1, PriceSnapshotVnd = 120000,
+                PerformerId = setup.DentistId, PerformedAt = DateTimeOffset.UtcNow,
+                CreatedAt = DateTimeOffset.UtcNow, State = "Posted"
+            };
+            db.ClinicalActivities.Add(activity);
+            await db.SaveChangesAsync();
+            activityId = activity.Id;
+            var labOrder = new LabOrder { ActivityId = activity.Id, DossierId = dossierId,
+                PatientId = setup.PatientId, BranchId = setup.BranchId, DentistId = setup.DentistId,
+                WorkName = "SYNTHETIC lab", OrderedOn = DateOnly.FromDateTime(DateTime.UtcNow),
+                TotalFeeVnd = 80000, PaidVnd = 10000, CreatedAt = DateTimeOffset.UtcNow,
+                UpdatedAt = DateTimeOffset.UtcNow, CreatedBy = setup.DentistId, UpdatedBy = setup.DentistId };
+            db.LabOrders.Add(labOrder);
+            await db.SaveChangesAsync(); labOrderId = labOrder.Id;
+        }
+        using var owner = await Login("owner.demo");
+        var before = await owner.GetFromJsonAsync<DCMS.Api.Features.Finance.TreatmentPaymentContext>(
+            $"/api/dossiers/{dossierId}/payments/context");
+        Assert.Equal(120000, Assert.Single(before!.Lines).DueVnd);
+        Assert.Equal(24000, Assert.Single(before.LabFees).Minimum30PercentVnd);
+        Assert.Equal(24000, Assert.Single(before.LabFees).PriorityRemainingVnd);
+        Assert.Equal(200000, before.TotalCostVnd);
+        var key = Guid.NewGuid();
+        var request = new DCMS.Api.Features.Finance.RecordTreatmentCashPayment(key,
+            DateOnly.FromDateTime(DateTime.UtcNow), [new(activityId, 120000)], [new(labOrderId, 24000)]);
+        var response = await owner.PostAsJsonAsync($"/api/dossiers/{dossierId}/payments", request);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var after = (await response.Content.ReadFromJsonAsync<DCMS.Api.Features.Finance.TreatmentPaymentContext>())!;
+        Assert.Equal(0, Assert.Single(after.Lines).DueVnd);
+        Assert.Equal(120000, Assert.Single(after.Lines).PaidVnd);
+        Assert.Equal(24000, Assert.Single(after.LabFees).PaidVnd);
+        Assert.Equal(56000, Assert.Single(after.LabFees).DueVnd);
+        Assert.Equal(0, Assert.Single(after.LabFees).PriorityRemainingVnd);
+        Assert.Equal(HttpStatusCode.OK,
+            (await owner.PostAsJsonAsync($"/api/dossiers/{dossierId}/payments", request)).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict,
+            (await owner.PostAsJsonAsync($"/api/dossiers/{dossierId}/payments", request with
+            { RequestKey = Guid.NewGuid() })).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await dentist.GetAsync($"/api/dossiers/{dossierId}/payments/context")).StatusCode);
+        var advance = new DCMS.Api.Features.Finance.CreateTreatmentPayOsOrder(Guid.NewGuid(), null, 75000, null);
+        var advanceResponse = await owner.PostAsJsonAsync($"/api/dossiers/{dossierId}/payments/advances", advance);
+        Assert.Equal(HttpStatusCode.OK, advanceResponse.StatusCode);
+        var afterAdvance = await owner.GetFromJsonAsync<DCMS.Api.Features.Finance.TreatmentPaymentContext>(
+            $"/api/dossiers/{dossierId}/payments/context");
+        Assert.Equal(75000, afterAdvance!.AdvanceReceivedVnd);
+        Assert.Equal(24000, Assert.Single(afterAdvance.LabFees).PaidVnd);
+        Assert.Equal(0, Assert.Single(afterAdvance.Lines).DueVnd);
+        var statistics = await owner.GetFromJsonAsync<DCMS.Api.Features.Finance.FinanceStatisticsResult>(
+            $"/api/finance/statistics?branchId={setup.BranchId}");
+        Assert.Equal(120000, statistics!.ActualReceivedVnd);
+        Assert.Equal(75000, statistics.AdvanceReceivedVnd);
+        Assert.Equal(HttpStatusCode.OK,
+            (await owner.PostAsJsonAsync($"/api/dossiers/{dossierId}/payments/advances", advance)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await dentist.PostAsJsonAsync($"/api/dossiers/{dossierId}/payments/advances", advance with
+            { RequestKey = Guid.NewGuid() })).StatusCode);
+    }
+
+    [Fact]
+    public async Task LabMinimumBlocksOtherServiceUntilAdvanceCoversIt()
+    {
+        var setup = await Prepare();
+        using var dentist = await Login("dentist.demo");
+        var created = await dentist.PostAsJsonAsync($"/api/patients/{setup.PatientId}/dossiers",
+            new CreateDossierRequest(setup.BranchId, setup.DentistId, "SYNTHETIC lab priority", null, null, Guid.NewGuid()));
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var dossierId = (await created.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier.Id;
+        Guid otherId;
+        using (var scope = fixture.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
+            var labActivity = new ClinicalActivity { DossierId = dossierId, PatientId = setup.PatientId,
+                BranchId = setup.BranchId, ServiceId = setup.ServiceId, ServiceNameSnapshot = "SYNTHETIC lab service",
+                Unit = "lần", Quantity = 1, PriceSnapshotVnd = 100000, PerformerId = setup.DentistId,
+                PerformedAt = DateTimeOffset.UtcNow, CreatedAt = DateTimeOffset.UtcNow, State = "Posted" };
+            var other = new ClinicalActivity { DossierId = dossierId, PatientId = setup.PatientId,
+                BranchId = setup.BranchId, ServiceId = setup.ServiceId, ServiceNameSnapshot = "SYNTHETIC other service",
+                Unit = "lần", Quantity = 1, PriceSnapshotVnd = 100000, PerformerId = setup.DentistId,
+                PerformedAt = DateTimeOffset.UtcNow, CreatedAt = DateTimeOffset.UtcNow, State = "Posted" };
+            db.ClinicalActivities.AddRange(labActivity, other);
+            await db.SaveChangesAsync(); otherId = other.Id;
+            db.LabOrders.Add(new LabOrder { ActivityId = labActivity.Id, DossierId = dossierId,
+                PatientId = setup.PatientId, BranchId = setup.BranchId, DentistId = setup.DentistId,
+                WorkName = "SYNTHETIC lab", OrderedOn = DateOnly.FromDateTime(DateTime.UtcNow),
+                TotalFeeVnd = 100000, PaidVnd = 0, CreatedAt = DateTimeOffset.UtcNow,
+                UpdatedAt = DateTimeOffset.UtcNow, CreatedBy = setup.DentistId, UpdatedBy = setup.DentistId });
+            await db.SaveChangesAsync();
+        }
+        using var owner = await Login("owner.demo");
+        var payment = new DCMS.Api.Features.Finance.RecordTreatmentCashPayment(Guid.NewGuid(),
+            DateOnly.FromDateTime(DateTime.UtcNow), [new(otherId, 50000)], null);
+        Assert.Equal(HttpStatusCode.Conflict,
+            (await owner.PostAsJsonAsync($"/api/dossiers/{dossierId}/payments", payment)).StatusCode);
+        var deposit = new DCMS.Api.Features.Finance.CreateTreatmentPayOsOrder(Guid.NewGuid(), null, 30000, null);
+        Assert.Equal(HttpStatusCode.OK,
+            (await owner.PostAsJsonAsync($"/api/dossiers/{dossierId}/payments/advances", deposit)).StatusCode);
+        var afterDeposit = await owner.GetFromJsonAsync<DCMS.Api.Features.Finance.TreatmentPaymentContext>(
+            $"/api/dossiers/{dossierId}/payments/context");
+        Assert.Equal(30000, Assert.Single(afterDeposit!.LabFees).PaidVnd);
+        Assert.Equal(0, afterDeposit.AdvanceReceivedVnd);
+        Assert.Equal(0, Assert.Single(afterDeposit.LabFees).PriorityRemainingVnd);
+        Assert.Equal(HttpStatusCode.OK,
+            (await owner.PostAsJsonAsync($"/api/dossiers/{dossierId}/payments", payment)).StatusCode);
+    }
+
+    [Fact]
     public async Task OwnSummaryExposesOnlyCommittedPlanForVerifiedSelfLink()
     {
         var setup = await Prepare();
@@ -444,10 +568,50 @@ public sealed class TreatmentDossierApiTests(ApiFixture fixture) : IClassFixture
             Assert.Empty(Assert.Single(beforePost!, x => x.DossierId == created.Id).PerformedItems);
             activity.State = "Posted";
             await db.SaveChangesAsync();
+            var paymentId = Guid.NewGuid();
+            var archivedPayment = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                table = "TREATMENT_DOSSIER_PAYMENT", rowCount = 1,
+                rows = new[] { new { Id = paymentId, DossierId = created.Id, PatientId = setup.PatientId,
+                    PaidOn = DateOnly.FromDateTime(DateTime.UtcNow), Method = "Cash", TotalVnd = 50000L } }
+            });
+            await db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO \"AUDIT_LOG\" (\"StorageId\", \"AuditType\", \"Target\", \"PayloadJson\", \"At\") VALUES ({Guid.NewGuid()}, 'FinanceLegacyArchive', 'TREATMENT_DOSSIER_PAYMENT', {archivedPayment}::jsonb, {DateTimeOffset.UtcNow})");
+            var paymentLines = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                table = "TREATMENT_DOSSIER_PAYMENT_LINE", rowCount = 1,
+                rows = new[] { new { PaymentId = paymentId, ActivityId = activity.Id, AmountVnd = 50000L } }
+            });
+            await db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO \"AUDIT_LOG\" (\"StorageId\", \"AuditType\", \"Target\", \"PayloadJson\", \"At\") VALUES ({Guid.NewGuid()}, 'FinanceLegacyArchive', 'TREATMENT_DOSSIER_PAYMENT_LINE', {paymentLines}::jsonb, {DateTimeOffset.UtcNow})");
+            var advanceReceipts = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                table = "PAYMENT_RECEIPT", rowCount = 2,
+                rows = new[] {
+                    new { Id = Guid.NewGuid(), DossierId = created.Id, PatientId = setup.PatientId, BranchId = setup.BranchId,
+                        State = "Posted", Purpose = "Advance", Method = "Cash", AmountVnd = 100000L,
+                        CreatedAt = DateTimeOffset.UtcNow, ConfirmedAt = DateTimeOffset.UtcNow },
+                    new { Id = Guid.NewGuid(), DossierId = created.Id, PatientId = setup.PatientId, BranchId = setup.BranchId,
+                        State = "Pending", Purpose = "Advance", Method = "BankTransfer", AmountVnd = 900000L,
+                        CreatedAt = DateTimeOffset.UtcNow, ConfirmedAt = DateTimeOffset.UtcNow }
+                }
+            });
+            await db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO \"AUDIT_LOG\" (\"StorageId\", \"AuditType\", \"Target\", \"PayloadJson\", \"At\") VALUES ({Guid.NewGuid()}, 'FinanceLegacyArchive', 'PAYMENT_RECEIPT', {advanceReceipts}::jsonb, {DateTimeOffset.UtcNow})");
         }
         var afterPost = await publicClient.GetFromJsonAsync<OwnTreatmentSummaryItem[]>("/api/patients/me/treatment-summary");
         Assert.Equal("SYNTHETIC service performed", Assert.Single(Assert.Single(afterPost!, x => x.DossierId == created.Id).PerformedItems).ServiceName);
-        // Finance is removed: the summary keeps the payments field but returns no payments.
-        Assert.Empty(Assert.Single(afterPost!, x => x.DossierId == created.Id).Payments);
+        var recordedPayments = Assert.Single(afterPost!, x => x.DossierId == created.Id).Payments;
+        Assert.Equal(2, recordedPayments.Count);
+        Assert.Contains(recordedPayments, x => x.TotalVnd == 50000 && x.Source == "DossierPayment");
+        using var owner = await Login("owner.demo");
+        var ownerProfile = await owner.GetFromJsonAsync<CurrentUser>("/api/auth/me");
+        Assert.Contains("ClinicOwner", ownerProfile!.EffectiveRoles);
+        var statisticsResponse = await owner.GetAsync("/api/finance/statistics");
+        Assert.True(statisticsResponse.IsSuccessStatusCode, await statisticsResponse.Content.ReadAsStringAsync());
+        var statistics = (await statisticsResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>());
+        Assert.Equal(50000, statistics.GetProperty("actualReceivedVnd").GetInt64());
+        Assert.Equal(100000, statistics.GetProperty("advanceReceivedVnd").GetInt64());
+        Assert.Equal(HttpStatusCode.Forbidden, (await dentist.GetAsync("/api/finance/statistics")).StatusCode);
+        var otherBranch = await owner.GetFromJsonAsync<System.Text.Json.JsonElement>("/api/finance/statistics?branchId=9999");
+        Assert.Equal(0, otherBranch.GetProperty("actualReceivedVnd").GetInt64());
+        Assert.Equal(0, otherBranch.GetProperty("advanceReceivedVnd").GetInt64());
     }
 }

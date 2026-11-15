@@ -1,5 +1,4 @@
 import { Alert, Button, Card, Form, Input, Modal, Result, Select, Space, Table, Typography, Breadcrumb, Segmented } from 'antd';
-import CommercialTreatmentPage from '../treatment/CommercialTreatmentPage';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { api } from '../../services/api';
@@ -68,11 +67,6 @@ export default function SystemSettingsPage() {
     // 2. diagnoses
     ...(has('catalog.diagnoses.read') || has('settings.read')
       ? [{ key: 'diagnoses', label: '2. Chẩn đoán / Tên bệnh', children: <ReferenceCatalogPanel initialKind="diagnoses" /> }]
-      : []),
-
-    // 12. treatment-services (moved from the Chuyên môn menu)
-    ...(has('treatment.prices.read') || has('treatment.commercial.read')
-      ? [{ key: 'treatment-services', label: '12. Dịch vụ điều trị', children: <CommercialTreatmentPage /> }]
       : []),
 
     // 4. material-suppliers
@@ -150,7 +144,7 @@ export default function SystemSettingsPage() {
   const plain = (label: string) => label.replace(/^\d+\.\s*/, '');
   const groups = [
     { name: 'Phòng khám', keys: ['general', 'branches', 'customer-groups'] },
-    { name: 'Danh mục', keys: ['diagnoses', 'services', 'treatment-services', 'medicines'] },
+    { name: 'Danh mục', keys: ['diagnoses', 'services', 'medicines'] },
     { name: 'Vật liệu và labo', keys: ['material-suppliers', 'materials', 'lab-providers', 'lab-work-types'] },
     { name: 'Bảo mật', keys: ['access-groups'] },
   ].map(g => ({ ...g, items: g.keys.map(k => tabs.find(t => t.key === k)).filter((t): t is (typeof tabs)[number] => !!t) })).filter(g => g.items.length > 0);

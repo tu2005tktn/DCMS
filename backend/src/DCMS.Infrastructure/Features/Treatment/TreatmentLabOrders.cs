@@ -25,7 +25,7 @@ public sealed partial class TreatmentDossierService
     {
         await DossierAsync(actorId, dossierId, ct);
         return await db.LabOrders.AsNoTracking().Where(x => x.DossierId == dossierId)
-            .Select(x => new LabOrderSummary(x.ActivityId, x.WorkName, x.DueOn, x.DeliveredOn)).ToListAsync(ct);
+            .Select(x => new LabOrderSummary(x.ActivityId, x.WorkName, x.TotalFeeVnd, x.DueOn, x.DeliveredOn)).ToListAsync(ct);
     }
 
     private async Task<ClinicalActivity> LabActivityAsync(Guid dossierId, Guid activityId, CancellationToken ct) =>
@@ -86,7 +86,11 @@ public sealed partial class TreatmentDossierService
             order.StatusLogs.Add(new LabOrderStatusLog { LabOrderId = order.Id, ToStatus = LabOrderStatus.NotSent, ChangedAt = now, ChangedBy = actorId });
         }
         else if (r.ExpectedVersion != order.Version) throw Error("MSG111", 409);
-        else order.Version++;
+        else
+        {
+            if (r.TotalFeeVnd < await PatientPaidLabAsync(order.Id, ct)) throw Error("MSG111", 409);
+            order.Version++;
+        }
         order.Code = code; order.OrderedOn = r.OrderedOn; order.DueOn = r.DueOn; order.DeliveredOn = r.DeliveredOn; order.DentistId = r.DentistId;
         order.LabProviderId = r.LabProviderId; order.LabWorkTypeId = r.LabWorkTypeId; order.WorkName = work;
         order.MarginOuter = Clean(r.MarginOuter); order.MarginInner = Clean(r.MarginInner); order.MarginSide = Clean(r.MarginSide);
@@ -103,8 +107,20 @@ public sealed partial class TreatmentDossierService
         await access.RequireAsync(actorId, "treatment.lab.manage", ct);
         await DossierAsync(actorId, dossierId, ct);
         var order = await db.LabOrders.AsNoTracking().SingleOrDefaultAsync(x => x.ActivityId == activityId && x.DossierId == dossierId, ct) ?? throw Error("MSG113", 404);
+        if (await PatientPaidLabAsync(order.Id, ct) > 0) throw Error("MSG111", 409);
         // EF cannot delete a tracked row whose JSONB status history has entries, so delete directly and keep the stamp check.
         if (await db.LabOrders.Where(x => x.Id == order.Id && x.StorageStamp == order.StorageStamp).ExecuteDeleteAsync(ct) == 0)
             throw Error("MSG111", 409);
     }
+
+    private async Task<long> PatientPaidLabAsync(Guid labOrderId, CancellationToken ct) =>
+        await db.Database.SqlQuery<long>($"""
+            SELECT COALESCE(sum((item.row->>'amountVnd')::bigint), 0)::bigint AS "Value"
+            FROM "AUDIT_LOG" ledger
+            CROSS JOIN LATERAL jsonb_array_elements(
+                COALESCE(ledger."PayloadJson"->'labPriority', '[]'::jsonb)
+                || COALESCE(ledger."PayloadJson"->'labLines', '[]'::jsonb)) item(row)
+            WHERE ledger."AuditType" = 'FinanceLedger'
+              AND item.row->>'labOrderId' = {labOrderId.ToString()}
+            """).SingleAsync(ct);
 }

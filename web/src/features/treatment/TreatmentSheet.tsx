@@ -1,4 +1,5 @@
 import { usePermissions } from '../authentication/usePermissions';
+import { useAuth } from '../authentication/AuthContext';
 import { Alert, Button, Dropdown, Input, Modal, Pagination, Skeleton, Tooltip } from 'antd';
 import { ExperimentOutlined, ToolOutlined } from '@ant-design/icons';
 import { useEffect, useRef, useState } from 'react';
@@ -11,6 +12,7 @@ import TreatmentSheetDraftRow, { type SheetActualPreview } from './TreatmentShee
 import ApplyItemPlanModal from './ApplyItemPlanModal';
 import LabOrderModal, { type LabOrderSummary } from './LabOrderModal';
 import MaterialNotePicker, { mergeMaterialUses, type MaterialUse } from './MaterialNotePicker';
+import DossierPaymentModal from './DossierPaymentModal';
 import type { ActivityPage, SheetActivity, SheetContext } from './sheetTypes';
 
 type Draft = { id: string; kind: 'Plan' | 'Actual'; row: SheetActualPreview; version: number };
@@ -24,6 +26,8 @@ export default function TreatmentSheet({ patientId, dossierId, dossierVersion, o
   onUnsavedChange?: (dirty: boolean) => void; onLoaded: (v: TreatmentDossier | null) => void; onPlanTotalChange?: (id: string, total: number) => void;
 }) {
   const has = usePermissions();
+  const { user } = useAuth();
+  const [paymentOpen, setPaymentOpen] = useState(false);
   const [dossier, setDossier] = useState<TreatmentDossier | null>(null), [context, setContext] = useState<SheetContext | null>(null);
   const [drafts, setDrafts] = useState<Draft[]>([]), [activities, setActivities] = useState<ActivityPage | null>(null);
   const [error, setError] = useState<string>(), [activityError, setActivityError] = useState<string>();
@@ -264,7 +268,7 @@ export default function TreatmentSheet({ patientId, dossierId, dossierVersion, o
               disabled={!has('treatment.actuals.update') || !canWrite || busy || !!editor} onClick={() => setMaterialFor(a)} /></Tooltip></div></td>
           <td>{member(a.performerId)}<small>{member(a.assistantId)}</small></td><td><div className="treatment-sheet-lab-cell"><span>{(() => { const lab = labOrders.find(o => o.activityId === a.id); return lab ? <>{lab.workName}{lab.dueOn && <small>Hẹn {date(lab.dueOn)}</small>}</> : a.labWorkSnapshot || '—'; })()}</span>
             <Tooltip title="Phiếu labo"><Button className="lab-order-trigger" type="text" size="small" icon={<ExperimentOutlined />} aria-label={`Phiếu labo cho ${a.serviceNameSnapshot ?? 'điều trị'}`}
-              disabled={!has('treatment.read') || busy || !!editor} onClick={() => setLabFor(a)} /></Tooltip></div></td><td>{money(Math.round(a.quantity*a.priceSnapshotVnd))}<small>{fees[a.feeStatus] ?? a.feeStatus}</small></td><td>{money(a.discountSnapshotVnd ?? 0)}</td>
+              disabled={!has('treatment.read') || busy || !!editor} onClick={() => setLabFor(a)} /></Tooltip></div></td><td>{money(Math.round(a.quantity*a.priceSnapshotVnd))}<small>{fees[a.feeStatus] ?? a.feeStatus}</small>{labOrders.find(o => o.activityId === a.id && o.totalFeeVnd > 0) && <small>Phí labo: {money(labOrders.find(o => o.activityId === a.id)!.totalFeeVnd)}</small>}</td><td>{money(a.discountSnapshotVnd ?? 0)}</td>
           <td><div className="treatment-sheet-edit-actions"><Button size="small" title="Sửa" aria-label={`Sửa quá trình ${a.serviceNameSnapshot ?? 'điều trị'}`} disabled={!has('treatment.actuals.update') || !canWrite || busy || !!editor} onClick={() => editActivity(a)}>✎</Button>
             <Button size="small" title="Xóa" aria-label={`Xóa quá trình ${a.serviceNameSnapshot ?? 'điều trị'}`} disabled={!has('treatment.actuals.delete') || !canWrite || busy || !!editor} onClick={() => { setError(undefined); setDeletingActivity(a); }}>×</Button></div></td></tr>)}
         {activities?.total === 0 && <tr><td colSpan={9}>Phiếu chưa có việc điều trị.</td></tr>}
@@ -272,6 +276,7 @@ export default function TreatmentSheet({ patientId, dossierId, dossierVersion, o
         {drafts.filter(d => d.kind === 'Actual' && d.id !== editor?.row?.id).map(d => <tr key={d.id}><td>{d.row.date || '—'}</td><td>{d.row.regions?.join(', ')}</td><td>{d.row.serviceName}<small>Nháp</small></td><td>{d.row.note}</td><td>{member(d.row.dentistId)}</td><td>{d.row.labWork}</td><td>{money(d.row.costVnd)}</td><td>—</td><td><Button size="small" disabled={!has('treatment.actuals.create')} onClick={() => setEditor({kind:'actual',row:d.row})}>Sửa nháp</Button></td></tr>)}
         {rowEditor('actual')}
       </tbody></table></div><Button className="treatment-sheet-create" aria-label="Thêm quá trình điều trị" disabled={!has('treatment.actuals.create') || !canWrite || !!editor || busy} onClick={() => setEditor({kind:'actual'})}>+ Thêm việc đã làm</Button>
+      {user?.effectiveRoles.includes('ClinicOwner') && <Button type="primary" style={{ marginLeft: 12 }} onClick={() => setPaymentOpen(true)}>Trả tiền</Button>}
       {(activities?.total ?? 0) > 20 && <Pagination current={page} total={activities?.total} pageSize={20} onChange={setPage} />}</section>
     <section className="treatment-sheet-images"><h3 className="treatment-sheet-section-title">HÌNH ẢNH</h3>{has('documents.read') && <PatientImageGallery patientId={patientId} dossierId={dossierId} canUpload={has('documents.upload')} />}</section>
     <section className="treatment-sheet-notes"><h3 className="treatment-sheet-minor-heading">GHI CHÚ</h3><Input.TextArea aria-label="Ghi chú hồ sơ" value={note} maxLength={4000} disabled={!has('treatment.dossiers.update') || !canWrite || noteBusy}
@@ -279,6 +284,7 @@ export default function TreatmentSheet({ patientId, dossierId, dossierVersion, o
     <Modal open={!!deleting} title="Bạn có muốn xóa dòng này không?" okText="Đồng ý" cancelText="Không đồng ý" confirmLoading={busy}
       closable={!busy} cancelButtonProps={{ disabled: busy }} onCancel={() => setDeleting(null)} onOk={() => { if (deleting) void act(deleting,'delete').then(ok => { if (ok) setDeleting(null); }); }}>
       <p>{deleting?.serviceName}</p>{error && <Alert type="error" message={error} />}</Modal>
+    <DossierPaymentModal dossierId={dossierId} open={paymentOpen} onClose={() => setPaymentOpen(false)} onSaved={refresh} />
     {materialFor && <MaterialNotePicker note={materialFor.outcome ?? ''} onCancel={() => { materialKey.current = null; setMaterialFor(null); }}
       onApply={(value, uses) => saveMaterials(materialFor, value, uses)} />}
     {labFor && <LabOrderModal dossierId={dossierId} activityId={labFor.id} serviceName={labFor.serviceNameSnapshot ?? 'điều trị'} canEdit={has('treatment.lab.manage') && canWrite}
