@@ -14,18 +14,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace DCMS.Infrastructure.Features.Treatment;
 
-public sealed class UnavailableClinicalVisitPort : IClinicalVisitPort
-{
-    public Task<ClinicalVisitState> GetAsync(Guid visitId, CancellationToken ct) =>
-        Task.FromResult(new ClinicalVisitState(false, false, 0, 0, 0));
-}
-
-public sealed class UnavailableClinicalConsentPort : IClinicalConsentPort
-{
-    public Task<bool> ValidAsync(int patientId, Guid? itemId, Guid? stepId, int? planVersion,
-        int serviceId, CancellationToken ct) => Task.FromResult(false);
-}
-
 public sealed class ClinicalActualEvidencePort(DcmsDbContext db) : ITreatmentActualEvidencePort
 {
     public async Task<bool> HasDentistConfirmedActualAsync(int patientId, Guid dossierId, Guid stepId,

@@ -222,13 +222,3 @@ public sealed class AppointmentService(DcmsDbContext db, IAvailabilityService av
         appointment.Id, appointment.Code, appointment.Version, appointment.Status,
         appointment.StartAt, appointment.EndAt, SystemMessages.Get(message));
 }
-
-// A missing TV4 module must not silently create a booking that claims a follow-up was booked.
-public sealed class UnavailableFollowUpBookingPort : IFollowUpBookingPort
-{
-    public Task ValidateAsync(Guid followUpId, int patientId, int branchId, int dentistId, int durationMinutes,
-        DateTimeOffset startAt, CancellationToken ct, bool allowItemDurationOverride = false) =>
-        throw new BusinessException(503, SystemMessages.Get("MSG144"));
-    public Task MarkBookedAsync(Guid followUpId, Guid appointmentId, CancellationToken ct) =>
-        throw new BusinessException(503, SystemMessages.Get("MSG144"));
-}

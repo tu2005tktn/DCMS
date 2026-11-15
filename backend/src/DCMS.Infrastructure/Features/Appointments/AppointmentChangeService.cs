@@ -238,12 +238,3 @@ public sealed class AppointmentChangeService(DcmsDbContext db, IAvailabilityServ
         return result;
     }
 }
-
-public sealed class UnavailableFollowUpAppointmentChangePort : IFollowUpAppointmentChangePort
-{
-    public Task ValidateRescheduleAsync(Guid followUpId, Guid appointmentId, int dentistId,
-        DateTimeOffset startAt, CancellationToken ct) =>
-        throw new BusinessException(503, SystemMessages.Get("MSG144"));
-    public Task MarkNeedsBookingAsync(Guid followUpId, Guid appointmentId, CancellationToken ct) =>
-        throw new BusinessException(503, SystemMessages.Get("MSG144"));
-}

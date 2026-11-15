@@ -23,10 +23,6 @@ export type StepDefinition = {
 };
 export type TemplateVersion = { number: number; state: 'Draft' | 'Active' | 'Retired';
   steps: StepDefinition[]; createdAt: string; activatedAt: string | null; retiredAt: string | null };
-export type TreatmentTemplate = { id: string; branchId: number; name: string; version: number;
-  versions: TemplateVersion[] };
-export type TemplateListItem = { id: string; branchId: number; name: string; version: number;
-  activeVersion: number | null; createdAt: string };
 export type PlanStep = { id: string; itemId: string; name: string; region: string | null;
   planVersion: number; estimatedMinMinutes: number | null; estimatedMaxMinutes: number | null;
   estimatedMinutes: number; reservedMinutes: number; predecessorIds: string[];

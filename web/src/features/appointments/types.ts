@@ -46,7 +46,6 @@ export const localMinute = (iso: string) => { const d = new Date(Date.parse(iso)
 export const clock = (minute: number) => `${pad(Math.floor(minute / 60) % 24)}:${pad(minute % 60)}`;
 export const formatClock = (iso: string) => clock(localMinute(iso));
 export const formatDate = (date: string) => date.split('-').reverse().join('/');
-export const toInstant = (date: string, minute: number) => new Date(Date.parse(`${date}T00:00:00Z`) - OFFSET + minute * 60_000).toISOString();
 const weekdays = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
 export const weekday = (date: string) => weekdays[new Date(`${date}T00:00:00Z`).getUTCDay()];
 

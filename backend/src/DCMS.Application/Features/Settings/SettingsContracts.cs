@@ -19,15 +19,6 @@ public sealed record GeneralSettings(int StaffIdleTimeoutMinutes, RequiredPatien
 {
     public static GeneralSettings Default => new(20, new(), new(), new());
 }
-public sealed record GeneralDto(int Version, DateTimeOffset? EffectiveAt, GeneralSettings Settings);
-[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
-public sealed record GeneralCommand(int ExpectedVersion, Guid RequestKey, string Reason, GeneralSettings Settings);
-[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
-public sealed record RestoreSettings(int SourceVersion, int ExpectedVersion, Guid RequestKey, string Reason);
-[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
-public sealed record ReferenceValue(string Name, string? Code = null, string? Description = null);
-[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
-public sealed record ReferenceCommand(Guid RequestKey, ReferenceValue Entry, int ExpectedVersion = 0, string? Reason = null);
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record StateCommand(int ExpectedVersion, Guid RequestKey, bool Active, string Reason);
 public sealed record ReferenceDto(Guid Id, string Kind, string Name, string? Code, string? Description, bool Active,

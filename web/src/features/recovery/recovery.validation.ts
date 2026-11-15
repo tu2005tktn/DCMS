@@ -60,15 +60,3 @@ export function passwordHints(policy: RecoveryPolicy): string[] {
   return hints;
 }
 
-/** Maps a policy code returned alongside MSG109 to the specific rule that failed. */
-export function policyViolations(policy: RecoveryPolicy, password: string): string[] {
-  const violations: string[] = [];
-  if (password.length < policy.requiredLength)
-    violations.push(`Cần tối thiểu ${policy.requiredLength} ký tự.`);
-  if (policy.requireDigit && !/\d/.test(password)) violations.push('Cần có chữ số.');
-  if (policy.requireLowercase && !/[a-z]/.test(password)) violations.push('Cần có chữ thường.');
-  if (policy.requireUppercase && !/[A-Z]/.test(password)) violations.push('Cần có chữ in hoa.');
-  if (policy.requireNonAlphanumeric && !/[^A-Za-z0-9]/.test(password))
-    violations.push('Cần có ký tự đặc biệt.');
-  return violations;
-}

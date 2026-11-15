@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace DCMS.Infrastructure.Features.SystemSettings;
 
-public sealed class SystemCatalogService(DcmsDbContext db, UserManager<ApplicationUser> users, TimeProvider clock, DCMS.Application.Features.Settings.ISettingsAccess access) : ISystemCatalogService
+public sealed class SystemCatalogService(DcmsDbContext db, TimeProvider clock, DCMS.Application.Features.Settings.ISettingsAccess access) : ISystemCatalogService
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     private static BusinessException Error(string code, int status = 400, string? field = null) => new(status, SystemMessages.Get(code) with { Field = field });

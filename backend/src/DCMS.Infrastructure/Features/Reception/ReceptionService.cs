@@ -19,12 +19,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace DCMS.Infrastructure.Features.Reception;
 
-public sealed class UnavailableReceptionSourceReader : IReceptionSourceReader
-{
-    public Task<IReadOnlyList<ReceptionCourse>> CoursesAsync(int branchId, int patientId, CancellationToken ct) => Task.FromResult<IReadOnlyList<ReceptionCourse>>([]);
-    public Task<VisitSource> ResolveAsync(int branchId, int patientId, Guid priorCourseId, CancellationToken ct) => throw new BusinessException(503, SystemMessages.Get("MSG144"));
-}
-
 public sealed class ReceptionService(DcmsDbContext db, UserManager<ApplicationUser> users,
     IAppointmentQueryService appointments, IAvailabilityService availability, IReceptionSourceReader sources,
     TimeProvider clock, DCMS.Application.Features.Settings.ISettingsAccess settingsAccess) : IReceptionService

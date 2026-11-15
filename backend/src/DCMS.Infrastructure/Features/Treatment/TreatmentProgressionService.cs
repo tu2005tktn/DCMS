@@ -693,14 +693,6 @@ public sealed class TreatmentProgressionService(DcmsDbContext db, UserManager<Ap
     }
 }
 
-public sealed class UnavailableTreatmentActualEvidencePort : ITreatmentActualEvidencePort
-{
-    public Task<bool> HasDentistConfirmedActualAsync(int patientId, Guid dossierId, Guid stepId,
-        IReadOnlyList<Guid> evidenceIds, CancellationToken ct) => Task.FromResult(false);
-    public Task<bool> HasFollowUpFulfillmentAsync(int patientId, Guid instructionId, CancellationToken ct) =>
-        Task.FromResult(false);
-}
-
 public sealed class UnavailableTreatmentLabReadinessPort : ITreatmentLabReadinessPort
 {
     public Task<LabReadinessResult> CheckAsync(int patientId, Guid stepId, string specification,
