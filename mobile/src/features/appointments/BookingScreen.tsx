@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,6 +14,9 @@ import { notificationRepoPersist } from './notification.repo.persist';
 import { appointmentRepo } from './appointment.repo';
 import { addMockBooking } from './appointments.mock';
 import type { AvailabilitySlot, BookingOptions, BookingResult } from './booking.types';
+import FamilyMemberPicker from '@/features/family-members/FamilyMemberPicker';
+import { familyApi } from '@/features/family-members/family-members.api';
+import { displayDate, type FamilyMember } from '@/features/family-members/family-members.types';
 
 type Relation = 'Self' | 'Relative';
 type FieldName = 'bookerName' | 'contact' | 'attendeeName';
@@ -48,6 +51,24 @@ export default function BookingScreen() {
   const [result, setResult] = useState<BookingResult | null>(null);
   const prefilledAccount = useRef<number | null>(null);
   const account = state.status === 'authenticated' ? state.user : null;
+  // Signed-in patients book a relative only from their saved family members (docs/specs/MOBILE-FAMILY-MEMBERS.vi.md).
+  const familyToken = account?.accountType === 'Public' ? token ?? null : null;
+  const [member, setMember] = useState<FamilyMember | null>(null);
+  const [memberNotice, setMemberNotice] = useState<string | null>(null);
+  const { familyMemberId } = useLocalSearchParams<{ familyMemberId?: string }>();
+  const usesFamilyMember = relation === 'Relative' && !!familyToken;
+  function chooseMember(value: FamilyMember) {
+    setMember(value); setAttendeeName(value.fullName); setMemberNotice(null);
+  }
+  // Deep link from a family member: read the member again from the API before selecting it.
+  useEffect(() => {
+    if (!familyMemberId || !familyToken) return;
+    let live = true;
+    familyApi.get(familyToken, familyMemberId)
+      .then(value => { if (live) { setRelation('Relative'); chooseMember(value); } })
+      .catch(() => { if (live) { setRelation('Relative'); setMember(null); setAttendeeName(''); setMemberNotice('Không tìm thấy người thân này trong danh sách của bạn. Vui lòng chọn lại.'); } });
+    return () => { live = false; };
+  }, [familyMemberId, familyToken]);
   useEffect(() => {
     if (!account || prefilledAccount.current === account.id) return;
     const changedAccount = prefilledAccount.current !== null;
@@ -110,8 +131,8 @@ export default function BookingScreen() {
       const value = await bookingApi.create({
         branchId, booker: { name: bookerName.trim(), phone: /^0\d{9}$/.test(contact.trim()) ? contact.trim() : null,
           email: /^0\d{9}$/.test(contact.trim()) ? null : contact.trim() },
-        attendee: { patientId: null, name: attendeeName.trim(), birthDate: null },
-        attendeeRelation: relation, kind: 'Standard', source: 'App', serviceId: service.id,
+        attendee: { patientId: null, name: usesFamilyMember && member ? member.fullName : attendeeName.trim(), birthDate: usesFamilyMember && member ? member.birthDate : null },
+        attendeeRelation: relation, ...(usesFamilyMember && member ? { familyMemberId: member.id } : {}), kind: 'Standard', source: 'App', serviceId: service.id,
         reason: reason.trim() || null, dentistId, assistantId: null, chairId: null,
         startAt: slot.start, durationMinutes: service.publicDurationMinutes, followUpId: null,
         exceptionReason: null, requestKey: key, scheduleVersion: slot.scheduleVersion,
@@ -194,9 +215,11 @@ export default function BookingScreen() {
         <Text style={styles.section}>Chọn lịch khám</Text>
         <Text style={styles.label}>Người khám</Text>
         <View style={styles.choices}>
-          <Choice label="Bản thân" selected={relation === 'Self'} onPress={() => { if (relation !== 'Self') { setRelation('Self'); if (account) setAttendeeName(account.fullName); } }} />
+          <Choice label="Bản thân" selected={relation === 'Self'} onPress={() => { if (relation !== 'Self') { setRelation('Self'); setMember(null); setMemberNotice(null); if (account) setAttendeeName(account.fullName); } }} />
           <Choice label="Người thân" selected={relation === 'Relative'} onPress={() => { if (relation !== 'Relative') { setRelation('Relative'); setAttendeeName(''); } }} />
         </View>
+        {memberNotice && <Text style={styles.error} accessibilityRole="alert">{memberNotice}</Text>}
+        {usesFamilyMember && familyToken && <FamilyMemberPicker token={familyToken} selected={member} onSelect={chooseMember} />}
         <Text style={styles.label}>Chi nhánh</Text>
         <View style={styles.choices}>{options?.branches.map(x => <Choice key={x.id} label={x.name} selected={branchId === x.id}
           onPress={() => { setBranchId(x.id); setDentistId(null); }} />)}</View>
@@ -216,14 +239,18 @@ export default function BookingScreen() {
         {!loadingSlots && branchId && dentistId && service && slots.length === 0 && <Text>Không có khung giờ phù hợp. Hãy chọn ngày hoặc bác sĩ khác.</Text>}
         <View style={styles.choices}>{slots.map(x => <Choice key={x.start} label={formatTime(x.start)} selected={slot?.start === x.start}
           onPress={() => chooseSlot(x)} />)}</View>
-        <PrimaryButton label="Tiếp tục" disabled={!slot} onPress={() => { setError(null); setStep(1); }} />
+        {usesFamilyMember && !member && <Text style={styles.muted}>Chọn người thân đi khám để tiếp tục.</Text>}
+        <PrimaryButton label="Tiếp tục" disabled={!slot || (usesFamilyMember && !member)} onPress={() => { setError(null); setStep(1); }} />
       </>}
       {step === 1 && <>
         <Text style={styles.section}>Thông tin người đặt và người khám</Text>
         <Text style={styles.muted}>Phòng khám sẽ dùng thông tin này để xác nhận lịch hẹn.</Text>
         <Field label="Họ tên người đặt" value={bookerName} onChangeText={setBookerName} error={fieldErrors.bookerName} />
         <Field label="Số điện thoại Việt Nam hoặc email" value={contact} onChangeText={setContact} error={fieldErrors.contact} />
-        <Field label="Họ tên người khám" value={attendeeName} onChangeText={setAttendeeName} error={fieldErrors.attendeeName} />
+        {usesFamilyMember && member ? <View style={styles.summary}>
+          <Summary label="Người khám (người thân)" value={member.fullName} /><Summary label="Ngày sinh" value={displayDate(member.birthDate)} />
+          <Text style={styles.muted}>Muốn đổi họ tên hoặc ngày sinh, hãy sửa người thân trong mục Người thân.</Text>
+        </View> : <Field label="Họ tên người khám" value={attendeeName} onChangeText={setAttendeeName} error={fieldErrors.attendeeName} />}
         {relation === 'Relative' && <Text>Đặt lịch cho người thân không cấp quyền xem hồ sơ bệnh án của họ.</Text>}
         <PrimaryButton label="Xem lại" onPress={() => { if (validateContact()) { setError(null); setStep(2); } }} />
         <Choice label="Quay lại chọn lịch" selected={false} onPress={() => setStep(0)} />
