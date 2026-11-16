@@ -1,6 +1,6 @@
-import { Alert, Button, Input, Select, Table, Tag, Typography } from 'antd';
+import { Alert, Button, Input, Select, Space, Table, Tag, Typography } from 'antd';
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import './workStatistics.css';
 import { api } from '../../services/api';
 import { clinicToday, formatDate, localDate } from '../appointments/types';
@@ -87,22 +87,30 @@ export default function WorkStatisticsPage() {
   const [period, setPeriod] = useState<Period>('all');
   const [page, setPage] = useState(1), [pageSize, setPageSize] = useState(20), [attempt, setAttempt] = useState(0);
   const [data, setData] = useState<Result>(), [loading, setLoading] = useState(true), [error, setError] = useState<string>();
+  // Opened from another screen for one dossier (?dossierId=...): show only that dossier, expanded, until the user leaves this view.
+  const [query, setQuery] = useSearchParams();
+  const focusId = query.get('dossierId') ?? undefined;
+  const focusPatientId = /^\d+$/.test(query.get('patientId') ?? '') ? query.get('patientId') : null;
+  const leaveFocus = () => { if (focusId) setQuery({}); };
   useEffect(() => { if (canPickBranch) api<{ branches: { id: number; name: string }[] }>('/api/appointments/options').then(o => setBranches(o.branches)).catch(() => setBranches([])); }, [canPickBranch]);
   useEffect(() => { const t = window.setTimeout(() => setSearch(q.trim()), 300); return () => window.clearTimeout(t); }, [q]);
-  useEffect(() => setPage(1), [from, to, branchId, search]);
+  useEffect(() => setPage(1), [from, to, branchId, search, focusId]);
   useEffect(() => {
     let current = true; setLoading(true); setError(undefined);
     const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
-    if (from) params.set('from', from); if (to) params.set('to', to); if (branchId) params.set('branchId', String(branchId)); if (search) params.set('q', search);
+    if (focusId) params.set('dossierId', focusId);
+    else { if (from) params.set('from', from); if (to) params.set('to', to); if (branchId) params.set('branchId', String(branchId)); if (search) params.set('q', search); }
     api<Result>(`/api/work-statistics?${params}`).then(r => { if (current) setData(r); })
       .catch((e: unknown) => { if (current) setError(e instanceof Error ? e.message : 'Không tải được thống kê.'); })
       .finally(() => { if (current) setLoading(false); });
     return () => { current = false; };
-  }, [from, to, branchId, search, page, pageSize, attempt]);
+  }, [from, to, branchId, search, page, pageSize, attempt, focusId]);
+  const focused = focusId ? data?.items.find(d => d.dossierId === focusId) : undefined;
+  useEffect(() => { if (focused) setOpen(focused.dossierId); }, [focused]);
   const totals = data?.totals;
   const toggle = (id: string) => setOpen(current => current === id ? undefined : id);
   function choose(kind: Period) {
-    setPeriod(kind);
+    leaveFocus(); setPeriod(kind);
     if (kind === 'all') { setFrom(''); setTo(''); } else if (kind !== 'custom') { const r = periodRange(kind); setFrom(r.from); setTo(r.to); }
   }
   return <div className="system-settings-page">
@@ -110,12 +118,12 @@ export default function WorkStatisticsPage() {
     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
       <Select aria-label="Thời gian" style={{ width: 150 }} value={period} onChange={choose} options={periods} />
       {period === 'custom' && <>
-        <Input type="date" aria-label="Từ ngày" value={from} max={to || undefined} onChange={e => { setFrom(e.target.value); }} style={{ width: 160 }} />
-        <Input type="date" aria-label="Đến ngày" value={to} min={from || undefined} onChange={e => { setTo(e.target.value); }} style={{ width: 160 }} />
+        <Input type="date" aria-label="Từ ngày" value={from} max={to || undefined} onChange={e => { leaveFocus(); setFrom(e.target.value); }} style={{ width: 160 }} />
+        <Input type="date" aria-label="Đến ngày" value={to} min={from || undefined} onChange={e => { leaveFocus(); setTo(e.target.value); }} style={{ width: 160 }} />
       </>}
-      {canPickBranch && branches.length > 1 && <Select allowClear aria-label="Chi nhánh" placeholder="Tất cả chi nhánh" style={{ minWidth: 200 }} value={branchId} onChange={setBranchId}
+      {canPickBranch && branches.length > 1 && <Select allowClear aria-label="Chi nhánh" placeholder="Tất cả chi nhánh" style={{ minWidth: 200 }} value={branchId} onChange={value => { leaveFocus(); setBranchId(value); }}
         options={branches.map(b => ({ value: b.id, label: b.name }))} />}
-      <Input.Search allowClear aria-label="Tìm công việc" placeholder="Tìm MSKH, khách hàng, dịch vụ" value={q} onChange={e => setQ(e.target.value)} style={{ maxWidth: 320 }} />
+      <Input.Search allowClear aria-label="Tìm công việc" placeholder="Tìm MSKH, khách hàng, dịch vụ" value={q} onChange={e => { leaveFocus(); setQ(e.target.value); }} style={{ maxWidth: 320 }} />
     </div>
     <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 8 }} aria-label="Tổng hợp">
       <span>{totals && <><strong>Tổng cộng:</strong> <span style={{ color: '#1677ff' }}>{vnd(totals.costVnd)}</span>
@@ -123,6 +131,10 @@ export default function WorkStatisticsPage() {
         {'  '}<strong>Còn lại:</strong> <span style={{ color: '#1677ff' }}>{vnd(totals.dueVnd)}</span></>}</span>
       <span style={{ color: '#667085' }}>{data && <>Tìm thấy {data.lineCount} công việc/dịch vụ.</>}</span>
     </div>
+    {focusId && <Alert type="info" showIcon style={{ marginBottom: 12 }} role="status"
+      message={focused ? `Đang xem phiếu ${focused.dossierCode}.` : loading || error ? 'Đang mở phiếu…' : 'Phiếu này chưa có dịch vụ đã thực hiện nên chưa có trong thống kê công việc.'}
+      action={<Space>{!focused && !loading && !error && focusPatientId && <Link to={`/patients/${focusPatientId}?tab=treatment&dossierId=${focusId}`}>Mở phiếu điều trị</Link>}
+        <Button size="small" onClick={leaveFocus}>Xem tất cả phiếu</Button></Space>} />}
     {error && <Alert type="error" showIcon style={{ marginBottom: 12 }} message={error} action={<Button size="small" onClick={() => setAttempt(a => a + 1)}>Thử lại</Button>} />}
     <Table<Dossier> rowKey="dossierId" size="small" className="work-stats-table" loading={loading} dataSource={data?.items ?? []}
       locale={{ emptyText: 'Chưa có công việc nào.' }}
@@ -135,7 +147,7 @@ export default function WorkStatisticsPage() {
       columns={[
         { title: 'Mã phiếu', dataIndex: 'dossierCode', width: 130 },
         { title: 'Ngày', key: 'date', width: 105, render: (_v, d) => formatDate(d.startedOn) },
-        { title: 'MSKH', dataIndex: 'patientCode', width: 110 },
+        { title: 'MSKH', dataIndex: 'patientCode', width: 140 },
         { title: 'Khách hàng', dataIndex: 'patientName' },
         { title: 'Bác sĩ', dataIndex: 'dentistName', width: 190 },
         { title: 'Chi phí', key: 'cost', width: 130, align: 'right', render: (_v, d) => vnd(d.costVnd) },

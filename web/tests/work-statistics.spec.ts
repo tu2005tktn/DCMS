@@ -17,6 +17,8 @@ async function prepare(page: Page) {
     if (path === '/api/work-statistics') {
       if (state.fail) { return route.fulfill({ status: 400, json: { code: 'MSG04', message: 'Không thể tải thử nghiệm.' } }); }
       state.queries.push(url.searchParams);
+      const wanted = url.searchParams.get('dossierId');
+      if (wanted && wanted !== dossier.dossierId) return ok({ items: [], lineCount: 0, total: 0, page: 1, pageSize: 20, totals: { costVnd: 0, paidVnd: 0, dueVnd: 0 } });
       return ok({ items: [dossier], lineCount: 2, total: 1, page: 1, pageSize: 20, totals: { costVnd: 350000, paidVnd: 100000, dueVnd: 250000 } });
     }
     return route.fulfill({ status: 404, json: { code: 'NOT_MOCKED', message: path } });
@@ -81,4 +83,29 @@ test('thống kê công việc/dịch vụ: lỗi thử lại, dòng thu gọn x
   await page.getByLabel('Từ ngày', { exact: true }).fill('2026-11-01');
   await page.getByLabel('Tìm công việc', { exact: true }).fill('Trám');
   await expect.poll(() => state.queries.some(q => q.get('from') === '2026-11-01' && q.get('q') === 'Trám')).toBe(true);
+});
+
+test('mở từ thống kê tài chính: chỉ một phiếu, tự xổ chi tiết, thoát về danh sách và báo khi phiếu chưa có dịch vụ', async ({ page }) => {
+  const state = await prepare(page); state.fail = false;
+  await page.goto('/work-statistics?dossierId=d-1&patientId=1');
+  // Only the requested dossier is asked for; the other filters are not sent.
+  await expect.poll(() => state.queries.at(-1)?.get('dossierId')).toBe('d-1');
+  expect(state.queries.at(-1)!.get('from')).toBeNull(); expect(state.queries.at(-1)!.get('q')).toBeNull();
+  await expect(page.getByRole('status')).toContainText('Đang xem phiếu HS-001.');
+  await expect(page.locator('tr.work-stats-row', { hasText: 'HS-001' })).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.getByLabel('Chi tiết phiếu HS-001', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Xem tất cả phiếu', exact: true }).click();
+  await expect(page).toHaveURL(/\/work-statistics$/);
+  await expect.poll(() => state.queries.at(-1)?.get('dossierId')).toBeNull();
+  await expect(page.getByRole('status')).toHaveCount(0);
+  // Changing a filter also leaves the single-dossier view.
+  await page.goto('/work-statistics?dossierId=d-1&patientId=1');
+  await expect(page.getByRole('status')).toContainText('Đang xem phiếu HS-001.');
+  await page.getByLabel('Tìm công việc', { exact: true }).fill('Trám');
+  await expect(page).toHaveURL(/\/work-statistics$/);
+  await expect.poll(() => { const q = state.queries.at(-1); return q?.get('q') === 'Trám' && q.get('dossierId') === null; }).toBe(true);
+  // A dossier without performed services is not in these statistics: say so and offer the dossier itself.
+  await page.goto('/work-statistics?dossierId=d-404&patientId=9');
+  await expect(page.getByRole('status')).toContainText('Phiếu này chưa có dịch vụ đã thực hiện nên chưa có trong thống kê công việc.');
+  await expect(page.getByRole('link', { name: 'Mở phiếu điều trị' })).toHaveAttribute('href', '/patients/9?tab=treatment&dossierId=d-404');
 });

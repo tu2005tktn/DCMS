@@ -16,7 +16,7 @@ public sealed class WorkStatisticsService(DcmsDbContext db, TimeProvider clock, 
     private sealed record Snapshot(Guid ActivityId, int SheetVersion, ActivityDto Activity);
     private static BusinessException Bad() => new(400, SystemMessages.Get("MSG04"));
 
-    public async Task<WorkStatisticsPage> ListAsync(int actorId, DateOnly? from, DateOnly? to, int? branchId, string? q, int page, int pageSize, CancellationToken ct)
+    public async Task<WorkStatisticsPage> ListAsync(int actorId, DateOnly? from, DateOnly? to, int? branchId, string? q, int page, int pageSize, CancellationToken ct, Guid? dossierId = null)
     {
         var scope = await access.RequireAsync(actorId, "finance.work-statistics.read", ct);
         if (branchId.HasValue && !scope.BranchIds.Contains(branchId.Value))
@@ -24,6 +24,8 @@ public sealed class WorkStatisticsService(DcmsDbContext db, TimeProvider clock, 
         if (pageSize is not (20 or 50 or 100) || page < 1 || page > int.MaxValue / pageSize || q?.Length > 160 || from > to) throw Bad();
         var dossierQuery = db.TreatmentDossiers.AsNoTracking().Where(d => d.State != "Deleted" && scope.BranchIds.Contains(d.BranchId));
         if (branchId.HasValue) dossierQuery = dossierQuery.Where(d => d.BranchId == branchId);
+        // Opened from another screen for one dossier; out-of-scope or unknown ids simply yield an empty page.
+        if (dossierId.HasValue) dossierQuery = dossierQuery.Where(d => d.Id == dossierId);
         if (from.HasValue) dossierQuery = dossierQuery.Where(d => d.StartedOn >= from);
         if (to.HasValue) dossierQuery = dossierQuery.Where(d => d.StartedOn <= to);
         var dossiers = await dossierQuery.ToListAsync(ct);

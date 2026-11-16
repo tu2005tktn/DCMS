@@ -10,5 +10,5 @@ public sealed record WorkStatisticsTotals(long CostVnd, long PaidVnd, long DueVn
 public sealed record WorkStatisticsPage(IReadOnlyList<WorkStatisticsDossier> Items, int Total, int Page, int PageSize, WorkStatisticsTotals Totals, int LineCount = 0);
 public interface IWorkStatisticsService
 {
-    Task<WorkStatisticsPage> ListAsync(int actorId, DateOnly? from, DateOnly? to, int? branchId, string? q, int page, int pageSize, CancellationToken ct);
+    Task<WorkStatisticsPage> ListAsync(int actorId, DateOnly? from, DateOnly? to, int? branchId, string? q, int page, int pageSize, CancellationToken ct, Guid? dossierId = null);
 }

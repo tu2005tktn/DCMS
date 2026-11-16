@@ -89,3 +89,13 @@ Bảng không còn trải mọi dòng dịch vụ ra màn hình. Mỗi phiếu �
 **API** giữ nguyên route, quyền và bộ lọc. Phản hồi thêm cho mỗi phiếu `state`, `note`, `createdByName`; thêm cho mỗi dòng `performedAt`, `quantity`, `unitPriceVnd`, `discountVnd`. Thanh tổng hợp phía trên và phân trang theo phiếu không đổi.
 
 **Màn hình hẹp** (≤ 900px): mỗi phiếu là một thẻ có nhãn cột; bảng dịch vụ trong phần chi tiết cuộn ngang.
+
+## Mở phiếu từ Thống kê tài chính (16/11/2026)
+
+Liên kết **Mở phiếu** trong các bảng chi tiết của màn Thống kê tài chính (`/finance/statistics`) không còn dẫn sang hồ sơ bệnh nhân mà mở đúng phiếu đó trong Thống kê công việc/dịch vụ: `/work-statistics?dossierId={dossierId}&patientId={patientId}`.
+
+- Khi URL có `dossierId`, màn hình chỉ hiện **một phiếu đó** và tự xổ phần chi tiết. Phía trên bảng có dòng thông báo "Đang xem phiếu {mã phiếu}" kèm nút **Xem tất cả phiếu**; bấm nút thì bỏ `dossierId` khỏi URL và quay về danh sách đầy đủ.
+- Trong chế độ này các bộ lọc thời gian, chi nhánh và ô tìm kiếm không áp vào yêu cầu. Người dùng đổi bất kỳ bộ lọc nào thì màn hình tự thoát chế độ xem một phiếu.
+- API nhận thêm tham số tùy chọn `dossierId` (GUID): chỉ trả phiếu đó, vẫn theo quyền `finance.work-statistics.read` và phạm vi chi nhánh. Phiếu ngoài phạm vi, đã xóa hoặc không tồn tại cho kết quả rỗng, không báo lỗi riêng để không lộ sự tồn tại của phiếu.
+- Phiếu chưa có dịch vụ nào được thực hiện (ví dụ phiếu mới chỉ nhận cọc) không có trong thống kê công việc. Khi đó màn hình báo "Phiếu này chưa có dịch vụ đã thực hiện nên chưa có trong thống kê công việc." và, nếu URL có `patientId`, kèm liên kết **Mở phiếu điều trị** tới `/patients/{patientId}?tab=treatment&dossierId={dossierId}`.
+- Liên kết **Mở phiếu điều trị** trong phần chi tiết vẫn dẫn tới hồ sơ bệnh nhân, là nơi thu tiền.

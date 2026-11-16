@@ -111,9 +111,10 @@ export default function FinanceStatisticsPage() {
     return () => { active = false; };
   }, [from, to, branchId, revision]);
 
+  // Opens the dossier in the work/service statistics, which shows its services, paid and due amounts (docs/specs/WORK-SERVICE-STATISTICS.md).
   const openLink = (patientId: number, dossierId: string | null, canOpen = true) =>
     canOpen && dossierId && patientId > 0
-      ? <Link to={`/patients/${patientId}?tab=treatment&dossierId=${dossierId}`}>Mở phiếu</Link>
+      ? <Link to={`/work-statistics?dossierId=${dossierId}&patientId=${patientId}`}>Mở phiếu</Link>
       : null;
 
   const metrics = useMemo(() => {

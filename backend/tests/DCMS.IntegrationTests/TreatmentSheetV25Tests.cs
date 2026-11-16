@@ -352,6 +352,10 @@ public sealed class TreatmentSheetV25Tests(ApiFixture fixture) : IClassFixture<A
         Assert.Empty((await cashier.GetFromJsonAsync<WorkStatisticsPage>("/api/work-statistics?from=2000-01-01&to=2000-01-02"))!.Items);
         using var guest = await Login("guest.demo");
         Assert.Equal(HttpStatusCode.Forbidden, (await guest.GetAsync("/api/work-statistics")).StatusCode);
+        // Opened for one dossier: only that dossier comes back; an unknown id is an empty page, not an error.
+        var single = (await cashier.GetFromJsonAsync<WorkStatisticsPage>($"/api/work-statistics?dossierId={dossier.Id}"))!;
+        Assert.Equal(dossier.Id, Assert.Single(single.Items).DossierId); Assert.Equal(1, single.Total); Assert.Equal(expectedCost, single.Totals.CostVnd);
+        Assert.Empty((await cashier.GetFromJsonAsync<WorkStatisticsPage>($"/api/work-statistics?dossierId={Guid.NewGuid()}"))!.Items);
 
         // A cash payment recorded on the dossier payment screen shows up as paid, and the rest stays due.
         Assert.True(expectedCost > 1, "The synthetic service needs a price to check collections.");

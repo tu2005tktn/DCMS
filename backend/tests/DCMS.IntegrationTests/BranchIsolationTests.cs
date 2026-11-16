@@ -133,6 +133,8 @@ public sealed class BranchIsolationTests(ApiFixture fixture) : IClassFixture<Api
         var q = Uri.EscapeDataString(w.PatientName);
         Assert.Empty((await dentistB.GetFromJsonAsync<WorkStatisticsPage>($"/api/work-statistics?q={q}&pageSize=100"))!.Items);
         Assert.NotEmpty((await dentistA.GetFromJsonAsync<WorkStatisticsPage>($"/api/work-statistics?q={q}&pageSize=100"))!.Items);
+        Assert.Empty((await dentistB.GetFromJsonAsync<WorkStatisticsPage>($"/api/work-statistics?dossierId={w.DossierA}"))!.Items);
+        Assert.Single((await dentistA.GetFromJsonAsync<WorkStatisticsPage>($"/api/work-statistics?dossierId={w.DossierA}"))!.Items);
 
         // Hủy phiếu: nha sĩ chi nhánh B không hủy được phiếu của chi nhánh A.
         var dossierA = (await dentistA.GetFromJsonAsync<TreatmentDossierDto>($"/api/dossiers/{w.DossierA}"))!;
