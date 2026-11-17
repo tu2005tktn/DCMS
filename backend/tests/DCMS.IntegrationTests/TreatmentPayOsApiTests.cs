@@ -151,8 +151,14 @@ public sealed class TreatmentPayOsApiTests(TreatmentPayOsFixture fixture) : ICla
         Assert.Equal(50000, depositPaid!.Context!.AdvanceReceivedVnd);
         Assert.Equal(15000, Assert.Single(depositPaid.Context.LabFees).PaidVnd);
         Assert.Equal(0, Assert.Single(depositPaid.Context.Lines).DueVnd);
+        var applied = await owner.PostAsJsonAsync($"{basePath}/advance-allocations",
+            new ApplyTreatmentAdvance(Guid.NewGuid(), [], [new(labOrderId, 35000)]));
+        Assert.Equal(HttpStatusCode.OK, applied.StatusCode);
+        var afterApply = (await applied.Content.ReadFromJsonAsync<TreatmentPaymentContext>())!;
+        Assert.Equal(15000, afterApply.AdvanceReceivedVnd);
+        Assert.Equal(0, Assert.Single(afterApply.LabFees).DueVnd);
         var totals = await owner.GetFromJsonAsync<FinanceStatisticsResult>($"/api/finance/statistics?branchId={branchId}");
-        Assert.Equal(100000, totals!.ActualReceivedVnd);
-        Assert.Equal(50000, totals.AdvanceReceivedVnd);
+        Assert.Equal(165000, totals!.ActualReceivedVnd);
+        Assert.Equal(15000, totals.AdvanceReceivedVnd);
     }
 }

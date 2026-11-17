@@ -10,6 +10,7 @@ export type BookingRequest = {
   booker: { name: string; phone: string | null; email: string | null };
   attendee: { patientId: number | null; name: string; birthDate: string | null };
   attendeeRelation: 'Self' | 'Relative';
+  familyMemberId?: string;
   kind: 'Standard'; source: 'App'; serviceId: number; reason: string | null;
   dentistId: number; assistantId: null; chairId: null; startAt: string;
   durationMinutes: number; followUpId: null; exceptionReason: null;

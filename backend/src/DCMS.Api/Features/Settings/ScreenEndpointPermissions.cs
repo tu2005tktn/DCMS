@@ -78,6 +78,10 @@ public static class ScreenEndpointPermissions
             if (p.Contains("/payments/payos-orders") || p.Contains("/payments/advance-payos-orders"))
                 return Need(read ? "finance.read" : "finance.payments.create");
             if (p.EndsWith("/payments/advances")) return Need(read ? "finance.read" : "finance.payments.create");
+            if (p.EndsWith("/payments/advance-allocations") || p.EndsWith("/payments/no-show-forfeit"))
+                return Need("finance.payments.create");
+            if (p.EndsWith("/payments/cancel-dossier"))
+                return ScreenEndpointRule.Any("treatment.dossiers.update", "finance.payments.create");
             if (p.EndsWith("/payments/context")) return Need("finance.read");
             if (p.EndsWith("/payments")) return Need(read ? "finance.read" : "finance.payments.create");
             if (p.EndsWith("/sheet-items/from-item-plan")) return Need("treatment.items.create");

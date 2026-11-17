@@ -5,7 +5,7 @@ import { env } from '@/config/env';
 // header, so content is fetched with the session token and shown as an in-memory data URI (no disk cache of the image
 // loader; dropped together with screen state on sign-out or 403).
 const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-function base64(bytes: Uint8Array) {
+export function base64(bytes: Uint8Array) {
   let out = '';
   for (let i = 0; i < bytes.length; i += 3) {
     const a = bytes[i], b = bytes[i + 1], c = bytes[i + 2];

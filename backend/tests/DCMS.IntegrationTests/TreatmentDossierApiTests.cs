@@ -101,6 +101,62 @@ public sealed class TreatmentDossierApiTests(ApiFixture fixture) : IClassFixture
     }
 
     [Fact]
+    public async Task OwnerCanForfeitDepositAndHideUnperformedNoShowDossier()
+    {
+        var setup = await Prepare();
+        using var dentist = await Login("dentist.demo");
+        using var owner = await Login("owner.demo");
+        var createdResponse = await dentist.PostAsJsonAsync($"/api/patients/{setup.PatientId}/dossiers",
+            new CreateDossierRequest(setup.BranchId, setup.DentistId, "SYNTHETIC no show", null,
+                null, Guid.NewGuid()));
+        Assert.Equal(HttpStatusCode.Created, createdResponse.StatusCode);
+        var created = (await createdResponse.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
+        var draftResponse = await dentist.PostAsJsonAsync($"/api/dossiers/{created.Id}/plan/draft",
+            new SavePlanDraftRequest(created.Version, "SYNTHETIC planned work", [
+                new TreatmentItemInput(null, null, setup.ServiceId, "25", "tooth", 1, 1,
+                    30, null, null, 200000, "Agreed", "Consulted", "Patient", null, null)],
+                [], Guid.NewGuid()));
+        Assert.Equal(HttpStatusCode.OK, draftResponse.StatusCode);
+        var draft = (await draftResponse.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
+        var committedResponse = await dentist.PostAsJsonAsync($"/api/dossiers/{created.Id}/plan/commit",
+            new CommitPlanRequest(draft.Version, Guid.NewGuid()));
+        Assert.Equal(HttpStatusCode.OK, committedResponse.StatusCode);
+        var committed = (await committedResponse.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
+        var ownerId = (await owner.GetFromJsonAsync<CurrentUser>("/api/auth/me"))!.Id;
+        using (var scope = fixture.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
+            var payload = System.Text.Json.JsonSerializer.Serialize(new { kind = "AdvanceCash", amountVnd = 100000L,
+                labPriority = Array.Empty<object>() });
+            await db.Database.ExecuteSqlInterpolatedAsync($"""
+                INSERT INTO "AUDIT_LOG" ("StorageId", "AuditType", "Action", "ActorId", "At",
+                    "PatientId", "BranchId", "Target", "PayloadJson")
+                VALUES ({Guid.NewGuid()}, 'FinanceLedger', 'AdvanceCash', {ownerId}, {DateTimeOffset.UtcNow},
+                    {setup.PatientId}, {setup.BranchId}, {created.Id.ToString()}, {payload}::jsonb)
+                """);
+        }
+        var before = await owner.GetFromJsonAsync<DCMS.Api.Features.Finance.FinanceStatisticsResult>(
+            $"/api/finance/statistics?branchId={setup.BranchId}");
+        Assert.Equal(100000, before!.AdvanceReceivedVnd);
+        Assert.Equal(100000, before.ActualReceivedVnd);
+        Assert.Contains(before.OutstandingDossiers, x => x.DossierId == created.Id && x.CanForfeitDeposit);
+        var request = new DCMS.Api.Features.Finance.ForfeitNoShowDeposit(Guid.NewGuid(), committed.Version,
+            "SYNTHETIC patient did not attend");
+        var url = $"/api/dossiers/{created.Id}/payments/no-show-forfeit";
+        Assert.Equal(HttpStatusCode.Forbidden, (await dentist.PostAsJsonAsync(url, request)).StatusCode);
+        var response = await owner.PostAsJsonAsync(url, request);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await owner.PostAsJsonAsync(url, request)).StatusCode);
+        var after = await owner.GetFromJsonAsync<DCMS.Api.Features.Finance.FinanceStatisticsResult>(
+            $"/api/finance/statistics?branchId={setup.BranchId}");
+        Assert.Equal(0, after!.AdvanceReceivedVnd);
+        Assert.Equal(100000, after.ActualReceivedVnd);
+        Assert.Equal(0, after.RemainingReceivableVnd);
+        Assert.DoesNotContain(after.OutstandingDossiers, x => x.DossierId == created.Id);
+        Assert.Equal(HttpStatusCode.NotFound, (await dentist.GetAsync($"/api/dossiers/{created.Id}")).StatusCode);
+    }
+
+    [Fact]
     public async Task LegacyDisplayFlagCannotBypassClinicalClosure()
     {
         var setup = await Prepare();
@@ -417,6 +473,33 @@ public sealed class TreatmentDossierApiTests(ApiFixture fixture) : IClassFixture
                 UpdatedAt = DateTimeOffset.UtcNow, CreatedBy = setup.DentistId, UpdatedBy = setup.DentistId };
             db.LabOrders.Add(labOrder);
             await db.SaveChangesAsync(); labOrderId = labOrder.Id;
+            var category = new DCMS.Domain.Features.SystemSettings.MaterialCategory
+            {
+                Name = "SYNTHETIC finance category", NormalizedName = "SYNTHETIC_FINANCE_" + Guid.NewGuid().ToString("N"),
+                CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow
+            };
+            var material = new DCMS.Domain.Features.SystemSettings.MaterialCatalogItem
+            {
+                Name = "SYNTHETIC finance material", NormalizedName = "SYNTHETIC_FINANCE_" + Guid.NewGuid().ToString("N"),
+                Category = category, UsageUnit = "unit"
+            };
+            db.MaterialCatalogItems.Add(material);
+            db.MaterialPurchases.Add(new DCMS.Domain.Features.SystemSettings.MaterialPurchase
+            {
+                Material = material, MaterialName = material.Name, CategoryName = category.Name,
+                EnteredOn = DateOnly.FromDateTime(DateTime.UtcNow), Quantity = 2, Unit = "unit",
+                UsageQuantity = 2, UsageUnit = "unit", UnitPriceVnd = 10000, TotalVnd = 20000,
+                CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow,
+                CreatedBy = setup.DentistId, UpdatedBy = setup.DentistId
+            });
+            db.MaterialUsages.Add(new DCMS.Domain.Features.SystemSettings.MaterialUsage
+            {
+                ActivityId = activity.Id, DossierId = dossierId, PatientId = setup.PatientId,
+                BranchId = setup.BranchId, MaterialId = material.Id, MaterialName = material.Name,
+                Quantity = 1, UsageUnit = "unit", UsedAt = DateTimeOffset.UtcNow,
+                CreatedAt = DateTimeOffset.UtcNow
+            });
+            await db.SaveChangesAsync();
         }
         using var owner = await Login("owner.demo");
         var before = await owner.GetFromJsonAsync<DCMS.Api.Features.Finance.TreatmentPaymentContext>(
@@ -425,6 +508,11 @@ public sealed class TreatmentDossierApiTests(ApiFixture fixture) : IClassFixture
         Assert.Equal(24000, Assert.Single(before.LabFees).Minimum30PercentVnd);
         Assert.Equal(24000, Assert.Single(before.LabFees).PriorityRemainingVnd);
         Assert.Equal(200000, before.TotalCostVnd);
+        var labBefore = Assert.Single((await owner.GetFromJsonAsync<LabWorkPage>(
+            "/api/lab-orders?pageSize=100"))!.Items, x => x.Id == labOrderId);
+        Assert.Equal("Unpaid", labBefore.PatientPaymentStatus);
+        Assert.Equal(0, labBefore.PatientPaidVnd);
+        Assert.Equal(10000, labBefore.PaidVnd); // Clinic payment to the lab provider is separate.
         var key = Guid.NewGuid();
         var request = new DCMS.Api.Features.Finance.RecordTreatmentCashPayment(key,
             DateOnly.FromDateTime(DateTime.UtcNow), [new(activityId, 120000)], [new(labOrderId, 24000)]);
@@ -436,6 +524,19 @@ public sealed class TreatmentDossierApiTests(ApiFixture fixture) : IClassFixture
         Assert.Equal(24000, Assert.Single(after.LabFees).PaidVnd);
         Assert.Equal(56000, Assert.Single(after.LabFees).DueVnd);
         Assert.Equal(0, Assert.Single(after.LabFees).PriorityRemainingVnd);
+        var labPartial = Assert.Single((await owner.GetFromJsonAsync<LabWorkPage>(
+            "/api/lab-orders?pageSize=100"))!.Items, x => x.Id == labOrderId);
+        Assert.Equal("Partial", labPartial.PatientPaymentStatus);
+        Assert.Equal(24000, labPartial.PatientPaidVnd);
+        var partialStatistics = await owner.GetFromJsonAsync<DCMS.Api.Features.Finance.FinanceStatisticsResult>(
+            $"/api/finance/statistics?branchId={setup.BranchId}");
+        Assert.Equal(200000, partialStatistics!.ServiceAmountVnd);
+        Assert.Equal(20000, partialStatistics.MaterialPurchaseVnd);
+        Assert.Equal(144000, partialStatistics.ActualReceivedVnd);
+        Assert.Equal(56000, partialStatistics.RemainingReceivableVnd);
+        Assert.Contains(partialStatistics.OutstandingDossiers, x => x.DossierId == dossierId && x.DueVnd == 56000);
+        Assert.Equal(-20000, partialStatistics.ProfitVnd);
+        Assert.Equal(0, partialStatistics.ProfitableDossierCount);
         Assert.Equal(HttpStatusCode.OK,
             (await owner.PostAsJsonAsync($"/api/dossiers/{dossierId}/payments", request)).StatusCode);
         Assert.Equal(HttpStatusCode.Conflict,
@@ -453,8 +554,60 @@ public sealed class TreatmentDossierApiTests(ApiFixture fixture) : IClassFixture
         Assert.Equal(0, Assert.Single(afterAdvance.Lines).DueVnd);
         var statistics = await owner.GetFromJsonAsync<DCMS.Api.Features.Finance.FinanceStatisticsResult>(
             $"/api/finance/statistics?branchId={setup.BranchId}");
-        Assert.Equal(120000, statistics!.ActualReceivedVnd);
+        Assert.Equal(200000, statistics!.ServiceAmountVnd);
+        Assert.Equal(219000, statistics.ActualReceivedVnd);
         Assert.Equal(75000, statistics.AdvanceReceivedVnd);
+        Assert.Equal(219000, statistics.ActualReceivedVnd);
+        Assert.Equal(56000, statistics.RemainingReceivableVnd);
+        Assert.Equal(75000, statistics.AdvanceReceivedVnd);
+        Assert.Equal(-20000, statistics.ProfitVnd);
+        Assert.Equal(0, statistics.ProfitableDossierCount);
+        Guid additionalActivityId;
+        using (var scope = fixture.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
+            var additional = new ClinicalActivity
+            {
+                DossierId = dossierId, PatientId = setup.PatientId, BranchId = setup.BranchId,
+                ServiceId = setup.ServiceId, ServiceNameSnapshot = "SYNTHETIC service paid from deposit",
+                Unit = "lần", Quantity = 1, PriceSnapshotVnd = 19000,
+                PerformerId = setup.DentistId, PerformedAt = DateTimeOffset.UtcNow,
+                CreatedAt = DateTimeOffset.UtcNow, State = "Posted"
+            };
+            db.ClinicalActivities.Add(additional);
+            await db.SaveChangesAsync();
+            additionalActivityId = additional.Id;
+        }
+        var useDeposit = new DCMS.Api.Features.Finance.ApplyTreatmentAdvance(Guid.NewGuid(),
+            [new(additionalActivityId, 19000)], [new(labOrderId, 56000)]);
+        Assert.Equal(HttpStatusCode.OK,
+            (await owner.PostAsJsonAsync($"/api/dossiers/{dossierId}/payments/advance-allocations", useDeposit)).StatusCode);
+        var afterAllocation = await owner.GetFromJsonAsync<DCMS.Api.Features.Finance.TreatmentPaymentContext>(
+            $"/api/dossiers/{dossierId}/payments/context");
+        Assert.Equal(0, afterAllocation!.AdvanceReceivedVnd);
+        Assert.Equal(0, Assert.Single(afterAllocation.Lines, x => x.ActivityId == additionalActivityId).DueVnd);
+        Assert.Equal(0, Assert.Single(afterAllocation.LabFees).DueVnd);
+        var afterAllocationStatistics = await owner.GetFromJsonAsync<DCMS.Api.Features.Finance.FinanceStatisticsResult>(
+            $"/api/finance/statistics?branchId={setup.BranchId}");
+        Assert.Equal(219000, afterAllocationStatistics!.ServiceAmountVnd);
+        Assert.Equal(219000, afterAllocationStatistics.ActualReceivedVnd);
+        Assert.Equal(0, afterAllocationStatistics.AdvanceReceivedVnd);
+        Assert.Equal(0, afterAllocationStatistics.RemainingReceivableVnd);
+        Assert.DoesNotContain(afterAllocationStatistics.OutstandingDossiers, x => x.DossierId == dossierId);
+        Assert.Equal(20000, afterAllocationStatistics.MaterialPurchaseVnd);
+        Assert.Equal(119000, afterAllocationStatistics.ProfitVnd);
+        Assert.Equal(1, afterAllocationStatistics.ProfitableDossierCount);
+        Assert.Equal(HttpStatusCode.OK,
+            (await owner.PostAsJsonAsync($"/api/dossiers/{dossierId}/payments/advance-allocations", useDeposit)).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict,
+            (await owner.PostAsJsonAsync($"/api/dossiers/{dossierId}/payments/advance-allocations",
+                useDeposit with { RequestKey = Guid.NewGuid() })).StatusCode);
+        var labPaid = Assert.Single((await owner.GetFromJsonAsync<LabWorkPage>(
+            "/api/lab-orders?pageSize=100"))!.Items, x => x.Id == labOrderId);
+        Assert.Equal("Paid", labPaid.PatientPaymentStatus);
+        Assert.Equal(80000, labPaid.PatientPaidVnd);
+        Assert.Equal("NotSent", labPaid.Status);
+        Assert.Equal(10000, labPaid.PaidVnd);
         Assert.Equal(HttpStatusCode.OK,
             (await owner.PostAsJsonAsync($"/api/dossiers/{dossierId}/payments/advances", advance)).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden,
@@ -604,14 +757,51 @@ public sealed class TreatmentDossierApiTests(ApiFixture fixture) : IClassFixture
         using var owner = await Login("owner.demo");
         var ownerProfile = await owner.GetFromJsonAsync<CurrentUser>("/api/auth/me");
         Assert.Contains("ClinicOwner", ownerProfile!.EffectiveRoles);
-        var statisticsResponse = await owner.GetAsync("/api/finance/statistics");
+        // Scoped to this test's own branch: the unscoped total also counts money recorded by the other tests of this class.
+        var statisticsResponse = await owner.GetAsync($"/api/finance/statistics?branchId={setup.BranchId}");
         Assert.True(statisticsResponse.IsSuccessStatusCode, await statisticsResponse.Content.ReadAsStringAsync());
         var statistics = (await statisticsResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>());
-        Assert.Equal(50000, statistics.GetProperty("actualReceivedVnd").GetInt64());
+        Assert.Equal(150000, statistics.GetProperty("actualReceivedVnd").GetInt64());
         Assert.Equal(100000, statistics.GetProperty("advanceReceivedVnd").GetInt64());
         Assert.Equal(HttpStatusCode.Forbidden, (await dentist.GetAsync("/api/finance/statistics")).StatusCode);
         var otherBranch = await owner.GetFromJsonAsync<System.Text.Json.JsonElement>("/api/finance/statistics?branchId=9999");
         Assert.Equal(0, otherBranch.GetProperty("actualReceivedVnd").GetInt64());
         Assert.Equal(0, otherBranch.GetProperty("advanceReceivedVnd").GetInt64());
+        Assert.Equal(0, otherBranch.GetProperty("serviceAmountVnd").GetInt64());
+    }
+
+    [Fact]
+    public async Task CancelledDossierClearsRemainingReceivable()
+    {
+        var setup = await Prepare();
+        using var dentist = await Login("dentist.demo");
+        using var owner = await Login("owner.demo");
+        var createdResponse = await dentist.PostAsJsonAsync($"/api/patients/{setup.PatientId}/dossiers",
+            new CreateDossierRequest(setup.BranchId, setup.DentistId, "SYNTHETIC cancel receivable", null,
+                null, Guid.NewGuid()));
+        Assert.Equal(HttpStatusCode.Created, createdResponse.StatusCode);
+        var created = (await createdResponse.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
+        var draftResponse = await dentist.PostAsJsonAsync($"/api/dossiers/{created.Id}/plan/draft",
+            new SavePlanDraftRequest(created.Version, "SYNTHETIC planned work", [
+                new TreatmentItemInput(null, null, setup.ServiceId, "25", "tooth", 1, 1,
+                    30, null, null, 300000, "Agreed", "Consulted", "Patient", null, null)],
+                [], Guid.NewGuid()));
+        var draft = (await draftResponse.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
+        var committedResponse = await dentist.PostAsJsonAsync($"/api/dossiers/{created.Id}/plan/commit",
+            new CommitPlanRequest(draft.Version, Guid.NewGuid()));
+        var committed = (await committedResponse.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
+        var before = await owner.GetFromJsonAsync<DCMS.Api.Features.Finance.FinanceStatisticsResult>(
+            $"/api/finance/statistics?branchId={setup.BranchId}");
+        Assert.Equal(300000, before!.RemainingReceivableVnd);
+        Assert.Contains(before.OutstandingDossiers, x => x.DossierId == created.Id && x.DueVnd == 300000);
+        var cancelResponse = await owner.PostAsJsonAsync($"/api/dossiers/{created.Id}/payments/cancel-dossier",
+            new DCMS.Api.Features.Finance.CancelTreatmentDossier(Guid.NewGuid(), committed.Version, "Hủy phiếu"));
+        Assert.Equal(HttpStatusCode.OK, cancelResponse.StatusCode);
+        var after = await owner.GetFromJsonAsync<DCMS.Api.Features.Finance.FinanceStatisticsResult>(
+            $"/api/finance/statistics?branchId={setup.BranchId}");
+        Assert.Equal(0, after!.RemainingReceivableVnd);
+        Assert.DoesNotContain(after.OutstandingDossiers, x => x.DossierId == created.Id);
+        var read = await owner.GetFromJsonAsync<TreatmentDossierDto>($"/api/dossiers/{created.Id}");
+        Assert.Equal("Cancelled", read!.State);
     }
 }

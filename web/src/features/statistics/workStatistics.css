@@ -1,20 +1,43 @@
-/* Work/service statistics table (docs/specs/WORK-SERVICE-STATISTICS.md). */
+/* Work/service statistics: summary rows with an expandable read-only detail (docs/specs/WORK-SERVICE-STATISTICS.md). */
 .work-stats-table .ant-table-cell { overflow-wrap:anywhere; }
-.work-stats-table table { width:100% !important; table-layout:auto; }
+.work-stats-table tr.work-stats-row { cursor:pointer; }
+.work-stats-table tr.work-stats-row:focus-visible { outline:2px solid #1677ff; outline-offset:-2px; }
+.work-stats-table tr.work-stats-row-open > td.ant-table-cell { background:#e6f4ff !important; font-weight:600; border-top:1px solid #1677ff; }
+.work-stats-table tr.ant-table-expanded-row > td.ant-table-cell { padding:0 !important; background:#fff !important; border:1px solid #1677ff; border-top:0; }
+.work-stats-detail { padding:14px 16px 16px; cursor:default; }
+.work-stats-detail-head { display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px; margin-bottom:12px; }
+.work-stats-detail-title { font-size:16px; font-weight:700; }
+.work-stats-muted { color:#667085; }
+.work-stats-open-dossier { margin-left:auto; }
+.work-stats-facts { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:8px 24px; margin:0 0 14px; }
+.work-stats-facts > div { display:flex; gap:8px; min-width:0; }
+.work-stats-facts dt { flex:none; color:#667085; }
+.work-stats-facts dd { margin:0; font-weight:600; min-width:0; }
+.work-stats-lines .ant-table-thead > tr > th { background:#f2f4f7; }
+.work-stats-foot { display:flex; flex-wrap:wrap; gap:16px 32px; align-items:flex-start; margin-top:14px; }
+.work-stats-note { flex:1 1 320px; min-width:0; }
+.work-stats-note-box { min-height:84px; margin-top:4px; padding:8px 10px; border:1px solid #d0d5dd; border-radius:6px; background:#fcfcfd; white-space:pre-wrap; overflow-wrap:anywhere; }
+.work-stats-sum { flex:0 1 300px; margin:0 0 0 auto; }
+.work-stats-sum > div { display:flex; justify-content:space-between; gap:24px; padding:4px 0; }
+.work-stats-sum dt { color:#475467; }
+.work-stats-sum dd { margin:0; font-variant-numeric:tabular-nums; }
 @media screen and (max-width:900px) {
-  .work-stats-table .ant-table-thead, .work-stats-table .ant-table-measure-row { display:none; }
-  .work-stats-table table, .work-stats-table tbody, .work-stats-table tr.ant-table-row { display:block; width:100%; }
-  .work-stats-table tr.ant-table-row { margin:0 0 8px; padding:2px 8px; border:1px solid #e4e7ec; background:#fff; }
-  .work-stats-table td.ant-table-cell { display:grid; grid-template-columns:minmax(110px,40%) minmax(0,1fr); gap:8px; padding:6px 0!important; border:0!important; border-bottom:1px dashed #eceff3!important; text-align:left!important; }
-  .work-stats-table td.ant-table-cell:last-child { border-bottom:0!important; }
-  .work-stats-table td.ant-table-cell::before { color:#475467; font-weight:700; }
-  .work-stats-table td.ant-table-cell:nth-child(1)::before { content:"Ngày"; }
-  .work-stats-table td.ant-table-cell:nth-child(2)::before { content:"MSKH"; }
-  .work-stats-table td.ant-table-cell:nth-child(3)::before { content:"Khách hàng"; }
-  .work-stats-table td.ant-table-cell:nth-child(4)::before { content:"Lịch hẹn tiếp theo"; }
-  .work-stats-table td.ant-table-cell:nth-child(5)::before { content:"Điều trị/dịch vụ"; }
-  .work-stats-table td.ant-table-cell:nth-child(6)::before { content:"Bác sĩ & phụ tá"; }
-  .work-stats-table td.ant-table-cell:nth-child(7)::before { content:"Chi phí"; }
-  .work-stats-table td.ant-table-cell:nth-child(8)::before { content:"Đã trả"; }
-  .work-stats-table td.ant-table-cell:nth-child(9)::before { content:"Còn lại"; }
+  .work-stats-table .ant-table-thead:not(.work-stats-lines .ant-table-thead), .work-stats-table .ant-table-measure-row:not(.work-stats-lines .ant-table-measure-row) { display:none; }
+  .work-stats-table table:not(.work-stats-lines table), .work-stats-table tbody:not(.work-stats-lines tbody) { display:block; width:100%; }
+  .work-stats-table tr.work-stats-row { display:block; width:100%; margin:8px 0 0; padding:2px 8px; border:1px solid #e4e7ec; background:#fff; }
+  .work-stats-table tr.work-stats-row-open { border-color:#1677ff; background:#e6f4ff; }
+  .work-stats-table tr.work-stats-row > td.ant-table-cell { display:grid; grid-template-columns:minmax(110px,40%) minmax(0,1fr); gap:8px; padding:6px 0!important; border:0!important; border-bottom:1px dashed #eceff3!important; text-align:left!important; }
+  .work-stats-table tr.work-stats-row > td.ant-table-cell:last-child { border-bottom:0!important; }
+  .work-stats-table tr.work-stats-row > td.ant-table-cell::before { color:#475467; font-weight:700; }
+  .work-stats-table tr.work-stats-row > td.ant-table-cell:nth-child(1)::before { content:"Mã phiếu"; }
+  .work-stats-table tr.work-stats-row > td.ant-table-cell:nth-child(2)::before { content:"Ngày"; }
+  .work-stats-table tr.work-stats-row > td.ant-table-cell:nth-child(3)::before { content:"MSKH"; }
+  .work-stats-table tr.work-stats-row > td.ant-table-cell:nth-child(4)::before { content:"Khách hàng"; }
+  .work-stats-table tr.work-stats-row > td.ant-table-cell:nth-child(5)::before { content:"Bác sĩ"; }
+  .work-stats-table tr.work-stats-row > td.ant-table-cell:nth-child(6)::before { content:"Chi phí"; }
+  .work-stats-table tr.work-stats-row > td.ant-table-cell:nth-child(7)::before { content:"Đã trả"; }
+  .work-stats-table tr.work-stats-row > td.ant-table-cell:nth-child(8)::before { content:"Còn lại"; }
+  .work-stats-table tr.ant-table-expanded-row, .work-stats-table tr.ant-table-expanded-row > td.ant-table-cell { display:block; width:100%; }
+  .work-stats-detail { padding:12px 10px; }
+  .work-stats-sum { flex-basis:100%; margin-left:0; }
 }

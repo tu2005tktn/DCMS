@@ -9,6 +9,44 @@ namespace DCMS.Infrastructure.Features.Treatment;
 // Lab work management (list, history, status). See docs/specs/LAB-ORDER-MANAGEMENT.md.
 public sealed partial class TreatmentDossierService
 {
+    private sealed class LabPatientPaymentRow
+    {
+        public Guid LabOrderId { get; set; }
+        public long PaidVnd { get; set; }
+    }
+
+    private async Task<Dictionary<Guid, long>> LabPatientPaymentsAsync(Guid[] labOrderIds, CancellationToken ct)
+    {
+        if (labOrderIds.Length == 0) return [];
+        // FinanceLedger contains only confirmed cash payments and settled PayOS transfers.
+        // Deposits allocated to a particular lab order are included; pending QR orders are not.
+        var rows = await db.Database.SqlQuery<LabPatientPaymentRow>($"""
+            SELECT lab."Id" AS "LabOrderId", sum((line.row->>'amountVnd')::bigint)::bigint AS "PaidVnd"
+            FROM "AUDIT_LOG" ledger
+            CROSS JOIN LATERAL jsonb_array_elements(
+                COALESCE(ledger."PayloadJson"->'labPriority', '[]'::jsonb)
+                || COALESCE(ledger."PayloadJson"->'labLines', '[]'::jsonb)) line(row)
+            JOIN "LAB_ORDER" lab ON lab."Id" = (line.row->>'labOrderId')::uuid
+            WHERE ledger."AuditType" = 'FinanceLedger'
+              AND ledger."Action" IN ('TreatmentCashPayment', 'TreatmentTransferPayment',
+                  'AdvanceCash', 'AdvanceTransfer', 'AdvanceApplied')
+              AND lab."Id" = ANY({labOrderIds})
+              AND ledger."Target" = lab."DossierId"::text
+              AND ledger."PatientId" = lab."PatientId"
+              AND ledger."BranchId" = lab."BranchId"
+            GROUP BY lab."Id"
+            """).ToArrayAsync(ct);
+        return rows.ToDictionary(x => x.LabOrderId, x => x.PaidVnd);
+    }
+
+    private static LabWorkItem WithPatientPayment(LabWorkItem item, IReadOnlyDictionary<Guid, long> amounts)
+    {
+        var paid = Math.Clamp(amounts.GetValueOrDefault(item.Id), 0, item.TotalFeeVnd);
+        var status = item.TotalFeeVnd <= 0 ? "NoFee" : paid >= item.TotalFeeVnd ? "Paid" :
+            paid > 0 ? "Partial" : "Unpaid";
+        return item with { PatientPaidVnd = paid, PatientPaymentStatus = status };
+    }
+
     private DateOnly VnToday() => DateOnly.FromDateTime(clock.GetUtcNow().ToOffset(TimeSpan.FromHours(7)).DateTime);
 
     // BranchIds is already limited to the actor's own active branches (owner: all active; others: membership ∩ access-group branches).
@@ -59,10 +97,11 @@ public sealed partial class TreatmentDossierService
             orderby x.DueOn == null, x.DueOn, x.OrderedOn descending, x.Id
             select new { x, DossierCode = d.Code, pt.PatientCode, PatientName = pt.FullName, DentistName = e.FullName, LabName = lab == null ? null : lab.Name })
             .Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(ct);
-        var items = rows.Select(r => new LabWorkItem(r.x.Id, r.x.Code, r.x.DossierId, r.DossierCode, r.x.ActivityId, r.x.PatientId, r.PatientCode,
+        var patientPayments = await LabPatientPaymentsAsync(rows.Select(r => r.x.Id).ToArray(), ct);
+        var items = rows.Select(r => WithPatientPayment(new LabWorkItem(r.x.Id, r.x.Code, r.x.DossierId, r.DossierCode, r.x.ActivityId, r.x.PatientId, r.PatientCode,
             r.PatientName, r.x.WorkName, r.x.LabProviderId, r.LabName, r.x.DentistId, r.DentistName, r.x.OrderedOn, r.x.DueOn, r.x.SentOn,
             r.x.ReceivedOn, r.x.DeliveredOn, r.x.Quantity, r.x.Material, r.x.Teeth, r.x.Note, r.x.TotalFeeVnd, r.x.PaidVnd, r.x.Status,
-            IsOverdue(r.x.Status, r.x.DueOn, today), r.x.Version)).ToList();
+            IsOverdue(r.x.Status, r.x.DueOn, today), r.x.Version), patientPayments)).ToList();
         return new(items, total, page, pageSize, counts, labs, dentists);
     }
 
@@ -119,8 +158,9 @@ public sealed partial class TreatmentDossierService
             from lab in prs.DefaultIfEmpty()
             select new { x, DossierCode = d.Code, pt.PatientCode, PatientName = pt.FullName, DentistName = e.FullName, LabName = lab == null ? null : lab.Name })
             .SingleAsync(ct);
-        return new(r.x.Id, r.x.Code, r.x.DossierId, r.DossierCode, r.x.ActivityId, r.x.PatientId, r.PatientCode, r.PatientName, r.x.WorkName,
+        var patientPayments = await LabPatientPaymentsAsync([id], ct);
+        return WithPatientPayment(new(r.x.Id, r.x.Code, r.x.DossierId, r.DossierCode, r.x.ActivityId, r.x.PatientId, r.PatientCode, r.PatientName, r.x.WorkName,
             r.x.LabProviderId, r.LabName, r.x.DentistId, r.DentistName, r.x.OrderedOn, r.x.DueOn, r.x.SentOn, r.x.ReceivedOn, r.x.DeliveredOn,
-            r.x.Quantity, r.x.Material, r.x.Teeth, r.x.Note, r.x.TotalFeeVnd, r.x.PaidVnd, r.x.Status, IsOverdue(r.x.Status, r.x.DueOn, today), r.x.Version);
+            r.x.Quantity, r.x.Material, r.x.Teeth, r.x.Note, r.x.TotalFeeVnd, r.x.PaidVnd, r.x.Status, IsOverdue(r.x.Status, r.x.DueOn, today), r.x.Version), patientPayments);
     }
 }
