@@ -28,7 +28,7 @@ Nút **Lưu đơn thuốc** / **Hủy** ở chân form. Danh sách đơn trong t
 
 ## UI và quyền
 
-- Tab đơn thuốc nằm trong hồ sơ bệnh nhân. `prescriptions.read` xem danh sách/chi tiết; `prescriptions.manage` + vai trò Dentist tạo và sửa. Nút tạo thuốc trong danh mục chỉ hiển thị với người có `catalog.medicines.create`.
+- Tab đơn thuốc nằm trong hồ sơ bệnh nhân. `prescriptions.read` xem danh sách/chi tiết; `prescriptions.manage` + vai trò Dentist tạo và sửa. Bác sĩ chưa bị giới hạn bởi access group nhận `catalog.medicines.read/create` theo role baseline để chọn và thêm thuốc; access group phải cấp rõ hai grant này. Bác sĩ không được sửa/ngừng dùng thuốc trong danh mục. Nút tạo thuốc chỉ hiển thị với người có `catalog.medicines.create`.
 - Trường tối thiểu khi lưu: ít nhất một thuốc, đơn vị thuốc có giá trị và số lượng nguyên dương. Đơn vị được tự điền theo danh mục khi chọn thuốc và bác sĩ có thể sửa. Chi nhánh/ngày kê/bác sĩ tự điền; chẩn đoán, chẩn đoán khác, hướng dẫn và lời dặn tùy chọn.
 - **Bác sĩ kê đơn** được chọn trên form (`prescriberEmployeeId`). Server chỉ nhận bác sĩ là thành viên đang hoạt động, có quyền khám (`CanDentist`) của chi nhánh kê đơn; bỏ trống thì dùng nhân sự của tài khoản đang thao tác. Audit luôn ghi tài khoản thực hiện thao tác, kể cả khi ghi đơn dưới tên bác sĩ khác.
 - Không hiển thị mẫu đơn, in/QR, bước finalize, hiệu chỉnh phiên bản hay cảnh báo nhiều tầng trong luồng thường dùng. Popup tạo thuốc chỉ xuất hiện khi người kê đơn có quyền `catalog.medicines.create`; thao tác này lưu vào danh mục thuốc dùng chung nhưng không tạo tồn kho hoặc khoản thu.

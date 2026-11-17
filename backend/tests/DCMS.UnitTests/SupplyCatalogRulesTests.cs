@@ -20,7 +20,7 @@ public sealed class SupplyCatalogRulesTests
     }
 
     [Fact]
-    public void MedicineAndUnknownKindsDoNotGainDentistPermission()
+    public void DentistCannotFullyManageMedicineCatalog()
     {
         Assert.False(SupplyCatalogPermissions.CanManage("medicines", ["Dentist"]));
         Assert.False(SupplyCatalogPermissions.CanManage("unknown", ["Dentist"]));

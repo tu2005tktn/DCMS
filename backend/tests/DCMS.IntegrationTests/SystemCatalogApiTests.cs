@@ -15,6 +15,7 @@ public sealed class SystemCatalogApiTests(ApiFixture fixture) : IClassFixture<Ap
 {
     private const string Categories = "/api/system-settings/material-categories";
     private const string Materials = "/api/system-settings/materials";
+    private const string Medicines = "/api/system-settings/settings/catalogs/medicines";
     private async Task<HttpClient> Login(string name = "dentist.demo")
     {
         var client = fixture.CreateClient();
@@ -36,6 +37,20 @@ public sealed class SystemCatalogApiTests(ApiFixture fixture) : IClassFixture<Ap
     }
     private static Task<HttpResponseMessage> Delete(HttpClient c, string path, int version, Guid? key = null) =>
         c.SendAsync(new HttpRequestMessage(HttpMethod.Delete, path) { Content = JsonContent.Create(new DeleteCatalogRequest(version, key ?? Guid.NewGuid())) });
+
+    [Fact]
+    public async Task DentistCanCreateMedicineForPrescribingButCannotEditCatalog()
+    {
+        using var c = await Login();
+        var entry = new MedicineInput(Unique("MED-"), Unique("SYNTHETIC prescription medicine "),
+            null, null, null, "viên", null, null, null, null, null, 0, true, false);
+        var createdResponse = await c.PostAsJsonAsync(Medicines, new CreateSupplyRequest<MedicineInput>(Guid.NewGuid(), entry));
+        Assert.Equal(HttpStatusCode.Created, createdResponse.StatusCode);
+        var created = (await createdResponse.Content.ReadFromJsonAsync<MedicineDto>())!;
+
+        var update = new UpdateSupplyRequest<MedicineInput>(created.Version, Guid.NewGuid(), "SYNTHETIC no catalog edit", entry);
+        Assert.Equal(HttpStatusCode.Forbidden, (await c.PutAsJsonAsync($"{Medicines}/{created.Id}", update)).StatusCode);
+    }
 
     [Fact]
     public async Task CrudMoveAndSoftDeletePreserveAuditAndRejectNonemptyGroup()
