@@ -19,6 +19,10 @@ public sealed record TreatmentPaymentContext(Guid DossierId, int PatientId, int 
 public sealed record TreatmentPaymentInput(Guid ActivityId, long AmountVnd);
 public sealed record RecordTreatmentCashPayment(Guid RequestKey, DateOnly PaidOn,
     IReadOnlyList<TreatmentPaymentInput> Lines, IReadOnlyList<TreatmentLabAllocation>? LabLines);
+public sealed record ApplyTreatmentAdvance(Guid RequestKey, IReadOnlyList<TreatmentPaymentInput> Lines,
+    IReadOnlyList<TreatmentLabAllocation>? LabLines);
+public sealed record ForfeitNoShowDeposit(Guid RequestKey, int ExpectedVersion, string Reason);
+public sealed record CancelTreatmentDossier(Guid RequestKey, int ExpectedVersion, string? Reason = null);
 public sealed class TreatmentPaidRow
 {
     public Guid ActivityId { get; set; }
@@ -110,13 +114,223 @@ public static class TreatmentPaymentEndpoints
             await transaction.CommitAsync(ct);
             return Results.Ok(updated);
         });
+        group.MapPost("/advance-allocations", async (HttpContext context, Guid dossierId,
+            ApplyTreatmentAdvance request, DcmsDbContext db, CancellationToken ct) =>
+        {
+            if (!IsOwner(context)) return Results.Forbid();
+            var labLines = request.LabLines?.OrderBy(x => x.LabOrderId).ToArray() ?? [];
+            var lines = request.Lines.OrderBy(x => x.ActivityId).ToArray();
+            if (request.RequestKey == Guid.Empty || (lines.Length == 0 && labLines.Length == 0)
+                || lines.Any(x => x.AmountVnd <= 0) || labLines.Any(x => x.AmountVnd <= 0)
+                || lines.Select(x => x.ActivityId).Distinct().Count() != lines.Length
+                || labLines.Select(x => x.LabOrderId).Distinct().Count() != labLines.Length)
+                return Results.BadRequest("Khoản phân bổ cọc không hợp lệ.");
+            long total;
+            try { total = checked(lines.Sum(x => x.AmountVnd) + labLines.Sum(x => x.AmountVnd)); }
+            catch (OverflowException) { return Results.BadRequest("Số tiền không hợp lệ."); }
+            if (total > 1_000_000_000_000L) return Results.BadRequest("Số tiền vượt giới hạn.");
+
+            await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+            await db.Database.ExecuteSqlInterpolatedAsync(
+                $"SELECT 1 FROM \"TREATMENT_DOSSIER\" WHERE \"Id\" = {dossierId} FOR UPDATE", ct);
+            var current = await ContextAsync(db, dossierId, ct);
+            if (current is null) return Results.NotFound();
+            var old = await db.Database.SqlQuery<string>($"""
+                SELECT "PayloadJson"::text AS "Value" FROM "AUDIT_LOG"
+                WHERE "StorageId" = {request.RequestKey} AND "AuditType" = 'FinanceLedger'
+                  AND "Target" = {dossierId.ToString()}
+                """).SingleOrDefaultAsync(ct);
+            if (old is not null)
+            {
+                using var previous = JsonDocument.Parse(old);
+                using var proposed = JsonDocument.Parse(JsonSerializer.Serialize(new
+                {
+                    kind = "AdvanceApplied", lines, labLines
+                }, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
+                if (!JsonElement.DeepEquals(previous.RootElement, proposed.RootElement))
+                    return Results.Conflict("Mã yêu cầu đã được dùng cho một khoản phân bổ khác.");
+                await transaction.CommitAsync(ct);
+                return Results.Ok(current);
+            }
+            if (total > current.AdvanceReceivedVnd)
+                return Results.Conflict("Số dư cọc không đủ. Vui lòng tải lại.");
+            if (lines.Any(line => current.Lines.All(x => x.ActivityId != line.ActivityId || line.AmountVnd > x.DueVnd)))
+                return Results.Conflict("Dịch vụ hoặc số còn phải thu đã thay đổi. Vui lòng tải lại.");
+            if (!ValidateLabPayment(current, lines, labLines))
+                return Results.Conflict("Cần ưu tiên đủ 30% phí labo trước khi phân bổ cọc cho dịch vụ khác.");
+            var payload = JsonSerializer.Serialize(new { kind = "AdvanceApplied", lines, labLines },
+                new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            var inserted = await db.Database.ExecuteSqlInterpolatedAsync($"""
+                INSERT INTO "AUDIT_LOG" ("StorageId", "AuditType", "Action", "ActorId", "At",
+                    "PatientId", "BranchId", "Target", "PayloadJson")
+                VALUES ({request.RequestKey}, 'FinanceLedger', 'AdvanceApplied',
+                    {((CurrentUser)context.Items["CurrentUser"]!).Id}, {DateTimeOffset.UtcNow},
+                    {current.PatientId}, {current.BranchId}, {dossierId.ToString()}, {payload}::jsonb)
+                ON CONFLICT ("StorageId") DO NOTHING
+                """, ct);
+            if (inserted != 1) return Results.Conflict("Mã yêu cầu đã được dùng.");
+            var updated = await ContextAsync(db, dossierId, ct);
+            await transaction.CommitAsync(ct);
+            return Results.Ok(updated);
+        });
+        group.MapPost("/no-show-forfeit", async (HttpContext context, Guid dossierId,
+            ForfeitNoShowDeposit request, DcmsDbContext db, CancellationToken ct) =>
+        {
+            if (!IsOwner(context)) return Results.Forbid();
+            var reason = request.Reason?.Trim();
+            if (request.RequestKey == Guid.Empty || request.ExpectedVersion < 1 ||
+                string.IsNullOrWhiteSpace(reason) || reason.Length > 500)
+                return Results.BadRequest("Cần nhập lý do khách không đến.");
+            await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+            await db.Database.ExecuteSqlInterpolatedAsync(
+                $"SELECT 1 FROM \"TREATMENT_DOSSIER\" WHERE \"Id\" = {dossierId} FOR UPDATE", ct);
+            var previous = await db.Database.SqlQuery<string>($"""
+                SELECT "PayloadJson"::text AS "Value" FROM "AUDIT_LOG"
+                WHERE "StorageId" = {request.RequestKey} AND "AuditType" = 'FinanceLedger'
+                    AND "Target" = {dossierId.ToString()} AND "Action" = 'AdvanceForfeited'
+                """).SingleOrDefaultAsync(ct);
+            if (previous is not null)
+            {
+                using var document = JsonDocument.Parse(previous);
+                if (document.RootElement.GetProperty("reason").GetString() != reason ||
+                    document.RootElement.GetProperty("expectedVersion").GetInt32() != request.ExpectedVersion)
+                    return Results.Conflict("Mã yêu cầu đã được dùng cho thao tác khác.");
+                await transaction.CommitAsync(ct);
+                return Results.Ok(new { forfeitedVnd = document.RootElement.GetProperty("amountVnd").GetInt64() });
+            }
+            var dossier = await db.TreatmentDossiers.SingleOrDefaultAsync(x => x.Id == dossierId, ct);
+            if (dossier is null) return Results.NotFound();
+            if (dossier.State != "Open" || dossier.Version != request.ExpectedVersion)
+                return Results.Conflict("Phiếu đã thay đổi. Vui lòng tải lại.");
+            if (await db.ClinicalActivities.AnyAsync(x => x.DossierId == dossierId && x.State == "Posted", ct)
+                || await db.LabOrders.AnyAsync(x => x.DossierId == dossierId, ct))
+                return Results.Conflict("Phiếu đã có điều trị hoặc labo, không thể xóa do khách không đến.");
+            var current = await ContextAsync(db, dossierId, ct);
+            if (current is null || current.AdvanceReceivedVnd <= 0)
+                return Results.Conflict("Phiếu không có số dư cọc để ghi nhận bỏ cọc.");
+            var hasOtherMoney = await db.Database.SqlQuery<int>($"""
+                SELECT 1 AS "Value" FROM "AUDIT_LOG" WHERE "AuditType" = 'FinanceLedger'
+                    AND "Target" = {dossierId.ToString()}
+                    AND "Action" NOT IN ('AdvanceCash', 'AdvanceTransfer') LIMIT 1
+                """).AnyAsync(ct);
+            if (hasOtherMoney) return Results.Conflict("Phiếu đã sử dụng cọc hoặc có giao dịch dịch vụ.");
+            var hasUnsettledOrder = await db.Database.SqlQuery<int>($"""
+                SELECT 1 AS "Value" FROM "AUDIT_LOG" order_log
+                WHERE order_log."AuditType" = 'FinancePayOsOrder'
+                    AND order_log."Target" = {dossierId.ToString()}
+                    AND NOT EXISTS (SELECT 1 FROM "AUDIT_LOG" payment
+                        WHERE payment."AuditType" = 'FinanceLedger'
+                          AND payment."Action" IN ('TreatmentTransferPayment', 'AdvanceTransfer')
+                          AND payment."PayloadJson"->>'orderId' = order_log."StorageId"::text)
+                LIMIT 1
+                """).AnyAsync(ct);
+            if (hasUnsettledOrder) return Results.Conflict("Phiếu còn QR chuyển khoản chưa đối soát.");
+            var payload = JsonSerializer.Serialize(new { kind = "AdvanceForfeited", amountVnd = current.AdvanceReceivedVnd,
+                expectedVersion = request.ExpectedVersion, reason }, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            var inserted = await db.Database.ExecuteSqlInterpolatedAsync($"""
+                INSERT INTO "AUDIT_LOG" ("StorageId", "AuditType", "Action", "ActorId", "At",
+                    "PatientId", "BranchId", "Target", "PayloadJson")
+                VALUES ({request.RequestKey}, 'FinanceLedger', 'AdvanceForfeited',
+                    {((CurrentUser)context.Items["CurrentUser"]!).Id}, {DateTimeOffset.UtcNow},
+                    {current.PatientId}, {current.BranchId}, {dossierId.ToString()}, {payload}::jsonb)
+                ON CONFLICT ("StorageId") DO NOTHING
+                """, ct);
+            if (inserted != 1) return Results.Conflict("Mã yêu cầu đã được dùng.");
+            dossier.State = "Deleted";
+            dossier.Version++;
+            dossier.UpdatedAt = DateTimeOffset.UtcNow;
+            db.TreatmentEvents.Add(new DCMS.Domain.Features.Treatment.TreatmentEvent
+            {
+                DossierId = dossierId, ActorId = ((CurrentUser)context.Items["CurrentUser"]!).Id,
+                Kind = "DossierNoShowDeleted", DossierVersion = dossier.Version,
+                OccurredAt = DateTimeOffset.UtcNow, PayloadJson = payload
+            });
+            await db.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+            return Results.Ok(new { forfeitedVnd = current.AdvanceReceivedVnd });
+        });
+        group.MapPost("/cancel-dossier", async (HttpContext context, Guid dossierId,
+            CancelTreatmentDossier request, DcmsDbContext db,
+            DCMS.Application.Features.Settings.ISettingsAccess access, CancellationToken ct) =>
+        {
+            if (!IsOwner(context) && (context.Items["CurrentUser"] is not CurrentUser currentUser
+                || !currentUser.Permissions.Contains("treatment.dossiers.update"))) return Results.Forbid();
+            // Non-owners reach this endpoint, so the dossier must belong to a branch the caller is assigned to.
+            var dossierBranchId = await db.TreatmentDossiers.AsNoTracking().Where(x => x.Id == dossierId && x.State != "Deleted")
+                .Select(x => (int?)x.BranchId).SingleOrDefaultAsync(ct);
+            if (dossierBranchId is null) return Results.NotFound();
+            var scope = await access.ResolveAsync(((CurrentUser)context.Items["CurrentUser"]!).Id, ct);
+            if (!scope.BranchIds.Contains(dossierBranchId.Value)) return Results.Forbid();
+            var reason = string.IsNullOrWhiteSpace(request.Reason) ? "Hủy phiếu" : request.Reason.Trim();
+            if (request.RequestKey == Guid.Empty || request.ExpectedVersion < 1 || reason.Length > 1000)
+                return Results.BadRequest("Cần nhập lý do hủy phiếu.");
+            await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+            await db.Database.ExecuteSqlInterpolatedAsync(
+                $"SELECT 1 FROM \"TREATMENT_DOSSIER\" WHERE \"Id\" = {dossierId} FOR UPDATE", ct);
+            var previous = await db.Database.SqlQuery<string>($"""
+                SELECT "PayloadJson"::text AS "Value" FROM "AUDIT_LOG"
+                WHERE "StorageId" = {request.RequestKey} AND "AuditType" = 'FinanceLedger'
+                    AND "Target" = {dossierId.ToString()} AND "Action" = 'DossierCancelled'
+                """).SingleOrDefaultAsync(ct);
+            if (previous is not null)
+            {
+                using var document = JsonDocument.Parse(previous);
+                if (document.RootElement.GetProperty("reason").GetString() != reason ||
+                    document.RootElement.GetProperty("expectedVersion").GetInt32() != request.ExpectedVersion)
+                    return Results.Conflict("Mã yêu cầu đã được dùng cho thao tác khác.");
+                await transaction.CommitAsync(ct);
+                return Results.Ok(new { status = "Cancelled" });
+            }
+            var dossier = await db.TreatmentDossiers.SingleOrDefaultAsync(x => x.Id == dossierId, ct);
+            if (dossier is null || dossier.State == "Deleted") return Results.NotFound();
+            if (dossier.State == "Cancelled" || dossier.Version != request.ExpectedVersion)
+                return Results.Conflict("Phiếu đã thay đổi. Vui lòng tải lại.");
+            var hasUnsettledOrder = await db.Database.SqlQuery<int>($"""
+                SELECT 1 AS "Value" FROM "AUDIT_LOG" order_log
+                WHERE order_log."AuditType" = 'FinancePayOsOrder'
+                    AND order_log."Target" = {dossierId.ToString()}
+                    AND NOT EXISTS (SELECT 1 FROM "AUDIT_LOG" payment
+                        WHERE payment."AuditType" = 'FinanceLedger'
+                          AND payment."Action" IN ('TreatmentTransferPayment', 'AdvanceTransfer')
+                          AND payment."PayloadJson"->>'orderId' = order_log."StorageId"::text)
+                LIMIT 1
+                """).AnyAsync(ct);
+            if (hasUnsettledOrder) return Results.Conflict("Phiếu còn QR chuyển khoản chưa đối soát.");
+            var actor = ((CurrentUser)context.Items["CurrentUser"]!).Id;
+            var now = DateTimeOffset.UtcNow;
+            var payload = JsonSerializer.Serialize(new { kind = "DossierCancelled", reason,
+                expectedVersion = request.ExpectedVersion }, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            var inserted = await db.Database.ExecuteSqlInterpolatedAsync($"""
+                INSERT INTO "AUDIT_LOG" ("StorageId", "AuditType", "Action", "ActorId", "At",
+                    "PatientId", "BranchId", "Target", "PayloadJson")
+                VALUES ({request.RequestKey}, 'FinanceLedger', 'DossierCancelled', {actor}, {now},
+                    {dossier.PatientId}, {dossier.BranchId}, {dossierId.ToString()}, {payload}::jsonb)
+                ON CONFLICT ("StorageId") DO NOTHING
+                """, ct);
+            if (inserted != 1) return Results.Conflict("Mã yêu cầu đã được dùng.");
+            dossier.State = "Cancelled";
+            dossier.ClosureOutcome = "Cancelled";
+            dossier.ClosureReason = reason;
+            dossier.ClosedAt = now;
+            dossier.ClosedBy = actor;
+            dossier.Version++;
+            dossier.UpdatedAt = now;
+            db.TreatmentEvents.Add(new DCMS.Domain.Features.Treatment.TreatmentEvent
+            {
+                DossierId = dossierId, ActorId = actor, Kind = "DossierCancelled",
+                DossierVersion = dossier.Version, OccurredAt = now, PayloadJson = payload
+            });
+            await db.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+            return Results.Ok(new { status = "Cancelled" });
+        });
         TreatmentPayOsEndpoints.Map(group);
     }
 
     internal static async Task<TreatmentPaymentContext?> ContextAsync(DcmsDbContext db, Guid dossierId, CancellationToken ct)
     {
         var dossier = await db.TreatmentDossiers.AsNoTracking()
-            .Where(x => x.Id == dossierId && x.State != "Deleted")
+            .Where(x => x.Id == dossierId && x.State != "Deleted" && x.State != "Cancelled")
             .Select(x => new { x.Id, x.PatientId, x.BranchId }).SingleOrDefaultAsync(ct);
         if (dossier is null) return null;
         var activities = await db.ClinicalActivities.AsNoTracking()
@@ -161,7 +375,7 @@ public static class TreatmentPaymentEndpoints
                 FROM "AUDIT_LOG" entry
                 CROSS JOIN LATERAL jsonb_array_elements(entry."PayloadJson"->'lines') line(row)
                 WHERE entry."AuditType" = 'FinanceLedger'
-                  AND entry."Action" IN ('TreatmentCashPayment', 'TreatmentTransferPayment')
+                  AND entry."Action" IN ('TreatmentCashPayment', 'TreatmentTransferPayment', 'AdvanceApplied')
                   AND entry."Target" = {dossierId.ToString()}
                   AND entry."PatientId" = {dossier.PatientId}
                   AND entry."BranchId" = {dossier.BranchId}
@@ -205,13 +419,33 @@ public static class TreatmentPaymentEndpoints
                 WHERE a."AuditType" = 'FinanceLegacyArchive' AND a."Target" = 'PAYMENT_RECEIPT'
                   AND item.row->>'Purpose' = 'Advance' AND item.row->>'State' = 'Posted'
                   AND item.row->>'DossierId' = {dossierId.ToString()}), 0)
+              - COALESCE((SELECT sum((allocation.row->>'AmountVnd')::bigint)
+                  FROM "AUDIT_LOG" a CROSS JOIN LATERAL jsonb_array_elements(a."PayloadJson"->'rows') allocation(row)
+                  JOIN "AUDIT_LOG" i ON i."AuditType" = 'FinanceLegacyArchive'
+                      AND i."Target" = 'FINANCE_INVOICE_LINE'
+                  CROSS JOIN LATERAL jsonb_array_elements(i."PayloadJson"->'rows') invoice(row)
+                  JOIN "AUDIT_LOG" c ON c."AuditType" = 'FinanceLegacyArchive'
+                      AND c."Target" = 'FINANCE_CHARGE'
+                  CROSS JOIN LATERAL jsonb_array_elements(c."PayloadJson"->'rows') charge(row)
+                  WHERE a."AuditType" = 'FinanceLegacyArchive' AND a."Target" = 'FINANCE_ADVANCE_ALLOCATION'
+                    AND invoice.row->>'Id' = allocation.row->>'InvoiceLineId'
+                    AND charge.row->>'Id' = invoice.row->>'ChargeId'
+                    AND charge.row->>'DossierId' = {dossierId.ToString()}), 0)
               + COALESCE((SELECT sum((entry."PayloadJson"->>'amountVnd')::bigint
                   - COALESCE((SELECT sum((priority.row->>'amountVnd')::bigint)
                       FROM jsonb_array_elements(COALESCE(entry."PayloadJson"->'labPriority', '[]'::jsonb)
                           || COALESCE(entry."PayloadJson"->'labLines', '[]'::jsonb)) priority(row)), 0))
                 FROM "AUDIT_LOG" entry WHERE entry."AuditType" = 'FinanceLedger'
                   AND entry."Action" IN ('AdvanceCash', 'AdvanceTransfer')
-                  AND entry."Target" = {dossierId.ToString()}), 0) AS "Value"
+                  AND entry."Target" = {dossierId.ToString()}), 0)
+              - COALESCE((SELECT sum(COALESCE((
+                    SELECT sum((line.row->>'amountVnd')::bigint)
+                    FROM jsonb_array_elements(COALESCE(entry."PayloadJson"->'lines', '[]'::jsonb)
+                        || COALESCE(entry."PayloadJson"->'labLines', '[]'::jsonb)) line(row)), 0))
+                  FROM "AUDIT_LOG" entry
+                  WHERE entry."AuditType" = 'FinanceLedger'
+                    AND entry."Action" = 'AdvanceApplied'
+                    AND entry."Target" = {dossierId.ToString()}), 0) AS "Value"
             """).SingleAsync(ct);
         return new(dossier.Id, dossier.PatientId, dossier.BranchId, lines, advance, labFees,
             checked(lines.Sum(x => x.PriceVnd) + labFees.Sum(x => x.TotalFeeVnd)), labFees.Sum(x => x.PaidVnd));

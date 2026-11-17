@@ -26,6 +26,7 @@ export default function AccountHomeScreen() {
     <Text style={styles.section}>Chăm sóc của tôi</Text>
     {user.accountType === 'Public' ? <>
       <Item title="Lịch hẹn" onPress={() => go('/(account)/appointments')} />
+      <Item title="Người thân" onPress={() => go('/(account)/family-members')} />
       <Item title="Bệnh án" onPress={() => go('/(account)/medical-records')} />
       <Item title="Kết quả khám" onPress={() => go('/(account)/visit-results')} />
       <Item title="Đơn thuốc" onPress={() => go('/(account)/prescriptions')} />

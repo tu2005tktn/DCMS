@@ -5,8 +5,7 @@ const routes = [
   '/appointments', `/appointments/${id}`, '/working-schedules', '/booking-settings',
   '/patients', '/patients/1', '/patients/1/documents', '/reception', `/reception/appointments/${id}`,
   `/visits/${id}`, `/visits/${id}/prescription`, `/visits/${id}/payments`,
-  `/patients/1/dossiers/${id}`, `/patients/1/dossiers/${id}/plan`,
-  `/patients/1/dossiers/${id}/plan/revise/${id}`, '/treatment-templates', '/commercial/treatment',
+  '/treatment-templates', '/commercial/treatment',
   '/payments', `/payments/${id}/print`, '/clinical-services', '/accounts', '/system-settings',
   '/link-verification', '/support-inbox', '/materials', '/revenue', '/work-statistics',
 ];

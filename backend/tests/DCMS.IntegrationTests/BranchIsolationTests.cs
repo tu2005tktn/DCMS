@@ -133,6 +133,15 @@ public sealed class BranchIsolationTests(ApiFixture fixture) : IClassFixture<Api
         var q = Uri.EscapeDataString(w.PatientName);
         Assert.Empty((await dentistB.GetFromJsonAsync<WorkStatisticsPage>($"/api/work-statistics?q={q}&pageSize=100"))!.Items);
         Assert.NotEmpty((await dentistA.GetFromJsonAsync<WorkStatisticsPage>($"/api/work-statistics?q={q}&pageSize=100"))!.Items);
+        Assert.Empty((await dentistB.GetFromJsonAsync<WorkStatisticsPage>($"/api/work-statistics?dossierId={w.DossierA}"))!.Items);
+        Assert.Single((await dentistA.GetFromJsonAsync<WorkStatisticsPage>($"/api/work-statistics?dossierId={w.DossierA}"))!.Items);
+
+        // Hủy phiếu: nha sĩ chi nhánh B không hủy được phiếu của chi nhánh A.
+        var dossierA = (await dentistA.GetFromJsonAsync<TreatmentDossierDto>($"/api/dossiers/{w.DossierA}"))!;
+        var cancelB = await dentistB.PostAsJsonAsync($"/api/dossiers/{w.DossierA}/payments/cancel-dossier",
+            new DCMS.Api.Features.Finance.CancelTreatmentDossier(Guid.NewGuid(), dossierA.Version, "SYNTHETIC lén hủy"));
+        Assert.Equal(HttpStatusCode.Forbidden, cancelB.StatusCode);
+        Assert.Equal("Open", (await dentistA.GetFromJsonAsync<TreatmentDossierDto>($"/api/dossiers/{w.DossierA}"))!.State);
 
         // Phía chi nhánh A và chủ phòng khám vẫn thấy dữ liệu của mình.
         Assert.Contains((await dentistA.GetFromJsonAsync<LabWorkPage>("/api/lab-orders?pageSize=100"))!.Items, x => x.Id == w.LabOrderA);
