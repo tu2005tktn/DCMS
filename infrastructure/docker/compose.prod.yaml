@@ -1,0 +1,101 @@
+# Production-like stack for a VPN-only server. See docs/implementation/DEPLOY-SERVER-WIREGUARD.vi.md.
+# Run from the repository root:
+#   docker compose --env-file .env -f infrastructure/docker/compose.prod.yaml up -d --build
+name: dcms
+x-api-env: &api-env
+  ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+  Jwt__SigningKey: ${JWT_SIGNING_KEY:?Set JWT_SIGNING_KEY in .env}
+  Cors__AllowedOrigins__0: ${PUBLIC_WEB_URL:?Set PUBLIC_WEB_URL in .env}
+  ClinicalDocuments__StoragePath: /data/clinical-documents
+  ClinicalDocuments__ClamAvHost: clamav
+  ClinicalDocuments__ClamAvPort: "3310"
+  BranchAssets__StoragePath: /data/branch-assets
+  DevSeed__Password: ${DEV_SEED_PASSWORD:-}
+  Google__WebClientId: ${GOOGLE_WEB_CLIENT_ID:-}
+  Smtp__Host: ${SMTP_HOST:-}
+  Smtp__Port: ${SMTP_PORT:-465}
+  Smtp__EnableSsl: ${SMTP_ENABLE_SSL:-true}
+  Smtp__UserName: ${SMTP_USERNAME:-}
+  Smtp__Password: ${SMTP_PASSWORD:-}
+  Smtp__FromAddress: ${SMTP_FROM_ADDRESS:-}
+  Smtp__FromName: ${SMTP_FROM_NAME:-DCMS}
+  PayOs__ClientId: ${PAYOS_CLIENT_ID:-}
+  PayOs__ApiKey: ${PAYOS_API_KEY:-}
+  PayOs__ChecksumKey: ${PAYOS_CHECKSUM_KEY:-}
+  TZ: Asia/Ho_Chi_Minh
+x-api-volumes: &api-volumes
+  - dcms_clinical_documents:/data/clinical-documents
+  - dcms_branch_assets:/data/branch-assets
+  - dcms_dataprotection:/home/app/.aspnet
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      TZ: Asia/Ho_Chi_Minh
+    volumes:
+      - dcms_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  clamav:
+    image: clamav/clamav:stable
+    restart: unless-stopped
+    volumes:
+      - dcms_clamav_data:/var/lib/clamav
+  api:
+    build: { context: ../../backend }
+    image: dcms-api:latest
+    restart: unless-stopped
+    environment: *api-env
+    volumes: *api-volumes
+    depends_on:
+      postgres: { condition: service_healthy }
+  web:
+    build: { context: ../../web }
+    image: dcms-web:latest
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-80}:80"
+    depends_on: [api]
+  # Public access through Cloudflare Tunnel; enable with COMPOSE_PROFILES=public in .env.
+  cloudflared:
+    image: cloudflare/cloudflared:2025.8.1
+    profiles: ["public"]
+    restart: unless-stopped
+    command: ["tunnel", "--no-autoupdate", "run"]
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    depends_on: [web]
+  # One-off jobs: Program.cs only allows these commands in Development, so they run in a short-lived container.
+  migrate:
+    image: dcms-api:latest
+    profiles: ["tools"]
+    environment:
+      <<: *api-env
+      ASPNETCORE_ENVIRONMENT: Development
+    volumes: *api-volumes
+    depends_on:
+      postgres: { condition: service_healthy }
+    command: ["--migrate"]
+  seed:
+    image: dcms-api:latest
+    profiles: ["tools"]
+    environment:
+      <<: *api-env
+      ASPNETCORE_ENVIRONMENT: Development
+    volumes: *api-volumes
+    depends_on:
+      postgres: { condition: service_healthy }
+    entrypoint: ["sh", "-c", "dotnet DCMS.Api.dll --seed-demo && dotnet DCMS.Api.dll --seed-clinic-catalog"]
+volumes:
+  dcms_postgres_data:
+  dcms_clamav_data:
+  dcms_clinical_documents:
+  dcms_branch_assets:
+  dcms_dataprotection:
