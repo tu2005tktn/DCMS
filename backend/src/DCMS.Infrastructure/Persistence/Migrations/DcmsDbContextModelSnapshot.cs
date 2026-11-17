@@ -5664,14 +5664,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(160)")
                         .HasColumnName("ServiceNameSnapshot");
 
-                    b.Property<string>("SourceKind")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
-                        .HasDefaultValue("Visit")
-                        .HasColumnName("SourceKind");
-
                     b.Property<string>("State")
                         .IsRequired()
                         .HasMaxLength(16)

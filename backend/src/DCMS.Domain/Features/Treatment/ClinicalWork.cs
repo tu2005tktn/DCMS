@@ -9,7 +9,8 @@ public abstract class TreatmentProcessRecord
 
 public sealed class ClinicalActivity : TreatmentProcessRecord
 {
-    public string SourceKind { get; set; } = "Visit";
+    // Derived from VisitId (not stored): dossier-sheet activities have no visit.
+    public string SourceKind => VisitId.HasValue ? "Visit" : "Dossier";
     public string? ServiceNameSnapshot { get; set; }
     public string? LabWorkSnapshot { get; set; }
     public bool IsPlanTransfer { get; set; }

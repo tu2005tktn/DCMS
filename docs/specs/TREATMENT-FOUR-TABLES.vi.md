@@ -50,3 +50,5 @@ Trong lúc kiểm chứng, schema `dcms_test_*` còn sót từ các lượt test
 ## Phạm vi kiểm tra
 
 Kiểm tra cấu hình mẫu, áp dụng và tùy chỉnh hạng mục, bản nháp và xác nhận kế hoạch, chỉnh sửa kế hoạch, tiến độ, lần điều trị thực tế, đánh giá, ghi chú, tái khám và đặt lịch, bàn giao từ khám, labo, vật tư và thanh toán. Bổ sung kiểm thử rollback, ID trùng giữa các loại quá trình, cập nhật collection đồng thời và sự kiện tiến độ cũ thiếu phiên bản. Chạy backend restore/build, web install/build, kiểm tra model/migration và API health sau chuyển đổi.
+
+Cập nhật 18/11/2026: cột `SourceKind` của `CLINICAL_ACTIVITY` được bỏ, suy ra từ `VisitId`; xem [rút gọn bảng CLINICAL_ACTIVITY](CLINICAL-ACTIVITY-TABLE-SIMPLIFICATION.vi.md).

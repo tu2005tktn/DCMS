@@ -10,7 +10,6 @@ internal static class ClinicalWorkModel
         model.Entity<ClinicalActivity>(b =>
         {
 
-            b.Property(x => x.SourceKind).HasMaxLength(16).HasDefaultValue("Visit");
             b.Property(x => x.ServiceNameSnapshot).HasMaxLength(160);
             b.Property(x => x.LabWorkSnapshot).HasMaxLength(1000);
             b.HasIndex(x => new { x.ItemId, x.PlanVersion }).IsUnique().HasFilter("\"IsPlanTransfer\" = TRUE");

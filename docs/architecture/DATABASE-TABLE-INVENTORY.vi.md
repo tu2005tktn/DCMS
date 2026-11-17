@@ -36,7 +36,7 @@ Thông báo chỉ còn `IN_APP_NOTIFICATION`; lượt gửi và việc nhân vi�
 | `TREATMENT_DOSSIER` | Hồ sơ điều trị, bệnh nhân, chi nhánh, thông tin và phiên bản kế hoạch, trạng thái tổng thể; bản nháp phiếu và bản nháp chỉnh sửa kế hoạch trong JSONB. |
 | `TREATMENT_PLAN_ITEM` | Các mục dịch vụ trong kế hoạch điều trị với giá đã thỏa thuận; các bước thực hiện và trạng thái tiến độ trong JSONB. |
 | `TREATMENT_TEMPLATE` | Mẫu kế hoạch điều trị dùng lại; dòng dịch vụ, nhân sự và các phiên bản mẫu cũ trong JSONB. |
-| `CLINICAL_ACTIVITY` | Quá trình điều trị phân theo loại bản ghi: hoạt động điều trị thực tế, phiếu đánh giá lâm sàng, ghi chú chăm sóc và hướng dẫn tái khám kèm liên kết lịch hẹn. |
+| `CLINICAL_ACTIVITY` | Quá trình điều trị phân theo loại bản ghi: hoạt động điều trị thực tế, phiếu đánh giá lâm sàng, ghi chú chăm sóc và hướng dẫn tái khám kèm liên kết lịch hẹn; nguồn của hoạt động (lượt khám hay phiếu điều trị) suy ra từ `VisitId`. Xem [rút gọn bảng](../specs/CLINICAL-ACTIVITY-TABLE-SIMPLIFICATION.vi.md). |
 | `CARE_TASK` | Công việc chăm sóc hoặc theo dõi bệnh nhân; các lần liên hệ và các lần chuyển cấp xử lý trong JSONB. |
 | `LAB_ORDER` | Phiếu labo theo hoạt động điều trị: xưởng, loại công việc, răng, màu, ngày gửi/nhận/giao, trạng thái và phí labo; lịch sử trạng thái trong JSONB. |
 | `LAB_WORK_TYPE` | Danh mục labo: loại công việc theo xưởng, đơn vị, giá tham khảo và bảo hành. |

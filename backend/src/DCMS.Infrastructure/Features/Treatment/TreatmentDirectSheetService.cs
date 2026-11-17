@@ -114,7 +114,7 @@ public sealed partial class TreatmentDossierService
         x.DossierId, x.ItemId, x.StepId, x.PlanVersion, x.ServiceId, x.Region, x.Unit, x.Quantity, x.PerformedAt,
         x.ElapsedMinutes, x.PerformerId, x.Outcome, x.NextSteps, x.ChargingBasis, x.ChargingBasisEvidence,
         x.PriceSnapshotVnd, x.ReviewId, x.State, x.Version, x.CreatedAt, x.PostedAt, x.FeeStatus,
-        x.DiscountSnapshotVnd, x.AssistantId, x.RecordedBy, x.SourceKind, x.ServiceNameSnapshot, x.LabWorkSnapshot);
+        x.DiscountSnapshotVnd, x.AssistantId, x.RecordedBy, (x.VisitId == null ? "Dossier" : "Visit"), x.ServiceNameSnapshot, x.LabWorkSnapshot);
 
     private async Task<ActivityDto> RecordDossierActivityAsync(int actorId, TreatmentDossier dossier, TreatmentItem item,
         Guid activityId, DateOnly? date, string? note, bool transfer, Guid key, CancellationToken ct, string? labWork = null, SheetRow? input = null)
@@ -136,7 +136,7 @@ public sealed partial class TreatmentDossierService
         catch (ArgumentOutOfRangeException) { throw Error("MSG252"); }
         var assistant = input == null ? item.AssistantId : input.AssistantId;
         if (assistant.HasValue && !await db.SchedulingMembers.AnyAsync(x => x.BranchId == dossier.BranchId && x.EmployeeId == assistant && x.Active && !x.CanDentist, ct)) throw Error("MSG04");
-        var activity = new ClinicalActivity { Id = activityId, SourceKind = "Dossier", ServiceNameSnapshot = service == null || service.Id == item.ServiceId ? item.ServiceName : service.Name,
+        var activity = new ClinicalActivity { Id = activityId, ServiceNameSnapshot = service == null || service.Id == item.ServiceId ? item.ServiceName : service.Name,
             LabWorkSnapshot = Clean(labWork), IsPlanTransfer = transfer, PatientId = dossier.PatientId, BranchId = dossier.BranchId, DossierId = dossier.Id,
             ItemId = item.Id, PlanVersion = dossier.PlanVersion, ServiceId = service?.Id ?? item.ServiceId, Unit = service?.Unit ?? item.Unit,
             Quantity = qty, Region = input == null ? item.Region : Clean(string.Join(", ", input.Regions ?? [])), PerformerId = employee, AssistantId = assistant,

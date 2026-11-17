@@ -34,7 +34,7 @@ public sealed class CareLabStorageTests(ApiFixture fixture) : IClassFixture<ApiF
         });
         var activity = new ClinicalActivity
         {
-            SourceKind = "Dossier", PatientId = 1, BranchId = 1, DossierId = Guid.NewGuid(), ServiceId = 1, Unit = "răng", Quantity = 1,
+            PatientId = 1, BranchId = 1, DossierId = Guid.NewGuid(), ServiceId = 1, Unit = "răng", Quantity = 1,
             PerformedAt = now, PerformerId = 1, Outcome = "SYNTHETIC outcome", ChargingBasis = "Included", PriceSnapshotVnd = 0, State = "Posted", CreatedAt = now
         };
         var order = new LabOrder
