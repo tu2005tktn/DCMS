@@ -2,7 +2,7 @@
 export type CareStatus = 'Open' | 'InProgress' | 'Done' | 'Cancelled';
 export type StatusFilter = CareStatus | 'Pending';
 export type CareTask = { id: string; patientId: number; branchId: number; instructionId: string | null; appointmentId: string | null;
-  reviewId: string | null; type: string; content: string; ownerAccountId: number | null; dueAt: string; status: CareStatus; version: number;
+  type: string; content: string; ownerAccountId: number | null; dueAt: string; status: CareStatus; version: number;
   allowedActions: string[] };
 export type CareWorklistItem = { task: CareTask; branchName: string; patientCode: string; patientName: string; phone: string | null; typeName: string;
   ownerName: string | null; lastContactResult: string | null; lastContactAt: string | null };

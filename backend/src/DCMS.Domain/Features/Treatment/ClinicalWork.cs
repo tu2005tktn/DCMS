@@ -37,46 +37,10 @@ public sealed class ClinicalActivity : TreatmentProcessRecord
     public string ChargingBasis { get; set; } = "Included";
     public string? ChargingBasisEvidence { get; set; }
     public decimal PriceSnapshotVnd { get; set; }
-    public Guid? ReviewId { get; set; }
     public string State { get; set; } = "Draft";
     public int Version { get; set; } = 1;
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? PostedAt { get; set; }
-}
-
-public sealed class ClinicalReview : TreatmentProcessRecord
-{
-    public Guid VisitId { get; set; }
-    public int PatientId { get; set; }
-    public int BranchId { get; set; }
-    public Guid? SourceActivityId { get; set; }
-    public Guid? SourceItemId { get; set; }
-    public string Complaint { get; set; } = "";
-    public string Findings { get; set; } = "";
-    public string Coverage { get; set; } = "PendingAssessment";
-    public string Outcome { get; set; } = "AdviceOnly";
-    public string? CoveredComponent { get; set; }
-    public string? Exclusions { get; set; }
-    public string? Policy { get; set; }
-    public string? PolicyVersion { get; set; }
-    public string? Basis { get; set; }
-    public string? NextAction { get; set; }
-    public int DentistAccountId { get; set; }
-    public DateTimeOffset RecordedAt { get; set; }
-    public int Version { get; set; } = 1;
-}
-
-public sealed class ClinicalCareNote : TreatmentProcessRecord
-{
-    public Guid VisitId { get; set; }
-    public int PatientId { get; set; }
-    public int BranchId { get; set; }
-    public Guid? SourceActivityId { get; set; }
-    public Guid? ReviewId { get; set; }
-    public string Content { get; set; } = "";
-    public string? Response { get; set; }
-    public int ActorId { get; set; }
-    public DateTimeOffset RecordedAt { get; set; }
 }
 
 public sealed class ClinicalCommandReceipt : DCMS.Domain.Common.CommandReceiptRecord
@@ -93,7 +57,6 @@ public sealed class CareTask
     public int BranchId { get; set; }
     public Guid? InstructionId { get; set; }
     public Guid? AppointmentId { get; set; }
-    public Guid? ReviewId { get; set; }
     public string? EpisodeKey { get; set; }
     public string Type { get; set; } = "FollowUp";
     public string Content { get; set; } = "";

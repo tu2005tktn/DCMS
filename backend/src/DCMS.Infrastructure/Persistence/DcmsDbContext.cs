@@ -71,8 +71,6 @@ public sealed partial class DcmsDbContext(DbContextOptions<DcmsDbContext> option
     public DbSet<TreatmentProgressionReceipt> TreatmentProgressionReceipts => Set<TreatmentProgressionReceipt>();
     public DbSet<TreatmentProgressionEvent> TreatmentProgressionEvents => Set<TreatmentProgressionEvent>();
     public DbSet<ClinicalActivity> ClinicalActivities => Set<ClinicalActivity>();
-    public DbSet<ClinicalReview> ClinicalReviews => Set<ClinicalReview>();
-    public DbSet<ClinicalCareNote> ClinicalCareNotes => Set<ClinicalCareNote>();
     public DbSet<ClinicalCommandReceipt> ClinicalCommandReceipts => Set<ClinicalCommandReceipt>();
     public DbSet<CareTask> CareTasks => Set<CareTask>();
     public IQueryable<CareContactAttempt> CareContactAttempts => CareTasks.AsNoTracking().SelectMany(x => x.ContactAttempts);

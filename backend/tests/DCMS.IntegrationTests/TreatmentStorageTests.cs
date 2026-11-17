@@ -129,21 +129,6 @@ public sealed class TreatmentStorageTests(ApiFixture fixture) : IClassFixture<Ap
             Unit = "răng", Quantity = 1.500m, PerformedAt = now, PerformerId = setup.DentistId, Outcome = "SYNTHETIC outcome",
             ChargingBasis = "Included", PriceSnapshotVnd = 100000m, State = "Posted", Version = 2, CreatedAt = now, PostedAt = now
         };
-        // A review and a care note written by the old tables may carry the same id.
-        var sharedId = Guid.NewGuid();
-        var visitId = Guid.NewGuid();
-        var review = new ClinicalReview
-        {
-            Id = sharedId, VisitId = visitId, PatientId = setup.PatientId, BranchId = setup.BranchId, SourceActivityId = activity.Id,
-            SourceItemId = item.Id, Complaint = "SYNTHETIC complaint", Findings = "SYNTHETIC findings", Coverage = "Covered",
-            Outcome = "CoveredCare", CoveredComponent = "SYNTHETIC component", Policy = "SYNTHETIC policy", PolicyVersion = "1",
-            Basis = "SYNTHETIC basis", NextAction = "SYNTHETIC next", DentistAccountId = setup.ActorId, RecordedAt = now, Version = 3
-        };
-        var note = new ClinicalCareNote
-        {
-            Id = sharedId, VisitId = visitId, PatientId = setup.PatientId, BranchId = setup.BranchId, SourceActivityId = activity.Id,
-            ReviewId = sharedId, Content = "SYNTHETIC care note", Response = "SYNTHETIC response", ActorId = setup.ActorId, RecordedAt = now
-        };
         var instruction = new FollowUpInstruction
         {
             PatientId = setup.PatientId, BranchId = setup.BranchId, DossierId = dossier.Id, ItemId = item.Id, StepId = second.Id,
@@ -163,7 +148,7 @@ public sealed class TreatmentStorageTests(ApiFixture fixture) : IClassFixture<Ap
             AggregateId = second.Id, Kind = "step.due", PayloadJson = "{\"planVersion\":1}",
             StableKey = "storage-test:" + second.Id, ActorId = 0, OccurredAt = now
         };
-        db.AddRange(dossier, template, activity, review, note, instruction, planEvent, systemEvent);
+        db.AddRange(dossier, template, activity, instruction, planEvent, systemEvent);
         await db.SaveChangesAsync();
 
         var expectedSteps = item.Steps.Select(Snapshot).ToArray();
@@ -172,8 +157,6 @@ public sealed class TreatmentStorageTests(ApiFixture fixture) : IClassFixture<Ap
         var expectedTemplateItems = template.Items.Select(Snapshot).ToArray();
         var expectedTemplateVersions = template.Versions.Select(Snapshot).ToArray();
         var expectedActivity = Snapshot(activity);
-        var expectedReview = Snapshot(review);
-        var expectedNote = Snapshot(note);
         var expectedInstruction = Snapshot(instruction);
         var expectedPlanEvent = Snapshot(planEvent);
         var expectedSystemEvent = Snapshot(systemEvent);
@@ -188,8 +171,6 @@ public sealed class TreatmentStorageTests(ApiFixture fixture) : IClassFixture<Ap
         Assert.Equal(1, await Count(db, $"SELECT count(*)::integer AS \"Value\" FROM \"TREATMENT_TEMPLATE_ITEM\" WHERE \"TemplateId\"={template.Id}"));
         Assert.Equal(1, await Count(db, $"SELECT count(*)::integer AS \"Value\" FROM \"TREATMENT_TEMPLATE_VERSION\" WHERE \"TemplateId\"={template.Id} AND \"State\"='Active'"));
         Assert.Equal(1, await Count(db, $"SELECT count(*)::integer AS \"Value\" FROM \"CLINICAL_ACTIVITY\" WHERE \"Id\"={activity.Id}"));
-        Assert.Equal(1, await Count(db, $"SELECT count(*)::integer AS \"Value\" FROM \"CLINICAL_REVIEW\" WHERE \"Id\"={sharedId}"));
-        Assert.Equal(1, await Count(db, $"SELECT count(*)::integer AS \"Value\" FROM \"CLINICAL_CARE_NOTE\" WHERE \"Id\"={sharedId} AND \"ReviewId\"={sharedId}"));
         Assert.Equal(1, await Count(db, $"SELECT count(*)::integer AS \"Value\" FROM \"FOLLOW_UP_INSTRUCTION\" WHERE \"Id\"={instruction.Id} AND \"StepId\"={second.Id}"));
         Assert.Equal(1, await Count(db, $"SELECT count(*)::integer AS \"Value\" FROM \"TREATMENT_EVENT\" WHERE \"Id\"={planEvent.Id} AND \"ActorId\"={setup.ActorId}"));
         Assert.Equal(1, await Count(db, $"SELECT count(*)::integer AS \"Value\" FROM \"TREATMENT_PROGRESSION_EVENT\" WHERE \"Id\"={systemEvent.Id} AND \"ActorId\"=0"));
@@ -207,8 +188,6 @@ public sealed class TreatmentStorageTests(ApiFixture fixture) : IClassFixture<Ap
         var restoredActivity = await db.ClinicalActivities.AsNoTracking().SingleAsync(x => x.Id == activity.Id);
         Assert.Equal(activity.Id, restoredActivity.StorageId);
         AssertSame([expectedActivity], [Snapshot(restoredActivity)]);
-        AssertSame([expectedReview], [Snapshot(await db.ClinicalReviews.AsNoTracking().SingleAsync(x => x.Id == sharedId))]);
-        AssertSame([expectedNote], [Snapshot(await db.ClinicalCareNotes.AsNoTracking().SingleAsync(x => x.Id == sharedId))]);
         AssertSame([expectedInstruction], [Snapshot(await db.FollowUpInstructions.AsNoTracking().SingleAsync(x => x.Id == instruction.Id))]);
         AssertSame([expectedPlanEvent], [Snapshot(await db.TreatmentEvents.AsNoTracking().SingleAsync(x => x.Id == planEvent.Id))]);
         AssertSame([expectedSystemEvent], [Snapshot(await db.TreatmentProgressionEvents.AsNoTracking().SingleAsync(x => x.Id == systemEvent.Id))]);

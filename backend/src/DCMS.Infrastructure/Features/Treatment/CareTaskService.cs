@@ -56,7 +56,7 @@ public sealed class CareTaskService(DcmsDbContext db, UserManager<ApplicationUse
     }
 
     private static CareTaskDto Map(CareTask x) => new(x.Id, x.PatientId, x.BranchId,
-        x.InstructionId, x.AppointmentId, x.ReviewId, x.Type, x.Content, x.OwnerAccountId,
+        x.InstructionId, x.AppointmentId, x.Type, x.Content, x.OwnerAccountId,
         x.DueAt, x.Status, x.Version, x.Status is "Done" or "Cancelled" ? [] :
             ["update", "recordContact", "escalate"]);
     private static ContactAttemptDto Map(CareContactAttempt x) => new(x.Id, x.TaskId,
@@ -126,15 +126,12 @@ public sealed class CareTaskService(DcmsDbContext db, UserManager<ApplicationUse
         if (request.AppointmentId.HasValue && !await db.Appointments.AsNoTracking()
             .AnyAsync(x => x.Id == request.AppointmentId && x.BranchId == request.BranchId &&
                 x.PatientId == request.PatientId, ct)) throw Error("MSG113", 404);
-        if (request.ReviewId.HasValue && !await db.ClinicalReviews.AsNoTracking()
-            .AnyAsync(x => x.Id == request.ReviewId && x.PatientId == request.PatientId &&
-                x.BranchId == request.BranchId, ct)) throw Error("MSG113", 404);
         var now = clock.GetUtcNow();
         var row = new CareTask
         {
             PatientId = request.PatientId, BranchId = request.BranchId,
             InstructionId = request.InstructionId, AppointmentId = request.AppointmentId,
-            ReviewId = request.ReviewId, Type = request.Type.Trim(),
+            Type = request.Type.Trim(),
             Content = request.Content.Trim(), OwnerAccountId = request.OwnerAccountId,
             // Npgsql only writes UTC offsets to timestamptz; the Web sends clinic time (+07:00).
             DueAt = request.DueAt.ToUniversalTime(), CreatedBy = actorId, CreatedAt = now, UpdatedAt = now

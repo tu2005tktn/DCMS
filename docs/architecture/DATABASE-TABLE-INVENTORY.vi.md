@@ -7,7 +7,7 @@ Chi nhánh, lịch làm việc và lịch hẹn đã gộp về ba bảng `SCHED
 
 Phần khám đã gộp về `VISIT` và `CLINICAL_DOCUMENT`. Phiếu khám và chỉ định nằm trong lượt khám, các lần đọc tài liệu nằm trong tài liệu. Snapshot bảng tham chiếu cũ nằm trong audit chuyển đổi dùng chung. Xem [thiết kế và kiểm chứng hai bảng khám](../specs/EXAMINATION-TWO-TABLES.vi.md). Ngày 17/11/2026 thêm cột JSONB `AiAnalyses` vào `CLINICAL_DOCUMENT` cho [AI hỗ trợ phát hiện sâu răng](../specs/AI-CARIES-DETECTION.vi.md), không thêm bảng. Cùng ngày rút gọn `VISIT` từ 32 xuống 16 cột; xem [rút gọn bảng VISIT](../specs/VISIT-TABLE-SIMPLIFICATION.vi.md).
 
-Phần điều trị đã gộp về `TREATMENT_DOSSIER`, `TREATMENT_PLAN_ITEM`, `CLINICAL_ACTIVITY` và `TREATMENT_TEMPLATE`. Bản nháp nằm trong phiếu, các bước nằm trong hạng mục, hạng mục và phiên bản mẫu nằm trong mẫu; đánh giá, ghi chú và hướng dẫn tái khám dùng chung bảng quá trình. Sự kiện điều trị và tiến độ nằm trong `AUDIT_LOG`. Xem [thiết kế và kiểm chứng bốn bảng điều trị](../specs/TREATMENT-FOUR-TABLES.vi.md).
+Phần điều trị đã gộp về `TREATMENT_DOSSIER`, `TREATMENT_PLAN_ITEM`, `CLINICAL_ACTIVITY` và `TREATMENT_TEMPLATE`. Bản nháp nằm trong phiếu, các bước nằm trong hạng mục, hạng mục và phiên bản mẫu nằm trong mẫu; hướng dẫn tái khám dùng chung bảng quá trình với hoạt động điều trị. Sự kiện điều trị và tiến độ nằm trong `AUDIT_LOG`. Xem [thiết kế và kiểm chứng bốn bảng điều trị](../specs/TREATMENT-FOUR-TABLES.vi.md).
 
 Chăm sóc bệnh nhân chỉ còn `CARE_TASK`; labo còn phiếu labo `LAB_ORDER` và danh mục labo `LAB_WORK_TYPE`. Phân hệ tài chính đã được gỡ cùng 18 bảng, sẽ đặc tả và thêm lại sau. Xem [chăm sóc, labo và tài chính](../specs/CARE-LAB-FINANCE-STORAGE.vi.md).
 
@@ -36,7 +36,7 @@ Thông báo chỉ còn `IN_APP_NOTIFICATION`; lượt gửi và việc nhân vi�
 | `TREATMENT_DOSSIER` | Hồ sơ điều trị, bệnh nhân, chi nhánh, thông tin và phiên bản kế hoạch, trạng thái tổng thể; bản nháp phiếu và bản nháp chỉnh sửa kế hoạch trong JSONB. |
 | `TREATMENT_PLAN_ITEM` | Các mục dịch vụ trong kế hoạch điều trị với giá đã thỏa thuận; các bước thực hiện và trạng thái tiến độ trong JSONB. |
 | `TREATMENT_TEMPLATE` | Mẫu kế hoạch điều trị dùng lại; dòng dịch vụ, nhân sự và các phiên bản mẫu cũ trong JSONB. |
-| `CLINICAL_ACTIVITY` | Quá trình điều trị phân theo loại bản ghi: hoạt động điều trị thực tế, phiếu đánh giá lâm sàng, ghi chú chăm sóc và hướng dẫn tái khám kèm liên kết lịch hẹn; nguồn của hoạt động (lượt khám hay phiếu điều trị) suy ra từ `VisitId`. Xem [rút gọn bảng](../specs/CLINICAL-ACTIVITY-TABLE-SIMPLIFICATION.vi.md). |
+| `CLINICAL_ACTIVITY` | Quá trình điều trị phân theo loại bản ghi: hoạt động điều trị thực tế và hướng dẫn tái khám kèm liên kết lịch hẹn (đánh giá lâm sàng S63 và ghi chú chăm sóc đã bị xóa ngày 18/11/2026); nguồn của hoạt động (lượt khám hay phiếu điều trị) suy ra từ `VisitId`. Xem [rút gọn bảng](../specs/CLINICAL-ACTIVITY-TABLE-SIMPLIFICATION.vi.md). |
 | `CARE_TASK` | Công việc chăm sóc hoặc theo dõi bệnh nhân; các lần liên hệ và các lần chuyển cấp xử lý trong JSONB. |
 | `LAB_ORDER` | Phiếu labo theo hoạt động điều trị: xưởng, loại công việc, răng, màu, ngày gửi/nhận/giao, trạng thái và phí labo; lịch sử trạng thái trong JSONB. |
 | `LAB_WORK_TYPE` | Danh mục labo: loại công việc theo xưởng, đơn vị, giá tham khảo và bảo hành. |

@@ -99,14 +99,8 @@ public sealed class ClinicalWorkService(DcmsDbContext db, UserManager<Applicatio
         x.BranchId, x.DossierId, x.ItemId, x.StepId, x.PlanVersion, x.ServiceId, x.Region,
         x.Unit, x.Quantity, x.PerformedAt, x.ElapsedMinutes, x.PerformerId, x.Outcome,
         x.NextSteps, x.ChargingBasis, x.ChargingBasisEvidence, x.PriceSnapshotVnd,
-        x.ReviewId, x.State, x.Version,
+        x.State, x.Version,
         x.CreatedAt, x.PostedAt, x.FeeStatus, x.DiscountSnapshotVnd, x.AssistantId, x.RecordedBy, (x.VisitId == null ? "Dossier" : "Visit"), x.ServiceNameSnapshot, x.LabWorkSnapshot);
-    private static ReviewDto Map(ClinicalReview x) => new(x.Id, x.VisitId, x.PatientId,
-        x.BranchId, x.SourceActivityId, x.SourceItemId, x.Complaint, x.Findings, x.Coverage,
-        x.Outcome, x.CoveredComponent, x.Exclusions, x.Policy, x.PolicyVersion, x.Basis,
-        x.NextAction, x.DentistAccountId, x.RecordedAt, x.Version);
-    private static CareNoteDto Map(ClinicalCareNote x) => new(x.Id, x.VisitId, x.PatientId,
-        x.BranchId, x.SourceActivityId, x.ReviewId, x.Content, x.Response, x.ActorId, x.RecordedAt);
 
     private static void Validate(ActivityInput x)
     {
@@ -134,19 +128,11 @@ public sealed class ClinicalWorkService(DcmsDbContext db, UserManager<Applicatio
     private async Task ValidateSourceAsync(ClinicalVisitState visit, ActivityInput x,
         CancellationToken ct)
     {
-        if (x.ChargingBasis == "Free" && !x.ReviewId.HasValue &&
+        if (x.ChargingBasis == "Free" &&
             (!x.ItemId.HasValue || x.PriceSnapshotVnd != 0 || Clean(x.ChargingBasisEvidence) == null)) throw Error("MSG244", 409);
         if (!await db.Set<SchedulingService>().AsNoTracking().AnyAsync(s =>
             s.Id == x.ServiceId && s.BranchId == visit.BranchId && s.Active, ct))
             throw Error("MSG04");
-        if (x.ReviewId.HasValue)
-        {
-            var review = await db.ClinicalReviews.AsNoTracking().SingleOrDefaultAsync(r =>
-                r.Id == x.ReviewId && r.PatientId == visit.PatientId && r.BranchId == visit.BranchId, ct);
-            if (review == null) throw Error("MSG113", 404);
-            if (x.ChargingBasis == "Free" &&
-                (review.Coverage != "Covered" || Clean(review.Basis) == null)) throw Error("MSG244", 409);
-        }
         if (x.DossierId.HasValue)
         {
             var dossier = await db.TreatmentDossiers.Include(d => d.Items)
@@ -219,7 +205,7 @@ public sealed class ClinicalWorkService(DcmsDbContext db, UserManager<Applicatio
             ElapsedMinutes = a.ElapsedMinutes, PerformerId = performer, Outcome = a.Outcome.Trim(),
             NextSteps = Clean(a.NextSteps), ChargingBasis = a.ChargingBasis,
             ChargingBasisEvidence = Clean(a.ChargingBasisEvidence),
-            PriceSnapshotVnd = a.PriceSnapshotVnd, ReviewId = a.ReviewId,
+            PriceSnapshotVnd = a.PriceSnapshotVnd,
             CreatedAt = clock.GetUtcNow()
         };
         db.ClinicalActivities.Add(row);
@@ -250,7 +236,7 @@ public sealed class ClinicalWorkService(DcmsDbContext db, UserManager<Applicatio
         row.ElapsedMinutes = a.ElapsedMinutes; row.Outcome = a.Outcome.Trim();
         row.NextSteps = Clean(a.NextSteps); row.ChargingBasis = a.ChargingBasis;
         row.ChargingBasisEvidence = Clean(a.ChargingBasisEvidence);
-        row.PriceSnapshotVnd = a.PriceSnapshotVnd; row.ReviewId = a.ReviewId; row.Version++;
+        row.PriceSnapshotVnd = a.PriceSnapshotVnd; row.Version++;
         Receipt(actorId, request.RequestKey, "ActivityDraftUpdate", new { id, request }, id);
         await db.SaveChangesAsync(ct);
         return Map(row);
@@ -303,7 +289,7 @@ public sealed class ClinicalWorkService(DcmsDbContext db, UserManager<Applicatio
             row.StepId, row.PlanVersion, row.ServiceId, row.Region, row.Unit, row.Quantity,
             row.PerformedAt, row.ElapsedMinutes, row.Outcome, row.NextSteps, row.ChargingBasis,
             row.ChargingBasisEvidence,
-            row.PriceSnapshotVnd, row.ReviewId), ct);
+            row.PriceSnapshotVnd), ct);
         }
         if (row.SourceKind == "Dossier" && row.PriceSnapshotVnd == 0) row.FeeStatus = "NotRequested";
         else if (row.SourceKind == "Dossier" && row.Unit == "gói") row.FeeStatus = "NeedsRule";
@@ -359,103 +345,6 @@ public sealed class ClinicalWorkService(DcmsDbContext db, UserManager<Applicatio
             }, Json)
         });
         Receipt(actorId, request.RequestKey, "ActivityPost", new { id, request }, id);
-        await db.SaveChangesAsync(ct);
-        return Map(row);
-    }
-
-    public async Task<ReviewDto> CreateReviewAsync(int actorId, CreateReviewRequest request,
-        CancellationToken ct)
-    {
-        if (request.RequestKey == Guid.Empty) throw Error("MSG04");
-        await using var gate = await ClinicalRequestLock.AcquireAsync(db, request.RequestKey, ct);
-        var replay = await ReplayAsync(actorId, request.RequestKey, "ReviewCreate", request, ct);
-        if (replay.HasValue) return Map(await db.ClinicalReviews.AsNoTracking().SingleAsync(x => x.Id == replay, ct));
-        var visit = await VisitAsync(actorId, request.VisitId, request.ExpectedVisitVersion, ct, "treatment.progress.manage");
-        if (Clean(request.Complaint) is not { Length: <= 4000 } ||
-            Clean(request.Findings) is not { Length: <= 4000 } ||
-            request.Coverage is not ("PendingAssessment" or "Covered" or "NotCovered") ||
-            request.Outcome is not ("AdviceOnly" or "FurtherAssessment" or "CorrectiveCareNeeded" or "NewProblem") ||
-            request.SourceActivityId.HasValue == request.SourceItemId.HasValue) throw Error("MSG04");
-        if (request.Coverage != "PendingAssessment" &&
-            (Clean(request.Basis) is not { Length: <= 1000 } ||
-             Clean(request.CoveredComponent)?.Length > 500 || Clean(request.Exclusions)?.Length > 1000))
-            throw Error("MSG244", 409);
-        if (request.SourceActivityId.HasValue)
-        {
-            var source = await db.ClinicalActivities.AsNoTracking().SingleOrDefaultAsync(x =>
-                x.Id == request.SourceActivityId && x.State == "Posted", ct);
-            if (source == null || source.PatientId != visit.PatientId ||
-                source.BranchId != visit.BranchId) throw Error("MSG113", 404);
-            if (source.Version != request.ExpectedSourceVersion) throw Error("MSG111", 409);
-        }
-        else
-        {
-            var source = await db.TreatmentItems.AsNoTracking().SingleOrDefaultAsync(x =>
-                x.Id == request.SourceItemId, ct);
-            if (source == null || source.Progress != "Completed" ||
-                !await db.TreatmentDossiers.AnyAsync(x => x.Id == source.DossierId &&
-                    x.PatientId == visit.PatientId && x.BranchId == visit.BranchId, ct))
-                throw Error("MSG113", 404);
-            var sourceVersion = source.DecisionPlanVersion ?? await db.TreatmentDossiers.AsNoTracking()
-                .Where(x => x.Id == source.DossierId).Select(x => x.PlanVersion).SingleAsync(ct);
-            if (request.ExpectedSourceVersion != sourceVersion) throw Error("MSG111", 409);
-        }
-        var row = new ClinicalReview
-        {
-            VisitId = request.VisitId, PatientId = visit.PatientId, BranchId = visit.BranchId,
-            SourceActivityId = request.SourceActivityId, SourceItemId = request.SourceItemId,
-            Complaint = request.Complaint.Trim(), Findings = request.Findings.Trim(),
-            Coverage = request.Coverage, Outcome = request.Outcome,
-            CoveredComponent = Clean(request.CoveredComponent), Exclusions = Clean(request.Exclusions),
-            Policy = Clean(request.Policy), PolicyVersion = Clean(request.PolicyVersion),
-            Basis = Clean(request.Basis), NextAction = Clean(request.NextAction),
-            DentistAccountId = actorId, RecordedAt = clock.GetUtcNow()
-        };
-        db.ClinicalReviews.Add(row);
-        Receipt(actorId, request.RequestKey, "ReviewCreate", request, row.Id);
-        await db.SaveChangesAsync(ct);
-        return Map(row);
-    }
-
-    public async Task<IReadOnlyList<ReviewDto>> ReviewsAsync(int actorId, Guid visitId, CancellationToken ct)
-    {
-        await VisitAsync(actorId, visitId, 0, ct, "treatment.read");
-        return (await db.ClinicalReviews.AsNoTracking().Where(x => x.VisitId == visitId)
-            .OrderByDescending(x => x.RecordedAt).ToListAsync(ct)).Select(Map).ToArray();
-    }
-
-    public async Task<ReviewDto> ReviewAsync(int actorId, Guid id, CancellationToken ct)
-    {
-        var row = await db.ClinicalReviews.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, ct)
-            ?? throw Error("MSG113", 404);
-        await DentistAsync(actorId, row.BranchId, ct);
-        return Map(row);
-    }
-
-    public async Task<CareNoteDto> AddCareNoteAsync(int actorId, CreateCareNoteRequest request,
-        CancellationToken ct)
-    {
-        if (request.RequestKey == Guid.Empty) throw Error("MSG04");
-        await using var gate = await ClinicalRequestLock.AcquireAsync(db, request.RequestKey, ct);
-        var replay = await ReplayAsync(actorId, request.RequestKey, "CareNoteCreate", request, ct);
-        if (replay.HasValue) return Map(await db.ClinicalCareNotes.AsNoTracking().SingleAsync(x => x.Id == replay, ct));
-        var visit = await VisitAsync(actorId, request.VisitId, request.ExpectedVisitVersion, ct);
-        if (Clean(request.Content) is not { Length: <= 4000 } || Clean(request.Response)?.Length > 4000)
-            throw Error("MSG04");
-        if (request.SourceActivityId.HasValue && !await db.ClinicalActivities.AsNoTracking().AnyAsync(x =>
-            x.Id == request.SourceActivityId && x.PatientId == visit.PatientId && x.State == "Posted", ct))
-            throw Error("MSG113", 404);
-        if (request.ReviewId.HasValue && !await db.ClinicalReviews.AsNoTracking().AnyAsync(x =>
-            x.Id == request.ReviewId && x.PatientId == visit.PatientId, ct)) throw Error("MSG113", 404);
-        var row = new ClinicalCareNote
-        {
-            VisitId = request.VisitId, PatientId = visit.PatientId, BranchId = visit.BranchId,
-            SourceActivityId = request.SourceActivityId, ReviewId = request.ReviewId,
-            Content = request.Content.Trim(), Response = Clean(request.Response), ActorId = actorId,
-            RecordedAt = clock.GetUtcNow()
-        };
-        db.ClinicalCareNotes.Add(row);
-        Receipt(actorId, request.RequestKey, "CareNoteCreate", request, row.Id);
         await db.SaveChangesAsync(ct);
         return Map(row);
     }

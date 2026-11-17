@@ -25,6 +25,8 @@ Nguồn nghiệp vụ hiện hành: DCMS_Screen_Specifications_v2.3 và DCMS_Use
 
 ### Tích hợp S22/S63 và care backend
 
+Cập nhật 18/11/2026: bản ghi review và care note của S63 đã bị xóa; xem [S22-S63-ACTUAL-REVIEW-CARE.md](S22-S63-ACTUAL-REVIEW-CARE.md).
+
 [S22/S63/care contract](S22-S63-ACTUAL-REVIEW-CARE.md) bổ sung bảng activity/review/care và cổng evidence đọc activity `Posted` đúng Patient/dossier/step. `ITreatmentActualEvidencePort` không còn mặc định trả false; tuy nhiên S22 production vẫn chặn Post khi cổng Visit InProgress và consent đúng version chưa được nối, và bước yêu cầu Labo vẫn chặn khi chưa xác minh Accepted. Đánh giá S63, activity S22 và contact care là các commit riêng. Điều này không biến một activity thành completed step, Appointment hoặc charge nếu chưa có command và bằng chứng tương ứng.
 
 ## API và DTO chung

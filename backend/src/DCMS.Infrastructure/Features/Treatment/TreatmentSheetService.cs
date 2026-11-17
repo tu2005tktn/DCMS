@@ -359,7 +359,7 @@ public sealed partial class TreatmentDossierService
         return new(rows.Select(x => overrides.GetValueOrDefault(x.Id) ?? new ActivityDto(x.Id, x.VisitId, x.PatientId, x.BranchId, x.DossierId, x.ItemId,
             x.StepId, x.PlanVersion, x.ServiceId, x.Region, x.Unit, x.Quantity, x.PerformedAt, x.ElapsedMinutes,
             x.PerformerId, x.Outcome, x.NextSteps, x.ChargingBasis, x.ChargingBasisEvidence, x.PriceSnapshotVnd,
-            x.ReviewId, x.State, x.Version, x.CreatedAt, x.PostedAt, x.FeeStatus, x.DiscountSnapshotVnd, x.AssistantId, x.RecordedBy, (x.VisitId == null ? "Dossier" : "Visit"), names.GetValueOrDefault(x.Id), x.LabWorkSnapshot)).ToArray(), total, page, pageSize);
+            x.State, x.Version, x.CreatedAt, x.PostedAt, x.FeeStatus, x.DiscountSnapshotVnd, x.AssistantId, x.RecordedBy, (x.VisitId == null ? "Dossier" : "Visit"), names.GetValueOrDefault(x.Id), x.LabWorkSnapshot)).ToArray(), total, page, pageSize);
     }
 
     // Resolve legacy display metadata from immutable versions without rewriting posted actuals.

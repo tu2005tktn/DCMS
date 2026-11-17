@@ -2,6 +2,8 @@
 
 Người phụ trách: Ngô Minh Trí (phần giao diện S25/S60 theo [S22-S63-ACTUAL-REVIEW-CARE.md](S22-S63-ACTUAL-REVIEW-CARE.md)). Ngày 09/11/2026.
 
+Cập nhật 18/11/2026: công việc chăm sóc không còn trường `reviewId` (bản ghi đánh giá lâm sàng S63 đã bị xóa); API bỏ qua trường này nếu client còn gửi.
+
 Tài liệu tham chiếu:
 - Màn "Customer cares" của oDental (ảnh chụp do người dùng cung cấp). Chỉ tham khảo bố cục, không dùng dữ liệu oDental.
 - Backend công việc chăm sóc đã có: `CARE_TASK` (từ 13/11/2026 các lần liên hệ và chuyển cấp nằm trong JSONB của dòng, xem [CARE-LAB-FINANCE-STORAGE.vi.md](CARE-LAB-FINANCE-STORAGE.vi.md)), `/api/care-tasks`.

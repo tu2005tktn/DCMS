@@ -557,7 +557,7 @@ public sealed class ExaminationApiTests(ExaminationFixture fixture) : IClassFixt
     {
         var (s,v,c) = await Prepare(); using(c) {
             var saved = await Ok<ExaminationWorkspace>(await c.PutAsJsonAsync(Exam(v.VisitId),new SaveExamination(v.PatientId,v.VisitVersion,Guid.NewGuid(),Content(true),true)));
-            var activity = new DCMS.Application.Features.Treatment.ActivityInput(v.VisitId,null,null,null,null,s.ServiceId,"Toàn hàm","lần",1,fixture.Clock.Now,10,"SYNTHETIC ghi nhận",null,"Separate",null,100000,null);
+            var activity = new DCMS.Application.Features.Treatment.ActivityInput(v.VisitId,null,null,null,null,s.ServiceId,"Toàn hàm","lần",1,fixture.Clock.Now,10,"SYNTHETIC ghi nhận",null,"Separate",null,100000);
             var results = await Task.WhenAll(
                 c.PostAsJsonAsync($"/api/visits/{v.VisitId}/activities/drafts",new DCMS.Application.Features.Treatment.CreateActivityDraftRequest(activity,saved.Visit.VisitVersion,Guid.NewGuid())),
                 c.PostAsJsonAsync($"/api/visits/{v.VisitId}/complete",new CompleteExaminationVisit(v.PatientId,saved.Visit.VisitVersion,Guid.NewGuid(),true)));

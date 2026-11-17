@@ -27,30 +27,6 @@ internal static class ClinicalWorkModel
             b.Property(x => x.FeeStatus).HasMaxLength(24).HasDefaultValue("Unavailable");
             b.Property(x => x.Version).IsConcurrencyToken(false);
         });
-        model.Entity<ClinicalReview>(b =>
-        {
-
-            b.HasIndex(x => new { x.VisitId, x.RecordedAt });
-            b.HasIndex(x => new { x.SourceActivityId, x.SourceItemId });
-            b.Property(x => x.Complaint).HasMaxLength(4000);
-            b.Property(x => x.Findings).HasMaxLength(4000);
-            b.Property(x => x.Coverage).HasMaxLength(24);
-            b.Property(x => x.Outcome).HasMaxLength(32);
-            b.Property(x => x.CoveredComponent).HasMaxLength(500);
-            b.Property(x => x.Exclusions).HasMaxLength(1000);
-            b.Property(x => x.Policy).HasMaxLength(160);
-            b.Property(x => x.PolicyVersion).HasMaxLength(40);
-            b.Property(x => x.Basis).HasMaxLength(1000);
-            b.Property(x => x.NextAction).HasMaxLength(2000);
-            b.Property(x => x.Version).IsConcurrencyToken(false);
-        });
-        model.Entity<ClinicalCareNote>(b =>
-        {
-
-            b.HasIndex(x => new { x.VisitId, x.RecordedAt });
-            b.Property(x => x.Content).HasMaxLength(4000);
-            b.Property(x => x.Response).HasMaxLength(4000);
-        });
         model.Entity<ClinicalCommandReceipt>(b =>
         {
             b.HasIndex(new[] { "ReceiptType", "RequestKey" }, "UX_ClinicalCommandReceipt_Scope").IsUnique().HasDatabaseName("UX_RECEIPT_RequestKey");

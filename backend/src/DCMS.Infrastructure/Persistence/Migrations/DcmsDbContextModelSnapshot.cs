@@ -2226,9 +2226,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<int>("PatientId")
                         .HasColumnType("integer");
 
-                    b.Property<Guid?>("ReviewId")
-                        .HasColumnType("uuid");
-
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(16)
@@ -5604,7 +5601,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Outcome")
                         .IsRequired()
-                        .ValueGeneratedOnUpdateSometimes()
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)")
                         .HasColumnName("Outcome");
@@ -5650,11 +5646,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(80)")
                         .HasColumnName("Region");
 
-                    b.Property<Guid?>("ReviewId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("uuid")
-                        .HasColumnName("ReviewId");
-
                     b.Property<int>("ServiceId")
                         .HasColumnType("integer")
                         .HasColumnName("ServiceId");
@@ -5687,7 +5678,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasColumnName("Version");
 
                     b.Property<Guid?>("VisitId")
-                        .ValueGeneratedOnUpdateSometimes()
                         .HasColumnType("uuid")
                         .HasColumnName("VisitId");
 
@@ -5709,182 +5699,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         });
 
                     b.HasDiscriminator().HasValue("ClinicalActivity");
-                });
-
-            modelBuilder.Entity("DCMS.Domain.Features.Treatment.ClinicalCareNote", b =>
-                {
-                    b.HasBaseType("DCMS.Domain.Features.Treatment.TreatmentProcessRecord");
-
-                    b.Property<int>("ActorId")
-                        .HasColumnType("integer")
-                        .HasColumnName("ActorId");
-
-                    b.Property<int>("BranchId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("BranchId");
-
-                    b.Property<string>("Content")
-                        .IsRequired()
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)")
-                        .HasColumnName("Content");
-
-                    b.Property<int>("PatientId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("PatientId");
-
-                    b.Property<DateTimeOffset>("RecordedAt")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("RecordedAt");
-
-                    b.Property<string>("Response")
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)")
-                        .HasColumnName("Response");
-
-                    b.Property<Guid?>("ReviewId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("uuid")
-                        .HasColumnName("ReviewId");
-
-                    b.Property<Guid?>("SourceActivityId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("uuid")
-                        .HasColumnName("SourceActivityId");
-
-                    b.Property<Guid>("VisitId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("uuid")
-                        .HasColumnName("VisitId");
-
-                    b.HasIndex("VisitId", "RecordedAt");
-
-                    b.ToTable(t =>
-                        {
-                            t.HasCheckConstraint("CK_CLINICAL_ACTIVITY_VALUES", "\"ProcessKind\" <> 'ClinicalActivity' OR (\"Quantity\" > 0 AND \"PriceSnapshotVnd\" >= 0)");
-
-                            t.HasCheckConstraint("CK_FOLLOW_UP_DURATION", "\"ProcessKind\" <> 'FollowUpInstruction' OR \"DurationMinutes\" BETWEEN 15 AND 480 AND \"DurationMinutes\" % 15 = 0");
-
-                            t.HasCheckConstraint("CK_FOLLOW_UP_WINDOW", "\"ProcessKind\" <> 'FollowUpInstruction' OR (\"EarliestOn\" <= \"TargetOn\" AND \"TargetOn\" <= \"LatestOn\")");
-                        });
-
-                    b.HasDiscriminator().HasValue("ClinicalCareNote");
-                });
-
-            modelBuilder.Entity("DCMS.Domain.Features.Treatment.ClinicalReview", b =>
-                {
-                    b.HasBaseType("DCMS.Domain.Features.Treatment.TreatmentProcessRecord");
-
-                    b.Property<string>("Basis")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
-                        .HasColumnName("Basis");
-
-                    b.Property<int>("BranchId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("BranchId");
-
-                    b.Property<string>("Complaint")
-                        .IsRequired()
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)")
-                        .HasColumnName("Complaint");
-
-                    b.Property<string>("Coverage")
-                        .IsRequired()
-                        .HasMaxLength(24)
-                        .HasColumnType("character varying(24)")
-                        .HasColumnName("Coverage");
-
-                    b.Property<string>("CoveredComponent")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("CoveredComponent");
-
-                    b.Property<int>("DentistAccountId")
-                        .HasColumnType("integer")
-                        .HasColumnName("DentistAccountId");
-
-                    b.Property<string>("Exclusions")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
-                        .HasColumnName("Exclusions");
-
-                    b.Property<string>("Findings")
-                        .IsRequired()
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)")
-                        .HasColumnName("Findings");
-
-                    b.Property<string>("NextAction")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)")
-                        .HasColumnName("NextAction");
-
-                    b.Property<string>("Outcome")
-                        .IsRequired()
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)")
-                        .HasColumnName("Outcome");
-
-                    b.Property<int>("PatientId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("PatientId");
-
-                    b.Property<string>("Policy")
-                        .HasMaxLength(160)
-                        .HasColumnType("character varying(160)")
-                        .HasColumnName("Policy");
-
-                    b.Property<string>("PolicyVersion")
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
-                        .HasColumnName("PolicyVersion");
-
-                    b.Property<DateTimeOffset>("RecordedAt")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("RecordedAt");
-
-                    b.Property<Guid?>("SourceActivityId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("uuid")
-                        .HasColumnName("SourceActivityId");
-
-                    b.Property<Guid?>("SourceItemId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("SourceItemId");
-
-                    b.Property<int>("Version")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("Version");
-
-                    b.Property<Guid>("VisitId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("uuid")
-                        .HasColumnName("VisitId");
-
-                    b.HasIndex("SourceActivityId", "SourceItemId");
-
-                    b.HasIndex("VisitId", "RecordedAt");
-
-                    b.ToTable(t =>
-                        {
-                            t.HasCheckConstraint("CK_CLINICAL_ACTIVITY_VALUES", "\"ProcessKind\" <> 'ClinicalActivity' OR (\"Quantity\" > 0 AND \"PriceSnapshotVnd\" >= 0)");
-
-                            t.HasCheckConstraint("CK_FOLLOW_UP_DURATION", "\"ProcessKind\" <> 'FollowUpInstruction' OR \"DurationMinutes\" BETWEEN 15 AND 480 AND \"DurationMinutes\" % 15 = 0");
-
-                            t.HasCheckConstraint("CK_FOLLOW_UP_WINDOW", "\"ProcessKind\" <> 'FollowUpInstruction' OR (\"EarliestOn\" <= \"TargetOn\" AND \"TargetOn\" <= \"LatestOn\")");
-                        });
-
-                    b.HasDiscriminator().HasValue("ClinicalReview");
                 });
 
             modelBuilder.Entity("DCMS.Domain.Features.Treatment.FollowUpInstruction", b =>
@@ -5968,7 +5782,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasColumnName("Reason");
 
                     b.Property<Guid?>("SourceActivityId")
-                        .ValueGeneratedOnUpdateSometimes()
                         .HasColumnType("uuid")
                         .HasColumnName("SourceActivityId");
 
