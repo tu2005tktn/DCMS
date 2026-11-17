@@ -25,8 +25,6 @@ export type TreatmentItem = {
 export type TreatmentDiscount = { type: 'Fixed' | 'Percent'; value: number; reason: string;
   qualifyingItemId: string | null; status: 'Proposed' | 'Approved' | 'Rejected';
   decidedBy: number | null; decidedAt: string | null; amountVnd: number };
-export type PaymentTerm = { purpose: string; amountVnd: number; dueOn: string; evidence: string | null;
-  milestone: string | null; planVersion: number | null };
 export type ServicePrice = { unit?: string; serviceId: number; branchId: number; name: string;
   referenceUnitPriceVnd: number | null; priceVersion: number };
 export type PricePreview = { dossierId: string; dossierVersion: number; planVersion: number;
@@ -37,23 +35,19 @@ export type PricePreview = { dossierId: string; dossierVersion: number; planVers
 export type TreatmentEvent = { id: string; kind: string; dossierVersion: number; actorId: number;
   occurredAt: string; payloadJson: string; actorName?: string };
 export type TreatmentDossier = {
-  sourceExaminationId?: string | null; sourceExaminationVersion?: number | null;
+  sourceExaminationVisitId?: string | null;
   id: string; code: string; patientId: number; branchId: number; dentistId: number;
   startedOn: string; diagnosis: string; note: string | null; state: 'Open' | 'Completed' | 'Stopped' | 'Cancelled';
-  closureOutcome: string | null; closureReason: string | null; version: number;
-  planId: string; planVersion: number; planState: 'None' | 'Draft' | 'Committed'; goals: string | null;
-  items: TreatmentItem[]; paymentTerms: PaymentTerm[]; timeline: TreatmentEvent[];
+  version: number; planVersion: number;
+  items: TreatmentItem[]; timeline: TreatmentEvent[];
   financialSummaryAvailable: boolean; createdAt: string; updatedAt: string;
   financialSummary?: { available: boolean; plannedVnd: number; postedChargeVnd: number | null;
     receivedVnd: number | null; allocatedVnd: number | null; outstandingVnd: number | null;
     sourceVersion: string | null; unusedAdvanceVnd?: number | null; asOf?: string; pendingFeeCount?: number;
     lines?: { activityId: string; chargeId: string; netVnd: number; confirmedAllocatedVnd: number; outstandingVnd: number; includedCoverage: boolean }[] };
-  depositExceptionReason?: string | null; depositExceptionBy?: number | null;
-  depositExceptionAt?: string | null;
-  displayCompleted: boolean;
 };
 export type DossierListItem = Pick<TreatmentDossier, 'id' | 'code' | 'patientId' | 'branchId' |
-  'dentistId' | 'diagnosis' | 'state' | 'closureOutcome' | 'version' | 'planVersion' | 'updatedAt' | 'displayCompleted'>;
+  'dentistId' | 'diagnosis' | 'state' | 'version' | 'updatedAt'>;
 export type DossierPage = { items: DossierListItem[]; total: number; page: number; pageSize: number };
 export type TreatmentChange = { dossier: TreatmentDossier; notification: SystemMessage };
 export type AppointmentOptions = { branches: { id: number; name: string }[];
@@ -68,8 +62,5 @@ export const stateLabel: Record<TreatmentDossier['state'], string> = {
 };
 export const progressLabel: Record<string, string> = {
   NotStarted: 'Chưa thực hiện', InProgress: 'Đang thực hiện', Partial: 'Đã làm một phần', Completed: 'Đã hoàn tất', Stopped: 'Đã dừng',
-};
-export const closureOutcomeLabel: Record<string, string> = {
-  CompletedAsAgreed: 'Hoàn tất đúng phần đã đồng ý', StoppedIncomplete: 'Dừng khi còn phần chưa thực hiện', Cancelled: 'Hủy phiếu',
 };
 export const money = (amount: number) => `${new Intl.NumberFormat('vi-VN').format(amount)} ₫`;

@@ -8,11 +8,11 @@ internal static class TreatmentProgressionMigrationSnapshot
 {
     public static void Configure(ModelBuilder model)
     {
-        model.Entity<TreatmentDossier>(b =>
+        model.Entity("DCMS.Domain.Features.Treatment.TreatmentDossier", b =>
         {
-            b.Property(x => x.SourceTemplateId).HasColumnType("uuid");
-            b.Property(x => x.SourceTemplateVersion).HasColumnType("integer");
-            b.HasIndex(x => x.SourceTemplateId);
+            b.Property<Guid?>("SourceTemplateId").HasColumnType("uuid");
+            b.Property<int?>("SourceTemplateVersion").HasColumnType("integer");
+            b.HasIndex("SourceTemplateId");
         });
         model.Entity<TreatmentTemplate>(b =>
         {

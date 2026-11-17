@@ -81,14 +81,18 @@ public sealed partial class DcmsDbContext
                     $"visit-complete:{v.Id}:{v.Version}", $"/visit-results/{v.Id}"));
             }
 
-        foreach (var entry in ChangeTracker.Entries<TreatmentDossier>())
-            if (Became(entry, nameof(TreatmentDossier.PlanState), "Committed"))
-            {
-                var dossier = entry.Entity;
+        foreach (var group in ChangeTracker.Entries<TreatmentEvent>()
+            .Where(e => e.State == EntityState.Added && e.Entity.Kind == "PlanCommitted")
+            .GroupBy(e => e.Entity.DossierId).ToArray())
+        {
+            var evt = group.Last().Entity;
+            var dossier = ChangeTracker.Entries<TreatmentDossier>().Select(x => x.Entity).FirstOrDefault(x => x.Id == evt.DossierId)
+                ?? await TreatmentDossiers.AsNoTracking().SingleOrDefaultAsync(x => x.Id == evt.DossierId, ct);
+            if (dossier != null)
                 events.Add(new(dossier.PatientId, dossier.BranchId, NotificationKind.TreatmentUpdated,
                     "Kế hoạch điều trị đã cập nhật", "Phòng khám đã cập nhật kế hoạch điều trị của bạn.",
-                    $"plan:{dossier.Id}:{dossier.PlanVersion}", $"/medical-records/{dossier.Id}"));
-            }
+                    $"plan:{dossier.Id}:{evt.DossierVersion}", $"/medical-records/{dossier.Id}"));
+        }
 
         foreach (var entry in ChangeTracker.Entries<ClinicalActivity>())
             if (Became(entry, nameof(ClinicalActivity.State), "Posted"))

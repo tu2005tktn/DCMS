@@ -289,7 +289,7 @@ public sealed class TreatmentProgressionService(DcmsDbContext db, UserManager<Ap
         {
             var dossier = await DossierAsync(actorId, dossierId, ct);
             if (dossier.Version != request.ExpectedVersion) throw Error("MSG111", 409);
-            if (dossier.State != "Open" || dossier.PlanState == "Committed") throw Error("MSG240", 409);
+            if (dossier.State != "Open" || dossier.HasCommittedPlan()) throw Error("MSG240", 409);
             var template = await db.TreatmentTemplateVersions.AsNoTracking().SingleOrDefaultAsync(x =>
                 x.TemplateId == request.TemplateId && x.Number == request.TemplateVersion && x.State == "Active", ct)
                 ?? throw Error("MSG236", 409);
@@ -304,11 +304,12 @@ public sealed class TreatmentProgressionService(DcmsDbContext db, UserManager<Ap
             if (await db.TreatmentSteps.AnyAsync(x => x.DossierId == dossierId, ct)) throw Error("MSG233", 409);
             // Template IDs identify the source graph. Patient steps get their own stable IDs.
             var patientIds = request.Steps.ToDictionary(x => x.LogicalStepId, _ => Guid.NewGuid());
+            var nextPlanVersion = dossier.CurrentPlanVersion() + 1;
             foreach (var definition in request.Steps)
                 await db.AddTreatmentDataAsync(new TreatmentStep
                 {
-                    Id = patientIds[definition.LogicalStepId], DossierId = dossierId, PlanId = dossier.PlanId,
-                    PlanVersion = dossier.PlanVersion + 1, ItemId = definition.ItemId!.Value,
+                    Id = patientIds[definition.LogicalStepId], DossierId = dossierId, PlanId = dossier.Id,
+                    PlanVersion = nextPlanVersion, ItemId = definition.ItemId!.Value,
                     Name = Clean(definition.Name)!, Region = Clean(definition.Region),
                     EstimatedMinutes = definition.EstimatedMinutes, ReservedMinutes = definition.ReservedMinutes,
                     EstimatedMinMinutes = definition.EstimatedMinMinutes,
@@ -322,8 +323,6 @@ public sealed class TreatmentProgressionService(DcmsDbContext db, UserManager<Ap
                     EarliestOffsetDays = definition.EarliestOffsetDays, TargetOffsetDays = definition.TargetOffsetDays,
                     LatestOffsetDays = definition.LatestOffsetDays, ChargingCoverage = definition.ChargingCoverage
                 });
-            dossier.SourceTemplateId = request.TemplateId;
-            dossier.SourceTemplateVersion = request.TemplateVersion;
             dossier.Version++;
             dossier.UpdatedAt = clock.GetUtcNow();
             Event(dossierId, actorId, "plan.template.applied", new { request.TemplateId, request.TemplateVersion,
@@ -352,16 +351,17 @@ public sealed class TreatmentProgressionService(DcmsDbContext db, UserManager<Ap
         {
             var dossier = await DossierAsync(actorId, dossierId, ct);
             if (dossier.Version != request.ExpectedVersion) throw Error("MSG111", 409);
-            if (dossier.State != "Open" || dossier.PlanState != "Committed"
+            if (dossier.State != "Open" || !dossier.HasCommittedPlan()
                 || dossier.Items.All(x => x.Id != request.ItemId || x.Decision != "Agreed"))
                 throw Error("MSG240", 409);
+            var currentPlanVersion = dossier.CurrentPlanVersion();
             var existing = await db.LoadTreatmentStepsAsync(db.TreatmentSteps.Where(x => x.DossierId == dossierId &&
-                x.PlanVersion == dossier.PlanVersion), ct);
+                x.PlanVersion == currentPlanVersion), ct);
             if (request.PredecessorIds.Any(id => existing.All(x => x.Id != id))) throw Error("MSG229");
             var now = clock.GetUtcNow();
             var step = new TreatmentStep
             {
-                DossierId = dossierId, PlanId = dossier.PlanId, PlanVersion = dossier.PlanVersion,
+                DossierId = dossierId, PlanId = dossier.Id, PlanVersion = currentPlanVersion,
                 ItemId = request.ItemId, Name = Clean(request.Name)!, Region = Clean(request.Region),
                 EstimatedMinutes = request.EstimatedMinutes, ReservedMinutes = request.ReservedMinutes,
                 EstimatedMinMinutes = request.EstimatedMinMinutes,
@@ -390,10 +390,10 @@ public sealed class TreatmentProgressionService(DcmsDbContext db, UserManager<Ap
     {
         var dossier = await DossierAsync(actorId, dossierId, ct);
         if (dossier.Version != expectedVersion) throw Error("MSG111", 409);
-        if (dossier.State != "Open" || dossier.PlanState != "Committed") throw Error("MSG240", 409);
+        if (dossier.State != "Open" || !dossier.HasCommittedPlan()) throw Error("MSG240", 409);
         var step = await db.LoadTreatmentStepAsync(db.TreatmentSteps.Where(x => x.Id == stepId && x.DossierId == dossierId), ct)
             ?? throw Error("MSG113", 404);
-        if (step.Version != expectedStepVersion || step.PlanVersion != dossier.PlanVersion) throw Error("MSG111", 409);
+        if (step.Version != expectedStepVersion || step.PlanVersion != dossier.CurrentPlanVersion()) throw Error("MSG111", 409);
         if (dossier.Items.SingleOrDefault(x => x.Id == step.ItemId)?.Decision != "Agreed") throw Error("MSG240", 409);
         return (dossier, step);
     }

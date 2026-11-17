@@ -5,7 +5,6 @@ public sealed class TreatmentDossier
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid? SourceExaminationVisitId { get; set; }
-    public string? SourceExaminationJson { get; set; }
     public string Code { get; set; } = "";
     public int PatientId { get; set; }
     public int BranchId { get; set; }
@@ -14,30 +13,15 @@ public sealed class TreatmentDossier
     public string Diagnosis { get; set; } = "";
     public string? Note { get; set; }
     public string State { get; set; } = "Open";
-    public bool DisplayCompleted { get; set; }
-    public string? ClosureOutcome { get; set; }
-    public string? ClosureReason { get; set; }
-    public DateTimeOffset? ClosedAt { get; set; }
-    public int? ClosedBy { get; set; }
     public int Version { get; set; } = 1;
-    public Guid PlanId { get; set; } = Guid.NewGuid();
-    public int PlanVersion { get; set; }
-    public string PlanState { get; set; } = "None";
-    public string? Goals { get; set; }
-    public Guid? SourceExaminationId { get; set; }
-    public int? SourceExaminationVersion { get; set; }
-    public Guid? SourceTemplateId { get; set; }
-    public int? SourceTemplateVersion { get; set; }
-    public string PaymentTermsJson { get; set; } = "[]";
-    public string? DepositExceptionReason { get; set; }
-    public int? DepositExceptionBy { get; set; }
-    public DateTimeOffset? DepositExceptionAt { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
     public List<TreatmentItem> Items { get; set; } = [];
     public List<TreatmentSheetDraft> SheetDrafts { get; set; } = [];
-    public List<TreatmentRevisionDraft> RevisionDrafts { get; set; } = [];
-    public Guid StorageStamp { get; set; } = Guid.NewGuid();
+
+    public int CurrentPlanVersion() => Items.Select(x => x.DecisionPlanVersion).Max() ?? 0;
+    public bool HasDraftPlan() => Items.Any(x => !x.SheetDeleted && x.DecisionPlanVersion == null);
+    public bool HasCommittedPlan() => Items.Any(x => x.DecisionPlanVersion != null) && !HasDraftPlan();
 }
 
 public sealed class TreatmentItem
@@ -140,17 +124,5 @@ public sealed class TreatmentSheetDraft
     public string PayloadJson { get; set; } = "{}";
     public Guid LastRequestKey { get; set; }
     public string LastFingerprint { get; set; } = "";
-    public DateTimeOffset UpdatedAt { get; set; }
-}
-
-public sealed class TreatmentRevisionDraft
-{
-    public Guid Id { get; set; } = Guid.NewGuid();
-    public Guid DossierId { get; set; }
-    public Guid ItemId { get; set; }
-    public int ActorId { get; set; }
-    public int BasePlanVersion { get; set; }
-    public int Version { get; set; } = 1;
-    public string PayloadJson { get; set; } = "{}";
     public DateTimeOffset UpdatedAt { get; set; }
 }

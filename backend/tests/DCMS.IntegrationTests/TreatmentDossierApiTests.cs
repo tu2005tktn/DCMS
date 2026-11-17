@@ -90,9 +90,9 @@ public sealed class TreatmentDossierApiTests(ApiFixture fixture) : IClassFixture
                 null, Guid.NewGuid()));
         var second = (await secondResponse.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
         var draftResponse = await dentist.PostAsJsonAsync($"/api/dossiers/{second.Id}/plan/draft",
-            new SavePlanDraftRequest(second.Version, "SYNTHETIC goal", [
+            new SavePlanDraftRequest(second.Version, [
                 new TreatmentItemInput(null, null, setup.ServiceId, "25", "răng", 1, 1,
-                    30, null, null, 100000, "Proposed", null, null, null, null)], [], Guid.NewGuid()));
+                    30, null, null, 100000, "Proposed", null, null, null, null)], Guid.NewGuid()));
         Assert.Equal(HttpStatusCode.OK, draftResponse.StatusCode);
         var draft = (await draftResponse.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
         using var blocked = new HttpRequestMessage(HttpMethod.Delete, $"/api/dossiers/{second.Id}")
@@ -112,10 +112,10 @@ public sealed class TreatmentDossierApiTests(ApiFixture fixture) : IClassFixture
         Assert.Equal(HttpStatusCode.Created, createdResponse.StatusCode);
         var created = (await createdResponse.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
         var draftResponse = await dentist.PostAsJsonAsync($"/api/dossiers/{created.Id}/plan/draft",
-            new SavePlanDraftRequest(created.Version, "SYNTHETIC planned work", [
+            new SavePlanDraftRequest(created.Version, [
                 new TreatmentItemInput(null, null, setup.ServiceId, "25", "tooth", 1, 1,
                     30, null, null, 200000, "Agreed", "Consulted", "Patient", null, null)],
-                [], Guid.NewGuid()));
+                Guid.NewGuid()));
         Assert.Equal(HttpStatusCode.OK, draftResponse.StatusCode);
         var draft = (await draftResponse.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
         var committedResponse = await dentist.PostAsJsonAsync($"/api/dossiers/{created.Id}/plan/commit",
@@ -166,20 +166,16 @@ public sealed class TreatmentDossierApiTests(ApiFixture fixture) : IClassFixture
                 null, Guid.NewGuid()));
         var created = (await createdResponse.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
         var draftResponse = await dentist.PostAsJsonAsync($"/api/dossiers/{created.Id}/plan/draft",
-            new SavePlanDraftRequest(created.Version, "SYNTHETIC plan", [
+            new SavePlanDraftRequest(created.Version, [
                 new TreatmentItemInput(null, null, setup.ServiceId, "25", "răng", 1, 1,
-                    30, null, null, 100000, "Agreed", "Đã tư vấn", "Bệnh nhân", null, null)], [], Guid.NewGuid()));
+                    30, null, null, 100000, "Agreed", "Đã tư vấn", "Bệnh nhân", null, null)], Guid.NewGuid()));
         var draft = (await draftResponse.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
         var commitResponse = await dentist.PostAsJsonAsync($"/api/dossiers/{created.Id}/plan/commit",
             new CommitPlanRequest(draft.Version, Guid.NewGuid()));
         var committed = (await commitResponse.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
-        var flagKey = Guid.NewGuid();
-        var flagRequest = new SetDossierDisplayStatusRequest(committed.Version, true, flagKey);
-        var flagResponse = await dentist.PostAsJsonAsync($"/api/dossiers/{created.Id}/display-status", flagRequest);
-        await AssertMessage(flagResponse, HttpStatusCode.Conflict, "MSG243");
         var read = (await dentist.GetFromJsonAsync<TreatmentDossierDto>($"/api/dossiers/{created.Id}"))!;
         Assert.Equal("Open", read.State);
-        Assert.False(read.DisplayCompleted);
+        Assert.Equal(committed.Version, read.Version);
         Assert.Equal("NotStarted", Assert.Single(read.Items).Progress);
         await AssertMessage(await dentist.PostAsJsonAsync($"/api/dossiers/{created.Id}/close",
             new CloseDossierRequest(read.Version, "CompletedAsAgreed", null, [], Guid.NewGuid())), HttpStatusCode.Conflict, "MSG243");
@@ -197,7 +193,7 @@ public sealed class TreatmentDossierApiTests(ApiFixture fixture) : IClassFixture
         var item = new TreatmentItemInput(null, null, setup.ServiceId, "25", "răng", 1, 1,
             30, null, null, 1000000, "Agreed", "Đã giải thích bảo hành", "Bệnh nhân", null, null);
         var draftResponse = await dentist.PostAsJsonAsync($"/api/dossiers/{created.Id}/plan/draft",
-            new SavePlanDraftRequest(created.Version, "SYNTHETIC warranty plan", [item], [], Guid.NewGuid()));
+            new SavePlanDraftRequest(created.Version, [item], Guid.NewGuid()));
         var draft = (await draftResponse.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
         var committedResponse = await dentist.PostAsJsonAsync($"/api/dossiers/{created.Id}/plan/commit",
             new CommitPlanRequest(draft.Version, Guid.NewGuid()));
@@ -253,9 +249,7 @@ public sealed class TreatmentDossierApiTests(ApiFixture fixture) : IClassFixture
             ReturnTargetOn: new DateOnly(2027, 1, 8), ReturnLatestOn: new DateOnly(2027, 1, 15));
         var second = first with { Region = "25", PlannedOrder = 2, AgreedUnitPriceVnd = 1000000,
             EstimatedSessions = 4, Decision = "Deferred", Counseling = "Hoãn sau tư vấn" };
-        var draft = new SavePlanDraftRequest(created.Version, "Điều trị nhiều buổi", [first, second],
-            [new PaymentTermInput("Đợt một", 200000, new DateOnly(2027, 1, 1), "Thỏa thuận",
-                "Sau buổi đầu")], Guid.NewGuid());
+        var draft = new SavePlanDraftRequest(created.Version, [first, second], Guid.NewGuid());
         await AssertMessage(await dentist.PostAsJsonAsync($"/api/dossiers/{created.Id}/plan/draft",
             draft with { Items = [first with { ReservedMinutes = 20 }, second] }), HttpStatusCode.BadRequest, "MSG04");
         var savedResponse = await dentist.PostAsJsonAsync($"/api/dossiers/{created.Id}/plan/draft", draft);
@@ -265,7 +259,6 @@ public sealed class TreatmentDossierApiTests(ApiFixture fixture) : IClassFixture
         Assert.Equal(25, saved.Items[0].EstimatedMaxMinutes);
         Assert.Equal(30, saved.Items[0].ReservedMinutes);
         Assert.Equal(600000, saved.Items[0].ReferenceUnitPriceVnd);
-        Assert.Equal("Sau buổi đầu", saved.PaymentTerms[0].Milestone);
         Assert.Equal(600000, saved.FinancialSummary!.PlannedVnd); // Deferred item is not agreed cost.
         await AssertMessage(await dentist.PostAsJsonAsync($"/api/dossiers/{created.Id}/plan/draft",
             draft with { ExpectedVersion = saved.Version, RequestKey = Guid.NewGuid(),
@@ -302,15 +295,8 @@ public sealed class TreatmentDossierApiTests(ApiFixture fixture) : IClassFixture
         Assert.Equal(600000, afterCatalogChange!.Items[0].ReferenceUnitPriceVnd);
         var preview = await dentist.GetFromJsonAsync<PlanPricePreviewDto>($"/api/dossiers/{created.Id}/plan/preview");
         Assert.Equal(1300000, preview!.NetBeforeTaxVnd);
-        var depositUrl = $"/api/commercial/dossiers/{created.Id}/deposit-exception";
-        Assert.Equal(HttpStatusCode.Forbidden, (await assistant.PostAsJsonAsync(depositUrl,
-            new DepositExceptionRequest(approved.Version, "Không cọc", Guid.NewGuid()))).StatusCode);
-        var deposit = await dentist.PostAsJsonAsync(depositUrl,
-            new DepositExceptionRequest(approved.Version, "Thỏa thuận không cọc", Guid.NewGuid()));
-        Assert.Equal(HttpStatusCode.OK, deposit.StatusCode);
-        var deposited = (await deposit.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
         var committedResponse = await dentist.PostAsJsonAsync($"/api/dossiers/{created.Id}/plan/commit",
-            new CommitPlanRequest(deposited.Version, Guid.NewGuid()));
+            new CommitPlanRequest(approved.Version, Guid.NewGuid()));
         Assert.Equal(HttpStatusCode.OK, committedResponse.StatusCode);
         var committed = (await committedResponse.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
         Assert.Equal(1300000, committed.FinancialSummary!.PlannedVnd);
@@ -344,15 +330,13 @@ public sealed class TreatmentDossierApiTests(ApiFixture fixture) : IClassFixture
             30, null, null, 300000, "Agreed", "Lợi ích, rủi ro và vật liệu đã trao đổi", "Bệnh nhân", null, null);
         var deferred = filling with { Region = "46", PlannedOrder = 2, Decision = "Deferred",
             Counseling = "Hoãn chữa tủy sau tư vấn" };
-        var draft = new SavePlanDraftRequest(created.Version, "Điều trị răng 25 và cân nhắc răng 46",
-            [filling, deferred], [new PaymentTermInput("Theo thỏa thuận", 300000, new DateOnly(2027, 1, 1), null)],
-            Guid.NewGuid());
+        var draft = new SavePlanDraftRequest(created.Version, [filling, deferred], Guid.NewGuid());
         var draftResponse = await dentist.PostAsJsonAsync($"/api/dossiers/{created.Id}/plan/draft", draft);
         Assert.True(draftResponse.StatusCode == HttpStatusCode.OK, await draftResponse.Content.ReadAsStringAsync());
         var saved = (await draftResponse.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
         Assert.Equal(2, saved.Items.Count);
         Assert.All(saved.Items, x => Assert.Equal("NotStarted", x.Progress));
-        Assert.Equal("Draft", saved.PlanState);
+        Assert.Equal(0, saved.PlanVersion);
         Assert.All(saved.Items, x => Assert.NotEqual(Guid.Empty, x.Id));
         var draftRetry = await dentist.PostAsJsonAsync($"/api/dossiers/{created.Id}/plan/draft", draft);
         Assert.Equal(HttpStatusCode.OK, draftRetry.StatusCode);
@@ -360,7 +344,7 @@ public sealed class TreatmentDossierApiTests(ApiFixture fixture) : IClassFixture
         Assert.Equal(saved.Version, replayed.Version);
         Assert.Equal(saved.Items.Select(x => x.Id), replayed.Items.Select(x => x.Id));
         await AssertMessage(await dentist.PostAsJsonAsync($"/api/dossiers/{created.Id}/plan/draft",
-            draft with { Goals = "Payload changed" }), HttpStatusCode.Conflict, "MSG111");
+            draft with { Items = [filling with { Region = "26" }, deferred] }), HttpStatusCode.Conflict, "MSG111");
         await AssertMessage(await dentist.PostAsJsonAsync($"/api/dossiers/{created.Id}/plan/draft",
             draft with { RequestKey = Guid.NewGuid() }), HttpStatusCode.Conflict, "MSG111");
         var committedResponse = await dentist.PostAsJsonAsync($"/api/dossiers/{created.Id}/plan/commit",
@@ -368,7 +352,6 @@ public sealed class TreatmentDossierApiTests(ApiFixture fixture) : IClassFixture
         Assert.Equal(HttpStatusCode.OK, committedResponse.StatusCode);
         var committed = (await committedResponse.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
         Assert.Equal(1, committed.PlanVersion);
-        Assert.Equal("Committed", committed.PlanState);
         Assert.Equal("Deferred", committed.Items.Single(x => x.Region == "46").Decision);
 
         using (var scope = fixture.Services.CreateScope())
@@ -395,7 +378,7 @@ public sealed class TreatmentDossierApiTests(ApiFixture fixture) : IClassFixture
         Assert.Equal(HttpStatusCode.OK, stoppedResponse.StatusCode);
         var stopped = (await stoppedResponse.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
         Assert.Equal("Stopped", stopped.State);
-        Assert.Equal("StoppedIncomplete", stopped.ClosureOutcome);
+        Assert.Single(stopped.Timeline, e => e.Kind == "DossierClosed" && e.PayloadJson.Contains("StoppedIncomplete"));
         Assert.Equal("Stopped", stopped.Items.Single(x => x.Region == "25").Progress);
         Assert.Equal("NotStarted", stopped.Items.Single(x => x.Region == "46").Progress);
         using var verify = fixture.Services.CreateScope();
@@ -430,9 +413,9 @@ public sealed class TreatmentDossierApiTests(ApiFixture fixture) : IClassFixture
         var item = new TreatmentItemInput(null, null, setup.ServiceId, "25", "răng", 1, 1,
             30, null, null, 300000, "Proposed", null, null, null, null);
         var first = firstClient.PostAsJsonAsync($"/api/dossiers/{created.Id}/plan/draft",
-            new SavePlanDraftRequest(created.Version, "Phương án A", [item], [], Guid.NewGuid()));
+            new SavePlanDraftRequest(created.Version, [item], Guid.NewGuid()));
         var second = secondClient.PostAsJsonAsync($"/api/dossiers/{created.Id}/plan/draft",
-            new SavePlanDraftRequest(created.Version, "Phương án B", [item], [], Guid.NewGuid()));
+            new SavePlanDraftRequest(created.Version, [item], Guid.NewGuid()));
         var responses = await Task.WhenAll(first, second);
         Assert.Single(responses, x => x.StatusCode == HttpStatusCode.OK);
         Assert.Single(responses, x => x.StatusCode == HttpStatusCode.Conflict);
@@ -691,10 +674,10 @@ public sealed class TreatmentDossierApiTests(ApiFixture fixture) : IClassFixture
         var uncommitted = await publicClient.GetFromJsonAsync<OwnTreatmentSummaryItem[]>("/api/patients/me/treatment-summary");
         Assert.DoesNotContain(uncommitted!, x => x.DossierId == created.Id);
         var draftResponse = await dentist.PostAsJsonAsync($"/api/dossiers/{created.Id}/plan/draft",
-            new SavePlanDraftRequest(created.Version, "SYNTHETIC official plan",
+            new SavePlanDraftRequest(created.Version,
                 [new TreatmentItemInput(null, null, setup.ServiceId, "25", "răng", 1, 1, 30,
                     null, null, 300000, "Agreed", "Tư vấn phương án", "Bệnh nhân", null, null)],
-                [], Guid.NewGuid()));
+                Guid.NewGuid()));
         Assert.Equal(HttpStatusCode.OK, draftResponse.StatusCode);
         var draft = (await draftResponse.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
         var committedResponse = await dentist.PostAsJsonAsync($"/api/dossiers/{created.Id}/plan/commit",
@@ -782,10 +765,10 @@ public sealed class TreatmentDossierApiTests(ApiFixture fixture) : IClassFixture
         Assert.Equal(HttpStatusCode.Created, createdResponse.StatusCode);
         var created = (await createdResponse.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
         var draftResponse = await dentist.PostAsJsonAsync($"/api/dossiers/{created.Id}/plan/draft",
-            new SavePlanDraftRequest(created.Version, "SYNTHETIC planned work", [
+            new SavePlanDraftRequest(created.Version, [
                 new TreatmentItemInput(null, null, setup.ServiceId, "25", "tooth", 1, 1,
                     30, null, null, 300000, "Agreed", "Consulted", "Patient", null, null)],
-                [], Guid.NewGuid()));
+                Guid.NewGuid()));
         var draft = (await draftResponse.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
         var committedResponse = await dentist.PostAsJsonAsync($"/api/dossiers/{created.Id}/plan/commit",
             new CommitPlanRequest(draft.Version, Guid.NewGuid()));

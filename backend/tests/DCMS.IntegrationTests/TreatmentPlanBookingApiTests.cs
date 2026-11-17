@@ -61,8 +61,8 @@ public sealed class TreatmentPlanBookingApiTests(ApiFixture fixture) : IClassFix
         var week = new WorkingWeek { BranchId = branch.Id, EmployeeId = dentist.Id, WeekStart = monday, PublishedBy = dentist.AccountId, PublishedAt = DateTimeOffset.UtcNow };
         for (var day = 0; day < 7; day++) week.Periods.Add(new WorkingPeriod { WeekId = week.Id, Day = day, StartMinute = 480, EndMinute = 1080, Kind = "Work" });
         db.Add(week); await db.SaveChangesAsync();
-        var dossier = new TreatmentDossier { PatientId = patient.Id, BranchId = branch.Id, DentistId = dentist.Id, Code = "AUD-" + Guid.NewGuid().ToString("N"), StartedOn = date.AddDays(-7), PlanState = "Committed", PlanVersion = 1, CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow };
-        var item = new TreatmentItem { DossierId = dossier.Id, ServiceId = service.Id, ServiceName = service.Name, Unit = "răng", Quantity = 1, PlannedOrder = 1, EstimatedMinutes = 30, EstimatedStart = date, AgreedUnitPriceVnd = 100000, EntrySource = "ClinicianEntry", Decision = "Agreed", ResponsibleDentistId = dentist.Id };
+        var dossier = new TreatmentDossier { PatientId = patient.Id, BranchId = branch.Id, DentistId = dentist.Id, Code = "AUD-" + Guid.NewGuid().ToString("N"), StartedOn = date.AddDays(-7), CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow };
+        var item = new TreatmentItem { DossierId = dossier.Id, ServiceId = service.Id, ServiceName = service.Name, Unit = "răng", Quantity = 1, PlannedOrder = 1, EstimatedMinutes = 30, EstimatedStart = date, AgreedUnitPriceVnd = 100000, EntrySource = "ClinicianEntry", Decision = "Agreed", DecisionPlanVersion = 1, ResponsibleDentistId = dentist.Id };
         dossier.Items.Add(item); db.Add(dossier); await db.SaveChangesAsync();
         return new(patient.Id, branch.Id, dentist.Id, service.Id, date, dossier.Id, item.Id);
     }
@@ -187,7 +187,7 @@ public sealed class TreatmentPlanBookingApiTests(ApiFixture fixture) : IClassFix
             var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
             var item = new TreatmentItem { DossierId = s.Dossier, ServiceId = s.Service, ServiceName = "SYNTHETIC later service", Unit = "răng", Quantity = 1,
                 PlannedOrder = 2, EstimatedMinutes = 45, EstimatedStart = s.Date.AddDays(14), AgreedUnitPriceVnd = 100000, EntrySource = "ClinicianEntry",
-                Decision = "Agreed", ResponsibleDentistId = s.Dentist };
+                Decision = "Agreed", DecisionPlanVersion = 1, ResponsibleDentistId = s.Dentist };
             db.Add(item); later = item.Id; await db.SaveChangesAsync();
         }
         Assert.Equal(s.Item, Assert.Single(await Candidates(client, s)).ItemId);

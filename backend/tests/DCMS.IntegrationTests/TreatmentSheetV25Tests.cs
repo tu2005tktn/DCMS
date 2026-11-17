@@ -154,7 +154,7 @@ public sealed class TreatmentSheetV25Tests(ApiFixture fixture) : IClassFixture<A
         var read = await c.GetFromJsonAsync<TreatmentDossierDto>($"/api/dossiers/{dossier.Id}");
         Assert.Equal(350000, read!.Items[0].ReferenceUnitPriceVnd);
         var step = new DCMS.Domain.Features.Treatment.TreatmentStep { DossierId = dossier.Id, ItemId = a.Id,
-            PlanId = saved.PlanId, PlanVersion = saved.PlanVersion, Name = "SYNTHETIC unchanged", EstimatedMinutes = 25, ReservedMinutes = 30 };
+            PlanId = saved.Id, PlanVersion = saved.PlanVersion, Name = "SYNTHETIC unchanged", EstimatedMinutes = 25, ReservedMinutes = 30 };
         await db.AddTreatmentDataAsync(step); await db.SaveChangesAsync();
         var deferred = await c.PostAsJsonAsync($"/api/dossiers/{dossier.Id}/sheet-drafts/{b.Id}/confirm-plan",
             new ConfirmSheetPlanRequest(saved.Version, b.Version, new("Deferred", "SYNTHETIC hoãn", "SYNTHETIC"), Guid.NewGuid()));
@@ -235,7 +235,7 @@ public sealed class TreatmentSheetV25Tests(ApiFixture fixture) : IClassFixture<A
         {
             var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
             var step = new DCMS.Domain.Features.Treatment.TreatmentStep { DossierId = dossier.Id, ItemId = item.Id,
-                PlanId = dossier.PlanId, PlanVersion = dossier.PlanVersion, 
+                PlanId = dossier.Id, PlanVersion = dossier.PlanVersion,
                 Name = "SYNTHETIC held", EstimatedMinutes = 30, ReservedMinutes = 30, HoldReason = "SYNTHETIC hold" };
             await db.AddTreatmentDataAsync(step); await db.SaveChangesAsync(); stepId = step.Id;
         }
@@ -265,10 +265,13 @@ public sealed class TreatmentSheetV25Tests(ApiFixture fixture) : IClassFixture<A
             new CreateDossierRequest(s.Branch, s.Dentist, "SYNTHETIC", null, null, Guid.NewGuid(), s.Visits[0], sourceVersion));
         Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
         var dossier = (await response.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
-        Assert.Equal(s.Visits[0], dossier.SourceExaminationId); Assert.Equal(sourceVersion, dossier.SourceExaminationVersion);
+        Assert.Equal(s.Visits[0], dossier.SourceExaminationVisitId);
         examination.ContentJson = "{\"diagnosis\":\"SYNTHETIC changed\"}"; await db.SaveChangesAsync();
         var read = (await c.GetFromJsonAsync<TreatmentDossierDto>($"/api/dossiers/{dossier.Id}"))!;
-        Assert.Contains("SYNTHETIC original", Assert.Single(read.Timeline, e => e.Kind == "ExaminationSourceCaptured").PayloadJson);
+        var handoffPayload = Assert.Single(read.Timeline, e => e.Kind == "ExaminationSourceCaptured").PayloadJson;
+        Assert.Contains("SYNTHETIC original", handoffPayload);
+        using var handoffDoc = System.Text.Json.JsonDocument.Parse(handoffPayload);
+        Assert.Equal(sourceVersion, handoffDoc.RootElement.GetProperty("sourceVisitVersion").GetInt32());
         Assert.Equal(2, await db.Visits.CountAsync(v => s.Visits.Contains(v.Id)));
     }
     [Fact]

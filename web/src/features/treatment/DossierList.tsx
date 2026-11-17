@@ -6,7 +6,6 @@ import { api, type ApiError } from '../../services/api';
 import { useAuth } from '../authentication/AuthContext';
 import type { AppointmentOptions, DossierListItem, DossierPage, TreatmentChange, TreatmentDossier } from './types';
 import TreatmentSheet from './TreatmentSheet';
-import DossierClosureModal from './DossierClosureModal';
 
 
 const displayTime = (value: string) => new Intl.DateTimeFormat('vi-VN', {
@@ -38,7 +37,6 @@ export default function DossierList({ patientId, visitId, initialDossierId, sour
   const [statusBusyId, setStatusBusyId] = useState<string | null>(null);
   // Cancelling cannot be undone, so it is confirmed first instead of running straight from the status menu.
   const [cancelTarget, setCancelTarget] = useState<DossierListItem | null>(null);
-  const [clinicalTarget, setClinicalTarget] = useState<{ dossier: TreatmentDossier; completed: boolean } | null>(null);
   const [createContext,setCreateContext] = useState<{dentistId:number;branches:{id:number;name:string}[]} | null>(null);
   const [branchId,setBranchId] = useState<number>();
   const [unsaved,setUnsaved] = useState(false);
@@ -129,8 +127,16 @@ export default function DossierList({ patientId, visitId, initialDossierId, sour
   async function changeStatus(item: DossierListItem, completed: boolean) {
     if ((item.state === 'Open' && !completed) || item.state === 'Cancelled' || statusBusyId) return;
     setStatusBusyId(item.id); setStatusError(null);
-    try { const value = await api<TreatmentDossier>(`/api/dossiers/${item.id}`); setClinicalTarget({ dossier: value, completed }); }
-    catch (failure) { setStatusError({ id: item.id, message: (failure as Error).message }); }
+    try {
+      const value = await api<TreatmentDossier>(`/api/dossiers/${item.id}`);
+      const payload = completed
+        ? { expectedVersion: value.version, outcome: 'CompletedAsAgreed', reason: null, dispositions: [], requestKey: crypto.randomUUID() }
+        : { expectedVersion: value.version, reason: 'Mở lại phiếu điều trị', requestKey: crypto.randomUUID() };
+      await api(`/api/dossiers/${item.id}/${completed ? 'close' : 'reopen'}`, {
+        method: 'POST', body: JSON.stringify(payload),
+      });
+      setRevision(v => v + 1);
+    } catch (failure) { setStatusError({ id: item.id, message: (failure as Error).message }); }
     finally { setStatusBusyId(null); }
   }
 
@@ -212,8 +218,6 @@ export default function DossierList({ patientId, visitId, initialDossierId, sour
       {saveError && <Alert type="error" message={saveError} action={<Button onClick={()=>createContext && branchId ? void create() : setContextRetry(v=>v+1)}>Thử lại</Button>}/>}
       {optionsError && <Alert type="error" message={optionsError}/>}
     </div>
-    {clinicalTarget && <DossierClosureModal dossier={clinicalTarget.dossier} completed={clinicalTarget.completed}
-      onClose={() => setClinicalTarget(null)} onSaved={() => { setClinicalTarget(null); setRevision(v => v + 1); }} />}
     <Modal open={!!deleteTarget} title={`Xóa phiếu ${deleteTarget?.code ?? ''}?`}
       okText="Xóa phiếu" okButtonProps={{ danger: true, loading: deleteBusy }}
       onOk={() => void deleteDossier()} onCancel={() => { if (!deleteBusy) setDeleteTarget(null); }}>

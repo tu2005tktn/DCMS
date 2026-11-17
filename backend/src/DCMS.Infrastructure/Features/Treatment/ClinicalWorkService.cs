@@ -130,8 +130,8 @@ public sealed class ClinicalWorkService(DcmsDbContext db, UserManager<Applicatio
                 .SingleOrDefaultAsync(d => d.Id == x.DossierId, ct);
             if (dossier == null || dossier.PatientId != visit.PatientId ||
                 dossier.BranchId != visit.BranchId) throw Error("MSG113", 404);
-            if (dossier.State != "Open" || dossier.PlanState != "Committed" ||
-                dossier.PlanVersion != x.PlanVersion) throw Error("MSG111", 409);
+            if (dossier.State != "Open" || !dossier.HasCommittedPlan() ||
+                dossier.CurrentPlanVersion() != x.PlanVersion) throw Error("MSG111", 409);
             var item = dossier.Items.SingleOrDefault(i => i.Id == x.ItemId);
             if (item == null || item.Decision != "Agreed" || item.ServiceId != x.ServiceId || item.Progress is "Completed" or "Stopped" or "Cancelled"
                 || item.Unit != x.Unit || item.AgreedUnitPriceVnd != x.PriceSnapshotVnd || !TreatmentSheetRules.RegionWithinScope(item.Region, x.Region))
@@ -267,7 +267,7 @@ public sealed class ClinicalWorkService(DcmsDbContext db, UserManager<Applicatio
             if (row.VisitId.HasValue || row.RecordedBy != actorId || employee != dossierSource.DentistId || row.PerformerId != employee
                 || row.PatientId != dossierSource.PatientId || row.BranchId != dossierSource.BranchId
                 || dossierSource.State != "Open" || source.SheetDeleted
-                || row.PlanVersion != dossierSource.PlanVersion || row.State != "Draft" || row.Version != request.ExpectedVersion)
+                || row.PlanVersion != dossierSource.CurrentPlanVersion() || row.State != "Draft" || row.Version != request.ExpectedVersion)
                 throw Error("MSG111", 409);
         }
         else

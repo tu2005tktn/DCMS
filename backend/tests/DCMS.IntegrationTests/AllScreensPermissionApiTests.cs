@@ -67,7 +67,7 @@ public sealed class AllScreensPermissionApiTests(ReceptionFixture fixture) : ICl
     [InlineData("treatment.templates.read", "Dentist", "/api/treatment-templates?branchId={branch}", "/api/treatment-templates", "POST")]
     [InlineData("treatment.templates.read", "Dentist", "/api/treatment-templates/item-plans?branchId={branch}", "/api/treatment-templates/item-plans", "POST")]
     [InlineData("treatment.prices.read", "Admin", "/api/service-prices", "/api/service-prices/{service}", "PUT")]
-    [InlineData("treatment.commercial.read", "Admin", "/api/commercial/dossiers", "/api/commercial/dossiers/11111111-1111-4111-8111-111111111111/deposit-exception", "POST")]
+    [InlineData("treatment.commercial.read", "Admin", "/api/commercial/dossiers", "/api/commercial/dossiers/11111111-1111-4111-8111-111111111111/items/11111111-1111-4111-8111-111111111111/discount/decision", "POST")]
     [InlineData("treatment.read", "Dentist", "/api/patients/{patient}/dossiers?branchId={branch}", "/api/patients/{patient}/dossiers", "POST")]
     [InlineData("documents.read", "Dentist", "/api/patients/{patient}/document-contexts", "/api/clinical-documents/11111111-1111-4111-8111-111111111111/review", "POST")]
     [InlineData("care-tasks.read", "ClinicAssistant", "/api/care-tasks?branchId={branch}", "/api/care-tasks", "POST")]
@@ -165,7 +165,7 @@ public sealed class AllScreensPermissionApiTests(ReceptionFixture fixture) : ICl
         }
         var dossier = (await Ok<DCMS.Application.Features.Treatment.TreatmentChange>(await user.PostAsJsonAsync($"/api/patients/{setup.PatientId}/dossiers", new DCMS.Application.Features.Treatment.CreateDossierRequest(setup.BranchId, staff.EmployeeId, "SYNTHETIC grant test", null, null, Guid.NewGuid())))).Dossier;
         DCMS.Application.Features.Treatment.TreatmentItemInput Item(Guid? id, int order, long price = 100000) => new(id, null, setup.ServiceId, "25", "răng", 1, order, 30, null, null, price, "Proposed", null, null, null, null);
-        async Task<HttpResponseMessage> Save(params DCMS.Application.Features.Treatment.TreatmentItemInput[] items) => await user.PostAsJsonAsync($"/api/dossiers/{dossier.Id}/plan/draft", new DCMS.Application.Features.Treatment.SavePlanDraftRequest(dossier.Version, "SYNTHETIC goal", items, [], Guid.NewGuid()));
+        async Task<HttpResponseMessage> Save(params DCMS.Application.Features.Treatment.TreatmentItemInput[] items) => await user.PostAsJsonAsync($"/api/dossiers/{dossier.Id}/plan/draft", new DCMS.Application.Features.Treatment.SavePlanDraftRequest(dossier.Version, items, Guid.NewGuid()));
         Assert.Equal(HttpStatusCode.Forbidden, (await Save(Item(null, 1), Item(null, 2))).StatusCode);
         await Change("treatment.items.create");
         dossier = (await Ok<DCMS.Application.Features.Treatment.TreatmentChange>(await Save(Item(null, 1), Item(null, 2)))).Dossier;

@@ -17,13 +17,6 @@ public sealed partial class DcmsDbContext
         return (await TreatmentDossiers.SingleAsync(x => x.SheetDrafts.Any(d => d.Id == id), ct)).SheetDrafts.Single(x => x.Id == id);
     }
 
-    public async Task<TreatmentRevisionDraft?> LoadRevisionDraftAsync(IQueryable<TreatmentRevisionDraft> query, CancellationToken ct)
-    {
-        var id = await query.Select(x => (Guid?)x.Id).SingleOrDefaultAsync(ct);
-        if (!id.HasValue) return null;
-        return (await TreatmentDossiers.SingleAsync(x => x.RevisionDrafts.Any(d => d.Id == id), ct)).RevisionDrafts.Single(x => x.Id == id);
-    }
-
     public async Task<List<TreatmentStep>> LoadTreatmentStepsAsync(IQueryable<TreatmentStep> query, CancellationToken ct)
     {
         var ids = await query.Select(x => x.Id).ToArrayAsync(ct);
@@ -39,7 +32,7 @@ public sealed partial class DcmsDbContext
 
     public async Task AddTreatmentDataAsync(params object[] rows)
     {
-        foreach (var row in rows.Where(x => x is not (TreatmentStep or TreatmentSheetDraft or TreatmentRevisionDraft or TreatmentTemplateItem or TreatmentTemplateVersion)))
+        foreach (var row in rows.Where(x => x is not (TreatmentStep or TreatmentSheetDraft or TreatmentTemplateItem or TreatmentTemplateVersion)))
             Add(row);
         foreach (var row in rows)
         {
@@ -54,11 +47,6 @@ public sealed partial class DcmsDbContext
                     var sheet = await TreatmentDossiers.FindAsync(draft.DossierId)
                         ?? throw new InvalidOperationException("The treatment dossier must exist before its drafts are saved.");
                     if (!sheet.SheetDrafts.Contains(draft)) sheet.SheetDrafts.Add(draft);
-                    break;
-                case TreatmentRevisionDraft revision:
-                    var dossier = await TreatmentDossiers.FindAsync(revision.DossierId)
-                        ?? throw new InvalidOperationException("The treatment dossier must exist before its revisions are saved.");
-                    if (!dossier.RevisionDrafts.Contains(revision)) dossier.RevisionDrafts.Add(revision);
                     break;
                 case TreatmentTemplateItem templateItem:
                     var template = await TreatmentTemplates.FindAsync(templateItem.TemplateId)
@@ -83,11 +71,6 @@ public sealed partial class DcmsDbContext
                     ?? throw new InvalidOperationException("The treatment dossier no longer exists.");
                 sheet.SheetDrafts.RemoveAll(x => x.Id == draft.Id);
                 break;
-            case TreatmentRevisionDraft revision:
-                var dossier = await TreatmentDossiers.FindAsync(revision.DossierId)
-                    ?? throw new InvalidOperationException("The treatment dossier no longer exists.");
-                dossier.RevisionDrafts.RemoveAll(x => x.Id == revision.Id);
-                break;
             default:
                 Remove(row);
                 break;
@@ -100,7 +83,7 @@ public sealed partial class DcmsDbContext
         foreach (var activity in ChangeTracker.Entries<ClinicalActivity>().Where(x => x.State == EntityState.Modified).ToArray())
             if (!activity.Property(x => x.Version).IsModified) activity.Entity.Version = activity.Property(x => x.Version).OriginalValue + 1;
         foreach (var entry in ChangeTracker.Entries().Where(x => x.State == EntityState.Modified
-            && x.Entity is TreatmentDossier or TreatmentItem or TreatmentTemplate or CareTask or LabOrder).ToArray())
+            && x.Entity is TreatmentItem or TreatmentTemplate or CareTask or LabOrder).ToArray())
             entry.Property("StorageStamp").CurrentValue = Guid.NewGuid();
     }
 }

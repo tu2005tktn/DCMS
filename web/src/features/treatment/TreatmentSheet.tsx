@@ -253,7 +253,7 @@ export default function TreatmentSheet({ patientId, dossierId, dossierVersion, o
       ? <Button disabled={busy} onClick={() => void reloadCopy()}>Đọc lại phiên bản sao chép</Button>
       : <Button disabled={busy} onClick={() => void copyItem()}>Thử lại sao chép</Button>} />}
     <div className="treatment-sheet-tools">
-      {dossier.sourceExaminationId && <Link to={`/visits/${dossier.sourceExaminationId}`}>Mở nguồn khám</Link>}</div>
+      {dossier.sourceExaminationVisitId && <Link to={`/visits/${dossier.sourceExaminationVisitId}`}>Mở nguồn khám</Link>}</div>
     <h2 className="treatment-sheet-print-title">Phiếu điều trị {dossier.code}</h2>
     <section><div className="treatment-sheet-band"><div className="treatment-sheet-band-title"><h3>KẾ HOẠCH ĐIỀU TRỊ/DỊCH VỤ</h3><Button size="small" disabled={!has('treatment.items.create') || !has('treatment.templates.read') || !canWrite || !!editor || busy || noteBusy} title={editor ? 'Lưu hoặc hủy hàng đang nhập trước khi chọn kế hoạch.' : undefined} onClick={() => setSelectPlan(true)}>Kế hoạch điều trị</Button></div><div><span>Tổng dự toán: {money(gross)}</span><span>Giảm giá: {money(discount)}</span><strong>Thành tiền: {money(gross-discount)}</strong></div></div>
       <div className="treatment-sheet-table-scroll"><table className="treatment-sheet-table treatment-sheet-plan-table"><thead><tr>

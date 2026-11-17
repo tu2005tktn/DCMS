@@ -20,8 +20,7 @@ internal static class TreatmentModel
         model.Entity<TreatmentDossier>(b =>
         {
             b.ToTable("TREATMENT_DOSSIER");
-            b.Property(x=>x.SourceExaminationJson).HasColumnType("jsonb");
-            b.HasOne<DCMS.Domain.Features.Visits.Visit>().WithMany().HasForeignKey(x=>x.SourceExaminationVisitId).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<DCMS.Domain.Features.Visits.Visit>().WithMany().HasForeignKey(x => x.SourceExaminationVisitId).OnDelete(DeleteBehavior.Restrict);
             b.HasKey(x => x.Id);
             b.HasIndex(x => x.Code).IsUnique();
             b.HasIndex(x => new { x.PatientId, x.BranchId, x.UpdatedAt });
@@ -29,14 +28,6 @@ internal static class TreatmentModel
             b.Property(x => x.Diagnosis).HasMaxLength(4000);
             b.Property(x => x.Note).HasMaxLength(4000);
             b.Property(x => x.State).HasMaxLength(16);
-            b.Property(x => x.DisplayCompleted).HasDefaultValue(false);
-            b.Property(x => x.ClosureOutcome).HasMaxLength(32);
-            b.Property(x => x.ClosureReason).HasMaxLength(1000);
-            b.Property(x => x.PlanState).HasMaxLength(16);
-            b.Property(x => x.Goals).HasMaxLength(4000);
-            b.Property(x => x.PaymentTermsJson).HasColumnType("jsonb");
-            b.Property(x => x.DepositExceptionReason).HasMaxLength(1000);
-            b.HasIndex(x => x.SourceTemplateId);
             b.Property(x => x.Version).IsConcurrencyToken();
             b.HasOne<PatientProfile>().WithMany().HasForeignKey(x => x.PatientId).OnDelete(DeleteBehavior.Restrict);
             b.HasOne<SchedulingBranch>().WithMany().HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Restrict);

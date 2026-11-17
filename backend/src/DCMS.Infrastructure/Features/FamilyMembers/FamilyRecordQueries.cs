@@ -66,7 +66,8 @@ public sealed partial class FamilyRecordService
             }).ToArray();
         } else if (scope == "Treatment") {
             var query = db.TreatmentDossiers.AsNoTracking().Include(x => x.Items).Where(x => x.PatientId == row.PatientId
-                && x.BranchId == row.BranchId && x.PlanState == "Committed" && x.State != "Deleted");
+                && x.BranchId == row.BranchId && x.State != "Deleted"
+                && x.Items.Any(i => i.DecisionPlanVersion != null) && !x.Items.Any(i => !i.SheetDeleted && i.DecisionPlanVersion == null));
             total = await query.CountAsync(ct);
             items = (await query.OrderByDescending(x => x.StartedOn).ThenBy(x => x.Id).Skip(skip).Take(pageSize).ToArrayAsync(ct))
                 .Select(x => (object)new FamilyTreatmentDto(x.Id, x.Code, x.Diagnosis, x.State, x.StartedOn,
@@ -98,7 +99,9 @@ public sealed partial class FamilyRecordService
         && (d.VisitId != null
             ? db.Visits.Any(v => v.Id == d.VisitId && v.PatientId == row.PatientId && v.BranchId == row.BranchId && v.Status != "Cancelled"
                 && DCMS.Domain.Features.Visits.VisitStatuses.HasConfirmedExamination.Contains(v.Status) && db.Set<VisitExamination>().Any(e => e.VisitId == v.Id))
-            : db.TreatmentDossiers.Any(t => t.Id == d.DossierId && t.PatientId == row.PatientId && t.BranchId == row.BranchId && t.PlanState == "Committed" && t.State != "Deleted")));
+            : db.TreatmentDossiers.Any(t => t.Id == d.DossierId && t.PatientId == row.PatientId && t.BranchId == row.BranchId
+                && t.State != "Deleted" && t.Items.Any(i => i.DecisionPlanVersion != null)
+                && !t.Items.Any(i => !i.SheetDeleted && i.DecisionPlanVersion == null))));
 
     public async Task<DocumentContent> DocumentAsync(int actor, Guid memberId, Guid documentId, CancellationToken ct)
     {

@@ -62,12 +62,12 @@ public sealed class TreatmentStorageTests(ApiFixture fixture) : IClassFixture<Ap
         {
             Code = "ST-" + Guid.NewGuid().ToString("N")[..20], PatientId = setup.PatientId, BranchId = setup.BranchId,
             DentistId = setup.DentistId, StartedOn = DateOnly.FromDateTime(now.UtcDateTime), Diagnosis = "SYNTHETIC diagnosis",
-            PlanVersion = 1, PlanState = "Committed", CreatedAt = now, UpdatedAt = now
+            CreatedAt = now, UpdatedAt = now
         };
         var item = new TreatmentItem
         {
             DossierId = dossier.Id, ServiceId = setup.ServiceId, ServiceName = "SYNTHETIC storage service", Unit = "răng",
-            Quantity = 1.000m, PlannedOrder = 1, AgreedUnitPriceVnd = 100000, Decision = "Agreed"
+            Quantity = 1.000m, PlannedOrder = 1, AgreedUnitPriceVnd = 100000, Decision = "Agreed", DecisionPlanVersion = 1
         };
         dossier.Items.Add(item);
         return (dossier, item);
@@ -83,13 +83,13 @@ public sealed class TreatmentStorageTests(ApiFixture fixture) : IClassFixture<Ap
         var (dossier, item) = NewDossier(setup, now);
         var first = new TreatmentStep
         {
-            DossierId = dossier.Id, PlanId = dossier.PlanId, PlanVersion = 1, ItemId = item.Id, Name = "SYNTHETIC step one",
+            DossierId = dossier.Id, PlanId = dossier.Id, PlanVersion = 1, ItemId = item.Id, Name = "SYNTHETIC step one",
             EstimatedMinutes = 20, EstimatedMinMinutes = 15, EstimatedMaxMinutes = 40, ReservedMinutes = 30,
             Outcome = "Completed", CompletedAt = now, CompletionEventId = Guid.NewGuid(), Version = 3
         };
         var second = new TreatmentStep
         {
-            DossierId = dossier.Id, PlanId = dossier.PlanId, PlanVersion = 1, ItemId = item.Id, Name = "SYNTHETIC step two",
+            DossierId = dossier.Id, PlanId = dossier.Id, PlanVersion = 1, ItemId = item.Id, Name = "SYNTHETIC step two",
             Region = "16", EstimatedMinutes = 30, ReservedMinutes = 45, PredecessorsJson = JsonSerializer.Serialize(new[] { first.Id }),
             Capability = "SYNTHETIC capability", LabRequirement = "SYNTHETIC lab", EarliestOffsetDays = 3, TargetOffsetDays = 7,
             LatestOffsetDays = 10, HoldReason = "SYNTHETIC hold", HoldEffectiveAt = now, Version = 2
@@ -100,11 +100,6 @@ public sealed class TreatmentStorageTests(ApiFixture fixture) : IClassFixture<Ap
             Id = Guid.NewGuid(), DossierId = dossier.Id, VisitId = Guid.NewGuid(), ActorId = setup.ActorId, Kind = "Activity", Version = 4,
             PayloadJson = "{\"rows\":[{\"tooth\":\"16\",\"note\":\"SYNTHETIC\"}]}", LastRequestKey = Guid.NewGuid(),
             LastFingerprint = new string('b', 64), UpdatedAt = now
-        });
-        dossier.RevisionDrafts.Add(new TreatmentRevisionDraft
-        {
-            DossierId = dossier.Id, ItemId = item.Id, ActorId = setup.ActorId, BasePlanVersion = 1, Version = 2,
-            PayloadJson = "{\"reason\":\"SYNTHETIC revision\"}", UpdatedAt = now
         });
         var template = new TreatmentTemplate
         {
@@ -145,7 +140,6 @@ public sealed class TreatmentStorageTests(ApiFixture fixture) : IClassFixture<Ap
 
         var expectedSteps = item.Steps.Select(Snapshot).ToArray();
         var expectedSheetDrafts = dossier.SheetDrafts.Select(Snapshot).ToArray();
-        var expectedRevisionDrafts = dossier.RevisionDrafts.Select(Snapshot).ToArray();
         var expectedTemplateItems = template.Items.Select(Snapshot).ToArray();
         var expectedTemplateVersions = template.Versions.Select(Snapshot).ToArray();
         var expectedActivity = Snapshot(activity);
@@ -158,7 +152,6 @@ public sealed class TreatmentStorageTests(ApiFixture fixture) : IClassFixture<Ap
         Assert.Equal(LegacyTables.Length, await TableCount(db));
         Assert.Equal(2, await Count(db, $"SELECT count(*)::integer AS \"Value\" FROM \"TREATMENT_STEP\" WHERE \"ItemId\"={item.Id} AND \"DossierId\"={dossier.Id}"));
         Assert.Equal(1, await Count(db, $"SELECT count(*)::integer AS \"Value\" FROM \"TREATMENT_SHEET_DRAFT\" WHERE \"DossierId\"={dossier.Id}"));
-        Assert.Equal(1, await Count(db, $"SELECT count(*)::integer AS \"Value\" FROM \"TREATMENT_REVISION_DRAFT\" WHERE \"DossierId\"={dossier.Id} AND \"ItemId\"={item.Id}"));
         Assert.Equal(1, await Count(db, $"SELECT count(*)::integer AS \"Value\" FROM \"TREATMENT_TEMPLATE_ITEM\" WHERE \"TemplateId\"={template.Id}"));
         Assert.Equal(1, await Count(db, $"SELECT count(*)::integer AS \"Value\" FROM \"TREATMENT_TEMPLATE_VERSION\" WHERE \"TemplateId\"={template.Id} AND \"State\"='Active'"));
         Assert.Equal(1, await Count(db, $"SELECT count(*)::integer AS \"Value\" FROM \"CLINICAL_ACTIVITY\" WHERE \"Id\"={activity.Id}"));
@@ -171,7 +164,6 @@ public sealed class TreatmentStorageTests(ApiFixture fixture) : IClassFixture<Ap
         AssertSame(expectedSteps, restoredItem.Steps.Select(Snapshot));
         var restoredDossier = await db.TreatmentDossiers.AsNoTracking().SingleAsync(x => x.Id == dossier.Id);
         AssertSame(expectedSheetDrafts, restoredDossier.SheetDrafts.Select(Snapshot));
-        AssertSame(expectedRevisionDrafts, restoredDossier.RevisionDrafts.Select(Snapshot));
         var restoredTemplate = await db.TreatmentTemplates.AsNoTracking().SingleAsync(x => x.Id == template.Id);
         AssertSame(expectedTemplateItems, restoredTemplate.Items.Select(Snapshot));
         AssertSame(expectedTemplateVersions, restoredTemplate.Versions.Select(Snapshot));
@@ -182,7 +174,6 @@ public sealed class TreatmentStorageTests(ApiFixture fixture) : IClassFixture<Ap
         // The JSONB collections stay queryable through the read projections the services use.
         Assert.Equal(2, await db.TreatmentSteps.CountAsync(x => x.DossierId == dossier.Id));
         Assert.True(await db.TreatmentSteps.AnyAsync(x => x.Id == second.Id && x.HoldReason != null));
-        Assert.Equal(1, await db.TreatmentRevisionDrafts.CountAsync(x => x.DossierId == dossier.Id && x.ActorId == setup.ActorId));
         Assert.Equal(1, await db.TreatmentTemplateVersions.CountAsync(x => x.TemplateId == template.Id && x.State == "Active"));
     }
 
@@ -207,19 +198,20 @@ public sealed class TreatmentStorageTests(ApiFixture fixture) : IClassFixture<Ap
         var staleItem = await second.TreatmentItems.SingleAsync(x => x.Id == item.Id);
         var staleDossier = await third.TreatmentDossiers.SingleAsync(x => x.Id == dossier.Id);
         await first.AddTreatmentDataAsync(
-            new TreatmentStep { DossierId = dossier.Id, PlanId = dossier.PlanId, PlanVersion = 1, ItemId = item.Id, Name = "SYNTHETIC current step", EstimatedMinutes = 30, ReservedMinutes = 30 },
-            new TreatmentRevisionDraft { DossierId = dossier.Id, ItemId = item.Id, ActorId = setup.ActorId, BasePlanVersion = 1, UpdatedAt = now });
+            new TreatmentStep { DossierId = dossier.Id, PlanId = dossier.Id, PlanVersion = 1, ItemId = item.Id, Name = "SYNTHETIC current step", EstimatedMinutes = 30, ReservedMinutes = 30 });
+        var firstDossier = await first.TreatmentDossiers.SingleAsync(x => x.Id == dossier.Id);
+        firstDossier.Note = "SYNTHETIC current note";
+        firstDossier.Version++;
         await first.SaveChangesAsync();
 
-        staleItem.Steps.Add(new TreatmentStep { DossierId = dossier.Id, PlanId = dossier.PlanId, PlanVersion = 1, ItemId = item.Id, Name = "SYNTHETIC stale step", EstimatedMinutes = 30, ReservedMinutes = 30 });
+        staleItem.Steps.Add(new TreatmentStep { DossierId = dossier.Id, PlanId = dossier.Id, PlanVersion = 1, ItemId = item.Id, Name = "SYNTHETIC stale step", EstimatedMinutes = 30, ReservedMinutes = 30 });
         await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => second.SaveChangesAsync());
         second.ChangeTracker.Clear();
-        // The draft added above did not change the dossier's business version, only its storage stamp.
         staleDossier.Note = "SYNTHETIC stale note";
         await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => third.SaveChangesAsync());
 
         Assert.Equal("SYNTHETIC current step", Assert.Single((await second.TreatmentItems.AsNoTracking().SingleAsync(x => x.Id == item.Id)).Steps).Name);
-        Assert.Single((await second.TreatmentDossiers.AsNoTracking().SingleAsync(x => x.Id == dossier.Id)).RevisionDrafts);
+        Assert.Equal("SYNTHETIC current note", (await second.TreatmentDossiers.AsNoTracking().SingleAsync(x => x.Id == dossier.Id)).Note);
     }
 
     [Fact]
@@ -228,7 +220,7 @@ public sealed class TreatmentStorageTests(ApiFixture fixture) : IClassFixture<Ap
         var setup = await Prepare();
         var now = Now();
         var (dossier, item) = NewDossier(setup, now);
-        var step = new TreatmentStep { DossierId = dossier.Id, PlanId = dossier.PlanId, PlanVersion = 1, ItemId = item.Id, Name = "SYNTHETIC blocked step", EstimatedMinutes = 30, ReservedMinutes = 30 };
+        var step = new TreatmentStep { DossierId = dossier.Id, PlanId = dossier.Id, PlanVersion = 1, ItemId = item.Id, Name = "SYNTHETIC blocked step", EstimatedMinutes = 30, ReservedMinutes = 30 };
         item.Steps.Add(step);
         var legacyKey = "legacy-step-blocked:" + step.Id;
         var payload = JsonSerializer.Serialize(new { patientId = setup.PatientId });

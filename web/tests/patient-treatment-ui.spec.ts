@@ -23,8 +23,8 @@ async function prepare(page: Page, withItem = true, withFinance = false) {
       ...Array.from({length:22},(_,i)=>({id:`extra-${i}`,name:`Dụng cụ ${String(i+1).padStart(2,'0')}`,categoryId:'group-2',categoryName:'Dụng cụ khám',version:1}))
     ] };
   const detail = () => ({ id: dossierId, code: 'DT-001', patientId: 123, branchId: 1, dentistId: 7,
-    state: 'Open', version: state.version, planVersion: 1, planState: 'Committed', items: state.items,
-    paymentTerms: [], timeline: [], createdAt: '2026-10-27T01:00:00Z', updatedAt: '2026-10-27T01:00:00Z',
+    state: 'Open', version: state.version, planVersion: 1, items: state.items,
+    timeline: [], createdAt: '2026-10-27T01:00:00Z', updatedAt: '2026-10-27T01:00:00Z',
     note: state.notes, financialSummary: { available: withFinance, plannedVnd: 600000,
       postedChargeVnd: withFinance ? 600000 : null, allocatedVnd: withFinance ? 0 : null, outstandingVnd: withFinance ? 600000 : null } });
   await page.route('**/api/**', async route => {
@@ -170,7 +170,7 @@ test('ngày giảm dần, thiếu ngày cuối, sửa giữ vị trí và không
 });
 test('tạo phiếu nhanh không Modal hoặc chuyển trang, retry cùng key và mở đúng ID', async ({page})=>{
   await prepare(page);const id='99999999-9999-4999-8999-999999999999';const calls:any[]=[];let fail=true;
-  const dossier={id,code:'DT-NEW',patientId:123,branchId:1,dentistId:7,state:'Open',version:1,planVersion:0,planState:'Empty',items:[],timeline:[],paymentTerms:[],note:null,createdAt:'2026-11-02T00:00:00Z'};
+  const dossier={id,code:'DT-NEW',patientId:123,branchId:1,dentistId:7,state:'Open',version:1,planVersion:0,items:[],timeline:[],note:null,createdAt:'2026-11-02T00:00:00Z'};
   await page.route('**/api/patients/123/dossiers/quick',async r=>{calls.push(r.request().postDataJSON());if(fail){fail=false;return r.fulfill({status:503,json:{code:'MSG144',message:'Lỗi tạo thử nghiệm'}});}return r.fulfill({json:{dossier}});});
   await page.route(`**/api/dossiers/${id}`,r=>r.fulfill({json:dossier}));
   await page.getByRole('button',{name:'Tạo phiếu mới',exact:true}).click();await expect(page.getByText('Lỗi tạo thử nghiệm',{exact:true})).toBeVisible();
@@ -346,8 +346,6 @@ test('đọc quá trình nhiều buổi, tổng toàn bộ phiếu và đóng c�
   await expect(page.getByText('Buổi đầu', { exact: true })).toBeVisible(); await expect(page.getByText('Buổi sau', { exact: true })).toBeVisible();
   await expect(page.locator('.treatment-sheet-payment')).toContainText(/Còn nợ:\s*600\.000\s*₫/);
   await page.getByRole('button', { name: 'Trạng thái phiếu: Chưa xong' }).click(); await page.getByRole('menuitem', { name: 'Hoàn tất', exact: true }).click();
-  await expect(page.getByText(/Còn 1 hạng mục chưa hoàn tất/)).toBeVisible();
-  await page.getByRole('button', { name: 'Xác nhận kết thúc' }).click();
   await expect(page.getByText('MSG243 — Còn hạng mục chưa được xử lý', { exact: true })).toBeVisible();
 });
 

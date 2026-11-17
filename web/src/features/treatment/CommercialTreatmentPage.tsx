@@ -1,5 +1,5 @@
 import { usePermissions } from '../authentication/usePermissions';
-import { Alert, Button, Card, Empty, Form, Input, InputNumber, Modal, Select, Skeleton, Space, Tag, Typography } from 'antd';
+import { Alert, Button, Card, Empty, Form, InputNumber, Modal, Select, Skeleton, Space, Tag, Typography } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../../services/api';
@@ -10,8 +10,7 @@ import './treatment.css';
 type CommercialListItem = { dossierId: string; code: string; branchId: number;
   version: number; pendingDiscounts: number };
 type CommercialPlan = { dossierId: string; code: string; branchId: number; version: number;
-  planState: string; items: TreatmentItem[]; depositExceptionReason: string | null;
-  preview: { grossVnd: number; approvedDiscountVnd: number; netBeforeTaxVnd: number } };
+  items: TreatmentItem[]; preview: { grossVnd: number; approvedDiscountVnd: number; netBeforeTaxVnd: number } };
 
 export default function CommercialTreatmentPage() {
   const has = usePermissions();
@@ -24,9 +23,7 @@ export default function CommercialTreatmentPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [priceEditing, setPriceEditing] = useState<ServicePrice | null>(null);
-  const [depositOpen, setDepositOpen] = useState(false);
   const [priceForm] = Form.useForm<{ referenceUnitPriceVnd: number | null; unit?: string }>();
-  const [depositForm] = Form.useForm<{ reason: string }>();
   const requestKey = useRef(crypto.randomUUID());
 
   async function reload() {
@@ -74,23 +71,9 @@ export default function CommercialTreatmentPage() {
     finally { setBusy(false); }
   }
 
-  async function approveDeposit(values: { reason: string }) {
-    if (!plan || busy) return;
-    setBusy(true); setError(null);
-    try {
-      const result = await api<TreatmentChange>(`/api/commercial/dossiers/${plan.dossierId}/deposit-exception`, {
-        method: 'POST', body: JSON.stringify({ expectedVersion: plan.version, reason: values.reason,
-          requestKey: requestKey.current }),
-      });
-      requestKey.current = crypto.randomUUID(); setDepositOpen(false); depositForm.resetFields();
-      setNotice(result.notification.message); await reload();
-    } catch (failure) { setError((failure as Error).message); }
-    finally { setBusy(false); }
-  }
-
   return <main className="treatment-page">
     <div className="treatment-page-heading"><div><Typography.Title level={2}>Duyệt thương mại điều trị</Typography.Title>
-      <Typography.Paragraph>Bác sĩ trong chi nhánh được phân công, Admin hoặc chủ phòng khám có thể cập nhật giá tham chiếu, duyệt giảm trừ và ngoại lệ cọc. Các thao tác này không ghi nhận khoản thu.</Typography.Paragraph></div></div>
+      <Typography.Paragraph>Bác sĩ trong chi nhánh được phân công, Admin hoặc chủ phòng khám có thể cập nhật giá tham chiếu và duyệt giảm trừ. Các thao tác này không ghi nhận khoản thu.</Typography.Paragraph></div></div>
     {error && <Alert type="error" showIcon message={error} action={<Button onClick={() => void reload()}>Thử lại</Button>} />}
     {notice && <Alert type="success" showIcon message={notice} />}
     <div className="treatment-detail-grid">
@@ -117,9 +100,6 @@ export default function CommercialTreatmentPage() {
           <div className="treatment-price-summary"><span>Giá trước giảm: {money(plan.preview.grossVnd)}</span>
             <span>Đã duyệt: {money(plan.preview.approvedDiscountVnd)}</span>
             <strong>Dự kiến trước thuế: {money(plan.preview.netBeforeTaxVnd)}</strong></div>
-          <Button disabled={!has('treatment.commercial.approve')} onClick={() => { requestKey.current = crypto.randomUUID(); setDepositOpen(true); }}>
-            {plan.depositExceptionReason ? 'Sửa ngoại lệ không cọc' : 'Duyệt ngoại lệ không cọc'}</Button>
-          {plan.depositExceptionReason && <Typography.Paragraph>Lý do đã duyệt: {plan.depositExceptionReason}</Typography.Paragraph>}
         </>}</Card>
     </div>
     <Card title="Giá tham chiếu dịch vụ" extra={<Typography.Text type="secondary">Thay đổi catalog không sửa giá đã chốt</Typography.Text>}>
@@ -136,13 +116,6 @@ export default function CommercialTreatmentPage() {
         <Form.Item name="unit" label="Đơn vị dịch vụ"><Select options={['lần','răng','hàm','gói','g','ml'].map(v => ({ value: v, label: v }))} /></Form.Item>
         <Form.Item name="referenceUnitPriceVnd" label="Giá tham chiếu mỗi đơn vị (VND)">
           <InputNumber min={0} precision={0} className="treatment-number-full" /></Form.Item>
-      </Form></Modal>
-    <Modal open={depositOpen} title="Ngoại lệ không cọc" okText="Duyệt ngoại lệ"
-      okButtonProps={{ loading: busy }} onOk={() => depositForm.submit()}
-      onCancel={() => !busy && setDepositOpen(false)}>
-      <Form form={depositForm} layout="vertical" onFinish={values => void approveDeposit(values)}>
-        <Form.Item name="reason" label="Lý do" rules={[{ required: true, whitespace: true }]}>
-          <Input.TextArea rows={3} maxLength={1000} /></Form.Item>
       </Form></Modal>
   </main>;
 }

@@ -73,7 +73,7 @@ public sealed partial class TreatmentDossierService
     }
 
     private async Task<TreatmentItem> AddSheetItemAsync(int actorId, TreatmentDossier dossier,
-        SheetRow row, Guid itemId, SheetDecision? decision, CancellationToken ct, bool finalize = true)
+        SheetRow row, Guid itemId, SheetDecision? decision, CancellationToken ct, bool finalize = true, int? targetPlanVersion = null)
     {
         var clinicianEntry = decision == null;
         decision ??= new SheetDecision("Proposed", null, null);
@@ -83,7 +83,7 @@ public sealed partial class TreatmentDossierService
             || decision.Decision != "Proposed" && (Clean(decision.Counseling) == null || Clean(decision.DecisionMaker) == null))
             throw Error("MSG240", 409);
         // A new source may be added to an agreed version, but cannot silently commit other pending edits.
-        if (dossier.PlanState == "Draft") throw Error("MSG111", 409);
+        if (dossier.HasDraftPlan()) throw Error("MSG111", 409);
         var service = await db.Set<SchedulingService>().AsNoTracking().SingleOrDefaultAsync(x =>
             x.Id == row.ServiceId && x.BranchId == dossier.BranchId && x.Active, ct) ?? throw Error("MSG04");
         var actorEmployee = await DentistAsync(actorId, dossier.BranchId, ct);
@@ -94,7 +94,7 @@ public sealed partial class TreatmentDossierService
             && x.EmployeeId == row.AssistantId && x.Active && !x.CanDentist, ct)) throw Error("MSG04");
         if (decision.ConsentDocumentId.HasValue && !await db.Set<ClinicalDocument>().AnyAsync(x =>
             x.Id == decision.ConsentDocumentId && x.PatientId == dossier.PatientId && x.DossierId == dossier.Id
-            && x.PlanId == dossier.PlanId && x.FileState == "Ready", ct)) throw Error("MSG240", 409);
+            && (!x.PlanId.HasValue || x.PlanId == dossier.Id) && x.FileState == "Ready", ct)) throw Error("MSG240", 409);
         var unitPrice = row.UnitPriceVnd ?? checked((long)(row.CostVnd / row.Quantity));
         var gross = TreatmentPlanRules.Gross(row.Quantity, unitPrice);
         if (gross != row.CostVnd) throw Error("MSG04");
@@ -107,7 +107,7 @@ public sealed partial class TreatmentDossierService
             try { _ = TreatmentPlanRules.Discount(gross, discountType!, row.DiscountValue); }
             catch (ArgumentOutOfRangeException) { throw Error("MSG252"); }
         }
-        if (finalize) dossier.PlanVersion++;
+        var planVersion = targetPlanVersion ?? dossier.CurrentPlanVersion() + 1;
         var item = new TreatmentItem { Id = itemId, DossierId = dossier.Id, ServiceId = service.Id,
             ServiceName = service.Name, Unit = service.Unit, Region = Clean(row.Region) ?? Clean(string.Join(", ", row.Regions ?? [])),
             Note = Clean(row.Note), ResponsibleDentistId = row.DentistId, AssistantId = row.AssistantId,
@@ -118,8 +118,8 @@ public sealed partial class TreatmentDossierService
             PlannedOrder = dossier.Items.Select(x => x.PlannedOrder).DefaultIfEmpty(0).Max() + 1,
             Decision = decision.Decision, Counseling = Clean(decision.Counseling), DecisionMaker = Clean(decision.DecisionMaker),
             RepresentativeBasis = Clean(decision.RepresentativeBasis), DecidedAt = decision.Decision == "Proposed" ? null : clock.GetUtcNow(),
-            DecidedBy = decision.Decision == "Proposed" ? null : actorId, DecisionPlanVersion = dossier.PlanVersion,
-            ConsentDocumentId = decision.ConsentDocumentId, ConsentPlanVersion = decision.ConsentDocumentId.HasValue ? dossier.PlanVersion : null };
+            DecidedBy = decision.Decision == "Proposed" ? null : actorId, DecisionPlanVersion = planVersion,
+            ConsentDocumentId = decision.ConsentDocumentId, ConsentPlanVersion = decision.ConsentDocumentId.HasValue ? planVersion : null };
         if (row.DiscountValue > 0)
         {
             if (actorEmployee != dossier.DentistId) throw Error("MSG06", 403);
@@ -129,32 +129,30 @@ public sealed partial class TreatmentDossierService
         }
         dossier.Items.Add(item);
         db.TreatmentItems.Add(item);
-        if (finalize) await FinalizeSheetItemsAsync(actorId, dossier, clinicianEntry, ct);
+        if (finalize) await FinalizeSheetItemsAsync(actorId, dossier, planVersion, clinicianEntry, ct);
         return item;
     }
 
-    private async Task FinalizeSheetItemsAsync(int actorId, TreatmentDossier dossier, bool clinicianEntry, CancellationToken ct)
+    private async Task FinalizeSheetItemsAsync(int actorId, TreatmentDossier dossier, int planVersion, bool clinicianEntry, CancellationToken ct)
     {
-        dossier.PlanState = "Committed";
-        dossier.Goals ??= clinicianEntry ? "Kế hoạch do bác sĩ ghi nhận" : "Kế hoạch điều trị theo thỏa thuận từng hạng mục";
         dossier.Version++; dossier.UpdatedAt = clock.GetUtcNow();
-        await CarryForwardUnchangedProgressionAsync(dossier, actorId, ct);
-        Event(dossier, actorId, "PlanCommitted", new { dossier.PlanId, dossier.PlanVersion,
-            dossier.Goals, dossier.PaymentTermsJson, Items = dossier.Items.OrderBy(x => x.PlannedOrder).Select(ItemDto).ToArray() });
+        await CarryForwardUnchangedProgressionAsync(dossier, planVersion, actorId, ct);
+        Event(dossier, actorId, "PlanCommitted", new { planVersion,
+            Items = dossier.Items.OrderBy(x => x.PlannedOrder).Select(ItemDto).ToArray() });
     }
 
     public Task<ImportItemPlanResult> ImportItemPlanAsync(int actorId, Guid dossierId, ImportItemPlanRequest request, CancellationToken ct) =>
         SheetCommandAsync(actorId, dossierId, request.RequestKey, "SheetImportItemPlan", new { dossierId, request }, async dossier =>
         {
             if (dossier.Version != request.ExpectedVersion) throw Error("MSG111", 409);
-            if (dossier.State != "Open" || dossier.PlanState == "Draft") throw Error("MSG240", 409);
+            if (dossier.State != "Open" || dossier.HasDraftPlan()) throw Error("MSG240", 409);
             var source = await db.TreatmentTemplates.AsNoTracking().SingleOrDefaultAsync(x => x.Id == request.ItemPlanId && x.DefinitionKind == "ItemPlan" && x.DeletedAt == null, ct) ?? throw Error("MSG113", 404);
             if (source.BranchId != dossier.BranchId) throw Error("MSG06", 403);
             if (source.Version != request.ExpectedItemPlanVersion) throw Error("MSG111", 409);
             var rows = await db.TreatmentTemplateItems.AsNoTracking().Where(x => x.TemplateId == source.Id && x.DeletedAt == null).OrderBy(x => x.Position).ThenBy(x => x.Id).ToListAsync(ct);
             if (rows.Count == 0) throw Error("MSG04");
             var created = new List<Guid>();
-            dossier.PlanVersion++;
+            var planVersion = dossier.CurrentPlanVersion() + 1;
             foreach (var row in rows)
             {
                 try {
@@ -162,26 +160,26 @@ public sealed partial class TreatmentDossierService
                         null, "VND", 0, null, row.CostVnd, null, row.EstimatedMinutes);
                     // Reuse all sheet limits, not just the catalog's more permissive tooth limits.
                     input = ReadRow(JsonSerializer.SerializeToElement(input, Json));
-                    var item = await AddSheetItemAsync(actorId, dossier, input, Guid.NewGuid(), null, ct, false);
+                    var item = await AddSheetItemAsync(actorId, dossier, input, Guid.NewGuid(), null, ct, false, planVersion);
                     item.ServiceName = row.ServiceName;
                     created.Add(item.Id);
                 } catch (BusinessException e) when (e.Status == 400) {
                     throw new BusinessException(400, new("ITEM_PLAN_IMPORT_INVALID", $"Hạng mục {row.Position} ({row.ServiceName}) không còn hợp lệ. Vui lòng sửa kế hoạch nguồn.") { Field = $"items.{row.Id}" });
                 }
             }
-            await FinalizeSheetItemsAsync(actorId, dossier, true, ct);
+            await FinalizeSheetItemsAsync(actorId, dossier, planVersion, true, ct);
             Event(dossier, actorId, "ItemPlanImported", new { source.Id, source.Version, snapshot = rows, mapping = rows.Select((x, i) => new { sourceItemId = x.Id, itemId = created[i] }).ToArray() });
             await db.SaveChangesAsync(ct);
             return new ImportItemPlanResult(await DetailAsync(dossier, ct), created.ToArray(), source.Id, source.Version);
         }, ct);
 
-    private async Task CarryForwardUnchangedProgressionAsync(TreatmentDossier dossier, int actorId, CancellationToken ct)
+    private async Task CarryForwardUnchangedProgressionAsync(TreatmentDossier dossier, int planVersion, int actorId, CancellationToken ct)
     {
-        var previousVersion = dossier.PlanVersion - 1;
+        var previousVersion = planVersion - 1;
         var steps = await db.LoadTreatmentStepsAsync(db.TreatmentSteps.Where(x => x.DossierId == dossier.Id && x.PlanVersion == previousVersion), ct);
-        foreach (var step in steps) { step.PlanVersion = dossier.PlanVersion; step.Version++; }
+        foreach (var step in steps) { step.PlanVersion = planVersion; step.Version++; }
         if (steps.Count > 0)
-            Event(dossier, actorId, "PlanReferencesCarriedForward", new { previousVersion, dossier.PlanVersion,
+            Event(dossier, actorId, "PlanReferencesCarriedForward", new { previousVersion, planVersion,
                 Steps = steps.Select(x => x.Id) });
     }
 
@@ -208,8 +206,8 @@ public sealed partial class TreatmentDossierService
             }
             // Replace this transaction's provisional snapshot with the complete immutable item contract.
             var snapshot = db.ChangeTracker.Entries<TreatmentEvent>().Single(x => x.Entity.DossierId == dossierId && x.Entity.Kind == "PlanCommitted" && x.State == EntityState.Added).Entity;
-            snapshot.PayloadJson = JsonSerializer.Serialize(new { dossier.PlanId, dossier.PlanVersion, dossier.Goals,
-                dossier.PaymentTermsJson, Items = dossier.Items.OrderBy(x => x.PlannedOrder).Select(ItemDto).ToArray() }, Json);
+            snapshot.PayloadJson = JsonSerializer.Serialize(new { planVersion = dossier.CurrentPlanVersion(),
+                Items = dossier.Items.OrderBy(x => x.PlannedOrder).Select(ItemDto).ToArray() }, Json);
             await db.RemoveTreatmentDataAsync(draft);
             await db.SaveChangesAsync(ct);
             return new TreatmentChange(await DetailAsync(dossier, ct), SystemMessages.Get(
@@ -233,8 +231,8 @@ public sealed partial class TreatmentDossierService
                     directItem = await AddSheetItemAsync(actorId, dossier, row, rowId, null, ct);
                     directItem.HiddenFromSheet = true;
                     var snapshot = db.ChangeTracker.Entries<TreatmentEvent>().Single(x => x.Entity.DossierId == dossierId && x.Entity.Kind == "PlanCommitted" && x.State == EntityState.Added).Entity;
-                    snapshot.PayloadJson = JsonSerializer.Serialize(new { dossier.PlanId, dossier.PlanVersion, dossier.Goals,
-                        dossier.PaymentTermsJson, Items = dossier.Items.OrderBy(x => x.PlannedOrder).Select(ItemDto).ToArray() }, Json);
+                    snapshot.PayloadJson = JsonSerializer.Serialize(new { planVersion = dossier.CurrentPlanVersion(),
+                        Items = dossier.Items.OrderBy(x => x.PlannedOrder).Select(ItemDto).ToArray() }, Json);
                 }
                 if (row.SourceItemId.HasValue && (row.ServiceId != directItem.ServiceId || row.Quantity != directItem.Quantity
                     || row.CostVnd != Gross(directItem) || !TreatmentSheetRules.RegionWithinScope(directItem.Region, Clean(string.Join(", ", row.Regions ?? []))))) throw Error("MSG04");
@@ -270,7 +268,7 @@ public sealed partial class TreatmentDossierService
             if (await db.TreatmentSteps.AnyAsync(x => x.DossierId == dossierId && x.ItemId == item.Id, ct) && !request.StepId.HasValue)
                 throw Error("MSG230", 409);
             var activity = new ClinicalActivity { Id = rowId, PatientId = dossier.PatientId, BranchId = dossier.BranchId,
-                DossierId = dossierId, ItemId = item.Id, PlanVersion = dossier.PlanVersion, StepId = request.StepId,
+                DossierId = dossierId, ItemId = item.Id, PlanVersion = dossier.CurrentPlanVersion(), StepId = request.StepId,
                 VisitId = visit.Id, ServiceId = item.ServiceId, Unit = item.Unit, Quantity = row.Quantity,
                 Region = performedRegion, PerformerId = employee, AssistantId = row.AssistantId ?? item.AssistantId, RecordedBy = actorId,
                 PerformedAt = row.Date.HasValue ? new DateTimeOffset(row.Date.Value.ToDateTime(TimeOnly.MinValue), TimeSpan.FromHours(7)).ToUniversalTime() : clock.GetUtcNow(),
@@ -318,7 +316,7 @@ public sealed partial class TreatmentDossierService
         var steps = await db.TreatmentSteps.AsNoTracking().Where(x => x.DossierId == dossierId)
             .Select(x => new SheetStep(x.Id, x.ItemId, x.Name, x.Version, x.Outcome, x.HoldReason != null)).ToListAsync(ct);
         var documents = await db.Set<ClinicalDocument>().AsNoTracking().Where(x => x.PatientId == dossier.PatientId
-            && x.DossierId == dossierId && x.PlanId == dossier.PlanId && x.FileState == "Ready")
+            && x.DossierId == dossierId && (!x.PlanId.HasValue || x.PlanId == dossier.Id) && x.FileState == "Ready")
             .Select(x => new SheetConsentDocument(x.Id, x.FileName, x.Version)).ToListAsync(ct);
         var actions = new List<string>();
         if (dossier.State == "Open") {
@@ -405,7 +403,7 @@ public sealed partial class TreatmentDossierService
             if (dossier.Version != request.ExpectedVersion) throw Error("MSG111", 409);
             var item = dossier.Items.SingleOrDefault(x => x.Id == itemId) ?? throw Error("MSG113", 404);
             var decision = request.Decision;
-            if (dossier.State != "Open" || dossier.PlanState != "Committed" || item.Decision == "Agreed"
+            if (dossier.State != "Open" || !dossier.HasCommittedPlan() || item.Decision == "Agreed"
                 || item.Progress != "NotStarted") throw Error("MSG240", 409);
             if (decision.Decision is not ("Proposed" or "Agreed" or "Deferred" or "Refused")
                 || decision.Decision != "Proposed" && (Clean(decision.Counseling) is not { Length: <= 4000 }
@@ -413,15 +411,16 @@ public sealed partial class TreatmentDossierService
                 || decision.RepresentativeBasis?.Length > 1000) throw Error("MSG240");
             if (decision.ConsentDocumentId.HasValue && !await db.Set<ClinicalDocument>().AnyAsync(x =>
                 x.Id == decision.ConsentDocumentId && x.PatientId == dossier.PatientId && x.DossierId == dossier.Id
-                && x.PlanId == dossier.PlanId && x.FileState == "Ready", ct)) throw Error("MSG240");
-            dossier.PlanVersion++; dossier.Version++; dossier.UpdatedAt = clock.GetUtcNow();
-            await CarryForwardUnchangedProgressionAsync(dossier, actorId, ct);
+                && (!x.PlanId.HasValue || x.PlanId == dossier.Id) && x.FileState == "Ready", ct)) throw Error("MSG240");
+            var planVersion = dossier.CurrentPlanVersion() + 1;
+            dossier.Version++; dossier.UpdatedAt = clock.GetUtcNow();
+            await CarryForwardUnchangedProgressionAsync(dossier, planVersion, actorId, ct);
             item.Decision = decision.Decision; item.Counseling = Clean(decision.Counseling); item.DecisionMaker = Clean(decision.DecisionMaker);
             item.RepresentativeBasis = Clean(decision.RepresentativeBasis); item.DecidedBy = actorId; item.DecidedAt = clock.GetUtcNow();
-            item.DecisionPlanVersion = dossier.PlanVersion; item.ConsentDocumentId = decision.ConsentDocumentId;
-            item.ConsentPlanVersion = decision.ConsentDocumentId.HasValue ? dossier.PlanVersion : null;
-            Event(dossier, actorId, "PlanCommitted", new { dossier.PlanId, dossier.PlanVersion, dossier.Goals,
-                dossier.PaymentTermsJson, Items = dossier.Items.OrderBy(x => x.PlannedOrder).Select(ItemDto).ToArray() });
+            item.DecisionPlanVersion = planVersion; item.ConsentDocumentId = decision.ConsentDocumentId;
+            item.ConsentPlanVersion = decision.ConsentDocumentId.HasValue ? planVersion : null;
+            Event(dossier, actorId, "PlanCommitted", new { planVersion,
+                Items = dossier.Items.OrderBy(x => x.PlannedOrder).Select(ItemDto).ToArray() });
             await db.SaveChangesAsync(ct);
             return new TreatmentChange(await DetailAsync(dossier, ct), SystemMessages.Get(
                 decision.Decision is "Deferred" or "Refused" ? "MSG249" : "MSG222", "quyết định điều trị", value: dossier.Code));

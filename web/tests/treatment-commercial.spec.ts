@@ -23,7 +23,6 @@ test('dentist opens commercial review and approves one item discount', async ({ 
   ] }));
   await page.route(`**/api/commercial/dossiers/${dossierId}/plan`, route => route.fulfill({ json: {
     dossierId, code: 'HS-SYNTHETIC', branchId: 1, version: discountStatus === 'Proposed' ? 3 : 4,
-    planState: 'Draft', depositExceptionReason: null,
     items: [{ id: itemId, serviceName: 'Chụp sứ', region: '25', agreedUnitPriceVnd: 1000000,
       quantity: 1, discount: { type: 'Fixed', value: 300000, reason: 'Ưu đãi theo ca',
         qualifyingItemId: null, status: discountStatus, amountVnd: discountStatus === 'Approved' ? 300000 : 0 } }],

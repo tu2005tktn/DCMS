@@ -104,10 +104,10 @@ public sealed class TreatmentProgressionApiTests(ProgressionFixture fixture) : I
         Assert.Equal(HttpStatusCode.Created, dossierResponse.StatusCode);
         var dossier = (await dossierResponse.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
         var draftResponse = await dentist.PostAsJsonAsync($"/api/dossiers/{dossier.Id}/plan/draft",
-            new SavePlanDraftRequest(dossier.Version, "Điều trị nhiều buổi",
+            new SavePlanDraftRequest(dossier.Version,
                 [new TreatmentItemInput(null, null, setup.Service, "25", "răng", 1, 1,
                     30, null, null, 300000, "Agreed", "Đã tư vấn", "Bệnh nhân", null, null)],
-                [], Guid.NewGuid()));
+                Guid.NewGuid()));
         Assert.Equal(HttpStatusCode.OK, draftResponse.StatusCode);
         dossier = (await draftResponse.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
         var itemId = dossier.Items.Single().Id;
@@ -194,10 +194,10 @@ public sealed class TreatmentProgressionApiTests(ProgressionFixture fixture) : I
             new CreateDossierRequest(setup.Branch, setup.Dentist, "Điều trị nhiều buổi", null, null, Guid.NewGuid()));
         var dossier = (await dossierResponse.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
         var draft = await dentist.PostAsJsonAsync($"/api/dossiers/{dossier.Id}/plan/draft",
-            new SavePlanDraftRequest(dossier.Version, "Điều trị theo đánh giá",
+            new SavePlanDraftRequest(dossier.Version,
                 [new TreatmentItemInput(null, null, setup.Service, "25", "răng", 1, 1,
                     30, null, null, 300000, "Agreed", "Đã tư vấn", "Bệnh nhân", null, null)],
-                [], Guid.NewGuid()));
+                Guid.NewGuid()));
         dossier = (await draft.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
         var itemId = dossier.Items.Single().Id;
         var applyRequest = new ApplyTemplateRequest(dossier.Version, template.Id, 1,

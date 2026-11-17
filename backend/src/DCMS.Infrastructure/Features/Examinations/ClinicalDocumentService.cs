@@ -37,7 +37,7 @@ public sealed class ClinicalDocumentService(DcmsDbContext db, ClinicalAccess acc
         if (!visit.HasValue) {
             if (!dossier.HasValue) throw Error("MSG04");
             var source = await db.TreatmentDossiers.AsNoTracking().SingleOrDefaultAsync(x => x.Id == dossier && x.PatientId == patient
-                && (!plan.HasValue || x.PlanId == plan), ct) ?? throw Error("MSG113", 404);
+                && (!plan.HasValue || x.Id == plan), ct) ?? throw Error("MSG113", 404);
             await access.BranchAsync(actor, source.BranchId, false, ct);
             return null;
         }
@@ -45,7 +45,7 @@ public sealed class ClinicalDocumentService(DcmsDbContext db, ClinicalAccess acc
         if (v.PatientId != patient) throw Error("MSG113", 404);
         if (dossier.HasValue || plan.HasValue) {
             if (!await db.TreatmentDossiers.AnyAsync(x => x.PatientId == patient && x.BranchId == v.BranchId
-                && (!dossier.HasValue || x.Id == dossier) && (!plan.HasValue || x.PlanId == plan), ct)) throw Error("MSG113", 404);
+                && (!dossier.HasValue || x.Id == dossier) && (!plan.HasValue || x.Id == plan), ct)) throw Error("MSG113", 404);
         }
         return v;
     }
@@ -74,7 +74,7 @@ public sealed class ClinicalDocumentService(DcmsDbContext db, ClinicalAccess acc
         var dossiers = await db.TreatmentDossiers.AsNoTracking().Where(x => x.PatientId == patientId && branches.Contains(x.BranchId)).ToArrayAsync(ct);
         if (visits.Length == 0 && dossiers.Length == 0) throw Error("MSG113", 404);
         return new { patient, visits = visits.Select(x => new { x.Id, Label = $"Lượt {x.ArrivalAt.ToOffset(TimeSpan.FromHours(7)):dd/MM/yyyy HH:mm}", Date = x.ArrivalAt }),
-            dossiers = dossiers.Select(x => new { x.Id, Label = x.Code }), plans = dossiers.Select(x => new { Id = x.PlanId, Label = x.Code + " / kế hoạch", DossierId = x.Id }) };
+            dossiers = dossiers.Select(x => new { x.Id, Label = x.Code }), plans = dossiers.Select(x => new { Id = x.Id, Label = x.Code + " / kế hoạch", DossierId = x.Id }) };
     }
     public async Task<DocumentPage> ListAsync(int actorId, DocumentQuery q, CancellationToken ct)
     {
@@ -84,7 +84,7 @@ public sealed class ClinicalDocumentService(DcmsDbContext db, ClinicalAccess acc
         else if (!await db.Visits.AnyAsync(x => x.PatientId == q.PatientId && branches.Contains(x.BranchId), ct)
             && !await db.TreatmentDossiers.AnyAsync(x => x.PatientId == q.PatientId && branches.Contains(x.BranchId), ct)) throw Error("MSG113", 404);
         if ((q.DossierId.HasValue || q.PlanId.HasValue) && !await db.TreatmentDossiers.AnyAsync(x => x.PatientId == q.PatientId && branches.Contains(x.BranchId)
-            && (!q.DossierId.HasValue || x.Id == q.DossierId) && (!q.PlanId.HasValue || x.PlanId == q.PlanId), ct)) throw Error("MSG113", 404);
+            && (!q.DossierId.HasValue || x.Id == q.DossierId) && (!q.PlanId.HasValue || x.Id == q.PlanId), ct)) throw Error("MSG113", 404);
         var query = db.Set<ClinicalDocument>().AsNoTracking().Where(x => x.PatientId == q.PatientId
             && (x.VisitId != null ? db.Visits.Any(v => v.Id == x.VisitId && branches.Contains(v.BranchId))
                 : db.TreatmentDossiers.Any(d => d.Id == x.DossierId && d.PatientId == q.PatientId && branches.Contains(d.BranchId)))

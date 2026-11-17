@@ -7,7 +7,7 @@ Chi nhánh, lịch làm việc và lịch hẹn đã gộp về ba bảng `SCHED
 
 Phần khám đã gộp về `VISIT` và `CLINICAL_DOCUMENT`. Phiếu khám và chỉ định nằm trong lượt khám, các lần đọc tài liệu nằm trong tài liệu. Snapshot bảng tham chiếu cũ nằm trong audit chuyển đổi dùng chung. Xem [thiết kế và kiểm chứng hai bảng khám](../specs/EXAMINATION-TWO-TABLES.vi.md). Ngày 17/11/2026 thêm cột JSONB `AiAnalyses` vào `CLINICAL_DOCUMENT` cho [AI hỗ trợ phát hiện sâu răng](../specs/AI-CARIES-DETECTION.vi.md), không thêm bảng. Cùng ngày rút gọn `VISIT` từ 32 xuống 16 cột; xem [rút gọn bảng VISIT](../specs/VISIT-TABLE-SIMPLIFICATION.vi.md).
 
-Phần điều trị đã gộp về `TREATMENT_DOSSIER`, `TREATMENT_PLAN_ITEM`, `CLINICAL_ACTIVITY` và `TREATMENT_TEMPLATE`. Bản nháp nằm trong phiếu, các bước nằm trong hạng mục, hạng mục và phiên bản mẫu nằm trong mẫu. Sự kiện điều trị và tiến độ nằm trong `AUDIT_LOG`. Xem [thiết kế và kiểm chứng bốn bảng điều trị](../specs/TREATMENT-FOUR-TABLES.vi.md).
+Phần điều trị đã gộp về `TREATMENT_DOSSIER`, `TREATMENT_PLAN_ITEM`, `CLINICAL_ACTIVITY` và `TREATMENT_TEMPLATE`. Bản nháp phiếu nằm trong phiếu, các bước nằm trong hạng mục, hạng mục và phiên bản mẫu nằm trong mẫu. Sự kiện điều trị và tiến độ nằm trong `AUDIT_LOG`. Xem [thiết kế và kiểm chứng bốn bảng điều trị](../specs/TREATMENT-FOUR-TABLES.vi.md). Ngày 18/11/2026 rút gọn `TREATMENT_DOSSIER` từ 34 xuống 14 cột theo Phương án A (chỉ giữ `SheetDrafts` JSONB và `Version`); xem [rút gọn bảng TREATMENT_DOSSIER](../specs/TREATMENT-DOSSIER-TABLE-SIMPLIFICATION.vi.md).
 
 Chăm sóc bệnh nhân chỉ còn `CARE_TASK`; labo còn phiếu labo `LAB_ORDER` và danh mục labo `LAB_WORK_TYPE`. Phân hệ tài chính đã được gỡ cùng 18 bảng, sẽ đặc tả và thêm lại sau. Xem [chăm sóc, labo và tài chính](../specs/CARE-LAB-FINANCE-STORAGE.vi.md).
 
@@ -33,7 +33,7 @@ Thông báo chỉ còn `IN_APP_NOTIFICATION`; lượt gửi và việc nhân vi�
 | `CLINICAL_DOCUMENT` | Metadata tài liệu lâm sàng, liên kết tệp và trạng thái xử lý; các lần bác sĩ đọc tài liệu theo lượt khám trong JSONB `Reviews`; các lần AI phân tích phim X-quang (bảng logic `AI_ANALYSIS`) trong JSONB `AiAnalyses`. |
 | `PRESCRIPTION` | Đơn thuốc, mẫu đơn và phiên bản đơn; danh sách thuốc nằm trong JSONB. |
 | `CATALOG_MEDICINE` | Danh mục thuốc dùng chung, đơn vị và thông tin kê đơn. |
-| `TREATMENT_DOSSIER` | Hồ sơ điều trị, bệnh nhân, chi nhánh, thông tin và phiên bản kế hoạch, trạng thái tổng thể; bản nháp phiếu và bản nháp chỉnh sửa kế hoạch trong JSONB. |
+| `TREATMENT_DOSSIER` | Phiếu điều trị (14 cột): mã, bệnh nhân, chi nhánh, bác sĩ phụ trách, ngày bắt đầu, chẩn đoán, ghi chú, lượt khám nguồn (`SourceExaminationVisitId`), trạng thái, phiên bản (`Version`) và các dòng nháp phiếu trong JSONB `SheetDrafts`; bỏ 20 cột kế hoạch/đóng/ngoại lệ cọc/`RevisionDrafts`/`StorageStamp`. |
 | `TREATMENT_PLAN_ITEM` | Các mục dịch vụ trong kế hoạch điều trị với giá đã thỏa thuận; các bước thực hiện và trạng thái tiến độ trong JSONB. |
 | `TREATMENT_TEMPLATE` | Mẫu kế hoạch điều trị dùng lại; dòng dịch vụ, nhân sự và các phiên bản mẫu cũ trong JSONB. |
 | `CLINICAL_ACTIVITY` | Hoạt động điều trị thực tế (31 cột): lượt khám hoặc phiếu điều trị nguồn, hạng mục/bước kế hoạch, dịch vụ, số lượng, người thực hiện, kết quả, căn cứ tính phí và ảnh chụp giá. Đánh giá lâm sàng, ghi chú chăm sóc và hướng dẫn tái khám đã bị xóa ngày 18/11/2026. Xem [rút gọn bảng](../specs/CLINICAL-ACTIVITY-TABLE-SIMPLIFICATION.vi.md). |

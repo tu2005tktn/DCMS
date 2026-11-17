@@ -24,7 +24,8 @@ public sealed partial class TreatmentDossierService
         var scope = await access.ResolveAsync(actorId, ct);
         if (scope.Assigned && !scope.Owner) branches = branches.Where(scope.BranchIds.Contains).ToList();
         var dossiers = await db.TreatmentDossiers.AsNoTracking().Include(x => x.Items).Where(x => x.PatientId == patientId
-            && x.State == "Open" && x.PlanState == "Committed" && branches.Contains(x.BranchId)).ToListAsync(ct);
+            && x.State == "Open" && x.Items.Any(i => i.DecisionPlanVersion != null)
+            && !x.Items.Any(i => !i.SheetDeleted && i.DecisionPlanVersion == null) && branches.Contains(x.BranchId)).ToListAsync(ct);
         if (dossiers.Count == 0) return new([]);
 
         var dossierIds = dossiers.Select(x => x.Id).ToArray();

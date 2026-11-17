@@ -51,7 +51,7 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
             return new PlanPricePreviewItem(x.Id, gross, discount, gross - discount,
                 x.ReferenceUnitPriceVnd, x.Decision, x.Decision == "Agreed" || x.EntrySource == "ClinicianEntry");
         }).ToArray();
-        return new(dossier.Id, dossier.Version, dossier.PlanVersion, lines,
+        return new(dossier.Id, dossier.Version, dossier.CurrentPlanVersion(), lines,
             checked(lines.Where(x => x.IncludedInTotal).Sum(x => x.GrossVnd)),
             checked(lines.Where(x => x.IncludedInTotal).Sum(x => x.ApprovedDiscountVnd)),
             checked(lines.Where(x => x.IncludedInTotal).Sum(x => x.NetVnd)));
@@ -134,7 +134,6 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
             .OrderBy(x => x.OccurredAt).ThenBy(x => x.Id).ToListAsync(ct);
         var actorIds = events.Select(x => x.ActorId).Distinct().ToArray();
         var actorNames = await db.Users.AsNoTracking().Where(x => actorIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.FullName, ct);
-        var terms = JsonSerializer.Deserialize<PaymentTermDto[]>(dossier.PaymentTermsJson, Json) ?? [];
         var finance = await financialPort.ReadAsync(dossier.PatientId, dossier.BranchId, dossier.Id, ct);
         var pendingFeeCount = await db.ClinicalActivities.CountAsync(x => x.DossierId == dossier.Id && x.State == "Posted" && x.FeeStatus == "Pending", ct);
         var planned = PricePreview(dossier).NetBeforeTaxVnd;
@@ -142,13 +141,11 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
             ? finance with { PlannedVnd = planned, PendingFeeCount = pendingFeeCount }
             : new TreatmentFinancialSummary(false, planned, null, null, null, null, null, PendingFeeCount: pendingFeeCount);
         return new(dossier.Id, dossier.Code, dossier.PatientId, dossier.BranchId, dossier.DentistId,
-            dossier.StartedOn, dossier.Diagnosis, dossier.Note, dossier.State, dossier.ClosureOutcome,
-            dossier.ClosureReason, dossier.Version, dossier.PlanId, dossier.PlanVersion, dossier.PlanState,
-            dossier.Goals, dossier.Items.OrderBy(x => x.PlannedOrder).Select(ItemDto).ToArray(), terms,
+            dossier.StartedOn, dossier.Diagnosis, dossier.Note, dossier.State, dossier.Version, dossier.CurrentPlanVersion(),
+            dossier.Items.OrderBy(x => x.PlannedOrder).Select(ItemDto).ToArray(),
             events.Select(x => new TreatmentEventDto(x.Id, x.Kind, x.DossierVersion, x.ActorId,
                 x.OccurredAt, x.PayloadJson, actorNames.GetValueOrDefault(x.ActorId))).ToArray(), finance.Available, dossier.CreatedAt, dossier.UpdatedAt,
-            finance, dossier.DepositExceptionReason, dossier.DepositExceptionBy,
-            dossier.DepositExceptionAt, dossier.State == "Completed", dossier.SourceExaminationId, dossier.SourceExaminationVersion);
+            finance, dossier.SourceExaminationVisitId);
     }
 
     private static TreatmentItemDto ItemDto(TreatmentItem x) => new(x.Id, x.SourceDiagnosisId, x.ServiceId,
@@ -193,23 +190,12 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
         var rows = await query.OrderByDescending(x => x.UpdatedAt).ThenBy(x => x.Id)
             .Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(ct);
         return new(rows.Select(x => new DossierListItem(x.Id, x.Code, x.PatientId, x.BranchId,
-            x.DentistId, x.Diagnosis, x.State, x.ClosureOutcome, x.Version, x.PlanVersion, x.UpdatedAt,
-            x.State == "Completed"))
+            x.DentistId, x.Diagnosis, x.State, x.Version, x.UpdatedAt))
             .ToArray(), total, page, pageSize);
     }
 
     public async Task<TreatmentDossierDto> GetAsync(int actorId, Guid dossierId, CancellationToken ct) =>
         await DetailAsync(await DossierAsync(actorId, dossierId, ct), ct);
-
-    public async Task<TreatmentChange> SetDisplayStatusAsync(int actorId, Guid dossierId,
-        SetDossierDisplayStatusRequest request, CancellationToken ct)
-    {
-        var dossier = await DossierAsync(actorId, dossierId, ct);
-        if (dossier.Version != request.ExpectedVersion) throw Error("MSG111", 409);
-        // Compatibility endpoint: a display flag cannot close or reopen a clinical course.
-        if (request.Completed != (dossier.State == "Completed")) throw Error("MSG243", 409);
-        return new(await DetailAsync(dossier, ct), SystemMessages.Get("MSG222", "trạng thái hồ sơ", value: dossier.Code));
-    }
 
     public async Task<TreatmentChange> UpdateNoteAsync(int actorId, Guid dossierId,
         UpdateDossierNoteRequest request, CancellationToken ct)
@@ -336,14 +322,11 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
             WHERE "AuditType" = 'FinanceLedger' AND "Target" = {dossierId.ToString()}
             LIMIT 1
             """).AnyAsync(ct)) throw Error("MSG233", 409);
-        if (dossier.State != "Open" || dossier.PlanState != "None" || dossier.PlanVersion != 0
-            || dossier.Items.Count != 0 || dossier.Goals != null || dossier.PaymentTermsJson != "[]"
-            || dossier.DepositExceptionReason != null
+        if (dossier.State != "Open" || dossier.Items.Count != 0
             || await db.TreatmentEvents.AnyAsync(x => x.DossierId == dossierId && x.Kind != "DossierCreated", ct)
             || await db.TreatmentSteps.AnyAsync(x => x.DossierId == dossierId, ct)
             || await db.Appointments.AnyAsync(x => x.DossierId == dossierId, ct)
             || await db.ClinicalActivities.AnyAsync(x => x.DossierId == dossierId, ct)
-            || await db.TreatmentRevisionDrafts.AnyAsync(x => x.DossierId == dossierId, ct)
             || await db.TreatmentSheetDrafts.AnyAsync(x => x.DossierId == dossierId, ct)
             || await db.Set<DCMS.Domain.Features.Examinations.ClinicalDocument>()
                 .AnyAsync(x => x.DossierId == dossierId, ct)) throw Error("MSG233", 409);
@@ -413,7 +396,7 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
             if (source.Version != request.ExpectedSourceVisitVersion) throw Error("MSG111", 409);
             var examination = await db.Set<DCMS.Domain.Features.Examinations.VisitExamination>().AsNoTracking()
                 .SingleOrDefaultAsync(x => x.VisitId == source.Id, ct) is { } found && DCMS.Domain.Features.Visits.VisitStatuses.HasConfirmedExamination.Contains(source.Status) ? found : throw Error("MSG240", 409);
-            dossier.SourceExaminationId = source.Id; dossier.SourceExaminationVersion = source.Version;
+            dossier.SourceExaminationVisitId = source.Id;
             Event(dossier, actorId, "ExaminationSourceCaptured", new { SourceVisitId = source.Id,
                 SourceVisitVersion = source.Version, Content = JsonSerializer.SerializeToElement(DCMS.Infrastructure.Features.Examinations.ExaminationService.WithDerivedDiagnoses(JsonSerializer.Deserialize<DCMS.Application.Features.Examinations.ExaminationContent>(examination.ContentJson, DCMS.Infrastructure.Features.Examinations.ExaminationService.Json)!), DCMS.Infrastructure.Features.Examinations.ExaminationService.Json) });
         }
@@ -434,17 +417,11 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
         var replay = await ReplayAsync(actorId, request.RequestKey, "Draft", new { dossierId, request }, ct);
         if (replay != null) return replay;
         if (dossier.Version != request.ExpectedVersion) throw Error("MSG111", 409);
-        if (dossier.State != "Open" || dossier.PlanState == "Committed") throw Error("MSG240", 409);
-        var goals = Clean(request.Goals);
-        if (goals == null || goals.Length > 4000 || request.Items is not { Length: >= 1 and <= 100 }
-            || request.PaymentTerms == null) throw Error("MSG04");
+        if (dossier.State != "Open" || dossier.HasCommittedPlan()) throw Error("MSG240", 409);
+        if (request.Items is not { Length: >= 1 and <= 100 }) throw Error("MSG04");
         if (request.Items.Any(x => x.Id == Guid.Empty) || request.Items.Where(x => x.Id.HasValue).Select(x => x.Id).Distinct().Count()
             != request.Items.Count(x => x.Id.HasValue) || request.Items.Select(x => x.PlannedOrder).Distinct().Count() != request.Items.Length)
             throw Error("MSG04");
-        var terms = request.PaymentTerms.Select(x => new PaymentTermDto(Clean(x.Purpose) ?? "", x.AmountVnd,
-            x.DueOn, Clean(x.Evidence), Clean(x.Milestone), dossier.PlanVersion + 1)).ToArray();
-        if (terms.Any(x => x.Purpose.Length is < 1 or > 160 || x.AmountVnd < 0
-            || x.DueOn == default || x.Evidence?.Length > 1000 || x.Milestone?.Length > 160)) throw Error("MSG04");
         var serviceIds = request.Items.Select(x => x.ServiceId).Distinct().ToArray();
         var services = await db.Set<SchedulingService>().AsNoTracking().Where(x => x.BranchId == dossier.BranchId
             && x.Active && serviceIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, ct);
@@ -557,6 +534,8 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
             item.ConsentDocumentId = input.ConsentDocumentId;
             item.DecidedAt = input.Decision == "Proposed" ? null : clock.GetUtcNow();
             item.DecidedBy = input.Decision == "Proposed" ? null : actorId;
+            item.DecisionPlanVersion = null;
+            item.ConsentPlanVersion = null;
         }
         foreach (var removed in dossier.Items.Where(x => !incoming.Contains(x.Id)).ToArray())
         {
@@ -587,14 +566,10 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
             if (gross > long.MaxValue - totalGross) throw Error("MSG04");
             totalGross += gross;
         }
-        dossier.Goals = goals;
-        dossier.PaymentTermsJson = JsonSerializer.Serialize(terms, Json);
-        dossier.PlanState = "Draft";
         dossier.Version++;
         dossier.UpdatedAt = clock.GetUtcNow();
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
-        Event(dossier, actorId, "PlanDraftSaved", new { dossier.PlanId, dossier.Version,
-            dossier.Goals, dossier.PaymentTermsJson,
+        Event(dossier, actorId, "PlanDraftSaved", new { DossierId = dossier.Id, dossier.Version,
             Items = dossier.Items.OrderBy(x => x.PlannedOrder).Select(ItemDto).ToArray() });
         await db.SaveChangesAsync(ct);
         var result = new TreatmentChange(await DetailAsync(dossier, ct), SystemMessages.Get("MSG222", "nháp kế hoạch", value: dossier.Code));
@@ -610,7 +585,7 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
         var replay = await ReplayAsync(actorId, request.RequestKey, "Commit", new { dossierId, request }, ct);
         if (replay != null) return replay;
         if (dossier.Version != request.ExpectedVersion) throw Error("MSG111", 409);
-        if (dossier.State != "Open" || dossier.PlanState != "Draft" || dossier.Items.Count == 0) throw Error("MSG04");
+        if (dossier.State != "Open" || !dossier.HasDraftPlan() || dossier.Items.Count == 0) throw Error("MSG04");
         if (dossier.Items.Any(x => x.Decision != "Proposed" && (x.Counseling == null || x.DecisionMaker == null)))
             throw Error("MSG240");
         if (dossier.Items.Any(x => x.DiscountStatus == "Proposed")) throw Error("MSG240");
@@ -619,19 +594,18 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
             throw Error("MSG240");
         foreach (var item in dossier.Items.Where(x => x.ConsentDocumentId.HasValue))
             if (!await db.Set<DCMS.Domain.Features.Examinations.ClinicalDocument>().AnyAsync(x => x.Id == item.ConsentDocumentId
-                && x.PatientId == dossier.PatientId && x.DossierId == dossier.Id && x.PlanId == dossier.PlanId && x.FileState == "Ready", ct)) throw Error("MSG240");
+                && x.PatientId == dossier.PatientId && x.DossierId == dossier.Id && (!x.PlanId.HasValue || x.PlanId == dossier.Id) && x.FileState == "Ready", ct)) throw Error("MSG240");
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
-        dossier.PlanVersion++;
-        foreach (var item in dossier.Items.Where(x => x.Decision != "Proposed"))
+        var planVersion = dossier.CurrentPlanVersion() + 1;
+        foreach (var item in dossier.Items)
         {
-            item.DecisionPlanVersion = dossier.PlanVersion;
-            item.ConsentPlanVersion = item.ConsentDocumentId.HasValue ? dossier.PlanVersion : null;
+            item.DecisionPlanVersion = planVersion;
+            item.ConsentPlanVersion = item.Decision != "Proposed" && item.ConsentDocumentId.HasValue ? planVersion : null;
         }
-        dossier.PlanState = "Committed";
         dossier.Version++;
         dossier.UpdatedAt = clock.GetUtcNow();
-        Event(dossier, actorId, "PlanCommitted", new { dossier.PlanId, dossier.PlanVersion,
-            dossier.Goals, dossier.PaymentTermsJson, Items = dossier.Items.OrderBy(x => x.PlannedOrder).Select(ItemDto).ToArray() });
+        Event(dossier, actorId, "PlanCommitted", new { planVersion,
+            Items = dossier.Items.OrderBy(x => x.PlannedOrder).Select(ItemDto).ToArray() });
         await db.SaveChangesAsync(ct);
         var result = new TreatmentChange(await DetailAsync(dossier, ct), SystemMessages.Get("MSG222", "kế hoạch điều trị", value: dossier.Code));
         StoreReceipt(actorId, request.RequestKey, "Commit", new { dossierId, request }, result);
@@ -667,7 +641,7 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
         if (request.Outcome == "CompletedRevisedScope" &&
             !await db.TreatmentEvents.AnyAsync(x => x.DossierId == dossierId && x.Kind == "PlanRevised", ct))
             throw Error("MSG233", 409);
-        if (request.Outcome == "CompletedAsAgreed" && dossier.PlanState != "Committed") throw Error("MSG243", 409);
+        if (request.Outcome == "CompletedAsAgreed" && !dossier.HasCommittedPlan()) throw Error("MSG243", 409);
         var unresolved = dossier.Items.Where(x => x.Decision == "Agreed" && x.Progress != "Completed").ToArray();
         if (request.Dispositions == null || request.Dispositions.Select(x => x.ItemId).Distinct().Count()
             != request.Dispositions.Length || request.Dispositions.Any(x => !unresolved.Any(item => item.Id == x.ItemId)))
@@ -689,10 +663,6 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
             step.Version++;
         }
         dossier.State = request.Outcome == "StoppedIncomplete" ? "Stopped" : "Completed";
-        dossier.ClosureOutcome = request.Outcome;
-        dossier.ClosureReason = reason;
-        dossier.ClosedAt = clock.GetUtcNow();
-        dossier.ClosedBy = actorId;
         dossier.Version++;
         dossier.UpdatedAt = clock.GetUtcNow();
         Event(dossier, actorId, "DossierClosed", new { request.Outcome, reason, request.Dispositions });
@@ -714,10 +684,6 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
         if (dossier.State is "Open" or "Cancelled" || reason is not { Length: > 0 and <= 1000 }) throw Error("MSG122");
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
         dossier.State = "Open";
-        dossier.ClosureOutcome = null;
-        dossier.ClosureReason = null;
-        dossier.ClosedAt = null;
-        dossier.ClosedBy = null;
         dossier.Version++;
         dossier.UpdatedAt = clock.GetUtcNow();
         Event(dossier, actorId, "DossierReopened", new { reason });
@@ -744,7 +710,7 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
         var exclusions = Clean(request.Exclusions);
         var explanation = Clean(request.Explanation);
         var today = DateOnly.FromDateTime(clock.GetUtcNow().ToOffset(TimeSpan.FromHours(7)).DateTime);
-        if (dossier.PlanState != "Committed" || item.Decision != "Agreed" || item.Progress != "Completed"
+        if (!dossier.HasCommittedPlan() || item.Decision != "Agreed" || item.Progress != "Completed"
             || request.EndsOn is { } endsOn && endsOn < today
             || policy is not { Length: > 0 and <= 160 }
             || version is not { Length: > 0 and <= 40 } || scope is not { Length: > 0 and <= 1000 }
@@ -787,9 +753,9 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
         var dossier = await db.TreatmentDossiers.AsNoTracking().Include(x => x.Items)
             .SingleOrDefaultAsync(x => x.Id == dossierId, ct) ?? throw Error("MSG113", 404);
         await CommercialAsync(actorId, dossier.BranchId, ct);
-        return new(dossier.Id, dossier.Code, dossier.BranchId, dossier.Version, dossier.PlanState,
+        return new(dossier.Id, dossier.Code, dossier.BranchId, dossier.Version,
             dossier.Items.OrderBy(x => x.PlannedOrder).Select(ItemDto).ToArray(),
-            dossier.DepositExceptionReason, PricePreview(dossier));
+            PricePreview(dossier));
     }
 
     public async Task<IReadOnlyList<CommercialDossierListItem>> CommercialDossiersAsync(int actorId,
@@ -802,7 +768,7 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
             && !roles.Contains(AccountRoles.Dentist))
             throw Error("MSG06", 403);
         var query = db.TreatmentDossiers.AsNoTracking().Include(x => x.Items)
-            .Where(x => x.State == "Open" && x.PlanState == "Draft");
+            .Where(x => x.State == "Open" && x.Items.Any(i => !i.SheetDeleted && i.DecisionPlanVersion == null));
         var scope = await access.ResolveAsync(actorId, ct);
         if (scope.Assigned && !scope.Owner) query = query.Where(x => scope.BranchIds.Contains(x.BranchId));
         if (!roles.Contains(AccountRoles.Admin))
@@ -836,7 +802,7 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
         if (replay != null) return replay;
         if (dossier.Version != request.ExpectedVersion) throw Error("MSG111", 409);
         var item = dossier.Items.SingleOrDefault(x => x.Id == itemId) ?? throw Error("MSG113", 404);
-        if (dossier.State != "Open" || dossier.PlanState != "Draft" || item.DiscountStatus != "Proposed"
+        if (dossier.State != "Open" || !dossier.HasDraftPlan() || item.DiscountStatus != "Proposed"
             || request.Decision is not ("Approved" or "Rejected")) throw Error("MSG240", 409);
         var qualifying = item.DiscountQualifyingItemId.HasValue
             ? dossier.Items.SingleOrDefault(x => x.Id == item.DiscountQualifyingItemId.Value) : null;
@@ -865,39 +831,14 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
         return result;
     }
 
-    public async Task<TreatmentChange> SetDepositExceptionAsync(int actorId, Guid dossierId,
-        DepositExceptionRequest request, CancellationToken ct)
-    {
-        var dossier = await db.TreatmentDossiers.Include(x => x.Items).SingleOrDefaultAsync(x => x.Id == dossierId, ct)
-            ?? throw Error("MSG113", 404);
-        await CommercialAsync(actorId, dossier.BranchId, ct);
-        var replay = await ReplayAsync(actorId, request.RequestKey, "Deposit", new { dossierId, request }, ct);
-        if (replay != null) return replay;
-        if (dossier.Version != request.ExpectedVersion) throw Error("MSG111", 409);
-        var reason = Clean(request.Reason);
-        if (dossier.State != "Open" || dossier.PlanState == "Committed" || reason is not { Length: > 0 and <= 1000 })
-            throw Error("MSG04");
-        await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
-        dossier.DepositExceptionReason = reason;
-        dossier.DepositExceptionBy = actorId;
-        dossier.DepositExceptionAt = clock.GetUtcNow();
-        dossier.Version++;
-        dossier.UpdatedAt = clock.GetUtcNow();
-        Event(dossier, actorId, "DepositException", new { reason });
-        await db.SaveChangesAsync(ct);
-        var result = new TreatmentChange(await DetailAsync(dossier, ct), SystemMessages.Get("MSG222", "ngoại lệ cọc", value: dossier.Code));
-        StoreReceipt(actorId, request.RequestKey, "Deposit", new { dossierId, request }, result);
-        await db.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
-        return result;
-    }
-
     public async Task<IReadOnlyList<OwnTreatmentSummaryItem>> OwnSummaryAsync(int accountId, CancellationToken ct)
     {
         var patientIds = db.PatientAccountLinks.AsNoTracking().Where(x => x.AccountId == accountId
             && x.Status == PatientLinkStatus.Verified).Select(x => x.PatientId);
         var dossiers = await db.TreatmentDossiers.AsNoTracking().Include(x => x.Items)
-            .Where(x => patientIds.Contains(x.PatientId) && x.PlanState == "Committed" && x.State != "Deleted")
+            .Where(x => patientIds.Contains(x.PatientId) && x.State != "Deleted"
+                && x.Items.Any(i => i.DecisionPlanVersion != null)
+                && !x.Items.Any(i => !i.SheetDeleted && i.DecisionPlanVersion == null))
             .OrderByDescending(x => x.StartedOn).ToListAsync(ct);
         var dossierIds = dossiers.Select(x => x.Id).ToArray();
         var verifiedPatientIds = await patientIds.ToArrayAsync(ct);
@@ -935,7 +876,7 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
                     source == "PAYMENT_RECEIPT" ? "PaymentReceipt" : "DossierPayment")));
         }
         return dossiers.Select(x => new OwnTreatmentSummaryItem(x.Id, x.Code, x.State, x.StartedOn,
-            x.Diagnosis, x.PlanVersion, x.Items.Where(item => item.Decision == "Agreed")
+            x.Diagnosis, x.CurrentPlanVersion(), x.Items.Where(item => item.Decision == "Agreed")
                 .OrderBy(item => item.PlannedOrder).Select(ItemDto).ToArray(),
             activities.Where(activity => activity.DossierId == x.Id).Select(activity =>
                 new PerformedTreatmentItem(activity.Id, activity.PerformedAt,

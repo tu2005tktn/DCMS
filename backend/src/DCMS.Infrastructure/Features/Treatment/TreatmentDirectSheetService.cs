@@ -34,10 +34,12 @@ public sealed partial class TreatmentDossierService
             var item = await EditableSheetItemAsync(actorId, dossier, itemId, request.ExpectedVersion, ct);
             var before = ItemDto(item);
             item.SheetDeleted = true;
-            dossier.PlanVersion++; dossier.Version++; dossier.UpdatedAt = clock.GetUtcNow();
-            await CarryForwardUnchangedProgressionAsync(dossier, actorId, ct);
-            Event(dossier, actorId, "SheetItemDeleted", new { itemId, before, dossier.PlanVersion });
-            RecordDirectPlanSnapshot(dossier, actorId);
+            var planVersion = dossier.CurrentPlanVersion() + 1;
+            item.DecisionPlanVersion = planVersion;
+            dossier.Version++; dossier.UpdatedAt = clock.GetUtcNow();
+            await CarryForwardUnchangedProgressionAsync(dossier, planVersion, actorId, ct);
+            Event(dossier, actorId, "SheetItemDeleted", new { itemId, before, planVersion });
+            RecordDirectPlanSnapshot(dossier, planVersion, actorId);
             await db.SaveChangesAsync(ct);
             return new TreatmentChange(await DetailAsync(dossier, ct), SystemMessages.Get("MSG222", "hạng mục", value: dossier.Code));
         }, ct);
@@ -74,10 +76,12 @@ public sealed partial class TreatmentDossierService
             item.DiscountDecidedBy = row.DiscountValue > 0 ? actorId : null; item.DiscountDecidedAt = row.DiscountValue > 0 ? clock.GetUtcNow() : null;
             item.DiscountBasisHash = row.DiscountValue > 0 ? DiscountBasis(item, null) : null;
             item.EntrySource = "ClinicianEntry"; item.EntryRecordedBy = actorId; item.EntryRecordedAt = clock.GetUtcNow();
-            dossier.PlanVersion++; dossier.Version++; dossier.UpdatedAt = clock.GetUtcNow();
-            await CarryForwardUnchangedProgressionAsync(dossier, actorId, ct);
-            Event(dossier, actorId, "SheetItemEdited", new { before, after = ItemDto(item), dossier.PlanVersion });
-            RecordDirectPlanSnapshot(dossier, actorId);
+            var planVersion = dossier.CurrentPlanVersion() + 1;
+            item.DecisionPlanVersion = planVersion;
+            dossier.Version++; dossier.UpdatedAt = clock.GetUtcNow();
+            await CarryForwardUnchangedProgressionAsync(dossier, planVersion, actorId, ct);
+            Event(dossier, actorId, "SheetItemEdited", new { before, after = ItemDto(item), planVersion });
+            RecordDirectPlanSnapshot(dossier, planVersion, actorId);
             await db.SaveChangesAsync(ct);
             return new TreatmentChange(await DetailAsync(dossier, ct), SystemMessages.Get("MSG222", "hạng mục", value: dossier.Code));
         }, ct);
@@ -104,9 +108,9 @@ public sealed partial class TreatmentDossierService
             return new ConfirmSheetActualResult(await DetailAsync(dossier, ct), activity);
         }, ct);
 
-    private void RecordDirectPlanSnapshot(TreatmentDossier dossier, int actorId) =>
-        Event(dossier, actorId, "PlanCommitted", new { dossier.PlanId, dossier.PlanVersion, dossier.Goals,
-            dossier.PaymentTermsJson, Items = dossier.Items.OrderBy(x => x.PlannedOrder).Select(ItemDto).ToArray() });
+    private void RecordDirectPlanSnapshot(TreatmentDossier dossier, int planVersion, int actorId) =>
+        Event(dossier, actorId, "PlanCommitted", new { planVersion,
+            Items = dossier.Items.OrderBy(x => x.PlannedOrder).Select(ItemDto).ToArray() });
 
     private static long GrossInput(decimal quantity, long price) => TreatmentPlanRules.Gross(quantity, price);
 
@@ -138,7 +142,7 @@ public sealed partial class TreatmentDossierService
         if (assistant.HasValue && !await db.SchedulingMembers.AnyAsync(x => x.BranchId == dossier.BranchId && x.EmployeeId == assistant && x.Active && !x.CanDentist, ct)) throw Error("MSG04");
         var activity = new ClinicalActivity { Id = activityId, ServiceNameSnapshot = service == null || service.Id == item.ServiceId ? item.ServiceName : service.Name,
             LabWorkSnapshot = Clean(labWork), IsPlanTransfer = transfer, PatientId = dossier.PatientId, BranchId = dossier.BranchId, DossierId = dossier.Id,
-            ItemId = item.Id, PlanVersion = dossier.PlanVersion, ServiceId = service?.Id ?? item.ServiceId, Unit = service?.Unit ?? item.Unit,
+            ItemId = item.Id, PlanVersion = dossier.CurrentPlanVersion(), ServiceId = service?.Id ?? item.ServiceId, Unit = service?.Unit ?? item.Unit,
             Quantity = qty, Region = input == null ? item.Region : Clean(string.Join(", ", input.Regions ?? [])), PerformerId = employee, AssistantId = assistant,
             RecordedBy = actorId, Outcome = Clean(note) ?? "", ChargingBasis = "Separate", PriceSnapshotVnd = price, DiscountSnapshotVnd = reduction,
             PerformedAt = date.HasValue ? new DateTimeOffset(date.Value.ToDateTime(TimeOnly.MinValue), TimeSpan.FromHours(7)).ToUniversalTime() : clock.GetUtcNow(),

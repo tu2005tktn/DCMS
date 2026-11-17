@@ -241,6 +241,7 @@ erDiagram
         Boolean is_active
     }
 
+    %% Physical schema update 2026-11-18: TREATMENT_DOSSIER reduced to 14 columns (Option A; keeps SheetDrafts JSONB, removes RevisionDrafts, StorageStamp and redundant plan/closure/deposit fields). See docs/specs/TREATMENT-DOSSIER-TABLE-SIMPLIFICATION.vi.md.
     TREATMENT_PLAN {
         Integer treatment_plan_id PK
         String plan_code "Family code; composite unique with revision_number"

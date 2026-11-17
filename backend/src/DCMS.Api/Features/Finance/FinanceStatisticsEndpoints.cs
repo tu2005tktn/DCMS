@@ -88,7 +88,7 @@ public static class FinanceStatisticsEndpoints
             var dossiers = await db.TreatmentDossiers.AsNoTracking()
                 .Where(x => x.State != "Deleted" && (!branchId.HasValue || x.BranchId == branchId)
                     && (!from.HasValue || x.StartedOn >= from) && (!to.HasValue || x.StartedOn <= to))
-                .Select(x => new { x.Id, x.Code, x.PatientId, x.StartedOn, x.PlanState, x.State, x.Version }).ToArrayAsync(ct);
+                .Select(x => new { x.Id, x.Code, x.PatientId, x.StartedOn, x.State, x.Version }).ToArrayAsync(ct);
             var deletedDossiers = await db.TreatmentDossiers.AsNoTracking()
                 .Where(x => x.State == "Deleted" && (!branchId.HasValue || x.BranchId == branchId)
                     && (!from.HasValue || x.StartedOn >= from) && (!to.HasValue || x.StartedOn <= to))
@@ -448,7 +448,9 @@ public static class FinanceStatisticsEndpoints
                 var posted = activities.Where(x => x.DossierId == dossier.Id).Sum(x =>
                     Math.Max(0, TreatmentPlanRules.Gross(x.Quantity,
                         checked((long)x.PriceSnapshotVnd)) - x.DiscountSnapshotVnd));
-                var planned = dossier.PlanState == "Committed" ? items.Where(x => x.DossierId == dossier.Id).Sum(item =>
+                var dossierItems = items.Where(x => x.DossierId == dossier.Id).ToArray();
+                var committed = dossierItems.Any(x => x.DecisionPlanVersion != null) && dossierItems.All(x => x.SheetDeleted || x.DecisionPlanVersion != null);
+                var planned = committed ? dossierItems.Sum(item =>
                 {
                     var remaining = Math.Max(0, item.Quantity - completedQuantity.GetValueOrDefault(item.Id));
                     if (remaining == 0) return 0L;

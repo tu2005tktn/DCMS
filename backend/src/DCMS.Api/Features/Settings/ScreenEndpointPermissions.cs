@@ -90,7 +90,6 @@ public static class ScreenEndpointPermissions
             if (p.Contains("/sheet-activities/")) return Need(method == "DELETE" ? "treatment.actuals.delete" : "treatment.actuals.update");
             if (p.Contains("/sheet-items/")) return Need(method == "DELETE" ? "treatment.items.delete" : p.EndsWith("/perform") ? "treatment.actuals.create" : "treatment.items.update");
             if (p.Contains("/sheet-drafts/")) return method == "DELETE" ? ScreenEndpointRule.Any("treatment.items.delete", "treatment.actuals.delete") : Need(p.EndsWith("/confirm-actual") || draftKind?.Equals("actual", StringComparison.OrdinalIgnoreCase) == true ? "treatment.actuals.create" : "treatment.items.create");
-            if (p.Contains("/revision")) return Need("treatment.revisions.manage");
             if (p.Contains("/plan/items/")) return Need("treatment.items.update");
             if (p.Contains("/plan/")) return Need("treatment.plan.manage");
             if (p.Contains("/steps") || p.Contains("/warranty/")) return Need("treatment.progress.manage");

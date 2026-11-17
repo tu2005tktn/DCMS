@@ -2474,20 +2474,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<int>("BranchId")
                         .HasColumnType("integer");
 
-                    b.Property<DateTimeOffset?>("ClosedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("ClosedBy")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("ClosureOutcome")
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
-
-                    b.Property<string>("ClosureReason")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasMaxLength(40)
@@ -2499,27 +2485,8 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<int>("DentistId")
                         .HasColumnType("integer");
 
-                    b.Property<DateTimeOffset?>("DepositExceptionAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("DepositExceptionBy")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("DepositExceptionReason")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
                     b.Property<string>("Diagnosis")
                         .IsRequired()
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)");
-
-                    b.Property<bool>("DisplayCompleted")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false);
-
-                    b.Property<string>("Goals")
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)");
 
@@ -2530,38 +2497,8 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<int>("PatientId")
                         .HasColumnType("integer");
 
-                    b.Property<string>("PaymentTermsJson")
-                        .IsRequired()
-                        .HasColumnType("jsonb");
-
-                    b.Property<Guid>("PlanId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("PlanState")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
-
-                    b.Property<int>("PlanVersion")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid?>("SourceExaminationId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("SourceExaminationJson")
-                        .HasColumnType("jsonb");
-
-                    b.Property<int?>("SourceExaminationVersion")
-                        .HasColumnType("integer");
-
                     b.Property<Guid?>("SourceExaminationVisitId")
                         .HasColumnType("uuid");
-
-                    b.Property<Guid?>("SourceTemplateId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int?>("SourceTemplateVersion")
-                        .HasColumnType("integer");
 
                     b.Property<DateOnly>("StartedOn")
                         .HasColumnType("date");
@@ -2571,40 +2508,12 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)");
 
-                    b.Property<Guid>("StorageStamp")
-                        .IsConcurrencyToken()
-                        .HasColumnType("uuid");
-
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("Version")
                         .IsConcurrencyToken()
                         .HasColumnType("integer");
-
-                    b.ComplexCollection(typeof(List<Dictionary<string, object>>), "RevisionDrafts", "DCMS.Domain.Features.Treatment.TreatmentDossier.RevisionDrafts#TreatmentRevisionDraft", b1 =>
-                        {
-                            b1.IsRequired();
-
-                            b1.Property<int>("ActorId");
-
-                            b1.Property<int>("BasePlanVersion");
-
-                            b1.Property<Guid>("DossierId");
-
-                            b1.Property<Guid>("Id");
-
-                            b1.Property<Guid>("ItemId");
-
-                            b1.Property<string>("PayloadJson")
-                                .IsRequired();
-
-                            b1.Property<DateTimeOffset>("UpdatedAt");
-
-                            b1.Property<int>("Version");
-
-                            b1.ToJson("RevisionDrafts");
-                        });
 
                     b.ComplexCollection(typeof(List<Dictionary<string, object>>), "SheetDrafts", "DCMS.Domain.Features.Treatment.TreatmentDossier.SheetDrafts#TreatmentSheetDraft", b1 =>
                         {
@@ -2644,8 +2553,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.HasIndex("SourceExaminationVisitId");
-
-                    b.HasIndex("SourceTemplateId");
 
                     b.HasIndex("PatientId", "BranchId", "UpdatedAt");
 

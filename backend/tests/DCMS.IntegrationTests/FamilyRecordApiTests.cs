@@ -302,12 +302,14 @@ public sealed class FamilyRecordApiTests(ApiFixture fixture) : IClassFixture<Api
         using (var scope = fixture.Services.CreateScope()) {
             var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
             var committed = new TreatmentDossier { PatientId = s.PatientId, BranchId = s.BranchId, DentistId = s.DentistId,
-                Code = "OFF-" + Guid.NewGuid().ToString("N"), PlanState = "Committed", PlanVersion = 1,
+                Code = "OFF-" + Guid.NewGuid().ToString("N"),
                 Diagnosis = "SYNTHETIC official treatment", Note = "SYNTHETIC INTERNAL COST NOTE", StartedOn = DateOnly.FromDateTime(DateTime.UtcNow) };
-            committed.Items.Add(new TreatmentItem { DossierId = committed.Id, ServiceId = s.ServiceId, ServiceName = "SYNTHETIC agreed item", Unit = "lần", Quantity = 1, Decision = "Agreed", AgreedUnitPriceVnd = 987654321 });
-            committed.Items.Add(new TreatmentItem { DossierId = committed.Id, ServiceId = s.ServiceId, ServiceName = "SYNTHETIC unagreed item", Unit = "lần", Quantity = 1, Decision = "Proposed" });
-            db.AddRange(committed, new TreatmentDossier { PatientId = s.PatientId, BranchId = s.BranchId, DentistId = s.DentistId,
-                Code = "DRAFT-" + Guid.NewGuid().ToString("N"), PlanState = "Draft", Diagnosis = "SYNTHETIC DRAFT TREATMENT", StartedOn = DateOnly.FromDateTime(DateTime.UtcNow) });
+            committed.Items.Add(new TreatmentItem { DossierId = committed.Id, ServiceId = s.ServiceId, ServiceName = "SYNTHETIC agreed item", Unit = "lần", Quantity = 1, Decision = "Agreed", DecisionPlanVersion = 1, AgreedUnitPriceVnd = 987654321 });
+            committed.Items.Add(new TreatmentItem { DossierId = committed.Id, ServiceId = s.ServiceId, ServiceName = "SYNTHETIC unagreed item", Unit = "lần", Quantity = 1, Decision = "Proposed", DecisionPlanVersion = 1 });
+            var draft = new TreatmentDossier { PatientId = s.PatientId, BranchId = s.BranchId, DentistId = s.DentistId,
+                Code = "DRAFT-" + Guid.NewGuid().ToString("N"), Diagnosis = "SYNTHETIC DRAFT TREATMENT", StartedOn = DateOnly.FromDateTime(DateTime.UtcNow) };
+            draft.Items.Add(new TreatmentItem { DossierId = draft.Id, ServiceId = s.ServiceId, ServiceName = "SYNTHETIC draft agreed", Unit = "lần", Quantity = 1, Decision = "Agreed" });
+            db.AddRange(committed, draft);
             var now = DateTimeOffset.UtcNow;
             db.Add(new ExternalPrescription { VisitId = s.VisitId, PatientId = s.PatientId, BranchId = s.BranchId,
                 PrescribedByDoctorId = s.DentistAccountId, CreatedBy = s.DentistAccountId, UpdatedBy = s.DentistAccountId, Revision = 1,

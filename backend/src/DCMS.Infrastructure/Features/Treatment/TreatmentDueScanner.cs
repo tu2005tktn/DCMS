@@ -19,7 +19,7 @@ public sealed class TreatmentDueScanner(DcmsDbContext db, ITreatmentLabReadiness
         await db.Database.ExecuteSqlRawAsync($"SELECT pg_advisory_xact_lock({DCMS.Infrastructure.Features.Scheduling.WorkingScheduleService.TransactionLock})", ct);
         var inserted = 0;
         var patients = await db.TreatmentDossiers.AsNoTracking().Where(x => x.State == "Open"
-            && x.PlanState == "Committed")
+            && x.Items.Any(i => i.DecisionPlanVersion != null) && !x.Items.Any(i => !i.SheetDeleted && i.DecisionPlanVersion == null))
             .ToDictionaryAsync(x => x.Id, x => x.PatientId, ct);
         var dossierIds = patients.Keys.ToArray();
         var steps = await db.TreatmentSteps.AsNoTracking().Where(x => dossierIds.Contains(x.DossierId))

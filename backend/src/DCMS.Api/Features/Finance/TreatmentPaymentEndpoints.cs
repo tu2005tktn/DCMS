@@ -309,10 +309,6 @@ public static class TreatmentPaymentEndpoints
                 """, ct);
             if (inserted != 1) return Results.Conflict("Mã yêu cầu đã được dùng.");
             dossier.State = "Cancelled";
-            dossier.ClosureOutcome = "Cancelled";
-            dossier.ClosureReason = reason;
-            dossier.ClosedAt = now;
-            dossier.ClosedBy = actor;
             dossier.Version++;
             dossier.UpdatedAt = now;
             db.TreatmentEvents.Add(new DCMS.Domain.Features.Treatment.TreatmentEvent
