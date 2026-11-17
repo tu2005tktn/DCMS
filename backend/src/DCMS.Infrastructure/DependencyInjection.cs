@@ -106,6 +106,7 @@ public static class DependencyInjection
         services.AddScoped<DCMS.Application.Features.Examinations.IClinicalDocumentService, Features.Examinations.ClinicalDocumentService>();
         services.AddScoped<DCMS.Application.Features.Examinations.IOwnClinicalRecordService, Features.Examinations.OwnClinicalRecordService>();
         services.AddSingleton<DCMS.Application.Features.Examinations.IClinicalFileScanner, Features.Examinations.ClamAvClinicalFileScanner>();
+        services.AddSingleton<DCMS.Application.Features.Examinations.IDentalAiClient, Features.Examinations.HttpDentalAiClient>();
         services.AddHostedService<Features.Examinations.ClinicalScanWorker>();
         services.AddScoped<IAppointmentQueryService, AppointmentQueryService>();
         services.AddScoped<IAppointmentChangeService, AppointmentChangeService>();

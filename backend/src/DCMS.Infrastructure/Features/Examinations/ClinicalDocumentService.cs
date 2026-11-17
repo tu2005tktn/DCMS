@@ -12,7 +12,7 @@ using static DCMS.Infrastructure.Features.Examinations.ClinicalAccess;
 namespace DCMS.Infrastructure.Features.Examinations;
 
 public sealed class ClinicalDocumentService(DcmsDbContext db, ClinicalAccess access, IConfiguration config,
-    IClinicalFileScanner scanner, TimeProvider clock) : IClinicalDocumentService
+    IClinicalFileScanner scanner, TimeProvider clock, IDentalAiClient ai) : IClinicalDocumentService
 {
     public static readonly DocumentConstraints Limits = new(10, 20 * 1024 * 1024,
         ["image/jpeg", "image/png", "application/pdf"], 1000);
@@ -60,10 +60,11 @@ public sealed class ClinicalDocumentService(DcmsDbContext db, ClinicalAccess acc
         var dossier = d.DossierId.HasValue ? await db.TreatmentDossiers.AsNoTracking().SingleAsync(x => x.Id == d.DossierId, ct) : null;
         var reviews = await db.DocumentReviews.AsNoTracking().Where(x => x.DocumentId == d.Id)
             .Select(x => new DocumentReviewDto(x.VisitId, x.ReviewedBy, x.ReviewedAt)).ToArrayAsync(ct);
+        var analyses = await AiDtosAsync(d, ct);
         return new(d.Id, d.Version, d.FileName, d.ContentType, d.SizeBytes, d.DocumentType, d.Source, d.SourceDate,
             d.Description, new(d.VisitId, d.VisitId.HasValue ? $"Lượt {d.VisitId.Value.ToString()[..8]}" : null, d.DossierId, dossier?.Code, d.PlanId,
                 d.PlanId.HasValue ? "Kế hoạch điều trị" : null, d.InvestigationId, d.InvestigationId.HasValue ? await db.Investigations.Where(x => x.Id == d.InvestigationId).Select(x => x.Name).SingleAsync(ct) : null), uploader, d.UploadedAt, d.FileState, d.RejectReason,
-            d.FileState == "Ready" ? ["view", "download"] : [], reviews);
+            d.FileState == "Ready" ? ["view", "download"] : [], reviews, analyses);
     }
     public async Task<object> ContextsAsync(int actorId, int patientId, CancellationToken ct)
     {
@@ -209,6 +210,65 @@ public sealed class ClinicalDocumentService(DcmsDbContext db, ClinicalAccess acc
             await db.SaveChangesAsync(ct);
         }
         await tx.CommitAsync(ct); return await DtoAsync(d, ct);
+    }
+    // AI decision support (docs/specs/AI-CARIES-DETECTION.vi.md §5). The AI call runs outside the transaction.
+    public const int MaxAiAnalyses = 20;
+    private async Task<IReadOnlyList<AiAnalysisDto>> AiDtosAsync(ClinicalDocument d, CancellationToken ct)
+    {
+        if (d.AiAnalyses.Count == 0) return [];
+        var ids = d.AiAnalyses.Select(x => x.RequestedBy).Distinct().ToArray();
+        var names = await db.Users.AsNoTracking().Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.FullName, ct);
+        return d.AiAnalyses.OrderByDescending(x => x.RequestedAt).Select(a => new AiAnalysisDto(a.AnalysisId, a.Kind, a.SchemaVersion, a.ModelName, a.ModelSha256,
+            a.InputSha256, a.RequestedBy, names.GetValueOrDefault(a.RequestedBy) ?? "", a.RequestedAt, a.ElapsedMs, a.Device, a.ImageWidth, a.ImageHeight,
+            a.Findings.Select(f => new AiFindingDto(f.FindingId, f.Kind, f.Label, f.Confidence, f.X1, f.Y1, f.X2, f.Y2, f.Jaw, f.Side)).ToArray())).ToArray();
+    }
+    private async Task<int> SourceBranchAsync(ClinicalDocument d, CancellationToken ct) => d.VisitId.HasValue
+        ? (await db.Visits.AsNoTracking().SingleAsync(x => x.Id == d.VisitId, ct)).BranchId
+        : (await db.TreatmentDossiers.AsNoTracking().SingleAsync(x => x.Id == d.DossierId, ct)).BranchId;
+    public async Task<AiAnalysisDto> AnalyzeAsync(int actorId, Guid documentId, RunAiAnalysis r, CancellationToken ct)
+    {
+        if (r.RequestKey == Guid.Empty) throw Error("MSG04");
+        var hash = ExaminationService.Hash(new { action = "AiAnalysis", documentId, r.RequestKey });
+        var d = await db.Set<ClinicalDocument>().AsNoTracking().SingleOrDefaultAsync(x => x.Id == documentId, ct) ?? throw Error("MSG113", 404);
+        await ContextAsync(actorId, d.PatientId, d.VisitId, d.DossierId, d.PlanId, ct);
+        await access.BranchAsync(actorId, await SourceBranchAsync(d, ct), true, ct, "documents.review");
+        var receipt = await db.Set<DocumentReceipt>().AsNoTracking().SingleOrDefaultAsync(x => x.ActorId == actorId && x.RequestKey == r.RequestKey, ct);
+        if (receipt != null) return await ReplayAiAsync(receipt, hash, documentId, ct);
+        if (d.DocumentType != "XRay" || d.ContentType is not ("image/jpeg" or "image/png")) throw Error("MSG04");
+        if (d.FileState != "Ready" || d.AiAnalyses.Count >= MaxAiAnalyses) throw Error("MSG42", 409);
+        byte[] bytes; try { bytes = await File.ReadAllBytesAsync(PathFor(d.Id), ct); } catch (IOException) { throw Error("MSG144", 503); }
+        if (Convert.ToHexString(SHA256.HashData(bytes)) != d.Sha256) throw Error("MSG42", 409);
+        DentalAiResult result;
+        try { result = await ai.AnalyzeXRayAsync(bytes, d.ContentType, d.FileName, ct); }
+        catch (DentalAiUnavailableException e) {
+            Audit(d.Id, actorId, "AiAnalysisFailed", e.Message); await db.SaveChangesAsync(ct);
+            throw new DCMS.Application.Common.BusinessException(503, new("MSG144", $"Không thể phân tích AI lúc này. {e.Message} Vui lòng thử lại sau."));
+        }
+        await using var tx = await db.Database.BeginTransactionAsync(ct); await LockAsync(ct);
+        receipt = await db.Set<DocumentReceipt>().AsNoTracking().SingleOrDefaultAsync(x => x.ActorId == actorId && x.RequestKey == r.RequestKey, ct);
+        if (receipt != null) { await tx.CommitAsync(ct); return await ReplayAiAsync(receipt, hash, documentId, ct); }
+        var row = await db.Set<ClinicalDocument>().SingleAsync(x => x.Id == documentId, ct);
+        if (row.FileState != "Ready" || row.Sha256 != d.Sha256 || row.AiAnalyses.Count >= MaxAiAnalyses) throw Error("MSG42", 409);
+        var analysis = new DocumentAiAnalysis {
+            AnalysisId = Guid.NewGuid(), Kind = "Caries", SchemaVersion = result.SchemaVersion, ModelName = result.ModelName, ModelSha256 = result.ModelSha256,
+            InputSha256 = row.Sha256, RequestedBy = actorId, RequestedAt = clock.GetUtcNow(), ElapsedMs = result.ElapsedMs, Device = result.Device,
+            ImageWidth = result.ImageWidth, ImageHeight = result.ImageHeight,
+            Findings = result.Findings.Select(f => new DocumentAiFinding { FindingId = f.FindingId, Kind = f.Kind, Label = f.Label, Confidence = f.Confidence,
+                X1 = f.X1, Y1 = f.Y1, X2 = f.X2, Y2 = f.Y2, Jaw = f.Jaw, Side = f.Side }).ToList() };
+        row.AiAnalyses.Add(analysis); row.Version++;
+        Audit(row.Id, actorId, "AiAnalyzed", $"{analysis.Findings.Count(x => x.Kind == "caries")} vùng nghi sâu răng · {analysis.ModelName}");
+        db.Add(new DocumentReceipt { ActorId = actorId, RequestKey = r.RequestKey, Fingerprint = hash, ResultJson = JsonSerializer.Serialize(new { analysis.AnalysisId }) });
+        await db.SaveChangesAsync(ct); await tx.CommitAsync(ct);
+        return (await AiDtosAsync(row, ct)).First(x => x.AnalysisId == analysis.AnalysisId);
+    }
+    private async Task<AiAnalysisDto> ReplayAiAsync(DocumentReceipt receipt, string hash, Guid documentId, CancellationToken ct)
+    {
+        if (receipt.Fingerprint != hash) throw Error("MSG111", 409);
+        using var json = JsonDocument.Parse(receipt.ResultJson);
+        if (!json.RootElement.TryGetProperty("AnalysisId", out var idProperty)) throw Error("MSG111", 409);
+        var id = idProperty.GetGuid();
+        var row = await db.Set<ClinicalDocument>().AsNoTracking().SingleAsync(x => x.Id == documentId, ct);
+        return (await AiDtosAsync(row, ct)).FirstOrDefault(x => x.AnalysisId == id) ?? throw Error("MSG113", 404);
     }
     public async Task ScanPendingAsync(CancellationToken ct)
     {

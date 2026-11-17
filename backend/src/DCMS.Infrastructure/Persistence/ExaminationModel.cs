@@ -41,6 +41,7 @@ internal static class ExaminationModel
             b.HasIndex(x => x.InvestigationId);
             b.HasOne<Visit>().WithMany().HasForeignKey(x => x.VisitId).OnDelete(DeleteBehavior.Restrict);
             b.ComplexCollection(x => x.Reviews).ToJson();
+            b.ComplexCollection(x => x.AiAnalyses, a => { a.ToJson(); a.ComplexCollection(x => x.Findings); });
             b.HasOne<TreatmentDossier>().WithMany().HasForeignKey(x => x.DossierId).OnDelete(DeleteBehavior.Restrict);
             b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.UploaderId).OnDelete(DeleteBehavior.Restrict);
         });

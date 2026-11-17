@@ -48,7 +48,7 @@ public sealed record DocumentReviewDto(Guid VisitId, int ReviewedBy, DateTimeOff
 public sealed record DocumentDto(Guid DocumentId, int Version, string FileName, string ContentType, long SizeBytes,
     string DocumentType, string Source, DateOnly SourceDate, string? Description, DocumentContext Context,
     string UploaderName, DateTimeOffset UploadedAt, string FileState, string? RejectReason,
-    IReadOnlyList<string> AllowedActions, IReadOnlyList<DocumentReviewDto> Reviews);
+    IReadOnlyList<string> AllowedActions, IReadOnlyList<DocumentReviewDto> Reviews, IReadOnlyList<AiAnalysisDto>? AiAnalyses = null);
 public sealed record DocumentConstraints(int MaxFiles, long MaxBytes, string[] ContentTypes, int DescriptionMax);
 public sealed record DocumentPage(IReadOnlyList<DocumentDto> Items, int Total, int Page, int PageSize,
     DocumentConstraints Constraints, string[] AllowedActions);
@@ -72,7 +72,23 @@ public interface IClinicalDocumentService
     Task<DocumentContent> PatientContentAsync(int patientId, int accountId, Guid documentId, CancellationToken ct);
     Task<DocumentDto> ReviewAsync(int actorId, Guid documentId, ReviewDocument request, CancellationToken ct);
     Task ScanPendingAsync(CancellationToken ct);
+    Task<AiAnalysisDto> AnalyzeAsync(int actorId, Guid documentId, RunAiAnalysis request, CancellationToken ct);
 }
+// AI decision support on X-ray documents: docs/specs/AI-CARIES-DETECTION.vi.md
+public sealed record RunAiAnalysis(Guid RequestKey);
+public sealed record AiFindingDto(string FindingId, string Kind, string Label, double Confidence, double X1, double Y1, double X2, double Y2, string Jaw, string Side);
+public sealed record AiAnalysisDto(Guid AnalysisId, string Kind, string SchemaVersion, string ModelName, string ModelSha256, string InputSha256,
+    int RequestedBy, string RequestedByName, DateTimeOffset RequestedAt, int ElapsedMs, string Device, int ImageWidth, int ImageHeight,
+    IReadOnlyList<AiFindingDto> Findings);
+public sealed record DentalAiFinding(string FindingId, string Kind, string Label, double Confidence, double X1, double Y1, double X2, double Y2, string Jaw, string Side);
+public sealed record DentalAiResult(string SchemaVersion, string ModelName, string ModelSha256, int ImageWidth, int ImageHeight,
+    int ElapsedMs, string Device, IReadOnlyList<DentalAiFinding> Findings);
+public interface IDentalAiClient
+{
+    // Throws DentalAiUnavailableException when the service is not configured, unreachable, times out or rejects the image.
+    Task<DentalAiResult> AnalyzeXRayAsync(byte[] image, string contentType, string fileName, CancellationToken ct);
+}
+public sealed class DentalAiUnavailableException(string reason, Exception? inner = null) : Exception(reason, inner);
 public interface IClinicalFileScanner
 {
     // Ready only after an affirmative clean result. Unknown/unavailable remains PendingScan.

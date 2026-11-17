@@ -202,6 +202,7 @@ erDiagram
         Integer concurrency_version
     }
 
+    %% Physical schema (17/11/2026): stored as JSONB collection CLINICAL_DOCUMENT.AiAnalyses, see docs/specs/AI-CARIES-DETECTION.vi.md
     AI_ANALYSIS {
         Integer analysis_id PK
         String correlation_id UK

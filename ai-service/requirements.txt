@@ -1,0 +1,6 @@
+# Install torch first for your hardware (CPU or CUDA build) from https://pytorch.org, then: pip install -r requirements.txt
+fastapi>=0.120
+uvicorn>=0.29
+python-multipart>=0.0.9
+pillow>=9.5
+ultralytics>=8.3

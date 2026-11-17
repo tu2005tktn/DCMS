@@ -546,6 +546,73 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("VisitId")
                         .HasColumnType("uuid");
 
+                    b.ComplexCollection(typeof(List<Dictionary<string, object>>), "AiAnalyses", "DCMS.Domain.Features.Examinations.ClinicalDocument.AiAnalyses#DocumentAiAnalysis", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<Guid>("AnalysisId");
+
+                            b1.Property<string>("Device")
+                                .IsRequired();
+
+                            b1.Property<int>("ElapsedMs");
+
+                            b1.Property<int>("ImageHeight");
+
+                            b1.Property<int>("ImageWidth");
+
+                            b1.Property<string>("InputSha256")
+                                .IsRequired();
+
+                            b1.Property<string>("Kind")
+                                .IsRequired();
+
+                            b1.Property<string>("ModelName")
+                                .IsRequired();
+
+                            b1.Property<string>("ModelSha256")
+                                .IsRequired();
+
+                            b1.Property<DateTimeOffset>("RequestedAt");
+
+                            b1.Property<int>("RequestedBy");
+
+                            b1.Property<string>("SchemaVersion")
+                                .IsRequired();
+
+                            b1.ComplexCollection(typeof(List<Dictionary<string, object>>), "Findings", "DCMS.Domain.Features.Examinations.ClinicalDocument.AiAnalyses#DocumentAiAnalysis.Findings#DocumentAiFinding", b2 =>
+                                {
+                                    b2.IsRequired();
+
+                                    b2.Property<double>("Confidence");
+
+                                    b2.Property<string>("FindingId")
+                                        .IsRequired();
+
+                                    b2.Property<string>("Jaw")
+                                        .IsRequired();
+
+                                    b2.Property<string>("Kind")
+                                        .IsRequired();
+
+                                    b2.Property<string>("Label")
+                                        .IsRequired();
+
+                                    b2.Property<string>("Side")
+                                        .IsRequired();
+
+                                    b2.Property<double>("X1");
+
+                                    b2.Property<double>("X2");
+
+                                    b2.Property<double>("Y1");
+
+                                    b2.Property<double>("Y2");
+                                });
+
+                            b1.ToJson("AiAnalyses");
+                        });
+
                     b.ComplexCollection(typeof(List<Dictionary<string, object>>), "Reviews", "DCMS.Domain.Features.Examinations.ClinicalDocument.Reviews#DocumentReview", b1 =>
                         {
                             b1.IsRequired();

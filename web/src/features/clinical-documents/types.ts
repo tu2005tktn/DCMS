@@ -23,6 +23,17 @@ export type DocumentItem = {
   context: DocumentContextRef; uploaderName: string; uploadedAt: string; fileState: FileState; rejectReason?: string | null;
   allowedActions: DocumentAction[];
   reviews?: { visitId: string; reviewedBy: number; reviewedAt: string }[];
+  aiAnalyses?: AiAnalysis[] | null;
+};
+// AI decision support on X-ray images: docs/specs/AI-CARIES-DETECTION.vi.md §5. Coordinates are original image pixels.
+export type AiFinding = {
+  findingId: string; kind: string; label: string; confidence: number; x1: number; y1: number; x2: number; y2: number;
+  jaw: 'upper' | 'lower' | string; side: 'right' | 'left' | string;
+};
+export type AiAnalysis = {
+  analysisId: string; kind: string; schemaVersion: string; modelName: string; modelSha256: string; inputSha256: string;
+  requestedBy: number; requestedByName: string; requestedAt: string; elapsedMs: number; device: string;
+  imageWidth: number; imageHeight: number; findings: AiFinding[];
 };
 export type DocumentConstraints = { maxFiles: number; maxBytes: number; contentTypes: string[]; descriptionMax: number };
 export type DocumentPage = {

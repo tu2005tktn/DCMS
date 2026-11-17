@@ -37,6 +37,39 @@ public sealed class ClinicalDocument
     public DateTimeOffset UploadedAt { get; set; }
     public int Version { get; set; } = 1;
     public List<DocumentReview> Reviews { get; set; } = [];
+    // Immutable AI decision-support results (logical AI_ANALYSIS); newest appended last. docs/specs/AI-CARIES-DETECTION.vi.md
+    public List<DocumentAiAnalysis> AiAnalyses { get; set; } = [];
+}
+
+public sealed class DocumentAiAnalysis
+{
+    public Guid AnalysisId { get; set; }
+    public string Kind { get; set; } = "Caries";
+    public string SchemaVersion { get; set; } = "";
+    public string ModelName { get; set; } = "";
+    public string ModelSha256 { get; set; } = "";
+    public string InputSha256 { get; set; } = "";
+    public int RequestedBy { get; set; }
+    public DateTimeOffset RequestedAt { get; set; }
+    public int ElapsedMs { get; set; }
+    public string Device { get; set; } = "";
+    public int ImageWidth { get; set; }
+    public int ImageHeight { get; set; }
+    public List<DocumentAiFinding> Findings { get; set; } = [];
+}
+
+public sealed class DocumentAiFinding
+{
+    public string FindingId { get; set; } = "";
+    public string Kind { get; set; } = "";
+    public string Label { get; set; } = "";
+    public double Confidence { get; set; }
+    public double X1 { get; set; }
+    public double Y1 { get; set; }
+    public double X2 { get; set; }
+    public double Y2 { get; set; }
+    public string Jaw { get; set; } = "";
+    public string Side { get; set; } = "";
 }
 
 public sealed class DocumentReview

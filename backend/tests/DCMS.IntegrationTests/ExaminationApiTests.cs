@@ -31,7 +31,8 @@ public sealed class ExaminationFixture : ReceptionFixture
     {
         base.ConfigureWebHost(builder);
         builder.ConfigureAppConfiguration((_, c) => c.AddInMemoryCollection(new Dictionary<string,string?> { ["ClinicalDocuments:StoragePath"] = StoragePath }));
-        builder.ConfigureServices(s => { s.RemoveAll<IClinicalFileScanner>(); s.AddSingleton<ExaminationTestScanner>(); s.AddSingleton<IClinicalFileScanner>(p => p.GetRequiredService<ExaminationTestScanner>()); });
+        builder.ConfigureServices(s => { s.RemoveAll<IClinicalFileScanner>(); s.AddSingleton<ExaminationTestScanner>(); s.AddSingleton<IClinicalFileScanner>(p => p.GetRequiredService<ExaminationTestScanner>());
+            s.RemoveAll<IDentalAiClient>(); s.AddSingleton<ExaminationTestDentalAi>(); s.AddSingleton<IDentalAiClient>(p => p.GetRequiredService<ExaminationTestDentalAi>()); });
     }
 }
 

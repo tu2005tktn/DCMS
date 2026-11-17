@@ -1,6 +1,7 @@
 import { Alert, Button, Descriptions, Drawer, Empty, Skeleton, Space, Tabs, Tag, Timeline, Typography } from 'antd';
 import { useEffect, useState } from 'react';
 import { ApiError } from '../../services/api';
+import AiCariesPanel, { supportsAiAnalysis } from './AiCariesPanel';
 import { documentsApi } from './documents.api';
 import {
   contextLabel, documentTypeLabels, fileStateColors, fileStateLabels, formatBytes, formatDay, formatStamp, sourceLabels,
@@ -8,7 +9,7 @@ import {
 } from './types';
 
 const historyLabels: Record<string, string> = {
-  Uploaded: 'Tải lên', ScanPassed: 'Kiểm tra an toàn đạt', ScanRejected: 'Bị từ chối khi kiểm tra', Viewed: 'Xem', Downloaded: 'Tải về',
+  Uploaded: 'Tải lên', AiAnalyzed: 'Phân tích AI', AiAnalysisFailed: 'Phân tích AI thất bại', ScanPassed: 'Kiểm tra an toàn đạt', ScanRejected: 'Bị từ chối khi kiểm tra', Viewed: 'Xem', Downloaded: 'Tải về',
 };
 const accessMessage = (e: ApiError) => e.status === 403 ? 'Bạn không có quyền xem tệp này.'
   : e.status === 401 ? 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.' : e.message;
@@ -83,6 +84,10 @@ export default function DocumentDetailDrawer({ documentId, onClose }: { document
         <Typography.Paragraph type="secondary" className="patient-section">
           Bác sĩ đánh giá lâm sàng tại workspace S19; màn này không có duyệt, công bố hay xóa tài liệu.</Typography.Paragraph>
       </> },
+      ...(supportsAiAnalysis(doc) ? [{ key: 'ai', label: 'AI sâu răng', children: <AiCariesPanel doc={doc} onAnalyzed={a => {
+        setDoc(d => d && { ...d, version: d.version + 1, aiAnalyses: [a, ...(d.aiAnalyses ?? []).filter(x => x.analysisId !== a.analysisId)] });
+        void documentsApi.history(doc.documentId).then(setHistory).catch(() => undefined);
+      }} /> }] : []),
       { key: 'history', label: 'Lịch sử', children: !history ? <Skeleton active /> : history.length === 0 ? <Empty description="Chưa có lịch sử." />
         : <Timeline items={history.map((h, i) => ({ key: i, children: <>
           <Typography.Text strong>{historyLabels[h.action] ?? h.action}</Typography.Text> · {h.actorName} ·{' '}

@@ -31,6 +31,7 @@ public static class ExaminationEndpoints
             Results.Ok(await s.ListAsync(AuthenticationEndpoints.AccountId(c.User), new(patientId, visitId, dossierId, planId, type, from, to, page ?? 1, pageSize ?? 20, imagesOnly ?? false), ct)));
         docs.MapGet("/{id:guid}", async (HttpContext c, Guid id, IClinicalDocumentService s, CancellationToken ct) => Results.Ok(await s.DetailAsync(AuthenticationEndpoints.AccountId(c.User), id, ct)));
         docs.MapGet("/{id:guid}/history", async (HttpContext c, Guid id, IClinicalDocumentService s, CancellationToken ct) => Results.Ok(await s.HistoryAsync(AuthenticationEndpoints.AccountId(c.User), id, ct)));
+        docs.MapPost("/{id:guid}/ai-analyses", async (HttpContext c, Guid id, RunAiAnalysis r, IClinicalDocumentService s, CancellationToken ct) => Results.Ok(await s.AnalyzeAsync(AuthenticationEndpoints.AccountId(c.User), id, r, ct)));
         docs.MapPost("/{id:guid}/review", async (HttpContext c, Guid id, ReviewDocument r, IClinicalDocumentService s, CancellationToken ct) => Results.Ok(await s.ReviewAsync(AuthenticationEndpoints.AccountId(c.User), id, r, ct)));
         docs.MapGet("/{id:guid}/content", async (HttpContext c, Guid id, string? disposition, IClinicalDocumentService s, CancellationToken ct) => {
             var content = await s.ContentAsync(AuthenticationEndpoints.AccountId(c.User), id, disposition == "inline", ct);
