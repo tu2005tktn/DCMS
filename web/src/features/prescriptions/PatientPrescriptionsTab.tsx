@@ -25,7 +25,7 @@ const splitDiagnoses = (value?: string | null) => (value ?? '').split(';').map(x
 export default function PatientPrescriptionsTab({ patient, active }: { patient: PatientDetail; active: boolean }) {
   const auth = useAuth();
   const canManage = auth.user?.permissions.includes('prescriptions.manage') ?? false;
-  const canAddMedicine = auth.user?.permissions.includes('catalog.medicines.manage') ?? false;
+  const canAddMedicine = auth.user?.permissions.includes('catalog.medicines.create') ?? false;
   const [notice, holder] = message.useMessage();
   const [rows, setRows] = useState<Prescription[]>([]);
   const [context, setContext] = useState<Context>();

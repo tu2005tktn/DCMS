@@ -75,7 +75,7 @@ export default function PrescriptionPanel({
   const has = usePermissions();
   const { user } = useAuth();
   const canManage = has('prescriptions.manage');
-  const canAddMedicine = user?.permissions.includes('catalog.medicines.manage') ?? false;
+  const canAddMedicine = user?.permissions.includes('catalog.medicines.create') ?? false;
 
   const [rx, setRx] = useState<Prescription | null>();
   const [history, setHistory] = useState<PrescriptionSummary[]>([]);
