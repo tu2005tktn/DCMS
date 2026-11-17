@@ -2,7 +2,7 @@
 
 Trạng thái: **spec đã duyệt theo yêu cầu người dùng, chưa triển khai**. Việc triển khai chờ phiên rút gọn `APPOINTMENT` ([APPOINTMENT-TABLE-SIMPLIFICATION.vi.md](APPOINTMENT-TABLE-SIMPLIFICATION.vi.md)) commit, vì phải sửa cùng các file lịch hẹn.
 
-Yêu cầu người dùng ngày 18/11/2026: "Chỉ cần tạo lịch hẹn tiếp theo theo kế hoạch, xóa hướng dẫn tái khám", "chỉ giữ các cột của hoạt động điều trị" và "chỉ cần link với phiếu điều trị là được". Hạng mục được chọn lúc ghi điều trị: lấy từ kế hoạch (kế hoạch có thể áp từ mẫu `TREATMENT_TEMPLATE`) hoặc tự thêm dòng điều trị không cần kế hoạch. Vì vậy lịch hẹn không gắn với hạng mục, chỉ gắn với phiếu điều trị. Đây là giai đoạn 3 của [rút gọn CLINICAL_ACTIVITY](CLINICAL-ACTIVITY-TABLE-SIMPLIFICATION.vi.md). Không thêm bảng.
+Yêu cầu người dùng ngày 18/11/2026: "Chỉ cần tạo lịch hẹn tiếp theo theo kế hoạch, xóa hướng dẫn tái khám", "chỉ giữ các cột của hoạt động điều trị" và "chỉ cần link với phiếu điều trị là được", "đặt lịch điều trị theo kế hoạch thì cứ theo hạng mục gần nhất mà đặt". Phiếu điều trị chứa kế hoạch (có thể áp từ mẫu `TREATMENT_TEMPLATE`) và hoạt động điều trị thực tế; hạng mục kế hoạch có thể chuyển thành hoạt động thực tế, hoặc tự thêm dòng điều trị không cần kế hoạch. Hạng mục thực hiện được chọn lúc ghi điều trị, nên lịch hẹn không gắn với hạng mục, chỉ gắn với phiếu điều trị. Đây là giai đoạn 3 của [rút gọn CLINICAL_ACTIVITY](CLINICAL-ACTIVITY-TABLE-SIMPLIFICATION.vi.md). Không thêm bảng.
 
 ## Lý do
 
@@ -10,8 +10,8 @@ Yêu cầu người dùng ngày 18/11/2026: "Chỉ cần tạo lịch hẹn ti�
 
 ## Luồng đặt lịch tiếp theo mới
 
-1. `GET /api/patients/{patientId}/next-visit-candidates` vẫn liệt kê các hạng mục còn chờ của phiếu đang mở, để gợi ý dịch vụ, thời lượng, nha sĩ và ngày dự kiến. `NextVisitCandidate` bỏ `followUpId`, `earliestOn`, `latestOn`; `status` là `Booked` khi **phiếu** đã có lịch hẹn hiệu lực (`Confirmed`, `CheckedIn`, `InProgress`) và `appointment` là lịch hẹn đó, ngược lại là `Ready`.
-2. Web gọi thẳng `POST /api/appointments` với `kind = "FollowUp"` và `dossierId` (thay cho `followUpId`). Hạng mục chọn trên giao diện chỉ dùng để điền sẵn dịch vụ, lý do, thời lượng; không gửi lên và không lưu. Bỏ lời gọi `POST /api/follow-up-instructions`.
+1. `GET /api/patients/{patientId}/next-visit-candidates` trả **một dòng cho mỗi phiếu đang mở** có kế hoạch đã chốt: hạng mục kế hoạch **gần nhất** còn chờ (chưa chuyển thành hoạt động thực tế, chưa hoàn tất, không bị ẩn/xóa), xếp theo ngày dự kiến rồi thứ tự kế hoạch. Dòng này gợi ý dịch vụ, vùng răng, thời lượng, nha sĩ và ngày dự kiến. `NextVisitCandidate` bỏ `followUpId`, `earliestOn`, `latestOn`; `status` là `Booked` khi phiếu đã có lịch hẹn hiệu lực (`Confirmed`, `CheckedIn`, `InProgress`) và `appointment` là lịch hẹn đó, ngược lại là `Ready`. Phiếu không còn hạng mục chờ thì không có dòng.
+2. Web gọi thẳng `POST /api/appointments` với `kind = "FollowUp"` và `dossierId` (thay cho `followUpId`), dùng hạng mục gần nhất để điền sẵn dịch vụ, lý do và thời lượng; hạng mục không gửi lên và không lưu. Bỏ lời gọi `POST /api/follow-up-instructions`. Khi bệnh nhân đến, hạng mục thực hiện vẫn do bác sĩ chọn lúc ghi điều trị.
 3. Server kiểm tra: phiếu tồn tại, đang mở, cùng bệnh nhân và chi nhánh; quyền đặt lịch như cũ. Bỏ kiểm tra khung ngày, sẵn sàng labo và nha sĩ theo hướng dẫn (các quy tắc này gắn với hướng dẫn tái khám). Một phiếu có thể có nhiều lịch hẹn.
 4. Đổi lịch, hủy, vắng mặt không còn cập nhật trạng thái nào ngoài lịch hẹn. Gợi ý dời ngày dự kiến (`planned-date-preview`) giữ nguyên, nhưng không còn loại trừ hạng mục "đã đặt".
 
