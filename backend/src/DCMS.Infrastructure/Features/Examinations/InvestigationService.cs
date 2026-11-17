@@ -19,8 +19,8 @@ public sealed class InvestigationService(DcmsDbContext db, ClinicalAccess access
         var dentist = await access.BranchAsync(actorId, visit.BranchId, false, ct);
         var grants = (await permissions.ResolveAsync(actorId, ct)).Permissions;
         var own = await db.Employees.AnyAsync(x => x.Id == visit.DentistId && x.AccountId == actorId, ct);
-        var active = visit.Status == VisitStatuses.InProgress;
-        var confirmed = await db.Set<VisitExamination>().AnyAsync(x => x.VisitId == visitId && x.Confirmed, ct);
+        var active = VisitStatuses.Open.Contains(visit.Status);
+        var confirmed = VisitStatuses.HasConfirmedExamination.Contains(visit.Status);
         var rows = await db.Investigations.AsNoTracking().Where(x => x.VisitId == visitId).OrderBy(x => x.CreatedAt).ThenBy(x => x.Id).ToArrayAsync(ct);
         var users = await db.Users.Where(x => rows.Select(r => r.CreatedBy).Contains(x.Id)
             || rows.Select(r => r.ResultBy).Contains(x.Id) || rows.Select(r => r.ReviewedBy).Contains(x.Id))
@@ -74,11 +74,11 @@ public sealed class InvestigationService(DcmsDbContext db, ClinicalAccess access
             await tx.CommitAsync(ct); return await ListAsync(actorId, visitId, ct);
         }
         if (visit.Version != expectedVisit || row != null && row.Version != expectedOrder) throw Error("MSG111",409);
-        if (visit.Status != VisitStatuses.InProgress) throw Error("MSG42",409);
+        if (!VisitStatuses.Open.Contains(visit.Status)) throw Error("MSG42",409);
         int? sourceExaminationVersion = null; string? amendmentReason = null;
         var before = row == null ? "{}" : JsonSerializer.Serialize(row, ExaminationService.Json);
         if (payload is CreateInvestigation create) {
-            if (await db.Set<VisitExamination>().AnyAsync(x => x.VisitId == visitId && x.Confirmed, ct)) {
+            if (visit.Status == VisitStatuses.ExaminationConfirmed) {
                 if (string.IsNullOrWhiteSpace(create.AmendmentReason) || create.AmendmentReason.Length > 1000)
                     throw new BusinessException(400,SystemMessages.Get("MSG02",field:"lý do bổ sung chỉ định sau xác nhận khám") with {Field="amendmentReason"});
                 sourceExaminationVersion = await db.Set<VisitAudit>().CountAsync(x => x.VisitId == visitId && new[]{"SaveExamination","ConfirmExamination","AmendExamination"}.Contains(x.Action),ct);

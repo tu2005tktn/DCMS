@@ -4,7 +4,6 @@ public sealed class VisitExamination
 {
     public Guid VisitId { get; set; }
     public string ContentJson { get; set; } = "{}";
-    public bool Confirmed { get; set; }
     public int UpdatedBy { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
 }

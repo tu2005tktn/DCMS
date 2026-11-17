@@ -25,7 +25,7 @@ public sealed record ExaminationWorkspace(VisitResult Visit, ExaminationDto? Exa
     ExaminationContent InitialContent, IReadOnlyList<string> AllowedActions, ExaminationPatient Patient, bool Replayed = false, IReadOnlyList<InvestigationDto>? Investigations = null);
 public sealed record ExaminationHistory(Guid VisitId, DateTimeOffset ArrivalAt, ExaminationDto Examination);
 public sealed record ClinicalHandoff(Guid VisitId, int PatientId, int BranchId, int Version, ExaminationContent Examination,
-    IReadOnlyList<int> Teeth, IReadOnlyList<DocumentDto> Documents, VisitSource? Source, int ExaminationVersion = 0, string VisitStatus = "InProgress");
+    IReadOnlyList<int> Teeth, IReadOnlyList<DocumentDto> Documents, int ExaminationVersion = 0, string VisitStatus = "InProgress");
 public interface IExaminationService
 {
     Task<ExaminationWorkspace> GetAsync(int actorId, Guid visitId, CancellationToken ct);

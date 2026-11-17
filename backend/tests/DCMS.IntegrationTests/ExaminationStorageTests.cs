@@ -49,7 +49,8 @@ public sealed class ExaminationStorageTests(ReceptionFixture fixture) : IClassFi
         document.Reviews.Add(new DocumentReview { DocumentId = document.Id, VisitId = visitId, ReviewedBy = actor, ReviewedAt = now });
         visit.Investigations.Add(order);
         db.Add(document);
-        db.Add(new VisitExamination { VisitId = visitId, ContentJson = "{\"symptoms\":\"SYNTHETIC\"}", Confirmed = true, UpdatedBy = actor, UpdatedAt = now });
+        visit.Status = DCMS.Domain.Features.Visits.VisitStatuses.ExaminationConfirmed;
+        db.Add(new VisitExamination { VisitId = visitId, ContentJson = "{\"symptoms\":\"SYNTHETIC\"}", UpdatedBy = actor, UpdatedAt = now });
         await db.SaveChangesAsync();
         var expectedOrder = OrderSnapshot(order);
         var expectedReviews = JsonSerializer.Serialize(document.Reviews);
@@ -70,7 +71,7 @@ public sealed class ExaminationStorageTests(ReceptionFixture fixture) : IClassFi
         var restoredVisit = await db.Visits.AsNoTracking().SingleAsync(x => x.Id == visitId);
         Assert.True(JsonNode.DeepEquals(expectedOrder, OrderSnapshot(Assert.Single(restoredVisit.Investigations))));
         var examination = await db.Set<VisitExamination>().AsNoTracking().SingleAsync(x => x.VisitId == visitId);
-        Assert.True(examination.Confirmed);
+        Assert.Equal(DCMS.Domain.Features.Visits.VisitStatuses.ExaminationConfirmed, restoredVisit.Status);
         Assert.Equal(actor, examination.UpdatedBy);
         Assert.True(JsonNode.DeepEquals(JsonNode.Parse("{\"symptoms\":\"SYNTHETIC\"}"), JsonNode.Parse(examination.ContentJson)));
         var restoredDocument = await db.Set<ClinicalDocument>().AsNoTracking().SingleAsync(x => x.Id == document.Id);

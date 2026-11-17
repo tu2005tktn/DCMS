@@ -70,10 +70,10 @@ public sealed class FamilyRecordApiTests(ApiFixture fixture) : IClassFixture<Api
         await db.AddSchedulingDataAsync(new Appointment { Id = id, ReservationId = id, Code = "AP-" + id.ToString("N"), BranchId = branch.Id, PatientId = patient.Id, DentistId = dentist.Id, ChairId = chair.Id, ServiceId = service.Id, BookerName = "SYNTHETIC", AttendeeName = name, StartAt = now.AddDays(-1), EndAt = now.AddDays(-1).AddHours(1), CreatedAt = now,
             BookerAccountId = linkedBooking ? ownerId : null, FamilyMemberId = linkedBooking ? member.Id : null, AttendeeBirthDate = linkedBooking ? member.BirthDate : null });
         await db.SaveChangesAsync();
-        var visit = new Visit { AppointmentId = id, PatientId = patient.Id, BranchId = branch.Id, DentistId = dentist.Id, Status = VisitStatuses.Completed, ArrivalAt = now.AddDays(-1), RecordedAt = now, RecordedBy = (await db.Employees.Where(e => e.Id == assistantId).Select(e => e.AccountId).SingleAsync()), Note = "SYNTHETIC INTERNAL VISIT NOTE" };
+        var visit = new Visit { AppointmentId = id, PatientId = patient.Id, BranchId = branch.Id, DentistId = dentist.Id, Status = VisitStatuses.Completed, ArrivalAt = now.AddDays(-1), RecordedBy = (await db.Employees.Where(e => e.Id == assistantId).Select(e => e.AccountId).SingleAsync()), Note = "SYNTHETIC INTERNAL VISIT NOTE" };
         db.Add(visit); await db.SaveChangesAsync();
         var content = new ExaminationContent("SYNTHETIC symptoms", new(), new(), new(), [], "SYNTHETIC diagnosis", "SYNTHETIC INTERNAL EXAM NOTE", "SYNTHETIC conclusion", "SYNTHETIC advice");
-        db.Add(new VisitExamination { VisitId = visit.Id, Confirmed = true, UpdatedBy = dentist.AccountId, UpdatedAt = now, ContentJson = JsonSerializer.Serialize(content, new JsonSerializerOptions(JsonSerializerDefaults.Web)) });
+        db.Add(new VisitExamination { VisitId = visit.Id, UpdatedBy = dentist.AccountId, UpdatedAt = now, ContentJson = JsonSerializer.Serialize(content, new JsonSerializerOptions(JsonSerializerDefaults.Web)) });
         await db.SaveChangesAsync();
         return new(owner, assistant, member, ownerId, patient.Id, branch.Id, dentist.Id, dentist.AccountId, service.Id, visit.Id);
     }
@@ -221,7 +221,7 @@ public sealed class FamilyRecordApiTests(ApiFixture fixture) : IClassFixture<Api
         Assert.Equal(HttpStatusCode.Forbidden, (await s.Owner.GetAsync(Url(s.Member.Id) + "/record/documents")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await s.Owner.GetAsync(Url(s.Member.Id) + $"/record/documents/{Guid.NewGuid()}/content")).StatusCode);
         using (var scope = fixture.Services.CreateScope()) {
-            var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>(); var exam = await db.Set<VisitExamination>().SingleAsync(x => x.VisitId == s.VisitId); exam.Confirmed = false; await db.SaveChangesAsync();
+            var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>(); var visit = await db.Visits.SingleAsync(x => x.Id == s.VisitId); visit.Status = VisitStatuses.InProgress; await db.SaveChangesAsync();
         }
         var empty = await s.Owner.GetFromJsonAsync<FamilyPage<JsonElement>>(Url(s.Member.Id) + "/record/examinations"); Assert.Empty(empty!.Items);
         var revoked = await s.Assistant.PostAsJsonAsync($"/api/family-record-reviews/{row.Id}/revoke", new DecideFamilyAccess("SYNTHETIC revoked", null, row.Version, Guid.NewGuid())); revoked.EnsureSuccessStatusCode();

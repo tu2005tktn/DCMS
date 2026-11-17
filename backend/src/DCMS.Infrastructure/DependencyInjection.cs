@@ -99,7 +99,6 @@ public static class DependencyInjection
         services.AddScoped<Features.Scheduling.DevelopmentSchedulingSeeder>();
         services.AddScoped<IAppointmentService, AppointmentService>();
         services.AddScoped<DCMS.Application.Features.Reception.IReceptionService, Features.Reception.ReceptionService>();
-        services.AddScoped<DCMS.Application.Features.Reception.IReceptionSourceReader, Features.Examinations.ReceptionTreatmentSourceReader>();
         services.AddScoped<Features.Examinations.ClinicalAccess>();
         services.AddScoped<DCMS.Application.Features.Examinations.IInvestigationService, Features.Examinations.InvestigationService>();
         services.AddScoped<DCMS.Application.Features.Examinations.IExaminationService, Features.Examinations.ExaminationService>();

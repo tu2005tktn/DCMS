@@ -42,8 +42,8 @@ export default function PrescriptionPage() {
   },[dirty,busy]);
   if(error)return <Alert type="error" message={error}/>;
   if(!workspace||workspace.visit.visitId!==visitId)return <Spin/>;
-  const readOnly=workspace.visit.status!=='InProgress'||!workspace.allowedActions.includes('prescribe');
-  const correctionAllowed=has('prescriptions.manage')&&(workspace.visit.status==='InProgress'||workspace.visit.status==='Completed');
+  const readOnly=(workspace.visit.status!=='InProgress'&&workspace.visit.status!=='ExaminationConfirmed')||!workspace.allowedActions.includes('prescribe');
+  const correctionAllowed=has('prescriptions.manage')&&(workspace.visit.status==='InProgress'||workspace.visit.status==='ExaminationConfirmed'||workspace.visit.status==='Completed');
   const patient=workspace.patient;
   const diagnoses=treatmentDiagnosis||diagnosisText(workspace.examination?.content ?? workspace.initialContent)||workspace.examination?.content.diagnosis||'';
   const prescribedOn=new Intl.DateTimeFormat('vi-VN',{timeZone:'Asia/Ho_Chi_Minh'}).format(new Date());

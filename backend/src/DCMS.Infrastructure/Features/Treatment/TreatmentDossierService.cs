@@ -412,10 +412,10 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
                 && x.PatientId == patientId && x.BranchId == request.BranchId, ct) ?? throw Error("MSG113", 404);
             if (source.Version != request.ExpectedSourceVisitVersion) throw Error("MSG111", 409);
             var examination = await db.Set<DCMS.Domain.Features.Examinations.VisitExamination>().AsNoTracking()
-                .SingleOrDefaultAsync(x => x.VisitId == source.Id && x.Confirmed, ct) ?? throw Error("MSG240", 409);
+                .SingleOrDefaultAsync(x => x.VisitId == source.Id, ct) is { } found && DCMS.Domain.Features.Visits.VisitStatuses.HasConfirmedExamination.Contains(source.Status) ? found : throw Error("MSG240", 409);
             dossier.SourceExaminationId = source.Id; dossier.SourceExaminationVersion = source.Version;
             Event(dossier, actorId, "ExaminationSourceCaptured", new { SourceVisitId = source.Id,
-                SourceVisitVersion = source.Version, Content = JsonSerializer.Deserialize<JsonElement>(examination.ContentJson) });
+                SourceVisitVersion = source.Version, Content = JsonSerializer.SerializeToElement(DCMS.Infrastructure.Features.Examinations.ExaminationService.WithDerivedDiagnoses(JsonSerializer.Deserialize<DCMS.Application.Features.Examinations.ExaminationContent>(examination.ContentJson, DCMS.Infrastructure.Features.Examinations.ExaminationService.Json)!), DCMS.Infrastructure.Features.Examinations.ExaminationService.Json) });
         }
         else if (request.ExpectedSourceVisitVersion.HasValue) throw Error("MSG04");
         Event(dossier, actorId, "DossierCreated", new { dossier.Code, dossier.Diagnosis });

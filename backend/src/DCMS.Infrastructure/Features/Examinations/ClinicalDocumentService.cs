@@ -95,7 +95,7 @@ public sealed class ClinicalDocumentService(DcmsDbContext db, ClinicalAccess acc
         var total = await query.CountAsync(ct); var list = new List<DocumentDto>();
         foreach (var d in await query.OrderByDescending(x => x.UploadedAt).ThenBy(x => x.Id).Skip((q.Page - 1) * q.PageSize).Take(q.PageSize).ToArrayAsync(ct)) list.Add(await DtoAsync(d, ct));
         var canUpload = q.DossierId.HasValue || await db.Visits.AnyAsync(x => x.PatientId == q.PatientId && branches.Contains(x.BranchId)
-            && (!q.VisitId.HasValue || x.Id == q.VisitId) && (x.Status == VisitStatuses.Queued || x.Status == VisitStatuses.InProgress), ct);
+            && (!q.VisitId.HasValue || x.Id == q.VisitId) && (x.Status == VisitStatuses.Queued || x.Status == VisitStatuses.InProgress || x.Status == VisitStatuses.ExaminationConfirmed), ct);
         return new(list, total, q.Page, q.PageSize, Limits, canUpload ? ["upload"] : []);
     }
     public async Task<DocumentDto> DetailAsync(int actorId, Guid documentId, CancellationToken ct) => await DtoAsync(await RowAsync(actorId, documentId, ct), ct);
@@ -140,7 +140,7 @@ public sealed class ClinicalDocumentService(DcmsDbContext db, ClinicalAccess acc
             foreach (var entry in entries) replay.Add(new(entry.Id.HasValue ? await DetailAsync(actorId, entry.Id.Value, ct) : null, entry.Error));
             await tx.CommitAsync(ct); return new(replay.Count == 1 ? replay[0].Document : null, replay);
         }
-        if (visit != null && visit.Status is not (VisitStatuses.Queued or VisitStatuses.InProgress)) throw Error("MSG42", 409);
+        if (visit != null && visit.Status is not (VisitStatuses.Queued or VisitStatuses.InProgress or VisitStatuses.ExaminationConfirmed)) throw Error("MSG42", 409);
         if (investigation != null && investigation.State != "Ordered") throw Error("MSG42",409);
         var results = new List<DocumentUploadResult>(); var ids = new List<BatchEntry>(); var written = new List<string>();
         try {
@@ -201,7 +201,7 @@ public sealed class ClinicalDocumentService(DcmsDbContext db, ClinicalAccess acc
         if (d.FileState != "Ready") throw Error("MSG42", 409);
         if (receipt == null) {
             if (d.Version != r.ExpectedVersion) throw Error("MSG111", 409);
-            if (v.Status != VisitStatuses.InProgress) throw Error("MSG42", 409);
+            if (!VisitStatuses.Open.Contains(v.Status)) throw Error("MSG42", 409);
             if (!d.Reviews.Any(x => x.VisitId == v.Id)) {
                 d.Reviews.Add(new DocumentReview { DocumentId = d.Id, VisitId = v.Id, ReviewedBy = actorId, ReviewedAt = clock.GetUtcNow() });
                 d.Version++; Audit(d.Id, actorId, "ClinicallyReviewed");

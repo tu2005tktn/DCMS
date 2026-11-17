@@ -16,9 +16,8 @@ internal static class VisitModel
         {
             b.ToTable("VISIT", t =>
             {
-                t.HasCheckConstraint("CK_VISIT_Status", "\"Status\" IN ('Queued','InProgress','Completed','Cancelled')");
+                t.HasCheckConstraint("CK_VISIT_Status", "\"Status\" IN ('Queued','InProgress','ExaminationConfirmed','Completed','Cancelled')");
                 t.HasCheckConstraint("CK_VISIT_Purpose", "\"Purpose\" IN ('InitialExamination','TreatmentContinuation','PostoperativeOrWarrantyReview','PeriodicOrNewProblem')");
-                t.HasCheckConstraint("CK_VISIT_Arrival", "\"ArrivalAt\" <= \"RecordedAt\"");
             });
             b.HasIndex(x => x.AppointmentId).IsUnique();
             b.HasIndex(x => new { x.BranchId, x.ArrivalAt, x.Status });
@@ -26,9 +25,8 @@ internal static class VisitModel
             b.Property(x => x.Purpose).HasMaxLength(40);
             b.Property(x => x.ArrivalReason).HasMaxLength(500);
             b.Property(x => x.Note).HasMaxLength(1000);
-            b.Property(x => x.SourceJson).HasColumnType("jsonb");
-            b.Property(x => x.Version).IsConcurrencyToken(false);
-            b.Property(x => x.StorageStamp).IsConcurrencyToken();
+            // Version is the only concurrency token; VisitExamination shares it (same row).
+            b.Property(x => x.Version).IsConcurrencyToken();
             b.ComplexCollection(x => x.Investigations).ToJson();
             b.HasOne<Appointment>().WithOne().HasForeignKey<Visit>(x => x.AppointmentId).OnDelete(DeleteBehavior.Restrict);
             b.HasOne<PatientProfile>().WithMany().HasForeignKey(x => x.PatientId).OnDelete(DeleteBehavior.Restrict);

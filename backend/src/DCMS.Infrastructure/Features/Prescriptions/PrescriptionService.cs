@@ -123,7 +123,7 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
     {
         if (rx != null && rx.Status != PrescriptionStatuses.Draft) throw Fail("MSG205", 409, "status", "Đơn thuốc");
         var revision = rx?.Revision ?? 1;
-        var visitOpen = visit.Status == VisitStatuses.InProgress || (revision > 1 && visit.Status == VisitStatuses.Completed);
+        var visitOpen = VisitStatuses.Open.Contains(visit.Status) || (revision > 1 && visit.Status == VisitStatuses.Completed);
         if (!visitOpen) throw Fail("MSG205", 409, "visit", "Lượt khám");
     }
 
@@ -322,7 +322,7 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
     {
         var exam = await db.Set<VisitExamination>().AsNoTracking().SingleOrDefaultAsync(x => x.VisitId == visitId, ct);
         if (exam == null || string.IsNullOrWhiteSpace(exam.ContentJson)) return null;
-        try { return JsonSerializer.Deserialize<ExaminationContent>(exam.ContentJson, ExaminationService.Json); }
+        try { return ExaminationService.WithDerivedDiagnoses(JsonSerializer.Deserialize<ExaminationContent>(exam.ContentJson, ExaminationService.Json)!); }
         catch (JsonException) { return null; }
     }
 
@@ -572,7 +572,7 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
         var signed = await CurrentAsync(visitId, ct) ?? throw Fail("MSG113", 404);
         if (signed.Version != c.ExpectedVersion) throw Fail("MSG111", 409, currentVersion: signed.Version);
         if (signed.Status != PrescriptionStatuses.Finalized) throw Fail("MSG205", 409, "status", "Đơn thuốc");
-        if (visit.Status is not (VisitStatuses.InProgress or VisitStatuses.Completed)) throw Fail("MSG205", 409, "visit", "Lượt khám");
+        if (visit.Status is not (VisitStatuses.InProgress or VisitStatuses.ExaminationConfirmed or VisitStatuses.Completed)) throw Fail("MSG205", 409, "visit", "Lượt khám");
 
         var draft = NewDraft(visit, actor, signed.Revision + 1);
         draft.SupersedesId = signed.Id;

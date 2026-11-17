@@ -44,5 +44,5 @@ export const accessLabels: Record<AccessStatus, string> = {
 };
 export const scopeLabels: Record<Scope, string> = { Examinations: 'Lịch sử khám', Treatment: 'Điều trị', Prescriptions: 'Đơn thuốc', Documents: 'Ảnh và tài liệu' };
 export const progressLabels: Record<string, string> = { NotStarted: 'Chưa thực hiện', InProgress: 'Đang thực hiện', Completed: 'Đã hoàn thành', Partial: 'Một phần', Cancelled: 'Đã hủy', Stopped: 'Đã dừng' };
-export const appointmentLabels: Record<string, string> = { Confirmed: 'Đã đặt', CheckedIn: 'Đã đến khám', Queued: 'Chờ khám', InProgress: 'Đang khám', Completed: 'Đã hoàn thành', Cancelled: 'Đã hủy', NoShow: 'Không đến' };
+export const appointmentLabels: Record<string, string> = { Confirmed: 'Đã đặt', CheckedIn: 'Đã đến khám', Queued: 'Chờ khám', ExaminationConfirmed: 'Đã xác nhận phiếu khám', InProgress: 'Đang khám', Completed: 'Đã hoàn thành', Cancelled: 'Đã hủy', NoShow: 'Không đến' };
 export const mealLabels: Record<string, string> = { BeforeMeal: 'Trước ăn', AfterMeal: 'Sau ăn', WithMeal: 'Cùng bữa ăn' };

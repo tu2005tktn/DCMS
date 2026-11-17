@@ -346,7 +346,7 @@ public sealed class CareTaskService(DcmsDbContext db, UserManager<ApplicationUse
                               EF.Functions.ILike(p.FullName, pattern) ||
                               p.Phone != null && EF.Functions.ILike(p.Phone, pattern))
                           let last = db.Visits.Where(v => v.PatientId == p.Id && v.BranchId == branchId &&
-                                  (v.Status == VisitStatuses.InProgress || v.Status == VisitStatuses.Completed))
+                                  (v.Status == VisitStatuses.InProgress || v.Status == VisitStatuses.ExaminationConfirmed || v.Status == VisitStatuses.Completed))
                               .Max(v => (DateTimeOffset?)v.ArrivalAt)
                           where last != null
                           orderby last descending, p.Id

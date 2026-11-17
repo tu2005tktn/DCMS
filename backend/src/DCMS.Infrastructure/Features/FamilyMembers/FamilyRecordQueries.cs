@@ -56,11 +56,11 @@ public sealed partial class FamilyRecordService
         if (scope == "Examinations") {
             var query = from v in db.Visits.AsNoTracking() join e in db.Set<VisitExamination>().AsNoTracking() on v.Id equals e.VisitId
                 join dentist in db.Employees on v.DentistId equals dentist.Id join b in db.Set<SchedulingBranch>() on v.BranchId equals b.Id
-                where v.PatientId == row.PatientId && v.BranchId == row.BranchId && e.Confirmed && v.Status != "Cancelled"
+                where v.PatientId == row.PatientId && v.BranchId == row.BranchId && DCMS.Domain.Features.Visits.VisitStatuses.HasConfirmedExamination.Contains(v.Status)
                 orderby v.ArrivalAt descending, v.Id select new { v.Id, v.ArrivalAt, DentistName = dentist.FullName, BranchName = b.Name, e.ContentJson };
             total = await query.CountAsync(ct);
             items = (await query.Skip(skip).Take(pageSize).ToArrayAsync(ct)).Select(x => {
-                var content = JsonSerializer.Deserialize<ExaminationContent>(x.ContentJson, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+                var content = DCMS.Infrastructure.Features.Examinations.ExaminationService.WithDerivedDiagnoses(JsonSerializer.Deserialize<ExaminationContent>(x.ContentJson, new JsonSerializerOptions(JsonSerializerDefaults.Web))!);
                 return (object)new FamilyExaminationDto(x.Id, x.ArrivalAt, x.DentistName, x.BranchName, content?.Symptoms,
                     content?.Diagnoses?.ToArray() ?? (string.IsNullOrWhiteSpace(content?.Diagnosis) ? [] : [content.Diagnosis]), content?.Conclusion, content?.Advice);
             }).ToArray();
@@ -97,7 +97,7 @@ public sealed partial class FamilyRecordService
         && (d.DocumentType == "XRay" || d.DocumentType == "IntraoralPhoto" || d.DocumentType == "LabResult" || d.DocumentType == "Referral" || d.DocumentType == "ConsentForm")
         && (d.VisitId != null
             ? db.Visits.Any(v => v.Id == d.VisitId && v.PatientId == row.PatientId && v.BranchId == row.BranchId && v.Status != "Cancelled"
-                && db.Set<VisitExamination>().Any(e => e.VisitId == v.Id && e.Confirmed))
+                && DCMS.Domain.Features.Visits.VisitStatuses.HasConfirmedExamination.Contains(v.Status) && db.Set<VisitExamination>().Any(e => e.VisitId == v.Id))
             : db.TreatmentDossiers.Any(t => t.Id == d.DossierId && t.PatientId == row.PatientId && t.BranchId == row.BranchId && t.PlanState == "Committed" && t.State != "Deleted")));
 
     public async Task<DocumentContent> DocumentAsync(int actor, Guid memberId, Guid documentId, CancellationToken ct)

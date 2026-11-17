@@ -423,7 +423,7 @@ public sealed class ExaminationApiTests(ExaminationFixture fixture) : IClassFixt
             var close = new CompleteExaminationVisit(v.PatientId, v.VisitVersion, Guid.NewGuid(), true);
             Assert.Equal(HttpStatusCode.Conflict, (await c.PostAsJsonAsync($"/api/visits/{v.VisitId}/complete", close)).StatusCode);
             var confirmed = await Ok<ExaminationWorkspace>(await c.PutAsJsonAsync(Exam(v.VisitId), new SaveExamination(v.PatientId,v.VisitVersion,Guid.NewGuid(),Content(true),true)));
-            Assert.Equal("InProgress", confirmed.Visit.Status); Assert.Equal("InProgress", confirmed.Visit.AppointmentStatus);
+            Assert.Equal("ExaminationConfirmed", confirmed.Visit.Status); Assert.Equal("InProgress", confirmed.Visit.AppointmentStatus);
             Assert.Equal(1, confirmed.Examination!.Version); Assert.Equal(v.VisitId, confirmed.Examination.Id);
             var list = await c.GetFromJsonAsync<PatientExamination[]>($"/api/patients/{v.PatientId}/examinations");
             Assert.Contains(list!, x => x.VisitId == v.VisitId && x.Examination!.Version == 1);
@@ -483,7 +483,7 @@ public sealed class ExaminationApiTests(ExaminationFixture fixture) : IClassFixt
                 await db.SaveChangesAsync(); }
             var complete=new CompleteExaminationVisit(v.PatientId,saved.Visit.VisitVersion,Guid.NewGuid(),true);
             var response=await c.PostAsJsonAsync($"/api/visits/{v.VisitId}/complete",complete);
-            if(draftWork){Assert.Equal(HttpStatusCode.Conflict,response.StatusCode);Assert.Equal("InProgress",(await c.GetFromJsonAsync<ExaminationWorkspace>(Exam(v.VisitId)))!.Visit.Status);}
+            if(draftWork){Assert.Equal(HttpStatusCode.Conflict,response.StatusCode);Assert.Equal("ExaminationConfirmed",(await c.GetFromJsonAsync<ExaminationWorkspace>(Exam(v.VisitId)))!.Visit.Status);}
             else {
                 var closed=await Ok<ExaminationWorkspace>(response);Assert.Equal("Completed",closed.Visit.Status);Assert.Contains("handoff",closed.AllowedActions);
                 var handoff=await Ok<ClinicalHandoff>(await c.GetAsync($"/api/visits/{v.VisitId}/clinical-handoff"));Assert.Equal("Completed",handoff.VisitStatus);Assert.Equal(v.VisitId,handoff.VisitId);
@@ -582,7 +582,7 @@ public sealed class ExaminationApiTests(ExaminationFixture fixture) : IClassFixt
                 var reservation = await db.Set<ResourceReservation>().SingleAsync(x => x.Id == a.ReservationId); reservation.AttendeeKey = $"patient:{s.PatientId}";
                 // Attach a second already-checked-in Visit to the same Patient. Check-in itself is covered through real API in the other cases.
                 a.Status = "CheckedIn"; var visit = new DCMS.Domain.Features.Visits.Visit { AppointmentId = a.Id, PatientId = s.PatientId, BranchId = s.BranchId, DentistId = s.DentistId,
-                    ArrivalAt = fixture.Clock.Now, RecordedAt = fixture.Clock.Now, RecordedBy = (await db.Employees.SingleAsync(x => x.Id == s.AssistantId)).AccountId };
+                    ArrivalAt = fixture.Clock.Now, RecordedBy = (await db.Employees.SingleAsync(x => x.Id == s.AssistantId)).AccountId };
                 db.Add(visit); var dossier = new TreatmentDossier { PatientId = s.PatientId, BranchId = s.BranchId, DentistId = s.DentistId, Code = "SYNTHETIC-OLD", Diagnosis = "SYNTHETIC cũ", StartedOn = DateOnly.FromDateTime(fixture.Clock.Now.DateTime), CreatedAt = fixture.Clock.Now, UpdatedAt = fixture.Clock.Now }; db.Add(dossier);
                 await db.SaveChangesAsync(); dossierId = dossier.Id; other = other with { AppointmentId = a.Id };
             }

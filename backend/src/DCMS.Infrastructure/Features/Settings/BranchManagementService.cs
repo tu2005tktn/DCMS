@@ -243,7 +243,7 @@ public sealed partial class BranchManagementService(DcmsDbContext db, ISettingsA
             blockers.Add(new("Appointments", $"Còn {appointments} lịch hẹn tương lai chưa hủy tại chi nhánh.", appointments, $"/appointments?branchId={id}"));
 
         var visits = await db.Set<Visit>().AsNoTracking()
-            .CountAsync(v => v.BranchId == id && (v.Status == VisitStatuses.Queued || v.Status == VisitStatuses.InProgress), ct);
+            .CountAsync(v => v.BranchId == id && (v.Status == VisitStatuses.Queued || v.Status == VisitStatuses.InProgress || v.Status == VisitStatuses.ExaminationConfirmed), ct);
         if (visits > 0)
             blockers.Add(new("Visits", $"Còn {visits} lượt khám đang chờ hoặc đang diễn ra.", visits, $"/reception?branchId={id}"));
 
@@ -448,7 +448,7 @@ public sealed partial class BranchManagementService(DcmsDbContext db, ISettingsA
             blockers.Add(new("Appointments", $"Ghế còn {appointments} lịch hẹn tương lai chưa hủy.", appointments, $"/appointments?branchId={branchId}"));
         var visits = await (from v in db.Set<Visit>().AsNoTracking()
                             join a in db.Set<Appointment>().AsNoTracking() on v.AppointmentId equals a.Id
-                            where v.BranchId == branchId && a.ChairId == chairId && (v.Status == VisitStatuses.Queued || v.Status == VisitStatuses.InProgress)
+                            where v.BranchId == branchId && a.ChairId == chairId && (v.Status == VisitStatuses.Queued || v.Status == VisitStatuses.InProgress || v.Status == VisitStatuses.ExaminationConfirmed)
                             select v.Id).CountAsync(ct);
         if (visits > 0)
             blockers.Add(new("Visits", $"Ghế đang có {visits} lượt khám chờ hoặc đang điều trị.", visits, $"/reception?branchId={branchId}"));

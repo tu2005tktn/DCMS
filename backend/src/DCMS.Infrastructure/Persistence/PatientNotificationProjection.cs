@@ -51,9 +51,14 @@ public sealed partial class DcmsDbContext
                     $"patient-rx:{prescription.Id}:{prescription.Version}", $"/prescriptions/{prescription.Id}"));
             }
 
-        var examinations = ChangeTracker.Entries<VisitExamination>().Where(e => e.Entity.Confirmed &&
+        // A confirmed examination is announced when it becomes confirmed or its confirmed content changes.
+        var trackedVisits = ChangeTracker.Entries<Visit>().ToDictionary(v => v.Entity.Id);
+        bool ConfirmedNow(Guid id) => trackedVisits.TryGetValue(id, out var v) && VisitStatuses.HasConfirmedExamination.Contains(v.Entity.Status);
+        bool ConfirmedBefore(Guid id) => trackedVisits.TryGetValue(id, out var v) && v.State != EntityState.Added
+            && VisitStatuses.HasConfirmedExamination.Contains((string)v.OriginalValues[nameof(Visit.Status)]!);
+        var examinations = ChangeTracker.Entries<VisitExamination>().Where(e => ConfirmedNow(e.Entity.VisitId) &&
             (e.State == EntityState.Added || e.State == EntityState.Modified &&
-                (e.OriginalValues[nameof(VisitExamination.Confirmed)] as bool? != true ||
+                (!ConfirmedBefore(e.Entity.VisitId) ||
                  e.OriginalValues[nameof(VisitExamination.ContentJson)] as string != e.Entity.ContentJson))).ToArray();
         if (examinations.Length > 0)
         {

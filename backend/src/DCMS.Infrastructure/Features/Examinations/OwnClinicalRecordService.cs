@@ -41,7 +41,7 @@ public sealed class OwnClinicalRecordService(DcmsDbContext db, IClinicalDocument
         join e in db.Set<VisitExamination>() on v.Id equals e.VisitId
         join b in db.Set<SchedulingBranch>() on v.BranchId equals b.Id
         join d in db.Employees on v.DentistId equals d.Id
-        where v.PatientId == patientId && e.Confirmed
+        where v.PatientId == patientId && VisitStatuses.HasConfirmedExamination.Contains(v.Status)
         select new OwnVisitRow {
             Id = v.Id, ArrivalAt = v.ArrivalAt, BranchName = b.Name, DentistName = d.FullName, Status = v.Status, ContentJson = e.ContentJson,
             CompletedAt = v.Status == VisitStatuses.Completed
@@ -67,7 +67,7 @@ public sealed class OwnClinicalRecordService(DcmsDbContext db, IClinicalDocument
         public bool HasPrescription { get; init; }
     }
 
-    private static ExaminationContent Content(string json) => JsonSerializer.Deserialize<ExaminationContent>(json, ExaminationService.Json)!;
+    private static ExaminationContent Content(string json) => ExaminationService.WithDerivedDiagnoses(JsonSerializer.Deserialize<ExaminationContent>(json, ExaminationService.Json)!);
 
     private static IReadOnlyList<string> Diagnoses(ExaminationContent c) =>
         c.Diagnoses is { Count: > 0 } list ? list : string.IsNullOrWhiteSpace(c.Diagnosis) ? [] : [c.Diagnosis.Trim()];

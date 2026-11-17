@@ -246,7 +246,7 @@ public sealed class AppointmentChangeApiTests(AppointmentChangeFixture fixture) 
             var row = await db.Appointments.FindAsync(source.AppointmentId);
             var recorder = await db.Users.Where(x => x.UserName == "assistant.demo").Select(x => x.Id).SingleAsync();
             db.Visits.Add(new DCMS.Domain.Features.Visits.Visit { AppointmentId = row!.Id, PatientId = row.PatientId!.Value,
-                BranchId = row.BranchId, DentistId = row.DentistId, ArrivalAt = fixture.Clock.Now, RecordedAt = fixture.Clock.Now, RecordedBy = recorder });
+                BranchId = row.BranchId, DentistId = row.DentistId, ArrivalAt = fixture.Clock.Now, RecordedBy = recorder });
             await db.SaveChangesAsync();
         }
         using var client = await Login(scenario == "customer" ? "guest.demo" : scenario == "other-dentist" ? "owner.demo" : "assistant.demo");

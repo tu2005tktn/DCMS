@@ -54,7 +54,7 @@ public sealed class TreatmentSheetV25Tests(ApiFixture fixture) : IClassFixture<A
                 AttendeeName = patient.FullName, StartAt = start, EndAt = start.AddHours(1), CreatedAt = start };
             db.Add(appointment);
             var visit = new Visit { AppointmentId = id, PatientId = patient.Id, BranchId = branch.Id, DentistId = staff.Id,
-                Status = "InProgress", Purpose = AttendancePurposes.TreatmentContinuation, ArrivalAt = start, RecordedAt = start, RecordedBy = staff.AccountId };
+                Status = "InProgress", Purpose = AttendancePurposes.TreatmentContinuation, ArrivalAt = start, RecordedBy = staff.AccountId };
             db.Add(visit); visits.Add(visit.Id);
         }
         await db.SaveChangesAsync(); return new(patient.Id, branch.Id, staff.Id, service.Id, visits.ToArray());
@@ -255,15 +255,18 @@ public sealed class TreatmentSheetV25Tests(ApiFixture fixture) : IClassFixture<A
         using var c = await Login(); var s = await Prepare();
         using var scope = fixture.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
         var actorId = await db.Employees.Where(e => e.Id == s.Dentist).Select(e => e.AccountId).SingleAsync();
-        var examination = new DCMS.Domain.Features.Examinations.VisitExamination { VisitId = s.Visits[0], Confirmed = true,
+        var examination = new DCMS.Domain.Features.Examinations.VisitExamination { VisitId = s.Visits[0],
             UpdatedBy = actorId, UpdatedAt = DateTimeOffset.UtcNow,
             ContentJson = "{\"diagnosis\":\"SYNTHETIC original\"}" };
+        var sourceVisit = await db.Visits.SingleAsync(v => v.Id == s.Visits[0]);
+        sourceVisit.Status = DCMS.Domain.Features.Visits.VisitStatuses.ExaminationConfirmed;
         db.Add(examination); await db.SaveChangesAsync();
+        var sourceVersion = sourceVisit.Version; // Saving the examination raises the shared visit Version.
         var response = await c.PostAsJsonAsync($"/api/patients/{s.Patient}/dossiers",
-            new CreateDossierRequest(s.Branch, s.Dentist, "SYNTHETIC", null, null, Guid.NewGuid(), s.Visits[0], 1));
+            new CreateDossierRequest(s.Branch, s.Dentist, "SYNTHETIC", null, null, Guid.NewGuid(), s.Visits[0], sourceVersion));
         Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
         var dossier = (await response.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
-        Assert.Equal(s.Visits[0], dossier.SourceExaminationId); Assert.Equal(1, dossier.SourceExaminationVersion);
+        Assert.Equal(s.Visits[0], dossier.SourceExaminationId); Assert.Equal(sourceVersion, dossier.SourceExaminationVersion);
         examination.ContentJson = "{\"diagnosis\":\"SYNTHETIC changed\"}"; await db.SaveChangesAsync();
         var read = (await c.GetFromJsonAsync<TreatmentDossierDto>($"/api/dossiers/{dossier.Id}"))!;
         Assert.Contains("SYNTHETIC original", Assert.Single(read.Timeline, e => e.Kind == "ExaminationSourceCaptured").PayloadJson);

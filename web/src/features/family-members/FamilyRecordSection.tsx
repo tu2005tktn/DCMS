@@ -13,7 +13,7 @@ type Prescription = { id: string; finalizedAt: string | null; diagnosis: string 
 type RecordDocument = { id: string; fileName: string; documentType: string; sourceDate: string; sizeBytes: number };
 type Booking = { code: string; startAt: string; status: string; branchName: string; dentistName: string };
 const progressLabels: Record<string, string> = { NotStarted: 'Chưa thực hiện', InProgress: 'Đang thực hiện', Completed: 'Đã hoàn thành', Partial: 'Một phần', Cancelled: 'Đã hủy', Stopped: 'Đã dừng' };
-const appointmentLabels: Record<string, string> = { Confirmed: 'Đã đặt', CheckedIn: 'Đã đến khám', Queued: 'Chờ khám', InProgress: 'Đang khám', Completed: 'Đã hoàn thành', Cancelled: 'Đã hủy', NoShow: 'Không đến' };
+const appointmentLabels: Record<string, string> = { Confirmed: 'Đã đặt', CheckedIn: 'Đã đến khám', Queued: 'Chờ khám', ExaminationConfirmed: 'Đã xác nhận phiếu khám', InProgress: 'Đang khám', Completed: 'Đã hoàn thành', Cancelled: 'Đã hủy', NoShow: 'Không đến' };
 const meals: Record<string, string> = { BeforeMeal: 'Trước ăn', AfterMeal: 'Sau ăn', WithMeal: 'Cùng bữa ăn' };
 
 export default function FamilyRecordSection({ memberId, section, denied }: { memberId: string; section: string; denied: () => void }) {

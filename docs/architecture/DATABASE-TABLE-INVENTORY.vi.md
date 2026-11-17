@@ -5,7 +5,7 @@ Riêng tài khoản và phân quyền chỉ có `USER_ACCOUNT` và `ACCESS_GROUP
 
 Chi nhánh, lịch làm việc và lịch hẹn đã gộp về ba bảng `SCHEDULING_BRANCH`, `WORKING_SCHEDULE`, `APPOINTMENT`, dùng chung danh mục dịch vụ điều trị hiện có. Xem [hợp đồng lưu trữ và kiểm chứng](../specs/SCHEDULING-STORAGE-REVIEW.vi.md). Danh sách dưới đây phản ánh schema đã áp dụng.
 
-Phần khám đã gộp về `VISIT` và `CLINICAL_DOCUMENT`. Phiếu khám và chỉ định nằm trong lượt khám, các lần đọc tài liệu nằm trong tài liệu. Snapshot bảng tham chiếu cũ nằm trong audit chuyển đổi dùng chung. Xem [thiết kế và kiểm chứng hai bảng khám](../specs/EXAMINATION-TWO-TABLES.vi.md). Ngày 17/11/2026 thêm cột JSONB `AiAnalyses` vào `CLINICAL_DOCUMENT` cho [AI hỗ trợ phát hiện sâu răng](../specs/AI-CARIES-DETECTION.vi.md), không thêm bảng.
+Phần khám đã gộp về `VISIT` và `CLINICAL_DOCUMENT`. Phiếu khám và chỉ định nằm trong lượt khám, các lần đọc tài liệu nằm trong tài liệu. Snapshot bảng tham chiếu cũ nằm trong audit chuyển đổi dùng chung. Xem [thiết kế và kiểm chứng hai bảng khám](../specs/EXAMINATION-TWO-TABLES.vi.md). Ngày 17/11/2026 thêm cột JSONB `AiAnalyses` vào `CLINICAL_DOCUMENT` cho [AI hỗ trợ phát hiện sâu răng](../specs/AI-CARIES-DETECTION.vi.md), không thêm bảng. Cùng ngày rút gọn `VISIT` từ 32 xuống 16 cột; xem [rút gọn bảng VISIT](../specs/VISIT-TABLE-SIMPLIFICATION.vi.md).
 
 Phần điều trị đã gộp về `TREATMENT_DOSSIER`, `TREATMENT_PLAN_ITEM`, `CLINICAL_ACTIVITY` và `TREATMENT_TEMPLATE`. Bản nháp nằm trong phiếu, các bước nằm trong hạng mục, hạng mục và phiên bản mẫu nằm trong mẫu; đánh giá, ghi chú và hướng dẫn tái khám dùng chung bảng quá trình. Sự kiện điều trị và tiến độ nằm trong `AUDIT_LOG`. Xem [thiết kế và kiểm chứng bốn bảng điều trị](../specs/TREATMENT-FOUR-TABLES.vi.md).
 
@@ -29,7 +29,7 @@ Thông báo chỉ còn `IN_APP_NOTIFICATION`; lượt gửi và việc nhân vi�
 | `APPOINTMENT` | Lịch hẹn và giữ chỗ dùng chung dòng; gồm người đặt/người khám, nhân sự, ghế, dịch vụ, thời gian, trạng thái, yêu cầu hỗ trợ và kế hoạch nhắc lịch. |
 | `IN_APP_NOTIFICATION` | Thông báo cho tài khoản, sự kiện chờ gửi của lịch hẹn, từng lượt gửi theo kênh (trạng thái, số lần thử, lỗi) và việc nhân viên cần xử lý khi gửi thất bại; phân biệt bằng loại dòng. |
 | `PUSH_DEVICE` | Token Firebase của thiết bị di động theo tài khoản và nền tảng, dùng để gửi push thông báo; token là duy nhất. |
-| `VISIT` | Lượt đến khám, tiếp nhận, bác sĩ phụ trách, trạng thái, nội dung khám và kết luận; các chỉ định, kết quả và snapshot báo giá trong JSONB. |
+| `VISIT` | Lượt đến khám: lịch hẹn, bệnh nhân, chi nhánh, bác sĩ, người tiếp nhận, giờ đến, mục đích, trạng thái (gồm "đã xác nhận phiếu khám"), phiên bản; nội dung phiếu khám và các chỉ định trong JSONB. |
 | `CLINICAL_DOCUMENT` | Metadata tài liệu lâm sàng, liên kết tệp và trạng thái xử lý; các lần bác sĩ đọc tài liệu theo lượt khám trong JSONB `Reviews`; các lần AI phân tích phim X-quang (bảng logic `AI_ANALYSIS`) trong JSONB `AiAnalyses`. |
 | `PRESCRIPTION` | Đơn thuốc, mẫu đơn và phiên bản đơn; danh sách thuốc nằm trong JSONB. |
 | `CATALOG_MEDICINE` | Danh mục thuốc dùng chung, đơn vị và thông tin kê đơn. |

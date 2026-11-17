@@ -89,7 +89,7 @@ public sealed class ReceptionApiTests(ReceptionFixture fixture) : IClassFixture<
             ChairId = a.ChairId, ServiceId = service.Id, Start = a.StartAt, End = a.EndAt, AttendeeKey = linked ? $"patient:{patient.Id}" : null, AttendeeLabel = patient.FullName });
         db.Add(a); await db.SaveChangesAsync(); return new(branch.Id, dentist.Id, assistant.Id, a.ChairId, service.Id, patient.Id, a.Id);
     }
-    private static CheckInRequest Command(Setup s) => new(s.PatientId, 1, Guid.NewGuid(), true, null, null, "InitialExamination", null, null);
+    private static CheckInRequest Command(Setup s) => new(s.PatientId, 1, Guid.NewGuid(), true, null, null, "InitialExamination", null);
     private static string Path(Setup s) => $"/api/reception/appointments/{s.AppointmentId}/check-in";
     internal async Task<VisitResult> Check(HttpClient client, Setup s, CheckInRequest? request = null)
     {
@@ -109,7 +109,7 @@ public sealed class ReceptionApiTests(ReceptionFixture fixture) : IClassFixture<
         using var scope = fixture.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
         var patientsBefore = await db.Patients.CountAsync(); var linksBefore = await db.PatientAccountLinks.CountAsync();
         var v = await Check(client, s); Assert.Equal("Queued", v.Status); Assert.Equal("CheckedIn", v.AppointmentStatus); Assert.Equal(s.PatientId, v.PatientId);
-        Assert.Equal(fixture.Clock.Now, v.ArrivalAt); Assert.Equal(v.ArrivalAt, v.RecordedAt);
+        Assert.Equal(fixture.Clock.Now, v.ArrivalAt);
         using var dentist = await Login("dentist.demo"); var read = await dentist.GetFromJsonAsync<VisitResult>($"/api/visits/{v.VisitId}");
         Assert.Equal(v.VisitId, read!.VisitId); Assert.Equal(s.AppointmentId, read.AppointmentId);
         var queue = await dentist.GetFromJsonAsync<ReceptionPage<VisitResult>>($"/api/reception/queue?branchId={s.BranchId}&date={Today:yyyy-MM-dd}");
@@ -165,18 +165,12 @@ public sealed class ReceptionApiTests(ReceptionFixture fixture) : IClassFixture<
         (await db.Patients.SingleAsync(x => x.Id == s.PatientId)).IsArchived = true; await db.SaveChangesAsync();
         await Error(await client.PostAsJsonAsync(Path(s), Command(s)), HttpStatusCode.Conflict, "MSG202"); Assert.Equal(0, await db.Visits.CountAsync(x => x.AppointmentId == s.AppointmentId));
     }
-    [Fact] public async Task OptionalSourceDoesNotBlockArrivalButForgedCourseIsNotAccepted()
-    {
-        var s = await Prepare(); using var client = await Login(); var command = Command(s) with { Purpose = "TreatmentContinuation" };
-        var courses = await client.GetFromJsonAsync<ReceptionCourse[]>($"/api/reception/appointments/{s.AppointmentId}/courses?patientId={s.PatientId}"); Assert.Empty(courses!);
-        await Error(await client.PostAsJsonAsync(Path(s), command with { PriorCourseId = Guid.NewGuid() }), HttpStatusCode.NotFound, "MSG113");
-        var v = await Check(client, s, command); Assert.True(v.RequiresClinicalSourceReview); Assert.Null(v.Source);
-    }
     [Fact] public async Task AppointmentFollowUpSourceIsCarriedByServer()
     {
         var s = await Prepare(); var source = Guid.NewGuid(); using var client = await Login();
         using (var scope = fixture.Services.CreateScope()) { var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>(); (await db.Appointments.SingleAsync(x => x.Id == s.AppointmentId)).FollowUpId = source; await db.SaveChangesAsync(); }
-        var v = await Check(client, s, Command(s) with { Purpose = "TreatmentContinuation" }); Assert.Equal(source, v.Source!.FollowUpId);
+        var v = await Check(client, s, Command(s) with { Purpose = "TreatmentContinuation" });
+        using (var scope = fixture.Services.CreateScope()) { var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>(); var audit = await db.Set<VisitAudit>().SingleAsync(x => x.VisitId == v.VisitId && x.Action == "CheckIn"); Assert.Contains(source.ToString(), audit.AfterJson); }
     }
     [Fact] public async Task BackdatingRequiresExplicitCurrentGrantAndReason()
     {
@@ -187,7 +181,7 @@ public sealed class ReceptionApiTests(ReceptionFixture fixture) : IClassFixture<
         try {
             await Error(await client.PostAsJsonAsync(Path(s), command with { ArrivalReason = null }), HttpStatusCode.BadRequest);
             await Error(await client.PostAsJsonAsync(Path(s), command with { ArrivalAt = fixture.Clock.Now.AddSeconds(1) }), HttpStatusCode.BadRequest);
-            var v = await Check(client, s, command); Assert.Equal(arrival, v.ArrivalAt); Assert.Equal(fixture.Clock.Now, v.RecordedAt);
+            var v = await Check(client, s, command); Assert.Equal(arrival, v.ArrivalAt);
         } finally { using var scope = fixture.Services.CreateScope(); var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>(); await users.RemoveClaimAsync((await users.FindByNameAsync("assistant.demo"))!, new Claim("permission", "reception.backdate")); }
     }
     [Theory] [InlineData("guest.demo")] [InlineData("admin.demo")] [InlineData("dentist.demo")] [InlineData("owner.demo")]
@@ -268,13 +262,6 @@ public sealed class ReceptionApiTests(ReceptionFixture fixture) : IClassFixture<
         await Check(client, s);
     }
 
-    [Fact] public async Task CourseLookupRejectsAnotherPatientBeforeCallingAnUnavailableAdapter()
-    {
-        var s = await Prepare(false); using var client = await Login(); int other;
-        using (var scope = fixture.Services.CreateScope()) { var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>(); other = await db.Patients.Where(x => x.Id != s.PatientId).Select(x => x.Id).FirstAsync(); }
-        await Error(await client.GetAsync($"/api/reception/appointments/{s.AppointmentId}/courses?patientId={other}"), HttpStatusCode.Conflict, "MSG43");
-    }
-
     [Fact] public async Task LegacyMigrationAdoptsExistingVisitAndHistoryAndSupportsNewCheckInAndRollback()
     {
         await using var legacy = new ReceptionFixture(); await legacy.InitializeAsync();
@@ -313,8 +300,8 @@ public sealed class ReceptionApiTests(ReceptionFixture fixture) : IClassFixture<
         await db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO \"CLINICAL_SOURCE_REFERENCE\" VALUES ({source},{s.PatientId},{s.BranchId},'Legacy course','Needs clinical review')");
         await db.Database.MigrateAsync();
         var adopted = await client.GetFromJsonAsync<VisitResult>($"/api/visits/{original.VisitId}");
-        Assert.Equal(original.VisitId, adopted!.VisitId); Assert.Equal(original.ArrivalAt, adopted.ArrivalAt); Assert.Equal(original.RecordedAt, adopted.RecordedAt);
-        Assert.Equal(source, adopted.Source!.PriorCourseId); Assert.Equal("Needs clinical review", adopted.Source.Blocker); Assert.Equal("Legacy concern", adopted.Note);
+        Assert.Equal(original.VisitId, adopted!.VisitId); Assert.Equal(original.ArrivalAt, adopted.ArrivalAt);
+        Assert.Equal("Legacy concern", adopted.Note);
         Assert.Equal(original.VisitId, (await Check(client, s, command)).VisitId);
         Assert.Equal(1, await db.Set<VisitAudit>().CountAsync(x => x.VisitId == original.VisitId));
         var a = await db.Appointments.AsNoTracking().SingleAsync(x => x.Id == s.AppointmentId);

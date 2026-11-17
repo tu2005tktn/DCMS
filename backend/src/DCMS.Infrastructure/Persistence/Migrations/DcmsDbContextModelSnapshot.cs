@@ -654,27 +654,23 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("Id");
 
-                    b.Property<bool>("Confirmed")
-                        .HasColumnType("boolean")
-                        .HasColumnName("ExaminationConfirmed");
-
                     b.Property<string>("ContentJson")
                         .IsRequired()
                         .HasColumnType("jsonb")
                         .HasColumnName("ExaminationContentJson");
 
-                    b.Property<Guid>("StorageStamp")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("uuid");
-
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("ExaminationUpdatedAt");
+                        .HasColumnName("UpdatedAt");
 
                     b.Property<int>("UpdatedBy")
                         .HasColumnType("integer")
-                        .HasColumnName("ExaminationUpdatedBy");
+                        .HasColumnName("UpdatedBy");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnUpdateSometimes()
+                        .HasColumnType("integer");
 
                     b.HasKey("VisitId");
 
@@ -3161,29 +3157,17 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)");
 
-                    b.Property<DateTimeOffset>("RecordedAt")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<int>("RecordedBy")
                         .HasColumnType("integer");
-
-                    b.Property<bool>("RequiresClinicalSourceReview")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("SourceJson")
-                        .HasColumnType("jsonb");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(24)
                         .HasColumnType("character varying(24)");
 
-                    b.Property<Guid>("StorageStamp")
+                    b.Property<int>("Version")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("Version")
                         .HasColumnType("integer");
 
                     b.ComplexCollection(typeof(List<Dictionary<string, object>>), "Investigations", "DCMS.Domain.Features.Visits.Visit.Investigations#InvestigationOrder", b1 =>
@@ -3287,11 +3271,9 @@ namespace DCMS.Infrastructure.Persistence.Migrations
 
                     b.ToTable("VISIT", null, t =>
                         {
-                            t.HasCheckConstraint("CK_VISIT_Arrival", "\"ArrivalAt\" <= \"RecordedAt\"");
-
                             t.HasCheckConstraint("CK_VISIT_Purpose", "\"Purpose\" IN ('InitialExamination','TreatmentContinuation','PostoperativeOrWarrantyReview','PeriodicOrNewProblem')");
 
-                            t.HasCheckConstraint("CK_VISIT_Status", "\"Status\" IN ('Queued','InProgress','Completed','Cancelled')");
+                            t.HasCheckConstraint("CK_VISIT_Status", "\"Status\" IN ('Queued','InProgress','ExaminationConfirmed','Completed','Cancelled')");
                         });
                 });
 

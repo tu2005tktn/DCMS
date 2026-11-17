@@ -14,10 +14,9 @@ internal static class ExaminationModel
             b.ToTable("VISIT"); b.HasKey(x => x.VisitId);
             b.Property(x => x.VisitId).HasColumnName("Id");
             b.Property(x => x.ContentJson).HasColumnName("ExaminationContentJson").HasColumnType("jsonb");
-            b.Property(x => x.Confirmed).HasColumnName("ExaminationConfirmed");
-            b.Property(x => x.UpdatedBy).HasColumnName("ExaminationUpdatedBy");
-            b.Property(x => x.UpdatedAt).HasColumnName("ExaminationUpdatedAt");
-            b.Property<Guid>("StorageStamp").IsConcurrencyToken();
+            b.Property(x => x.UpdatedBy).HasColumnName("UpdatedBy");
+            b.Property(x => x.UpdatedAt).HasColumnName("UpdatedAt");
+            b.Property<int>("Version").IsConcurrencyToken();
             b.HasOne<Visit>().WithOne().HasForeignKey<VisitExamination>(x => x.VisitId).OnDelete(DeleteBehavior.Restrict);
             b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.UpdatedBy).OnDelete(DeleteBehavior.Restrict);
         });

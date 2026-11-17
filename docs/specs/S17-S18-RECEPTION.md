@@ -192,3 +192,7 @@ Bộ lọc, tab và bảng của trang Tiếp nhận không còn nằm trong m�
 Trang Tiếp nhận dùng toàn bộ bề rộng vùng nội dung (bỏ giới hạn 1680px, lề ngoài còn 12px, tiêu đề và khoảng cách dọc thu gọn) để bảng chiếm hết màn hình.
 
 Trang tiếp nhận bệnh nhân (check-in): tiêu đề bên trái, nút "Về danh sách tiếp nhận" (có mũi tên) nằm cùng hàng ở góc phải.
+
+## Bỏ chọn đợt điều trị cũ khi tiếp nhận (17/11/2026)
+
+Theo [rút gọn bảng VISIT](VISIT-TABLE-SIMPLIFICATION.vi.md), check-in không còn trường "Đợt điều trị cũ (nếu có)" và không còn cờ "cần bác sĩ xác nhận nguồn". Bỏ `priorCourseId` khỏi request check-in, bỏ `source`, `requiresClinicalSourceReview`, `recordedAt` khỏi `VisitResult` và bỏ `GET /api/reception/appointments/{appointmentId}/courses`. Lượt "Tiếp tục điều trị" mở tab Điều trị của bệnh nhân để bác sĩ chọn hồ sơ. Hàng chờ hiển thị thêm trạng thái lượt "Đã xác nhận phiếu khám".
