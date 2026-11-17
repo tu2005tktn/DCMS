@@ -1,7 +1,6 @@
 # Danh sách bảng sau rút gọn
 
 Cập nhật ngày 13/11/2026. Schema đã áp dụng có 32 bảng trong model EF và 33 bảng vật lý trong schema `public`. Bảng ngoài model là `__EFMigrationsHistory`. Các schema `dcms_test_*` là môi trường kiểm thử tách biệt.
-
 Riêng tài khoản và phân quyền chỉ có `USER_ACCOUNT` và `ACCESS_GROUP`. Riêng đơn thuốc và danh mục thuốc chỉ có `PRESCRIPTION` và `CATALOG_MEDICINE`. Nhật ký và kết quả chống ghi trùng dùng hai kho chung cho toàn hệ thống.
 
 Chi nhánh, lịch làm việc và lịch hẹn đã gộp về ba bảng `SCHEDULING_BRANCH`, `WORKING_SCHEDULE`, `APPOINTMENT`, dùng chung danh mục dịch vụ điều trị hiện có. Xem [hợp đồng lưu trữ và kiểm chứng](../specs/SCHEDULING-STORAGE-REVIEW.vi.md). Danh sách dưới đây phản ánh schema đã áp dụng.
