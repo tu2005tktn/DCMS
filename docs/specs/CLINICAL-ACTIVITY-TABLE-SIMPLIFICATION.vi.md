@@ -77,3 +77,7 @@ Công việc chăm sóc từng cho phép tham chiếu một đánh giá lâm sà
 `FollowUpInstruction` (hướng dẫn tái khám) chưa bị xóa: nó gắn với `APPOINTMENT.FollowUpId`, luồng đặt lịch tiếp theo (`NextVisitBookingDrawer`), tiếp nhận, thông báo, công việc chăm sóc và quét đến hạn điều trị. Đây là thay đổi lớn hơn hẳn và trùng các file lịch hẹn đang được rút gọn song song, nên cần quyết định riêng.
 
 Migration: `SimplifyClinicalActivityTable` (giai đoạn 1) và `RemoveClinicalReviewsAndCareNotes` (giai đoạn 2).
+
+## Giai đoạn 3: chỉ còn hoạt động điều trị (đang chờ triển khai)
+
+Người dùng yêu cầu xóa hướng dẫn tái khám và chỉ giữ các cột của hoạt động điều trị; lịch hẹn tiếp theo tạo thẳng từ hạng mục kế hoạch. Bảng sẽ giảm từ **50 xuống 31 cột**. Thiết kế chi tiết: [FOLLOW-UP-INSTRUCTION-REMOVAL.vi.md](FOLLOW-UP-INSTRUCTION-REMOVAL.vi.md). Mục "Chưa làm" của giai đoạn 2 được thay bằng spec này.
