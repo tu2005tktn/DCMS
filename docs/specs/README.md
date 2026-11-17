@@ -38,6 +38,10 @@ Khám có phiếu và lịch sử riêng. Tiền sử, Dị ứng, Thuốc đang
 
 [Hợp đồng Khám S19/S20](S19-S20-DCMS-112.md) giữ quy tắc lỗi hoàn tất: chỉ rõ mục thiếu ngay cạnh nút hoàn tất, giữ bản nhập/tab Tổng kết và chỉ mở tab khác khi bấm Bổ sung. Khám không có bất thường vẫn ghi kết quả răng/vùng/toàn hàm theo thực tế. Ô Kết quả khám tổng quát lưu kết quả vùng Toàn hàm theo [bổ sung odontogram 2D/3D](S19-ODONTOGRAM-2D-3D.vi.md).
 
+## Giao diện nhân viên
+
+Bổ sung 16/11/2026: [Giao diện khung nhân viên — đổi kiểu hiển thị](STAFF-WEB-UI-LAYOUT.vi.md) — chỉ đổi màu sắc/kiểu dáng (sidebar sáng, header, card), giữ nguyên mọi thành phần và chức năng; kiểu bảng giữ theo [TABLE-STYLE](TABLE-STYLE.md).
+
 ## Cách sử dụng và thứ tự đối chiếu
 
 Đọc cặp Word cùng nhau: UC/GBR/MSG quy định hành vi, Screen quy định trường/thao tác. Tra theo mã thay vì số trang. Các quyết định riêng đã chốt tiếp tục phải được đối chiếu rõ ràng:

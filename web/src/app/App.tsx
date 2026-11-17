@@ -36,9 +36,6 @@ import CustomerAppointmentDetailPage from '../features/customer-appointments/Cus
 import CustomerTreatmentRecordsPage from '../features/customer-treatment/CustomerTreatmentRecordsPage';
 import CommercialTreatmentPage from '../features/treatment/CommercialTreatmentPage';
 
-import DossierPage from '../features/treatment/DossierPage';
-import PlanPage from '../features/treatment/PlanPage';
-import RevisionPage from '../features/treatment/RevisionPage';
 import ItemPlansPage from '../features/treatment/ItemPlansPage';
 import CustomerPrescriptionsPage, { CustomerPrescriptionDetailPage } from '../features/customer-prescriptions/CustomerPrescriptionsPage';
 

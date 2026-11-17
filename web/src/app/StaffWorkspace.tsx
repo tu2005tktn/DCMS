@@ -59,7 +59,7 @@ export default function StaffWorkspace() {
     <span><strong>DCMS</strong><small>Quản lý phòng khám</small></span>
   </Link>;
   const navigation = <><div className="staff-brand-wrap">{brand}</div>
-    <nav aria-label="Chức năng nhân viên" className="staff-navigation"><Menu mode="inline" theme="dark" selectedKeys={[selected]} items={items} onClick={()=>setMobileOpen(false)} /></nav>
+    <nav aria-label="Chức năng nhân viên" className="staff-navigation"><Menu mode="inline" theme="light" selectedKeys={[selected]} items={items} onClick={()=>setMobileOpen(false)} /></nav>
     <Link to="/" aria-label="Tài khoản của tôi" className={`staff-account-link${selected==='/'?' is-current':''}`} onClick={()=>setMobileOpen(false)}><UserOutlined aria-hidden="true" /> Tài khoản của tôi</Link></>;
   return <Layout className={`workspace staff-workspace${collapsed ? " is-collapsed" : ""}`}>
     <a className="staff-skip" href="#staff-content">Đến nội dung chính</a>
