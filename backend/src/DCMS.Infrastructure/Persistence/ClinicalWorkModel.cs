@@ -25,7 +25,6 @@ internal static class ClinicalWorkModel
             b.Property(x => x.ChargingBasisEvidence).HasMaxLength(1000);
             b.Property(x => x.State).HasMaxLength(16);
             b.Property(x => x.FeeStatus).HasMaxLength(24).HasDefaultValue("Unavailable");
-            b.Property(x => x.Version).IsConcurrencyToken(false);
         });
         model.Entity<ClinicalCommandReceipt>(b =>
         {

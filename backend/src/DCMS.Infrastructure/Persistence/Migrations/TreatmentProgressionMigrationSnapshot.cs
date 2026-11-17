@@ -76,47 +76,6 @@ internal static class TreatmentProgressionMigrationSnapshot
             b.HasOne<TreatmentItem>().WithMany().HasForeignKey(x => x.ItemId).OnDelete(DeleteBehavior.Restrict);
             b.ToTable(t => t.HasCheckConstraint("CK_STEP_DURATION", "\"EstimatedMinutes\" > 0 AND \"ReservedMinutes\" BETWEEN 15 AND 480 AND \"ReservedMinutes\" % 15 = 0 AND \"ReservedMinutes\" >= \"EstimatedMinutes\""));
         });
-        model.Entity<FollowUpInstruction>(b =>
-        {
-            b.ToTable("FOLLOW_UP_INSTRUCTION"); b.HasKey(x => x.Id);
-            b.HasIndex(x => new { x.PatientId, x.Status });
-            b.HasIndex(x => new { x.StepId, x.SourceCompletionEventId }).IsUnique()
-                .HasDatabaseName("IX_FOLLOW_UP_INSTRUCTION_Step_Completion")
-                .HasFilter("\"StepId\" IS NOT NULL AND \"SourceCompletionEventId\" IS NOT NULL");
-            b.HasIndex(x => x.ActiveAppointmentId).IsUnique().HasFilter("\"ActiveAppointmentId\" IS NOT NULL");
-            b.Property(x => x.Id).HasColumnType("uuid");
-            b.Property(x => x.PatientId).HasColumnType("integer");
-            b.Property(x => x.BranchId).HasColumnType("integer");
-            b.Property(x => x.DossierId).HasColumnType("uuid");
-            b.Property(x => x.ItemId).HasColumnType("uuid");
-            b.Property(x => x.StepId).HasColumnType("uuid");
-            b.Property(x => x.PlanVersion).HasColumnType("integer");
-            b.Property(x => x.SourceVisitId).HasColumnType("uuid");
-            b.Property(x => x.SourceActivityId).HasColumnType("uuid");
-            b.Property(x => x.SourceCompletionEventId).HasColumnType("uuid");
-            b.Property(x => x.Purpose).IsRequired().HasMaxLength(40).HasColumnType("character varying(40)");
-            b.Property(x => x.Reason).IsRequired().HasMaxLength(2000).HasColumnType("character varying(2000)");
-            b.Property(x => x.Guidance).HasMaxLength(4000).HasColumnType("character varying(4000)");
-            b.Property(x => x.EarliestOn).HasColumnType("date");
-            b.Property(x => x.TargetOn).HasColumnType("date");
-            b.Property(x => x.LatestOn).HasColumnType("date");
-            b.Property(x => x.DurationMinutes).HasColumnType("integer");
-            b.Property(x => x.DentistId).HasColumnType("integer");
-            b.Property(x => x.Capability).HasMaxLength(160).HasColumnType("character varying(160)");
-            b.Property(x => x.Status).IsRequired().HasMaxLength(20).HasColumnType("character varying(20)");
-            b.Property(x => x.ActiveAppointmentId).HasColumnType("uuid");
-            b.Property(x => x.Version).HasColumnType("integer").IsConcurrencyToken();
-            b.Property(x => x.CreatedBy).HasColumnType("integer");
-            b.Property(x => x.CreatedAt).HasColumnType("timestamp with time zone");
-            b.Property(x => x.UpdatedAt).HasColumnType("timestamp with time zone");
-            b.HasOne("DCMS.Domain.Features.Patients.PatientProfile", null).WithMany()
-                .HasForeignKey("PatientId").OnDelete(DeleteBehavior.Restrict);
-            b.ToTable(t =>
-            {
-                t.HasCheckConstraint("CK_FOLLOW_UP_WINDOW", "\"EarliestOn\" <= \"TargetOn\" AND \"TargetOn\" <= \"LatestOn\"");
-                t.HasCheckConstraint("CK_FOLLOW_UP_DURATION", "\"DurationMinutes\" BETWEEN 15 AND 480 AND \"DurationMinutes\" % 15 = 0");
-            });
-        });
         model.Entity<TreatmentProgressionReceipt>(b =>
         {
             b.ToTable("TREATMENT_PROGRESSION_RECEIPT"); b.HasKey(x => x.RequestKey);

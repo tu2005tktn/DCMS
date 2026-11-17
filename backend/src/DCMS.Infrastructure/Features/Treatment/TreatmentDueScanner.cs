@@ -17,23 +17,7 @@ public sealed class TreatmentDueScanner(DcmsDbContext db, ITreatmentLabReadiness
         var today = DateOnly.FromDateTime(clock.GetUtcNow().ToOffset(TimeSpan.FromHours(7)).DateTime);
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
         await db.Database.ExecuteSqlRawAsync($"SELECT pg_advisory_xact_lock({DCMS.Infrastructure.Features.Scheduling.WorkingScheduleService.TransactionLock})", ct);
-        var due = await db.FollowUpInstructions.AsNoTracking().Where(x => x.Status == "NeedsBooking"
-            && x.TargetOn <= today).ToListAsync(ct);
         var inserted = 0;
-        foreach (var instruction in due)
-        {
-            // A version can change without changing the clinical return window (for example booking/cancel).
-            var stable = $"followup-due:{instruction.Id}:{instruction.EarliestOn:yyyyMMdd}:{instruction.TargetOn:yyyyMMdd}:{instruction.LatestOn:yyyyMMdd}";
-            if (await db.TreatmentProgressionEvents.AnyAsync(x => x.StableKey == stable, ct)) continue;
-            db.TreatmentProgressionEvents.Add(new TreatmentProgressionEvent
-            {
-                AggregateId = instruction.Id, Kind = "followup.due", StableKey = stable,
-                ActorId = 0, OccurredAt = clock.GetUtcNow(),
-                PayloadJson = JsonSerializer.Serialize(new { instruction.Id, instruction.PatientId,
-                    instruction.BranchId, instruction.TargetOn, instruction.LatestOn, instruction.Version })
-            });
-            inserted++;
-        }
         var patients = await db.TreatmentDossiers.AsNoTracking().Where(x => x.State == "Open"
             && x.PlanState == "Committed")
             .ToDictionaryAsync(x => x.Id, x => x.PatientId, ct);

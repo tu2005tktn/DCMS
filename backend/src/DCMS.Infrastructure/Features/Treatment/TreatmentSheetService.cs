@@ -179,20 +179,10 @@ public sealed partial class TreatmentDossierService
     {
         var previousVersion = dossier.PlanVersion - 1;
         var steps = await db.LoadTreatmentStepsAsync(db.TreatmentSteps.Where(x => x.DossierId == dossier.Id && x.PlanVersion == previousVersion), ct);
-        var instructions = await db.FollowUpInstructions.Where(x => x.DossierId == dossier.Id && x.PlanVersion == previousVersion
-            && (x.Status == "NeedsBooking" || x.Status == "Booked")).ToListAsync(ct);
         foreach (var step in steps) { step.PlanVersion = dossier.PlanVersion; step.Version++; }
-        foreach (var instruction in instructions)
-        {
-            instruction.PlanVersion = dossier.PlanVersion; instruction.Version++; instruction.UpdatedAt = clock.GetUtcNow();
-            db.TreatmentProgressionEvents.Add(new TreatmentProgressionEvent { AggregateId = instruction.Id, ActorId = actorId,
-                Kind = "followup.plan-version-carried", StableKey = $"followup-plan:{instruction.Id}:{dossier.PlanVersion}",
-                OccurredAt = clock.GetUtcNow(), PayloadJson = JsonSerializer.Serialize(new { instruction.Id,
-                    previousVersion, dossier.PlanVersion, instruction.Version, instruction.ActiveAppointmentId }, Json) });
-        }
-        if (steps.Count + instructions.Count > 0)
+        if (steps.Count > 0)
             Event(dossier, actorId, "PlanReferencesCarriedForward", new { previousVersion, dossier.PlanVersion,
-                Steps = steps.Select(x => x.Id), Instructions = instructions.Select(x => x.Id) });
+                Steps = steps.Select(x => x.Id) });
     }
 
     public Task<TreatmentChange> ConfirmSheetPlanAsync(int actorId, Guid dossierId, Guid rowId,

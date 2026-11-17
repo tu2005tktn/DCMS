@@ -20,8 +20,7 @@ public sealed class CareTaskIngestionService(DcmsDbContext db, ITreatmentLabRead
         for (var offset = 0; ; offset += 500)
         {
             var events = await db.TreatmentProgressionEvents.AsNoTracking().Where(x =>
-                x.StableKey != null && (x.Kind == "followup.due" ||
-                    x.Kind == "step.prerequisite_blocked" || x.Kind == "step.lab_blocked"))
+                x.StableKey != null && (x.Kind == "step.prerequisite_blocked" || x.Kind == "step.lab_blocked"))
                 .OrderBy(x => x.OccurredAt).ThenBy(x => x.Id)
                 .Skip(offset).Take(500).ToListAsync(ct);
             if (events.Count == 0) break;
@@ -34,21 +33,8 @@ public sealed class CareTaskIngestionService(DcmsDbContext db, ITreatmentLabRead
             if (!root.TryGetProperty("patientId", out var patient)) continue;
             var patientId = patient.GetInt32();
             int branchId;
-            Guid? instructionId = null;
             string type;
             string content;
-            if (source.Kind == "followup.due")
-            {
-                var instruction = await db.FollowUpInstructions.AsNoTracking()
-                    .SingleOrDefaultAsync(x => x.Id == source.AggregateId, ct);
-                if (instruction == null || instruction.Status != "NeedsBooking" ||
-                    instruction.PatientId != patientId ||
-                    stableKey != $"followup-due:{instruction.Id}:{instruction.EarliestOn:yyyyMMdd}:{instruction.TargetOn:yyyyMMdd}:{instruction.LatestOn:yyyyMMdd}")
-                    continue;
-                branchId = instruction.BranchId; instructionId = instruction.Id;
-                type = "FollowUpDue"; content = "Liên hệ hỗ trợ đặt lịch theo chỉ định đang đến hạn.";
-            }
-            else
             {
                 var step = await db.TreatmentSteps.AsNoTracking()
                     .SingleOrDefaultAsync(x => x.Id == source.AggregateId, ct);
@@ -82,7 +68,7 @@ public sealed class CareTaskIngestionService(DcmsDbContext db, ITreatmentLabRead
             }
             db.CareTasks.Add(new CareTask
             {
-                PatientId = patientId, BranchId = branchId, InstructionId = instructionId,
+                PatientId = patientId, BranchId = branchId,
                 EpisodeKey = stableKey, Type = type, Content = content,
                 DueAt = clock.GetUtcNow(), CreatedBy = 0, CreatedAt = clock.GetUtcNow(),
                 UpdatedAt = clock.GetUtcNow()
@@ -108,7 +94,7 @@ public sealed class CareTaskIngestionService(DcmsDbContext db, ITreatmentLabRead
             db.CareTasks.Add(new CareTask
             {
                 PatientId = appointment.PatientId.Value, BranchId = appointment.BranchId,
-                InstructionId = appointment.FollowUpId, AppointmentId = appointment.Id,
+                AppointmentId = appointment.Id,
                 EpisodeKey = stableKey, Type = "MissedAppointment",
                 Content = "Liên hệ hỗ trợ sau khi bệnh nhân vắng mặt theo lịch hẹn.",
                 DueAt = clock.GetUtcNow(), CreatedBy = 0,

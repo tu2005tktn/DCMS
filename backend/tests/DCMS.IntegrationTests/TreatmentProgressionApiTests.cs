@@ -33,8 +33,6 @@ public sealed class SyntheticActualEvidencePort : ITreatmentActualEvidencePort
 {
     public Task<bool> HasDentistConfirmedActualAsync(int patientId, Guid dossierId, Guid stepId,
         IReadOnlyList<Guid> evidenceIds, CancellationToken ct) => Task.FromResult(evidenceIds.Count > 0);
-    public Task<bool> HasFollowUpFulfillmentAsync(int patientId, Guid instructionId, CancellationToken ct) =>
-        Task.FromResult(false);
 }
 
 public sealed class TreatmentProgressionApiTests(ProgressionFixture fixture) : IClassFixture<ProgressionFixture>
@@ -78,7 +76,7 @@ public sealed class TreatmentProgressionApiTests(ProgressionFixture fixture) : I
             1, 3, 5, "IncludedInItem");
 
     [Fact]
-    public async Task TemplateSnapshotAndProspectiveInstructionStayIndependentOfBooking()
+    public async Task TemplateSnapshotStaysIndependentOfBooking()
     {
         var setup = await Prepare();
         using var dentist = await Login("dentist.demo");
@@ -131,27 +129,18 @@ public sealed class TreatmentProgressionApiTests(ProgressionFixture fixture) : I
             new CommitPlanRequest(afterApply.Version, Guid.NewGuid()));
         Assert.Equal(HttpStatusCode.OK, commit.StatusCode);
         var committed = (await commit.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
-        var instruction = await dentist.PostAsJsonAsync("/api/follow-up-instructions", new CreateFollowUpRequest(
-            setup.Patient, setup.Branch, new FollowUpSource(dossier.Id, itemId, step.Id, null, null),
-            "TreatmentContinuation", "Quay lại để thực hiện bước đầu", null,
-            new DateOnly(2026, 11, 1), new DateOnly(2026, 11, 3), new DateOnly(2026, 11, 5),
-            30, setup.Dentist, null, Guid.NewGuid()));
-        Assert.Equal(HttpStatusCode.Created, instruction.StatusCode);
-        Assert.Equal("NeedsBooking", (await instruction.Content.ReadFromJsonAsync<FollowUpChange>())!.Instruction.Status);
         var completeCommand = new CompleteStepRequest(committed.Version, step.Version,
             [Guid.NewGuid()], Guid.NewGuid());
         var complete = await dentist.PostAsJsonAsync($"/api/dossiers/{dossier.Id}/steps/{step.Id}/complete", completeCommand);
         Assert.Equal(HttpStatusCode.OK, complete.StatusCode);
         var completed = (await complete.Content.ReadFromJsonAsync<StepChange>())!;
-        Assert.Single(completed.InstructionIds);
         var completedRetry = await dentist.PostAsJsonAsync($"/api/dossiers/{dossier.Id}/steps/{step.Id}/complete", completeCommand);
         Assert.Equal(HttpStatusCode.OK, completedRetry.StatusCode);
-        Assert.Equal(completed.InstructionIds, (await completedRetry.Content.ReadFromJsonAsync<StepChange>())!.InstructionIds);
+        Assert.Equal(completed.Steps.Select(x => x.Version), (await completedRetry.Content.ReadFromJsonAsync<StepChange>())!.Steps.Select(x => x.Version));
         Assert.Equal("Ready", completed.Steps.Single(x => x.Name == "Kiểm tra lần hai").Readiness);
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
         Assert.False(await db.Appointments.AnyAsync(x => x.PatientId == setup.Patient));
-        Assert.Equal("Completed", (await db.FollowUpInstructions.SingleAsync(x => x.StepId == step.Id)).Status);
 
         var currentTemplate = (await dentist.GetFromJsonAsync<TreatmentTemplateDto>(
             $"/api/treatment-templates/{template.Id}"))!;
@@ -240,22 +229,6 @@ public sealed class TreatmentProgressionApiTests(ProgressionFixture fixture) : I
         var changedPayload = await dentist.PostAsJsonAsync($"/api/dossiers/{dossier.Id}/steps", add with { Reason = "Khác" });
         Assert.Equal(HttpStatusCode.Conflict, changedPayload.StatusCode);
 
-        var source = new FollowUpSource(dossier.Id, itemId, second.Id, null, null);
-        var instructionRequest = new CreateFollowUpRequest(setup.Patient, setup.Branch, source,
-            "TreatmentContinuation", "Đánh giá thêm buổi", null,
-            new DateOnly(2026, 10, 1), new DateOnly(2026, 10, 2), new DateOnly(2026, 10, 3),
-            second.ReservedMinutes, setup.Dentist, null, Guid.NewGuid());
-        var instruction = await dentist.PostAsJsonAsync("/api/follow-up-instructions", instructionRequest);
-        Assert.Equal(HttpStatusCode.Created, instruction.StatusCode);
-        var instructionId = (await instruction.Content.ReadFromJsonAsync<FollowUpChange>())!.Instruction.Id;
-        var firstWithoutVisit = await dentist.PostAsJsonAsync("/api/follow-up-instructions",
-            instructionRequest with { Source = new FollowUpSource(dossier.Id, itemId, null, null, null),
-                RequestKey = Guid.NewGuid(), Reason = "Buổi đầu tiên từ hạng mục đã đồng ý" });
-        Assert.Equal(HttpStatusCode.Created, firstWithoutVisit.StatusCode);
-        Assert.Null((await firstWithoutVisit.Content.ReadFromJsonAsync<FollowUpChange>())!.Instruction.Source.VisitId);
-        var duplicate = await dentist.PostAsJsonAsync("/api/follow-up-instructions",
-            instructionRequest with { RequestKey = Guid.NewGuid() });
-        Assert.Equal(HttpStatusCode.Conflict, duplicate.StatusCode);
 
         using (var scannerScope = fixture.Services.CreateScope())
         {
@@ -269,7 +242,6 @@ public sealed class TreatmentProgressionApiTests(ProgressionFixture fixture) : I
         Assert.Equal(3, await db.SchedulingChairs.CountAsync(x => x.BranchId == setup.Branch));
         Assert.False(await db.Appointments.AnyAsync(x => x.PatientId == setup.Patient));
         Assert.Equal(2, await db.TreatmentSteps.CountAsync(x => x.DossierId == dossier.Id));
-        Assert.Equal(1, await db.TreatmentProgressionEvents.CountAsync(x => x.Kind == "followup.due"
-            && x.AggregateId == instructionId));
+        Assert.Equal(0, await db.TreatmentProgressionEvents.CountAsync(x => x.Kind == "followup.due"));
     }
 }

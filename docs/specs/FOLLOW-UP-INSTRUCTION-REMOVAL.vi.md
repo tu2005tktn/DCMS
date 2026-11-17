@@ -1,6 +1,6 @@
 # Xóa hướng dẫn tái khám; `CLINICAL_ACTIVITY` chỉ còn hoạt động điều trị (18/11/2026)
 
-Trạng thái: **spec đã duyệt theo yêu cầu người dùng, chưa triển khai**. Việc triển khai chờ phiên rút gọn `APPOINTMENT` ([APPOINTMENT-TABLE-SIMPLIFICATION.vi.md](APPOINTMENT-TABLE-SIMPLIFICATION.vi.md)) commit, vì phải sửa cùng các file lịch hẹn.
+Trạng thái: **đã triển khai 18/11/2026**, sau rút gọn `APPOINTMENT` ([APPOINTMENT-TABLE-SIMPLIFICATION.vi.md](APPOINTMENT-TABLE-SIMPLIFICATION.vi.md)).
 
 Yêu cầu người dùng ngày 18/11/2026: "Chỉ cần tạo lịch hẹn tiếp theo theo kế hoạch, xóa hướng dẫn tái khám", "chỉ giữ các cột của hoạt động điều trị" và "chỉ cần link với phiếu điều trị là được", "đặt lịch điều trị theo kế hoạch thì cứ theo hạng mục gần nhất mà đặt". Phiếu điều trị chứa kế hoạch (có thể áp từ mẫu `TREATMENT_TEMPLATE`) và hoạt động điều trị thực tế; hạng mục kế hoạch có thể chuyển thành hoạt động thực tế, hoặc tự thêm dòng điều trị không cần kế hoạch. Hạng mục thực hiện được chọn lúc ghi điều trị, nên lịch hẹn không gắn với hạng mục, chỉ gắn với phiếu điều trị. Đây là giai đoạn 3 của [rút gọn CLINICAL_ACTIVITY](CLINICAL-ACTIVITY-TABLE-SIMPLIFICATION.vi.md). Không thêm bảng.
 
@@ -44,13 +44,16 @@ Xóa. Công việc chăm sóc do sự kiện `followup.due` sinh ra vẫn giữ 
 - Route `/api/follow-up-instructions` (tạo, xem, sửa khung ngày, đổi trạng thái) và quy tắc phân quyền màn hình tương ứng.
 - Entity `FollowUpInstruction`, `IFollowUpBookingPort`/`IFollowUpAppointmentChangePort` (`FollowUpAppointmentPort`) thay bằng một kiểm tra phiếu điều trị khi đặt lịch.
 - Bộ quét `TreatmentDueScanner` thôi phát `followup.due`; thông báo "có thể đặt lịch tái khám" và chiếu thông báo bệnh nhân khi hướng dẫn về `NeedsBooking` bị bỏ.
-- Rà soát kế hoạch (`TreatmentRevisionService`) không còn tác động lên hướng dẫn.
+- Rà soát kế hoạch (`TreatmentRevisionService`): bỏ phần tác động lên hướng dẫn (`instructions` khỏi context, preview và lệnh lưu). Lịch hẹn của phiếu vẫn được liệt kê (`bookings`) để tham khảo nhưng **không còn chặn** việc sửa hạng mục, vì lịch hẹn không gắn với hạng mục nào.
+- Hoàn tất bước điều trị không còn tự sinh hướng dẫn cho bước kế tiếp; `StepChange` bỏ `instructionIds`. Đặt tạm dừng bước báo "đã có lịch" khi phiếu có lịch hẹn `Confirmed`/`CheckedIn`.
+- Đóng phiếu điều trị bị chặn (`MSG233`) khi phiếu còn lịch tái khám `Confirmed`/`CheckedIn` (trước đây: khi còn hướng dẫn `NeedsBooking`/`Booked`). Xóa phiếu nháp bị chặn khi phiếu đã có lịch hẹn.
+- Hoạt động điều trị: mỗi lần lưu thay đổi, `Version` tự tăng 1 nếu đoạn code ghi chưa tự tăng (thay cho `StorageStamp`).
 - Hợp đồng: `CreateAppointmentRequest.followUpId` → `dossierId`; DTO lịch hẹn của nhân viên `followUpId` → `dossierId`; DTO lịch hẹn của khách bỏ `followUp`; `CreateCareTaskRequest`/`CareTaskDto` bỏ `instructionId`; `BookingDrawer` bỏ nhánh `followUp` (không nơi nào dùng).
 - Mobile: chi tiết lịch hẹn bỏ trạng thái hướng dẫn; kiểu đặt lịch bỏ `followUpId`.
 
-## Migration dự kiến
+## Migration
 
-Một migration `RemoveFollowUpInstructions`:
+`20261117191212_RemoveFollowUpInstructions`:
 - `Up`: kiểm tra `Id = RecordId`; chuyển `APPOINTMENT.FollowUpId` sang `DossierId` như trên; xóa dòng `ProcessKind = 'FollowUpInstruction'`; bỏ chỉ mục, ràng buộc và 19 cột của `CLINICAL_ACTIVITY`; bỏ `CARE_TASK.InstructionId`.
 - `Down`: thêm lại cột, ràng buộc, chỉ mục; `ProcessKind = 'ClinicalActivity'`, `RecordId = Id`, `StorageStamp = gen_random_uuid()`; `APPOINTMENT.FollowUpId` không khôi phục được vì hướng dẫn đã bị xóa (để `NULL`; `Kind` của các lịch hẹn đó về `Standard`). Hướng dẫn tái khám đã xóa không khôi phục được.
 

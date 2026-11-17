@@ -70,10 +70,8 @@ public sealed class NotificationService(
                 x.AccountId == accountId && x.Status == PatientLinkStatus.Verified, ct), null);
         if (deepLink == "/book-appointment")
         {
-            var canBook = await db.FollowUpInstructions.AsNoTracking().AnyAsync(x =>
-                x.Status == "NeedsBooking" && db.PatientAccountLinks.Any(link =>
-                    link.AccountId == accountId && link.Status == PatientLinkStatus.Verified
-                    && link.PatientId == x.PatientId), ct);
+            var canBook = await db.PatientAccountLinks.AsNoTracking().AnyAsync(link =>
+                link.AccountId == accountId && link.Status == PatientLinkStatus.Verified, ct);
             return canBook ? new CheckDeepLinkResult(true, null)
                 : new CheckDeepLinkResult(false, "Yêu cầu đặt lịch không còn hiệu lực.");
         }

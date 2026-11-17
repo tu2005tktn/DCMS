@@ -36,22 +36,8 @@ public sealed record StepDto(Guid Id, Guid ItemId, string Name, string? Region, 
     string? HoldReason, string? ReviewCondition, int Version,
     int? EstimatedMinMinutes = null, int? EstimatedMaxMinutes = null,
     int? ShortReservationAcknowledgedBy = null, DateTimeOffset? ShortReservationAcknowledgedAt = null);
-public sealed record StepChange(IReadOnlyList<StepDto> Steps, Guid[] InstructionIds,
-    SystemMessage Notification);
+public sealed record StepChange(IReadOnlyList<StepDto> Steps, SystemMessage Notification);
 
-public sealed record FollowUpSource(Guid? DossierId, Guid? ItemId, Guid? StepId,
-    Guid? VisitId, Guid? ActivityId);
-public sealed record CreateFollowUpRequest(int PatientId, int BranchId, FollowUpSource Source,
-    string Purpose, string Reason, string? Guidance, DateOnly EarliestOn, DateOnly TargetOn,
-    DateOnly LatestOn, int DurationMinutes, int? DentistId, string? Capability, Guid RequestKey);
-public sealed record ReviseFollowUpRequest(int ExpectedVersion, DateOnly EarliestOn,
-    DateOnly TargetOn, DateOnly LatestOn, string Reason, Guid RequestKey);
-public sealed record FollowUpActionRequest(int ExpectedVersion, string Reason, Guid RequestKey);
-public sealed record FollowUpDto(Guid Id, int PatientId, int BranchId, FollowUpSource Source,
-    string Purpose, string Reason, string? Guidance, DateOnly EarliestOn, DateOnly TargetOn,
-    DateOnly LatestOn, int DurationMinutes, int? DentistId, string? Capability, string Status,
-    bool Overdue, Guid? ActiveAppointmentId, int Version, string[] AllowedActions);
-public sealed record FollowUpChange(FollowUpDto Instruction, SystemMessage Notification);
 
 public interface ITreatmentProgressionService
 {
@@ -70,12 +56,6 @@ public interface ITreatmentProgressionService
     Task<StepChange> HoldAsync(int actorId, Guid dossierId, Guid stepId, HoldStepRequest request, CancellationToken ct);
     Task<StepChange> ReleaseHoldAsync(int actorId, Guid dossierId, Guid stepId, HoldStepRequest request, CancellationToken ct);
     Task<StepChange> CompleteStepAsync(int actorId, Guid dossierId, Guid stepId, CompleteStepRequest request, CancellationToken ct);
-    Task<IReadOnlyList<FollowUpDto>> ListFollowUpsAsync(int actorId, int patientId, CancellationToken ct);
-    Task<FollowUpDto> GetFollowUpAsync(int actorId, Guid id, CancellationToken ct);
-    Task<FollowUpChange> CreateFollowUpAsync(int actorId, CreateFollowUpRequest request, CancellationToken ct);
-    Task<FollowUpChange> ReviseFollowUpAsync(int actorId, Guid id, ReviseFollowUpRequest request, CancellationToken ct);
-    Task<FollowUpChange> ChangeFollowUpAsync(int actorId, Guid id, string action,
-        FollowUpActionRequest request, CancellationToken ct);
 }
 
 // Other owners supply these implementations when their source modules are available.
@@ -83,7 +63,6 @@ public interface ITreatmentActualEvidencePort
 {
     Task<bool> HasDentistConfirmedActualAsync(int patientId, Guid dossierId, Guid stepId,
         IReadOnlyList<Guid> evidenceIds, CancellationToken ct);
-    Task<bool> HasFollowUpFulfillmentAsync(int patientId, Guid instructionId, CancellationToken ct);
 }
 public interface ITreatmentLabReadinessPort
 {

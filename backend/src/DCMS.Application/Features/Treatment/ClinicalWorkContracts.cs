@@ -53,7 +53,7 @@ public interface IClinicalWorkService
     Task<ActivityDto> PostAsync(int actorId, Guid id, PostActivityRequest request, CancellationToken ct);
 }
 
-public sealed record CreateCareTaskRequest(int PatientId, int BranchId, Guid? InstructionId,
+public sealed record CreateCareTaskRequest(int PatientId, int BranchId,
     Guid? AppointmentId, string Type, string Content,
     int? OwnerAccountId, DateTimeOffset DueAt, Guid RequestKey);
 public sealed record UpdateCareTaskRequest(int ExpectedVersion, string Status,
@@ -64,7 +64,7 @@ public sealed record EscalateCareRequest(int TargetClinicianAccountId, string Re
     int ExpectedTaskVersion, Guid RequestKey);
 public sealed record ResolveEscalationRequest(int ExpectedVersion, string? Resolution,
     Guid RequestKey);
-public sealed record CareTaskDto(Guid Id, int PatientId, int BranchId, Guid? InstructionId,
+public sealed record CareTaskDto(Guid Id, int PatientId, int BranchId,
     Guid? AppointmentId, string Type, string Content,
     int? OwnerAccountId, DateTimeOffset DueAt, string Status, int Version,
     string[] AllowedActions);

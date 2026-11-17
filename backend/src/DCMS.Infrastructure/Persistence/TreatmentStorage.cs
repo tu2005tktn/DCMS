@@ -96,10 +96,11 @@ public sealed partial class DcmsDbContext
 
     private void PrepareTreatmentChanges()
     {
-        foreach (var activity in ChangeTracker.Entries<ClinicalActivity>().Where(x => x.State == EntityState.Added).ToArray())
-            activity.Entity.StorageId = activity.Entity.Id;
+        // Every saved change to an activity moves Version on by exactly one (its concurrency token).
+        foreach (var activity in ChangeTracker.Entries<ClinicalActivity>().Where(x => x.State == EntityState.Modified).ToArray())
+            if (!activity.Property(x => x.Version).IsModified) activity.Entity.Version = activity.Property(x => x.Version).OriginalValue + 1;
         foreach (var entry in ChangeTracker.Entries().Where(x => x.State == EntityState.Modified
-            && x.Entity is TreatmentDossier or TreatmentItem or TreatmentTemplate or TreatmentProcessRecord or CareTask or LabOrder).ToArray())
+            && x.Entity is TreatmentDossier or TreatmentItem or TreatmentTemplate or CareTask or LabOrder).ToArray())
             entry.Property("StorageStamp").CurrentValue = Guid.NewGuid();
     }
 }

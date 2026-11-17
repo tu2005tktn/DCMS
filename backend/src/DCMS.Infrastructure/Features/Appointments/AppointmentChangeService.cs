@@ -21,7 +21,7 @@ namespace DCMS.Infrastructure.Features.Appointments;
 
 public sealed class AppointmentChangeService(DcmsDbContext db, IAvailabilityService availability,
     IAppointmentQueryService queries, UserManager<ApplicationUser> users,
-    IFollowUpAppointmentChangePort followUps, TimeProvider clock, ISettingsAccess access) : IAppointmentChangeService
+    TimeProvider clock, ISettingsAccess access) : IAppointmentChangeService
 {
     private static BusinessException Error(string code, int status = 409) => new(status, SystemMessages.Get(code));
     private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
@@ -99,8 +99,6 @@ public sealed class AppointmentChangeService(DcmsDbContext db, IAvailabilityServ
         var now = clock.GetUtcNow();
         if (appointment.Version != request.ExpectedVersion) throw Error("MSG111");
         if (appointment.Status != "Confirmed" || appointment.StartAt > now || await db.Visits.AnyAsync(x => x.AppointmentId == appointment.Id, ct)) throw Error("MSG31");
-        if (appointment.FollowUpId.HasValue)
-            await followUps.MarkNeedsBookingAsync(appointment.FollowUpId.Value, appointment.Id, ct);
         appointment.Status = "NoShow";
         appointment.Version++;
         db.AppointmentChanges.Add(new AppointmentChange
@@ -114,7 +112,7 @@ public sealed class AppointmentChangeService(DcmsDbContext db, IAvailabilityServ
         {
             AggregateId = appointment.Id, EventType = "appointment.no_show", OccurredAt = now,
             PayloadJson = JsonSerializer.Serialize(new { appointmentId = appointment.Id,
-                appointment.Code, appointment.Version, appointment.FollowUpId })
+                appointment.Code, appointment.Version, appointment.DossierId })
         });
         await db.SaveChangesAsync(ct);
         var result = new AppointmentChangeResult(await queries.ChangeDetailAsync(actorId, code, ct),
@@ -186,9 +184,6 @@ public sealed class AppointmentChangeService(DcmsDbContext db, IAvailabilityServ
             if (!AppointmentRules.PublicLeadTimeValid(now, move.NewStart)) throw Error("MSG34");
             if (move.NewStart == appointment.StartAt && move.ChairId == appointment.ChairId
                 && selectedDentistId == appointment.DentistId) throw Error("MSG34");
-            if (appointment.FollowUpId.HasValue)
-                await followUps.ValidateRescheduleAsync(appointment.FollowUpId.Value, appointment.Id,
-                    selectedDentistId, move.NewStart, ct);
             AvailabilitySlot slot;
             try
             {
@@ -207,8 +202,6 @@ public sealed class AppointmentChangeService(DcmsDbContext db, IAvailabilityServ
         }
         else
         {
-            if (appointment.FollowUpId.HasValue)
-                await followUps.MarkNeedsBookingAsync(appointment.FollowUpId.Value, appointment.Id, ct);
             appointment.Status = "Cancelled";
         }
         appointment.Version++;

@@ -73,7 +73,7 @@ internal static class SharedStorageModel
         model.Entity<SettingsAudit>().HasIndex(new[] { "AuditType", "Id" }, "UX_SettingsAudit_LegacyId").IsUnique().HasDatabaseName("UX_AUDIT_LOG_Type_Id");
         model.Entity<VisitAudit>().HasIndex(new[] { "AuditType", "Id" }, "UX_VisitAudit_LegacyId").IsUnique().HasDatabaseName("UX_AUDIT_LOG_Type_Id");
 
-        foreach (var root in new[] { typeof(CommandReceiptRecord), typeof(AuditRecord), typeof(PrescriptionRecord), typeof(TreatmentProcessRecord) })
+        foreach (var root in new[] { typeof(CommandReceiptRecord), typeof(AuditRecord), typeof(PrescriptionRecord) })
         {
             var properties = model.Model.GetEntityTypes().Where(type => type.BaseType?.ClrType == root)
                 .SelectMany(type => type.GetDeclaredProperties())

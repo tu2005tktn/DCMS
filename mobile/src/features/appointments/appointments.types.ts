@@ -23,7 +23,7 @@ export type AppointmentChange = {
 };
 export type AppointmentDetail = AppointmentCard & {
   branchId: number; branchName: string; dentistId: number; serviceId: number; serviceName: string;
-  bookerName: string; bookerContactMasked: string; followUp: { id: number; status: string } | null;
+  bookerName: string; bookerContactMasked: string;
   eligibility: { canSelfService: boolean; hoursRemaining: number; reasonCode: IneligibleReason | null; canRequestSupport: boolean };
   supportRequests: SupportRequest[]; history: AppointmentChange[]; clinicContact: { phone: string; hours: string };
 };

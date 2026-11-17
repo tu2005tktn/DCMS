@@ -113,7 +113,7 @@ public sealed class ClinicalWorkApiTests(ClinicalWorkFixture fixture) : IClassFi
         using var dentist = await Login("dentist.demo");
         using var assistant = await Login("assistant.demo");
         var setup = await SetupAsync(assistant);
-        var create = new CreateCareTaskRequest(setup.PatientId, setup.BranchId, null,
+        var create = new CreateCareTaskRequest(setup.PatientId, setup.BranchId,
             null, "FollowUp", "Gọi hỏi tình trạng sau điều trị", null,
             DateTimeOffset.UtcNow.AddDays(1), Guid.NewGuid());
         var created = await assistant.PostAsJsonAsync("/api/care-tasks", create);

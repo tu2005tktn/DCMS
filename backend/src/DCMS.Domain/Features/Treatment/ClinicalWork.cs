@@ -1,14 +1,8 @@
 namespace DCMS.Domain.Features.Treatment;
 
-public abstract class TreatmentProcessRecord
+public sealed class ClinicalActivity
 {
-    public Guid StorageId { get; set; } = Guid.NewGuid();
     public Guid Id { get; set; } = Guid.NewGuid();
-    public Guid StorageStamp { get; set; } = Guid.NewGuid();
-}
-
-public sealed class ClinicalActivity : TreatmentProcessRecord
-{
     // Derived from VisitId (not stored): dossier-sheet activities have no visit.
     public string SourceKind => VisitId.HasValue ? "Visit" : "Dossier";
     public string? ServiceNameSnapshot { get; set; }
@@ -55,7 +49,6 @@ public sealed class CareTask
     public Guid Id { get; set; } = Guid.NewGuid();
     public int PatientId { get; set; }
     public int BranchId { get; set; }
-    public Guid? InstructionId { get; set; }
     public Guid? AppointmentId { get; set; }
     public string? EpisodeKey { get; set; }
     public string Type { get; set; } = "FollowUp";

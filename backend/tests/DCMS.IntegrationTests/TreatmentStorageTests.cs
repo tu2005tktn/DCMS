@@ -129,14 +129,6 @@ public sealed class TreatmentStorageTests(ApiFixture fixture) : IClassFixture<Ap
             Unit = "răng", Quantity = 1.500m, PerformedAt = now, PerformerId = setup.DentistId, Outcome = "SYNTHETIC outcome",
             ChargingBasis = "Included", PriceSnapshotVnd = 100000m, State = "Posted", Version = 2, CreatedAt = now, PostedAt = now
         };
-        var instruction = new FollowUpInstruction
-        {
-            PatientId = setup.PatientId, BranchId = setup.BranchId, DossierId = dossier.Id, ItemId = item.Id, StepId = second.Id,
-            PlanVersion = 1, SourceActivityId = activity.Id, SourceCompletionEventId = first.CompletionEventId,
-            Reason = "SYNTHETIC follow-up", Guidance = "SYNTHETIC guidance", EarliestOn = new DateOnly(2026, 12, 1),
-            TargetOn = new DateOnly(2026, 12, 5), LatestOn = new DateOnly(2026, 12, 9), DurationMinutes = 45, DentistId = setup.DentistId,
-            Capability = "SYNTHETIC capability", Status = "NeedsBooking", Version = 2, CreatedBy = setup.ActorId, CreatedAt = now, UpdatedAt = now
-        };
         var planEvent = new TreatmentEvent
         {
             DossierId = dossier.Id, Kind = "plan.committed", PayloadJson = "{\"planVersion\":1}", ActorId = setup.ActorId,
@@ -148,7 +140,7 @@ public sealed class TreatmentStorageTests(ApiFixture fixture) : IClassFixture<Ap
             AggregateId = second.Id, Kind = "step.due", PayloadJson = "{\"planVersion\":1}",
             StableKey = "storage-test:" + second.Id, ActorId = 0, OccurredAt = now
         };
-        db.AddRange(dossier, template, activity, instruction, planEvent, systemEvent);
+        db.AddRange(dossier, template, activity, planEvent, systemEvent);
         await db.SaveChangesAsync();
 
         var expectedSteps = item.Steps.Select(Snapshot).ToArray();
@@ -157,7 +149,6 @@ public sealed class TreatmentStorageTests(ApiFixture fixture) : IClassFixture<Ap
         var expectedTemplateItems = template.Items.Select(Snapshot).ToArray();
         var expectedTemplateVersions = template.Versions.Select(Snapshot).ToArray();
         var expectedActivity = Snapshot(activity);
-        var expectedInstruction = Snapshot(instruction);
         var expectedPlanEvent = Snapshot(planEvent);
         var expectedSystemEvent = Snapshot(systemEvent);
         var migrator = db.GetService<IMigrator>();
@@ -171,7 +162,6 @@ public sealed class TreatmentStorageTests(ApiFixture fixture) : IClassFixture<Ap
         Assert.Equal(1, await Count(db, $"SELECT count(*)::integer AS \"Value\" FROM \"TREATMENT_TEMPLATE_ITEM\" WHERE \"TemplateId\"={template.Id}"));
         Assert.Equal(1, await Count(db, $"SELECT count(*)::integer AS \"Value\" FROM \"TREATMENT_TEMPLATE_VERSION\" WHERE \"TemplateId\"={template.Id} AND \"State\"='Active'"));
         Assert.Equal(1, await Count(db, $"SELECT count(*)::integer AS \"Value\" FROM \"CLINICAL_ACTIVITY\" WHERE \"Id\"={activity.Id}"));
-        Assert.Equal(1, await Count(db, $"SELECT count(*)::integer AS \"Value\" FROM \"FOLLOW_UP_INSTRUCTION\" WHERE \"Id\"={instruction.Id} AND \"StepId\"={second.Id}"));
         Assert.Equal(1, await Count(db, $"SELECT count(*)::integer AS \"Value\" FROM \"TREATMENT_EVENT\" WHERE \"Id\"={planEvent.Id} AND \"ActorId\"={setup.ActorId}"));
         Assert.Equal(1, await Count(db, $"SELECT count(*)::integer AS \"Value\" FROM \"TREATMENT_PROGRESSION_EVENT\" WHERE \"Id\"={systemEvent.Id} AND \"ActorId\"=0"));
 
@@ -186,9 +176,7 @@ public sealed class TreatmentStorageTests(ApiFixture fixture) : IClassFixture<Ap
         AssertSame(expectedTemplateItems, restoredTemplate.Items.Select(Snapshot));
         AssertSame(expectedTemplateVersions, restoredTemplate.Versions.Select(Snapshot));
         var restoredActivity = await db.ClinicalActivities.AsNoTracking().SingleAsync(x => x.Id == activity.Id);
-        Assert.Equal(activity.Id, restoredActivity.StorageId);
         AssertSame([expectedActivity], [Snapshot(restoredActivity)]);
-        AssertSame([expectedInstruction], [Snapshot(await db.FollowUpInstructions.AsNoTracking().SingleAsync(x => x.Id == instruction.Id))]);
         AssertSame([expectedPlanEvent], [Snapshot(await db.TreatmentEvents.AsNoTracking().SingleAsync(x => x.Id == planEvent.Id))]);
         AssertSame([expectedSystemEvent], [Snapshot(await db.TreatmentProgressionEvents.AsNoTracking().SingleAsync(x => x.Id == systemEvent.Id))]);
         // The JSONB collections stay queryable through the read projections the services use.
@@ -235,35 +223,24 @@ public sealed class TreatmentStorageTests(ApiFixture fixture) : IClassFixture<Ap
     }
 
     [Fact]
-    public async Task LegacyStepEventWithoutPlanVersionIsSkippedWhileLaterEventsAreStillIngested()
+    public async Task LegacyStepEventWithoutPlanVersionIsSkipped()
     {
         var setup = await Prepare();
         var now = Now();
         var (dossier, item) = NewDossier(setup, now);
         var step = new TreatmentStep { DossierId = dossier.Id, PlanId = dossier.PlanId, PlanVersion = 1, ItemId = item.Id, Name = "SYNTHETIC blocked step", EstimatedMinutes = 30, ReservedMinutes = 30 };
         item.Steps.Add(step);
-        var instruction = new FollowUpInstruction
-        {
-            PatientId = setup.PatientId, BranchId = setup.BranchId, Reason = "SYNTHETIC due follow-up", EarliestOn = new DateOnly(2026, 12, 1),
-            TargetOn = new DateOnly(2026, 12, 5), LatestOn = new DateOnly(2026, 12, 9), DurationMinutes = 30, Status = "NeedsBooking",
-            CreatedBy = setup.ActorId, CreatedAt = now, UpdatedAt = now
-        };
         var legacyKey = "legacy-step-blocked:" + step.Id;
-        var dueKey = $"followup-due:{instruction.Id}:20261201:20261205:20261209";
         var payload = JsonSerializer.Serialize(new { patientId = setup.PatientId });
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
-        db.AddRange(dossier, instruction,
-            new TreatmentProgressionEvent { AggregateId = step.Id, Kind = "step.prerequisite_blocked", PayloadJson = payload, StableKey = legacyKey, ActorId = 0, OccurredAt = now.AddMinutes(-5) },
-            new TreatmentProgressionEvent { AggregateId = instruction.Id, Kind = "followup.due", PayloadJson = payload, StableKey = dueKey, ActorId = 0, OccurredAt = now });
+        db.AddRange(dossier,
+            new TreatmentProgressionEvent { AggregateId = step.Id, Kind = "step.prerequisite_blocked", PayloadJson = payload, StableKey = legacyKey, ActorId = 0, OccurredAt = now.AddMinutes(-5) });
         await db.SaveChangesAsync();
 
-        Assert.True(await scope.ServiceProvider.GetRequiredService<CareTaskIngestionService>().IngestAsync(CancellationToken.None) >= 1);
+        await scope.ServiceProvider.GetRequiredService<CareTaskIngestionService>().IngestAsync(CancellationToken.None);
 
         Assert.False(await db.CareTasks.AnyAsync(x => x.EpisodeKey == legacyKey));
-        var task = await db.CareTasks.AsNoTracking().SingleAsync(x => x.EpisodeKey == dueKey);
-        Assert.Equal("FollowUpDue", task.Type);
-        Assert.Equal(instruction.Id, task.InstructionId);
     }
 
     private static Task<int> Count(DcmsDbContext db, FormattableString sql) => db.Database.SqlQuery<int>(sql).SingleAsync();
@@ -276,8 +253,8 @@ public sealed class TreatmentStorageTests(ApiFixture fixture) : IClassFixture<Ap
     private static JsonNode Snapshot<T>(T row) where T : class
     {
         var node = JsonSerializer.SerializeToNode(row, row.GetType())!.AsObject();
-        node.Remove(nameof(TreatmentProcessRecord.StorageId));
-        node.Remove(nameof(TreatmentProcessRecord.StorageStamp));
+        node.Remove("StorageId");
+        node.Remove("StorageStamp");
         foreach (var name in node.Select(x => x.Key).Where(x => x.EndsWith("Json")).ToArray())
             node[name] = JsonNode.Parse(node[name]!.GetValue<string>());
         return node;

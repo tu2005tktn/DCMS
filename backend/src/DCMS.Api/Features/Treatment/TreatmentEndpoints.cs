@@ -247,28 +247,6 @@ public static class TreatmentEndpoints
             Results.Ok(await service.TemplateStateAsync(AuthenticationEndpoints.AccountId(context.User), id,
                 number, "Retired", request, ct)));
 
-        var instructions = endpoints.MapGroup("/api/follow-up-instructions")
-            .RequireAuthorization(DentistPolicy).WithTags("UC-17 S24 Follow-up instructions");
-        instructions.MapGet("/", async (HttpContext context, int patientId, ITreatmentProgressionService service,
-            CancellationToken ct) => Results.Ok(await service.ListFollowUpsAsync(
-                AuthenticationEndpoints.AccountId(context.User), patientId, ct)));
-        instructions.MapPost("/", async (HttpContext context, CreateFollowUpRequest request,
-            ITreatmentProgressionService service, CancellationToken ct) => Results.Json(await service.CreateFollowUpAsync(
-                AuthenticationEndpoints.AccountId(context.User), request, ct), statusCode: 201));
-        instructions.MapGet("/{id:guid}", async (HttpContext context, Guid id, ITreatmentProgressionService service,
-            CancellationToken ct) => Results.Ok(await service.GetFollowUpAsync(AuthenticationEndpoints.AccountId(context.User), id, ct)));
-        instructions.MapPost("/{id:guid}/revise-window", async (HttpContext context, Guid id,
-            ReviseFollowUpRequest request, ITreatmentProgressionService service, CancellationToken ct) =>
-            Results.Ok(await service.ReviseFollowUpAsync(AuthenticationEndpoints.AccountId(context.User), id, request, ct)));
-        foreach (var action in new[] { "complete", "cancel", "supersede" })
-        {
-            var selected = action;
-            instructions.MapPost("/{id:guid}/" + selected, async (HttpContext context, Guid id,
-                FollowUpActionRequest request, ITreatmentProgressionService service, CancellationToken ct) =>
-                Results.Ok(await service.ChangeFollowUpAsync(AuthenticationEndpoints.AccountId(context.User), id,
-                    selected, request, ct)));
-        }
-
         endpoints.MapGet("/api/patients/me/treatment-summary", async (HttpContext context,
             ITreatmentDossierService service, CancellationToken ct) =>
             Results.Ok(await service.OwnSummaryAsync(AuthenticationEndpoints.AccountId(context.User), ct)))

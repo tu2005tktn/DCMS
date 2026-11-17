@@ -341,7 +341,7 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
             || dossier.DepositExceptionReason != null
             || await db.TreatmentEvents.AnyAsync(x => x.DossierId == dossierId && x.Kind != "DossierCreated", ct)
             || await db.TreatmentSteps.AnyAsync(x => x.DossierId == dossierId, ct)
-            || await db.FollowUpInstructions.AnyAsync(x => x.DossierId == dossierId, ct)
+            || await db.Appointments.AnyAsync(x => x.DossierId == dossierId, ct)
             || await db.ClinicalActivities.AnyAsync(x => x.DossierId == dossierId, ct)
             || await db.TreatmentRevisionDrafts.AnyAsync(x => x.DossierId == dossierId, ct)
             || await db.TreatmentSheetDrafts.AnyAsync(x => x.DossierId == dossierId, ct)
@@ -677,8 +677,9 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
             d.Outcome is not ("Stopped" or "Skipped" or "Cancelled") || Clean(d.Reason) is not { Length: > 0 and <= 1000 }))
             throw Error("MSG243", 409);
         if (request.Outcome == "CompletedAsAgreed" && unresolved.Length > 0) throw Error("MSG243", 409);
-        if (await db.FollowUpInstructions.AsNoTracking().AnyAsync(x => x.DossierId == dossierId &&
-            (x.Status == "NeedsBooking" || x.Status == "Booked"), ct)) throw Error("MSG233", 409);
+        // An upcoming follow-up appointment of this dossier must be handled before closing it.
+        if (await db.Appointments.AsNoTracking().AnyAsync(x => x.DossierId == dossierId &&
+            (x.Status == "Confirmed" || x.Status == "CheckedIn"), ct)) throw Error("MSG233", 409);
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
         foreach (var item in unresolved) item.Progress = dispositions[item.Id].Outcome;
         var openSteps = await db.LoadTreatmentStepsAsync(db.TreatmentSteps.Where(x => x.DossierId == dossierId && x.Outcome != "Completed"), ct);

@@ -107,25 +107,6 @@ internal static class TreatmentModel
 
 
 
-        model.Entity<FollowUpInstruction>(b =>
-        { 
-            b.HasIndex(x => new { x.PatientId, x.Status });
-            b.HasIndex(x => x.StepId).IsUnique().HasDatabaseName("IX_FOLLOW_UP_INSTRUCTION_ActiveStep")
-                .HasFilter("\"StepId\" IS NOT NULL AND \"Status\" IN ('NeedsBooking','Booked')");
-            b.HasIndex(x => new { x.DossierId, x.ItemId }).IsUnique()
-                .HasDatabaseName("IX_FOLLOW_UP_INSTRUCTION_ActiveItemOnly")
-                .HasFilter("\"DossierId\" IS NOT NULL AND \"ItemId\" IS NOT NULL AND \"StepId\" IS NULL AND \"Status\" IN ('NeedsBooking','Booked')");
-            b.HasIndex(x => new { x.StepId, x.SourceCompletionEventId }).IsUnique()
-                .HasDatabaseName("IX_FOLLOW_UP_INSTRUCTION_Step_Completion")
-                .HasFilter("\"StepId\" IS NOT NULL AND \"SourceCompletionEventId\" IS NOT NULL");
-            b.HasIndex(x => x.ActiveAppointmentId).IsUnique().HasFilter("\"ActiveAppointmentId\" IS NOT NULL");
-            b.Property(x => x.Purpose).HasMaxLength(40);
-            b.Property(x => x.Reason).HasMaxLength(2000);
-            b.Property(x => x.Guidance).HasMaxLength(4000);
-            b.Property(x => x.Capability).HasMaxLength(160);
-            b.Property(x => x.Status).HasMaxLength(20);
-            b.Property(x => x.Version).IsConcurrencyToken(false);
-        });
 
         model.Entity<LabOrder>(b =>
         {

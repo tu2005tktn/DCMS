@@ -192,13 +192,13 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<int>("DentistId")
                         .HasColumnType("integer");
 
+                    b.Property<Guid?>("DossierId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTimeOffset>("EndAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid?>("FamilyMemberId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("FollowUpId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("Kind")
@@ -342,11 +342,9 @@ namespace DCMS.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("DentistId");
 
-                    b.HasIndex("FamilyMemberId");
+                    b.HasIndex("DossierId");
 
-                    b.HasIndex("FollowUpId")
-                        .IsUnique()
-                        .HasFilter("\"FollowUpId\" IS NOT NULL AND \"Status\" IN ('Confirmed','CheckedIn')");
+                    b.HasIndex("FamilyMemberId");
 
                     b.HasIndex("PatientId");
 
@@ -2072,9 +2070,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
-                    b.Property<Guid?>("InstructionId")
-                        .HasColumnType("uuid");
-
                     b.Property<int?>("OwnerAccountId")
                         .HasColumnType("integer");
 
@@ -2167,6 +2162,137 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasIndex("BranchId", "DueAt", "Status");
 
                     b.ToTable("CARE_TASK", (string)null);
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Treatment.ClinicalActivity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("AssistantId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("BranchId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ChargingBasis")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("ChargingBasisEvidence")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("DiscountSnapshotVnd")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid?>("DossierId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("ElapsedMinutes")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("FeeStatus")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)")
+                        .HasDefaultValue("Unavailable");
+
+                    b.Property<bool>("IsPlanTransfer")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid?>("ItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("LabWorkSnapshot")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("NextSteps")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<int>("PatientId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("PerformedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("PerformerId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("PlanVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("PostedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("PriceSnapshotVnd")
+                        .HasPrecision(18)
+                        .HasColumnType("numeric(18,0)");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(12, 3)
+                        .HasColumnType("numeric(12,3)");
+
+                    b.Property<int?>("RecordedBy")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Region")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<int>("ServiceId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ServiceNameSnapshot")
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<Guid?>("StepId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("VisitId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ItemId", "PlanVersion")
+                        .IsUnique()
+                        .HasFilter("\"IsPlanTransfer\" = TRUE");
+
+                    b.HasIndex("VisitId", "State");
+
+                    b.HasIndex("PatientId", "DossierId", "StepId");
+
+                    b.ToTable("CLINICAL_ACTIVITY", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_CLINICAL_ACTIVITY_VALUES", "\"Quantity\" > 0 AND \"PriceSnapshotVnd\" >= 0");
+                        });
                 });
 
             modelBuilder.Entity("DCMS.Domain.Features.Treatment.LabOrder", b =>
@@ -2824,44 +2950,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("CK_TREATMENT_ITEM_VALUES", "\"Quantity\" > 0 AND \"AgreedUnitPriceVnd\" >= 0");
                         });
-                });
-
-            modelBuilder.Entity("DCMS.Domain.Features.Treatment.TreatmentProcessRecord", b =>
-                {
-                    b.Property<Guid>("StorageId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("Id");
-
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
-                        .HasColumnName("RecordId");
-
-                    b.Property<string>("ProcessKind")
-                        .IsRequired()
-                        .HasMaxLength(34)
-                        .HasColumnType("character varying(34)");
-
-                    b.Property<Guid>("StorageStamp")
-                        .IsConcurrencyToken()
-                        .HasColumnType("uuid");
-
-                    b.HasKey("StorageId");
-
-                    b.HasIndex("ProcessKind", "Id")
-                        .IsUnique();
-
-                    b.ToTable("CLINICAL_ACTIVITY", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_CLINICAL_ACTIVITY_VALUES", "\"ProcessKind\" <> 'ClinicalActivity' OR (\"Quantity\" > 0 AND \"PriceSnapshotVnd\" >= 0)");
-
-                            t.HasCheckConstraint("CK_FOLLOW_UP_DURATION", "\"ProcessKind\" <> 'FollowUpInstruction' OR \"DurationMinutes\" BETWEEN 15 AND 480 AND \"DurationMinutes\" % 15 = 0");
-
-                            t.HasCheckConstraint("CK_FOLLOW_UP_WINDOW", "\"ProcessKind\" <> 'FollowUpInstruction' OR (\"EarliestOn\" <= \"TargetOn\" AND \"TargetOn\" <= \"LatestOn\")");
-                        });
-
-                    b.HasDiscriminator<string>("ProcessKind").HasValue("TreatmentProcessRecord");
-
-                    b.UseTphMappingStrategy();
                 });
 
             modelBuilder.Entity("DCMS.Domain.Features.Treatment.TreatmentTemplate", b =>
@@ -5385,326 +5473,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasDiscriminator().HasValue("WorkingWeek");
                 });
 
-            modelBuilder.Entity("DCMS.Domain.Features.Treatment.ClinicalActivity", b =>
-                {
-                    b.HasBaseType("DCMS.Domain.Features.Treatment.TreatmentProcessRecord");
-
-                    b.Property<int?>("AssistantId")
-                        .HasColumnType("integer")
-                        .HasColumnName("AssistantId");
-
-                    b.Property<int>("BranchId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("BranchId");
-
-                    b.Property<string>("ChargingBasis")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
-                        .HasColumnName("ChargingBasis");
-
-                    b.Property<string>("ChargingBasisEvidence")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
-                        .HasColumnName("ChargingBasisEvidence");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("CreatedAt");
-
-                    b.Property<long>("DiscountSnapshotVnd")
-                        .HasColumnType("bigint")
-                        .HasColumnName("DiscountSnapshotVnd");
-
-                    b.Property<Guid?>("DossierId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("uuid")
-                        .HasColumnName("DossierId");
-
-                    b.Property<int?>("ElapsedMinutes")
-                        .HasColumnType("integer")
-                        .HasColumnName("ElapsedMinutes");
-
-                    b.Property<string>("FeeStatus")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(24)
-                        .HasColumnType("character varying(24)")
-                        .HasDefaultValue("Unavailable")
-                        .HasColumnName("FeeStatus");
-
-                    b.Property<bool>("IsPlanTransfer")
-                        .HasColumnType("boolean")
-                        .HasColumnName("IsPlanTransfer");
-
-                    b.Property<Guid?>("ItemId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("uuid")
-                        .HasColumnName("ItemId");
-
-                    b.Property<string>("LabWorkSnapshot")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
-                        .HasColumnName("LabWorkSnapshot");
-
-                    b.Property<string>("NextSteps")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)")
-                        .HasColumnName("NextSteps");
-
-                    b.Property<string>("Outcome")
-                        .IsRequired()
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)")
-                        .HasColumnName("Outcome");
-
-                    b.Property<int>("PatientId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("PatientId");
-
-                    b.Property<DateTimeOffset>("PerformedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("PerformedAt");
-
-                    b.Property<int>("PerformerId")
-                        .HasColumnType("integer")
-                        .HasColumnName("PerformerId");
-
-                    b.Property<int?>("PlanVersion")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("PlanVersion");
-
-                    b.Property<DateTimeOffset?>("PostedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("PostedAt");
-
-                    b.Property<decimal>("PriceSnapshotVnd")
-                        .HasPrecision(18)
-                        .HasColumnType("numeric(18,0)")
-                        .HasColumnName("PriceSnapshotVnd");
-
-                    b.Property<decimal>("Quantity")
-                        .HasPrecision(12, 3)
-                        .HasColumnType("numeric(12,3)")
-                        .HasColumnName("Quantity");
-
-                    b.Property<int?>("RecordedBy")
-                        .HasColumnType("integer")
-                        .HasColumnName("RecordedBy");
-
-                    b.Property<string>("Region")
-                        .HasMaxLength(80)
-                        .HasColumnType("character varying(80)")
-                        .HasColumnName("Region");
-
-                    b.Property<int>("ServiceId")
-                        .HasColumnType("integer")
-                        .HasColumnName("ServiceId");
-
-                    b.Property<string>("ServiceNameSnapshot")
-                        .HasMaxLength(160)
-                        .HasColumnType("character varying(160)")
-                        .HasColumnName("ServiceNameSnapshot");
-
-                    b.Property<string>("State")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
-                        .HasColumnName("State");
-
-                    b.Property<Guid?>("StepId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("uuid")
-                        .HasColumnName("StepId");
-
-                    b.Property<string>("Unit")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
-                        .HasColumnName("Unit");
-
-                    b.Property<int>("Version")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("Version");
-
-                    b.Property<Guid?>("VisitId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("VisitId");
-
-                    b.HasIndex("ItemId", "PlanVersion")
-                        .IsUnique()
-                        .HasFilter("\"IsPlanTransfer\" = TRUE");
-
-                    b.HasIndex("VisitId", "State");
-
-                    b.HasIndex("PatientId", "DossierId", "StepId");
-
-                    b.ToTable(t =>
-                        {
-                            t.HasCheckConstraint("CK_CLINICAL_ACTIVITY_VALUES", "\"ProcessKind\" <> 'ClinicalActivity' OR (\"Quantity\" > 0 AND \"PriceSnapshotVnd\" >= 0)");
-
-                            t.HasCheckConstraint("CK_FOLLOW_UP_DURATION", "\"ProcessKind\" <> 'FollowUpInstruction' OR \"DurationMinutes\" BETWEEN 15 AND 480 AND \"DurationMinutes\" % 15 = 0");
-
-                            t.HasCheckConstraint("CK_FOLLOW_UP_WINDOW", "\"ProcessKind\" <> 'FollowUpInstruction' OR (\"EarliestOn\" <= \"TargetOn\" AND \"TargetOn\" <= \"LatestOn\")");
-                        });
-
-                    b.HasDiscriminator().HasValue("ClinicalActivity");
-                });
-
-            modelBuilder.Entity("DCMS.Domain.Features.Treatment.FollowUpInstruction", b =>
-                {
-                    b.HasBaseType("DCMS.Domain.Features.Treatment.TreatmentProcessRecord");
-
-                    b.Property<Guid?>("ActiveAppointmentId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("ActiveAppointmentId");
-
-                    b.Property<int>("BranchId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("BranchId");
-
-                    b.Property<string>("Capability")
-                        .HasMaxLength(160)
-                        .HasColumnType("character varying(160)")
-                        .HasColumnName("Capability");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("CreatedAt");
-
-                    b.Property<int>("CreatedBy")
-                        .HasColumnType("integer")
-                        .HasColumnName("CreatedBy");
-
-                    b.Property<int?>("DentistId")
-                        .HasColumnType("integer")
-                        .HasColumnName("DentistId");
-
-                    b.Property<Guid?>("DossierId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("uuid")
-                        .HasColumnName("DossierId");
-
-                    b.Property<int>("DurationMinutes")
-                        .HasColumnType("integer")
-                        .HasColumnName("DurationMinutes");
-
-                    b.Property<DateOnly>("EarliestOn")
-                        .HasColumnType("date")
-                        .HasColumnName("EarliestOn");
-
-                    b.Property<string>("Guidance")
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)")
-                        .HasColumnName("Guidance");
-
-                    b.Property<Guid?>("ItemId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("uuid")
-                        .HasColumnName("ItemId");
-
-                    b.Property<DateOnly>("LatestOn")
-                        .HasColumnType("date")
-                        .HasColumnName("LatestOn");
-
-                    b.Property<int>("PatientId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("PatientId");
-
-                    b.Property<int?>("PlanVersion")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("PlanVersion");
-
-                    b.Property<string>("Purpose")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
-                        .HasColumnName("Purpose");
-
-                    b.Property<string>("Reason")
-                        .IsRequired()
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)")
-                        .HasColumnName("Reason");
-
-                    b.Property<Guid?>("SourceActivityId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("SourceActivityId");
-
-                    b.Property<Guid?>("SourceCompletionEventId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("SourceCompletionEventId");
-
-                    b.Property<Guid?>("SourceVisitId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("SourceVisitId");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("Status");
-
-                    b.Property<Guid?>("StepId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("uuid")
-                        .HasColumnName("StepId");
-
-                    b.Property<DateOnly>("TargetOn")
-                        .HasColumnType("date")
-                        .HasColumnName("TargetOn");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("UpdatedAt");
-
-                    b.Property<int>("Version")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("Version");
-
-                    b.HasIndex("ActiveAppointmentId")
-                        .IsUnique()
-                        .HasFilter("\"ActiveAppointmentId\" IS NOT NULL");
-
-                    b.HasIndex("StepId")
-                        .IsUnique()
-                        .HasDatabaseName("IX_FOLLOW_UP_INSTRUCTION_ActiveStep")
-                        .HasFilter("\"StepId\" IS NOT NULL AND \"Status\" IN ('NeedsBooking','Booked')");
-
-                    b.HasIndex("DossierId", "ItemId")
-                        .IsUnique()
-                        .HasDatabaseName("IX_FOLLOW_UP_INSTRUCTION_ActiveItemOnly")
-                        .HasFilter("\"DossierId\" IS NOT NULL AND \"ItemId\" IS NOT NULL AND \"StepId\" IS NULL AND \"Status\" IN ('NeedsBooking','Booked')");
-
-                    b.HasIndex("PatientId", "Status");
-
-                    b.HasIndex("StepId", "SourceCompletionEventId")
-                        .IsUnique()
-                        .HasDatabaseName("IX_FOLLOW_UP_INSTRUCTION_Step_Completion")
-                        .HasFilter("\"StepId\" IS NOT NULL AND \"SourceCompletionEventId\" IS NOT NULL");
-
-                    b.ToTable(t =>
-                        {
-                            t.HasCheckConstraint("CK_CLINICAL_ACTIVITY_VALUES", "\"ProcessKind\" <> 'ClinicalActivity' OR (\"Quantity\" > 0 AND \"PriceSnapshotVnd\" >= 0)");
-
-                            t.HasCheckConstraint("CK_FOLLOW_UP_DURATION", "\"ProcessKind\" <> 'FollowUpInstruction' OR \"DurationMinutes\" BETWEEN 15 AND 480 AND \"DurationMinutes\" % 15 = 0");
-
-                            t.HasCheckConstraint("CK_FOLLOW_UP_WINDOW", "\"ProcessKind\" <> 'FollowUpInstruction' OR (\"EarliestOn\" <= \"TargetOn\" AND \"TargetOn\" <= \"LatestOn\")");
-                        });
-
-                    b.HasDiscriminator().HasValue("FollowUpInstruction");
-                });
-
             modelBuilder.Entity("DCMS.Domain.Features.Accounts.EmployeeProfile", b =>
                 {
                     b.HasOne("DCMS.Infrastructure.Features.Accounts.ApplicationUser", null)
@@ -5733,6 +5501,11 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasPrincipalKey("Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.HasOne("DCMS.Domain.Features.Treatment.TreatmentDossier", null)
+                        .WithMany()
+                        .HasForeignKey("DossierId")
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("DCMS.Domain.Features.FamilyMembers.FamilyMember", null)
                         .WithMany()

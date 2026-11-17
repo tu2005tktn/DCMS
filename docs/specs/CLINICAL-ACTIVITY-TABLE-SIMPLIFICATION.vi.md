@@ -78,6 +78,6 @@ Công việc chăm sóc từng cho phép tham chiếu một đánh giá lâm sà
 
 Migration: `SimplifyClinicalActivityTable` (giai đoạn 1) và `RemoveClinicalReviewsAndCareNotes` (giai đoạn 2).
 
-## Giai đoạn 3: chỉ còn hoạt động điều trị (đang chờ triển khai)
+## Giai đoạn 3: chỉ còn hoạt động điều trị (đã triển khai)
 
 Người dùng yêu cầu xóa hướng dẫn tái khám và chỉ giữ các cột của hoạt động điều trị; lịch hẹn tiếp theo chỉ gắn với phiếu điều trị (`APPOINTMENT.DossierId`). Bảng sẽ giảm từ **50 xuống 31 cột**. Thiết kế chi tiết: [FOLLOW-UP-INSTRUCTION-REMOVAL.vi.md](FOLLOW-UP-INSTRUCTION-REMOVAL.vi.md). Mục "Chưa làm" của giai đoạn 2 được thay bằng spec này.

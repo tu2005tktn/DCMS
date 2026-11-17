@@ -37,7 +37,8 @@ internal static class AppointmentModel
             b.HasIndex(x => x.Code).IsUnique();
             b.HasIndex(x => new { x.BranchId, x.StartAt });
             b.HasIndex(x => new { x.StartAt, x.EndAt });
-            b.HasIndex(x => x.FollowUpId).IsUnique().HasFilter("\"FollowUpId\" IS NOT NULL AND \"Status\" IN ('Confirmed','CheckedIn')");
+            b.HasIndex(x => x.DossierId);
+            b.HasOne<DCMS.Domain.Features.Treatment.TreatmentDossier>().WithMany().HasForeignKey(x => x.DossierId).OnDelete(DeleteBehavior.Restrict);
             b.HasIndex(x => new { x.BookerAccountId, x.FamilyMemberId, x.StartAt });
 
             b.HasOne<SchedulingBranch>().WithMany().HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Restrict);

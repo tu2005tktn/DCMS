@@ -1,5 +1,7 @@
 # S58/S21/S24 — Mẫu, tiến trình điều trị và chỉ định quay lại
 
+> Cập nhật 18/11/2026: hướng dẫn tái khám (`FollowUpInstruction`, `/api/follow-up-instructions`) đã bị xóa. Lịch hẹn tiếp theo gắn với phiếu điều trị qua `APPOINTMENT.DossierId` (thay `FollowUpId`) và được gợi ý từ hạng mục kế hoạch gần nhất còn chờ của phiếu. Các phần bên dưới nói về hướng dẫn tái khám là lịch sử thiết kế. Xem [FOLLOW-UP-INSTRUCTION-REMOVAL.vi.md](FOLLOW-UP-INSTRUCTION-REMOVAL.vi.md).
+
 ## Giao diện kế hoạch dùng lại — 02/11/2026
 Menu `/treatment-templates` nay hiển thị Kế hoạch điều trị dạng hạng mục theo `TREATMENT-ITEM-PLANS.md`. Mẫu bước tiến trình cũ và hợp đồng bên dưới giữ tại `/treatment-templates/legacy`. DefinitionKind LegacySteps/ItemPlan phân biệt nguồn; API progression cũ chỉ đọc/sửa/áp dụng LegacySteps chưa xóa. Kế hoạch ItemPlan CRUD độc lập, chưa áp dụng vào dossier và không tạo bước/actual/lịch/tiền.
 

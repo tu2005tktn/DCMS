@@ -56,7 +56,7 @@ async function setupNextVisit(page: Page, candidatesStatus = 200, extra: { candi
   const sent: any[] = []; let booked = false;
   const candidate = { dossierId: 'd1', dossierCode: 'DT-001', itemId: 'i1', serviceId: 3, serviceName: 'Trám răng', region: '26',
     estimatedStart: '2099-01-10', durationMinutes: 30, dentistId: 5, dentistName: 'Bác sĩ A', branchId: 1, status: 'Ready',
-    followUpId: null, appointment: null, earliestOn: null, latestOn: null,
+    appointment: null,
     targetOn: '2099-01-10', windowFrom: '2099-01-06', windowTo: '2099-01-14', ...extra.candidate };
   await page.addInitScript(() => sessionStorage.setItem('dcms.web.access-token', 'fixture'));
   await page.route('**/api/**', async route => {
@@ -69,7 +69,7 @@ async function setupNextVisit(page: Page, candidatesStatus = 200, extra: { candi
     if (url.pathname === '/api/patients/7/appointments') return json({ items: [], total: 0, page: 1, pageSize: 20 });
     if (url.pathname === '/api/patients/7/next-visit-candidates') {
       if (candidatesStatus !== 200) return json({ code: 'MSG06', message: 'Không có quyền.' }, candidatesStatus);
-      return json({ items: [booked ? { ...candidate, status: 'Booked', followUpId: 'fu-1',
+      return json({ items: [booked ? { ...candidate, status: 'Booked',
         appointment: { id: 'ap-1', code: 'AP-NEXT', startAt: '2099-01-12T02:00:00Z' } } : candidate] });
     }
     if (url.pathname === '/api/availability') {
@@ -82,7 +82,6 @@ async function setupNextVisit(page: Page, candidatesStatus = 200, extra: { candi
     }
     if (url.pathname === '/api/dossiers/d1/plan/items/i1/planned-date-preview') return json(extra.preview ?? {});
     if (url.pathname === '/api/dossiers/d1/plan/planned-dates' && method === 'POST') { sent.push({ command: 'planned-dates', ...route.request().postDataJSON() }); return json({}); }
-    if (url.pathname === '/api/follow-up-instructions' && method === 'POST') { sent.push({ command: 'follow-up', ...route.request().postDataJSON() }); return json({ instruction: { id: 'fu-1' } }, 201); }
     if (url.pathname === '/api/appointments' && method === 'POST') {
       sent.push({ command: 'appointment', ...route.request().postDataJSON() }); booked = true;
       return json({ appointmentId: 'ap-1', code: 'AP-NEXT', version: 1, status: 'Confirmed', startAt: '2099-01-12T02:00:00Z', endAt: '2099-01-12T02:30:00Z',
@@ -108,13 +107,13 @@ test('tab shows the nearest unperformed plan item, jumps to the first day the de
   await drawer.getByRole('button', { name: '09:00', exact: true }).click();
   await drawer.getByLabel('SĐT (10 số) hoặc email').fill('0912345678');
   await expect(drawer.getByRole('button', { name: 'Xác nhận đặt lịch' })).toBeDisabled();
-  expect(sent.some(value => value.command === 'appointment' || value.command === 'follow-up')).toBe(false);
+  expect(sent.some(value => value.command === 'appointment')).toBe(false);
   await drawer.getByRole('checkbox', { name: 'Đã có sự đồng ý của bệnh nhân', exact: true }).check();
   await drawer.getByRole('button', { name: 'Xác nhận đặt lịch' }).click();
   await expect(drawer).toBeHidden();
-  const followUp = sent.find(x => x.command === 'follow-up'), appointment = sent.find(x => x.command === 'appointment');
-  expect(followUp.source).toMatchObject({ dossierId: 'd1', itemId: 'i1' }); expect(followUp.dentistId).toBe(5);
-  expect(appointment).toMatchObject({ kind: 'FollowUp', followUpId: 'fu-1', serviceId: 3, dentistId: 5, durationMinutes: 30, patientConsentConfirmed: true });
+  const appointment = sent.find(x => x.command === 'appointment');
+  expect(appointment).toMatchObject({ kind: 'FollowUp', dossierId: 'd1', serviceId: 3, dentistId: 5, durationMinutes: 30, patientConsentConfirmed: true });
+  expect(appointment).not.toHaveProperty('followUpId');
   await expect(page.getByText('Mọi hạng mục chưa thực hiện đã có lịch hẹn.')).toBeVisible();
   await expect(page.getByText('AP-NEXT')).toHaveCount(0);
 });
@@ -145,8 +144,6 @@ test('only days within 4 days of the planned date are offered, nearest first wit
   await expect(sync.getByText('Bọc sứ', { exact: false })).toBeVisible();
   await sync.getByRole('button', { name: 'Cập nhật ngày dự kiến' }).click();
   await expect(sync).toBeHidden();
-  const followUp = sent.find(x => x.command === 'follow-up');
-  expect(followUp).toMatchObject({ earliestOn: '2099-01-06', targetOn: '2099-01-10', latestOn: '2099-01-14' });
   expect(sent.find(x => x.command === 'appointment').exceptionReason).toBeNull();
   expect(sent.find(x => x.command === 'planned-dates')).toMatchObject({ expectedVersion: 4,
     changes: [{ itemId: 'i1', plannedOn: '2099-01-12' }, { itemId: 'i2', plannedOn: '2099-01-22' }] });
@@ -231,8 +228,8 @@ test('booking network retry preserves patient consent and the request key', asyn
   expect(requests.every(request => request.patientConsentConfirmed === true)).toBe(true);
 });
 
-for (const existingInstruction of [false, true]) test(`edited appointment duration reloads slots and ${existingInstruction ? 'reuses an existing' : 'creates a default-duration'} instruction`, async ({ page }) => {
-  const sent = await setupNextVisit(page, 200, { candidate: existingInstruction ? { status: 'NeedsBooking', followUpId: 'fu-1' } : {} });
+test('edited appointment duration reloads slots and books the dossier with that duration', async ({ page }) => {
+  const sent = await setupNextVisit(page);
   await page.getByRole('tab', { name: 'Lịch hẹn', exact: true }).click();
   await page.getByRole('button', { name: 'Đặt lịch', exact: true }).click();
   const drawer = page.getByRole('dialog').filter({ hasText: 'Đặt lịch theo kế hoạch điều trị' });
@@ -250,10 +247,7 @@ for (const existingInstruction of [false, true]) test(`edited appointment durati
   await expect(drawer.getByRole('checkbox', { name: 'Đã có sự đồng ý của bệnh nhân', exact: true })).toBeChecked();
   await drawer.getByRole('button', { name: 'Xác nhận đặt lịch' }).click();
   await expect(drawer).toBeHidden();
-  expect(sent.find(x => x.command === 'appointment')).toMatchObject({ durationMinutes: 37, followUpId: 'fu-1' });
-  const instruction = sent.find(x => x.command === 'follow-up');
-  if (existingInstruction) expect(instruction).toBeUndefined();
-  else expect(instruction.durationMinutes).toBe(30);
+  expect(sent.find(x => x.command === 'appointment')).toMatchObject({ durationMinutes: 37, dossierId: 'd1' });
 });
 
 test('blank duration blocks booking and reopening restores the item default', async ({ page }) => {
@@ -319,6 +313,5 @@ test('changing duration after a lost booking response uses a new request key and
   await expect(drawer).toBeHidden();
   expect(requests).toHaveLength(2);
   expect(requests[0].requestKey).not.toBe(requests[1].requestKey);
-  expect(requests[1]).toMatchObject({ durationMinutes: 37, followUpId: 'fu-1' });
-  expect(sent.filter(x => x.command === 'follow-up')).toHaveLength(1);
+  expect(requests[1]).toMatchObject({ durationMinutes: 37, dossierId: 'd1' });
 });

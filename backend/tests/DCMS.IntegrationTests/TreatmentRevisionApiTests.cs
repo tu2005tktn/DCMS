@@ -124,7 +124,7 @@ public sealed class TreatmentRevisionApiTests(ApiFixture fixture) : IClassFixtur
             .Content.ReadFromJsonAsync<RevisionPreviewDto>())!;
         Assert.True(preview.CanSave, string.Join(",", preview.Blockers));
         var command = new CommitRevisionRequest(item.Id, safeDraft.Version, preview.DossierVersion,
-            preview.PlanVersion, [], [], [], preview.Actual.VersionToken,
+            preview.PlanVersion, [], [], preview.Actual.VersionToken,
             preview.Finance.VersionToken, Guid.NewGuid());
         Assert.Equal(HttpStatusCode.Conflict, (await dentist.PostAsJsonAsync(
             $"{baseUrl}/revisions", command with
@@ -173,7 +173,7 @@ public sealed class TreatmentRevisionApiTests(ApiFixture fixture) : IClassFixtur
                 .Content.ReadFromJsonAsync<RevisionPreviewDto>())!;
             Assert.True(preview.CanSave);
             return (url, new CommitRevisionRequest(item.Id, draft.Version,
-                preview.DossierVersion, preview.PlanVersion, [], [], [],
+                preview.DossierVersion, preview.PlanVersion, [], [],
                 preview.Actual.VersionToken, preview.Finance.VersionToken, Guid.NewGuid()), dossier.Id);
         }
 

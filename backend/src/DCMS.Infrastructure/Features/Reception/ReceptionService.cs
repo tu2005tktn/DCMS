@@ -226,7 +226,7 @@ public sealed class ReceptionService(DcmsDbContext db, UserManager<ApplicationUs
         db.Visits.Add(visit);
         db.Add(new VisitAudit { VisitId = visit.Id, ActorAccountId = actorId, OccurredAt = now, BeforeJson = before,
             AfterJson = JsonSerializer.Serialize(new { visit.PatientId, visit.AppointmentId, visit.ArrivalAt, RecordedAt = now,
-                visit.ArrivalReason, visit.Purpose, request.IdentityConfirmed, a.FollowUpId, visit.Note, a.Version }) });
+                visit.ArrivalReason, visit.Purpose, request.IdentityConfirmed, a.DossierId, visit.Note, a.Version }) });
         db.Add(new ReceptionReceipt { ActorAccountId = actorId, RequestKey = request.RequestKey, VisitId = visit.Id, Fingerprint = fingerprint });
         db.AppointmentChanges.Add(new AppointmentChange { AppointmentId = a.Id, ActorAccountId = actorId, ActorKind = "STAFF", Action = "CHECK_IN",
             OldStart = a.StartAt, OldEnd = a.EndAt, OldDentistId = a.DentistId, OldChairId = a.ChairId,

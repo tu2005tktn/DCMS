@@ -32,32 +32,32 @@ public sealed partial class TreatmentDossierService
         foreach (var dossier in dossiers)
             performed.UnionWith(await PerformedItemIdsAsync(dossier.Id, ct));
 
-        var instructions = await db.FollowUpInstructions.AsNoTracking().Where(x => x.PatientId == patientId && x.DossierId.HasValue
-            && dossierIds.Contains(x.DossierId.Value) && x.ItemId.HasValue && x.StepId == null
-            && (x.Status == "NeedsBooking" || x.Status == "Booked")).OrderByDescending(x => x.CreatedAt).ToListAsync(ct);
-        var appointmentIds = instructions.Where(x => x.ActiveAppointmentId.HasValue).Select(x => x.ActiveAppointmentId!.Value).ToArray();
-        var appointments = await db.Appointments.AsNoTracking().Where(x => appointmentIds.Contains(x.Id)
-            && (x.Status == "Confirmed" || x.Status == "CheckedIn" || x.Status == "InProgress")).ToDictionaryAsync(x => x.Id, ct);
+        // A dossier is booked when it already has an upcoming follow-up appointment.
+        var appointments = (await db.Appointments.AsNoTracking().Where(x => x.DossierId.HasValue && dossierIds.Contains(x.DossierId.Value)
+            && (x.Status == "Confirmed" || x.Status == "CheckedIn" || x.Status == "InProgress")).OrderBy(x => x.StartAt).ToListAsync(ct))
+            .GroupBy(x => x.DossierId!.Value).ToDictionary(x => x.Key, x => x.First());
 
         var today = DateOnly.FromDateTime(clock.GetUtcNow().ToOffset(TimeSpan.FromHours(7)).DateTime);
+        // One suggestion per dossier: its nearest pending plan item, which only prefills the booking.
         var rows = new List<(TreatmentDossier Dossier, TreatmentItem Item, int DentistId)>();
         foreach (var dossier in dossiers)
-            foreach (var item in dossier.Items.Where(x => TreatmentItemRules.IsPendingForBooking(x) && !performed.Contains(x.Id)))
-                rows.Add((dossier, item, item.ResponsibleDentistId ?? dossier.DentistId));
+            if (dossier.Items.Where(x => TreatmentItemRules.IsPendingForBooking(x) && !performed.Contains(x.Id))
+                    .OrderBy(x => TreatmentItemRules.PlannedTarget(x) == null).ThenBy(x => TreatmentItemRules.PlannedTarget(x))
+                    .ThenBy(x => x.PlannedOrder).FirstOrDefault() is { } nearest)
+                rows.Add((dossier, nearest, nearest.ResponsibleDentistId ?? dossier.DentistId));
         var dentistIds = rows.Select(x => x.DentistId).Distinct().ToArray();
         var names = await db.Employees.AsNoTracking().Where(x => dentistIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.FullName, ct);
 
-        var items = rows.OrderBy(x => x.Item.EstimatedStart == null).ThenBy(x => x.Item.EstimatedStart).ThenBy(x => x.Dossier.CreatedAt)
-            .ThenBy(x => x.Item.PlannedOrder).Select(x =>
+        var items = rows.OrderBy(x => TreatmentItemRules.PlannedTarget(x.Item) == null).ThenBy(x => TreatmentItemRules.PlannedTarget(x.Item))
+            .ThenBy(x => x.Dossier.CreatedAt).Select(x =>
             {
-                var instruction = instructions.FirstOrDefault(i => i.DossierId == x.Dossier.Id && i.ItemId == x.Item.Id);
-                var appointment = instruction?.ActiveAppointmentId is { } id && appointments.TryGetValue(id, out var found) ? found : null;
-                var status = instruction == null ? "Ready" : instruction.Status == "Booked" && appointment != null ? "Booked" : "NeedsBooking";
+                var appointment = appointments.GetValueOrDefault(x.Dossier.Id);
                 var window = TreatmentItemRules.BookingWindow(x.Item, today);
                 return new NextVisitCandidate(x.Dossier.Id, x.Dossier.Code, x.Item.Id, x.Item.ServiceId, x.Item.ServiceName, x.Item.Region,
                     x.Item.EstimatedStart, RoundVisitMinutes(x.Item.EstimatedMinutes), x.DentistId, names.GetValueOrDefault(x.DentistId) ?? "—",
-                    x.Dossier.BranchId, status, instruction?.Id, appointment == null ? null : new(appointment.Id, appointment.Code, appointment.StartAt),
-                    instruction?.EarliestOn, instruction?.LatestOn, TreatmentItemRules.PlannedTarget(x.Item), window?.From, window?.To);
+                    x.Dossier.BranchId, appointment == null ? "Ready" : "Booked",
+                    appointment == null ? null : new(appointment.Id, appointment.Code, appointment.StartAt),
+                    TreatmentItemRules.PlannedTarget(x.Item), window?.From, window?.To);
             }).ToList();
         return new(items);
     }
@@ -79,11 +79,9 @@ public sealed partial class TreatmentDossierService
         if (shift > 0)
         {
             var performed = await PerformedItemIdsAsync(dossier.Id, ct);
-            var booked = (await db.FollowUpInstructions.AsNoTracking().Where(x => x.DossierId == dossier.Id && x.ItemId.HasValue
-                && x.StepId == null && x.Status == "Booked" && x.ActiveAppointmentId.HasValue).Select(x => x.ItemId!.Value).ToListAsync(ct)).ToHashSet();
             foreach (var later in dossier.Items.Where(x => x.Id != item.Id && x.PlannedOrder > item.PlannedOrder && !x.SheetDeleted
                 && !x.HiddenFromSheet && TreatmentItemRules.IsEffective(x) && !x.DisplayCompleted && x.Progress != "Completed"
-                && !performed.Contains(x.Id) && !booked.Contains(x.Id)).OrderBy(x => x.PlannedOrder))
+                && !performed.Contains(x.Id)).OrderBy(x => x.PlannedOrder))
                 if (TreatmentItemRules.PlannedTarget(later) is { } current)
                     changes.Add(new(later.Id, later.ServiceName, later.Region, current, current.AddDays(shift), false));
         }

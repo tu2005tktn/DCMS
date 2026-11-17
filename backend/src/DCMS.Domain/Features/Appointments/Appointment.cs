@@ -39,7 +39,8 @@ public sealed class Appointment
     public int ChairId { get; set; }
     public DateTimeOffset StartAt { get; set; }
     public DateTimeOffset EndAt { get; set; }
-    public Guid? FollowUpId { get; set; }
+    // Treatment dossier of a follow-up appointment (Kind = FollowUp); see docs/specs/FOLLOW-UP-INSTRUCTION-REMOVAL.vi.md.
+    public Guid? DossierId { get; set; }
     public string Status { get; set; } = "Confirmed";
     public int Version { get; set; } = 1;
     public DateTimeOffset CreatedAt { get; set; }

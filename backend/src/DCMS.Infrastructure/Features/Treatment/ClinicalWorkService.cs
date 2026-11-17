@@ -25,15 +25,6 @@ public sealed class ClinicalActualEvidencePort(DcmsDbContext db) : ITreatmentAct
         return rows.Count == evidenceIds.Distinct().Count() && rows.All(x => x.State == "Posted" &&
             x.PatientId == patientId && x.DossierId == dossierId && x.StepId == stepId);
     }
-
-    public async Task<bool> HasFollowUpFulfillmentAsync(int patientId, Guid instructionId,
-        CancellationToken ct)
-    {
-        var instruction = await db.FollowUpInstructions.AsNoTracking().SingleOrDefaultAsync(x =>
-            x.Id == instructionId && x.PatientId == patientId, ct);
-        return instruction?.StepId is { } stepId && await db.ClinicalActivities.AsNoTracking()
-            .AnyAsync(x => x.PatientId == patientId && x.StepId == stepId && x.State == "Posted", ct);
-    }
 }
 
 public sealed class ClinicalWorkService(DcmsDbContext db, UserManager<ApplicationUser> users,

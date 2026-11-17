@@ -166,7 +166,7 @@ public sealed class ReceptionApiTests(ReceptionFixture fixture) : IClassFixture<
     [Fact] public async Task AppointmentFollowUpSourceIsCarriedByServer()
     {
         var s = await Prepare(); var source = Guid.NewGuid(); using var client = await Login();
-        using (var scope = fixture.Services.CreateScope()) { var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>(); (await db.Appointments.SingleAsync(x => x.Id == s.AppointmentId)).FollowUpId = source; await db.SaveChangesAsync(); }
+        using (var scope = fixture.Services.CreateScope()) { var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>(); var appointment = await db.Appointments.SingleAsync(x => x.Id == s.AppointmentId); var dossier = new DCMS.Domain.Features.Treatment.TreatmentDossier { Id = source, PatientId = appointment.PatientId!.Value, BranchId = appointment.BranchId, DentistId = appointment.DentistId, Code = "RCP-" + source.ToString("N"), StartedOn = DateOnly.FromDateTime(DateTime.UtcNow), CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow }; db.Add(dossier); await db.SaveChangesAsync(); appointment.DossierId = source; await db.SaveChangesAsync(); }
         var v = await Check(client, s, Command(s) with { Purpose = "TreatmentContinuation" });
         using (var scope = fixture.Services.CreateScope()) { var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>(); var audit = await db.Set<VisitAudit>().SingleAsync(x => x.VisitId == v.VisitId && x.Action == "CheckIn"); Assert.Contains(source.ToString(), audit.AfterJson); }
     }

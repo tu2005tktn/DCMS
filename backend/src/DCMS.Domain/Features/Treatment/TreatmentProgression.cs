@@ -78,34 +78,6 @@ public sealed class TreatmentStep
     public int Version { get; set; } = 1;
 }
 
-public sealed class FollowUpInstruction : TreatmentProcessRecord
-{
-    public int PatientId { get; set; }
-    public int BranchId { get; set; }
-    public Guid? DossierId { get; set; }
-    public Guid? ItemId { get; set; }
-    public Guid? StepId { get; set; }
-    public int? PlanVersion { get; set; }
-    public Guid? SourceVisitId { get; set; }
-    public Guid? SourceActivityId { get; set; }
-    public Guid? SourceCompletionEventId { get; set; }
-    public string Purpose { get; set; } = "TreatmentContinuation";
-    public string Reason { get; set; } = "";
-    public string? Guidance { get; set; }
-    public DateOnly EarliestOn { get; set; }
-    public DateOnly TargetOn { get; set; }
-    public DateOnly LatestOn { get; set; }
-    public int DurationMinutes { get; set; }
-    public int? DentistId { get; set; }
-    public string? Capability { get; set; }
-    public string Status { get; set; } = "NeedsBooking";
-    public Guid? ActiveAppointmentId { get; set; }
-    public int Version { get; set; } = 1;
-    public int CreatedBy { get; set; }
-    public DateTimeOffset CreatedAt { get; set; }
-    public DateTimeOffset UpdatedAt { get; set; }
-}
-
 public sealed class TreatmentProgressionReceipt : DCMS.Domain.Common.CommandReceiptRecord
 {
     public int ActorId { get; set; }

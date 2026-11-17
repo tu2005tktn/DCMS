@@ -21,7 +21,7 @@ export const customerCareApi = {
   export: (filter: WorklistFilter) => apiBlob(`${base}/export?${query(filter)}`),
   detail: (id: string) => api<CareTaskDetail>(`${base}/${id}`),
   create: (body: { patientId: number; branchId: number; type: string; content: string; ownerAccountId: number | null; dueAt: string; requestKey: string }) =>
-    api<CareTask>(base, { method: 'POST', body: JSON.stringify({ ...body, instructionId: null, appointmentId: null }) }),
+    api<CareTask>(base, { method: 'POST', body: JSON.stringify({ ...body, appointmentId: null }) }),
   update: (id: string, body: { expectedVersion: number; status: string; ownerAccountId: number | null; dueAt: string; content: string; requestKey: string }) =>
     api<CareTask>(`${base}/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   contact: (id: string, body: { channel: string; result: string; nextAction: string | null; expectedTaskVersion: number; requestKey: string }) =>

@@ -200,7 +200,7 @@ public sealed class AppointmentApiTests(ApiFixture fixture) : IClassFixture<ApiF
     public async Task PublicFollowUpWithoutVerifiedPatientIsRejected()
     {
         var setup = await PrepareAsync(); using var client = fixture.CreateClient();
-        var command = Request(setup, await SlotAsync(client, setup)) with { Kind = "FollowUp", FollowUpId = Guid.NewGuid() };
+        var command = Request(setup, await SlotAsync(client, setup)) with { Kind = "FollowUp", DossierId = Guid.NewGuid() };
         var response = await client.PostAsJsonAsync("/api/appointments", command);
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         using var scope = fixture.Services.CreateScope();

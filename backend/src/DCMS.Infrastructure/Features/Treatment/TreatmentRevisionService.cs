@@ -43,7 +43,6 @@ public sealed class TreatmentRevisionService(DcmsDbContext db, UserManager<Appli
         Encoding.UTF8.GetBytes(JsonSerializer.Serialize(value, Json))));
     private static bool Retryable(DbUpdateException error) =>
         error.InnerException is PostgresException { SqlState: "40001" or "23505" };
-    private static bool Active(Appointment x) => x.Status is "Confirmed" or "CheckedIn" or "InProgress";
     private static void RequireOpen(TreatmentDossier dossier)
     {
         if (dossier.State != "Open" || dossier.PlanState != "Committed")
@@ -129,26 +128,19 @@ public sealed class TreatmentRevisionService(DcmsDbContext db, UserManager<Appli
         });
     }
 
-    private async Task<(List<TreatmentStep> Steps, List<FollowUpInstruction> Instructions,
-        List<Appointment> Bookings)> ImpactsAsync(Guid dossierId, Guid itemId, CancellationToken ct)
+    private async Task<(List<TreatmentStep> Steps, List<Appointment> Bookings)> ImpactsAsync(Guid dossierId, Guid itemId, CancellationToken ct)
     {
         var steps = await db.LoadTreatmentStepsAsync(db.TreatmentSteps.Where(x => x.DossierId == dossierId && x.ItemId == itemId)
             .OrderBy(x => x.Id), ct);
-        var instructions = await db.FollowUpInstructions.Where(x => x.DossierId == dossierId &&
-            x.ItemId == itemId && (x.Status == "NeedsBooking" || x.Status == "Booked"))
-            .OrderBy(x => x.Id).ToListAsync(ct);
-        var instructionIds = instructions.Select(x => x.Id).ToArray();
-        var bookings = await db.Appointments.Where(x => x.FollowUpId.HasValue &&
-            instructionIds.Contains(x.FollowUpId.Value) &&
+        // Follow-up appointments belong to the dossier, not to an item; they are shown for context only.
+        var bookings = await db.Appointments.Where(x => x.DossierId == dossierId &&
             (x.Status == "Confirmed" || x.Status == "CheckedIn" || x.Status == "InProgress"))
             .OrderBy(x => x.Id).ToListAsync(ct);
-        return (steps, instructions, bookings);
+        return (steps, bookings);
     }
 
     private static RevisionStepImpact Step(TreatmentStep x) => new(x.Id, x.Version, x.PlanVersion,
         x.Name, x.Outcome, x.HoldReason != null);
-    private static RevisionInstructionImpact Instruction(FollowUpInstruction x) =>
-        new(x.Id, x.Version, x.Status, x.ActiveAppointmentId);
     private static RevisionBookingImpact Booking(Appointment x) =>
         new(x.Id, x.Code, x.Version, x.Status, x.StartAt);
 
@@ -164,7 +156,7 @@ public sealed class TreatmentRevisionService(DcmsDbContext db, UserManager<Appli
             .OrderBy(x => x.Name).Select(x => new RevisionServiceOption(x.Id, x.Name))
             .ToArrayAsync(ct);
         return new(detail, detail.Items.Single(x => x.Id == itemId),
-            impacts.Steps.Select(Step).ToArray(), impacts.Instructions.Select(Instruction).ToArray(),
+            impacts.Steps.Select(Step).ToArray(),
             impacts.Bookings.Select(Booking).ToArray(), services);
     }
 
@@ -312,8 +304,6 @@ public sealed class TreatmentRevisionService(DcmsDbContext db, UserManager<Appli
         if (Clean(draft.Reason) is null) blockers.Add("MSG04");
         if (dossier.Version < 1 || dossier.PlanVersion != row.BasePlanVersion)
             blockers.Add("MSG111");
-        if (impacts.Bookings.Any(Active) || impacts.Instructions.Any(x => x.Status == "Booked"))
-            blockers.Add("MSG233");
         var openSteps = impacts.Steps.Where(x => x.Outcome is not ("Completed" or "Stopped" or "Cancelled" or "Skipped"))
             .Select(x => x.Id).Order().ToArray();
         if (!openSteps.SequenceEqual(draft.FutureDispositions.Select(x => x.StepId).Order()))
@@ -341,7 +331,7 @@ public sealed class TreatmentRevisionService(DcmsDbContext db, UserManager<Appli
             p.Unit == item.Unit && draft.Decision == item.Decision) blockers.Add("MSG04");
         return new(dossier.Id, item.Id, row.Version, dossier.Version, dossier.PlanVersion,
             (await dossiers.GetAsync(row.ActorId, dossier.Id, ct)).Items.Single(x => x.Id == item.Id), p,
-            impacts.Steps.Select(Step).ToArray(), impacts.Instructions.Select(Instruction).ToArray(),
+            impacts.Steps.Select(Step).ToArray(),
             impacts.Bookings.Select(Booking).ToArray(), actualState, financeState,
             p.Quantity * p.AgreedUnitPriceVnd - item.Quantity * item.AgreedUnitPriceVnd,
             blockers.Count == 0, blockers.Distinct().ToArray());
@@ -391,7 +381,6 @@ public sealed class TreatmentRevisionService(DcmsDbContext db, UserManager<Appli
             var preview = await BuildPreviewAsync(dossier, item, row, ct);
             if (!preview.CanSave) throw Error(preview.Blockers[0], 409);
             if (!Match(preview.Steps, request.Steps, x => x.Id, x => x.Version) ||
-                !Match(preview.Instructions, request.Instructions, x => x.Id, x => x.Version) ||
                 !Match(preview.Bookings, request.Bookings, x => x.Id, x => x.Version) ||
                 request.ActualVersionToken != preview.Actual.VersionToken ||
                 request.FinanceVersionToken != preview.Finance.VersionToken) throw Error("MSG111", 409);
@@ -407,12 +396,6 @@ public sealed class TreatmentRevisionService(DcmsDbContext db, UserManager<Appli
                 var disposition = dispositions[step.Id];
                 step.Outcome = disposition.Outcome;
                 step.Version++;
-            }
-            foreach (var instruction in impacts.Instructions.Where(x => x.Status == "NeedsBooking"))
-            {
-                instruction.Status = "Superseded";
-                instruction.Version++;
-                instruction.UpdatedAt = clock.GetUtcNow();
             }
             var serviceChanged = item.ServiceId != service.Id;
             item.ServiceId = service.Id;

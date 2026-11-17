@@ -16,7 +16,7 @@ Yêu cầu người dùng ngày 18/11/2026: bỏ các cột thừa của `APPOIN
 | Liên kết hồ sơ | `PatientId` | `int?`, FK `PATIENT_PROFILE(Id)` | |
 | | `BookerAccountId` | `int?`, FK `USER_ACCOUNT(Id)` | |
 | | `FamilyMemberId` | `uuid?`, FK `CUSTOMER_FAMILY_MEMBER(Id)` | |
-| | `FollowUpId` | `uuid?` | Unique filter khi `Status IN ('Confirmed','CheckedIn')` |
+| | `DossierId` | `uuid?`, FK `TREATMENT_DOSSIER(Id)` | Phiếu điều trị của lịch tái khám; bắt buộc khi `Kind = FollowUp`. Thay `FollowUpId` từ 18/11/2026, xem [FOLLOW-UP-INSTRUCTION-REMOVAL.vi.md](FOLLOW-UP-INSTRUCTION-REMOVAL.vi.md) |
 | Tìm kiếm & Phân loại | `AttendeeName` | `varchar(100)`, `NOT NULL` | Giữ top-level phục vụ tìm kiếm `ILike` tại Tiếp nhận |
 | | `Kind` | `varchar(16)`, `NOT NULL` | `Standard`, `WalkIn`, `FollowUp` |
 | | `Source` | `varchar(24)`, `NOT NULL` | `Phone`, `Zalo`, `Facebook`, `InPerson`, `App` |

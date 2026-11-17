@@ -7,7 +7,6 @@ using DCMS.Application.Features.Scheduling;
 using DCMS.Application.Features.Treatment;
 using DCMS.Application.Features.Settings;
 using DCMS.Domain.Features.Patients;
-using DCMS.Domain.Features.PatientLinks;
 using DCMS.Domain.Features.Scheduling;
 using DCMS.Domain.Features.Treatment;
 using DCMS.Infrastructure.Persistence;
@@ -17,14 +16,14 @@ using Xunit;
 
 namespace DCMS.IntegrationTests;
 
-// Regression coverage for booking from treatment plans, using an isolated PostgreSQL schema.
+// Booking the next visit of a treatment dossier (docs/specs/FOLLOW-UP-INSTRUCTION-REMOVAL.vi.md), using an isolated PostgreSQL schema.
 public sealed class TreatmentPlanBookingApiTests(ApiFixture fixture) : IClassFixture<ApiFixture>
 {
     private sealed record Setup(int Patient, int Branch, int Dentist, int Service, DateOnly Date, Guid Dossier, Guid Item);
     private CreateAppointmentRequest? lastCommand;
     private int outboxBefore;
 
-    private async Task AssertRejectedWithoutWrites(Setup s, Guid instruction, HttpResponseMessage response,
+    private async Task AssertRejectedWithoutWrites(Setup s, HttpResponseMessage response,
         HttpStatusCode expectedStatus = HttpStatusCode.Conflict, string expectedCode = "MSG230")
     {
         Assert.Equal(expectedStatus, response.StatusCode);
@@ -33,8 +32,6 @@ public sealed class TreatmentPlanBookingApiTests(ApiFixture fixture) : IClassFix
         Assert.False(await db.Appointments.AnyAsync(x => x.PatientId == s.Patient));
         Assert.False(await db.AppointmentReceipts.AnyAsync(x => x.RequestKey == lastCommand!.RequestKey));
         Assert.Equal(outboxBefore, await db.AppointmentOutboxEvents.CountAsync());
-        var followUp = await db.FollowUpInstructions.AsNoTracking().SingleAsync(x => x.Id == instruction);
-        Assert.Equal("NeedsBooking", followUp.Status); Assert.Null(followUp.ActiveAppointmentId);
     }
 
     private async Task<HttpClient> Login(string name = "dentist.demo")
@@ -70,22 +67,30 @@ public sealed class TreatmentPlanBookingApiTests(ApiFixture fixture) : IClassFix
         return new(patient.Id, branch.Id, dentist.Id, service.Id, date, dossier.Id, item.Id);
     }
 
-    private async Task<Guid> Instruction(HttpClient client, Setup s)
+    private async Task<NextVisitCandidate[]> Candidates(HttpClient client, Setup s) =>
+        (await client.GetFromJsonAsync<NextVisitCandidates>($"/api/patients/{s.Patient}/next-visit-candidates"))!.Items.ToArray();
+
+    private async Task<HttpResponseMessage> Book(HttpClient client, Setup s, Guid? dossier, bool patientConsent = true, int durationMinutes = 30)
     {
-        var response = await client.PostAsJsonAsync("/api/follow-up-instructions", new CreateFollowUpRequest(s.Patient, s.Branch,
-            new FollowUpSource(s.Dossier, s.Item, null, null, null), "TreatmentContinuation", "SYNTHETIC audit", null,
-            s.Date.AddDays(-4), s.Date, s.Date.AddDays(4), 30, s.Dentist, null, Guid.NewGuid()));
-        Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
-        return (await response.Content.ReadFromJsonAsync<FollowUpChange>())!.Instruction.Id;
+        var queryDuration = durationMinutes is >= 1 and <= 480 ? durationMinutes : 30;
+        var availability = await client.GetFromJsonAsync<AvailabilityResult>($"/api/availability?branchId={s.Branch}&dentistId={s.Dentist}&serviceId={s.Service}&date={s.Date:yyyy-MM-dd}&durationMinutes={queryDuration}");
+        Assert.NotEmpty(availability!.Slots);
+        var slot = availability.Slots[0];
+        using (var scope = fixture.Services.CreateScope()) outboxBefore = await scope.ServiceProvider.GetRequiredService<DcmsDbContext>().AppointmentOutboxEvents.CountAsync();
+        lastCommand = new CreateAppointmentRequest(s.Branch,
+            new BookerContact("SYNTHETIC audit", "0912345678", null), new AppointmentAttendee(s.Patient, "SYNTHETIC audit patient", null),
+            "Self", dossier.HasValue ? "FollowUp" : "Standard", "InPerson", s.Service, "SYNTHETIC audit", s.Dentist, slot.ChairId, slot.Start, durationMinutes,
+            dossier, null, Guid.NewGuid(), slot.ScheduleVersion, slot.AssistantScheduleVersion, slot.BookingSettingsVersion, PatientConsentConfirmed: patientConsent);
+        return await client.PostAsJsonAsync("/api/appointments", lastCommand);
     }
 
     [Fact]
     public async Task MissingPatientConsentDoesNotCreateAnyBookingWrites()
     {
-        var s = await Prepare(); using var client = await Login(); var instruction = await Instruction(client, s);
-        await AssertRejectedWithoutWrites(s, instruction, await Book(client, s, instruction, false),
+        var s = await Prepare(); using var client = await Login();
+        await AssertRejectedWithoutWrites(s, await Book(client, s, s.Dossier, false),
             HttpStatusCode.BadRequest, "APPOINTMENT_PATIENT_CONSENT_REQUIRED");
-        Assert.Equal(HttpStatusCode.Created, (await Book(client, s, instruction)).StatusCode);
+        Assert.Equal(HttpStatusCode.Created, (await Book(client, s, s.Dossier)).StatusCode);
     }
 
     [Fact]
@@ -102,14 +107,14 @@ public sealed class TreatmentPlanBookingApiTests(ApiFixture fixture) : IClassFix
         var appointment = (await response.Content.ReadFromJsonAsync<AppointmentResult>())!;
         using var verification = fixture.Services.CreateScope();
         var row = await verification.ServiceProvider.GetRequiredService<DcmsDbContext>().Appointments.AsNoTracking().SingleAsync(x => x.Id == appointment.AppointmentId);
-        Assert.Null(row.FollowUpId);
+        Assert.Null(row.DossierId);
     }
 
     [Fact]
     public async Task WorkingScheduleShowsSavedConsentAndCurrentAppointmentChanges()
     {
-        var s = await Prepare(); using var client = await Login(); var instruction = await Instruction(client, s);
-        var response = await Book(client, s, instruction); Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var s = await Prepare(); using var client = await Login();
+        var response = await Book(client, s, s.Dossier); Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var appointment = (await response.Content.ReadFromJsonAsync<AppointmentResult>())!;
         var path = $"/api/working-schedules/appointments?dentistId={s.Dentist}&from={s.Date:yyyy-MM-dd}&to={s.Date:yyyy-MM-dd}";
         var items = (await client.GetFromJsonAsync<ScheduleAppointments>(path))!.Items;
@@ -127,10 +132,8 @@ public sealed class TreatmentPlanBookingApiTests(ApiFixture fixture) : IClassFix
     public async Task DoctorScheduleRejectsOtherDoctorsAndFiltersAssignmentBranches()
     {
         var first = await Prepare(); var second = await Prepare(); using var client = await Login();
-        foreach (var setup in new[] { first, second }) {
-            var instruction = await Instruction(client, setup);
-            Assert.Equal(HttpStatusCode.Created, (await Book(client, setup, instruction)).StatusCode);
-        }
+        foreach (var setup in new[] { first, second })
+            Assert.Equal(HttpStatusCode.Created, (await Book(client, setup, setup.Dossier)).StatusCode);
         int otherDentist;
         using (var scope = fixture.Services.CreateScope()) {
             var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
@@ -158,58 +161,64 @@ public sealed class TreatmentPlanBookingApiTests(ApiFixture fixture) : IClassFix
         }
     }
 
-    private async Task<HttpResponseMessage> Book(HttpClient client, Setup s, Guid? instruction, bool patientConsent = true, int durationMinutes = 30)
-    {
-        var queryDuration = durationMinutes is >= 1 and <= 480 ? durationMinutes : 30;
-        var availability = await client.GetFromJsonAsync<AvailabilityResult>($"/api/availability?branchId={s.Branch}&dentistId={s.Dentist}&serviceId={s.Service}&date={s.Date:yyyy-MM-dd}&durationMinutes={queryDuration}");
-        Assert.NotEmpty(availability!.Slots);
-        var slot = availability.Slots[0];
-        using (var scope = fixture.Services.CreateScope()) outboxBefore = await scope.ServiceProvider.GetRequiredService<DcmsDbContext>().AppointmentOutboxEvents.CountAsync();
-        lastCommand = new CreateAppointmentRequest(s.Branch,
-            new BookerContact("SYNTHETIC audit", "0912345678", null), new AppointmentAttendee(s.Patient, "SYNTHETIC audit patient", null),
-            "Self", instruction.HasValue ? "FollowUp" : "Standard", "InPerson", s.Service, "SYNTHETIC audit", s.Dentist, slot.ChairId, slot.Start, durationMinutes,
-            instruction, null, Guid.NewGuid(), slot.ScheduleVersion, slot.AssistantScheduleVersion, slot.BookingSettingsVersion, PatientConsentConfirmed: patientConsent);
-        return await client.PostAsJsonAsync("/api/appointments", lastCommand);
-    }
-
     [Fact]
-    public async Task ControlMatchingPlanItemBooksSuccessfully()
+    public async Task FollowUpBookingStoresTheDossierAndMarksItsSuggestionBooked()
     {
-        var s = await Prepare(); using var client = await Login(); var instruction = await Instruction(client, s);
-        var response = await Book(client, s, instruction);
+        var s = await Prepare(); using var client = await Login();
+        var ready = Assert.Single(await Candidates(client, s));
+        Assert.Equal(s.Item, ready.ItemId); Assert.Equal("Ready", ready.Status); Assert.Null(ready.Appointment);
+        var response = await Book(client, s, s.Dossier);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var created = (await response.Content.ReadFromJsonAsync<AppointmentResult>())!;
-        using var scope = fixture.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
-        var row = await db.Appointments.AsNoTracking().SingleAsync(x => x.Id == created.AppointmentId);
-        Assert.Equal(instruction, row.FollowUpId);
+        using (var scope = fixture.Services.CreateScope()) {
+            var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
+            var row = await db.Appointments.AsNoTracking().SingleAsync(x => x.Id == created.AppointmentId);
+            Assert.Equal(s.Dossier, row.DossierId); Assert.Equal("FollowUp", row.Kind);
+        }
+        var booked = Assert.Single(await Candidates(client, s));
+        Assert.Equal("Booked", booked.Status); Assert.Equal(created.AppointmentId, booked.Appointment!.Id);
     }
 
     [Fact]
-    public async Task DentistProactivelyCancelsTreatmentAppointmentAndItemNeedsBookingAgain()
+    public async Task EachDossierSuggestsOnlyItsNearestPendingItem()
     {
-        var s = await Prepare(); using var dentist = await Login(); var instruction = await Instruction(dentist, s);
-        var booked = await Book(dentist, s, instruction); booked.EnsureSuccessStatusCode();
+        var s = await Prepare(); using var client = await Login(); Guid later;
+        using (var scope = fixture.Services.CreateScope()) {
+            var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
+            var item = new TreatmentItem { DossierId = s.Dossier, ServiceId = s.Service, ServiceName = "SYNTHETIC later service", Unit = "răng", Quantity = 1,
+                PlannedOrder = 2, EstimatedMinutes = 45, EstimatedStart = s.Date.AddDays(14), AgreedUnitPriceVnd = 100000, EntrySource = "ClinicianEntry",
+                Decision = "Agreed", ResponsibleDentistId = s.Dentist };
+            db.Add(item); later = item.Id; await db.SaveChangesAsync();
+        }
+        Assert.Equal(s.Item, Assert.Single(await Candidates(client, s)).ItemId);
+        var marked = await client.PatchAsJsonAsync($"/api/dossiers/{s.Dossier}/sheet-items/{s.Item}/display-completion", new MarkSheetItemRequest(1, true, Guid.NewGuid()));
+        Assert.True(marked.IsSuccessStatusCode, await marked.Content.ReadAsStringAsync());
+        Assert.Equal(later, Assert.Single(await Candidates(client, s)).ItemId);
+    }
+
+    [Fact]
+    public async Task CancelledFollowUpLeavesTheDossierReadyToBookAgain()
+    {
+        var s = await Prepare(); using var dentist = await Login();
+        var booked = await Book(dentist, s, s.Dossier); booked.EnsureSuccessStatusCode();
         var appointment = (await booked.Content.ReadFromJsonAsync<AppointmentResult>())!;
         var response = await dentist.PostAsJsonAsync($"/api/appointments/{appointment.Code}/cancel",
             new CancelAppointmentRequest(appointment.Version, Guid.NewGuid(), "SYNTHETIC clinic changes plan", ClinicInitiated: true));
         Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
-        using var scope = fixture.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
-        var followUp = await db.FollowUpInstructions.AsNoTracking().SingleAsync(x => x.Id == instruction);
-        Assert.Equal("NeedsBooking", followUp.Status); Assert.Null(followUp.ActiveAppointmentId);
-        var next = await dentist.GetFromJsonAsync<NextVisitCandidates>($"/api/patients/{s.Patient}/next-visit-candidates");
-        Assert.Contains(next!.Items, x => x.ItemId == s.Item && x.Status == "NeedsBooking");
+        var next = Assert.Single(await Candidates(dentist, s));
+        Assert.Equal(s.Item, next.ItemId); Assert.Equal("Ready", next.Status);
     }
 
     [Theory]
     [InlineData(1)]
     [InlineData(37)]
     [InlineData(480)]
-    public async Task ItemBookingUsesEditedDurationWithoutChangingPlanOrInstruction(int durationMinutes)
+    public async Task FollowUpBookingUsesEditedDurationWithoutChangingThePlan(int durationMinutes)
     {
         // These cases share the demo dentist: put long reservations on separate days from the regression fixtures.
         var s = await Prepare(durationMinutes == 1 ? 10 : durationMinutes == 37 ? 11 : 12);
-        using var client = await Login(); var instruction = await Instruction(client, s);
-        var response = await Book(client, s, instruction, durationMinutes: durationMinutes);
+        using var client = await Login();
+        var response = await Book(client, s, s.Dossier, durationMinutes: durationMinutes);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var booked = (await response.Content.ReadFromJsonAsync<AppointmentResult>())!;
         Assert.Equal(TimeSpan.FromMinutes(durationMinutes), booked.EndAt - booked.StartAt);
@@ -219,7 +228,6 @@ public sealed class TreatmentPlanBookingApiTests(ApiFixture fixture) : IClassFix
         using var scope = fixture.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
         var saved = await db.Appointments.AsNoTracking().SingleAsync(x => x.Id == booked.AppointmentId);
         Assert.Equal(TimeSpan.FromMinutes(durationMinutes), saved.EndAt - saved.StartAt);
-        Assert.Equal(30, (await db.FollowUpInstructions.AsNoTracking().SingleAsync(x => x.Id == instruction)).DurationMinutes);
         Assert.Equal(30, (await db.TreatmentDossiers.AsNoTracking().Where(x => x.Id == s.Dossier).SelectMany(x => x.Items).SingleAsync(x => x.Id == s.Item)).EstimatedMinutes);
         var changedKeyContent = await client.PostAsJsonAsync("/api/appointments", lastCommand! with { DurationMinutes = durationMinutes == 1 ? 2 : 1 });
         Assert.Equal(HttpStatusCode.Conflict, changedKeyContent.StatusCode);
@@ -228,103 +236,84 @@ public sealed class TreatmentPlanBookingApiTests(ApiFixture fixture) : IClassFix
     [Theory]
     [InlineData(0)]
     [InlineData(481)]
-    public async Task EditedItemDurationOutsideBoundsDoesNotCreateBooking(int durationMinutes)
+    public async Task EditedDurationOutsideBoundsDoesNotCreateBooking(int durationMinutes)
     {
-        var s = await Prepare(); using var client = await Login(); var instruction = await Instruction(client, s);
-        await AssertRejectedWithoutWrites(s, instruction, await Book(client, s, instruction, durationMinutes: durationMinutes), HttpStatusCode.BadRequest, "MSG04");
+        var s = await Prepare(); using var client = await Login();
+        await AssertRejectedWithoutWrites(s, await Book(client, s, s.Dossier, durationMinutes: durationMinutes), HttpStatusCode.BadRequest, "MSG04");
     }
 
     [Fact]
-    public async Task PublicAccountCannotOverrideInstructionDuration()
+    public async Task ClosedDossierCannotBeBooked()
     {
-        var s = await Prepare(); using var staff = await Login(); var instruction = await Instruction(staff, s);
-        await AssertRejectedWithoutWrites(s, instruction, await Book(staff, s, instruction, patientConsent: false, durationMinutes: 37),
-            HttpStatusCode.BadRequest, "APPOINTMENT_PATIENT_CONSENT_REQUIRED");
+        var s = await Prepare(); using var client = await Login();
         using (var scope = fixture.Services.CreateScope()) {
             var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
-            var ownerId = await db.Users.Where(x => x.UserName == "guest.demo").Select(x => x.Id).SingleAsync();
-            db.PatientAccountLinks.Add(new PatientAccountLink { RequestCode = "DURATION-" + Guid.NewGuid().ToString("N")[..20],
-                AccountId = ownerId, PatientId = s.Patient, Status = PatientLinkStatus.Verified,
-                DeclaredFullName = "SYNTHETIC audit patient", RequestedAt = DateTimeOffset.UtcNow });
+            (await db.TreatmentDossiers.SingleAsync(x => x.Id == s.Dossier)).State = "Closed";
             await db.SaveChangesAsync();
         }
-        using var customer = await Login("guest.demo");
-        var response = await customer.PostAsJsonAsync("/api/appointments", lastCommand! with { PatientConsentConfirmed = true, RequestKey = Guid.NewGuid() });
-        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
-        Assert.Equal("MSG230", (await response.Content.ReadFromJsonAsync<DCMS.Application.Common.SystemMessage>())!.Code);
-        using var check = fixture.Services.CreateScope();
-        Assert.False(await check.ServiceProvider.GetRequiredService<DcmsDbContext>().Appointments.AnyAsync(x => x.PatientId == s.Patient));
+        Assert.Empty(await Candidates(client, s));
+        await AssertRejectedWithoutWrites(s, await Book(client, s, s.Dossier));
     }
 
     [Fact]
-    public async Task CompletedItemMustBeRejectedAtBookingCommit()
+    public async Task AnotherPatientsDossierCannotBeBooked()
     {
-        var s = await Prepare(); using var client = await Login(); var instruction = await Instruction(client, s);
+        var s = await Prepare(); var other = await Prepare(); using var client = await Login();
+        await AssertRejectedWithoutWrites(s, await Book(client, s, other.Dossier), HttpStatusCode.Forbidden, "MSG06");
+    }
+
+    [Fact]
+    public async Task FollowUpKindRequiresADossier()
+    {
+        var s = await Prepare(); using var client = await Login();
+        Assert.Equal(HttpStatusCode.Created, (await Book(client, s, s.Dossier)).StatusCode);
+        using var assistant = await Login("assistant.demo");
+        var withoutDossier = await assistant.PostAsJsonAsync("/api/appointments", lastCommand! with { DossierId = null, RequestKey = Guid.NewGuid() });
+        Assert.Equal(HttpStatusCode.BadRequest, withoutDossier.StatusCode);
+    }
+
+    [Fact]
+    public async Task CompletedOrDeletedItemsDisappearFromSuggestions()
+    {
+        var s = await Prepare(); using var client = await Login();
         var marked = await client.PatchAsJsonAsync($"/api/dossiers/{s.Dossier}/sheet-items/{s.Item}/display-completion", new MarkSheetItemRequest(1, true, Guid.NewGuid()));
         Assert.True(marked.IsSuccessStatusCode, await marked.Content.ReadAsStringAsync());
-        var candidates = await client.GetFromJsonAsync<NextVisitCandidates>($"/api/patients/{s.Patient}/next-visit-candidates");
-        Assert.Empty(candidates!.Items);
-        var response = await Book(client, s, instruction);
-        await AssertRejectedWithoutWrites(s, instruction, response);
-    }
-
-    [Fact]
-    public async Task DeletedItemMustBeRejectedAtBookingCommit()
-    {
-        var s = await Prepare(); using var client = await Login(); var instruction = await Instruction(client, s);
-        using var deletion = new HttpRequestMessage(HttpMethod.Delete, $"/api/dossiers/{s.Dossier}/sheet-items/{s.Item}") { Content = JsonContent.Create(new SheetItemActionRequest(1, Guid.NewGuid())) };
+        Assert.Empty(await Candidates(client, s));
+        var other = await Prepare();
+        using var deletion = new HttpRequestMessage(HttpMethod.Delete, $"/api/dossiers/{other.Dossier}/sheet-items/{other.Item}") { Content = JsonContent.Create(new SheetItemActionRequest(1, Guid.NewGuid())) };
         var deleted = await client.SendAsync(deletion);
         Assert.True(deleted.IsSuccessStatusCode, await deleted.Content.ReadAsStringAsync());
-        var candidates = await client.GetFromJsonAsync<NextVisitCandidates>($"/api/patients/{s.Patient}/next-visit-candidates");
-        Assert.Empty(candidates!.Items);
-        var response = await Book(client, s, instruction);
-        await AssertRejectedWithoutWrites(s, instruction, response);
-    }
-
-    [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public async Task HiddenOrClinicallyCompletedItemCannotBeBooked(bool hidden)
-    {
-        var s = await Prepare(); using var client = await Login(); var instruction = await Instruction(client, s);
-        using (var scope = fixture.Services.CreateScope()) {
-            var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
-            var item = await db.TreatmentItems.SingleAsync(x => x.Id == s.Item);
-            if (hidden) item.HiddenFromSheet = true; else item.Progress = "Completed";
-            await db.SaveChangesAsync();
-        }
-        await AssertRejectedWithoutWrites(s, instruction, await Book(client, s, instruction));
+        Assert.Empty(await Candidates(client, other));
     }
 
     [Fact]
-    public async Task PostedActivityBlocksBookingUntilItIsDeletedFromTheSheet()
+    public async Task PostedActivityHidesTheItemUntilItIsDeletedFromTheSheet()
     {
-        var s = await Prepare(); using var client = await Login(); var instruction = await Instruction(client, s);
+        var s = await Prepare(); using var client = await Login();
         var performed = await client.PostAsJsonAsync($"/api/dossiers/{s.Dossier}/sheet-items/{s.Item}/perform", new SheetItemActionRequest(1, Guid.NewGuid()));
         Assert.True(performed.IsSuccessStatusCode, await performed.Content.ReadAsStringAsync());
         var result = (await performed.Content.ReadFromJsonAsync<ConfirmSheetActualResult>())!;
-        // Clear the independent display flag so the posted activity is the only reason booking is blocked.
+        // Clear the independent display flag so the posted activity is the only reason the item is not suggested.
         var unmarked = await client.PatchAsJsonAsync($"/api/dossiers/{s.Dossier}/sheet-items/{s.Item}/display-completion",
             new MarkSheetItemRequest(result.Dossier.Version, false, Guid.NewGuid()));
         Assert.True(unmarked.IsSuccessStatusCode, await unmarked.Content.ReadAsStringAsync());
         var current = (await unmarked.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
-        await AssertRejectedWithoutWrites(s, instruction, await Book(client, s, instruction));
+        Assert.Empty(await Candidates(client, s));
         var activity = result.Activity;
         using var deletion = new HttpRequestMessage(HttpMethod.Delete, $"/api/dossiers/{s.Dossier}/sheet-activities/{activity.Id}") {
             Content = JsonContent.Create(new SheetActivityActionRequest(current.Version, activity.Version, activity.SheetVersion, Guid.NewGuid()))
         };
         var deleted = await client.SendAsync(deletion);
         Assert.True(deleted.IsSuccessStatusCode, await deleted.Content.ReadAsStringAsync());
-        var candidates = (await client.GetFromJsonAsync<NextVisitCandidates>($"/api/patients/{s.Patient}/next-visit-candidates"))!;
-        Assert.Equal(s.Item, Assert.Single(candidates.Items).ItemId);
-        Assert.Equal(HttpStatusCode.Created, (await Book(client, s, instruction)).StatusCode);
+        Assert.Equal(s.Item, Assert.Single(await Candidates(client, s)).ItemId);
+        Assert.Equal(HttpStatusCode.Created, (await Book(client, s, s.Dossier)).StatusCode);
     }
 
     [Fact]
     public async Task SuccessfulRequestReplayRemainsIdempotentAfterTheItemIsCompleted()
     {
-        var s = await Prepare(); using var client = await Login(); var instruction = await Instruction(client, s);
-        var booked = await Book(client, s, instruction); Assert.Equal(HttpStatusCode.Created, booked.StatusCode);
+        var s = await Prepare(); using var client = await Login();
+        var booked = await Book(client, s, s.Dossier); Assert.Equal(HttpStatusCode.Created, booked.StatusCode);
         var original = (await booked.Content.ReadFromJsonAsync<AppointmentResult>())!;
         var marked = await client.PatchAsJsonAsync($"/api/dossiers/{s.Dossier}/sheet-items/{s.Item}/display-completion", new MarkSheetItemRequest(1, true, Guid.NewGuid()));
         Assert.True(marked.IsSuccessStatusCode, await marked.Content.ReadAsStringAsync());
@@ -341,32 +330,10 @@ public sealed class TreatmentPlanBookingApiTests(ApiFixture fixture) : IClassFix
     }
 
     [Fact]
-    public async Task RescheduleRechecksItemState()
+    public async Task FollowUpAppointmentCanBeRescheduled()
     {
-        var s = await Prepare(); using var client = await Login(); var instruction = await Instruction(client, s);
-        var booked = await Book(client, s, instruction); Assert.Equal(HttpStatusCode.Created, booked.StatusCode);
-        var original = (await booked.Content.ReadFromJsonAsync<AppointmentResult>())!;
-        var marked = await client.PatchAsJsonAsync($"/api/dossiers/{s.Dossier}/sheet-items/{s.Item}/display-completion", new MarkSheetItemRequest(1, true, Guid.NewGuid()));
-        Assert.True(marked.IsSuccessStatusCode, await marked.Content.ReadAsStringAsync());
-        var available = (await client.GetFromJsonAsync<AvailabilityResult>($"/api/availability?branchId={s.Branch}&dentistId={s.Dentist}&serviceId={s.Service}&date={s.Date:yyyy-MM-dd}&durationMinutes=30"))!;
-        var slot = available.Slots.First(x => x.Start != original.StartAt);
-        var command = new RescheduleAppointmentRequest(original.Version, Guid.NewGuid(), slot.Start, slot.ChairId,
-            slot.ScheduleVersion, slot.AssistantScheduleVersion, "SYNTHETIC reschedule", RequesterVerification: "SYNTHETIC verified requester", DentistId: s.Dentist, BookingSettingsVersion: slot.BookingSettingsVersion);
-        using var scheduler = await Login("assistant.demo");
-        var response = await scheduler.PostAsJsonAsync($"/api/appointments/{original.Code}/reschedule", command);
-        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
-        Assert.Equal("MSG230", (await response.Content.ReadFromJsonAsync<DCMS.Application.Common.SystemMessage>())!.Code);
-        using var scope = fixture.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
-        Assert.Equal(original.StartAt, (await db.Appointments.AsNoTracking().SingleAsync(x => x.Id == original.AppointmentId)).StartAt);
-        Assert.False(await db.AppointmentChangeReceipts.AnyAsync(x => x.RequestKey == command.RequestKey));
-        Assert.Equal("Booked", (await db.FollowUpInstructions.AsNoTracking().SingleAsync(x => x.Id == instruction)).Status);
-    }
-
-    [Fact]
-    public async Task MatchingPlanAppointmentCanStillBeRescheduled()
-    {
-        var s = await Prepare(); using var client = await Login(); var instruction = await Instruction(client, s);
-        var booked = await Book(client, s, instruction); Assert.Equal(HttpStatusCode.Created, booked.StatusCode);
+        var s = await Prepare(); using var client = await Login();
+        var booked = await Book(client, s, s.Dossier); Assert.Equal(HttpStatusCode.Created, booked.StatusCode);
         var original = (await booked.Content.ReadFromJsonAsync<AppointmentResult>())!;
         var available = (await client.GetFromJsonAsync<AvailabilityResult>($"/api/availability?branchId={s.Branch}&dentistId={s.Dentist}&serviceId={s.Service}&date={s.Date:yyyy-MM-dd}&durationMinutes=30"))!;
         var slot = available.Slots.First(x => x.Start != original.StartAt);
@@ -377,38 +344,9 @@ public sealed class TreatmentPlanBookingApiTests(ApiFixture fixture) : IClassFix
         Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
         using var scope = fixture.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
         var saved = await db.Appointments.AsNoTracking().SingleAsync(x => x.Id == original.AppointmentId);
-        Assert.Equal(slot.Start, saved.StartAt);
-        Assert.Equal(original.AppointmentId, (await db.FollowUpInstructions.AsNoTracking().SingleAsync(x => x.Id == instruction)).ActiveAppointmentId);
+        Assert.Equal(slot.Start, saved.StartAt); Assert.Equal(s.Dossier, saved.DossierId);
         var report = (await client.GetFromJsonAsync<ScheduleAppointments>($"/api/working-schedules/appointments?dentistId={s.Dentist}&from={s.Date:yyyy-MM-dd}&to={s.Date:yyyy-MM-dd}"))!;
         var row = Assert.Single(report.Items, item => item.Id == original.AppointmentId);
         Assert.Equal(slot.Start, row.StartAt); Assert.True(row.IsTreatmentPlan);
-    }
-
-    [Fact]
-    public async Task NextStepCanBeBookedAfterAnEarlierStepOfTheSameItemWasPerformed()
-    {
-        var s = await Prepare(); using var client = await Login(); Guid nextStepId;
-        using (var scope = fixture.Services.CreateScope()) {
-            var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
-            var dossier = await db.TreatmentDossiers.AsNoTracking().SingleAsync(x => x.Id == s.Dossier);
-            var first = new TreatmentStep { DossierId = s.Dossier, PlanId = dossier.PlanId, PlanVersion = 1, ItemId = s.Item,
-                Name = "SYNTHETIC first step", EstimatedMinutes = 30, ReservedMinutes = 30, Outcome = "Completed" };
-            var next = new TreatmentStep { DossierId = s.Dossier, PlanId = dossier.PlanId, PlanVersion = 1, ItemId = s.Item,
-                Name = "SYNTHETIC next step", EstimatedMinutes = 30, ReservedMinutes = 30,
-                PredecessorsJson = System.Text.Json.JsonSerializer.Serialize(new[] { first.Id }) };
-            nextStepId = next.Id;
-            await db.AddTreatmentDataAsync(first, next, new ClinicalActivity { DossierId = s.Dossier, ItemId = s.Item, StepId = first.Id,
-                PatientId = s.Patient, BranchId = s.Branch, PlanVersion = 1, ServiceId = s.Service, PerformerId = s.Dentist,
-                Unit = "răng", Quantity = 1, State = "Posted", Outcome = "SYNTHETIC first step done",
-                PerformedAt = DateTimeOffset.UtcNow, CreatedAt = DateTimeOffset.UtcNow, PostedAt = DateTimeOffset.UtcNow });
-            await db.SaveChangesAsync();
-        }
-        var response = await client.PostAsJsonAsync("/api/follow-up-instructions", new CreateFollowUpRequest(s.Patient, s.Branch,
-            new FollowUpSource(s.Dossier, s.Item, nextStepId, null, null), "TreatmentContinuation", "SYNTHETIC next step", null,
-            s.Date.AddDays(-4), s.Date, s.Date.AddDays(4), 30, s.Dentist, null, Guid.NewGuid()));
-        Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
-        var instruction = (await response.Content.ReadFromJsonAsync<FollowUpChange>())!.Instruction.Id;
-        await AssertRejectedWithoutWrites(s, instruction, await Book(client, s, instruction, durationMinutes: 37));
-        Assert.Equal(HttpStatusCode.Created, (await Book(client, s, instruction)).StatusCode);
     }
 }

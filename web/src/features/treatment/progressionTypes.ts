@@ -31,4 +31,4 @@ export type PlanStep = { id: string; itemId: string; name: string; region: strin
   outcome: string; readiness: 'Ready' | 'Blocked'; blockers: string[];
   holdReason: string | null; reviewCondition: string | null; version: number;
   shortReservationAcknowledgedBy: number | null; shortReservationAcknowledgedAt: string | null };
-export type StepChange = { steps: PlanStep[]; instructionIds: string[]; notification: SystemMessage };
+export type StepChange = { steps: PlanStep[]; notification: SystemMessage };

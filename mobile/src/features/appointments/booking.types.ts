@@ -13,6 +13,6 @@ export type BookingRequest = {
   familyMemberId?: string;
   kind: 'Standard'; source: 'App'; serviceId: number; reason: string | null;
   dentistId: number; chairId: null; startAt: string;
-  durationMinutes: number; followUpId: null; exceptionReason: null;
+  durationMinutes: number; dossierId: null; exceptionReason: null;
   requestKey: string; scheduleVersion: number; assistantScheduleVersion: null; bookingSettingsVersion?: number;
 };

@@ -20,7 +20,6 @@ export type AppointmentDetail = AppointmentCard & {
   branchId: number; branchName: string; dentistId: number; serviceId: number | null;
   serviceName: string; bookerName: string; bookerContactMasked: string;
   eligibility: { canSelfService: boolean; hoursRemaining: number; reasonCode: string | null; canRequestSupport: boolean };
-  followUp: { id: string; status: string } | null;
   history: { action: 'RESCHEDULE' | 'CANCEL'; actorKind: string; oldStart: string; newStart: string | null; reason: string; occurredAt: string }[];
   supportRequests?: CustomerSupportRequest[];
   clinicContact: { phone: string; hours: string };

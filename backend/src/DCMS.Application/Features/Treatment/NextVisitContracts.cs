@@ -3,8 +3,8 @@ namespace DCMS.Application.Features.Treatment;
 public sealed record NextVisitAppointment(Guid Id, string Code, DateTimeOffset StartAt);
 public sealed record NextVisitCandidate(Guid DossierId, string DossierCode, Guid ItemId, int ServiceId, string ServiceName,
     string? Region, DateOnly? EstimatedStart, int DurationMinutes, int DentistId, string DentistName, int BranchId,
-    string Status, Guid? FollowUpId, NextVisitAppointment? Appointment, DateOnly? EarliestOn = null, DateOnly? LatestOn = null,
-    DateOnly? TargetOn = null, DateOnly? WindowFrom = null, DateOnly? WindowTo = null);
+    string Status, NextVisitAppointment? Appointment, DateOnly? TargetOn = null, DateOnly? WindowFrom = null,
+    DateOnly? WindowTo = null);
 public sealed record NextVisitCandidates(IReadOnlyList<NextVisitCandidate> Items);
 
 public sealed record PlannedDateChange(Guid ItemId, string ServiceName, string? Region, DateOnly? CurrentPlannedOn,

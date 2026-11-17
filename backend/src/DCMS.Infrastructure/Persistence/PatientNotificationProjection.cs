@@ -81,15 +81,6 @@ public sealed partial class DcmsDbContext
                     $"visit-complete:{v.Id}:{v.Version}", $"/visit-results/{v.Id}"));
             }
 
-        foreach (var entry in ChangeTracker.Entries<FollowUpInstruction>())
-            if (Became(entry, nameof(FollowUpInstruction.Status), "NeedsBooking"))
-            {
-                var followUp = entry.Entity;
-                events.Add(new(followUp.PatientId, followUp.BranchId, NotificationKind.FollowUpBookingRequested,
-                    "Bác sĩ đề nghị đặt lịch", "Bạn có lịch tái khám cần đặt. Mở ứng dụng để xem hướng dẫn.",
-                    $"follow-up:{followUp.Id}:{followUp.Version}", "/book-appointment"));
-            }
-
         foreach (var entry in ChangeTracker.Entries<TreatmentDossier>())
             if (Became(entry, nameof(TreatmentDossier.PlanState), "Committed"))
             {

@@ -70,7 +70,6 @@ public static class ScreenEndpointPermissions
         if (p.StartsWith("/api/clinical-activities") || p.StartsWith("/api/activities")) return Need(read ? "treatment.read" : p.EndsWith("/correct") ? "treatment.actuals.update" : "treatment.actuals.create");
         if (p.StartsWith("/api/care-tasks")) return Need(read ? "care-tasks.read" : p.EndsWith("/escalations") ? "care-tasks.escalate" : "care-tasks.manage");
         if (p.StartsWith("/api/care-escalations")) return Need("care-tasks.escalate");
-        if (p.StartsWith("/api/follow-up-instructions")) return Need(read ? "treatment.read" : "treatment.progress.manage");
         if (p.StartsWith("/api/lab-orders")) return Need(read ? "treatment.lab.read" : "treatment.lab.track");
         if (p.StartsWith("/api/dossiers")) {
             if (p.Contains("/payments/payos-orders") || p.Contains("/payments/advance-payos-orders"))

@@ -124,14 +124,13 @@ public sealed class AppointmentChangeApiTests(AppointmentChangeFixture fixture) 
         Assert.Equal(status, response.StatusCode);
         Assert.Equal(code, (await response.Content.ReadFromJsonAsync<SystemMessage>())!.Code);
     }
-    private async Task SetState(AppointmentResult a, string status = "Confirmed", DateTimeOffset? start = null, Guid? followUp = null)
+    private async Task SetState(AppointmentResult a, string status = "Confirmed", DateTimeOffset? start = null)
     {
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
         var row = await db.Appointments.FindAsync(a.AppointmentId);
         row!.Status = status;
         if (start.HasValue) { row.StartAt = start.Value; row.EndAt = start.Value.AddMinutes(30); }
-        row.FollowUpId = followUp;
         await db.SaveChangesAsync();
     }
 
@@ -533,18 +532,13 @@ public sealed class AppointmentChangeApiTests(AppointmentChangeFixture fixture) 
     }
 
     [Fact]
-    public async Task ValidationAndUnknownFollowUpLeaveNoPartialWrites()
+    public async Task ValidationLeavesNoPartialWrites()
     {
         var s = await Prepare(); var (client, _) = await Public(); var slots = await Slots(client, s); var a = await Book(client, s, slots[36]);
         await Message(await client.PostAsJsonAsync(Path(a, "cancel"), Cancel(a, "  ")), HttpStatusCode.BadRequest, "MSG02");
         await Message(await client.PostAsJsonAsync(Path(a, "cancel"), Cancel(a, new string('a', 501))), HttpStatusCode.BadRequest, "MSG03");
         await Message(await client.PostAsJsonAsync(Path(a, "cancel"), Cancel(a) with { RequestKey = Guid.Empty }), HttpStatusCode.BadRequest, "MSG04");
         await Message(await client.PostAsJsonAsync(Path(a, "cancel"), Cancel(a) with { ExpectedVersion = 0 }), HttpStatusCode.BadRequest, "MSG04");
-        await SetState(a, followUp: Guid.NewGuid());
-        await Message(await client.PostAsJsonAsync(Path(a, "reschedule"), Move(a, slots[40])),
-            HttpStatusCode.NotFound, "MSG113");
-        await Message(await client.PostAsJsonAsync(Path(a, "cancel"), Cancel(a)),
-            HttpStatusCode.NotFound, "MSG113");
         using var scope = fixture.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
         var saved = await db.Appointments.FindAsync(a.AppointmentId);
         Assert.Equal("Confirmed", saved!.Status); Assert.Equal(1, saved.Version);

@@ -329,7 +329,7 @@ public sealed class TreatmentProgressionService(DcmsDbContext db, UserManager<Ap
             Event(dossierId, actorId, "plan.template.applied", new { request.TemplateId, request.TemplateVersion,
                 snapshot = source, patientSteps = request.Steps, patientIds });
             await db.SaveChangesAsync(ct);
-            return new StepChange(await StepDtosAsync(dossier, ct), [], SystemMessages.Get("MSG222", "mẫu điều trị", value: owner.Name));
+            return new StepChange(await StepDtosAsync(dossier, ct), SystemMessages.Get("MSG222", "mẫu điều trị", value: owner.Name));
         }, ct);
     }
 
@@ -380,7 +380,7 @@ public sealed class TreatmentProgressionService(DcmsDbContext db, UserManager<Ap
                 step.PlanVersion, step.EstimatedMinMinutes, step.EstimatedMaxMinutes,
                 step.EstimatedMinutes, step.ReservedMinutes, request.PredecessorIds });
             await db.SaveChangesAsync(ct);
-            return new StepChange(await StepDtosAsync(dossier, ct), [],
+            return new StepChange(await StepDtosAsync(dossier, ct),
                 SystemMessages.Get("MSG222", "bước", value: step.Name));
         }, ct);
     }
@@ -414,7 +414,7 @@ public sealed class TreatmentProgressionService(DcmsDbContext db, UserManager<Ap
             step.Version++; dossier.Version++; dossier.UpdatedAt = clock.GetUtcNow();
             Event(dossierId, actorId, "step.progress", new { stepId, request.Outcome, request.Reason });
             await db.SaveChangesAsync(ct);
-            return new StepChange(await StepDtosAsync(dossier, ct), [], SystemMessages.Get("MSG222", "tiến độ", value: step.Name));
+            return new StepChange(await StepDtosAsync(dossier, ct), SystemMessages.Get("MSG222", "tiến độ", value: step.Name));
         }, ct);
     }
 
@@ -442,10 +442,10 @@ public sealed class TreatmentProgressionService(DcmsDbContext db, UserManager<Ap
             step.Version++; dossier.Version++; dossier.UpdatedAt = clock.GetUtcNow();
             Event(dossierId, actorId, release ? "step.hold.released" : "step.held",
                 new { stepId, request.Reason, request.EffectiveAt, request.ReviewCondition });
-            var booked = await db.FollowUpInstructions.AsNoTracking().AnyAsync(x => x.StepId == stepId
-                && x.Status == "Booked", ct);
+            var booked = await db.Appointments.AsNoTracking().AnyAsync(x => x.DossierId == dossierId
+                && (x.Status == "Confirmed" || x.Status == "CheckedIn"), ct);
             await db.SaveChangesAsync(ct);
-            return new StepChange(await StepDtosAsync(dossier, ct), [],
+            return new StepChange(await StepDtosAsync(dossier, ct),
                 SystemMessages.Get(booked ? "MSG234" : "MSG241"));
         }, ct);
     }
@@ -470,225 +470,11 @@ public sealed class TreatmentProgressionService(DcmsDbContext db, UserManager<Ap
             var sameItem = await db.LoadTreatmentStepsAsync(db.TreatmentSteps.Where(x => x.DossierId == dossierId && x.ItemId == step.ItemId), ct);
             if (sameItem.All(x => x.Outcome == "Completed"))
                 dossier.Items.Single(x => x.Id == step.ItemId).Progress = "Completed";
-            var fulfilled = await db.FollowUpInstructions.Where(x => x.StepId == stepId &&
-                (x.Status == "NeedsBooking" || x.Status == "Booked")).ToListAsync(ct);
-            foreach (var instruction in fulfilled)
-            {
-                instruction.Status = "Completed"; instruction.Version++; instruction.UpdatedAt = now;
-                Event(instruction.Id, actorId, "followup.completed", new { instruction.Id, stepId, completion });
-            }
             Event(dossierId, actorId, "step.completed", new { stepId, completion,
                 request.ActualEvidenceIds }, $"step-complete:{stepId}:{completion}");
             await db.SaveChangesAsync(ct);
-            var rows = await db.LoadTreatmentStepsAsync(db.TreatmentSteps.Where(x => x.DossierId == dossierId), ct);
-            var generated = new List<Guid>();
-            foreach (var successor in rows.Where(x => x.Outcome != "Completed"))
-            {
-                var parents = Parse<Guid>(successor.PredecessorsJson);
-                if (!parents.Contains(stepId) || parents.Any(id => rows.All(x => x.Id != id || x.Outcome != "Completed"))) continue;
-                if (!successor.EarliestOffsetDays.HasValue || !successor.TargetOffsetDays.HasValue
-                    || !successor.LatestOffsetDays.HasValue) continue;
-                if (await db.FollowUpInstructions.AnyAsync(x => x.StepId == successor.Id &&
-                    x.Status != "Cancelled" && x.Status != "Superseded", ct)) continue;
-                var anchor = rows.Where(x => parents.Contains(x.Id)).Max(x => x.CompletedAt)!.Value
-                    .ToOffset(TimeSpan.FromHours(7));
-                var day = DateOnly.FromDateTime(anchor.DateTime);
-                var instruction = new FollowUpInstruction
-                {
-                    PatientId = dossier.PatientId, BranchId = dossier.BranchId, DossierId = dossierId,
-                    ItemId = successor.ItemId, StepId = successor.Id, PlanVersion = dossier.PlanVersion,
-                    SourceCompletionEventId = completion, Reason = $"Tiếp tục bước {successor.Name}",
-                    EarliestOn = day.AddDays(successor.EarliestOffsetDays.Value),
-                    TargetOn = day.AddDays(successor.TargetOffsetDays.Value),
-                    LatestOn = day.AddDays(successor.LatestOffsetDays.Value),
-                    DurationMinutes = successor.ReservedMinutes, DentistId = dossier.DentistId,
-                    Capability = successor.Capability, CreatedBy = actorId, CreatedAt = now, UpdatedAt = now
-                };
-                db.FollowUpInstructions.Add(instruction); generated.Add(instruction.Id);
-                Event(instruction.Id, actorId, "followup.created", new { instructionId = instruction.Id, successorId = successor.Id },
-                    $"followup:{successor.Id}:{completion}");
-            }
-            await db.SaveChangesAsync(ct);
-            return new StepChange(await StepDtosAsync(dossier, ct), generated.ToArray(),
-                SystemMessages.Get(generated.Count > 0 ? "MSG231" : "MSG222", "bước", value: step.Name));
-        }, ct);
-    }
-
-    private FollowUpDto FollowUpDto(FollowUpInstruction x)
-    {
-        var today = DateOnly.FromDateTime(clock.GetUtcNow().ToOffset(TimeSpan.FromHours(7)).DateTime);
-        var actions = x.Status switch
-        {
-            "NeedsBooking" => new[] { "reviseWindow", "cancel", "supersede", "findSlots" },
-            "Booked" => new[] { "reviseWindow", "complete", "cancel", "supersede" },
-            _ => []
-        };
-        return new FollowUpDto(x.Id, x.PatientId, x.BranchId,
-            new FollowUpSource(x.DossierId, x.ItemId, x.StepId, x.SourceVisitId, x.SourceActivityId),
-            x.Purpose, x.Reason, x.Guidance, x.EarliestOn, x.TargetOn, x.LatestOn,
-            x.DurationMinutes, x.DentistId, x.Capability, x.Status,
-            x.Status is "NeedsBooking" or "Booked" && today > x.LatestOn,
-            x.ActiveAppointmentId, x.Version, actions);
-    }
-
-    private static void ValidateWindow(DateOnly earliest, DateOnly target, DateOnly latest, int duration)
-    {
-        if (earliest == default || target == default || latest == default || earliest > target || target > latest
-            || duration is < 15 or > 480 || duration % 15 != 0) throw Error("MSG229");
-    }
-
-    public async Task<IReadOnlyList<FollowUpDto>> ListFollowUpsAsync(int actorId, int patientId, CancellationToken ct)
-    {
-        var account = await users.FindByIdAsync(actorId.ToString());
-        if (account == null || account.AccountType != "Staff" || !account.IsActive ||
-            !AccountRoles.Effective(await users.GetRolesAsync(account)).Contains(AccountRoles.Dentist))
-            throw Error("MSG06", 403);
-        var employee = await db.Employees.AsNoTracking().SingleOrDefaultAsync(x => x.AccountId == actorId, ct);
-        if (employee == null) throw Error("MSG06", 403);
-        var branches = db.SchedulingMembers.AsNoTracking().Where(x => x.EmployeeId == employee.Id
-            && x.Active && x.CanDentist).Select(x => x.BranchId);
-        var scope = await access.ResolveAsync(actorId, ct);
-        if (scope.Assigned && !scope.Owner) branches = branches.Where(branch => scope.BranchIds.Contains(branch));
-        var rows = await db.FollowUpInstructions.AsNoTracking().Where(x => x.PatientId == patientId
-            && branches.Contains(x.BranchId)).OrderBy(x => x.TargetOn).ThenBy(x => x.Id).ToListAsync(ct);
-        return rows.Select(FollowUpDto).ToArray();
-    }
-
-    public async Task<FollowUpDto> GetFollowUpAsync(int actorId, Guid id, CancellationToken ct)
-    {
-        var row = await db.FollowUpInstructions.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, ct)
-            ?? throw Error("MSG113", 404);
-        await DentistAsync(actorId, row.BranchId, ct);
-        return FollowUpDto(row);
-    }
-
-    public async Task<FollowUpChange> CreateFollowUpAsync(int actorId, CreateFollowUpRequest request,
-        CancellationToken ct)
-    {
-        ValidateWindow(request.EarliestOn, request.TargetOn, request.LatestOn, request.DurationMinutes);
-        if (request.Source == null || Clean(request.Reason) is not { Length: <= 2000 } ||
-            Clean(request.Guidance)?.Length > 4000 || Clean(request.Capability)?.Length > 160 ||
-            request.Purpose is not ("TreatmentContinuation" or "PostoperativeReview" or "WarrantyReview"
-                or "PeriodicRecall" or "NewProblem")) throw Error("MSG04");
-        var hasDossierSource = request.Source.DossierId.HasValue && request.Source.ItemId.HasValue
-            && !request.Source.VisitId.HasValue
-            && !request.Source.ActivityId.HasValue;
-        var hasVisitSource = !request.Source.DossierId.HasValue && !request.Source.ItemId.HasValue
-            && !request.Source.StepId.HasValue && request.Source.VisitId.HasValue
-            && request.Source.ActivityId.HasValue;
-        if (!hasDossierSource && !hasVisitSource) throw Error("MSG04");
-        return await CommandAsync(actorId, request.RequestKey, "CreateFollowUp", request, async () =>
-        {
-            await DentistAsync(actorId, request.BranchId, ct);
-            if (!await db.Patients.AsNoTracking().AnyAsync(x => x.Id == request.PatientId && !x.IsArchived, ct))
-                throw Error("MSG113", 404);
-            var source = request.Source;
-            if (source.DossierId.HasValue)
-            {
-                var dossier = await DossierAsync(actorId, source.DossierId.Value, ct);
-                if (dossier.PatientId != request.PatientId || dossier.BranchId != request.BranchId ||
-                    dossier.State != "Open" || dossier.PlanState != "Committed" || source.ItemId is not Guid itemId ||
-                    dossier.Items.All(x => x.Id != itemId || !TreatmentItemRules.IsEffective(x))) throw Error("MSG06", 403);
-                if (source.StepId.HasValue)
-                {
-                    var step = await db.TreatmentSteps.AsNoTracking().SingleOrDefaultAsync(x =>
-                        x.Id == source.StepId && x.DossierId == dossier.Id && x.ItemId == itemId, ct)
-                        ?? throw Error("MSG113", 404);
-                    if (step.PlanVersion != dossier.PlanVersion ||
-                        await db.FollowUpInstructions.AnyAsync(x => x.StepId == step.Id &&
-                            (x.Status == "NeedsBooking" || x.Status == "Booked" ||
-                             x.ActiveAppointmentId.HasValue && db.Appointments.Any(a =>
-                                 a.Id == x.ActiveAppointmentId &&
-                                 (a.Status == "Confirmed" || a.Status == "CheckedIn" || a.Status == "InProgress"))), ct))
-                        throw Error("MSG233", 409);
-                }
-                else if (await db.FollowUpInstructions.AnyAsync(x => x.DossierId == dossier.Id &&
-                    x.ItemId == itemId && x.StepId == null &&
-                    (x.Status == "NeedsBooking" || x.Status == "Booked"), ct))
-                    throw Error("MSG233", 409);
-            }
-            else
-            {
-                var verified = await visitActivity.VerifyAsync(request.PatientId, request.BranchId,
-                    source.VisitId!.Value, source.ActivityId!.Value, ct);
-                if (!verified.Available) throw Error("MSG144", 503);
-                if (!verified.Matches) throw Error("MSG06", 403);
-            }
-            if (request.DentistId.HasValue && !await db.SchedulingMembers.AsNoTracking().AnyAsync(x =>
-                    x.BranchId == request.BranchId && x.EmployeeId == request.DentistId && x.Active && x.CanDentist, ct))
-                throw Error("MSG06", 403);
-            var now = clock.GetUtcNow();
-            var row = new FollowUpInstruction
-            {
-                PatientId = request.PatientId, BranchId = request.BranchId, DossierId = source.DossierId,
-                ItemId = source.ItemId, StepId = source.StepId, SourceVisitId = source.VisitId,
-                SourceActivityId = source.ActivityId, Purpose = request.Purpose,
-                PlanVersion = source.DossierId.HasValue
-                    ? await db.TreatmentDossiers.Where(x => x.Id == source.DossierId).Select(x => (int?)x.PlanVersion).SingleAsync(ct)
-                    : null,
-                Reason = Clean(request.Reason)!, Guidance = Clean(request.Guidance),
-                EarliestOn = request.EarliestOn, TargetOn = request.TargetOn, LatestOn = request.LatestOn,
-                DurationMinutes = request.DurationMinutes, DentistId = request.DentistId,
-                Capability = Clean(request.Capability), CreatedBy = actorId, CreatedAt = now, UpdatedAt = now
-            };
-            db.FollowUpInstructions.Add(row);
-            Event(row.Id, actorId, "followup.created", new { row.Id, row.PatientId, row.EarliestOn,
-                row.TargetOn, row.LatestOn });
-            await db.SaveChangesAsync(ct);
-            return new FollowUpChange(FollowUpDto(row), SystemMessages.Get("MSG231"));
-        }, ct);
-    }
-
-    public async Task<FollowUpChange> ReviseFollowUpAsync(int actorId, Guid id,
-        ReviseFollowUpRequest request, CancellationToken ct)
-    {
-        if (Clean(request.Reason) is not { Length: <= 1000 }) throw Error("MSG04");
-        return await CommandAsync(actorId, request.RequestKey, "ReviseFollowUp", new { id, request }, async () =>
-        {
-            var row = await db.FollowUpInstructions.SingleOrDefaultAsync(x => x.Id == id, ct)
-                ?? throw Error("MSG113", 404);
-            await DentistAsync(actorId, row.BranchId, ct);
-            if (row.Version != request.ExpectedVersion) throw Error("MSG111", 409);
-            if (row.Status is "Cancelled" or "Superseded" or "Completed") throw Error("MSG230", 409);
-            ValidateWindow(request.EarliestOn, request.TargetOn, request.LatestOn, row.DurationMinutes);
-            if (row.ActiveAppointmentId.HasValue) throw Error("MSG233", 409);
-            var old = new { row.EarliestOn, row.TargetOn, row.LatestOn };
-            row.EarliestOn = request.EarliestOn; row.TargetOn = request.TargetOn;
-            row.LatestOn = request.LatestOn; row.Version++; row.UpdatedAt = clock.GetUtcNow();
-            Event(id, actorId, "followup.window.revised", new { old, request.EarliestOn,
-                request.TargetOn, request.LatestOn, request.Reason });
-            await db.SaveChangesAsync(ct);
-            return new FollowUpChange(FollowUpDto(row), SystemMessages.Get("MSG231"));
-        }, ct);
-    }
-
-    public async Task<FollowUpChange> ChangeFollowUpAsync(int actorId, Guid id, string action,
-        FollowUpActionRequest request, CancellationToken ct)
-    {
-        if (action is not ("complete" or "cancel" or "supersede") ||
-            Clean(request.Reason) is not { Length: <= 1000 }) throw Error("MSG04");
-        return await CommandAsync(actorId, request.RequestKey, "FollowUpAction", new { id, action, request }, async () =>
-        {
-            var row = await db.FollowUpInstructions.SingleOrDefaultAsync(x => x.Id == id, ct)
-                ?? throw Error("MSG113", 404);
-            await DentistAsync(actorId, row.BranchId, ct);
-            if (row.Version != request.ExpectedVersion) throw Error("MSG111", 409);
-            if (row.Status is "Cancelled" or "Superseded" or "Completed") throw Error("MSG230", 409);
-            if (action == "complete")
-            {
-                if (!await actual.HasFollowUpFulfillmentAsync(row.PatientId, row.Id, ct))
-                    throw Error("MSG230", 409);
-                row.Status = "Completed";
-            }
-            else
-            {
-                if (row.ActiveAppointmentId.HasValue) throw Error("MSG233", 409);
-                row.Status = action == "cancel" ? "Cancelled" : "Superseded";
-            }
-            row.Version++; row.UpdatedAt = clock.GetUtcNow();
-            Event(id, actorId, "followup." + action, new { request.Reason });
-            await db.SaveChangesAsync(ct);
-            return new FollowUpChange(FollowUpDto(row), SystemMessages.Get("MSG231"));
+            return new StepChange(await StepDtosAsync(dossier, ct),
+                SystemMessages.Get("MSG222", "bước", value: step.Name));
         }, ct);
     }
 }

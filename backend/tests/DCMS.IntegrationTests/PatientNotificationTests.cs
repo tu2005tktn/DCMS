@@ -14,7 +14,7 @@ namespace DCMS.IntegrationTests;
 public sealed class PatientNotificationTests(ReceptionFixture fixture) : IClassFixture<ReceptionFixture>
 {
     [Fact]
-    public async Task OfficialFollowUpAndPrescriptionNotifyVerifiedAccountOnceAndRevocationStopsAccess()
+    public async Task OfficialPrescriptionNotifiesVerifiedAccountOnceAndRevocationStopsAccess()
     {
         var reception = new ReceptionApiTests(fixture);
         var setup = await reception.Prepare();
@@ -44,21 +44,6 @@ public sealed class PatientNotificationTests(ReceptionFixture fixture) : IClassF
         Assert.Single(await db.InAppNotifications.Where(x => x.AccountId == guest.Id
             && x.DedupeKey == $"appointment-event:{bookingEvent.Id}:account:{guest.Id}").ToListAsync());
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(2));
-        var followUp = new FollowUpInstruction
-        {
-            PatientId = setup.PatientId, BranchId = setup.BranchId, Status = "NeedsBooking",
-            EarliestOn = today, TargetOn = today, LatestOn = today.AddDays(7),
-            DurationMinutes = 30,
-            CreatedBy = dentist.Id, CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow
-        };
-        db.FollowUpInstructions.Add(followUp);
-        await db.SaveChangesAsync();
-        Assert.Single(await db.InAppNotifications.Where(x => x.AccountId == guest.Id
-            && x.DedupeKey.StartsWith($"patient:follow-up:{followUp.Id}:")).ToListAsync());
-        await db.SaveChangesAsync();
-        Assert.Single(await db.InAppNotifications.Where(x => x.AccountId == guest.Id
-            && x.DedupeKey.StartsWith($"patient:follow-up:{followUp.Id}:")).ToListAsync());
 
         using var assistant = await reception.Login();
         var visit = await reception.Check(assistant, setup);
@@ -103,16 +88,5 @@ public sealed class PatientNotificationTests(ReceptionFixture fixture) : IClassF
         await db.SaveChangesAsync();
         Assert.False((await notifications.CheckDeepLinkAsync(guest.Id, $"/prescriptions/{visit.VisitId}", default)).Allowed);
         Assert.False((await notifications.CheckDeepLinkAsync(guest.Id, "/book-appointment", default)).Allowed);
-
-        var later = new FollowUpInstruction
-        {
-            PatientId = setup.PatientId, BranchId = setup.BranchId, Status = "NeedsBooking",
-            EarliestOn = today, TargetOn = today, LatestOn = today.AddDays(7),
-            DurationMinutes = 30,
-            CreatedBy = dentist.Id, CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow
-        };
-        db.FollowUpInstructions.Add(later);
-        await db.SaveChangesAsync();
-        Assert.Empty(await db.InAppNotifications.Where(x => x.DedupeKey.StartsWith($"patient:follow-up:{later.Id}:")).ToListAsync());
     }
 }

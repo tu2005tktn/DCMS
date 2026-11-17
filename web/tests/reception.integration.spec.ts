@@ -26,7 +26,7 @@ async function appointment(request: APIRequestContext, c: Context, p: Patient, d
     branchId: c.branchId, booker: { name: 'SYNTHETIC người đặt khác', phone: '0912345678', email: null },
     attendee: { patientId: p.id, name: p.fullName, birthDate: null }, attendeeRelation: 'Relative', kind: 'WalkIn', source: 'InPerson',
     serviceId: c.serviceId, dentistId: c.dentistId, chairId: slot.chairId, startAt: slot.start, durationMinutes: 1,
-    followUpId: null, exceptionReason: 'Vãng lai đủ nguồn lực', requestKey: crypto.randomUUID(),
+    dossierId: null, exceptionReason: 'Vãng lai đủ nguồn lực', requestKey: crypto.randomUUID(),
     scheduleVersion: slot.scheduleVersion, assistantScheduleVersion: null, bookingSettingsVersion: slot.bookingSettingsVersion,
   } });
   expect(booked.ok(), await booked.text()).toBeTruthy(); return booked.json();

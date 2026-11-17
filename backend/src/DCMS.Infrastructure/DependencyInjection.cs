@@ -110,15 +110,12 @@ public static class DependencyInjection
         services.AddScoped<IAppointmentQueryService, AppointmentQueryService>();
         services.AddScoped<IAppointmentChangeService, AppointmentChangeService>();
         services.AddScoped<ISupportRequestService, SupportRequestService>();
-        services.AddScoped<FollowUpAppointmentPort>();
-        services.AddScoped<IFollowUpAppointmentChangePort>(sp => sp.GetRequiredService<FollowUpAppointmentPort>());
         services.AddScoped<DevelopmentAppointmentSeeder>();
         services.AddScoped<Features.Treatment.DevelopmentTreatmentCatalogSeeder>();
         services.AddScoped<Features.SystemSettings.DevelopmentMaterialSeeder>();
         services.AddScoped<Features.SystemSettings.DevelopmentLabSeeder>();
         services.AddScoped<Features.SystemSettings.DevelopmentMedicineSeeder>();
         services.AddScoped<Features.Prescriptions.DevelopmentPrescriptionSeeder>();
-        services.AddScoped<IFollowUpBookingPort>(sp => sp.GetRequiredService<FollowUpAppointmentPort>());
         services.AddScoped<IAppointmentNotificationDispatcher, AppointmentNotificationDispatcher>();
         services.AddScoped<IExternalNotificationAdapter, FirebasePushAdapter>();
         // S03 recovery delivery: a configured SMTP server sends real email in any environment; otherwise

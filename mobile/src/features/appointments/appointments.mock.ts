@@ -40,18 +40,18 @@ function seed(): Stored[] {
   const soon = new Date(Math.ceil((now + 6 * HOUR) / (15 * 60_000)) * 15 * 60_000).toISOString();
   const rows: Stored[] = [
     { ...base, code: 'LH-DEMO-0001', start: at(3, 9), end: at(3, 9, 30), durationMinutes: 30, dentistName: 'BS. Nha sĩ demo',
-      attendeeName: 'Bản thân', attendeeKind: 'SELF', status: 'Confirmed', access: 'BOTH', version: 1, followUp: { id: 7, status: 'Booked' } },
+      attendeeName: 'Bản thân', attendeeKind: 'SELF', status: 'Confirmed', access: 'BOTH', version: 1 },
     { ...base, code: 'LH-DEMO-0002', start: soon, end: plusMinutes(soon, 60), durationMinutes: 60, dentistName: 'BS. Nha sĩ demo',
-      attendeeName: 'Nguyễn Thị Hoa (mẹ)', attendeeKind: 'RELATIVE', status: 'Confirmed', access: 'BOOKED_BY_ME', version: 1, followUp: null },
+      attendeeName: 'Nguyễn Thị Hoa (mẹ)', attendeeKind: 'RELATIVE', status: 'Confirmed', access: 'BOOKED_BY_ME', version: 1 },
     { ...base, code: 'LH-DEMO-0003', start: at(8, 14), end: at(8, 14, 30), durationMinutes: 30, dentistName: 'BS. Nha sĩ demo',
-      attendeeName: 'Bản thân', attendeeKind: 'SELF', status: 'Confirmed', access: 'MY_OWN', version: 1, followUp: null },
+      attendeeName: 'Bản thân', attendeeKind: 'SELF', status: 'Confirmed', access: 'MY_OWN', version: 1 },
     { ...base, code: 'LH-DEMO-0004', start: at(-10, 8, 30), end: at(-10, 9), durationMinutes: 30, dentistName: 'BS. Nha sĩ demo',
-      attendeeName: 'Bản thân', attendeeKind: 'SELF', status: 'Completed', access: 'BOTH', version: 3, followUp: null },
+      attendeeName: 'Bản thân', attendeeKind: 'SELF', status: 'Completed', access: 'BOTH', version: 3 },
     { ...base, code: 'LH-DEMO-0005', start: at(-4, 15), end: at(-4, 15, 30), durationMinutes: 30, dentistName: 'BS. Nha sĩ demo',
-      attendeeName: 'Nguyễn Thị Hoa (mẹ)', attendeeKind: 'RELATIVE', status: 'Cancelled', access: 'BOOKED_BY_ME', version: 2, followUp: null,
+      attendeeName: 'Nguyễn Thị Hoa (mẹ)', attendeeKind: 'RELATIVE', status: 'Cancelled', access: 'BOOKED_BY_ME', version: 2,
       history: [{ action: 'CANCEL', actorKind: 'SELF', oldStart: at(-4, 15), newStart: null, reason: 'Bận việc gia đình', occurredAt: at(-6, 20) }] },
     { ...base, code: 'LH-DEMO-0006', start: at(-20, 10), end: at(-20, 10, 30), durationMinutes: 30, dentistName: 'BS. Nha sĩ demo',
-      attendeeName: 'Bản thân', attendeeKind: 'SELF', status: 'NoShow', access: 'MY_OWN', version: 2, followUp: null },
+      attendeeName: 'Bản thân', attendeeKind: 'SELF', status: 'NoShow', access: 'MY_OWN', version: 2 },
   ];
   return rows;
 }
@@ -155,7 +155,6 @@ export const mockAppointmentsApi: AppointmentsApi = {
       x.history.unshift({ action: 'RESCHEDULE', actorKind: 'SELF', oldStart: x.start, newStart: c.newStart, reason: c.reason.trim(), occurredAt: new Date().toISOString() });
       x.start = c.newStart; x.end = plusMinutes(c.newStart, x.durationMinutes);
       x.dentistId = c.dentistId; x.dentistName = mockDentists.find(value => value.id === c.dentistId)!.name; x.version += 1;
-      // The follow-up link is kept (GBR-076).
       return { appointment: detailOf(x), notification: { code: 'MSG35', message: `Đã đổi lịch hẹn sang ${formatDateTime(x.start)}. Mọi thông báo nhắc lịch sẽ theo giờ hẹn mới.` } };
     });
   },
@@ -167,8 +166,6 @@ export const mockAppointmentsApi: AppointmentsApi = {
       requireSelfService(x, c.expectedVersion);
       x.history.unshift({ action: 'CANCEL', actorKind: 'SELF', oldStart: x.start, newStart: null, reason: c.reason.trim(), occurredAt: new Date().toISOString() });
       x.status = 'Cancelled'; x.version += 1;
-      // An active follow-up returns to NeedsBooking (GBR-025).
-      if (x.followUp) x.followUp = { ...x.followUp, status: 'NeedsBooking' };
       return { appointment: detailOf(x), notification: { code: 'MSG37', message: `Đã hủy lịch hẹn ${x.code}.` } };
     });
   },
@@ -238,7 +235,6 @@ export function addMockBooking(result: {
     bookerContactMasked: '09******88',
     clinicContact: contact,
     version: result.version || 1,
-    followUp: null,
     history: [],
   };
   store.unshift(row);

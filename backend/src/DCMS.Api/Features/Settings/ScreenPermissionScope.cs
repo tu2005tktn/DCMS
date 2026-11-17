@@ -33,7 +33,6 @@ public sealed class ScreenPermissionScope(DcmsDbContext db, ISettingsAccess acce
         if (Guid.TryParse(http.Request.RouteValues["id"]?.ToString(), out var id)) {
             if (path.StartsWith("/api/appointments/")) await AddBranch(db.Appointments.Where(x => x.Id == id).Select(x => (int?)x.BranchId).SingleOrDefaultAsync(ct));
             if (path.StartsWith("/api/treatment-templates/")) await AddBranch(db.Set<TreatmentTemplate>().Where(x => x.Id == id).Select(x => (int?)x.BranchId).SingleOrDefaultAsync(ct));
-            if (path.StartsWith("/api/follow-up-instructions/")) await AddBranch(db.Set<FollowUpInstruction>().Where(x => x.Id == id).Select(x => (int?)x.BranchId).SingleOrDefaultAsync(ct));
             if (path.StartsWith("/api/care-tasks/")) await AddBranch(db.Set<CareTask>().Where(x => x.Id == id).Select(x => (int?)x.BranchId).SingleOrDefaultAsync(ct));
         }
         if (http.Request.RouteValues["code"] is { } code && path.StartsWith("/api/appointments/")) {

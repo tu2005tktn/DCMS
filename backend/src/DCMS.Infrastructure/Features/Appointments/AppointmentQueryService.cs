@@ -242,7 +242,6 @@ public sealed class AppointmentQueryService(DcmsDbContext db, UserManager<Applic
         return new(card.Code, card.Start, card.End, card.DurationMinutes, card.DentistName, card.AttendeeName, card.AttendeeKind,
             card.Status, staff ? "STAFF" : card.Access, card.Version, row.BranchId, branch ?? "", row.DentistId, row.ServiceId, service ?? "Khám và tư vấn",
             row.BookingInfo.BookerName, MaskPhone(row.BookingInfo.Phone()) ?? MaskEmail(row.BookingInfo.Email()) ?? "",
-            row.FollowUpId.HasValue ? new { id = row.FollowUpId, status = row.Status == "Cancelled" ? "NeedsBooking" : "Booked" } : null,
             new(reason == null, Math.Round(hours, 2), reason, reason == "WITHIN_12H"), supportRequests, history,
             new(configuration["Clinic:Phone"] ?? "0234 3 888 999", configuration["Clinic:Hours"] ?? "Thứ 2 – Thứ 7, 08:00 – 17:00"));
     }

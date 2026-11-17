@@ -172,7 +172,7 @@ function BookingForm() {
       attendeeRelation: relation, kind: 'Standard', source: 'App', serviceId: service.id, reason: reason.trim() || null,
       ...(relation === 'Relative' && selectedMember ? { familyMemberId: selectedMember.id } : {}),
       dentistId: slot.dentistId, chairId: null, startAt: slot.start,
-      durationMinutes: service.publicDurationMinutes, followUpId: null, exceptionReason: null, bookingSettingsVersion: slot.bookingSettingsVersion,
+      durationMinutes: service.publicDurationMinutes, dossierId: null, exceptionReason: null, bookingSettingsVersion: slot.bookingSettingsVersion,
       scheduleVersion: slot.scheduleVersion, assistantScheduleVersion: null,
     };
     const fingerprint = JSON.stringify(payload);
