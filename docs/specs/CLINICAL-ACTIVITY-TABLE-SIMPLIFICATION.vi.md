@@ -80,4 +80,4 @@ Migration: `SimplifyClinicalActivityTable` (giai đoạn 1) và `RemoveClinicalR
 
 ## Giai đoạn 3: chỉ còn hoạt động điều trị (đang chờ triển khai)
 
-Người dùng yêu cầu xóa hướng dẫn tái khám và chỉ giữ các cột của hoạt động điều trị; lịch hẹn tiếp theo tạo thẳng từ hạng mục kế hoạch. Bảng sẽ giảm từ **50 xuống 31 cột**. Thiết kế chi tiết: [FOLLOW-UP-INSTRUCTION-REMOVAL.vi.md](FOLLOW-UP-INSTRUCTION-REMOVAL.vi.md). Mục "Chưa làm" của giai đoạn 2 được thay bằng spec này.
+Người dùng yêu cầu xóa hướng dẫn tái khám và chỉ giữ các cột của hoạt động điều trị; lịch hẹn tiếp theo chỉ gắn với phiếu điều trị (`APPOINTMENT.DossierId`). Bảng sẽ giảm từ **50 xuống 31 cột**. Thiết kế chi tiết: [FOLLOW-UP-INSTRUCTION-REMOVAL.vi.md](FOLLOW-UP-INSTRUCTION-REMOVAL.vi.md). Mục "Chưa làm" của giai đoạn 2 được thay bằng spec này.
