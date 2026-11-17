@@ -1,0 +1,51 @@
+name: Deploy server
+
+# Builds and redeploys the DCMS stack on the self-hosted server runner.
+# See docs/implementation/DEPLOY-SERVER-WIREGUARD.vi.md.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-server
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, dcms-prod]
+    timeout-minutes: 45
+    env:
+      COMPOSE: docker compose -p dcms --env-file /opt/dcms/.env -f infrastructure/docker/compose.prod.yaml
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build images
+        run: $COMPOSE build api web
+
+      - name: Start database and scanner
+        run: $COMPOSE up -d --wait postgres
+
+      - name: Apply migrations
+        run: $COMPOSE --profile tools run --rm migrate
+
+      # Starts every default service plus profiles listed in COMPOSE_PROFILES (e.g. "public" for the tunnel).
+      - name: Restart services
+        run: $COMPOSE up -d --remove-orphans
+
+      - name: Wait for health
+        run: |
+          for i in $(seq 1 40); do
+            if curl -fsS http://localhost/health | grep -q '"api":"healthy","database":"healthy"'; then
+              curl -sS http://localhost/health; echo; exit 0
+            fi
+            sleep 3
+          done
+          echo "Health check failed"; $COMPOSE logs --tail 80 api; exit 1
+
+      - name: Prune old images
+        if: always()
+        run: docker image prune -f
