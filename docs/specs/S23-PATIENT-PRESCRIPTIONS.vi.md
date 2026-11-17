@@ -9,7 +9,7 @@ Cập nhật 09/11/2026: form kê đơn dạng "tờ đơn thuốc", chọn bác
 - Bác sĩ mở hồ sơ bệnh nhân, chọn tab **Đơn thuốc**, bấm **Kê đơn thuốc**, điền form đơn thuốc rồi lưu. Không yêu cầu tạo lượt khám mới, chọn mẫu đơn, hoàn tất một quy trình nhiều bước hoặc mở một trang riêng.
 - Hồ sơ bệnh nhân là nơi duy nhất staff bắt đầu và xem lại đơn. Không dùng mẫu đơn trong luồng kê này.
 - Thông tin bệnh nhân (họ tên, mã BN, ngày sinh, giới tính) lấy từ hồ sơ bệnh nhân ở server, chỉ đọc trên form. Thuật ngữ trên form là **Bệnh nhân** (không dùng "Khách hàng").
-- Thuốc được chọn từ danh mục active và prescription-eligible. Không tạo thuốc mới trong form kê đơn. Có thể thêm/xóa dòng thuốc ngay trên form.
+- Thuốc được chọn từ danh mục active và prescription-eligible. Người có quyền `catalog.medicines.create` có thể bấm nút **+** cạnh đơn vị tính/đóng gói để mở popup thêm thuốc vào danh mục dùng chung. Bấm **LƯU LẠI** trong popup ghi thuốc ngay vào `CATALOG_MEDICINE` và chọn thuốc đó vào dòng hiện tại; đơn thuốc chỉ được lưu khi bấm **Lưu đơn thuốc**. Có thể thêm/xóa dòng thuốc ngay trên form.
 - Lưu đơn một lần; ghi snapshot tên/mã/hàm lượng/dạng/đơn vị để đơn cũ không đổi khi danh mục thay đổi. Ghi audit, chống gửi trùng bằng requestKey và kiểm tra version khi sửa. Đơn lưu thành công được hiển thị trên mobile của tài khoản đã liên kết VERIFIED với bệnh nhân. Không cần bước phát hành riêng.
 - Bệnh nhân chỉ xem; không sửa đơn. API mobile không nhận PatientId từ client, chỉ trả đơn thuộc liên kết VERIFIED hiện tại. Nếu liên kết không còn hợp lệ thì từ chối và không trả dữ liệu.
 - Đây là dữ liệu kê đơn ngoại trú; không ghi tồn kho, xuất kho, bán thuốc hoặc chi phí. Không khẳng định đã gửi tới donthuocquocgia.vn.
@@ -20,7 +20,7 @@ Form mở trong hộp thoại dạng tờ đơn, theo thứ tự:
 
 1. **Tiêu đề**: chữ "ĐƠN THUỐC"; bên phải là tên phòng khám (chi nhánh kê đơn), số điện thoại và email của chi nhánh nếu có trong hồ sơ chi nhánh. Không có chức năng gửi đơn lên donthuocquocgia.vn. Khi bác sĩ thuộc nhiều chi nhánh, có ô chọn chi nhánh kê đơn; một chi nhánh thì tự chọn.
 2. **BỆNH NHÂN**: Họ và tên, Mã BN, Ngày sinh, Giới tính (chỉ đọc). Chẩn đoán: chọn một hoặc nhiều mục từ danh mục Chẩn đoán đang hoạt động (`/api/system-settings/reference-options?kind=diagnoses`) và được gõ thêm nội dung riêng; lưu thành chuỗi nối bằng `; `. Chẩn đoán khác: ô nhập tự do.
-3. **CHỈ ĐỊNH**: mỗi dòng gồm Tên thuốc (chọn từ danh mục, tìm theo tên/mã), Số lượng (nguyên 1–10.000), Đơn vị thuốc bắt buộc do bác sĩ tự nhập (đơn vị danh mục chỉ hiện làm gợi ý, không tự điền), và Hướng dẫn sử dụng (tự điền hướng dẫn mặc định của thuốc, sửa được, ≤1000 ký tự); nút xóa dòng khi có hơn một dòng. Nút xanh **+ THÊM** thêm dòng. Tối đa 30 dòng.
+3. **CHỈ ĐỊNH**: mỗi dòng có Tên thuốc (chọn từ danh mục, tìm theo tên/mã), Đơn vị tính/đóng gói (tự điền từ `baseUnit` khi chọn thuốc, sửa được), Số lượng (nguyên 1–10.000) và Hướng dẫn sử dụng (tự điền hướng dẫn mặc định của thuốc, sửa được, ≤1000 ký tự). Nút **+** cạnh đơn vị mở popup tạo thuốc trong danh mục dùng chung cho người có `catalog.medicines.create`; sau khi lưu, thuốc mới được chọn ngay vào dòng. Nút xóa dòng hiện khi có hơn một dòng. Nút xanh **+ THÊM** thêm dòng. Tối đa 30 dòng.
 4. **GHI CHÚ/LỜI DẶN**: ô nhiều dòng, tùy chọn (≤4000 ký tự).
 5. **NGÀY & BÁC SĨ KÊ ĐƠN**: Ngày kê (mặc định hôm nay, không cho chọn ngày tương lai) và Bác sĩ (mặc định bác sĩ đang đăng nhập; danh sách gồm nhân sự có vai trò bác sĩ đang hoạt động tại chi nhánh kê đơn).
 
@@ -28,10 +28,10 @@ Nút **Lưu đơn thuốc** / **Hủy** ở chân form. Danh sách đơn trong t
 
 ## UI và quyền
 
-- Tab đơn thuốc nằm trong hồ sơ bệnh nhân. `prescriptions.read` xem danh sách/chi tiết; `prescriptions.manage` + vai trò Dentist tạo và sửa.
-- Trường tối thiểu khi lưu: ít nhất một thuốc, đơn vị thuốc bác sĩ nhập và số lượng nguyên dương. Chi nhánh/ngày kê/bác sĩ tự điền; chẩn đoán, chẩn đoán khác, hướng dẫn và lời dặn tùy chọn.
+- Tab đơn thuốc nằm trong hồ sơ bệnh nhân. `prescriptions.read` xem danh sách/chi tiết; `prescriptions.manage` + vai trò Dentist tạo và sửa. Nút tạo thuốc trong danh mục chỉ hiển thị với người có `catalog.medicines.create`.
+- Trường tối thiểu khi lưu: ít nhất một thuốc, đơn vị thuốc có giá trị và số lượng nguyên dương. Đơn vị được tự điền theo danh mục khi chọn thuốc và bác sĩ có thể sửa. Chi nhánh/ngày kê/bác sĩ tự điền; chẩn đoán, chẩn đoán khác, hướng dẫn và lời dặn tùy chọn.
 - **Bác sĩ kê đơn** được chọn trên form (`prescriberEmployeeId`). Server chỉ nhận bác sĩ là thành viên đang hoạt động, có quyền khám (`CanDentist`) của chi nhánh kê đơn; bỏ trống thì dùng nhân sự của tài khoản đang thao tác. Audit luôn ghi tài khoản thực hiện thao tác, kể cả khi ghi đơn dưới tên bác sĩ khác.
-- Không hiển thị mẫu đơn, modal tạo thuốc từ form, in/QR, bước finalize, hiệu chỉnh phiên bản hay cảnh báo nhiều tầng trong luồng thường dùng.
+- Không hiển thị mẫu đơn, in/QR, bước finalize, hiệu chỉnh phiên bản hay cảnh báo nhiều tầng trong luồng thường dùng. Popup tạo thuốc chỉ xuất hiện khi người kê đơn có quyền `catalog.medicines.create`; thao tác này lưu vào danh mục thuốc dùng chung nhưng không tạo tồn kho hoặc khoản thu.
 
 ## API staff
 

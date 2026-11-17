@@ -115,9 +115,9 @@ Migration `20261107050902_PrescriptionsAndBranchProfiles` (dùng chung với S58
 ### 3.1 Thêm thuốc vào danh mục ngay khi kê đơn
 
 - Nút `+` nhỏ cạnh ô chọn thuốc mở popup tạo thuốc theo luồng Odental: tên, mã thuốc/mã sản phẩm, hoạt chất/biệt dược, hàm lượng, dạng bào chế, đơn vị gốc, quy cách đóng gói, giá tham khảo và hướng dẫn sử dụng mặc định.
-- Lưu qua API danh mục thuốc hiện có (`catalog.medicines.manage`), không tạo một dòng thuốc chỉ thuộc đơn hiện tại. Thuốc mới mặc định được bật `prescriptionEligible=true`, `internalStockTracked=false`; thao tác không tạo tồn kho, xuất kho hay phí. Kiểm tra trùng mã/tên và lỗi quyền theo contract danh mục; không tiếp tục kê nếu API báo lỗi.
+- Lưu qua API danh mục thuốc hiện có (`catalog.medicines.create`), không tạo một dòng thuốc chỉ thuộc đơn hiện tại. Thuốc mới mặc định được bật `prescriptionEligible=true`, `internalStockTracked=false`; thao tác ghi vào danh mục dùng chung nhưng không tạo tồn kho, xuất kho hay phí. Kiểm tra trùng mã/tên và lỗi quyền theo contract danh mục; không tiếp tục kê nếu API báo lỗi.
 - Khi tạo thành công, thêm thuốc mới vào lựa chọn, chọn ngay cho dòng kê hiện tại, điền đơn vị và hướng dẫn mặc định vào dòng; bác sĩ tiếp tục nhập liều, số ngày, số lượng và có thể sửa lời dặn riêng trước khi thêm vào đơn.
-- Người chỉ có quyền kê đơn nhưng không có quyền quản lý danh mục không được tạo thuốc qua nút này. Thuốc tùy chỉnh chỉ dùng cho đơn hiện tại tiếp tục là luồng riêng, không đưa vào danh mục.
+- Người chỉ có quyền kê đơn nhưng không có `catalog.medicines.create` không được tạo thuốc qua nút này. Thuốc tùy chỉnh chỉ dùng cho đơn hiện tại tiếp tục là luồng riêng, không đưa vào danh mục.
 - Nút thêm dòng lớn màu xanh, lời dặn chung, bác sĩ kê đơn, ngày kê, chọn mẫu, cảnh báo lâm sàng, sửa/xóa dòng và hoàn tất đơn giữ nguyên. Bản in và app bệnh nhân hiển thị snapshot tên/đơn vị/liều/hướng dẫn.
 
 ---

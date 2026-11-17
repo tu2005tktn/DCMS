@@ -61,7 +61,7 @@ DTO trả kèm `version`, `active`, `createdAt/ByName`, `updatedAt/ByName`; lab 
 
 Tab **Vật tư, labo & thuốc** trong `/system-settings` (Owner) với 4 mục: Công ty cung cấp vật liệu, Công ty labo, Loại công việc labo, Thuốc. Mỗi mục: tìm kiếm, lọc trạng thái, bảng, phân trang 20/50/100, Thêm/Sửa (Drawer form, Lý do khi sửa), Ngừng dùng/Khôi phục có preview + lý do, Lịch sử. Thuốc có nút "Xuất Excel". Giá nhập số nguyên, hiển thị định dạng VND; để trống = chưa xác định.
 
-Trong form kê đơn, người có quyền `catalog.medicines.manage` có thể mở popup **Thêm thuốc vào danh mục** cạnh ô chọn thuốc. Popup dùng cùng contract và ràng buộc tạo mới của danh mục này; sau khi tạo thành công, thuốc đủ điều kiện kê được chọn ngay trong dòng đơn hiện tại. Không tạo tồn kho hoặc khoản thu từ thao tác này.
+Trong form kê đơn, người có quyền `catalog.medicines.create` có thể mở popup **Thêm thuốc vào danh mục** cạnh đơn vị tính/đóng gói. Popup dùng cùng contract và ràng buộc tạo mới của danh mục này; khi bấm **LƯU LẠI**, thuốc được ghi ngay vào danh mục dùng chung và được chọn vào dòng đơn hiện tại. Đơn thuốc chỉ được lưu khi bấm **Lưu đơn thuốc**. Không tạo bảng mới, tồn kho hoặc khoản thu từ thao tác này.
 
 ## Nghiệm thu
 
