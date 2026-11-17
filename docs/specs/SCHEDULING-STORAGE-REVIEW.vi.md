@@ -1,5 +1,7 @@
 # Rà soát lưu trữ chi nhánh, lịch làm việc và lịch hẹn
 
+> Cập nhật 18/11/2026: tách phần table-splitting `RESOURCE_RESERVATION` khỏi `APPOINTMENT` và rút gọn bảng `APPOINTMENT` từ 40 xuống 22 cột (`BookingInfo` JSONB, `Version` làm concurrency token duy nhất). Xem [rút gọn bảng APPOINTMENT](APPOINTMENT-TABLE-SIMPLIFICATION.vi.md).
+
 Ngày 12/11/2026. Migration `20261112132059_ConsolidateSchedulingStorage` đã áp dụng vào DB phát triển. `public` giảm từ 82 xuống 72 bảng, model EF giảm từ 80 xuống 70 bảng. Kiểm thử hồi quy đã hoàn tất.
 
 Bước gộp khám sau đó đưa tổng DB về 68 bảng vật lý và 67 bảng model EF. Xem [lưu trữ khám trong hai bảng](EXAMINATION-TWO-TABLES.vi.md) và [danh sách bảng hiện tại](../architecture/DATABASE-TABLE-INVENTORY.vi.md).

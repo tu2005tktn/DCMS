@@ -45,25 +45,19 @@ public sealed class DevelopmentAppointmentSeeder(DcmsDbContext db, TimeProvider 
         var examples = new[]
         {
             (AppointmentCode: "AP-S12-DEMO-1", RequestCode: "SR-S12-DEMO-1", Kind: "Change", Status: "Pending", Hour: 0),
-            (AppointmentCode: "AP-S12-DEMO-2", RequestCode: "SR-S12-DEMO-2", Kind: "ConfirmToAttend", Status: "Pending", Hour: 1),
+            (AppointmentCode: "AP-S12-DEMO-2", RequestCode: "SR-S12-DEMO-2", Kind: "General", Status: "Pending", Hour: 1),
             (AppointmentCode: "AP-S12-DEMO-3", RequestCode: "SR-S12-DEMO-3", Kind: "Cancel", Status: "Withdrawn", Hour: 2)
         };
         foreach (var example in examples)
         {
             var id = Guid.NewGuid(); var start = baseStart.AddHours(example.Hour);
-            db.Set<ResourceReservation>().Add(new ResourceReservation
-            {
-                Id = id, Code = "RS-" + id.ToString("N"), BranchId = branch.Id, DentistId = dentist.Id,
-                ChairId = chair.Id, ServiceId = service.Id, Start = start, End = start.AddMinutes(30),
-                AttendeeLabel = "Bệnh nhân demo S12", Status = "Confirmed"
-            });
             db.Appointments.Add(new Appointment
             {
-                Id = id, ReservationId = id, Code = example.AppointmentCode, BranchId = branch.Id,
-                BookerAccountId = guest.Id, BookerName = guest.FullName, BookerPhone = guest.PhoneNumber,
-                AttendeeName = "Bệnh nhân demo S12", DentistId = dentist.Id, ChairId = chair.Id,
-                ServiceId = service.Id, StartAt = start, EndAt = start.AddMinutes(30), Status = "Confirmed",
-                CreatedAt = clock.GetUtcNow()
+                Id = id, Code = example.AppointmentCode, BranchId = branch.Id,
+                BookerAccountId = guest.Id, AttendeeName = "Bệnh nhân demo S12",
+                DentistId = dentist.Id, ChairId = chair.Id, ServiceId = service.Id,
+                StartAt = start, EndAt = start.AddMinutes(30), Status = "Confirmed", CreatedAt = clock.GetUtcNow(),
+                BookingInfo = new AppointmentBookingInfo { BookerName = guest.FullName, BookerContact = guest.PhoneNumber }
             });
             db.Appointments.Local.Single(a => a.Id == id).SupportRequests.Add(new AppointmentSupportRequest
             {

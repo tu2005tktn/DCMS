@@ -173,15 +173,14 @@ function ChangeDialog({ detail, token, mode, onClose, onChanged, onAccessError, 
       `/api/availability/options?${new URLSearchParams({ branchId: String(detail.branchId) })}`, { signal: controller.signal }, token)
       .then(value => {
         if (!active) return;
-        const available = value.employees.filter(item => item.branchId === detail.branchId && item.canDentist
-          && item.id !== detail.assistantId);
+        const available = value.employees.filter(item => item.branchId === detail.branchId && item.canDentist);
         setDentists(available.some(item => item.id === detail.dentistId) ? available
           : [{ id: detail.dentistId, branchId: detail.branchId, name: detail.dentistName, canDentist: true }, ...available]);
       })
       .catch((failure: Error) => { if (active) setDentistsError(failure.message); })
       .finally(() => { if (active) setDentistsBusy(false); });
     return () => { active = false; controller.abort(); };
-  }, [moving, detail.branchId, detail.dentistId, detail.dentistName, detail.assistantId, token]);
+  }, [moving, detail.branchId, detail.dentistId, detail.dentistName, token]);
   useEffect(() => {
     if (!moving) return;
     setSlot(null); setSlots([]); setSlotsError(null); setReviewing(false);

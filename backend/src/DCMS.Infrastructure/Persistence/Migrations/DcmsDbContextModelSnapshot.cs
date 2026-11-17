@@ -163,92 +163,37 @@ namespace DCMS.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("DCMS.Domain.Features.Appointments.Appointment", b =>
                 {
-                    b.Property<Guid>("ReservationId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("Id");
-
-                    b.Property<int?>("AssistantId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("AssistantId");
-
-                    b.Property<DateOnly?>("AttendeeBirthDate")
-                        .HasColumnType("date");
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
 
                     b.Property<string>("AttendeeName")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
-                    b.Property<string>("AttendeeRelation")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
-
                     b.Property<int?>("BookerAccountId")
                         .HasColumnType("integer");
 
-                    b.Property<string>("BookerEmail")
-                        .HasMaxLength(254)
-                        .HasColumnType("character varying(254)");
-
-                    b.Property<string>("BookerName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("BookerPhone")
-                        .HasMaxLength(24)
-                        .HasColumnType("character varying(24)");
-
                     b.Property<int>("BranchId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("BranchId");
-
-                    b.Property<string>("CancelReason")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<DateTimeOffset?>("CancelledAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("CancelledBy")
                         .HasColumnType("integer");
 
                     b.Property<int>("ChairId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("ChairId");
+                        .HasColumnType("integer");
 
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)");
 
-                    b.Property<string>("ConfirmedToAttend")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
-                        .HasDefaultValue("Pending");
-
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("DentistId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("DentistId");
+                        .HasColumnType("integer");
 
                     b.Property<DateTimeOffset>("EndAt")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("EndAt");
-
-                    b.Property<string>("ExceptionReason")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid?>("FamilyMemberId")
                         .HasColumnType("uuid");
@@ -256,20 +201,10 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("FollowUpId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
-                        .HasColumnName("AppointmentId");
-
                     b.Property<string>("Kind")
                         .IsRequired()
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)");
-
-                    b.Property<DateTimeOffset?>("PatientConsentConfirmedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("PatientConsentConfirmedBy")
-                        .HasColumnType("integer");
 
                     b.Property<int?>("PatientId")
                         .HasColumnType("integer");
@@ -279,9 +214,7 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(1000)");
 
                     b.Property<int?>("ServiceId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("ServiceId");
+                        .HasColumnType("integer");
 
                     b.Property<string>("Source")
                         .IsRequired()
@@ -289,22 +222,35 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(24)");
 
                     b.Property<DateTimeOffset>("StartAt")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("StartAt");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(24)
                         .HasColumnType("character varying(24)");
 
-                    b.Property<Guid>("StorageStamp")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("uuid");
-
                     b.Property<int>("Version")
+                        .IsConcurrencyToken()
                         .HasColumnType("integer");
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "BookingInfo", "DCMS.Domain.Features.Appointments.Appointment.BookingInfo#AppointmentBookingInfo", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<DateOnly?>("AttendeeBirthDate");
+
+                            b1.Property<string>("AttendeeRelation")
+                                .IsRequired();
+
+                            b1.Property<string>("BookerContact");
+
+                            b1.Property<string>("BookerName")
+                                .IsRequired();
+
+                            b1.Property<string>("ExceptionReason");
+
+                            b1.ToJson("BookingInfo");
+                        });
 
                     b.ComplexCollection(typeof(List<Dictionary<string, object>>), "Reminders", "DCMS.Domain.Features.Appointments.Appointment.Reminders#AppointmentReminder", b1 =>
                         {
@@ -389,15 +335,12 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                             b1.ToJson("SupportRequests");
                         });
 
-                    b.HasKey("ReservationId");
-
-                    b.HasAlternateKey("Id")
-                        .HasName("AK_APPOINTMENT_AppointmentId");
-
-                    b.HasIndex("CancelledBy");
+                    b.HasKey("Id");
 
                     b.HasIndex("Code")
                         .IsUnique();
+
+                    b.HasIndex("DentistId");
 
                     b.HasIndex("FamilyMemberId");
 
@@ -405,17 +348,21 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasFilter("\"FollowUpId\" IS NOT NULL AND \"Status\" IN ('Confirmed','CheckedIn')");
 
-                    b.HasIndex("PatientConsentConfirmedBy");
-
                     b.HasIndex("PatientId");
 
                     b.HasIndex("BranchId", "StartAt");
+
+                    b.HasIndex("ServiceId", "BranchId");
+
+                    b.HasIndex("StartAt", "EndAt");
 
                     b.HasIndex("BookerAccountId", "FamilyMemberId", "StartAt");
 
                     b.ToTable("APPOINTMENT", null, t =>
                         {
-                            t.HasCheckConstraint("CK_APPOINTMENT_RANGE", "\"StartAt\" < \"EndAt\" AND (\"AssistantId\" IS NULL OR \"AssistantId\" <> \"DentistId\")");
+                            t.HasCheckConstraint("CK_APPOINTMENT_RANGE", "\"StartAt\" < \"EndAt\"");
+
+                            t.HasCheckConstraint("CK_APPOINTMENT_Status", "\"Status\" IN ('Confirmed','CheckedIn','InProgress','Completed','Cancelled','NoShow')");
                         });
                 });
 
@@ -1056,98 +1003,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("CK_PATIENT_PROFILE_Gender", "\"Gender\" IS NULL OR \"Gender\" IN ('MALE','FEMALE','OTHER')");
                         });
-                });
-
-            modelBuilder.Entity("DCMS.Domain.Features.Scheduling.ResourceReservation", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("AppointmentKey")
-                        .HasColumnType("uuid")
-                        .HasColumnName("AppointmentId");
-
-                    b.Property<int?>("AssistantId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("AssistantId");
-
-                    b.Property<string>("AttendeeKey")
-                        .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
-
-                    b.Property<string>("AttendeeLabel")
-                        .IsRequired()
-                        .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
-
-                    b.Property<int>("BranchId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("BranchId");
-
-                    b.Property<int>("ChairId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("ChairId");
-
-                    b.Property<string>("Code")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
-                        .HasColumnName("ReservationCode");
-
-                    b.Property<int>("DentistId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("DentistId");
-
-                    b.Property<DateTimeOffset>("End")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("EndAt");
-
-                    b.Property<int?>("ServiceId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("ServiceId");
-
-                    b.Property<DateTimeOffset>("Start")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("StartAt");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
-                        .HasColumnName("ReservationStatus");
-
-                    b.Property<Guid>("StorageStamp")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasAlternateKey("AppointmentKey")
-                        .HasName("AK_APPOINTMENT_AppointmentId");
-
-                    b.HasIndex("AssistantId");
-
-                    b.HasIndex("BranchId");
-
-                    b.HasIndex("Code")
-                        .IsUnique();
-
-                    b.HasIndex("DentistId");
-
-                    b.HasIndex("ServiceId", "BranchId");
-
-                    b.HasIndex("Start", "End");
-
-                    b.ToTable("APPOINTMENT", (string)null);
                 });
 
             modelBuilder.Entity("DCMS.Domain.Features.Scheduling.SchedulingBranch", b =>
@@ -5866,19 +5721,22 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasForeignKey("BookerAccountId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("DCMS.Infrastructure.Features.Accounts.ApplicationUser", null)
+                    b.HasOne("DCMS.Domain.Features.Scheduling.SchedulingBranch", null)
                         .WithMany()
-                        .HasForeignKey("CancelledBy")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DCMS.Domain.Features.Accounts.EmployeeProfile", null)
+                        .WithMany()
+                        .HasForeignKey("DentistId")
+                        .HasPrincipalKey("Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
                     b.HasOne("DCMS.Domain.Features.FamilyMembers.FamilyMember", null)
                         .WithMany()
                         .HasForeignKey("FamilyMemberId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("DCMS.Infrastructure.Features.Accounts.ApplicationUser", null)
-                        .WithMany()
-                        .HasForeignKey("PatientConsentConfirmedBy")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("DCMS.Domain.Features.Patients.PatientProfile", null)
@@ -5886,11 +5744,11 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasForeignKey("PatientId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("DCMS.Domain.Features.Scheduling.ResourceReservation", null)
-                        .WithOne()
-                        .HasForeignKey("DCMS.Domain.Features.Appointments.Appointment", "ReservationId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                    b.HasOne("DCMS.Domain.Features.Scheduling.SchedulingService", null)
+                        .WithMany()
+                        .HasForeignKey("ServiceId", "BranchId")
+                        .HasPrincipalKey("Id", "BranchId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("DCMS.Domain.Features.Appointments.PushDevice", b =>
@@ -6016,34 +5874,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasOne("DCMS.Domain.Features.SystemSettings.ReferenceEntry", null)
                         .WithMany()
                         .HasForeignKey("SourceId")
-                        .OnDelete(DeleteBehavior.Restrict);
-                });
-
-            modelBuilder.Entity("DCMS.Domain.Features.Scheduling.ResourceReservation", b =>
-                {
-                    b.HasOne("DCMS.Domain.Features.Accounts.EmployeeProfile", null)
-                        .WithMany()
-                        .HasForeignKey("AssistantId")
-                        .HasPrincipalKey("Id")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("DCMS.Domain.Features.Scheduling.SchedulingBranch", null)
-                        .WithMany()
-                        .HasForeignKey("BranchId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("DCMS.Domain.Features.Accounts.EmployeeProfile", null)
-                        .WithMany()
-                        .HasForeignKey("DentistId")
-                        .HasPrincipalKey("Id")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("DCMS.Domain.Features.Scheduling.SchedulingService", null)
-                        .WithMany()
-                        .HasForeignKey("ServiceId", "BranchId")
-                        .HasPrincipalKey("Id", "BranchId")
                         .OnDelete(DeleteBehavior.Restrict);
                 });
 
@@ -6190,9 +6020,8 @@ namespace DCMS.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("DCMS.Domain.Features.Visits.Visit", b =>
                 {
                     b.HasOne("DCMS.Domain.Features.Appointments.Appointment", null)
-                        .WithMany()
-                        .HasForeignKey("AppointmentId")
-                        .HasPrincipalKey("Id")
+                        .WithOne()
+                        .HasForeignKey("DCMS.Domain.Features.Visits.Visit", "AppointmentId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
@@ -6248,7 +6077,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasOne("DCMS.Domain.Features.Appointments.Appointment", null)
                         .WithMany()
                         .HasForeignKey("AppointmentId")
-                        .HasPrincipalKey("Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
@@ -6263,7 +6091,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasOne("DCMS.Domain.Features.Appointments.Appointment", null)
                         .WithMany()
                         .HasForeignKey("AppointmentId")
-                        .HasPrincipalKey("Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
@@ -6397,7 +6224,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasOne("DCMS.Domain.Features.Appointments.Appointment", null)
                         .WithMany()
                         .HasForeignKey("AppointmentId")
-                        .HasPrincipalKey("Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
@@ -6407,7 +6233,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasOne("DCMS.Domain.Features.Appointments.Appointment", null)
                         .WithMany()
                         .HasForeignKey("AppointmentId")
-                        .HasPrincipalKey("Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
@@ -6602,7 +6427,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasOne("DCMS.Domain.Features.Appointments.Appointment", null)
                         .WithMany()
                         .HasForeignKey("AggregateId")
-                        .HasPrincipalKey("Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
@@ -6617,7 +6441,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasOne("DCMS.Domain.Features.Appointments.Appointment", null)
                         .WithMany()
                         .HasForeignKey("AppointmentId")
-                        .HasPrincipalKey("Id")
                         .OnDelete(DeleteBehavior.Restrict);
                 });
 
@@ -6635,7 +6458,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasOne("DCMS.Domain.Features.Appointments.Appointment", null)
                         .WithMany()
                         .HasForeignKey("AppointmentId")
-                        .HasPrincipalKey("Id")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("DCMS.Domain.Features.Appointments.InAppNotification", null)

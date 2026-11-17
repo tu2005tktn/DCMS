@@ -54,7 +54,7 @@ public sealed class AppointmentService(DcmsDbContext db, IAvailabilityService av
         var relation = Clean(request.AttendeeRelation) ?? "Self";
         var kind = Clean(request.Kind) ?? "Standard";
         var source = staff ? Clean(request.Source) ?? "Phone" : "App";
-        if (request.ReplacesAppointmentId.HasValue && (kind != "WalkIn" || source != "InPerson" || request.FollowUpId.HasValue || request.AssistantId.HasValue)) throw Error("MSG04");
+        if (request.ReplacesAppointmentId.HasValue && (kind != "WalkIn" || source != "InPerson" || request.FollowUpId.HasValue)) throw Error("MSG04");
         if (request.FamilyMemberId.HasValue && (account?.AccountType != "Public" || relation != "Relative")) throw Error("MSG06", 403);
         if (relation is not ("Self" or "Relative") || kind is not ("Standard" or "WalkIn" or "FollowUp")
             || (staff && source is not ("Phone" or "Zalo" or "Facebook" or "InPerson" or "App"))
@@ -92,7 +92,7 @@ public sealed class AppointmentService(DcmsDbContext db, IAvailabilityService av
         var reason = Clean(request.Reason);
         var exceptionReason = Clean(request.ExceptionReason);
         if (reason?.Length > 1000 || exceptionReason?.Length > 500 || (staff && request.ServiceId == null && reason == null)
-            || (!staff && (request.ServiceId == null || request.AssistantId.HasValue || exceptionReason != null))) throw Error("MSG04");
+            || (!staff && (request.ServiceId == null || exceptionReason != null))) throw Error("MSG04");
         if (!ScheduleRules.ValidDuration(request.DurationMinutes, !staff)) throw Error("MSG04");
         var start = request.StartAt.ToUniversalTime();
         var now = clock.GetUtcNow();
@@ -104,7 +104,7 @@ public sealed class AppointmentService(DcmsDbContext db, IAvailabilityService av
             Email = Clean(request.Booker?.Email)?.ToLowerInvariant(), PatientId = request.Attendee?.PatientId,
             AttendeeName = Clean(request.Attendee?.Name), BirthDate = request.Attendee?.BirthDate,
             Relation = relation, Kind = kind, Source = source,
-            request.ServiceId, Reason = reason, request.DentistId, request.AssistantId,
+            request.ServiceId, Reason = reason, request.DentistId,
             ChairId = staff ? request.ChairId : null, StartAt = start, request.DurationMinutes,
             request.FollowUpId, ExceptionReason = exceptionReason, request.ScheduleVersion, request.AssistantScheduleVersion, request.BookingSettingsVersion
         };
@@ -167,40 +167,37 @@ public sealed class AppointmentService(DcmsDbContext db, IAvailabilityService av
         }
 
         var slot = await availability.CheckInTransactionAsync(new ResourceCheck(request.BranchId, request.DentistId,
-            request.ServiceId, start, request.DurationMinutes, staff ? request.ChairId : null, request.AssistantId,
-            patientId.HasValue ? $"patient:{patientId.Value}" : null, request.ScheduleVersion,
+            request.ServiceId, start, request.DurationMinutes, staff ? request.ChairId : null, null,
+            patientId, request.ScheduleVersion,
             request.AssistantScheduleVersion, Public: !staff, BookingSettingsVersion: request.BookingSettingsVersion), ct);
 
         var id = Guid.NewGuid();
         var code = "AP-" + id.ToString("N").ToUpperInvariant();
-        var reservation = new ResourceReservation
-        {
-            Id = id, Code = code, BranchId = request.BranchId, DentistId = request.DentistId,
-            AssistantId = request.AssistantId, ChairId = slot.ChairId, ServiceId = request.ServiceId,
-            Start = slot.Start.ToUniversalTime(), End = slot.End.ToUniversalTime(),
-            AttendeeKey = patientId.HasValue ? $"patient:{patientId.Value}" : null,
-            AttendeeLabel = attendeeName, Status = "Confirmed"
-        };
+        var startUtc = slot.Start.ToUniversalTime();
+        var endUtc = slot.End.ToUniversalTime();
         var appointment = new Appointment
         {
-            Id = id, ReservationId = id, Code = code, BranchId = request.BranchId, BookerAccountId = accountId,
-            FamilyMemberId = request.FamilyMemberId,
-            BookerName = bookerName, BookerPhone = phone, BookerEmail = email, PatientId = patientId,
-            AttendeeName = attendeeName, AttendeeBirthDate = attendeeBirthDate,
-            AttendeeRelation = relation, Kind = kind, Source = source, ServiceId = request.ServiceId,
-            Reason = reason, DentistId = request.DentistId, AssistantId = request.AssistantId,
-            ChairId = slot.ChairId, StartAt = reservation.Start, EndAt = reservation.End,
-            FollowUpId = request.FollowUpId, ExceptionReason = exceptionReason, CreatedAt = now,
-            PatientConsentConfirmedAt = treatmentPlanBooking ? now : null,
-            PatientConsentConfirmedBy = treatmentPlanBooking ? accountId : null
+            Id = id, Code = code, BranchId = request.BranchId, BookerAccountId = accountId,
+            FamilyMemberId = request.FamilyMemberId, PatientId = patientId,
+            AttendeeName = attendeeName, Kind = kind, Source = source, ServiceId = request.ServiceId,
+            Reason = reason, DentistId = request.DentistId,
+            ChairId = slot.ChairId, StartAt = startUtc, EndAt = endUtc,
+            FollowUpId = request.FollowUpId, CreatedAt = now,
+            BookingInfo = new AppointmentBookingInfo
+            {
+                BookerName = bookerName,
+                BookerContact = phone ?? email,
+                AttendeeBirthDate = attendeeBirthDate,
+                AttendeeRelation = relation,
+                ExceptionReason = exceptionReason
+            }
         };
-        db.Add(reservation);
         db.Add(appointment);
         db.Add(new AppointmentReceipt { ActorScope = scope, RequestKey = request.RequestKey,
             Fingerprint = fingerprint, AppointmentId = id,
             ResultJson = JsonSerializer.Serialize(Result(appointment, "MSG29")) });
         var eventPayload = JsonSerializer.SerializeToNode(new { appointmentId = id, code, version = 1,
-            status = "Confirmed", branchId = request.BranchId, startAt = reservation.Start, endAt = reservation.End })!;
+            status = "Confirmed", branchId = request.BranchId, startAt = startUtc, endAt = endUtc })!;
         if (request.ReplacesAppointmentId.HasValue) eventPayload["replacesAppointmentId"] = JsonSerializer.SerializeToNode(request.ReplacesAppointmentId.Value);
         db.Add(new AppointmentOutboxEvent
         {

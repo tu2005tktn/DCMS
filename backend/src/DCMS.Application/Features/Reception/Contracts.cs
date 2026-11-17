@@ -10,7 +10,7 @@ public sealed record ReceptionPage<T>(IReadOnlyList<T> Items, int Total, int Pag
     DateOnly ClinicDate, DateTimeOffset ServerNow);
 public sealed record ReceptionOptions(AppointmentOptions Calendar, bool CanCheckIn, DateOnly ClinicDate, DateTimeOffset ServerNow);
 public sealed record ReceptionAppointment(Guid AppointmentId, string Code, int BranchId, string BranchName,
-    int DentistId, string DentistName, int ChairId, string ChairName, int? AssistantId,
+    int DentistId, string DentistName, int ChairId, string ChairName,
     DateTimeOffset StartAt, DateTimeOffset EndAt, string Status, int Version, int? PatientId,
     string? PatientCode, string? PatientName, string BookerName, string? BookerPhone, string? BookerEmail,
     string AttendeeName, DateOnly? AttendeeBirthDate, string AttendeeRelation, Guid? VisitId,
@@ -19,7 +19,7 @@ public sealed record ReceptionDetail(ReceptionAppointment Appointment, VisitResu
     DateOnly ClinicDate, DateTimeOffset ServerNow, bool CanBackdate);
 public sealed record VisitResult(Guid VisitId, int PatientId, string PatientCode, string PatientName,
     Guid AppointmentId, string AppointmentCode, int BranchId, string BranchName, int DentistId, string DentistName,
-    int ChairId, int? AssistantId, DateTimeOffset AppointmentAt, DateTimeOffset ArrivalAt,
+    int ChairId, DateTimeOffset AppointmentAt, DateTimeOffset ArrivalAt,
     string Status, string AppointmentStatus, int VisitVersion, int AppointmentVersion, string Purpose,
     string? Note, string? ArrivalReason,
     int WaitingMinutes, bool Replayed, string OpenVisitPath);

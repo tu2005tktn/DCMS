@@ -1,9 +1,9 @@
 # Danh sách bảng sau rút gọn
 
-Cập nhật ngày 13/11/2026. Schema đã áp dụng có 32 bảng trong model EF và 33 bảng vật lý trong schema `public`. Bảng ngoài model là `__EFMigrationsHistory`. Các schema `dcms_test_*` là môi trường kiểm thử tách biệt.
+Cập nhật ngày 18/11/2026. Schema đã áp dụng có 32 bảng trong model EF và 33 bảng vật lý trong schema `public`. Bảng ngoài model là `__EFMigrationsHistory`. Các schema `dcms_test_*` là môi trường kiểm thử tách biệt.
 Riêng tài khoản và phân quyền chỉ có `USER_ACCOUNT` và `ACCESS_GROUP`. Riêng đơn thuốc và danh mục thuốc chỉ có `PRESCRIPTION` và `CATALOG_MEDICINE`. Nhật ký và kết quả chống ghi trùng dùng hai kho chung cho toàn hệ thống.
 
-Chi nhánh, lịch làm việc và lịch hẹn đã gộp về ba bảng `SCHEDULING_BRANCH`, `WORKING_SCHEDULE`, `APPOINTMENT`, dùng chung danh mục dịch vụ điều trị hiện có. Xem [hợp đồng lưu trữ và kiểm chứng](../specs/SCHEDULING-STORAGE-REVIEW.vi.md). Danh sách dưới đây phản ánh schema đã áp dụng.
+Chi nhánh, lịch làm việc và lịch hẹn đã gộp về ba bảng `SCHEDULING_BRANCH`, `WORKING_SCHEDULE`, `APPOINTMENT`, dùng chung danh mục dịch vụ điều trị hiện có. Xem [hợp đồng lưu trữ và kiểm chứng](../specs/SCHEDULING-STORAGE-REVIEW.vi.md). Ngày 18/11/2026 rút gọn `APPOINTMENT` từ 40 xuống 22 cột (bỏ table-splitting `RESOURCE_RESERVATION`, các cột dư và gom thông tin khai báo đặt lịch vào JSONB `BookingInfo`); xem [rút gọn bảng APPOINTMENT](../specs/APPOINTMENT-TABLE-SIMPLIFICATION.vi.md). Danh sách dưới đây phản ánh schema đã áp dụng.
 
 Phần khám đã gộp về `VISIT` và `CLINICAL_DOCUMENT`. Phiếu khám và chỉ định nằm trong lượt khám, các lần đọc tài liệu nằm trong tài liệu. Snapshot bảng tham chiếu cũ nằm trong audit chuyển đổi dùng chung. Xem [thiết kế và kiểm chứng hai bảng khám](../specs/EXAMINATION-TWO-TABLES.vi.md). Ngày 17/11/2026 thêm cột JSONB `AiAnalyses` vào `CLINICAL_DOCUMENT` cho [AI hỗ trợ phát hiện sâu răng](../specs/AI-CARIES-DETECTION.vi.md), không thêm bảng. Cùng ngày rút gọn `VISIT` từ 32 xuống 16 cột; xem [rút gọn bảng VISIT](../specs/VISIT-TABLE-SIMPLIFICATION.vi.md).
 
@@ -26,7 +26,7 @@ Thông báo chỉ còn `IN_APP_NOTIFICATION`; lượt gửi và việc nhân vi�
 | `SCHEDULING_BRANCH` | Chi nhánh, thông tin liên hệ, nhân sự, ghế, metadata logo, cấu hình đặt lịch và ngân hàng. |
 | `SCHEDULING_SERVICE` | Danh mục dịch vụ điều trị dùng chung cho điều trị và đặt lịch; gồm thời lượng, giá tham chiếu, chi nhánh và điều kiện cho khách tự đặt. |
 | `WORKING_SCHEDULE` | Lịch tuần cũ và các lần công bố lịch lặp/ngoại lệ; giữ ngày hiệu lực, phiên bản và các khoảng giờ JSONB. |
-| `APPOINTMENT` | Lịch hẹn và giữ chỗ dùng chung dòng; gồm người đặt/người khám, nhân sự, ghế, dịch vụ, thời gian, trạng thái, yêu cầu hỗ trợ và kế hoạch nhắc lịch. |
+| `APPOINTMENT` | Lịch hẹn và chiếm chỗ tài nguyên trên cùng bản ghi (22 cột): người đặt/người khám, nha sĩ, ghế, dịch vụ, thời gian, loại/nguồn, trạng thái, phiên bản; thông tin khai báo đặt lịch trong JSONB `BookingInfo`, yêu cầu hỗ trợ trong JSONB `SupportRequests` và kế hoạch nhắc lịch trong JSONB `Reminders`. |
 | `IN_APP_NOTIFICATION` | Thông báo cho tài khoản, sự kiện chờ gửi của lịch hẹn, từng lượt gửi theo kênh (trạng thái, số lần thử, lỗi) và việc nhân viên cần xử lý khi gửi thất bại; phân biệt bằng loại dòng. |
 | `PUSH_DEVICE` | Token Firebase của thiết bị di động theo tài khoản và nền tảng, dùng để gửi push thông báo; token là duy nhất. |
 | `VISIT` | Lượt đến khám: lịch hẹn, bệnh nhân, chi nhánh, bác sĩ, người tiếp nhận, giờ đến, mục đích, trạng thái (gồm "đã xác nhận phiếu khám"), phiên bản; nội dung phiếu khám và các chỉ định trong JSONB. |

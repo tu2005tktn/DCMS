@@ -7,44 +7,42 @@ public static class AppointmentRules
         status == "Confirmed" && start >= now.AddHours(12);
 }
 
+public sealed class AppointmentBookingInfo
+{
+    public string BookerName { get; set; } = "";
+    public string? BookerContact { get; set; }
+    public DateOnly? AttendeeBirthDate { get; set; }
+    public string AttendeeRelation { get; set; } = "Self";
+    public string? ExceptionReason { get; set; }
+
+    public string? Phone() => BookerContact is { Length: > 0 } c && !c.Contains('@') ? c : null;
+    public string? Email() => BookerContact is { Length: > 0 } c && c.Contains('@') ? c : null;
+}
+
 public sealed class Appointment
 {
+    public AppointmentBookingInfo BookingInfo { get; set; } = new();
     public List<AppointmentSupportRequest> SupportRequests { get; set; } = [];
     public List<AppointmentReminder> Reminders { get; set; } = [];
     public Guid Id { get; set; } = Guid.NewGuid();
-    public Guid ReservationId { get; set; }
     public string Code { get; set; } = "";
     public int BranchId { get; set; }
     public int? BookerAccountId { get; set; }
     public Guid? FamilyMemberId { get; set; }
-    public string BookerName { get; set; } = "";
-    public string? BookerPhone { get; set; }
-    public string? BookerEmail { get; set; }
     public int? PatientId { get; set; }
     public string AttendeeName { get; set; } = "";
-    public DateOnly? AttendeeBirthDate { get; set; }
-    public string AttendeeRelation { get; set; } = "Self";
     public string Kind { get; set; } = "Standard";
     public string Source { get; set; } = "App";
     public int? ServiceId { get; set; }
     public string? Reason { get; set; }
     public int DentistId { get; set; }
-    public int? AssistantId { get; set; }
     public int ChairId { get; set; }
     public DateTimeOffset StartAt { get; set; }
     public DateTimeOffset EndAt { get; set; }
     public Guid? FollowUpId { get; set; }
-    public DateTimeOffset? PatientConsentConfirmedAt { get; set; }
-    public int? PatientConsentConfirmedBy { get; set; }
-    public string? ExceptionReason { get; set; }
     public string Status { get; set; } = "Confirmed";
-    // S12: attendance intent is not an Appointment/Visit lifecycle state.
-    public string ConfirmedToAttend { get; set; } = "Pending";
     public int Version { get; set; } = 1;
     public DateTimeOffset CreatedAt { get; set; }
-    public DateTimeOffset? CancelledAt { get; set; }
-    public int? CancelledBy { get; set; }
-    public string? CancelReason { get; set; }
 }
 
 public sealed class AppointmentSupportRequest

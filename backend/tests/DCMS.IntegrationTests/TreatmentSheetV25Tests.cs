@@ -47,10 +47,9 @@ public sealed class TreatmentSheetV25Tests(ApiFixture fixture) : IClassFixture<A
         {
             var start = DateTimeOffset.UtcNow.AddDays(-i).AddMinutes(-30);
             var id = Guid.NewGuid();
-            await db.AddSchedulingDataAsync(new ResourceReservation { Id = id, Code = "RV-" + id.ToString("N"), BranchId = branch.Id, DentistId = staff.Id,
-                ChairId = chair.Id, ServiceId = service.Id, Start = start, End = start.AddHours(1), AttendeeKey = $"patient:{patient.Id}", AttendeeLabel = patient.FullName });
-            var appointment = new Appointment { Id = id, ReservationId = id, Code = "AP-" + id.ToString("N"), BranchId = branch.Id,
-                PatientId = patient.Id, DentistId = staff.Id, ChairId = chair.Id, ServiceId = service.Id, BookerName = "SYNTHETIC", BookerPhone = "0900000000",
+            var appointment = new Appointment { Id = id, Code = "AP-" + id.ToString("N"), BranchId = branch.Id,
+                PatientId = patient.Id, DentistId = staff.Id, ChairId = chair.Id, ServiceId = service.Id,
+                BookingInfo = new AppointmentBookingInfo { BookerName = "SYNTHETIC", BookerContact = "0900000000" },
                 AttendeeName = patient.FullName, StartAt = start, EndAt = start.AddHours(1), CreatedAt = start };
             db.Add(appointment);
             var visit = new Visit { AppointmentId = id, PatientId = patient.Id, BranchId = branch.Id, DentistId = staff.Id,

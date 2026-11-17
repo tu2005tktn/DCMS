@@ -10,7 +10,7 @@ const original: AppointmentDetail = {
   code: 'AP-WEB-TEST', start: `${date}T09:00:00+07:00`, end: `${date}T09:30:00+07:00`, durationMinutes: 30,
   dentistName: 'SYNTHETIC dentist', attendeeName: 'SYNTHETIC attendee', attendeeKind: 'RELATIVE',
   status: 'Confirmed', access: 'BOOKED_BY_ME', version: 1, branchId: 1, branchName: 'SYNTHETIC branch', dentistId: 2,
-  assistantId: null, serviceId: 1, serviceName: 'Khám', bookerName: 'SYNTHETIC customer', bookerContactMasked: '09******78',
+  serviceId: 1, serviceName: 'Khám', bookerName: 'SYNTHETIC customer', bookerContactMasked: '09******78',
   eligibility: { canSelfService: true, hoursRemaining: 72, reasonCode: null, canRequestSupport: false },
   followUp: null, history: [], clinicContact: { phone: '0234 3 888 999', hours: '08:00–17:00' },
 };

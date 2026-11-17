@@ -60,9 +60,9 @@ public sealed class ReceptionApiTests(ReceptionFixture fixture) : IClassFixture<
     {
         var activeFixture = targetFixture ?? fixture;
         using var scope = activeFixture.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
-        // Cases share demo employees in this fixture's isolated schema. Retire only previous case reservations
+        // Cases share demo employees in this fixture's isolated schema. Retire only previous case appointments
         // before arranging a new case so cross-branch staff occupancy remains a real global check.
-        await db.Set<ResourceReservation>().ExecuteUpdateAsync(s => s.SetProperty(x => x.Status, "Cancelled"));
+        await db.Appointments.ExecuteUpdateAsync(s => s.SetProperty(x => x.Status, "Cancelled"));
         var dentist = await (from e in db.Employees join u in db.Users on e.AccountId equals u.Id where u.UserName == "dentist.demo" select e).SingleAsync();
         var assistant = await (from e in db.Employees join u in db.Users on e.AccountId equals u.Id where u.UserName == "assistant.demo" select e).SingleAsync();
         var dual = await (from e in db.Employees join u in db.Users on e.AccountId equals u.Id where u.UserName == "dual.demo" select e).SingleAsync();
@@ -82,11 +82,9 @@ public sealed class ReceptionApiTests(ReceptionFixture fixture) : IClassFixture<
         var minute = (activeFixture.Clock.Now.ToOffset(TimeSpan.FromHours(7)).Hour * 60 + activeFixture.Clock.Now.ToOffset(TimeSpan.FromHours(7)).Minute) / 15 * 15;
         var start = new DateTimeOffset(date.ToDateTime(TimeOnly.MinValue), TimeSpan.FromHours(7)).AddMinutes(minute).ToUniversalTime();
         var a = new Appointment { Code = "AP-" + Guid.NewGuid().ToString("N"), BranchId = branch.Id, PatientId = linked ? patient.Id : null,
-            DentistId = dentist.Id, AssistantId = assistant.Id, ChairId = chairs[0].Id, ServiceId = service.Id, BookerName = "SYNTHETIC người đặt khác",
-            BookerPhone = patient.Phone, AttendeeName = patient.FullName, AttendeeRelation = "Relative", StartAt = start, EndAt = start.AddMinutes(15), CreatedAt = fixture.Clock.Now };
-        a.ReservationId = a.Id;
-        db.Add(new ResourceReservation { Id = a.Id, Code = a.Code, BranchId = branch.Id, DentistId = dentist.Id, AssistantId = assistant.Id,
-            ChairId = a.ChairId, ServiceId = service.Id, Start = a.StartAt, End = a.EndAt, AttendeeKey = linked ? $"patient:{patient.Id}" : null, AttendeeLabel = patient.FullName });
+            DentistId = dentist.Id, ChairId = chairs[0].Id, ServiceId = service.Id,
+            BookingInfo = new AppointmentBookingInfo { BookerName = "SYNTHETIC người đặt khác", BookerContact = patient.Phone, AttendeeRelation = "Relative" },
+            AttendeeName = patient.FullName, StartAt = start, EndAt = start.AddMinutes(15), CreatedAt = fixture.Clock.Now };
         db.Add(a); await db.SaveChangesAsync(); return new(branch.Id, dentist.Id, assistant.Id, a.ChairId, service.Id, patient.Id, a.Id);
     }
     private static CheckInRequest Command(Setup s) => new(s.PatientId, 1, Guid.NewGuid(), true, null, null, "InitialExamination", null);
@@ -116,7 +114,7 @@ public sealed class ReceptionApiTests(ReceptionFixture fixture) : IClassFixture<
         Assert.Single(queue!.Items); Assert.Equal(v.VisitId, queue.Items[0].VisitId);
         Assert.Equal(patientsBefore, await db.Patients.CountAsync()); Assert.Equal(linksBefore, await db.PatientAccountLinks.CountAsync());
         Assert.Single(await db.Set<VisitAudit>().Where(x => x.VisitId == v.VisitId).ToArrayAsync());
-        Assert.Equal("Confirmed", (await db.Set<ResourceReservation>().AsNoTracking().SingleAsync(x => x.Id == s.AppointmentId)).Status);
+        Assert.Equal("CheckedIn", (await db.Appointments.AsNoTracking().SingleAsync(x => x.Id == s.AppointmentId)).Status);
         Assert.Equal(0, await db.AppointmentOutboxEvents.CountAsync(x => x.AggregateId == s.AppointmentId));
     }
     [Fact] public async Task ConcurrentSameAndDifferentKeysAndTwoStaffCreateOneVisitAndOneAudit()
@@ -198,16 +196,17 @@ public sealed class ReceptionApiTests(ReceptionFixture fixture) : IClassFixture<
         using (var scope = fixture.Services.CreateScope()) { var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>(); (await db.LoadMemberAsync(s.BranchId, s.AssistantId)).Active = false; await db.SaveChangesAsync(); }
         await Error(await client.GetAsync($"/api/visits/{v.VisitId}"), HttpStatusCode.Forbidden); await Error(await client.PostAsJsonAsync(Path(s), command), HttpStatusCode.Forbidden);
     }
-    [Theory] [InlineData("chair")] [InlineData("dentist")] [InlineData("assistant")] [InlineData("patient")]
+    [Theory] [InlineData("chair")] [InlineData("dentist")] [InlineData("patient")]
     public async Task RecheckBlocksOverlappingResourcesAndLeavesNoPartialReception(string kind)
     {
         var s = await Prepare(); using var client = await Login();
         using var scope = fixture.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>(); var a = await db.Appointments.SingleAsync(x => x.Id == s.AppointmentId);
         var dual = await (from e in db.Employees join u in db.Users on e.AccountId equals u.Id where u.UserName == "dual.demo" select e.Id).SingleAsync();
         var otherChair = await db.SchedulingChairs.Where(x => x.BranchId == s.BranchId && x.Id != s.ChairId).Select(x => x.Id).FirstAsync();
-        db.Add(new ResourceReservation { Code = "RX-" + Guid.NewGuid().ToString("N"), BranchId = s.BranchId, DentistId = kind == "dentist" ? s.DentistId : dual,
-            AssistantId = kind == "assistant" ? s.AssistantId : null, ChairId = kind == "chair" ? s.ChairId : otherChair,
-            Start = a.StartAt, End = a.EndAt, AttendeeKey = kind == "patient" ? $"patient:{s.PatientId}" : null }); await db.SaveChangesAsync();
+        db.Add(new Appointment { Code = "AP-" + Guid.NewGuid().ToString("N"), BranchId = s.BranchId, DentistId = kind == "dentist" ? s.DentistId : dual,
+            ChairId = kind == "chair" ? s.ChairId : otherChair, ServiceId = s.ServiceId, StartAt = a.StartAt, EndAt = a.EndAt,
+            PatientId = kind == "patient" ? s.PatientId : null, AttendeeName = "SYNTHETIC blocker", CreatedAt = fixture.Clock.Now,
+            BookingInfo = new() { BookerName = "SYNTHETIC" } }); await db.SaveChangesAsync();
         await Error(await client.PostAsJsonAsync(Path(s), Command(s)), HttpStatusCode.Conflict, kind == "chair" ? "MSG28" : "MSG27");
         Assert.Equal(0, await db.Visits.CountAsync(x => x.AppointmentId == s.AppointmentId)); Assert.Equal("Confirmed", (await db.Appointments.AsNoTracking().SingleAsync(x => x.Id == s.AppointmentId)).Status);
     }
@@ -217,7 +216,7 @@ public sealed class ReceptionApiTests(ReceptionFixture fixture) : IClassFixture<
         var available = (await client.GetFromJsonAsync<AvailabilityResult>($"/api/availability?branchId={s.BranchId}&dentistId={s.DentistId}&serviceId={s.ServiceId}&date={Today:yyyy-MM-dd}&durationMinutes=15"))!;
         var slot = available.Slots.First(x => x.Start > fixture.Clock.Now);
         var booking = new CreateAppointmentRequest(s.BranchId, new BookerContact("SYNTHETIC người đặt", "0912345678", null), new AppointmentAttendee(s.PatientId, "SYNTHETIC người đến", null),
-            "Relative", "WalkIn", "InPerson", s.ServiceId, null, s.DentistId, null, slot.ChairId, slot.Start, 15, null, "Vãng lai còn nguồn lực", Guid.NewGuid(), slot.ScheduleVersion, null, slot.BookingSettingsVersion);
+            "Relative", "WalkIn", "InPerson", s.ServiceId, null, s.DentistId, slot.ChairId, slot.Start, 15, null, "Vãng lai còn nguồn lực", Guid.NewGuid(), slot.ScheduleVersion, null, slot.BookingSettingsVersion);
         var response = await client.PostAsJsonAsync("/api/appointments", booking); Assert.Equal(HttpStatusCode.Created, response.StatusCode); var created = (await response.Content.ReadFromJsonAsync<AppointmentResult>())!;
         await Error(await client.PostAsJsonAsync("/api/appointments", booking with { RequestKey = Guid.NewGuid() }), HttpStatusCode.Conflict, "MSG27");
         var v = await Check(client, s with { AppointmentId = created.AppointmentId }); Assert.Equal(created.AppointmentId, v.AppointmentId);
@@ -228,8 +227,7 @@ public sealed class ReceptionApiTests(ReceptionFixture fixture) : IClassFixture<
         using (var arrangeScope = fixture.Services.CreateScope())
         {
             var arrangeDb = arrangeScope.ServiceProvider.GetRequiredService<DcmsDbContext>(); var a = await arrangeDb.Appointments.SingleAsync(x => x.Id == s.AppointmentId);
-            var r = await arrangeDb.Set<ResourceReservation>().SingleAsync(x => x.Id == a.ReservationId);
-            a.StartAt = r.Start = a.StartAt.AddMinutes(15); a.EndAt = r.End = a.EndAt.AddMinutes(15); await arrangeDb.SaveChangesAsync();
+            a.StartAt = a.StartAt.AddMinutes(15); a.EndAt = a.EndAt.AddMinutes(15); await arrangeDb.SaveChangesAsync();
         }
         var cancel = client.PostAsJsonAsync($"/api/appointments/{(await client.GetFromJsonAsync<ReceptionDetail>($"/api/reception/appointments/{s.AppointmentId}"))!.Appointment.Code}/cancel",
             new { expectedVersion = 1, requestKey = Guid.NewGuid(), reason = "SYNTHETIC cancel race", requesterVerification = "Đã đối chiếu" });
@@ -305,9 +303,8 @@ public sealed class ReceptionApiTests(ReceptionFixture fixture) : IClassFixture<
         Assert.Equal(original.VisitId, (await Check(client, s, command)).VisitId);
         Assert.Equal(1, await db.Set<VisitAudit>().CountAsync(x => x.VisitId == original.VisitId));
         var a = await db.Appointments.AsNoTracking().SingleAsync(x => x.Id == s.AppointmentId);
-        a.Id = a.ReservationId = Guid.NewGuid(); a.Code = "AP-" + a.Id.ToString("N"); a.Status = "Confirmed"; a.Version = 1; a.StartAt = a.StartAt.AddMinutes(15); a.EndAt = a.EndAt.AddMinutes(15);
-        db.Add(new ResourceReservation { Id = a.Id, Code = a.Code, BranchId = a.BranchId, DentistId = a.DentistId, AssistantId = a.AssistantId,
-            ChairId = a.ChairId, ServiceId = a.ServiceId, Start = a.StartAt, End = a.EndAt, AttendeeKey = $"patient:{s.PatientId}" }); db.Add(a); await db.SaveChangesAsync();
+        a.Id = Guid.NewGuid(); a.Code = "AP-" + a.Id.ToString("N"); a.Status = "Confirmed"; a.Version = 1; a.StartAt = a.StartAt.AddMinutes(15); a.EndAt = a.EndAt.AddMinutes(15);
+        db.Add(a); await db.SaveChangesAsync();
         await Check(client, s with { AppointmentId = a.Id });
         Assert.Equal(2, await db.Visits.CountAsync());
         var previous = db.Database.GetMigrations().Last(x => x != "20261025163452_ReceptionVisits");

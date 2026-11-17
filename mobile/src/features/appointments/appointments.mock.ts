@@ -135,7 +135,7 @@ export const mockAppointmentsApi: AppointmentsApi = {
   async detail(_token, code) { await delay(); return detailOf(own(code)); },
   async rescheduleDentists(_token, detail) {
     await delay();
-    return copy(mockDentists.filter(value => value.branchId === detail.branchId && value.id !== detail.assistantId));
+    return copy(mockDentists.filter(value => value.branchId === detail.branchId));
   },
   async availability(_token, detail, date, dentistId) {
     await delay();

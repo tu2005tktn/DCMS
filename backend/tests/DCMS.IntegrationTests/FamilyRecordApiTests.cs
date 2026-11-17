@@ -66,9 +66,9 @@ public sealed class FamilyRecordApiTests(ApiFixture fixture) : IClassFixture<Api
         var chair = new SchedulingChair { BranchId = branch.Id, Name = "SYNTHETIC chair", OpenMinute = 0, CloseMinute = 1440 };
         await db.AddSchedulingDataAsync(service, chair, new SchedulingMember { BranchId = branch.Id, EmployeeId = dentist.Id, CanDentist = true }, new SchedulingMember { BranchId = branch.Id, EmployeeId = assistantId }); await db.SaveChangesAsync();
         var id = Guid.NewGuid(); var now = DateTimeOffset.UtcNow;
-        await db.AddSchedulingDataAsync(new ResourceReservation { Id = id, Code = "RV-" + id.ToString("N"), BranchId = branch.Id, DentistId = dentist.Id, ChairId = chair.Id, ServiceId = service.Id, Start = now.AddDays(-1), End = now.AddDays(-1).AddHours(1), AttendeeLabel = name });
-        await db.AddSchedulingDataAsync(new Appointment { Id = id, ReservationId = id, Code = "AP-" + id.ToString("N"), BranchId = branch.Id, PatientId = patient.Id, DentistId = dentist.Id, ChairId = chair.Id, ServiceId = service.Id, BookerName = "SYNTHETIC", AttendeeName = name, StartAt = now.AddDays(-1), EndAt = now.AddDays(-1).AddHours(1), CreatedAt = now,
-            BookerAccountId = linkedBooking ? ownerId : null, FamilyMemberId = linkedBooking ? member.Id : null, AttendeeBirthDate = linkedBooking ? member.BirthDate : null });
+        await db.AddSchedulingDataAsync(new Appointment { Id = id, Code = "AP-" + id.ToString("N"), BranchId = branch.Id, PatientId = patient.Id, DentistId = dentist.Id, ChairId = chair.Id, ServiceId = service.Id, AttendeeName = name, StartAt = now.AddDays(-1), EndAt = now.AddDays(-1).AddHours(1), CreatedAt = now,
+            BookerAccountId = linkedBooking ? ownerId : null, FamilyMemberId = linkedBooking ? member.Id : null,
+            BookingInfo = new AppointmentBookingInfo { BookerName = "SYNTHETIC", AttendeeBirthDate = linkedBooking ? member.BirthDate : null } });
         await db.SaveChangesAsync();
         var visit = new Visit { AppointmentId = id, PatientId = patient.Id, BranchId = branch.Id, DentistId = dentist.Id, Status = VisitStatuses.Completed, ArrivalAt = now.AddDays(-1), RecordedBy = (await db.Employees.Where(e => e.Id == assistantId).Select(e => e.AccountId).SingleAsync()), Note = "SYNTHETIC INTERNAL VISIT NOTE" };
         db.Add(visit); await db.SaveChangesAsync();
@@ -159,7 +159,7 @@ public sealed class FamilyRecordApiTests(ApiFixture fixture) : IClassFixture<Api
                 case "NoVisit": db.Remove(await db.Set<VisitExamination>().SingleAsync(x => x.VisitId == s.VisitId)); db.Remove(visit); break;
                 case "WrongOwner": appointment.BookerAccountId = null; break;
                 case "SnapshotName": appointment.AttendeeName = "SYNTHETIC different attendee"; break;
-                case "SnapshotBirth": appointment.AttendeeBirthDate = new DateOnly(2014, 3, 12); break;
+                case "SnapshotBirth": appointment.BookingInfo.AttendeeBirthDate = new DateOnly(2014, 3, 12); break;
                 case "PatientName": patient.FullName = "SYNTHETIC different patient"; break;
                 case "Archived": patient.IsArchived = true; break;
                 case "WrongPatient": appointment.PatientId = null; break;
@@ -181,7 +181,7 @@ public sealed class FamilyRecordApiTests(ApiFixture fixture) : IClassFixture<Api
             var otherVisit = await db.Visits.SingleAsync(x => x.Id == other.VisitId);
             var appointment = await db.Appointments.SingleAsync(x => x.Id == otherVisit.AppointmentId);
             appointment.BookerAccountId = s.OwnerId; appointment.FamilyMemberId = s.Member.Id;
-            appointment.AttendeeName = s.Member.FullName; appointment.AttendeeBirthDate = s.Member.BirthDate;
+            appointment.AttendeeName = s.Member.FullName; appointment.BookingInfo.AttendeeBirthDate = s.Member.BirthDate;
             var patient = await db.Patients.SingleAsync(x => x.Id == other.PatientId); patient.FullName = s.Member.FullName; patient.BirthDate = s.Member.BirthDate;
             await db.SaveChangesAsync();
         }
@@ -360,13 +360,13 @@ public sealed class FamilyRecordApiTests(ApiFixture fixture) : IClassFixture<Api
         }
         var slots = (await s.Owner.GetFromJsonAsync<AvailabilityResult>($"/api/availability?branchId={s.BranchId}&dentistId={s.DentistId}&serviceId={s.ServiceId}&date={targetDate:yyyy-MM-dd}&durationMinutes=30"))!.Slots;
         var slot = slots.First();
-        var request = new CreateAppointmentRequest(s.BranchId, new("SYNTHETIC delegate", "0912345678", null), new(null, "Untrusted name", null), "Relative", "Standard", "App", s.ServiceId, null, s.DentistId, null, null, slot.Start, 30, null, null, Guid.NewGuid(), slot.ScheduleVersion, null, FamilyMemberId: s.Member.Id);
+        var request = new CreateAppointmentRequest(s.BranchId, new("SYNTHETIC delegate", "0912345678", null), new(null, "Untrusted name", null), "Relative", "Standard", "App", s.ServiceId, null, s.DentistId, null, slot.Start, 30, null, null, Guid.NewGuid(), slot.ScheduleVersion, null, FamilyMemberId: s.Member.Id);
         using var stranger = await Client(); Assert.Equal(HttpStatusCode.NotFound, (await stranger.PostAsJsonAsync("/api/appointments", request)).StatusCode);
         var response = await s.Owner.PostAsJsonAsync("/api/appointments", request); Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
         var result = (await response.Content.ReadFromJsonAsync<AppointmentResult>())!;
         using (var scope = fixture.Services.CreateScope()) {
             var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>(); var appointment = await db.Appointments.SingleAsync(x => x.Id == result.AppointmentId);
-            Assert.Equal(s.Member.FullName, appointment.AttendeeName); Assert.Equal(s.Member.BirthDate, appointment.AttendeeBirthDate); Assert.Null(appointment.PatientId); Assert.Equal(s.OwnerId, appointment.BookerAccountId);
+            Assert.Equal(s.Member.FullName, appointment.AttendeeName); Assert.Equal(s.Member.BirthDate, appointment.BookingInfo.AttendeeBirthDate); Assert.Null(appointment.PatientId); Assert.Equal(s.OwnerId, appointment.BookerAccountId);
             Assert.False(await db.Set<FamilyRecordAccess>().AnyAsync(x => x.FamilyMemberId == s.Member.Id));
         }
         var booked = await s.Owner.GetFromJsonAsync<FamilyPage<FamilyAppointmentDto>>(Url(s.Member.Id) + "/appointments"); Assert.Single(booked!.Items);

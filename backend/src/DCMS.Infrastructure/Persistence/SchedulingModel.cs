@@ -51,17 +51,6 @@ internal static class SchedulingModel
 
         });
 
-        model.Entity<ResourceReservation>(b =>
-        {
-
-            b.Property(x => x.Code).HasMaxLength(40); b.Property(x => x.Status).HasMaxLength(16);
-            b.Property(x => x.AttendeeKey).HasMaxLength(160); b.Property(x => x.AttendeeLabel).HasMaxLength(160);
-            b.HasIndex(x => new { x.Start, x.End }); b.HasIndex(x => x.Code).IsUnique();
-            b.HasOne<SchedulingMember>().WithMany().HasForeignKey(x => new { x.BranchId, EmployeeId = x.DentistId }).OnDelete(DeleteBehavior.Restrict);
-            b.HasOne<EmployeeProfile>().WithMany().HasForeignKey(x => x.AssistantId).OnDelete(DeleteBehavior.Restrict);
-            b.HasOne<SchedulingChair>().WithMany().HasForeignKey(x => new { x.ChairId, x.BranchId }).HasPrincipalKey(x => new { x.Id, x.BranchId }).OnDelete(DeleteBehavior.Restrict);
-            b.HasOne<SchedulingService>().WithMany().HasForeignKey(x => new { x.ServiceId, x.BranchId }).HasPrincipalKey(x => new { x.Id, x.BranchId }).OnDelete(DeleteBehavior.Restrict);
-        });
         model.Entity<ScheduleReceipt>(b =>
         {
             b.HasIndex(new[] { "ReceiptType", "ActorId", "RequestKey" }, "UX_ScheduleReceipt_Scope").IsUnique().HasDatabaseName("UX_RECEIPT_ActorId_RequestKey");

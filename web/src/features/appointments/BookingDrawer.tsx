@@ -141,7 +141,7 @@ export default function BookingDrawer({ open, prefill, options, followUp, replac
             birthDate: values.patientId ? null : values.attendeeBirthDate || null },
         attendeeRelation: followUp ? 'Self' : values.relation, kind: effectiveKind,
         source: values.source, serviceId: values.serviceId ?? null,
-        reason: values.reason?.trim() || null, dentistId: slot.dentistId, assistantId: null, chairId: slot.chairId,
+        reason: values.reason?.trim() || null, dentistId: slot.dentistId, chairId: slot.chairId,
         startAt: slot.start, durationMinutes: effectiveDuration,
         followUpId: followUp?.instructionId ?? null, bookingSettingsVersion: slot.bookingSettingsVersion,
         ...(replacement ? { replacesAppointmentId: replacement.id } : {}),

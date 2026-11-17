@@ -160,17 +160,6 @@ public sealed class SupportRequestService(DcmsDbContext db, UserManager<Applicat
                     && x.Action == (request.Kind == "Cancel" ? "CANCEL" : "RESCHEDULE"), ct))
                 throw Error("MSG111");
         }
-        if (command.Decision == "Resolve" && request.Kind is "ConfirmToAttend" or "WithdrawAttend")
-        {
-            appointment.ConfirmedToAttend = request.Kind == "ConfirmToAttend" ? "Yes" : "No";
-            appointment.Version++;
-            db.AppointmentOutboxEvents.Add(new AppointmentOutboxEvent
-            {
-                AggregateId = appointment.Id, EventType = "appointment.attendance", OccurredAt = clock.GetUtcNow(),
-                PayloadJson = JsonSerializer.Serialize(new { appointmentId = appointment.Id, appointment.Version,
-                    appointment.ConfirmedToAttend })
-            });
-        }
         request.Status = command.Decision == "Reject" ? "Rejected" : "Resolved";
         request.DecisionReason = reason ?? Clean(command.Notes) ?? "Đã xử lý yêu cầu.";
         request.PublicNote = Clean(command.Notes); request.DecidedAt = clock.GetUtcNow(); request.DecidedBy = actorId;
@@ -192,34 +181,6 @@ public sealed class SupportRequestService(DcmsDbContext db, UserManager<Applicat
         await tx.CommitAsync(ct);
         await PublishSupportUpdatedAsync(request, appointment,
             command.Decision == "Reject" ? "Rejected" : "Resolved");
-        return result;
-    }
-
-    public async Task<AttendanceConfirmationResult> SetAttendanceAsync(int actorId, Guid appointmentId,
-        AttendanceConfirmationCommand command, CancellationToken ct)
-    {
-        if (command.RequestKey == Guid.Empty || command.ExpectedVersion <= 0) throw Error("MSG04", 400);
-        var fingerprint = Hash(new { appointmentId, command.ExpectedVersion, command.Confirmed });
-        var appointment = await db.Appointments.SingleOrDefaultAsync(x => x.Id == appointmentId, ct) ?? throw Error("MSG102", 404);
-        await RequireBranchAsync(actorId, appointment.BranchId, ct);
-        var receipt = await db.AppointmentReceipts.AsNoTracking().SingleOrDefaultAsync(x => x.RequestKey == command.RequestKey, ct);
-        if (receipt != null)
-        {
-            if (receipt.ActorScope != $"staff:{actorId}" || receipt.Fingerprint != fingerprint) throw Error("MSG111");
-            return JsonSerializer.Deserialize<AttendanceConfirmationResult>(receipt.ResultJson)!;
-        }
-        if (appointment.Version != command.ExpectedVersion) throw Error("MSG111");
-        appointment.ConfirmedToAttend = command.Confirmed ? "Yes" : "No";
-        appointment.Version++;
-        var result = new AttendanceConfirmationResult(appointment.Id, appointment.Version,
-            appointment.Status, appointment.ConfirmedToAttend);
-        db.AppointmentReceipts.Add(new AppointmentReceipt { RequestKey = command.RequestKey,
-            ActorScope = $"staff:{actorId}", Fingerprint = fingerprint, AppointmentId = appointment.Id,
-            ResultJson = JsonSerializer.Serialize(result) });
-        db.AppointmentOutboxEvents.Add(new AppointmentOutboxEvent { AggregateId = appointment.Id,
-            EventType = "appointment.attendance", OccurredAt = clock.GetUtcNow(),
-            PayloadJson = JsonSerializer.Serialize(new { appointmentId, appointment.Version, appointment.ConfirmedToAttend }) });
-        await db.SaveChangesAsync(ct);
         return result;
     }
 
@@ -264,7 +225,7 @@ public sealed class SupportRequestService(DcmsDbContext db, UserManager<Applicat
             RequestKey = command.RequestKey,
             RequesterAccountId = actorId,
             RequesterName = appointment.AttendeeName,
-            RequesterPhone = appointment.BookerPhone,
+            RequesterPhone = appointment.BookingInfo.Phone(),
             Reason = reason,
             ProposedStartAt = command.NewStartAt?.ToUniversalTime(),
             ProposedReason = reason,
@@ -474,9 +435,9 @@ public sealed class SupportRequestService(DcmsDbContext db, UserManager<Applicat
             appointment.DentistId, dentistName, appointment.ServiceId, serviceName,
             (int)(appointment.EndAt - appointment.StartAt).TotalMinutes,
             new SupportAppointmentPerson(appointment.PatientId, appointment.AttendeeName,
-                appointment.AttendeeBirthDate, appointment.AttendeeRelation),
-            new SupportBooker(appointment.BookerAccountId, appointment.BookerName, appointment.BookerPhone,
-                !appointment.BookerAccountId.HasValue), appointment.ConfirmedToAttend);
+                appointment.BookingInfo.AttendeeBirthDate, appointment.BookingInfo.AttendeeRelation),
+            new SupportBooker(appointment.BookerAccountId, appointment.BookingInfo.BookerName, appointment.BookingInfo.Phone(),
+                !appointment.BookerAccountId.HasValue));
     }
 
     private async Task<T?> ReplayAsync<T>(int actorId, Guid key, string fingerprint, CancellationToken ct) where T : class

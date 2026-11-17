@@ -73,7 +73,7 @@ public sealed class SchedulingStorageTests(ApiFixture fixture) : IClassFixture<A
     }
 
     [Fact]
-    public async Task RollbackPreservesBranchCollectionsDifferentBookingIdsStandaloneReservationsAndWorkflowData()
+    public async Task RollbackPreservesBranchCollectionsAppointmentBookingInfoAndWorkflowData()
     {
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
@@ -88,19 +88,20 @@ public sealed class SchedulingStorageTests(ApiFixture fixture) : IClassFixture<A
         var service = new SchedulingService { BranchId = branch.Id, Name = "SYNTHETIC treatment", PublicDurationMinutes = 30 };
         db.Add(service); await db.SaveChangesAsync();
         var start = DateTimeOffset.UtcNow.AddDays(7);
-        var reservation = new ResourceReservation { BranchId = branch.Id, DentistId = dentist.Id, ChairId = chair.Id,
-            ServiceId = service.Id, Start = start, End = start.AddMinutes(30), Code = "SYNTHETIC-R", AttendeeLabel = "SYNTHETIC", Status = "Confirmed" };
-        var appointment = new Appointment { ReservationId = reservation.Id, BranchId = branch.Id, DentistId = dentist.Id,
+        var appointment = new Appointment { BranchId = branch.Id, DentistId = dentist.Id,
             ChairId = chair.Id, ServiceId = service.Id, StartAt = start, EndAt = start.AddMinutes(30), Code = "SYNTHETIC-A",
-            AttendeeName = "SYNTHETIC", BookerName = "SYNTHETIC", CreatedAt = start.AddDays(-7), Version = 3, Status = "CheckedIn" };
-        Assert.NotEqual(appointment.Id, reservation.Id);
+            AttendeeName = "SYNTHETIC", CreatedAt = start.AddDays(-7), Version = 3, Status = "CheckedIn",
+            BookingInfo = new AppointmentBookingInfo
+            {
+                BookerName = "SYNTHETIC Booker", BookerContact = "0912345678",
+                AttendeeBirthDate = new DateOnly(1995, 4, 15), AttendeeRelation = "Relative",
+                ExceptionReason = "SYNTHETIC exception"
+            } };
         var request = new AppointmentSupportRequest { AppointmentId = appointment.Id, Code = "SYNTHETIC-SR", Version = 5,
             RequesterName = "SYNTHETIC", Kind = "General", RequestKey = Guid.NewGuid(), CreatedAt = start.AddDays(-7), UpdatedAt = start.AddDays(-7) };
         var reminder = new AppointmentReminder { AppointmentId = appointment.Id, AppointmentVersion = 3, AccountId = dentist.AccountId,
             LeadMinutes = 120, DueAt = start.AddMinutes(-120), CreatedAt = start.AddDays(-7) };
         appointment.SupportRequests.Add(request); appointment.Reminders.Add(reminder);
-        var standalone = new ResourceReservation { BranchId = branch.Id, DentistId = dentist.Id, ChairId = chair.Id,
-            ServiceId = service.Id, Start = start.AddDays(1), End = start.AddDays(1).AddMinutes(30), Code = "SYNTHETIC-ONLY", AttendeeLabel = "SYNTHETIC" };
         var week = new WorkingWeek { BranchId = branch.Id, EmployeeId = dentist.Id, WeekStart = new(2026, 11, 9), Version = 4,
             PublishedBy = dentist.AccountId, PublishedAt = start, Periods = [new() { Day = 0, StartMinute = 480, EndMinute = 720 }] };
         var revision = new WorkingScheduleRevision { EmployeeId = dentist.Id, Date = new(2026, 11, 16), Version = 1,
@@ -108,24 +109,22 @@ public sealed class SchedulingStorageTests(ApiFixture fixture) : IClassFixture<A
         var history = new AppointmentSupportHistory { RequestId = request.Id, AppointmentId = appointment.Id,
             ActorAccountId = dentist.AccountId, Action = "Synthetic", OccurredAt = start };
         var outbox = new AppointmentOutboxEvent { AggregateId = appointment.Id, OccurredAt = start, PayloadJson = "{}" };
-        db.AddRange(reservation, appointment, standalone, week, revision, history, outbox);
+        db.AddRange(appointment, week, revision, history, outbox);
         await db.SaveChangesAsync(); db.ChangeTracker.Clear();
-        Assert.False(await db.Appointments.AnyAsync(x => x.Id == standalone.Id));
         var migrator = db.GetService<IMigrator>();
         await migrator.MigrateAsync("20261112095901_ConsolidateAccountStorage");
         await migrator.MigrateAsync(); db.ChangeTracker.Clear();
 
         var read = await db.Appointments.SingleAsync(x => x.Id == appointment.Id);
-        Assert.Equal(reservation.Id, read.ReservationId);
         Assert.Equal(3, read.Version); Assert.Equal("CheckedIn", read.Status);
-        var reserved = await db.Set<ResourceReservation>().SingleAsync(x => x.Id == reservation.Id);
-        Assert.Equal(appointment.Id, reserved.AppointmentKey); Assert.Equal("Confirmed", reserved.Status);
-        Assert.Equal("SYNTHETIC-R", reserved.Code);
+        Assert.Equal("SYNTHETIC Booker", read.BookingInfo.BookerName);
+        Assert.Equal("0912345678", read.BookingInfo.BookerContact);
+        Assert.Equal(new DateOnly(1995, 4, 15), read.BookingInfo.AttendeeBirthDate);
+        Assert.Equal("Relative", read.BookingInfo.AttendeeRelation);
+        Assert.Equal("SYNTHETIC exception", read.BookingInfo.ExceptionReason);
         Assert.Equal(request.Id, Assert.Single(read.SupportRequests).Id);
         Assert.Equal(5, read.SupportRequests[0].Version);
         Assert.Equal(reminder.Id, Assert.Single(read.Reminders).Id);
-        Assert.True(await db.Set<ResourceReservation>().AnyAsync(x => x.Id == standalone.Id));
-        Assert.False(await db.Appointments.AnyAsync(x => x.Id == standalone.Id));
         var parent = await db.Set<SchedulingBranch>().SingleAsync(x => x.Id == branch.Id);
         Assert.Equal(chair.Id, Assert.Single(parent.Chairs).Id); Assert.Equal(4, parent.Chairs[0].Version);
         Assert.Equal(asset.Id, Assert.Single(parent.Assets).Id);

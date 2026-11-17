@@ -27,7 +27,7 @@ public sealed partial class WorkingScheduleService
             select new ScheduleAppointment(appointment.Id, appointment.Code, appointment.BranchId, branch.Name,
                 appointment.StartAt, appointment.EndAt, appointment.AttendeeName, service == null ? "Khác" : service.Name,
                 appointment.Status, appointment.FollowUpId.HasValue && db.FollowUpInstructions.Any(x => x.Id == appointment.FollowUpId
-                    && x.DossierId.HasValue && x.ItemId.HasValue), appointment.PatientConsentConfirmedAt)).ToListAsync(ct);
+                    && x.DossierId.HasValue && x.ItemId.HasValue))).ToListAsync(ct);
         return new(rows);
     }
 }

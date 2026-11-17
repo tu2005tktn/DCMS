@@ -31,7 +31,6 @@ public sealed class TreatmentPlanBookingApiTests(ApiFixture fixture) : IClassFix
         Assert.Equal(expectedCode, (await response.Content.ReadFromJsonAsync<DCMS.Application.Common.SystemMessage>())!.Code);
         using var scope = fixture.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
         Assert.False(await db.Appointments.AnyAsync(x => x.PatientId == s.Patient));
-        Assert.False(await db.Set<ResourceReservation>().AnyAsync(x => x.AttendeeKey == $"patient:{s.Patient}"));
         Assert.False(await db.AppointmentReceipts.AnyAsync(x => x.RequestKey == lastCommand!.RequestKey));
         Assert.Equal(outboxBefore, await db.AppointmentOutboxEvents.CountAsync());
         var followUp = await db.FollowUpInstructions.AsNoTracking().SingleAsync(x => x.Id == instruction);
@@ -103,7 +102,7 @@ public sealed class TreatmentPlanBookingApiTests(ApiFixture fixture) : IClassFix
         var appointment = (await response.Content.ReadFromJsonAsync<AppointmentResult>())!;
         using var verification = fixture.Services.CreateScope();
         var row = await verification.ServiceProvider.GetRequiredService<DcmsDbContext>().Appointments.AsNoTracking().SingleAsync(x => x.Id == appointment.AppointmentId);
-        Assert.Null(row.PatientConsentConfirmedAt); Assert.Null(row.PatientConsentConfirmedBy);
+        Assert.Null(row.FollowUpId);
     }
 
     [Fact]
@@ -115,18 +114,12 @@ public sealed class TreatmentPlanBookingApiTests(ApiFixture fixture) : IClassFix
         var path = $"/api/working-schedules/appointments?dentistId={s.Dentist}&from={s.Date:yyyy-MM-dd}&to={s.Date:yyyy-MM-dd}";
         var items = (await client.GetFromJsonAsync<ScheduleAppointments>(path))!.Items;
         var row = Assert.Single(items, item => item.Id == appointment.AppointmentId);
-        Assert.True(row.IsTreatmentPlan); Assert.NotNull(row.PatientConsentConfirmedAt); Assert.Equal("Confirmed", row.Status);
+        Assert.True(row.IsTreatmentPlan); Assert.Equal("Confirmed", row.Status);
         using var assistant = await Login("assistant.demo");
         var cancelled = await assistant.PostAsJsonAsync($"/api/appointments/{appointment.Code}/cancel",
             new CancelAppointmentRequest(appointment.Version, Guid.NewGuid(), "SYNTHETIC cancelled", "SYNTHETIC verified patient"));
         Assert.True(cancelled.IsSuccessStatusCode, await cancelled.Content.ReadAsStringAsync());
         Assert.Equal("Cancelled", (await client.GetFromJsonAsync<ScheduleAppointments>(path))!.Items.Single(item => item.Id == appointment.AppointmentId).Status);
-        using (var scope = fixture.Services.CreateScope()) {
-            var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
-            var legacy = await db.Appointments.SingleAsync(x => x.Id == appointment.AppointmentId);
-            legacy.PatientConsentConfirmedAt = null; legacy.PatientConsentConfirmedBy = null; await db.SaveChangesAsync();
-        }
-        Assert.Null((await client.GetFromJsonAsync<ScheduleAppointments>(path))!.Items.Single(item => item.Id == appointment.AppointmentId).PatientConsentConfirmedAt);
         Assert.Equal(HttpStatusCode.BadRequest, (await client.GetAsync($"/api/working-schedules/appointments?dentistId={s.Dentist}&from={s.Date:yyyy-MM-dd}&to={s.Date.AddDays(31):yyyy-MM-dd}")).StatusCode);
     }
 
@@ -174,7 +167,7 @@ public sealed class TreatmentPlanBookingApiTests(ApiFixture fixture) : IClassFix
         using (var scope = fixture.Services.CreateScope()) outboxBefore = await scope.ServiceProvider.GetRequiredService<DcmsDbContext>().AppointmentOutboxEvents.CountAsync();
         lastCommand = new CreateAppointmentRequest(s.Branch,
             new BookerContact("SYNTHETIC audit", "0912345678", null), new AppointmentAttendee(s.Patient, "SYNTHETIC audit patient", null),
-            "Self", instruction.HasValue ? "FollowUp" : "Standard", "InPerson", s.Service, "SYNTHETIC audit", s.Dentist, null, slot.ChairId, slot.Start, durationMinutes,
+            "Self", instruction.HasValue ? "FollowUp" : "Standard", "InPerson", s.Service, "SYNTHETIC audit", s.Dentist, slot.ChairId, slot.Start, durationMinutes,
             instruction, null, Guid.NewGuid(), slot.ScheduleVersion, slot.AssistantScheduleVersion, slot.BookingSettingsVersion, PatientConsentConfirmed: patientConsent);
         return await client.PostAsJsonAsync("/api/appointments", lastCommand);
     }
@@ -188,8 +181,7 @@ public sealed class TreatmentPlanBookingApiTests(ApiFixture fixture) : IClassFix
         var created = (await response.Content.ReadFromJsonAsync<AppointmentResult>())!;
         using var scope = fixture.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
         var row = await db.Appointments.AsNoTracking().SingleAsync(x => x.Id == created.AppointmentId);
-        Assert.Equal(row.CreatedAt, row.PatientConsentConfirmedAt);
-        Assert.Equal(await db.Users.Where(x => x.UserName == "dentist.demo").Select(x => x.Id).SingleAsync(), row.PatientConsentConfirmedBy);
+        Assert.Equal(instruction, row.FollowUpId);
     }
 
     [Fact]
@@ -226,8 +218,7 @@ public sealed class TreatmentPlanBookingApiTests(ApiFixture fixture) : IClassFix
         Assert.Equal(booked.AppointmentId, (await replay.Content.ReadFromJsonAsync<AppointmentResult>())!.AppointmentId);
         using var scope = fixture.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
         var saved = await db.Appointments.AsNoTracking().SingleAsync(x => x.Id == booked.AppointmentId);
-        var reserved = await db.Set<ResourceReservation>().AsNoTracking().SingleAsync(x => x.Id == saved.ReservationId);
-        Assert.Equal(TimeSpan.FromMinutes(durationMinutes), reserved.End - reserved.Start);
+        Assert.Equal(TimeSpan.FromMinutes(durationMinutes), saved.EndAt - saved.StartAt);
         Assert.Equal(30, (await db.FollowUpInstructions.AsNoTracking().SingleAsync(x => x.Id == instruction)).DurationMinutes);
         Assert.Equal(30, (await db.TreatmentDossiers.AsNoTracking().Where(x => x.Id == s.Dossier).SelectMany(x => x.Items).SingleAsync(x => x.Id == s.Item)).EstimatedMinutes);
         var changedKeyContent = await client.PostAsJsonAsync("/api/appointments", lastCommand! with { DurationMinutes = durationMinutes == 1 ? 2 : 1 });
@@ -346,7 +337,7 @@ public sealed class TreatmentPlanBookingApiTests(ApiFixture fixture) : IClassFix
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
         var saved = Assert.Single(await db.Appointments.AsNoTracking().Where(x => x.PatientId == s.Patient).ToListAsync());
-        Assert.Equal(saved.CreatedAt, saved.PatientConsentConfirmedAt);
+        Assert.Equal("Confirmed", saved.Status);
     }
 
     [Fact]
@@ -387,11 +378,10 @@ public sealed class TreatmentPlanBookingApiTests(ApiFixture fixture) : IClassFix
         using var scope = fixture.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
         var saved = await db.Appointments.AsNoTracking().SingleAsync(x => x.Id == original.AppointmentId);
         Assert.Equal(slot.Start, saved.StartAt);
-        Assert.Equal(saved.CreatedAt, saved.PatientConsentConfirmedAt);
         Assert.Equal(original.AppointmentId, (await db.FollowUpInstructions.AsNoTracking().SingleAsync(x => x.Id == instruction)).ActiveAppointmentId);
         var report = (await client.GetFromJsonAsync<ScheduleAppointments>($"/api/working-schedules/appointments?dentistId={s.Dentist}&from={s.Date:yyyy-MM-dd}&to={s.Date:yyyy-MM-dd}"))!;
         var row = Assert.Single(report.Items, item => item.Id == original.AppointmentId);
-        Assert.Equal(slot.Start, row.StartAt); Assert.Equal(saved.PatientConsentConfirmedAt, row.PatientConsentConfirmedAt);
+        Assert.Equal(slot.Start, row.StartAt); Assert.True(row.IsTreatmentPlan);
     }
 
     [Fact]

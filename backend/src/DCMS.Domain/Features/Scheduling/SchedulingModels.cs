@@ -74,24 +74,6 @@ public sealed class WorkingPeriod
     public string Kind { get; set; } = "Work";
     public string Reason { get; set; } = "";
 }
-// Shared persistence seam for TV2; no appointment creation API is exposed by S09.
-public sealed class ResourceReservation
-{
-    public Guid AppointmentKey { get; set; } = Guid.NewGuid();
-    public Guid StorageStamp { get; set; } = Guid.NewGuid();
-    public Guid Id { get; set; } = Guid.NewGuid();
-    public string Code { get; set; } = "";
-    public int BranchId { get; set; }
-    public int DentistId { get; set; }
-    public int? AssistantId { get; set; }
-    public int ChairId { get; set; }
-    public int? ServiceId { get; set; }
-    public DateTimeOffset Start { get; set; }
-    public DateTimeOffset End { get; set; }
-    public string? AttendeeKey { get; set; }
-    public string AttendeeLabel { get; set; } = "";
-    public string Status { get; set; } = "Confirmed";
-}
 public sealed class ScheduleReceipt : DCMS.Domain.Common.CommandReceiptRecord
 {
     public int ActorId { get; set; }

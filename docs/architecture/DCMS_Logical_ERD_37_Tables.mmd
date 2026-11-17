@@ -91,6 +91,7 @@ erDiagram
         Integer concurrency_version
     }
 
+    %% Physical schema (18/11/2026): simplified to 22 columns with BookingInfo, SupportRequests, Reminders JSONB; see docs/specs/APPOINTMENT-TABLE-SIMPLIFICATION.vi.md
     APPOINTMENT {
         Integer appointment_id PK
         String booking_code UK

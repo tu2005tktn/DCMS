@@ -50,7 +50,7 @@ public sealed class AppointmentApiTests(ApiFixture fixture) : IClassFixture<ApiF
     private static CreateAppointmentRequest Request(Setup setup, AvailabilitySlot slot, Guid? key = null,
         string attendee = "Nguyễn A", string relation = "Self") => new(setup.BranchId,
         new BookerContact("Nguyễn B", "0912345678", null), new AppointmentAttendee(null, attendee, null),
-        relation, "Standard", "App", setup.ServiceId, null, setup.DentistId, null, null,
+        relation, "Standard", "App", setup.ServiceId, null, setup.DentistId, null,
         slot.Start, 30, null, null, key ?? Guid.NewGuid(), slot.ScheduleVersion, null);
 
     private static async Task<AvailabilitySlot> SlotAsync(HttpClient client, Setup setup)
@@ -84,7 +84,6 @@ public sealed class AppointmentApiTests(ApiFixture fixture) : IClassFixture<ApiF
         using var scope = fixture.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
         Assert.Equal(1, await db.Appointments.CountAsync(x => x.BranchId == setup.BranchId));
         Assert.Equal(1, await db.AppointmentOutboxEvents.CountAsync(x => x.AggregateId == created.AppointmentId));
-        Assert.Equal(1, await db.Set<ResourceReservation>().CountAsync(x => x.BranchId == setup.BranchId));
         Assert.Equal(0, await db.Patients.CountAsync(x => x.FullName == "Nguyễn A"));
     }
 
@@ -119,7 +118,7 @@ public sealed class AppointmentApiTests(ApiFixture fixture) : IClassFixture<ApiF
         var appointment = await db.Appointments.SingleAsync(x => x.BranchId == setup.BranchId);
         Assert.Equal(session.User.Id, appointment.BookerAccountId);
         Assert.Null(appointment.PatientId);
-        Assert.Equal("Relative", appointment.AttendeeRelation);
+        Assert.Equal("Relative", appointment.BookingInfo.AttendeeRelation);
     }
 
     [Fact]
@@ -158,7 +157,7 @@ public sealed class AppointmentApiTests(ApiFixture fixture) : IClassFixture<ApiF
             .SingleAsync(x => x.BranchId == setup.BranchId);
         Assert.Equal(patientId, appointment.PatientId);
         Assert.Equal("Tên hồ sơ đã xác minh", appointment.AttendeeName);
-        Assert.Equal(new DateOnly(1990, 5, 6), appointment.AttendeeBirthDate);
+        Assert.Equal(new DateOnly(1990, 5, 6), appointment.BookingInfo.AttendeeBirthDate);
     }
 
     [Fact]
@@ -186,7 +185,7 @@ public sealed class AppointmentApiTests(ApiFixture fixture) : IClassFixture<ApiF
             (await signIn.Content.ReadFromJsonAsync<SignInResponse>())!.AccessToken);
         var command = new CreateAppointmentRequest(setup.BranchId, new BookerContact("Khách vãng lai", "0912345678", null),
             new AppointmentAttendee(null, "Người khám", null), "Self", "WalkIn", "InPerson", setup.ServiceId,
-            "Khám khẩn", setup.DentistId, null, null, candidate, 15, null, null, Guid.NewGuid(), 1, null);
+            "Khám khẩn", setup.DentistId, null, candidate, 15, null, null, Guid.NewGuid(), 1, null);
         var denied = await client.PostAsJsonAsync("/api/appointments", command);
         Assert.Equal(HttpStatusCode.BadRequest, denied.StatusCode);
         Assert.Equal("MSG24", (await denied.Content.ReadFromJsonAsync<SystemMessage>())!.Code);

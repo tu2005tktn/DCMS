@@ -34,7 +34,7 @@ public sealed record MyAppointmentDetail(string Code, DateTimeOffset Start, Date
     string DentistName, string AttendeeName, string AttendeeKind, string Status, string Access, int Version,
     int BranchId, string BranchName, int DentistId, int? ServiceId, string ServiceName, string BookerName,
     string BookerContactMasked, object? FollowUp, MyEligibility Eligibility, IReadOnlyList<object> SupportRequests,
-    IReadOnlyList<MyAppointmentChange> History, MyClinicContact ClinicContact, int? AssistantId = null);
+    IReadOnlyList<MyAppointmentChange> History, MyClinicContact ClinicContact);
 public sealed record MyAppointmentQuery(string Scope, string? Status, DateOnly? From, DateOnly? To, int Page, int PageSize);
 
 public interface IAppointmentQueryService

@@ -369,7 +369,7 @@ public sealed class ExaminationApiTests(ExaminationFixture fixture) : IClassFixt
             using(var scope = fixture.Services.CreateScope()) {
                 var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
                 var p = await db.Patients.SingleAsync(x => x.Id == v.PatientId); p.BirthDate = birth; p.Gender = gender;
-                var a = await db.Appointments.SingleAsync(x => x.Id == v.AppointmentId); a.AttendeeBirthDate = today.AddYears(-10);
+                var a = await db.Appointments.SingleAsync(x => x.Id == v.AppointmentId); a.BookingInfo.AttendeeBirthDate = today.AddYears(-10);
                 await db.SaveChangesAsync();
             }
             var w = await c.GetFromJsonAsync<ExaminationWorkspace>(Exam(v.VisitId));
@@ -579,7 +579,6 @@ public sealed class ExaminationApiTests(ExaminationFixture fixture) : IClassFixt
                 a.BranchId = s.BranchId;
                 a.ChairId = s.ChairId;
                 a.ServiceId = s.ServiceId;
-                var reservation = await db.Set<ResourceReservation>().SingleAsync(x => x.Id == a.ReservationId); reservation.AttendeeKey = $"patient:{s.PatientId}";
                 // Attach a second already-checked-in Visit to the same Patient. Check-in itself is covered through real API in the other cases.
                 a.Status = "CheckedIn"; var visit = new DCMS.Domain.Features.Visits.Visit { AppointmentId = a.Id, PatientId = s.PatientId, BranchId = s.BranchId, DentistId = s.DentistId,
                     ArrivalAt = fixture.Clock.Now, RecordedBy = (await db.Employees.SingleAsync(x => x.Id == s.AssistantId)).AccountId };

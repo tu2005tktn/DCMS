@@ -53,10 +53,9 @@ public sealed class BranchIsolationTests(ApiFixture fixture) : IClassFixture<Api
             await db.AddSchedulingDataAsync(svc, chair, new SchedulingMember { BranchId = branch.Id, EmployeeId = staff.Id, CanDentist = true });
             await db.SaveChangesAsync();
             var start = DateTimeOffset.UtcNow.AddDays(2); var id = Guid.NewGuid();
-            await db.AddSchedulingDataAsync(new ResourceReservation { Id = id, Code = "RV-" + id.ToString("N"), BranchId = branch.Id, DentistId = staff.Id, ChairId = chair.Id, ServiceId = svc.Id,
-                Start = start, End = start.AddHours(1), AttendeeKey = $"patient:{p.Id}", AttendeeLabel = p.FullName });
-            await db.AddSchedulingDataAsync(new Appointment { Id = id, ReservationId = id, Code = "AP-" + id.ToString("N"), BranchId = branch.Id, PatientId = p.Id, DentistId = staff.Id, ChairId = chair.Id,
-                ServiceId = svc.Id, BookerName = "SYNTHETIC", BookerPhone = "0900000000", AttendeeName = p.FullName, StartAt = start, EndAt = start.AddHours(1), CreatedAt = DateTimeOffset.UtcNow });
+            await db.AddSchedulingDataAsync(new Appointment { Id = id, Code = "AP-" + id.ToString("N"), BranchId = branch.Id, PatientId = p.Id, DentistId = staff.Id, ChairId = chair.Id,
+                ServiceId = svc.Id, AttendeeName = p.FullName, StartAt = start, EndAt = start.AddHours(1), CreatedAt = DateTimeOffset.UtcNow,
+                BookingInfo = new() { BookerName = "SYNTHETIC", BookerContact = "0900000000" } });
             await db.SaveChangesAsync();
             patient = p.Id; branchA = branch.Id; dentist = staff.Id; service = svc.Id;
         }

@@ -1,3 +1,4 @@
+using DCMS.Domain.Features.Accounts;
 using DCMS.Domain.Features.Appointments;
 using DCMS.Domain.Features.Patients;
 using DCMS.Domain.Features.Scheduling;
@@ -10,33 +11,40 @@ internal static class AppointmentModel
 {
     public static void Configure(ModelBuilder model)
     {
+        model.Ignore<AppointmentBookingInfo>();
+        model.Ignore<AppointmentSupportRequest>();
+        model.Ignore<AppointmentReminder>();
+
         model.Entity<Appointment>(b =>
         {
-            b.ToTable("APPOINTMENT", t => t.HasCheckConstraint("CK_APPOINTMENT_RANGE", "\"StartAt\" < \"EndAt\" AND (\"AssistantId\" IS NULL OR \"AssistantId\" <> \"DentistId\")"));
-            b.Property(x => x.Code).HasMaxLength(40);
-            b.Property(x => x.BookerName).HasMaxLength(100);
-            b.Property(x => x.BookerPhone).HasMaxLength(24);
-            b.Property(x => x.BookerEmail).HasMaxLength(254);
-            b.Property(x => x.AttendeeName).HasMaxLength(100);
-            b.Property(x => x.AttendeeRelation).HasMaxLength(16);
-            b.Property(x => x.Kind).HasMaxLength(16);
-            b.Property(x => x.Source).HasMaxLength(24);
+            b.ToTable("APPOINTMENT", t =>
+            {
+                t.HasCheckConstraint("CK_APPOINTMENT_RANGE", "\"StartAt\" < \"EndAt\"");
+                t.HasCheckConstraint("CK_APPOINTMENT_Status", "\"Status\" IN ('Confirmed','CheckedIn','InProgress','Completed','Cancelled','NoShow')");
+            });
+            b.HasKey(x => x.Id);
+            b.Property(x => x.Code).HasMaxLength(40).IsRequired();
+            b.Property(x => x.AttendeeName).HasMaxLength(100).IsRequired();
+            b.Property(x => x.Kind).HasMaxLength(16).IsRequired();
+            b.Property(x => x.Source).HasMaxLength(24).IsRequired();
             b.Property(x => x.Reason).HasMaxLength(1000);
-            b.Property(x => x.ExceptionReason).HasMaxLength(500);
-            b.Property(x => x.Status).HasMaxLength(24);
-            b.Property(x => x.ConfirmedToAttend).HasMaxLength(16).HasDefaultValue("Pending");
-            b.Property(x => x.Version).IsConcurrencyToken(false);
-            b.Property(x => x.CancelReason).HasMaxLength(500);
-            b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.CancelledBy).OnDelete(DeleteBehavior.Restrict);
-            b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.PatientConsentConfirmedBy).OnDelete(DeleteBehavior.Restrict);
+            b.Property(x => x.Status).HasMaxLength(24).IsRequired();
+            b.Property(x => x.Version).IsConcurrencyToken();
+            b.ComplexProperty(x => x.BookingInfo, j => j.ToJson("BookingInfo"));
+            b.ComplexCollection(x => x.SupportRequests).ToJson();
+            b.ComplexCollection(x => x.Reminders).ToJson();
+
             b.HasIndex(x => x.Code).IsUnique();
-
             b.HasIndex(x => new { x.BranchId, x.StartAt });
+            b.HasIndex(x => new { x.StartAt, x.EndAt });
             b.HasIndex(x => x.FollowUpId).IsUnique().HasFilter("\"FollowUpId\" IS NOT NULL AND \"Status\" IN ('Confirmed','CheckedIn')");
+            b.HasIndex(x => new { x.BookerAccountId, x.FamilyMemberId, x.StartAt });
 
+            b.HasOne<SchedulingBranch>().WithMany().HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<EmployeeProfile>().WithMany().HasForeignKey(x => x.DentistId).HasPrincipalKey(x => x.Id).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<SchedulingService>().WithMany().HasForeignKey(x => new { x.ServiceId, x.BranchId }).HasPrincipalKey(x => new { x.Id, x.BranchId }).OnDelete(DeleteBehavior.Restrict);
             b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.BookerAccountId).OnDelete(DeleteBehavior.Restrict);
             b.HasOne<DCMS.Domain.Features.FamilyMembers.FamilyMember>().WithMany().HasForeignKey(x => x.FamilyMemberId).OnDelete(DeleteBehavior.Restrict);
-            b.HasIndex(x => new { x.BookerAccountId, x.FamilyMemberId, x.StartAt });
             b.HasOne<PatientProfile>().WithMany().HasForeignKey(x => x.PatientId).OnDelete(DeleteBehavior.Restrict);
         });
         model.Entity<AppointmentChange>(b =>

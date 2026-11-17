@@ -9,14 +9,14 @@ export type ReceptionOptions = { calendar: AppointmentOptions; canCheckIn: boole
 export type PageResult<T> = { items: T[]; total: number; page: number; pageSize: number; clinicDate: string; serverNow: string };
 export type ReceptionAppointment = {
   appointmentId: string; code: string; branchId: number; branchName: string; dentistId: number; dentistName: string;
-  chairId: number; chairName: string; assistantId: number | null; startAt: string; endAt: string;
+  chairId: number; chairName: string; startAt: string; endAt: string;
   status: AppointmentStatus; version: number; patientId: number | null; patientCode: string | null; patientName: string | null;
   bookerName: string; bookerPhone: string | null; bookerEmail: string | null; attendeeName: string; attendeeBirthDate: string | null;
   attendeeRelation: string; visitId: string | null; canCheckIn: boolean; ineligibleReason: string | null;
 };
 export type VisitResult = {
   visitId: string; patientId: number; patientCode: string; patientName: string; appointmentId: string; appointmentCode: string;
-  branchId: number; branchName: string; dentistId: number; dentistName: string; chairId: number; assistantId: number | null;
+  branchId: number; branchName: string; dentistId: number; dentistName: string; chairId: number;
   appointmentAt: string; arrivalAt: string; status: string; appointmentStatus: string;
   visitVersion: number; appointmentVersion: number; purpose: string; note: string | null; arrivalReason: string | null;
   waitingMinutes: number; replayed: boolean; openVisitPath: string;

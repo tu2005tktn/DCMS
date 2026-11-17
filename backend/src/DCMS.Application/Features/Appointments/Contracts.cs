@@ -6,7 +6,7 @@ public sealed record BookerContact(string? Name, string? Phone, string? Email);
 public sealed record AppointmentAttendee(int? PatientId, string? Name, DateOnly? BirthDate);
 public sealed record CreateAppointmentRequest(int BranchId, BookerContact? Booker, AppointmentAttendee? Attendee,
     string? AttendeeRelation, string? Kind, string? Source, int? ServiceId, string? Reason,
-    int DentistId, int? AssistantId, int? ChairId, DateTimeOffset StartAt, int DurationMinutes,
+    int DentistId, int? ChairId, DateTimeOffset StartAt, int DurationMinutes,
     Guid? FollowUpId, string? ExceptionReason, Guid RequestKey, int ScheduleVersion,
     int? AssistantScheduleVersion, int? BookingSettingsVersion = null, bool PatientConsentConfirmed = false, Guid? FamilyMemberId = null,
     Guid? ReplacesAppointmentId = null);

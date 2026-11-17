@@ -38,10 +38,10 @@ public sealed class FamilyMemberApiTests(ApiFixture fixture) : IClassFixture<Api
         var response = await client.PostAsJsonAsync(Route, new CreateFamilyMember(name, "Child", new DateOnly(2015, 3, 12), Guid.NewGuid(), "MALE", "0912345678"));
         Assert.Equal(HttpStatusCode.Created, response.StatusCode); return (await response.Content.ReadFromJsonAsync<FamilyMemberDto>())!;
     }
-    private async Task<(int Patients, int Appointments, int Links, int Reservations)> Counts()
+    private async Task<(int Patients, int Appointments, int Links)> Counts()
     {
         using var scope = fixture.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
-        return (await db.Patients.CountAsync(), await db.Appointments.CountAsync(), await db.PatientAccountLinks.CountAsync(), await db.Set<ResourceReservation>().CountAsync());
+        return (await db.Patients.CountAsync(), await db.Appointments.CountAsync(), await db.PatientAccountLinks.CountAsync());
     }
     private static Task<HttpResponseMessage> Delete(HttpClient client, FamilyMemberDto member, Guid key) => client.SendAsync(new HttpRequestMessage(HttpMethod.Delete, $"{Route}/{member.Id}")
     { Content = JsonContent.Create(new DeleteFamilyMember(member.Version, key)) });

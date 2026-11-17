@@ -92,21 +92,5 @@ public sealed partial class DcmsDbContext
             related.Property("StorageStamp").CurrentValue = branch.Entity.StorageStamp;
             if (related.State == EntityState.Added) related.Property("StorageStamp").OriginalValue = branch.Property(x => x.StorageStamp).OriginalValue;
         }
-        var appointments = ChangeTracker.Entries<Appointment>().ToArray();
-        foreach (var appointment in appointments.Where(x => x.State is EntityState.Added or EntityState.Modified))
-            _ = await Set<ResourceReservation>().FindAsync([appointment.Entity.ReservationId], ct)
-                ?? throw new InvalidOperationException("The reservation must exist before its appointment is saved.");
-        foreach (var resource in ChangeTracker.Entries<ResourceReservation>().ToArray())
-        {
-            var related = appointments.SingleOrDefault(x => x.Entity.ReservationId == resource.Entity.Id);
-            if (resource.State == EntityState.Added) resource.Entity.AppointmentKey = related?.Entity.Id ?? resource.Entity.Id;
-            if (resource.State == EntityState.Modified || related?.State is EntityState.Added or EntityState.Modified)
-                resource.Entity.StorageStamp = Guid.NewGuid();
-            if (related == null) continue;
-            if (related.State != EntityState.Added && !Equals(related.Property("StorageStamp").OriginalValue, resource.Property(x => x.StorageStamp).OriginalValue))
-                throw new DbUpdateConcurrencyException("The appointment changed while it was being edited.");
-            related.Property("StorageStamp").CurrentValue = resource.Entity.StorageStamp;
-            if (related.State == EntityState.Added) related.Property("StorageStamp").OriginalValue = resource.Property(x => x.StorageStamp).OriginalValue;
-        }
     }
 }

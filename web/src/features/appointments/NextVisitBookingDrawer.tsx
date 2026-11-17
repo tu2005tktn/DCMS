@@ -163,7 +163,7 @@ export default function NextVisitBookingDrawer({ open, candidate, patient, onClo
         branchId: candidate.branchId, booker: { name: bookerName.trim(), phone: contact.includes('@') ? null : contact, email: contact.includes('@') ? contact : null },
         attendee: { patientId: patient.id, name: patient.fullName, birthDate: null }, attendeeRelation: 'Self', kind: 'FollowUp', source: 'InPerson',
         serviceId: candidate.serviceId, reason: `Điều trị theo kế hoạch: ${candidate.serviceName}${candidate.region ? ` · ${candidate.region}` : ''}`,
-        dentistId: candidate.dentistId, assistantId: null, chairId: slot.chairId, startAt: slot.start, durationMinutes,
+        dentistId: candidate.dentistId, chairId: slot.chairId, startAt: slot.start, durationMinutes,
         followUpId: followUpId.current, bookingSettingsVersion: slot.bookingSettingsVersion,
         patientConsentConfirmed: patientConsent,
         exceptionReason: reason, requestKey: requestKeys.current.appointment,
