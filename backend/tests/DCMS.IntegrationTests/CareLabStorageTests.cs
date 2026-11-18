@@ -18,7 +18,7 @@ public sealed class CareLabStorageTests(ApiFixture fixture) : IClassFixture<ApiF
     private static DateTimeOffset Now() =>
         new(DateTimeOffset.UtcNow.Ticks / TimeSpan.TicksPerMillisecond * TimeSpan.TicksPerMillisecond, TimeSpan.Zero);
 
-    private static (CareTask Task, ClinicalActivity Activity, LabOrder Order) NewRows(DateTimeOffset now)
+    private static (CareTask Task, ClinicalActivity Activity, LabOrder Order, TreatmentDossier Dossier) NewRows(DateTimeOffset now)
     {
         var task = new CareTask
         {
@@ -32,21 +32,33 @@ public sealed class CareLabStorageTests(ApiFixture fixture) : IClassFixture<ApiF
             TaskId = task.Id, TargetClinicianAccountId = 3, Reason = "SYNTHETIC escalation", Resolution = "SYNTHETIC resolved", Status = "Resolved",
             CreatedBy = 1, CreatedAt = now, Version = 3, AcknowledgedAt = now.AddMinutes(1), ResolvedAt = now.AddMinutes(2)
         });
+        // Activities belong to a dossier (FK); the storage test only needs a minimal one.
+        var dossier = new TreatmentDossier { PatientId = 1, BranchId = 1, DentistId = 1, Code = "LAB-" + Guid.NewGuid().ToString("N"),
+            StartedOn = new DateOnly(2026, 11, 1), CreatedAt = now, UpdatedAt = now };
         var activity = new ClinicalActivity
-        {
-            PatientId = 1, BranchId = 1, DossierId = Guid.NewGuid(), ServiceId = 1, Unit = "răng", Quantity = 1,
-            PerformedAt = now, PerformerId = 1, Outcome = "SYNTHETIC outcome", ChargingBasis = "Included", PriceSnapshotVnd = 0, State = "Posted", CreatedAt = now
+        { DossierId = dossier.Id, ServiceId = 1, Unit = "răng", Quantity = 1,
+            PerformedAt = now, PerformerId = 1, Outcome = "SYNTHETIC outcome", PriceSnapshotVnd = 0, CreatedAt = now
         };
         var order = new LabOrder
         {
-            ActivityId = activity.Id, DossierId = activity.DossierId!.Value, PatientId = 1, BranchId = 1, OrderedOn = new DateOnly(2026, 11, 13),
+            ActivityId = activity.Id, DossierId = activity.DossierId, PatientId = 1, BranchId = 1, OrderedOn = new DateOnly(2026, 11, 13),
             Status = LabOrderStatus.Received, DentistId = 1, WorkName = "SYNTHETIC crown", Teeth = ["36"], Shade = new() { ["1"] = "A2" },
             Quantity = 1, TotalFeeVnd = 500000, PaidVnd = 200000, CreatedAt = now, CreatedBy = 1, UpdatedAt = now, UpdatedBy = 1
         };
         order.StatusLogs.Add(new LabOrderStatusLog { LabOrderId = order.Id, ToStatus = LabOrderStatus.NotSent, ChangedAt = now.AddMinutes(-2), ChangedBy = 1 });
         order.StatusLogs.Add(new LabOrderStatusLog { LabOrderId = order.Id, FromStatus = LabOrderStatus.NotSent, ToStatus = LabOrderStatus.Sent, ChangedAt = now.AddMinutes(-1), ChangedBy = 1, Note = "SYNTHETIC sent" });
         order.StatusLogs.Add(new LabOrderStatusLog { LabOrderId = order.Id, FromStatus = LabOrderStatus.Sent, ToStatus = LabOrderStatus.Received, ChangedAt = now, ChangedBy = 2 });
-        return (task, activity, order);
+        return (task, activity, order, dossier);
+    }
+
+    // The activity's dossier needs a real patient and branch (foreign keys).
+    private static async Task AnchorAsync(DcmsDbContext db, TreatmentDossier dossier)
+    {
+        var branch = new DCMS.Domain.Features.Scheduling.SchedulingBranch { Name = "SYNTHETIC lab storage " + Guid.NewGuid().ToString("N") };
+        var patient = new DCMS.Domain.Features.Patients.PatientProfile { PatientCode = "LAB-" + Guid.NewGuid().ToString("N"),
+            FullName = "SYNTHETIC lab patient", CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow };
+        db.AddRange(branch, patient); await db.SaveChangesAsync();
+        dossier.BranchId = branch.Id; dossier.PatientId = patient.Id;
     }
 
     [Fact]
@@ -54,8 +66,9 @@ public sealed class CareLabStorageTests(ApiFixture fixture) : IClassFixture<ApiF
     {
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
-        var (task, activity, order) = NewRows(Now());
-        db.AddRange(task, activity, order);
+        var (task, activity, order, dossier) = NewRows(Now());
+        await AnchorAsync(db, dossier);
+        db.AddRange(dossier, task, activity, order);
         await db.SaveChangesAsync();
         var contacts = JsonSerializer.Serialize(task.ContactAttempts.OrderBy(x => x.Id));
         var escalations = JsonSerializer.Serialize(task.Escalations.OrderBy(x => x.Id));
@@ -86,11 +99,12 @@ public sealed class CareLabStorageTests(ApiFixture fixture) : IClassFixture<ApiF
     [Fact]
     public async Task StaleCareTaskAndLabOrderCannotOverwriteAConcurrentCollectionChange()
     {
-        var (task, activity, order) = NewRows(Now());
+        var (task, activity, order, dossier) = NewRows(Now());
         using (var seed = fixture.Services.CreateScope())
         {
             var db = seed.ServiceProvider.GetRequiredService<DcmsDbContext>();
-            db.AddRange(task, activity, order);
+            await AnchorAsync(db, dossier);
+            db.AddRange(dossier, task, activity, order);
             await db.SaveChangesAsync();
         }
         using var firstScope = fixture.Services.CreateScope();

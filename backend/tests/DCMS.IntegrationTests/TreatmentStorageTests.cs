@@ -118,12 +118,8 @@ public sealed class TreatmentStorageTests(ApiFixture fixture) : IClassFixture<Ap
             CreatedBy = setup.ActorId, CreatedAt = now, ActivatedAt = now
         });
         var activity = new ClinicalActivity
-        {
-            PatientId = setup.PatientId, BranchId = setup.BranchId, DossierId = dossier.Id, ItemId = item.Id,
-            StepId = first.Id, PlanVersion = 1, ServiceId = setup.ServiceId, ServiceNameSnapshot = "SYNTHETIC storage service",
-            Unit = "răng", Quantity = 1.500m, PerformedAt = now, PerformerId = setup.DentistId, Outcome = "SYNTHETIC outcome",
-            ChargingBasis = "Included", PriceSnapshotVnd = 100000m, State = "Posted", Version = 2, CreatedAt = now, PostedAt = now
-        };
+        { DossierId = dossier.Id, ItemId = item.Id, PlanVersion = 1, ServiceId = setup.ServiceId, ServiceNameSnapshot = "SYNTHETIC storage service",
+            Unit = "răng", Quantity = 1.500m, PerformedAt = now, PerformerId = setup.DentistId, Outcome = "SYNTHETIC outcome", PriceSnapshotVnd = 100000m, Version = 2, CreatedAt = now};
         var planEvent = new TreatmentEvent
         {
             DossierId = dossier.Id, Kind = "plan.committed", PayloadJson = "{\"planVersion\":1}", ActorId = setup.ActorId,

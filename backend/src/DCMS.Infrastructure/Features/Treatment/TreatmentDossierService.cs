@@ -135,7 +135,7 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
         var actorIds = events.Select(x => x.ActorId).Distinct().ToArray();
         var actorNames = await db.Users.AsNoTracking().Where(x => actorIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.FullName, ct);
         var finance = await financialPort.ReadAsync(dossier.PatientId, dossier.BranchId, dossier.Id, ct);
-        var pendingFeeCount = await db.ClinicalActivities.CountAsync(x => x.DossierId == dossier.Id && x.State == "Posted" && x.FeeStatus == "Pending", ct);
+        var pendingFeeCount = await db.ClinicalActivities.CountAsync(x => x.DossierId == dossier.Id && x.FeeStatus == "Pending", ct);
         var planned = PricePreview(dossier).NetBeforeTaxVnd;
         finance = finance is { Available: true }
             ? finance with { PlannedVnd = planned, PendingFeeCount = pendingFeeCount }
@@ -843,7 +843,7 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
         var dossierIds = dossiers.Select(x => x.Id).ToArray();
         var verifiedPatientIds = await patientIds.ToArrayAsync(ct);
         var activities = await db.ClinicalActivities.AsNoTracking()
-            .Where(x => x.DossierId.HasValue && dossierIds.Contains(x.DossierId.Value) && x.State == "Posted")
+            .Where(x => dossierIds.Contains(x.DossierId))
             .OrderByDescending(x => x.PerformedAt).ToArrayAsync(ct);
         // Legacy finance rows are archived before the compact-schema migration drops their tables.
         var archived = dossierIds.Length == 0 ? [] : await db.Database.SqlQuery<string>($"""

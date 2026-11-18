@@ -1,40 +1,29 @@
 namespace DCMS.Domain.Features.Treatment;
 
+// One treatment actually performed, always recorded on a treatment dossier item; patient and branch come from
+// the dossier. See docs/specs/CLINICAL-ACTIVITY-TABLE-SIMPLIFICATION.vi.md (phase 4, 20 columns).
 public sealed class ClinicalActivity
 {
     public Guid Id { get; set; } = Guid.NewGuid();
-    // Derived from VisitId (not stored): dossier-sheet activities have no visit.
-    public string SourceKind => VisitId.HasValue ? "Visit" : "Dossier";
-    public string? ServiceNameSnapshot { get; set; }
-    public string? LabWorkSnapshot { get; set; }
-    public bool IsPlanTransfer { get; set; }
-    public Guid? VisitId { get; set; }
-    public int PatientId { get; set; }
-    public int BranchId { get; set; }
-    public Guid? DossierId { get; set; }
-    public Guid? ItemId { get; set; }
-    public Guid? StepId { get; set; }
+    public Guid DossierId { get; set; }
+    public Guid ItemId { get; set; }
     public int? PlanVersion { get; set; }
+    public bool IsPlanTransfer { get; set; }
     public int ServiceId { get; set; }
+    public string? ServiceNameSnapshot { get; set; }
     public string? Region { get; set; }
     public string Unit { get; set; } = "";
     public decimal Quantity { get; set; }
+    public string? LabWorkSnapshot { get; set; }
     public DateTimeOffset PerformedAt { get; set; }
-    public int? ElapsedMinutes { get; set; }
     public int PerformerId { get; set; }
     public int? AssistantId { get; set; }
-    public int? RecordedBy { get; set; }
-    public string FeeStatus { get; set; } = "Unavailable";
-    public long DiscountSnapshotVnd { get; set; }
     public string Outcome { get; set; } = "";
-    public string? NextSteps { get; set; }
-    public string ChargingBasis { get; set; } = "Included";
-    public string? ChargingBasisEvidence { get; set; }
     public decimal PriceSnapshotVnd { get; set; }
-    public string State { get; set; } = "Draft";
+    public long DiscountSnapshotVnd { get; set; }
+    public string FeeStatus { get; set; } = "Unavailable";
     public int Version { get; set; } = 1;
     public DateTimeOffset CreatedAt { get; set; }
-    public DateTimeOffset? PostedAt { get; set; }
 }
 
 public sealed class ClinicalCommandReceipt : DCMS.Domain.Common.CommandReceiptRecord

@@ -81,7 +81,7 @@ public sealed partial class TreatmentDossierService
         var now = clock.GetUtcNow();
         if (order == null)
         {
-            order = new LabOrder { ActivityId = activityId, DossierId = dossierId, PatientId = activity.PatientId, BranchId = dossier.BranchId, CreatedAt = now, CreatedBy = actorId };
+            order = new LabOrder { ActivityId = activityId, DossierId = dossierId, PatientId = dossier.PatientId, BranchId = dossier.BranchId, CreatedAt = now, CreatedBy = actorId };
             db.Add(order);
             order.StatusLogs.Add(new LabOrderStatusLog { LabOrderId = order.Id, ToStatus = LabOrderStatus.NotSent, ChangedAt = now, ChangedBy = actorId });
         }

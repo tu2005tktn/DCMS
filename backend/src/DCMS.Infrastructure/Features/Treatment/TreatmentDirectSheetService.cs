@@ -114,11 +114,7 @@ public sealed partial class TreatmentDossierService
 
     private static long GrossInput(decimal quantity, long price) => TreatmentPlanRules.Gross(quantity, price);
 
-    private static ActivityDto DirectActivityDto(ClinicalActivity x) => new(x.Id, x.VisitId, x.PatientId, x.BranchId,
-        x.DossierId, x.ItemId, x.StepId, x.PlanVersion, x.ServiceId, x.Region, x.Unit, x.Quantity, x.PerformedAt,
-        x.ElapsedMinutes, x.PerformerId, x.Outcome, x.NextSteps, x.ChargingBasis, x.ChargingBasisEvidence,
-        x.PriceSnapshotVnd, x.State, x.Version, x.CreatedAt, x.PostedAt, x.FeeStatus,
-        x.DiscountSnapshotVnd, x.AssistantId, x.RecordedBy, (x.VisitId == null ? "Dossier" : "Visit"), x.ServiceNameSnapshot, x.LabWorkSnapshot);
+    private static ActivityDto DirectActivityDto(ClinicalActivity x) => ActivityDto.From(x);
 
     private async Task<ActivityDto> RecordDossierActivityAsync(int actorId, TreatmentDossier dossier, TreatmentItem item,
         Guid activityId, DateOnly? date, string? note, bool transfer, Guid key, CancellationToken ct, string? labWork = null, SheetRow? input = null)
@@ -141,21 +137,21 @@ public sealed partial class TreatmentDossierService
         var assistant = input == null ? item.AssistantId : input.AssistantId;
         if (assistant.HasValue && !await db.SchedulingMembers.AnyAsync(x => x.BranchId == dossier.BranchId && x.EmployeeId == assistant && x.Active && !x.CanDentist, ct)) throw Error("MSG04");
         var activity = new ClinicalActivity { Id = activityId, ServiceNameSnapshot = service == null || service.Id == item.ServiceId ? item.ServiceName : service.Name,
-            LabWorkSnapshot = Clean(labWork), IsPlanTransfer = transfer, PatientId = dossier.PatientId, BranchId = dossier.BranchId, DossierId = dossier.Id,
+            LabWorkSnapshot = Clean(labWork), IsPlanTransfer = transfer, DossierId = dossier.Id,
             ItemId = item.Id, PlanVersion = dossier.CurrentPlanVersion(), ServiceId = service?.Id ?? item.ServiceId, Unit = service?.Unit ?? item.Unit,
             Quantity = qty, Region = input == null ? item.Region : Clean(string.Join(", ", input.Regions ?? [])), PerformerId = employee, AssistantId = assistant,
-            RecordedBy = actorId, Outcome = Clean(note) ?? "", ChargingBasis = "Separate", PriceSnapshotVnd = price, DiscountSnapshotVnd = reduction,
+            Outcome = Clean(note) ?? "", PriceSnapshotVnd = price, DiscountSnapshotVnd = reduction,
             PerformedAt = date.HasValue ? new DateTimeOffset(date.Value.ToDateTime(TimeOnly.MinValue), TimeSpan.FromHours(7)).ToUniversalTime() : clock.GetUtcNow(),
             CreatedAt = clock.GetUtcNow(), FeeStatus = "NotRequested" };
         db.ClinicalActivities.Add(activity);
         await db.SaveChangesAsync(ct);
-        await DCMS.Infrastructure.Features.SystemSettings.MaterialStock.ReplaceAsync(db, clock, activity.Id, activity.PatientId, activity.BranchId,
+        await DCMS.Infrastructure.Features.SystemSettings.MaterialStock.ReplaceAsync(db, clock, activity.Id, dossier.PatientId, dossier.BranchId,
             activity.DossierId, activity.PerformedAt, actorId, input?.Materials, ct);
         await db.SaveChangesAsync(ct);
         return await clinicalWork.PostWithinTransactionAsync(actorId, activity.Id,
-            new PostActivityRequest(activity.Version, 0, null, null, key), ct,
+            new PostActivityRequest(activity.Version, key), ct,
             input == null ? null : new ClinicalFeeRequest($"clinical-fee:{activity.Id}", activity.Id, activity.Version + 1,
-                activity.PatientId, activity.BranchId, activity.DossierId, activity.ItemId, activity.PlanVersion, "Separate",
+                dossier.PatientId, dossier.BranchId, activity.DossierId, activity.ItemId, activity.PlanVersion, "Separate",
                 qty, activity.Unit, price, GrossInput(qty, price), reduction, discountType, discountValue, Clean(discountReason), null,
                 reduction > 0 ? actorId : null, reduction > 0 ? clock.GetUtcNow() : null, actorId));
     }

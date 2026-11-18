@@ -36,7 +36,7 @@ Thông báo chỉ còn `IN_APP_NOTIFICATION`; lượt gửi và việc nhân vi�
 | `TREATMENT_DOSSIER` | Phiếu điều trị (14 cột): mã, bệnh nhân, chi nhánh, bác sĩ phụ trách, ngày bắt đầu, chẩn đoán, ghi chú, lượt khám nguồn (`SourceExaminationVisitId`), trạng thái, phiên bản (`Version`) và các dòng nháp phiếu trong JSONB `SheetDrafts`; bỏ 20 cột kế hoạch/đóng/ngoại lệ cọc/`RevisionDrafts`/`StorageStamp`. |
 | `TREATMENT_PLAN_ITEM` | Các mục dịch vụ trong kế hoạch điều trị với giá đã thỏa thuận; các bước thực hiện và trạng thái tiến độ trong JSONB. |
 | `TREATMENT_TEMPLATE` | Mẫu kế hoạch điều trị dùng lại; dòng dịch vụ, nhân sự và các phiên bản mẫu cũ trong JSONB. |
-| `CLINICAL_ACTIVITY` | Hoạt động điều trị thực tế (31 cột): lượt khám hoặc phiếu điều trị nguồn, hạng mục/bước kế hoạch, dịch vụ, số lượng, người thực hiện, kết quả, căn cứ tính phí và ảnh chụp giá. Đánh giá lâm sàng, ghi chú chăm sóc và hướng dẫn tái khám đã bị xóa ngày 18/11/2026. Xem [rút gọn bảng](../specs/CLINICAL-ACTIVITY-TABLE-SIMPLIFICATION.vi.md). |
+| `CLINICAL_ACTIVITY` | Hoạt động điều trị thực tế (20 cột): phiếu điều trị và hạng mục kế hoạch, dịch vụ, số lượng, người thực hiện, kết quả, ảnh chụp giá và trạng thái phí; bệnh nhân và chi nhánh lấy từ phiếu. Xem [rút gọn bảng](../specs/CLINICAL-ACTIVITY-TABLE-SIMPLIFICATION.vi.md). |
 | `CARE_TASK` | Công việc chăm sóc hoặc theo dõi bệnh nhân; các lần liên hệ và các lần chuyển cấp xử lý trong JSONB. |
 | `LAB_ORDER` | Phiếu labo theo hoạt động điều trị: xưởng, loại công việc, răng, màu, ngày gửi/nhận/giao, trạng thái và phí labo; lịch sử trạng thái trong JSONB. |
 | `LAB_WORK_TYPE` | Danh mục labo: loại công việc theo xưởng, đơn vị, giá tham khảo và bảo hành. |

@@ -221,82 +221,26 @@ public sealed partial class TreatmentDossierService
             var draft = await SheetDraftAsync(actorId, dossierId, rowId, "Actual", request.ExpectedDraftVersion, request.ExpectedVersion, dossier, ct);
             var row = ReadRow(JsonDocument.Parse(draft.PayloadJson).RootElement);
             var employee = await DentistAsync(actorId, dossier.BranchId, ct);
-            if (!request.VisitId.HasValue)
-            {
-                TreatmentItem directItem;
-                if (row.SourceItemId.HasValue)
-                    directItem = dossier.Items.SingleOrDefault(x => x.Id == row.SourceItemId && !x.SheetDeleted) ?? throw Error("MSG113", 404);
-                else
-                {
-                    directItem = await AddSheetItemAsync(actorId, dossier, row, rowId, null, ct);
-                    directItem.HiddenFromSheet = true;
-                    var snapshot = db.ChangeTracker.Entries<TreatmentEvent>().Single(x => x.Entity.DossierId == dossierId && x.Entity.Kind == "PlanCommitted" && x.State == EntityState.Added).Entity;
-                    snapshot.PayloadJson = JsonSerializer.Serialize(new { planVersion = dossier.CurrentPlanVersion(),
-                        Items = dossier.Items.OrderBy(x => x.PlannedOrder).Select(ItemDto).ToArray() }, Json);
-                }
-                if (row.SourceItemId.HasValue && (row.ServiceId != directItem.ServiceId || row.Quantity != directItem.Quantity
-                    || row.CostVnd != Gross(directItem) || !TreatmentSheetRules.RegionWithinScope(directItem.Region, Clean(string.Join(", ", row.Regions ?? []))))) throw Error("MSG04");
-                var recorded = await RecordDossierActivityAsync(actorId, dossier, directItem, rowId,
-                    row.Date, row.Note, false, request.RequestKey, ct, row.LabWork, row);
-                await db.RemoveTreatmentDataAsync(draft);
-                dossier.Version++; dossier.UpdatedAt = clock.GetUtcNow();
-                Event(dossier, actorId, "DossierActualRecorded", new { ActivityId = recorded.Id, ItemId = directItem.Id });
-                await db.SaveChangesAsync(ct);
-                return new ConfirmSheetActualResult(await DetailAsync(dossier, ct), recorded);
-            }
-            var visit = await db.Visits.SingleOrDefaultAsync(x => x.Id == request.VisitId && x.PatientId == dossier.PatientId
-                && x.BranchId == dossier.BranchId, ct) ?? throw Error("MSG113", 404);
-            if (visit.Version != request.ExpectedVisitVersion) throw Error("MSG111", 409);
-            if (visit.Status != "InProgress" || visit.DentistId != employee || row.DentistId != employee) throw Error("MSG230", 409);
-            if (row.Date.HasValue && row.Date != DateOnly.FromDateTime(visit.ArrivalAt.ToOffset(TimeSpan.FromHours(7)).DateTime)) throw Error("MSG04");
-            if (row.AssistantId.HasValue && !await db.SchedulingMembers.AnyAsync(x => x.BranchId == dossier.BranchId
-                && x.EmployeeId == row.AssistantId && x.Active && !x.CanDentist, ct)) throw Error("MSG04");
-            if (Clean(request.Outcome) is not { Length: <= 4000 }) throw Error("MSG04");
-            TreatmentItem item;
+            TreatmentItem directItem;
             if (row.SourceItemId.HasValue)
-                item = dossier.Items.SingleOrDefault(x => x.Id == row.SourceItemId) ?? throw Error("MSG113", 404);
+                directItem = dossier.Items.SingleOrDefault(x => x.Id == row.SourceItemId && !x.SheetDeleted) ?? throw Error("MSG113", 404);
             else
             {
-                if (request.DirectDecision?.Decision != "Agreed") throw Error("MSG240", 409);
-                item = await AddSheetItemAsync(actorId, dossier, row, rowId, request.DirectDecision, ct);
+                directItem = await AddSheetItemAsync(actorId, dossier, row, rowId, null, ct);
+                directItem.HiddenFromSheet = true;
+                var snapshot = db.ChangeTracker.Entries<TreatmentEvent>().Single(x => x.Entity.DossierId == dossierId && x.Entity.Kind == "PlanCommitted" && x.State == EntityState.Added).Entity;
+                snapshot.PayloadJson = JsonSerializer.Serialize(new { planVersion = dossier.CurrentPlanVersion(),
+                    Items = dossier.Items.OrderBy(x => x.PlannedOrder).Select(ItemDto).ToArray() }, Json);
             }
-            if (item.Decision != "Agreed" || item.ServiceId != row.ServiceId || item.Progress is "Completed" or "Stopped" or "Cancelled") throw Error("MSG240", 409);
-            var performedRegion = Clean(row.Region) ?? Clean(string.Join(", ", row.Regions ?? []));
-            if (row.CostVnd != TreatmentPlanRules.Gross(row.Quantity, item.AgreedUnitPriceVnd)
-                || !TreatmentSheetRules.RegionWithinScope(item.Region, performedRegion))
-                throw Error("MSG240", 409);
-            if (await db.TreatmentSteps.AnyAsync(x => x.DossierId == dossierId && x.ItemId == item.Id, ct) && !request.StepId.HasValue)
-                throw Error("MSG230", 409);
-            var activity = new ClinicalActivity { Id = rowId, PatientId = dossier.PatientId, BranchId = dossier.BranchId,
-                DossierId = dossierId, ItemId = item.Id, PlanVersion = dossier.CurrentPlanVersion(), StepId = request.StepId,
-                VisitId = visit.Id, ServiceId = item.ServiceId, Unit = item.Unit, Quantity = row.Quantity,
-                Region = performedRegion, PerformerId = employee, AssistantId = row.AssistantId ?? item.AssistantId, RecordedBy = actorId,
-                PerformedAt = row.Date.HasValue ? new DateTimeOffset(row.Date.Value.ToDateTime(TimeOnly.MinValue), TimeSpan.FromHours(7)).ToUniversalTime() : clock.GetUtcNow(),
-                Outcome = request.Outcome.Trim(), ChargingBasis = request.ChargingBasis,
-                ChargingBasisEvidence = Clean(request.ChargingBasisEvidence), PriceSnapshotVnd = item.AgreedUnitPriceVnd,
-                CreatedAt = clock.GetUtcNow(), FeeStatus = "NotRequested" };
-            db.ClinicalActivities.Add(activity);
-            await db.SaveChangesAsync(ct);
-            await DCMS.Infrastructure.Features.SystemSettings.MaterialStock.ReplaceAsync(db, clock, activity.Id, activity.PatientId, activity.BranchId,
-                activity.DossierId, activity.PerformedAt, actorId, row.Materials, ct);
-            await db.SaveChangesAsync(ct);
-            var posted = await clinicalWork.PostWithinTransactionAsync(actorId, activity.Id,
-                new PostActivityRequest(activity.Version, visit.Version, request.ExpectedStepVersion,
-                    request.CompleteItem ? "Completed" : "Partial", request.RequestKey), ct);
-            if (request.CompleteItem)
-            {
-                if (item.Unit != "gói" && await db.ClinicalActivities.Where(x => x.ItemId == item.Id && x.State == "Posted").SumAsync(x => x.Quantity, ct) < item.Quantity)
-                    throw Error("MSG203", 409);
-                if (await db.TreatmentSteps.AnyAsync(x => x.DossierId == dossierId && x.ItemId == item.Id && x.Outcome != "Completed", ct))
-                    throw Error("MSG230", 409);
-                item.Progress = "Completed";
-            }
-            else item.Progress = "InProgress";
-            dossier.Version++; dossier.UpdatedAt = clock.GetUtcNow();
-            Event(dossier, actorId, "ActualConfirmed", new { ActivityId = activity.Id, activity.VisitId, ItemId = item.Id, request.CompleteItem });
+            if (row.SourceItemId.HasValue && (row.ServiceId != directItem.ServiceId || row.Quantity != directItem.Quantity
+                || row.CostVnd != Gross(directItem) || !TreatmentSheetRules.RegionWithinScope(directItem.Region, Clean(string.Join(", ", row.Regions ?? []))))) throw Error("MSG04");
+            var recorded = await RecordDossierActivityAsync(actorId, dossier, directItem, rowId,
+                row.Date, row.Note, false, request.RequestKey, ct, row.LabWork, row);
             await db.RemoveTreatmentDataAsync(draft);
+            dossier.Version++; dossier.UpdatedAt = clock.GetUtcNow();
+            Event(dossier, actorId, "DossierActualRecorded", new { ActivityId = recorded.Id, ItemId = directItem.Id });
             await db.SaveChangesAsync(ct);
-            return new ConfirmSheetActualResult(await DetailAsync(dossier, ct), posted);
+            return new ConfirmSheetActualResult(await DetailAsync(dossier, ct), recorded);
         }, ct);
 
     public async Task<TreatmentSheetContext> SheetContextAsync(int actorId, Guid dossierId, CancellationToken ct)
@@ -333,9 +277,7 @@ public sealed partial class TreatmentDossierService
     {
         var dossier = await DossierAsync(actorId, dossierId, ct);
         if (page < 1 || page > int.MaxValue / 100 || pageSize is not (20 or 50 or 100) || from > to) throw Error("MSG04");
-        var query = db.ClinicalActivities.AsNoTracking().Where(x => x.DossierId == dossierId
-            && x.PatientId == dossier.PatientId && x.BranchId == dossier.BranchId && x.State == "Posted");
-        if (visitId.HasValue) query = query.Where(x => x.VisitId == visitId);
+        var query = db.ClinicalActivities.AsNoTracking().Where(x => x.DossierId == dossierId);
         if (from.HasValue) { var start = new DateTimeOffset(from.Value.ToDateTime(TimeOnly.MinValue), TimeSpan.FromHours(7)).ToUniversalTime(); query = query.Where(x => x.PerformedAt >= start); }
         if (to.HasValue) { var end = new DateTimeOffset(to.Value.AddDays(1).ToDateTime(TimeOnly.MinValue), TimeSpan.FromHours(7)).ToUniversalTime(); query = query.Where(x => x.PerformedAt < end); }
         var overrides = await SheetActivityOverridesAsync(dossierId, ct);
@@ -344,10 +286,7 @@ public sealed partial class TreatmentDossierService
         var total = await query.CountAsync(ct);
         var rows = await query.OrderByDescending(x => x.PerformedAt).ThenBy(x => x.Id).Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(ct);
         var names = await ActivitySourceNamesAsync(rows, dossier, ct);
-        return new(rows.Select(x => overrides.GetValueOrDefault(x.Id) ?? new ActivityDto(x.Id, x.VisitId, x.PatientId, x.BranchId, x.DossierId, x.ItemId,
-            x.StepId, x.PlanVersion, x.ServiceId, x.Region, x.Unit, x.Quantity, x.PerformedAt, x.ElapsedMinutes,
-            x.PerformerId, x.Outcome, x.NextSteps, x.ChargingBasis, x.ChargingBasisEvidence, x.PriceSnapshotVnd,
-            x.State, x.Version, x.CreatedAt, x.PostedAt, x.FeeStatus, x.DiscountSnapshotVnd, x.AssistantId, x.RecordedBy, (x.VisitId == null ? "Dossier" : "Visit"), names.GetValueOrDefault(x.Id), x.LabWorkSnapshot)).ToArray(), total, page, pageSize);
+        return new(rows.Select(x => overrides.GetValueOrDefault(x.Id) ?? ActivityDto.From(x) with { ServiceNameSnapshot = names.GetValueOrDefault(x.Id) }).ToArray(), total, page, pageSize);
     }
 
     // Resolve legacy display metadata from immutable versions without rewriting posted actuals.
@@ -443,7 +382,7 @@ public sealed partial class TreatmentDossierService
         }
         var available = dossiers.Count > 0 && summaries.Count == dossiers.Count;
         var ids = dossiers.Select(x => x.Id).ToArray();
-        var pending = await db.ClinicalActivities.CountAsync(x => x.DossierId.HasValue && ids.Contains(x.DossierId.Value) && x.State == "Posted" && x.FeeStatus == "Pending", ct);
+        var pending = await db.ClinicalActivities.CountAsync(x => ids.Contains(x.DossierId) && x.FeeStatus == "Pending", ct);
         return new(dossiers.Count, gross, reduction, gross - reduction, available,
             available && summaries.All(x => x.PostedChargeVnd.HasValue) ? summaries.Sum(x => x.PostedChargeVnd!.Value) : null,
             available && summaries.All(x => x.AllocatedVnd.HasValue) ? summaries.Sum(x => x.AllocatedVnd!.Value) : null,

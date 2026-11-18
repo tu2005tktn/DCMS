@@ -94,15 +94,17 @@ public sealed partial class DcmsDbContext
                     $"plan:{dossier.Id}:{evt.DossierVersion}", $"/medical-records/{dossier.Id}"));
         }
 
-        foreach (var entry in ChangeTracker.Entries<ClinicalActivity>())
-            if (Became(entry, nameof(ClinicalActivity.State), "Posted"))
-            {
-                var activity = entry.Entity;
-                events.Add(new(activity.PatientId, activity.BranchId, NotificationKind.TreatmentUpdated,
+        // Activities are recorded as soon as they are added; patient and branch come from the dossier.
+        foreach (var entry in ChangeTracker.Entries<ClinicalActivity>().Where(x => x.State == EntityState.Added).ToArray())
+        {
+            var activity = entry.Entity;
+            var dossier = ChangeTracker.Entries<TreatmentDossier>().Select(x => x.Entity).FirstOrDefault(x => x.Id == activity.DossierId)
+                ?? await TreatmentDossiers.AsNoTracking().SingleOrDefaultAsync(x => x.Id == activity.DossierId, ct);
+            if (dossier != null)
+                events.Add(new(dossier.PatientId, dossier.BranchId, NotificationKind.TreatmentUpdated,
                     "Hồ sơ điều trị đã cập nhật", "Phòng khám đã ghi nhận một buổi điều trị của bạn.",
-                    $"activity:{activity.Id}:{activity.Version}",
-                    activity.DossierId is { } id ? $"/medical-records/{id}" : null));
-            }
+                    $"activity:{activity.Id}", $"/medical-records/{activity.DossierId}"));
+        }
 
         foreach (var entry in ChangeTracker.Entries<ClinicalDocument>())
             if (Became(entry, nameof(ClinicalDocument.FileState), "Ready"))

@@ -1,8 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 const dossierId = '11111111-1111-4111-8111-111111111111';
 const itemId = '22222222-2222-4222-8222-222222222222';
-const visitId = '33333333-3333-4333-8333-333333333333';
-const secondVisit = '44444444-4444-4444-8444-444444444444';
 const patient = { id: 123, patientCode: 'SYNTHETIC-123', fullName: 'Bệnh nhân thử nghiệm', birthDate: null,
   gender: null, phone: null, address: null, guardianName: null, guardianRelationship: null, guardianPhone: null,
   note: null, profileDate: null, source: null, customerGroup: null, occupation: null, intakeHistory: [],
@@ -79,8 +77,8 @@ async function prepare(page: Page, withItem = true, withFinance = false) {
     }
     if (path.endsWith('/confirm-actual')) {
       const id = path.split('/').at(-2)!, draft = state.drafts.get(id), body = r.postDataJSON(); state.requests.push(body);
-      const activity = { id, visitId: body.visitId, dossierId, itemId: draft.row.sourceItemId ?? itemId, planVersion: 1, serviceId: draft.row.serviceId, region: draft.row.regions.join(', '), quantity: draft.row.quantity, version: 2, sheetVersion: 0,
-        unit: 'răng', performerId: 7, performedAt: '2026-10-27T02:00:00Z', outcome: draft.row.note, labWorkSnapshot: draft.row.labWork, sourceKind: 'Dossier', serviceNameSnapshot: draft.row.serviceName, feeStatus: 'Pending', priceSnapshotVnd: draft.row.unitPriceVnd, discountSnapshotVnd: 0 };
+      const activity = { id, dossierId, itemId: draft.row.sourceItemId ?? itemId, planVersion: 1, serviceId: draft.row.serviceId, region: draft.row.regions.join(', '), quantity: draft.row.quantity, version: 2, sheetVersion: 0,
+        unit: 'răng', performerId: 7, performedAt: '2026-10-27T02:00:00Z', outcome: draft.row.note, labWorkSnapshot: draft.row.labWork, serviceNameSnapshot: draft.row.serviceName, feeStatus: 'Pending', priceSnapshotVnd: draft.row.unitPriceVnd, discountSnapshotVnd: 0 };
       if (body.planTransfer) state.items.find(i => i.id === draft.row.sourceItemId).displayCompleted = true;
       state.activities.push(activity); state.drafts.delete(id); state.version++; return ok({ dossier: detail(), activity });
     }
@@ -109,7 +107,7 @@ async function prepare(page: Page, withItem = true, withFinance = false) {
       const parts = path.split('/'), id = parts[parts.indexOf('sheet-items')+1], i = state.items.find(x => x.id === id), body = r.postDataJSON();
       state.requests.push({ ...body, command: path.split('/').at(-1), method: r.method() });
       if (path.endsWith('/perform')) {
-        if (!state.activities.some(a => a.itemId === id)) state.activities.push({ id: 'performed-1', itemId: id, dossierId, visitId: null, version: 2, sheetVersion: 0, sourceKind: 'Dossier', serviceNameSnapshot: body.row?.serviceName ?? i.serviceName,
+        if (!state.activities.some(a => a.itemId === id)) state.activities.push({ id: 'performed-1', itemId: id, dossierId, version: 2, sheetVersion: 0, serviceNameSnapshot: body.row?.serviceName ?? i.serviceName,
           planVersion: 1, serviceId: body.row?.serviceId ?? i.serviceId, region: body.row?.regions.join(', ') ?? i.region, quantity: i.quantity, unit: i.unit, performerId: 7,
           performedAt: '2026-10-27T02:00:00Z', outcome: body.row?.note ?? i.note, feeStatus: 'Pending', priceSnapshotVnd: body.row?.unitPriceVnd ?? i.agreedUnitPriceVnd, discountSnapshotVnd: 0 });
         i.displayCompleted = true;
@@ -255,7 +253,7 @@ test('Thực hiện mở hàng sửa; × hủy và ✓ mới lưu/gạch ngang; 
   await page.getByLabel('Chi phí', { exact: true }).fill('800000');
   await page.getByRole('button', { name: 'Đồng ý', exact: true }).click();
   await expect(page.getByText('Chưa ghi nhận phí', { exact: true })).toBeVisible();
-  expect(state.activities).toHaveLength(1); expect(state.activities[0].visitId).toBeNull();
+  expect(state.activities).toHaveLength(1);
   const row = page.locator('.treatment-sheet-plan-table tbody tr').first();
   await expect(row).toHaveClass('treatment-sheet-row-completed');
   expect(await row.locator('td').first().evaluate(e => getComputedStyle(e).textDecorationLine)).toContain('line-through');
@@ -334,14 +332,14 @@ test('Thêm việc đã làm không cần kế hoạch/Visit; không còn bộ l
   await page.getByLabel('Ghi chú Labo').fill('Mô tả Labo');
   await page.getByRole('button', { name: 'Đồng ý', exact: true }).click();
   await expect(page.getByText('Ghi trực tiếp theo phiếu', { exact: true })).toBeVisible();
-  expect(state.activities[0].visitId).toBeNull();
+ 
   await expect(page.getByRole('row').filter({ hasText: 'Ghi trực tiếp theo phiếu' }).locator('td').nth(7)).toHaveText('0 ₫');
 });
 
 test('đọc quá trình nhiều buổi, tổng toàn bộ phiếu và đóng có kiểm tra lâm sàng', async ({ page }) => {
   const state = await prepare(page);
-  state.activities.push({ id: 'a1', visitId, dossierId, itemId, planVersion: 1, serviceId: 3, region: '25', quantity: 1, unit: 'răng', performerId: 7, performedAt: '2026-10-26T02:00:00Z', outcome: 'Buổi đầu', feeStatus: 'Pending', priceSnapshotVnd: 300000 },
-    { id: 'a2', visitId: secondVisit, dossierId, itemId, planVersion: 1, serviceId: 3, region: '26', quantity: 1, unit: 'răng', performerId: 7, performedAt: '2026-10-27T02:00:00Z', outcome: 'Buổi sau', feeStatus: 'Pending', priceSnapshotVnd: 300000 });
+  state.activities.push({ id: 'a1', dossierId, itemId, planVersion: 1, serviceId: 3, region: '25', quantity: 1, unit: 'răng', performerId: 7, performedAt: '2026-10-26T02:00:00Z', outcome: 'Buổi đầu', feeStatus: 'Pending', priceSnapshotVnd: 300000 },
+    { id: 'a2', dossierId, itemId, planVersion: 1, serviceId: 3, region: '26', quantity: 1, unit: 'răng', performerId: 7, performedAt: '2026-10-27T02:00:00Z', outcome: 'Buổi sau', feeStatus: 'Pending', priceSnapshotVnd: 300000 });
   await page.reload(); await page.getByRole('tab', { name: 'Điều trị & Thanh toán' }).click();
   await expect(page.getByText('Buổi đầu', { exact: true })).toBeVisible(); await expect(page.getByText('Buổi sau', { exact: true })).toBeVisible();
   await expect(page.locator('.treatment-sheet-payment')).toContainText(/Còn nợ:\s*600\.000\s*₫/);
@@ -361,7 +359,7 @@ test('Đã trả mặc định 0, Còn nợ bằng Thành tiền trừ Đã tr�
 
 test('form Tạo thanh toán mới điền sẵn việc đã làm, tự cộng tổng, chặn vượt nợ và cập nhật Đã trả/Còn nợ', async ({ page }) => {
   const state = await prepare(page);
-  state.activities.push({ id: 'a1', visitId, dossierId, itemId, planVersion: 1, serviceId: 3, region: '25', quantity: 1, unit: 'răng', performerId: 7, performedAt: '2026-10-26T02:00:00Z', outcome: 'Buổi đầu', feeStatus: 'Pending', priceSnapshotVnd: 300000, serviceNameSnapshot: 'Trám răng' });
+  state.activities.push({ id: 'a1', dossierId, itemId, planVersion: 1, serviceId: 3, region: '25', quantity: 1, unit: 'răng', performerId: 7, performedAt: '2026-10-26T02:00:00Z', outcome: 'Buổi đầu', feeStatus: 'Pending', priceSnapshotVnd: 300000, serviceNameSnapshot: 'Trám răng' });
   await page.reload(); await page.getByRole('tab', { name: 'Điều trị & Thanh toán' }).click();
   await page.getByRole('button', { name: 'TRẢ TIỀN...' }).click();
   const dialog = page.getByRole('dialog', { name: 'Tạo thanh toán mới' });
@@ -389,7 +387,7 @@ test('form Tạo thanh toán mới điền sẵn việc đã làm, tự cộng t
 test('chuyển khoản mở bill với dịch vụ và vật liệu trong ngày, quay lại giữ số tiền', async ({ page }) => {
   const state = await prepare(page);
   const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date());
-  state.activities.push({ id: 'transfer-activity', visitId, dossierId, itemId, planVersion: 1, serviceId: 3,
+  state.activities.push({ id: 'transfer-activity', dossierId, itemId, planVersion: 1, serviceId: 3,
     region: '25', quantity: 1, unit: 'răng', performerId: 7, performedAt: `${today}T02:00:00Z`,
     outcome: 'Điều trị hôm nay', feeStatus: 'Pending', priceSnapshotVnd: 300000, serviceNameSnapshot: 'Trám răng',
     materials: [{ name: 'Composite', quantity: 2.5, unit: 'g' }] });

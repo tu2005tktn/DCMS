@@ -7,27 +7,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace DCMS.Infrastructure.Features.Treatment;
 
-public sealed class ClinicalConsentPort(DcmsDbContext db) : IClinicalConsentPort
-{
-    public async Task<bool> ValidAsync(int patientId, Guid? itemId, Guid? stepId, int? planVersion,
-        int serviceId, CancellationToken ct)
-    {
-        if (!itemId.HasValue || !planVersion.HasValue) return false;
-        var item = await db.TreatmentItems.AsNoTracking().SingleOrDefaultAsync(x => x.Id == itemId, ct);
-        if (item == null || item.ServiceId != serviceId || item.Decision != "Agreed"
-            || item.DecisionPlanVersion is null || item.DecisionPlanVersion > planVersion
-            || string.IsNullOrWhiteSpace(item.Counseling) || string.IsNullOrWhiteSpace(item.DecisionMaker)) return false;
-        var dossier = await db.TreatmentDossiers.AsNoTracking().Include(x => x.Items).SingleOrDefaultAsync(x => x.Id == item.DossierId
-            && x.PatientId == patientId && x.State == "Open", ct);
-        if (dossier == null || !dossier.HasCommittedPlan() || dossier.CurrentPlanVersion() != planVersion) return false;
-        if (stepId.HasValue && !await db.TreatmentSteps.AnyAsync(x => x.Id == stepId && x.ItemId == item.Id
-            && x.DossierId == dossier.Id, ct)) return false;
-        return !item.ConsentDocumentId.HasValue || item.ConsentPlanVersion == item.DecisionPlanVersion
-            && await db.Set<ClinicalDocument>().AnyAsync(x => x.Id == item.ConsentDocumentId && x.PatientId == patientId
-                && x.DossierId == dossier.Id && (!x.PlanId.HasValue || x.PlanId == dossier.Id) && x.FileState == "Ready", ct);
-    }
-}
-
 // Only writes the outbox owned by the posting transaction. DCMS-101 consumes the source key.
 public sealed class OutboxClinicalChargePort(DcmsDbContext db, TimeProvider clock) : IClinicalChargePort
 {

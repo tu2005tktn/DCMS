@@ -410,10 +410,8 @@ public sealed class ExaminationApiTests(ExaminationFixture fixture) : IClassFixt
             Assert.Equal(HttpStatusCode.BadRequest, (await c.PutAsJsonAsync(Exam(v.VisitId), draft with { ExpectedVersion = saved.Visit.VisitVersion, RequestKey = Guid.NewGuid(), Confirm = true })).StatusCode);
             var confirmed = await Ok<ExaminationWorkspace>(await c.PutAsJsonAsync(Exam(v.VisitId), draft with { ExpectedVersion = saved.Visit.VisitVersion, RequestKey = Guid.NewGuid(), Content = Content(true), Confirm = true }));
             var handoff = await c.GetFromJsonAsync<ClinicalHandoff>($"/api/visits/{v.VisitId}/clinical-handoff"); Assert.Equal(v.VisitId, handoff!.VisitId); Assert.Contains(16, handoff.Teeth); Assert.Empty(handoff.Documents);
-            // Native Vinh context is readable for an active Visit; reading it creates no treatment data.
-            var treatment = await c.GetAsync($"/api/visits/{v.VisitId}/treatment-context"); Assert.Equal(HttpStatusCode.OK, treatment.StatusCode);
             using var scope = fixture.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
-            Assert.Equal(0, await db.ClinicalActivities.CountAsync(x => x.VisitId == v.VisitId)); Assert.Equal(0, await db.TreatmentDossiers.CountAsync(x => x.PatientId == s.PatientId));
+            Assert.Equal(0, await db.TreatmentDossiers.CountAsync(x => x.PatientId == s.PatientId));
             Assert.Equal(HttpStatusCode.Conflict, (await c.PutAsJsonAsync(Exam(v.VisitId), draft with { ExpectedVersion = confirmed.Visit.VisitVersion, RequestKey = Guid.NewGuid() })).StatusCode);
         }
     }
@@ -451,7 +449,6 @@ public sealed class ExaminationApiTests(ExaminationFixture fixture) : IClassFixt
             Assert.Equal(2,versions!.Length); Assert.Equal("SYNTHETIC đính chính",versions[0].Content.Conclusion);
             Assert.Equal(Content(true).Conclusion,versions[1].Content.Conclusion); Assert.Equal(amendment.Reason,versions[0].Reason);
             using var scope = fixture.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
-            Assert.False(await db.ClinicalActivities.AnyAsync(x => x.VisitId == v.VisitId));
             Assert.False(await db.TreatmentDossiers.AnyAsync(x => x.PatientId == v.PatientId));
             Assert.Equal(1,await db.Set<DCMS.Domain.Features.Visits.VisitAudit>().CountAsync(x=>x.VisitId==v.VisitId && x.Action=="CompleteVisit"));
             Assert.Equal(history.CompletedAt, (await db.Set<DCMS.Domain.Features.Visits.VisitAudit>().SingleAsync(x=>x.VisitId==v.VisitId && x.Action=="CompleteVisit")).OccurredAt);
@@ -472,23 +469,19 @@ public sealed class ExaminationApiTests(ExaminationFixture fixture) : IClassFixt
             Assert.True(saved.Examination!.Confirmed);
         }
     }
-    [Theory] [InlineData(false)] [InlineData(true)]
-    public async Task VisitClosingBlocksDraftWorkButDoesNotRequirePromisedTreatmentToBePerformed(bool draftWork)
+    [Fact]
+    public async Task VisitClosingDoesNotRequirePromisedTreatmentToBePerformed()
     {
         var (_,v,c) = await Prepare(); using(c) {
             var saved = await Ok<ExaminationWorkspace>(await c.PutAsJsonAsync(Exam(v.VisitId),new SaveExamination(v.PatientId,v.VisitVersion,Guid.NewGuid(),
-                Content(true) with { Disposition = draftWork ? "ConsultationOnly" : "ProceedToTreatment" },true)));
-            if(draftWork) { using var scope=fixture.Services.CreateScope(); var db=scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
-                db.ClinicalActivities.Add(new ClinicalActivity { VisitId=v.VisitId,PatientId=v.PatientId,BranchId=v.BranchId,State="Draft",Quantity=1,PerformedAt=fixture.Clock.Now,CreatedAt=fixture.Clock.Now });
-                await db.SaveChangesAsync(); }
+                Content(true) with { Disposition = "ProceedToTreatment" },true)));
             var complete=new CompleteExaminationVisit(v.PatientId,saved.Visit.VisitVersion,Guid.NewGuid(),true);
             var response=await c.PostAsJsonAsync($"/api/visits/{v.VisitId}/complete",complete);
-            if(draftWork){Assert.Equal(HttpStatusCode.Conflict,response.StatusCode);Assert.Equal("ExaminationConfirmed",(await c.GetFromJsonAsync<ExaminationWorkspace>(Exam(v.VisitId)))!.Visit.Status);}
-            else {
+            {
                 var closed=await Ok<ExaminationWorkspace>(response);Assert.Equal("Completed",closed.Visit.Status);Assert.Contains("handoff",closed.AllowedActions);
                 var handoff=await Ok<ClinicalHandoff>(await c.GetAsync($"/api/visits/{v.VisitId}/clinical-handoff"));Assert.Equal("Completed",handoff.VisitStatus);Assert.Equal(v.VisitId,handoff.VisitId);
                 var replay=await Ok<ExaminationWorkspace>(await c.PostAsJsonAsync($"/api/visits/{v.VisitId}/complete",complete));Assert.True(replay.Replayed);
-                using var scope=fixture.Services.CreateScope();var db=scope.ServiceProvider.GetRequiredService<DcmsDbContext>();Assert.False(await db.ClinicalActivities.AnyAsync(x=>x.VisitId==v.VisitId));Assert.Equal("Completed",(await db.Appointments.SingleAsync(x=>x.Id==v.AppointmentId)).Status);
+                using var scope=fixture.Services.CreateScope();var db=scope.ServiceProvider.GetRequiredService<DcmsDbContext>();Assert.Equal("Completed",(await db.Appointments.SingleAsync(x=>x.Id==v.AppointmentId)).Status);
             }
         }
     }
@@ -551,20 +544,6 @@ public sealed class ExaminationApiTests(ExaminationFixture fixture) : IClassFixt
             Assert.Equal(HttpStatusCode.Conflict, (await c.PutAsJsonAsync(Exam(v.VisitId), command with { RequestKey = Guid.NewGuid() })).StatusCode);
             using var scope = fixture.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
             Assert.Equal(1, await db.Set<DCMS.Domain.Features.Visits.VisitAudit>().CountAsync(x => x.VisitId == v.VisitId && x.Action == "SaveExamination"));
-        }
-    }
-    [Fact] public async Task ConcurrentDraftCreationAndVisitCompletionCannotLeaveDraftOnCompletedVisit()
-    {
-        var (s,v,c) = await Prepare(); using(c) {
-            var saved = await Ok<ExaminationWorkspace>(await c.PutAsJsonAsync(Exam(v.VisitId),new SaveExamination(v.PatientId,v.VisitVersion,Guid.NewGuid(),Content(true),true)));
-            var activity = new DCMS.Application.Features.Treatment.ActivityInput(v.VisitId,null,null,null,null,s.ServiceId,"Toàn hàm","lần",1,fixture.Clock.Now,10,"SYNTHETIC ghi nhận",null,"Separate",null,100000);
-            var results = await Task.WhenAll(
-                c.PostAsJsonAsync($"/api/visits/{v.VisitId}/activities/drafts",new DCMS.Application.Features.Treatment.CreateActivityDraftRequest(activity,saved.Visit.VisitVersion,Guid.NewGuid())),
-                c.PostAsJsonAsync($"/api/visits/{v.VisitId}/complete",new CompleteExaminationVisit(v.PatientId,saved.Visit.VisitVersion,Guid.NewGuid(),true)));
-            Assert.Single(results,x=>x.IsSuccessStatusCode); Assert.Single(results,x=>x.StatusCode==HttpStatusCode.Conflict);
-            using var scope=fixture.Services.CreateScope(); var db=scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
-            var visit=await db.Visits.SingleAsync(x=>x.Id==v.VisitId);
-            Assert.False(visit.Status=="Completed" && await db.ClinicalActivities.AnyAsync(x=>x.VisitId==v.VisitId && x.State=="Draft"));
         }
     }
     [Fact] public async Task AnotherVisitKeepsPreviousResultsAndOpensExistingDossier()

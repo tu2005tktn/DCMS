@@ -13,17 +13,13 @@ internal static class ClinicalWorkModel
             b.Property(x => x.ServiceNameSnapshot).HasMaxLength(160);
             b.Property(x => x.LabWorkSnapshot).HasMaxLength(1000);
             b.HasIndex(x => new { x.ItemId, x.PlanVersion }).IsUnique().HasFilter("\"IsPlanTransfer\" = TRUE");
-            b.HasIndex(x => new { x.VisitId, x.State });
-            b.HasIndex(x => new { x.PatientId, x.DossierId, x.StepId });
+            b.HasIndex(x => new { x.DossierId, x.PerformedAt });
+            b.HasOne<TreatmentDossier>().WithMany().HasForeignKey(x => x.DossierId).OnDelete(DeleteBehavior.Restrict);
             b.Property(x => x.Unit).HasMaxLength(40);
             b.Property(x => x.Region).HasMaxLength(80);
             b.Property(x => x.Quantity).HasPrecision(12, 3);
             b.Property(x => x.PriceSnapshotVnd).HasPrecision(18, 0);
             b.Property(x => x.Outcome).HasMaxLength(4000);
-            b.Property(x => x.NextSteps).HasMaxLength(2000);
-            b.Property(x => x.ChargingBasis).HasMaxLength(16);
-            b.Property(x => x.ChargingBasisEvidence).HasMaxLength(1000);
-            b.Property(x => x.State).HasMaxLength(16);
             b.Property(x => x.FeeStatus).HasMaxLength(24).HasDefaultValue("Unavailable");
         });
         model.Entity<ClinicalCommandReceipt>(b =>

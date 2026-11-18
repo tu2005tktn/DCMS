@@ -88,7 +88,6 @@ public sealed class ExaminationService(DcmsDbContext db, ClinicalAccess access, 
         if (action == "Complete") {
             var request = (CompleteExaminationVisit)payload;
             if (!request.WorkReviewed || e == null || v.Status != VisitStatuses.ExaminationConfirmed || a.Status != "InProgress") throw new BusinessException(409, SystemMessages.Get("MSG239", field: "hoàn tất phiếu khám và kiểm tra công việc trước khi kết thúc lượt"));
-            if (await db.ClinicalActivities.AnyAsync(x => x.VisitId == visitId && x.State == "Draft", ct)) throw new BusinessException(409, SystemMessages.Get("MSG239", field: "lượt còn hoạt động điều trị nháp"));
             if (await db.Investigations.AnyAsync(x => x.VisitId == visitId && x.State != "Reviewed" && x.State != "Cancelled", ct))
                 throw new BusinessException(409, SystemMessages.Get("MSG239",field:"còn chỉ định cận lâm sàng chưa được bác sĩ đọc hoặc hủy") with { Field = "investigations" });
             var content = Dto(e, v.Status).Content;

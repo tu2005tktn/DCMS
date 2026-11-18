@@ -81,3 +81,40 @@ Migration: `SimplifyClinicalActivityTable` (giai đoạn 1) và `RemoveClinicalR
 ## Giai đoạn 3: chỉ còn hoạt động điều trị (đã triển khai)
 
 Người dùng yêu cầu xóa hướng dẫn tái khám và chỉ giữ các cột của hoạt động điều trị; lịch hẹn tiếp theo chỉ gắn với phiếu điều trị (`APPOINTMENT.DossierId`). Bảng sẽ giảm từ **50 xuống 31 cột**. Thiết kế chi tiết: [FOLLOW-UP-INSTRUCTION-REMOVAL.vi.md](FOLLOW-UP-INSTRUCTION-REMOVAL.vi.md). Mục "Chưa làm" của giai đoạn 2 được thay bằng spec này.
+
+## Giai đoạn 4: rút gọn tối đa, 31 → 20 cột (18/11/2026)
+
+Người dùng yêu cầu "giảm xuống mức tối đa" và chọn phương án 20 cột. Mọi hoạt động điều trị đều thuộc một phiếu điều trị và một hạng mục; được ghi nhận ngay khi lưu (không còn bản nháp). Không thêm bảng.
+
+### Cột còn lại (20)
+
+| Nhóm | Cột |
+| --- | --- |
+| Liên kết | `Id`, `DossierId` (bắt buộc, FK `TREATMENT_DOSSIER`), `ItemId` (bắt buộc), `PlanVersion`, `IsPlanTransfer` |
+| Dịch vụ | `ServiceId`, `ServiceNameSnapshot`, `Region`, `Unit`, `Quantity`, `LabWorkSnapshot` |
+| Thực hiện | `PerformedAt`, `PerformerId`, `AssistantId`, `Outcome` |
+| Tiền | `PriceSnapshotVnd`, `DiscountSnapshotVnd`, `FeeStatus` |
+| Hệ thống | `Version`, `CreatedAt` |
+
+### Cột bị xóa (11)
+
+| Cột | Cách thay |
+| --- | --- |
+| `PatientId`, `BranchId` | Lấy từ phiếu điều trị qua `DossierId`. |
+| `VisitId`, `ElapsedMinutes`, `NextSteps`, `ChargingBasisEvidence`, `StepId` | Chỉ được ghi bởi luồng ghi điều trị theo lượt khám (S22), giao diện không dùng; luồng này bị xóa. |
+| `State`, `PostedAt` | Hoạt động được ghi nhận ngay khi lưu; thời điểm ghi nhận là `CreatedAt`. |
+| `ChargingBasis` | Mọi hoạt động tính phí riêng theo giá ảnh chụp (giao diện luôn gửi `Separate`). Bỏ căn cứ `Free`/`Included`. |
+| `RecordedBy` | Người ghi đã có trong sự kiện phiếu điều trị ở `AUDIT_LOG`. |
+
+### Hành vi thay đổi
+
+- Xóa API ghi điều trị theo lượt khám: `GET /api/clinical-services`, `GET /api/visits/{visitId}/treatment-context`, `POST /api/visits/{visitId}/activities/drafts`, `PUT /api/activities/{id}/draft`, `POST /api/activities/{id}/post`. Xác nhận dòng thực tế của phiếu (`confirm-actual`) bỏ nhánh có `visitId`; chỉ còn ghi trực tiếp trên phiếu.
+- Hoàn tất bước điều trị (`CompleteStep`) nhận bằng chứng là hoạt động đã ghi của **cùng hạng mục** trong phiếu (trước đây: cùng `StepId`).
+- Hoàn tất lượt khám không còn kiểm tra "hoạt động nháp trong lượt khám".
+- `ActivityDto` bỏ `visitId`, `patientId`, `branchId`, `stepId`, `elapsedMinutes`, `nextSteps`, `chargingBasis`, `chargingBasisEvidence`, `state`, `postedAt`, `recordedBy`, `sourceKind`; `dossierId`, `itemId` không còn null.
+- Thống kê công việc và tài chính: chi phí = giá × số lượng − giảm giá cho mọi hoạt động (bỏ nhánh `Included` = 0).
+
+### Migration `ReduceClinicalActivityToActivityColumns`
+
+- `Up`: kiểm tra mọi dòng có `DossierId`, `ItemId`, và `State = 'Posted'` (dừng nếu không); kiểm tra `PatientId`/`BranchId` khớp phiếu; đặt `CreatedAt = PostedAt`; xóa 11 cột; `DossierId`, `ItemId` thành `NOT NULL`; thêm FK `DossierId` → `TREATMENT_DOSSIER`.
+- `Down`: thêm lại cột; `PatientId`/`BranchId` lấy từ phiếu, `State = 'Posted'`, `PostedAt = CreatedAt`, `ChargingBasis = 'Separate'`; các cột còn lại để trống.

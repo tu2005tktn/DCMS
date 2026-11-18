@@ -30,17 +30,14 @@ public sealed class WorkStatisticsService(DcmsDbContext db, TimeProvider clock, 
         if (to.HasValue) dossierQuery = dossierQuery.Where(d => d.StartedOn <= to);
         var dossiers = await dossierQuery.ToListAsync(ct);
         var dossierIds = dossiers.Select(d => d.Id).ToArray();
-        var source = await db.ClinicalActivities.AsNoTracking().Where(x => x.State == "Posted" && x.DossierId != null && dossierIds.Contains(x.DossierId.Value)).ToListAsync(ct);
+        var source = await db.ClinicalActivities.AsNoTracking().Where(x => dossierIds.Contains(x.DossierId)).ToListAsync(ct);
         // Latest sheet edit/delete per activity wins (same rule as the treatment sheet).
         var events = await db.TreatmentEvents.AsNoTracking().Where(e => dossierIds.Contains(e.DossierId) &&
             (e.Kind == "SheetActivityEdited" || e.Kind == "SheetActivityDeleted")).OrderBy(e => e.DossierVersion).ToListAsync(ct);
         var overrides = new Dictionary<Guid, ActivityDto>();
         foreach (var e in events)
             if (JsonSerializer.Deserialize<Snapshot>(e.PayloadJson, Json) is { } s) overrides[s.ActivityId] = s.Activity;
-        var activities = source.Select(x => overrides.TryGetValue(x.Id, out var o) ? o : new ActivityDto(x.Id, x.VisitId, x.PatientId, x.BranchId, x.DossierId,
-                x.ItemId, x.StepId, x.PlanVersion, x.ServiceId, x.Region, x.Unit, x.Quantity, x.PerformedAt, x.ElapsedMinutes, x.PerformerId, x.Outcome,
-                x.NextSteps, x.ChargingBasis, x.ChargingBasisEvidence, x.PriceSnapshotVnd, x.State, x.Version, x.CreatedAt, x.PostedAt,
-                x.FeeStatus, x.DiscountSnapshotVnd, x.AssistantId, x.RecordedBy, (x.VisitId == null ? "Dossier" : "Visit"), x.ServiceNameSnapshot, x.LabWorkSnapshot))
+        var activities = source.Select(x => overrides.TryGetValue(x.Id, out var o) ? o : ActivityDto.From(x))
             .Where(a => !a.SheetDeleted).ToList();
 
         var patientIds = dossiers.Select(d => d.PatientId).Distinct().ToArray();
@@ -72,7 +69,7 @@ public sealed class WorkStatisticsService(DcmsDbContext db, TimeProvider clock, 
             var lines = own.Select(a =>
             {
                 var gross = checked((long)Math.Round(a.Quantity * a.PriceSnapshotVnd, MidpointRounding.AwayFromZero));
-                var cost = a.ChargingBasis == "Included" ? 0 : gross - Math.Min(gross, a.DiscountSnapshotVnd);
+                var cost = gross - Math.Min(gross, a.DiscountSnapshotVnd);
                 var paidVnd = Math.Clamp(paid.GetValueOrDefault(a.Id), 0, cost);
                 var discount = gross - cost;
                 // A cancelled dossier keeps what was collected; the unpaid part is written off (same rule as the finance statistics).

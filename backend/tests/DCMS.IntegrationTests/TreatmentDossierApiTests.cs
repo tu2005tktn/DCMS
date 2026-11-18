@@ -306,7 +306,7 @@ public sealed class TreatmentDossierApiTests(ApiFixture fixture) : IClassFixture
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
         Assert.Equal(0, await db.Appointments.CountAsync(x => x.PatientId == setup.PatientId));
-        Assert.Equal(0, await db.ClinicalActivities.CountAsync(x => x.PatientId == setup.PatientId));
+        Assert.Equal(0, await db.ClinicalActivities.CountAsync(x => db.TreatmentDossiers.Any(d => d.Id == x.DossierId && d.PatientId == setup.PatientId)));
     }
 
     [Fact]
@@ -440,12 +440,11 @@ public sealed class TreatmentDossierApiTests(ApiFixture fixture) : IClassFixture
             var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
             var activity = new ClinicalActivity
             {
-                DossierId = dossierId, PatientId = setup.PatientId, BranchId = setup.BranchId,
+                DossierId = dossierId,
                 ServiceId = setup.ServiceId, ServiceNameSnapshot = "SYNTHETIC paid service",
                 Unit = "lần", Quantity = 1, PriceSnapshotVnd = 120000,
                 PerformerId = setup.DentistId, PerformedAt = DateTimeOffset.UtcNow,
-                CreatedAt = DateTimeOffset.UtcNow, State = "Posted"
-            };
+                CreatedAt = DateTimeOffset.UtcNow};
             db.ClinicalActivities.Add(activity);
             await db.SaveChangesAsync();
             activityId = activity.Id;
@@ -551,12 +550,11 @@ public sealed class TreatmentDossierApiTests(ApiFixture fixture) : IClassFixture
             var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
             var additional = new ClinicalActivity
             {
-                DossierId = dossierId, PatientId = setup.PatientId, BranchId = setup.BranchId,
+                DossierId = dossierId,
                 ServiceId = setup.ServiceId, ServiceNameSnapshot = "SYNTHETIC service paid from deposit",
                 Unit = "lần", Quantity = 1, PriceSnapshotVnd = 19000,
                 PerformerId = setup.DentistId, PerformedAt = DateTimeOffset.UtcNow,
-                CreatedAt = DateTimeOffset.UtcNow, State = "Posted"
-            };
+                CreatedAt = DateTimeOffset.UtcNow};
             db.ClinicalActivities.Add(additional);
             await db.SaveChangesAsync();
             additionalActivityId = additional.Id;
@@ -611,14 +609,12 @@ public sealed class TreatmentDossierApiTests(ApiFixture fixture) : IClassFixture
         using (var scope = fixture.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
-            var labActivity = new ClinicalActivity { DossierId = dossierId, PatientId = setup.PatientId,
-                BranchId = setup.BranchId, ServiceId = setup.ServiceId, ServiceNameSnapshot = "SYNTHETIC lab service",
+            var labActivity = new ClinicalActivity { DossierId = dossierId, ServiceId = setup.ServiceId, ServiceNameSnapshot = "SYNTHETIC lab service",
                 Unit = "lần", Quantity = 1, PriceSnapshotVnd = 100000, PerformerId = setup.DentistId,
-                PerformedAt = DateTimeOffset.UtcNow, CreatedAt = DateTimeOffset.UtcNow, State = "Posted" };
-            var other = new ClinicalActivity { DossierId = dossierId, PatientId = setup.PatientId,
-                BranchId = setup.BranchId, ServiceId = setup.ServiceId, ServiceNameSnapshot = "SYNTHETIC other service",
+                PerformedAt = DateTimeOffset.UtcNow, CreatedAt = DateTimeOffset.UtcNow};
+            var other = new ClinicalActivity { DossierId = dossierId, ServiceId = setup.ServiceId, ServiceNameSnapshot = "SYNTHETIC other service",
                 Unit = "lần", Quantity = 1, PriceSnapshotVnd = 100000, PerformerId = setup.DentistId,
-                PerformedAt = DateTimeOffset.UtcNow, CreatedAt = DateTimeOffset.UtcNow, State = "Posted" };
+                PerformedAt = DateTimeOffset.UtcNow, CreatedAt = DateTimeOffset.UtcNow};
             db.ClinicalActivities.AddRange(labActivity, other);
             await db.SaveChangesAsync(); otherId = other.Id;
             db.LabOrders.Add(new LabOrder { ActivityId = labActivity.Id, DossierId = dossierId,
@@ -692,17 +688,11 @@ public sealed class TreatmentDossierApiTests(ApiFixture fixture) : IClassFixture
             var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
             var activity = new ClinicalActivity
             {
-                DossierId = created.Id, PatientId = setup.PatientId, BranchId = setup.BranchId,
+                DossierId = created.Id,
                 ServiceId = setup.ServiceId, ServiceNameSnapshot = "SYNTHETIC service performed",
                 Region = "25", Unit = "răng", Quantity = 1, PerformerId = setup.DentistId,
-                PerformedAt = DateTimeOffset.UtcNow, CreatedAt = DateTimeOffset.UtcNow,
-                State = "Draft"
-            };
+                PerformedAt = DateTimeOffset.UtcNow, CreatedAt = DateTimeOffset.UtcNow};
             db.ClinicalActivities.Add(activity);
-            await db.SaveChangesAsync();
-            var beforePost = await publicClient.GetFromJsonAsync<OwnTreatmentSummaryItem[]>("/api/patients/me/treatment-summary");
-            Assert.Empty(Assert.Single(beforePost!, x => x.DossierId == created.Id).PerformedItems);
-            activity.State = "Posted";
             await db.SaveChangesAsync();
             var paymentId = Guid.NewGuid();
             var archivedPayment = System.Text.Json.JsonSerializer.Serialize(new

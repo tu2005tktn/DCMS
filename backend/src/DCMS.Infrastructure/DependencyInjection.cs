@@ -78,8 +78,6 @@ public static class DependencyInjection
         services.AddScoped<ITreatmentProgressionService, TreatmentProgressionService>();
         services.AddScoped<ITreatmentActualEvidencePort, ClinicalActualEvidencePort>();
         services.AddScoped<IClinicalWorkService, ClinicalWorkService>();
-        services.AddScoped<IClinicalVisitPort, Features.Examinations.ClinicalVisitPort>();
-        services.AddScoped<IClinicalConsentPort, ClinicalConsentPort>();
         services.AddScoped<IClinicalChargePort, OutboxClinicalChargePort>();
         services.AddScoped<ICareTaskService, CareTaskService>();
         services.AddScoped<ITreatmentLabReadinessPort, UnavailableTreatmentLabReadinessPort>();

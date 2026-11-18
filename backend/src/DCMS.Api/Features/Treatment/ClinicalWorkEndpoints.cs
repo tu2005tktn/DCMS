@@ -7,30 +7,6 @@ public static class ClinicalWorkEndpoints
 {
     public static void MapClinicalWorkEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapGet("/api/clinical-services", async (HttpContext http, int branchId,
-            IClinicalWorkService service, CancellationToken ct) => Results.Ok(await service.ServicesAsync(
-            AuthenticationEndpoints.AccountId(http.User), branchId, ct)))
-            .RequireAuthorization(TreatmentEndpoints.DentistPolicy)
-            .WithTags("UC-14 S22 Active clinical services");
-        var visits = app.MapGroup("/api/visits/{visitId:guid}")
-            .RequireAuthorization(TreatmentEndpoints.DentistPolicy)
-            .WithTags("UC-14 S22 Clinical work");
-        visits.MapGet("/treatment-context", async (HttpContext http, Guid visitId,
-            IClinicalWorkService service, CancellationToken ct) => Results.Ok(await service.ContextAsync(
-            AuthenticationEndpoints.AccountId(http.User), visitId, ct)));
-        visits.MapPost("/activities/drafts", async (HttpContext http, Guid visitId,
-            CreateActivityDraftRequest request, IClinicalWorkService service, CancellationToken ct) =>
-            request.Activity.VisitId != visitId ? Results.BadRequest() : Results.Json(await service.CreateDraftAsync(
-                AuthenticationEndpoints.AccountId(http.User), request, ct), statusCode: 201));
-        var activities = app.MapGroup("/api/activities").RequireAuthorization(TreatmentEndpoints.DentistPolicy)
-            .WithTags("UC-14 S22 Actual treatment");
-        activities.MapPut("/{id:guid}/draft", async (HttpContext http, Guid id,
-            UpdateActivityDraftRequest request, IClinicalWorkService service, CancellationToken ct) =>
-            Results.Ok(await service.UpdateDraftAsync(AuthenticationEndpoints.AccountId(http.User), id, request, ct)));
-        activities.MapPost("/{id:guid}/post", async (HttpContext http, Guid id,
-            PostActivityRequest request, IClinicalWorkService service, CancellationToken ct) =>
-            Results.Ok(await service.PostAsync(AuthenticationEndpoints.AccountId(http.User), id, request, ct)));
-
         var care = app.MapGroup("/api/care-tasks").RequireAuthorization()
             .WithTags("UC-25/53 S25/S60 Care task backend");
         care.MapGet("/", async (HttpContext http, int branchId, DateOnly? from, DateOnly? to,

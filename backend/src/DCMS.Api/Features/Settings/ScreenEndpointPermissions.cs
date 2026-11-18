@@ -58,16 +58,12 @@ public static class ScreenEndpointPermissions
         if (p.StartsWith("/api/clinical-documents")) return Need(read ? "documents.read" : p.EndsWith("/review") || p.EndsWith("/ai-analyses") ? "documents.review" : "documents.upload");
         if (p.StartsWith("/api/visits")) {
             if (p == "/api/visits/{visitId}") return Need("reception.read");
-            if (p.EndsWith("/treatment-context")) return Need(read ? "treatment.read" : "treatment.progress.manage");
-            if (p.EndsWith("/activities/drafts")) return Need("treatment.actuals.create");
             if (p.Contains("/investigations/") && p.EndsWith("/result")) return Need("investigations.results.receive");
             return Need(read ? "examinations.read" : "examinations.manage");
         }
         if (p.StartsWith("/api/service-prices")) return read ? ScreenEndpointRule.Any("treatment.prices.read", "treatment.read") : Need("treatment.prices.manage");
         if (p.StartsWith("/api/commercial")) return Need(read ? "treatment.commercial.read" : "treatment.commercial.approve");
         if (p.StartsWith("/api/treatment-templates")) return Need(read ? "treatment.templates.read" : "treatment.templates.manage");
-        if (p.StartsWith("/api/clinical-services")) return Need("treatment.read");
-        if (p.StartsWith("/api/clinical-activities") || p.StartsWith("/api/activities")) return Need(read ? "treatment.read" : p.EndsWith("/correct") ? "treatment.actuals.update" : "treatment.actuals.create");
         if (p.StartsWith("/api/care-tasks")) return Need(read ? "care-tasks.read" : p.EndsWith("/escalations") ? "care-tasks.escalate" : "care-tasks.manage");
         if (p.StartsWith("/api/care-escalations")) return Need("care-tasks.escalate");
         if (p.StartsWith("/api/lab-orders")) return Need(read ? "treatment.lab.read" : "treatment.lab.track");

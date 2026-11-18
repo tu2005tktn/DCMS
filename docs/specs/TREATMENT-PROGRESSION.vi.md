@@ -1,5 +1,7 @@
 # S58/S21/S24 — Mẫu, tiến trình điều trị và chỉ định quay lại
 
+> Cập nhật 18/11/2026: hoàn tất bước nhận bằng chứng là hoạt động đã ghi của cùng hạng mục trong phiếu (hoạt động không còn `StepId`). Xem [CLINICAL-ACTIVITY-TABLE-SIMPLIFICATION.vi.md](CLINICAL-ACTIVITY-TABLE-SIMPLIFICATION.vi.md) giai đoạn 4.
+
 > Cập nhật 18/11/2026: hướng dẫn tái khám (`FollowUpInstruction`, `/api/follow-up-instructions`) đã bị xóa. Lịch hẹn tiếp theo gắn với phiếu điều trị qua `APPOINTMENT.DossierId` (thay `FollowUpId`) và được gợi ý từ hạng mục kế hoạch gần nhất còn chờ của phiếu. Các phần bên dưới nói về hướng dẫn tái khám là lịch sử thiết kế. Xem [FOLLOW-UP-INSTRUCTION-REMOVAL.vi.md](FOLLOW-UP-INSTRUCTION-REMOVAL.vi.md).
 
 ## Giao diện kế hoạch dùng lại — 02/11/2026

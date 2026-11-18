@@ -26,10 +26,7 @@ public sealed record SheetEstimate(int? MinMinutes, int? SelectedMinutes, int? M
     int? Sessions, DateOnly? EarliestOn, DateOnly? TargetOn, DateOnly? LatestOn);
 public sealed record ConfirmSheetPlanRequest(int ExpectedVersion, int ExpectedDraftVersion, SheetDecision? Decision, Guid RequestKey,
     SheetEstimate? Estimate = null, Guid? QualifyingItemId = null);
-public sealed record ConfirmSheetActualRequest(int ExpectedVersion, int ExpectedDraftVersion, Guid? VisitId,
-    int ExpectedVisitVersion, string Outcome, string ChargingBasis, string? ChargingBasisEvidence,
-    bool CompleteItem, SheetDecision? DirectDecision, Guid RequestKey, Guid? StepId = null,
-    int? ExpectedStepVersion = null);
+public sealed record ConfirmSheetActualRequest(int ExpectedVersion, int ExpectedDraftVersion, Guid RequestKey);
 public sealed record ConfirmSheetActualResult(TreatmentDossierDto Dossier, ActivityDto Activity);
 public sealed record ScheduleNoteRequest(int ExpectedVersion, DateOnly? PlannedOn, string? Note, Guid RequestKey);
 public sealed record DecideSheetItemRequest(int ExpectedVersion, SheetDecision Decision, Guid RequestKey);

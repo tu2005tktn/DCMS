@@ -247,12 +247,12 @@ public static class FinanceStatisticsEndpoints
             var received = receipts.ToDictionary(x => x.DossierId);
 
             var activities = await db.ClinicalActivities.AsNoTracking()
-                .Where(x => x.DossierId.HasValue && ids.Contains(x.DossierId.Value) && x.State == "Posted")
+                .Where(x => ids.Contains(x.DossierId))
                 .Select(x => new { x.Id, x.DossierId, x.ItemId, x.ServiceNameSnapshot, x.Quantity, x.PriceSnapshotVnd,
                     x.DiscountSnapshotVnd }).ToArrayAsync(ct);
             var postedIds = activities.Select(x => x.Id).ToArray();
-            var completedQuantity = activities.Where(x => x.ItemId.HasValue)
-                .GroupBy(x => x.ItemId!.Value).ToDictionary(x => x.Key, x => x.Sum(y => y.Quantity));
+            var completedQuantity = activities
+                .GroupBy(x => x.ItemId).ToDictionary(x => x.Key, x => x.Sum(y => y.Quantity));
             var items = await db.TreatmentItems.AsNoTracking()
                 .Where(x => ids.Contains(x.DossierId) && !x.SheetDeleted && !x.HiddenFromSheet
                     && (x.Decision == "Agreed" || x.EntrySource == "ClinicianEntry")

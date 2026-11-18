@@ -202,7 +202,7 @@ public static class TreatmentPaymentEndpoints
             if (dossier is null) return Results.NotFound();
             if (dossier.State != "Open" || dossier.Version != request.ExpectedVersion)
                 return Results.Conflict("Phiếu đã thay đổi. Vui lòng tải lại.");
-            if (await db.ClinicalActivities.AnyAsync(x => x.DossierId == dossierId && x.State == "Posted", ct)
+            if (await db.ClinicalActivities.AnyAsync(x => x.DossierId == dossierId, ct)
                 || await db.LabOrders.AnyAsync(x => x.DossierId == dossierId, ct))
                 return Results.Conflict("Phiếu đã có điều trị hoặc labo, không thể xóa do khách không đến.");
             var current = await ContextAsync(db, dossierId, ct);
@@ -330,8 +330,7 @@ public static class TreatmentPaymentEndpoints
             .Select(x => new { x.Id, x.PatientId, x.BranchId }).SingleOrDefaultAsync(ct);
         if (dossier is null) return null;
         var activities = await db.ClinicalActivities.AsNoTracking()
-            .Where(x => x.DossierId == dossierId && x.PatientId == dossier.PatientId &&
-                x.BranchId == dossier.BranchId && x.State == "Posted")
+            .Where(x => x.DossierId == dossierId)
             .OrderBy(x => x.PerformedAt).ThenBy(x => x.Id).ToArrayAsync(ct);
         var paid = await db.Database.SqlQuery<TreatmentPaidRow>($"""
             WITH archive AS (

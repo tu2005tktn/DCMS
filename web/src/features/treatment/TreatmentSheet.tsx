@@ -108,7 +108,6 @@ export default function TreatmentSheet({ patientId, dossierId, dossierVersion, o
       }
       await api(`/api/dossiers/${dossierId}/sheet-drafts/${row.id}/confirm-${kind}`, { method: 'POST', body: JSON.stringify({
         expectedVersion: dossier.version, expectedDraftVersion: write.current.saved, requestKey: key, decision: null,
-        visitId: null, expectedVisitVersion: 0, outcome: row.note ?? '', chargingBasis: 'Separate', completeItem: false, directDecision: null,
       }) });
     }
     setEditor(null); write.current = null; refresh();
@@ -201,7 +200,7 @@ export default function TreatmentSheet({ patientId, dossierId, dossierVersion, o
       discountValue: activity.sheetDiscountValue ?? activity.discountSnapshotVnd ?? 0, discountNote: activity.sheetDiscountReason };
   }
   function beginTransfer(item: TreatmentItem) {
-    const existing = activities?.items.find(a => a.itemId === item.id && a.sourceKind === 'Dossier');
+    const existing = activities?.items.find(a => a.itemId === item.id);
     if (existing) { editActivity(existing); return; }
     setEditor({ kind: 'actual', transferItemId: item.id, row: { id: crypto.randomUUID(), sourceItemId: item.id,
       date: new Intl.DateTimeFormat('sv-SE', {timeZone:'Asia/Ho_Chi_Minh'}).format(new Date()), serviceId: item.serviceId,

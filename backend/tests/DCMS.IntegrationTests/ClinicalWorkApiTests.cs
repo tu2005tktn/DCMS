@@ -6,41 +6,14 @@ using DCMS.Application.Features.Patients;
 using DCMS.Application.Features.Treatment;
 using DCMS.Domain.Features.Scheduling;
 using DCMS.Infrastructure.Persistence;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Xunit;
 
 namespace DCMS.IntegrationTests;
 
-public sealed class ClinicalVisitFixturePort : IClinicalVisitPort
-{
-    public ClinicalVisitState State { get; set; } = new(false, false, 0, 0, 0);
-    public Task<ClinicalVisitState> GetAsync(Guid visitId, CancellationToken ct) => Task.FromResult(State);
-}
-
-public sealed class ClinicalConsentFixturePort : IClinicalConsentPort
-{
-    public Task<bool> ValidAsync(int patientId, Guid? itemId, Guid? stepId, int? planVersion,
-        int serviceId, CancellationToken ct) => Task.FromResult(true);
-}
-
-public sealed class ClinicalWorkFixture : ApiFixture
-{
-    public ClinicalVisitFixturePort Visit { get; } = new();
-    protected override void ConfigureWebHost(IWebHostBuilder builder)
-    {
-        base.ConfigureWebHost(builder);
-        builder.ConfigureServices(services =>
-        {
-            services.RemoveAll<IClinicalVisitPort>();
-            services.AddSingleton<IClinicalVisitPort>(Visit);
-            services.RemoveAll<IClinicalConsentPort>();
-            services.AddSingleton<IClinicalConsentPort, ClinicalConsentFixturePort>();
-        });
-    }
-}
+// Care task backend (S25/S60); the visit-based treatment flow (S22) was removed.
+public sealed class ClinicalWorkFixture : ApiFixture;
 
 public sealed class ClinicalWorkApiTests(ClinicalWorkFixture fixture) : IClassFixture<ClinicalWorkFixture>
 {
@@ -76,35 +49,7 @@ public sealed class ClinicalWorkApiTests(ClinicalWorkFixture fixture) : IClassFi
         await db.SaveChangesAsync();
         var serviceId = await db.Set<SchedulingService>().Where(x => x.BranchId == branch.Id)
             .Select(x => x.Id).SingleAsync();
-        var visitId = Guid.NewGuid();
-        fixture.Visit.State = new ClinicalVisitState(true, true, patientId, branch.Id, 1);
-        return (patientId, branch.Id, serviceId, visitId);
-    }
-
-    [Fact]
-    public async Task ActivityDraftRetryUsesOneIdAndPostsOnce()
-    {
-        using var dentist = await Login("dentist.demo");
-        using var assistant = await Login("assistant.demo");
-        var setup = await SetupAsync(assistant);
-        var input = new ActivityInput(setup.VisitId, null, null, null, null, setup.ServiceId,
-            "25", "răng", 1, DateTimeOffset.UtcNow, 30, "Đã trám răng 25", null,
-            "Separate", null, 300000);
-        var draftRequest = new CreateActivityDraftRequest(input, 1, Guid.NewGuid());
-        var draftResponse = await dentist.PostAsJsonAsync($"/api/visits/{setup.VisitId}/activities/drafts", draftRequest);
-        Assert.Equal(HttpStatusCode.Created, draftResponse.StatusCode);
-        var draft = (await draftResponse.Content.ReadFromJsonAsync<ActivityDto>())!;
-        var retry = (await (await dentist.PostAsJsonAsync($"/api/visits/{setup.VisitId}/activities/drafts",
-            draftRequest)).Content.ReadFromJsonAsync<ActivityDto>())!;
-        Assert.Equal(draft.Id, retry.Id);
-        Assert.Equal("Draft", draft.State);
-        Assert.Equal(HttpStatusCode.OK, (await dentist.PostAsJsonAsync(
-            $"/api/activities/{draft.Id}/post", new PostActivityRequest(draft.Version, 1,
-                null, null, Guid.NewGuid()))).StatusCode);
-
-        using var check = fixture.Services.CreateScope();
-        var context = check.ServiceProvider.GetRequiredService<DcmsDbContext>();
-        Assert.Single(await context.ClinicalActivities.Where(x => x.VisitId == setup.VisitId).ToListAsync());
+        return (patientId, branch.Id, serviceId, Guid.NewGuid());
     }
 
     [Fact]

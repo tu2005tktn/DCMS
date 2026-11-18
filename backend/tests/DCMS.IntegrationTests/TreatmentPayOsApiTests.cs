@@ -99,10 +99,10 @@ public sealed class TreatmentPayOsApiTests(TreatmentPayOsFixture fixture) : ICla
         using (var scope = fixture.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
-            var activity = new ClinicalActivity { DossierId = dossierId, PatientId = patientId, BranchId = branchId,
+            var activity = new ClinicalActivity { DossierId = dossierId,
                 ServiceId = serviceId, ServiceNameSnapshot = "Synthetic treatment", Unit = "lần", Quantity = 1,
                 PriceSnapshotVnd = 100000, PerformerId = dentistId, PerformedAt = DateTimeOffset.UtcNow,
-                CreatedAt = DateTimeOffset.UtcNow, State = "Posted" };
+                CreatedAt = DateTimeOffset.UtcNow};
             db.ClinicalActivities.Add(activity); await db.SaveChangesAsync(); activityId = activity.Id;
             var labOrder = new LabOrder { ActivityId = activityId, DossierId = dossierId,
                 PatientId = patientId, BranchId = branchId, DentistId = dentistId,

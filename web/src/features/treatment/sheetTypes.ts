@@ -7,10 +7,10 @@ export type SheetContext = {
   consentDocuments?: { id: string; fileName: string; version: number }[];
 };
 export type SheetActivity = {
-  id: string; visitId: string | null; dossierId: string; itemId: string; planVersion: number;
+  id: string; dossierId: string; itemId: string; planVersion: number;
   serviceId: number; region: string | null; unit: string; quantity: number; performedAt: string;
   performerId: number; outcome: string; version: number; priceSnapshotVnd: number;
-  sheetVersion?: number; sheetDeleted?: boolean; sheetDiscountType?: string; sheetDiscountValue?: number; sheetDiscountReason?: string; sourceKind?: string; serviceNameSnapshot?: string; labWorkSnapshot?: string; chargingBasis: string; feeStatus: string; discountSnapshotVnd: number; assistantId?: number;
+  sheetVersion?: number; sheetDeleted?: boolean; sheetDiscountType?: string; sheetDiscountValue?: number; sheetDiscountReason?: string; serviceNameSnapshot?: string; labWorkSnapshot?: string; feeStatus: string; discountSnapshotVnd: number; assistantId?: number;
 };
 export type ActivityPage = { items: SheetActivity[]; total: number; page: number; pageSize: number };
 

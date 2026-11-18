@@ -2172,29 +2172,14 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<int?>("AssistantId")
                         .HasColumnType("integer");
 
-                    b.Property<int>("BranchId")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("ChargingBasis")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
-
-                    b.Property<string>("ChargingBasisEvidence")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<long>("DiscountSnapshotVnd")
                         .HasColumnType("bigint");
 
-                    b.Property<Guid?>("DossierId")
+                    b.Property<Guid>("DossierId")
                         .HasColumnType("uuid");
-
-                    b.Property<int?>("ElapsedMinutes")
-                        .HasColumnType("integer");
 
                     b.Property<string>("FeeStatus")
                         .IsRequired()
@@ -2206,24 +2191,17 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsPlanTransfer")
                         .HasColumnType("boolean");
 
-                    b.Property<Guid?>("ItemId")
+                    b.Property<Guid>("ItemId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("LabWorkSnapshot")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
 
-                    b.Property<string>("NextSteps")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
                     b.Property<string>("Outcome")
                         .IsRequired()
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)");
-
-                    b.Property<int>("PatientId")
-                        .HasColumnType("integer");
 
                     b.Property<DateTimeOffset>("PerformedAt")
                         .HasColumnType("timestamp with time zone");
@@ -2234,9 +2212,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<int?>("PlanVersion")
                         .HasColumnType("integer");
 
-                    b.Property<DateTimeOffset?>("PostedAt")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<decimal>("PriceSnapshotVnd")
                         .HasPrecision(18)
                         .HasColumnType("numeric(18,0)");
@@ -2244,9 +2219,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<decimal>("Quantity")
                         .HasPrecision(12, 3)
                         .HasColumnType("numeric(12,3)");
-
-                    b.Property<int?>("RecordedBy")
-                        .HasColumnType("integer");
 
                     b.Property<string>("Region")
                         .HasMaxLength(80)
@@ -2259,14 +2231,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(160)
                         .HasColumnType("character varying(160)");
 
-                    b.Property<string>("State")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
-
-                    b.Property<Guid?>("StepId")
-                        .HasColumnType("uuid");
-
                     b.Property<string>("Unit")
                         .IsRequired()
                         .HasMaxLength(40)
@@ -2276,18 +2240,13 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .IsConcurrencyToken()
                         .HasColumnType("integer");
 
-                    b.Property<Guid?>("VisitId")
-                        .HasColumnType("uuid");
-
                     b.HasKey("Id");
+
+                    b.HasIndex("DossierId", "PerformedAt");
 
                     b.HasIndex("ItemId", "PlanVersion")
                         .IsUnique()
                         .HasFilter("\"IsPlanTransfer\" = TRUE");
-
-                    b.HasIndex("VisitId", "State");
-
-                    b.HasIndex("PatientId", "DossierId", "StepId");
 
                     b.ToTable("CLINICAL_ACTIVITY", null, t =>
                         {
@@ -5646,6 +5605,15 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasOne("DCMS.Domain.Features.SystemSettings.MaterialCatalogItem", null)
                         .WithMany()
                         .HasForeignKey("MaterialId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Treatment.ClinicalActivity", b =>
+                {
+                    b.HasOne("DCMS.Domain.Features.Treatment.TreatmentDossier", null)
+                        .WithMany()
+                        .HasForeignKey("DossierId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
