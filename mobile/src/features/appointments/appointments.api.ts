@@ -51,8 +51,8 @@ const httpAppointmentsApi: AppointmentsApi = {
     const query = new URLSearchParams({ branchId: String(detail.branchId) });
     const options = await call<{ employees: { id: number; branchId: number; name: string; canDentist: boolean }[] }>(
       `/api/availability/options?${query}`, token);
-    return options.employees.filter(item => item.branchId === detail.branchId && item.canDentist
-      && item.id !== detail.assistantId).map(({ id, branchId, name }) => ({ id, branchId, name }));
+    return options.employees.filter(item => item.branchId === detail.branchId && item.canDentist)
+      .map(({ id, branchId, name }) => ({ id, branchId, name }));
   },
   availability: async (token, detail, date, dentistId) => {
     const query = new URLSearchParams({ date, dentistId: String(dentistId) });

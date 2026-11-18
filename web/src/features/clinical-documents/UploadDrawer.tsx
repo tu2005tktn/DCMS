@@ -7,12 +7,12 @@ import {
   type DocumentConstraints, type DocumentItem, type DocumentSource, type DocumentType, type PatientDocumentContexts,
 } from './types';
 
-export type UploadContext = { visitId?: string; dossierId?: string; planId?: string; investigationId?: string; investigationLabel?: string; documentType?: DocumentType; consentVersion?: string };
+export type UploadContext = { visitId?: string; dossierId?: string; investigationId?: string; investigationLabel?: string; documentType?: DocumentType; consentVersion?: string };
 type Row = {
   key: string; file: File; requestKey: string; status: 'ready' | 'uploading' | 'done' | 'failed' | 'invalid';
   progress: number; error?: string; result?: DocumentItem;
 };
-type Values = { documentType: DocumentType; source: DocumentSource; sourceDate: string; description?: string; visitId?: string; dossierId?: string; planId?: string };
+type Values = { documentType: DocumentType; source: DocumentSource; sourceDate: string; description?: string; visitId?: string; dossierId?: string };
 
 const today = () => new Date(Date.now() + 7 * 3_600_000).toISOString().slice(0, 10);
 const extensionTypes: Record<string, string> = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', pdf: 'application/pdf' };
@@ -44,7 +44,7 @@ export default function UploadDrawer({ open, patientId, contexts, initialContext
     if (!open) return;
     form.resetFields();
     form.setFieldsValue({ documentType: initialContext.documentType ?? 'XRay', source: 'Clinic', sourceDate: today(), visitId: initialContext.visitId,
-      dossierId: initialContext.dossierId, planId: initialContext.planId });
+      dossierId: initialContext.dossierId });
     setRows([]); setSelectionError(null);
   }, [open]);
 
@@ -72,7 +72,7 @@ export default function UploadDrawer({ open, patientId, contexts, initialContext
     update(row.key, { status: 'uploading', progress: 0, error: undefined });
     try {
       const result = await documentsApi.upload({
-        patientId, visitId: lockedVisitId ?? values.visitId ?? null, dossierId: values.dossierId ?? null, planId: values.planId ?? null,
+        patientId, visitId: lockedVisitId ?? values.visitId ?? null, dossierId: values.dossierId ?? null,
         investigationId: initialContext.investigationId ?? null, consentVersion: initialContext.consentVersion ?? null,
         documentType: values.documentType, source: values.source, sourceDate: values.sourceDate, description: values.description?.trim() ?? '',
         requestKey: row.requestKey,
@@ -122,8 +122,6 @@ export default function UploadDrawer({ open, patientId, contexts, initialContext
           options={contexts?.visits.map(v => ({ value: v.id, label: v.label }))} /></Form.Item>
         <Form.Item name="dossierId" label="Hồ sơ điều trị"><Select allowClear placeholder="Không gắn hồ sơ"
           options={contexts?.dossiers.map(d => ({ value: d.id, label: d.label }))} /></Form.Item>
-        <Form.Item name="planId" label="Kế hoạch"><Select allowClear placeholder="Không gắn kế hoạch"
-          options={contexts?.plans.map(p => ({ value: p.id, label: p.label }))} /></Form.Item>
       </div>
       {(initialContext.investigationId || initialContext.consentVersion) && <Typography.Paragraph type="secondary">
         Ngữ cảnh được truyền vào: {initialContext.investigationId ? `chỉ định cận lâm sàng: ${initialContext.investigationLabel ?? 'đã chọn'}` : ''}

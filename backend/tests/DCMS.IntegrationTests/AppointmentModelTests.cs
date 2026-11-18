@@ -20,7 +20,7 @@ public sealed class AppointmentModelTests
     }
 
     [Fact]
-    public void ModelKeepsReservationAndBookingReceiptConstraints()
+    public void ModelKeepsAppointmentAndBookingReceiptConstraints()
     {
         using var db = new DcmsDbContext(new DbContextOptionsBuilder<DcmsDbContext>()
             .UseNpgsql("Host=localhost;Database=not_used;Username=none;Password=none").Options);
@@ -28,10 +28,9 @@ public sealed class AppointmentModelTests
         Assert.Contains(receipt.GetIndexes(), index => index.IsUnique
             && index.Properties.Select(property => property.Name).SequenceEqual(["ReceiptType", nameof(AppointmentReceipt.RequestKey)]));
         var appointment = db.Model.FindEntityType(typeof(Appointment))!;
-        Assert.Equal([nameof(Appointment.ReservationId)], appointment.FindPrimaryKey()!.Properties.Select(x => x.Name));
-        Assert.Contains(appointment.GetKeys(), key => key.Properties.Select(x => x.Name).SequenceEqual([nameof(Appointment.Id)]));
-        var service = db.Model.FindEntityType(typeof(ResourceReservation))!
-            .FindProperty(nameof(ResourceReservation.ServiceId))!;
+        Assert.Equal([nameof(Appointment.Id)], appointment.FindPrimaryKey()!.Properties.Select(x => x.Name));
+        Assert.NotNull(appointment.FindComplexProperty(nameof(Appointment.BookingInfo)));
+        var service = appointment.FindProperty(nameof(Appointment.ServiceId))!;
         Assert.True(service.IsNullable);
     }
 

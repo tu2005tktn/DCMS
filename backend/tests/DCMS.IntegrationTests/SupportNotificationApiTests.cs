@@ -59,12 +59,10 @@ public sealed class SupportNotificationApiTests(SupportNotificationFixture fixtu
         var service = new SchedulingService { BranchId = branch.Id, Name = "Khám S12", PublicDurationMinutes = 30 };
         await db.AddSchedulingDataAsync(chair, service); await db.SaveChangesAsync();
         var id = Guid.NewGuid(); var start = DateTimeOffset.UtcNow.AddDays(3);
-        db.Set<ResourceReservation>().Add(new ResourceReservation { Id = id, Code = "RS-" + id.ToString("N"),
-            BranchId = branch.Id, DentistId = dentist.Id, ChairId = chair.Id, ServiceId = service.Id,
-            Start = start, End = start.AddMinutes(30), AttendeeLabel = "Synthetic attendee", Status = "Confirmed" });
-        var appointment = new Appointment { Id = id, ReservationId = id, Code = "AP-" + id.ToString("N"),
-            BranchId = branch.Id, BookerAccountId = guest.Id, BookerName = guest.FullName,
-            BookerPhone = guest.PhoneNumber, AttendeeName = "Synthetic attendee", DentistId = dentist.Id,
+        var appointment = new Appointment { Id = id, Code = "AP-" + id.ToString("N"),
+            BranchId = branch.Id, BookerAccountId = guest.Id,
+            BookingInfo = new AppointmentBookingInfo { BookerName = guest.FullName, BookerContact = guest.PhoneNumber },
+            AttendeeName = "Synthetic attendee", DentistId = dentist.Id,
             ChairId = chair.Id, ServiceId = service.Id, StartAt = start, EndAt = start.AddMinutes(30),
             Status = "Confirmed", CreatedAt = DateTimeOffset.UtcNow };
         db.Appointments.Add(appointment);
@@ -138,7 +136,7 @@ public sealed class SupportNotificationApiTests(SupportNotificationFixture fixtu
     }
 
     [Fact]
-    public async Task ResolveConflictKeepsRequestPendingAndAttendanceDoesNotChangeLifecycle()
+    public async Task ResolveConflictKeepsRequestPendingAndGeneralResolutionDoesNotChangeLifecycle()
     {
         var change = await SeedAsync("Change");
         using var staff = await Login("assistant.demo");
@@ -149,16 +147,15 @@ public sealed class SupportNotificationApiTests(SupportNotificationFixture fixtu
             Assert.Equal("Pending", (await scope.ServiceProvider.GetRequiredService<DcmsDbContext>()
                 .AppointmentSupportRequests.SingleAsync(x => x.Code == change.RequestCode)).Status);
 
-        var attendance = await SeedAsync("ConfirmToAttend");
-        var resolved = await staff.PostAsJsonAsync($"/api/support-requests/{attendance.RequestCode}/resolve",
-            new ResolveSupportCommand(Guid.NewGuid(), 1, "Resolve", "Đã xác nhận", null));
+        var general = await SeedAsync("General");
+        var resolved = await staff.PostAsJsonAsync($"/api/support-requests/{general.RequestCode}/resolve",
+            new ResolveSupportCommand(Guid.NewGuid(), 1, "Resolve", "Đã xử lý", null));
         Assert.Equal(HttpStatusCode.OK, resolved.StatusCode);
         using var verifyScope = fixture.Services.CreateScope();
         var db = verifyScope.ServiceProvider.GetRequiredService<DcmsDbContext>();
-        var appointment = await db.Appointments.SingleAsync(x => x.Id == attendance.AppointmentId);
+        var appointment = await db.Appointments.SingleAsync(x => x.Id == general.AppointmentId);
         Assert.Equal("Confirmed", appointment.Status);
-        Assert.Equal("Yes", appointment.ConfirmedToAttend);
-        Assert.Equal("Resolved", (await db.AppointmentSupportRequests.SingleAsync(x => x.Code == attendance.RequestCode)).Status);
+        Assert.Equal("Resolved", (await db.AppointmentSupportRequests.SingleAsync(x => x.Code == general.RequestCode)).Status);
     }
 
     [Fact]

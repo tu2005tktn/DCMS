@@ -64,10 +64,8 @@ public sealed class AllScreensPermissionApiTests(ReceptionFixture fixture) : ICl
     [InlineData("appointments.read", "Dentist", "/api/appointments/options", "/api/appointments", "POST")]
     [InlineData("working-schedules.read", "Dentist", "/api/working-schedules/options", "/api/working-schedules/recurring/publish", "POST")]
     [InlineData("booking-settings.read", "Dentist", "/api/booking-settings/options", "/api/booking-settings/{branch}", "PUT")]
-    [InlineData("treatment.templates.read", "Dentist", "/api/treatment-templates?branchId={branch}", "/api/treatment-templates", "POST")]
     [InlineData("treatment.templates.read", "Dentist", "/api/treatment-templates/item-plans?branchId={branch}", "/api/treatment-templates/item-plans", "POST")]
     [InlineData("treatment.prices.read", "Admin", "/api/service-prices", "/api/service-prices/{service}", "PUT")]
-    [InlineData("treatment.commercial.read", "Admin", "/api/commercial/dossiers", "/api/commercial/dossiers/11111111-1111-4111-8111-111111111111/deposit-exception", "POST")]
     [InlineData("treatment.read", "Dentist", "/api/patients/{patient}/dossiers?branchId={branch}", "/api/patients/{patient}/dossiers", "POST")]
     [InlineData("documents.read", "Dentist", "/api/patients/{patient}/document-contexts", "/api/clinical-documents/11111111-1111-4111-8111-111111111111/review", "POST")]
     [InlineData("care-tasks.read", "ClinicAssistant", "/api/care-tasks?branchId={branch}", "/api/care-tasks", "POST")]
@@ -157,35 +155,39 @@ public sealed class AllScreensPermissionApiTests(ReceptionFixture fixture) : ICl
     [Fact] public async Task WholePlanSaveCannotBypassCreateDeleteOrPriceGrants() {
         var setup = await reception.Prepare(); using var owner = await reception.Login("owner.demo");
         var (staff, name) = await Staff(setup.BranchId, AccountRoles.Dentist);
-        var roots = new[] { "treatment.dossiers.create", "treatment.plan.manage" };
+        var roots = new[] { "treatment.dossiers.create" };
         var group = await Assign(owner, staff, AccountRoles.Dentist, roots); using var user = await reception.Login(name);
         async Task Change(params string[] extra) {
             group = (await owner.GetFromJsonAsync<GroupDto>($"/api/system-settings/access-groups/{group.Id}"))!;
             group = await Ok<GroupDto>(await owner.PutAsJsonAsync($"/api/system-settings/access-groups/{group.Id}", new GroupCommand(Guid.NewGuid(), new(group.Code, group.Name, group.BaseRole, Grants([..roots, ..extra])), group.Version, "SYNTHETIC granular plan grant")));
         }
         var dossier = (await Ok<DCMS.Application.Features.Treatment.TreatmentChange>(await user.PostAsJsonAsync($"/api/patients/{setup.PatientId}/dossiers", new DCMS.Application.Features.Treatment.CreateDossierRequest(setup.BranchId, staff.EmployeeId, "SYNTHETIC grant test", null, null, Guid.NewGuid())))).Dossier;
-        DCMS.Application.Features.Treatment.TreatmentItemInput Item(Guid? id, int order, long price = 100000) => new(id, null, setup.ServiceId, "25", "răng", 1, order, 30, null, null, price, "Proposed", null, null, null, null);
-        async Task<HttpResponseMessage> Save(params DCMS.Application.Features.Treatment.TreatmentItemInput[] items) => await user.PostAsJsonAsync($"/api/dossiers/{dossier.Id}/plan/draft", new DCMS.Application.Features.Treatment.SavePlanDraftRequest(dossier.Version, "SYNTHETIC goal", items, [], Guid.NewGuid()));
-        Assert.Equal(HttpStatusCode.Forbidden, (await Save(Item(null, 1), Item(null, 2))).StatusCode);
+        System.Text.Json.JsonElement Row(long price = 100000) => System.Text.Json.JsonSerializer.SerializeToElement(new { serviceId = setup.ServiceId, dentistId = staff.EmployeeId, regions = new[] { "25" }, quantity = 1m, estimatedMinutes = 30, unitPriceVnd = price, costVnd = price, note = "", discountType = "VND", discountValue = 0m });
+        async Task<HttpResponseMessage> PutDraft(Guid draftId, long price = 100000) => await user.PutAsJsonAsync($"/api/dossiers/{dossier.Id}/sheet-drafts/{draftId}", new DCMS.Application.Features.Treatment.SaveSheetDraftRequest("Plan", null, Row(price), 0, Guid.NewGuid()));
+        var blockedDraft = Guid.NewGuid();
+        Assert.Equal(HttpStatusCode.Forbidden, (await PutDraft(blockedDraft)).StatusCode);
         await Change("treatment.items.create");
-        dossier = (await Ok<DCMS.Application.Features.Treatment.TreatmentChange>(await Save(Item(null, 1), Item(null, 2)))).Dossier;
+        var firstDraft = Guid.NewGuid(); Assert.Equal(HttpStatusCode.OK, (await PutDraft(firstDraft)).StatusCode);
+        dossier = (await Ok<DCMS.Application.Features.Treatment.TreatmentChange>(await user.PostAsJsonAsync($"/api/dossiers/{dossier.Id}/sheet-drafts/{firstDraft}/confirm-plan", new DCMS.Application.Features.Treatment.ConfirmSheetPlanRequest(dossier.Version, 1, Guid.NewGuid())))).Dossier;
+        var secondDraft = Guid.NewGuid(); Assert.Equal(HttpStatusCode.OK, (await PutDraft(secondDraft)).StatusCode);
+        dossier = (await Ok<DCMS.Application.Features.Treatment.TreatmentChange>(await user.PostAsJsonAsync($"/api/dossiers/{dossier.Id}/sheet-drafts/{secondDraft}/confirm-plan", new DCMS.Application.Features.Treatment.ConfirmSheetPlanRequest(dossier.Version, 1, Guid.NewGuid())))).Dossier;
         var first = dossier.Items[0].Id; var second = dossier.Items[1].Id;
-        Assert.Equal(HttpStatusCode.Forbidden, (await Save(Item(first, 1, 200000), Item(second, 2))).StatusCode);
-        dossier = (await Ok<DCMS.Application.Features.Treatment.TreatmentChange>(await Save(Item(first, 1), Item(second, 2)))).Dossier;
-        Assert.Equal(HttpStatusCode.Forbidden, (await Save(Item(first, 1))).StatusCode);
-        await Change("treatment.items.delete");
-        dossier = (await Ok<DCMS.Application.Features.Treatment.TreatmentChange>(await Save(Item(first, 1)))).Dossier;
+        Assert.Equal(HttpStatusCode.Forbidden, (await user.PutAsJsonAsync($"/api/dossiers/{dossier.Id}/sheet-items/{first}", new DCMS.Application.Features.Treatment.EditSheetItemRequest(dossier.Version, Row(200000), Guid.NewGuid()))).StatusCode);
+        await Change("treatment.items.update");
+        Assert.Equal(HttpStatusCode.Forbidden, (await user.PutAsJsonAsync($"/api/dossiers/{dossier.Id}/sheet-items/{first}", new DCMS.Application.Features.Treatment.EditSheetItemRequest(dossier.Version, Row(200000), Guid.NewGuid()))).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await user.SendAsync(new HttpRequestMessage(HttpMethod.Delete, $"/api/dossiers/{dossier.Id}/sheet-items/{second}") { Content = JsonContent.Create(new DCMS.Application.Features.Treatment.SheetItemActionRequest(dossier.Version, Guid.NewGuid())) })).StatusCode);
+        await Change("treatment.items.update", "treatment.items.delete");
+        dossier = (await Ok<DCMS.Application.Features.Treatment.TreatmentChange>(await user.SendAsync(new HttpRequestMessage(HttpMethod.Delete, $"/api/dossiers/{dossier.Id}/sheet-items/{second}") { Content = JsonContent.Create(new DCMS.Application.Features.Treatment.SheetItemActionRequest(dossier.Version, Guid.NewGuid())) }))).Dossier;
         Assert.Single(dossier.Items);
-        await Change("treatment.items.price");
-        dossier = (await Ok<DCMS.Application.Features.Treatment.TreatmentChange>(await Save(Item(first, 1, 200000)))).Dossier;
+        await Change("treatment.items.update", "treatment.items.price");
+        dossier = (await Ok<DCMS.Application.Features.Treatment.TreatmentChange>(await user.PutAsJsonAsync($"/api/dossiers/{dossier.Id}/sheet-items/{first}", new DCMS.Application.Features.Treatment.EditSheetItemRequest(dossier.Version, Row(200000), Guid.NewGuid())))).Dossier;
         Assert.Equal(200000, Assert.Single(dossier.Items).AgreedUnitPriceVnd);
-        await Change();
-        Assert.Equal(HttpStatusCode.Forbidden, (await Save(Item(first, 1, 300000))).StatusCode);
+        await Change("treatment.items.update");
+        Assert.Equal(HttpStatusCode.Forbidden, (await user.PutAsJsonAsync($"/api/dossiers/{dossier.Id}/sheet-items/{first}", new DCMS.Application.Features.Treatment.EditSheetItemRequest(dossier.Version, Row(300000), Guid.NewGuid()))).StatusCode);
         group = (await owner.GetFromJsonAsync<GroupDto>($"/api/system-settings/access-groups/{group.Id}"))!;
         await Ok<GroupDto>(await owner.PutAsJsonAsync($"/api/system-settings/access-groups/{group.Id}", new GroupCommand(Guid.NewGuid(), new(group.Code, group.Name, group.BaseRole, ["treatment.read"]), group.Version, "SYNTHETIC read only")));
         var context = await Ok<DCMS.Application.Features.Treatment.TreatmentSheetContext>(await user.GetAsync($"/api/dossiers/{dossier.Id}/sheet-context"));
         Assert.Empty(context.AllowedActions);
-        Assert.Empty(context.ConsentDocuments!);
     }
     [Fact] public async Task ReceptionVisitHeaderDoesNotRequireClinicalRead() {
         var setup = await reception.Prepare(); using var assistant = await reception.Login(); var visit = await reception.Check(assistant, setup);
@@ -198,9 +200,9 @@ public sealed class AllScreensPermissionApiTests(ReceptionFixture fixture) : ICl
         var setup = await reception.Prepare(); using var assistant = await reception.Login(); var visit = await reception.Check(assistant, setup);
         using var owner = await reception.Login("owner.demo"); var (staff, name) = await Staff(setup.BranchId, AccountRoles.Dentist);
         await Assign(owner, staff, AccountRoles.Dentist, "prescriptions.read"); using var user = await reception.Login(name);
-        Assert.True((await user.GetAsync($"/api/prescriptions/visits/{visit.VisitId}/lines")).IsSuccessStatusCode);
+        Assert.True((await user.GetAsync($"/api/prescriptions/patients/{setup.PatientId}")).IsSuccessStatusCode);
         await Ok<DCMS.Application.Features.Examinations.ExaminationWorkspace>(await user.GetAsync($"/api/visits/{visit.VisitId}/examination"));
-        Assert.Equal(HttpStatusCode.Forbidden, (await user.PostAsJsonAsync($"/api/prescriptions/visits/{visit.VisitId}/lines", new { })).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await user.PostAsJsonAsync($"/api/prescriptions/patients/{setup.PatientId}", new { })).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await user.GetAsync("/api/reception/options")).StatusCode);
     }
 }

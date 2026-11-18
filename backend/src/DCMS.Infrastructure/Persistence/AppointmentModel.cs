@@ -1,3 +1,4 @@
+using DCMS.Domain.Features.Accounts;
 using DCMS.Domain.Features.Appointments;
 using DCMS.Domain.Features.Patients;
 using DCMS.Domain.Features.Scheduling;
@@ -10,33 +11,41 @@ internal static class AppointmentModel
 {
     public static void Configure(ModelBuilder model)
     {
+        model.Ignore<AppointmentBookingInfo>();
+        model.Ignore<AppointmentSupportRequest>();
+        model.Ignore<AppointmentReminder>();
+
         model.Entity<Appointment>(b =>
         {
-            b.ToTable("APPOINTMENT", t => t.HasCheckConstraint("CK_APPOINTMENT_RANGE", "\"StartAt\" < \"EndAt\" AND (\"AssistantId\" IS NULL OR \"AssistantId\" <> \"DentistId\")"));
-            b.Property(x => x.Code).HasMaxLength(40);
-            b.Property(x => x.BookerName).HasMaxLength(100);
-            b.Property(x => x.BookerPhone).HasMaxLength(24);
-            b.Property(x => x.BookerEmail).HasMaxLength(254);
-            b.Property(x => x.AttendeeName).HasMaxLength(100);
-            b.Property(x => x.AttendeeRelation).HasMaxLength(16);
-            b.Property(x => x.Kind).HasMaxLength(16);
-            b.Property(x => x.Source).HasMaxLength(24);
+            b.ToTable("APPOINTMENT", t =>
+            {
+                t.HasCheckConstraint("CK_APPOINTMENT_RANGE", "\"StartAt\" < \"EndAt\"");
+                t.HasCheckConstraint("CK_APPOINTMENT_Status", "\"Status\" IN ('Confirmed','CheckedIn','InProgress','Completed','Cancelled','NoShow')");
+            });
+            b.HasKey(x => x.Id);
+            b.Property(x => x.Code).HasMaxLength(40).IsRequired();
+            b.Property(x => x.AttendeeName).HasMaxLength(100).IsRequired();
+            b.Property(x => x.Kind).HasMaxLength(16).IsRequired();
+            b.Property(x => x.Source).HasMaxLength(24).IsRequired();
             b.Property(x => x.Reason).HasMaxLength(1000);
-            b.Property(x => x.ExceptionReason).HasMaxLength(500);
-            b.Property(x => x.Status).HasMaxLength(24);
-            b.Property(x => x.ConfirmedToAttend).HasMaxLength(16).HasDefaultValue("Pending");
-            b.Property(x => x.Version).IsConcurrencyToken(false);
-            b.Property(x => x.CancelReason).HasMaxLength(500);
-            b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.CancelledBy).OnDelete(DeleteBehavior.Restrict);
-            b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.PatientConsentConfirmedBy).OnDelete(DeleteBehavior.Restrict);
+            b.Property(x => x.Status).HasMaxLength(24).IsRequired();
+            b.Property(x => x.Version).IsConcurrencyToken();
+            b.ComplexProperty(x => x.BookingInfo, j => j.ToJson("BookingInfo"));
+            b.ComplexCollection(x => x.SupportRequests).ToJson();
+            b.ComplexCollection(x => x.Reminders).ToJson();
+
             b.HasIndex(x => x.Code).IsUnique();
-
             b.HasIndex(x => new { x.BranchId, x.StartAt });
-            b.HasIndex(x => x.FollowUpId).IsUnique().HasFilter("\"FollowUpId\" IS NOT NULL AND \"Status\" IN ('Confirmed','CheckedIn')");
+            b.HasIndex(x => new { x.StartAt, x.EndAt });
+            b.HasIndex(x => x.DossierId);
+            b.HasOne<DCMS.Domain.Features.Treatment.TreatmentDossier>().WithMany().HasForeignKey(x => x.DossierId).OnDelete(DeleteBehavior.Restrict);
+            b.HasIndex(x => new { x.BookerAccountId, x.FamilyMemberId, x.StartAt });
 
+            b.HasOne<SchedulingBranch>().WithMany().HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<EmployeeProfile>().WithMany().HasForeignKey(x => x.DentistId).HasPrincipalKey(x => x.Id).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<SchedulingService>().WithMany().HasForeignKey(x => new { x.ServiceId, x.BranchId }).HasPrincipalKey(x => new { x.Id, x.BranchId }).OnDelete(DeleteBehavior.Restrict);
             b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.BookerAccountId).OnDelete(DeleteBehavior.Restrict);
             b.HasOne<DCMS.Domain.Features.FamilyMembers.FamilyMember>().WithMany().HasForeignKey(x => x.FamilyMemberId).OnDelete(DeleteBehavior.Restrict);
-            b.HasIndex(x => new { x.BookerAccountId, x.FamilyMemberId, x.StartAt });
             b.HasOne<PatientProfile>().WithMany().HasForeignKey(x => x.PatientId).OnDelete(DeleteBehavior.Restrict);
         });
         model.Entity<AppointmentChange>(b =>
@@ -68,9 +77,13 @@ internal static class AppointmentModel
         });
         model.Entity<AppointmentOutboxEvent>(b =>
         {
-            b.Property(x => x.EventType).HasMaxLength(80);
-            b.Property(x => x.PayloadJson).HasColumnType("jsonb");
-            b.HasIndex(x => new { x.DispatchedAt, x.OccurredAt });
+            b.Ignore(x => x.PayloadJson);
+            b.Ignore(x => x.DispatchedAt);
+            b.Property(x => x.AggregateId).HasColumnName("AppointmentId");
+            b.Property(x => x.EventType).HasMaxLength(80).HasColumnName("Kind");
+            b.Property(x => x.Status).HasMaxLength(16).HasColumnName("Status");
+            b.Property(x => x.OccurredAt).HasColumnName("CreatedAt");
+            b.HasIndex(x => new { x.Status, x.OccurredAt }).HasFilter("\"NotificationRecordKind\" = 'AppointmentOutboxEvent'");
             b.HasOne<Appointment>().WithMany().HasForeignKey(x => x.AggregateId).OnDelete(DeleteBehavior.Restrict);
         });
 
@@ -94,19 +107,20 @@ internal static class AppointmentModel
         });
         model.Entity<InAppNotification>(b =>
         {
+            b.Ignore(x => x.RequestId);
+            b.Ignore(x => x.DeepLink);
+            b.Ignore(x => x.HasExternalFailure);
             b.Property(x => x.PublicId).HasMaxLength(40);
-            b.Property(x => x.Kind).HasMaxLength(40);
+            b.Property(x => x.Kind).HasMaxLength(80).HasColumnName("Kind");
             b.Property(x => x.Title).HasMaxLength(160);
             b.Property(x => x.Body).HasMaxLength(1000);
-            b.Property(x => x.DeepLink).HasMaxLength(300);
             b.Property(x => x.DedupeKey).HasMaxLength(160);
             b.HasIndex(x => x.PublicId).IsUnique();
             b.HasIndex(x => x.DedupeKey).IsUnique();
             b.HasIndex(x => new { x.AccountId, x.CreatedAt });
             b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.AccountId).OnDelete(DeleteBehavior.Restrict);
             b.HasOne<Appointment>().WithMany().HasForeignKey(x => x.AppointmentId).OnDelete(DeleteBehavior.Restrict);
-            // Columns shared with StaffHandlingItem rows of the same table.
-            b.Property(x => x.Kind).HasColumnName("Kind");
+            // Columns shared with StaffHandlingItem and AppointmentOutboxEvent rows of the same table.
             b.Property(x => x.BranchId).HasColumnName("BranchId");
             b.Property(x => x.AppointmentId).HasColumnName("AppointmentId");
             b.Property(x => x.CreatedAt).HasColumnName("CreatedAt");
@@ -114,11 +128,12 @@ internal static class AppointmentModel
         // Deliveries and staff handling items are row kinds of IN_APP_NOTIFICATION (docs/specs/NOTIFICATION-STORAGE.vi.md).
         model.Entity<NotificationDelivery>(b =>
         {
+            b.Ignore(x => x.LastAttemptAt);
             b.Property(x => x.NotificationId).HasColumnName("NotificationId");
             b.Property(x => x.Channel).HasMaxLength(16);
             b.Property(x => x.Status).HasMaxLength(16).HasColumnName("Status");
             b.Property(x => x.AttemptCount).HasColumnName("AttemptCount");
-            b.Property(x => x.LastError).HasMaxLength(1000);
+            b.Property(x => x.LastError).HasMaxLength(1000).HasColumnName("Error");
             b.HasIndex(x => new { x.Status, x.NextRetryAt }).HasFilter("\"NotificationRecordKind\" = 'NotificationDelivery'");
             b.HasIndex(x => new { x.NotificationId, x.Channel }).IsUnique().HasFilter("\"NotificationRecordKind\" = 'NotificationDelivery'");
             b.HasOne<InAppNotification>().WithMany(x => x.Deliveries).HasForeignKey(x => x.NotificationId).OnDelete(DeleteBehavior.Restrict);
@@ -135,12 +150,12 @@ internal static class AppointmentModel
         });
         model.Entity<StaffHandlingItem>(b =>
         {
-            b.Property(x => x.Kind).HasMaxLength(40).HasColumnName("Kind");
+            b.Property(x => x.Kind).HasMaxLength(80).HasColumnName("Kind");
             b.Property(x => x.BranchId).HasColumnName("BranchId");
             b.Property(x => x.AppointmentId).HasColumnName("AppointmentId");
             b.Property(x => x.NotificationId).HasColumnName("NotificationId");
             b.Property(x => x.AttemptCount).HasColumnName("AttemptCount");
-            b.Property(x => x.Error).HasMaxLength(1000);
+            b.Property(x => x.Error).HasMaxLength(1000).IsRequired(false).HasColumnName("Error");
             b.Property(x => x.Status).HasMaxLength(16).HasColumnName("Status");
             b.Property(x => x.CreatedAt).HasColumnName("CreatedAt");
             b.HasIndex(x => new { x.Status, x.CreatedAt }).HasFilter("\"NotificationRecordKind\" = 'StaffHandlingItem'");

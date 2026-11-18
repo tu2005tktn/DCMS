@@ -25,7 +25,7 @@ public sealed class TreatmentCatalogSeedTests(ApiFixture fixture) : IClassFixtur
         await db.SaveChangesAsync();
         await seeder.SeedAsync();
         var branch = await db.Set<SchedulingBranch>().SingleAsync(x => x.Name == "S09 - Chi nhánh thử nghiệm");
-        var plans = await db.TreatmentTemplates.Where(x => x.BranchId == branch.Id && x.DefinitionKind == "ItemPlan" && x.DeletedAt == null).ToListAsync();
+        var plans = await db.TreatmentTemplates.Where(x => x.BranchId == branch.Id && x.DeletedAt == null).ToListAsync();
         Assert.Equal(17, plans.Count);
         var serviceIds = await db.Set<SchedulingService>().Where(x => x.BranchId == branch.Id).Select(x => x.Id).ToListAsync();
         foreach (var plan in plans)
@@ -43,6 +43,6 @@ public sealed class TreatmentCatalogSeedTests(ApiFixture fixture) : IClassFixtur
         var second = await seeder.SeedAsync();
         Assert.Contains("Dịch vụ: thêm 0", second); Assert.Contains("Kế hoạch: thêm 1", second);
         Assert.Equal(123_000, (await db.Set<SchedulingService>().AsNoTracking().SingleAsync(x => x.Id == service.Id)).ReferenceUnitPriceVnd);
-        Assert.Equal(17, await db.TreatmentTemplates.AsNoTracking().CountAsync(x => x.BranchId == branch.Id && x.DefinitionKind == "ItemPlan" && x.DeletedAt == null));
+        Assert.Equal(17, await db.TreatmentTemplates.AsNoTracking().CountAsync(x => x.BranchId == branch.Id && x.DeletedAt == null));
     }
 }

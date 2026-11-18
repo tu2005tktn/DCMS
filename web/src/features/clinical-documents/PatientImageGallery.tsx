@@ -77,7 +77,7 @@ export default function PatientImageGallery({ patientId, dossierId, canUpload = 
     }
     setSelectionError(undefined);
     const added: UploadRow[] = files.map(file => ({ id: newRequestKey(), file, state: 'uploading', progress: 0,
-      metadata: { patientId, dossierId, visitId: null, planId: null, documentType: 'Other', source: 'Clinic',
+      metadata: { patientId, dossierId, visitId: null, documentType: 'Other', source: 'Clinic',
         sourceDate: new Date(Date.now() + 7 * 3600000).toISOString().slice(0, 10), description: '', requestKey: newRequestKey() } }));
     setRows(rs => [...rs.filter(r => r.state !== 'done'), ...added]);
     const batchGeneration = generation.current;

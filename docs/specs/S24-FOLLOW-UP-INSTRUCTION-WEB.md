@@ -1,5 +1,7 @@
 # S24 — Ghi chỉ định quay lại & chuyển đặt lịch (Web)
 
+> Cập nhật 18/11/2026: hướng dẫn tái khám (`FollowUpInstruction`, `/api/follow-up-instructions`) đã bị xóa. Lịch hẹn tiếp theo gắn với phiếu điều trị qua `APPOINTMENT.DossierId` (thay `FollowUpId`) và được gợi ý từ hạng mục kế hoạch gần nhất còn chờ của phiếu. Các phần bên dưới nói về hướng dẫn tái khám là lịch sử thiết kế. Xem [FOLLOW-UP-INSTRUCTION-REMOVAL.vi.md](FOLLOW-UP-INSTRUCTION-REMOVAL.vi.md).
+
 Nguồn: task DCMS-92 (Tống Nguyên Tuấn, Epic DCMS-92) trích từ DCMS_Screen_Specifications_v2.2.docx và DCMS_Use_Cases_Business_Rules_Messages_v2.2.docx (19/10/2026), cùng [TREATMENT-PROGRESSION.vi.md](TREATMENT-PROGRESSION.vi.md) — đặc tả backend UC-17/GBR-129–135/AT37 của Vinh. Backend instruction/booking port thuộc DCMS-97 (Vinh) và **đã có trong nhánh này** (`/api/follow-up-instructions`, `FollowUpAppointmentPort`); task này chỉ dựng UI/UX và gọi API thật.
 
 ## 1. Luồng

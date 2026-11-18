@@ -54,9 +54,9 @@ public sealed partial class ReferenceCatalogService(DcmsDbContext db, UserManage
             "Active" => query.Where(x => x.IsActive), "Inactive" => query.Where(x => !x.IsActive), "All" => query,
             _ => throw Error("MSG04", label: "Trạng thái", field: "status")
         };
-        if (term.Length > 0) query = query.Where(x => x.NormalizedName.Contains(term) || (x.Code != null && x.Code.Contains(term)));
+        if (term.Length > 0) query = query.Where(x => x.Name.ToUpper().Contains(term) || (x.Code != null && x.Code.Contains(term)));
         var total = await query.CountAsync(ct);
-        var rows = await query.OrderBy(x => x.NormalizedName).ThenBy(x => x.Id).Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(ct);
+        var rows = await query.OrderBy(x => x.Name.ToUpper()).ThenBy(x => x.Id).Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(ct);
         return new(await DtosAsync(rows, ct), total, page, pageSize);
     }
 
@@ -71,8 +71,7 @@ public sealed partial class ReferenceCatalogService(DcmsDbContext db, UserManage
         {
             var (code, name, description) = Validate(Kind(kind), request.Entry);
             await UniqueAsync(kind, code, name, null, ct);
-            var row = new ReferenceEntry { Kind = kind, Code = code, Name = name, NormalizedName = name.ToUpperInvariant(), Description = description,
-                CreatedAt = now, CreatedBy = actorId, UpdatedAt = now, UpdatedBy = actorId };
+            var row = new ReferenceEntry { Kind = kind, Code = code, Name = name, Description = description };
             db.ReferenceEntries.Add(row);
             return (row, new Change(null, null));
         }, ct);
@@ -87,8 +86,8 @@ public sealed partial class ReferenceCatalogService(DcmsDbContext db, UserManage
             if (code == row.Code && name == row.Name && description == row.Description) throw new BusinessException(400, GeneralSettingsMessages.NoChange);
             await UniqueAsync(kind, code, name, id, ct);
             var before = await DtoAsync(row, ct);
-            row.Code = code; row.Name = name; row.NormalizedName = name.ToUpperInvariant(); row.Description = description;
-            Touch(row, actorId, now);
+            row.Code = code; row.Name = name; row.Description = description;
+            row.Version++;
             return (row, new Change(reason, before));
         }, ct);
 
@@ -113,7 +112,7 @@ public sealed partial class ReferenceCatalogService(DcmsDbContext db, UserManage
             if (!request.Active && row.IsReserved) throw new BusinessException(409, ReferenceMessages.Reserved);
             var before = await DtoAsync(row, ct);
             row.IsActive = request.Active;
-            Touch(row, actorId, now);
+            row.Version++;
             return (row, new Change(reason, before));
         }, ct);
 
@@ -151,8 +150,8 @@ public sealed partial class ReferenceCatalogService(DcmsDbContext db, UserManage
         if (search?.Length > 100) throw Error("MSG03", label: "Từ khóa", max: 100);
         var term = search?.Trim().Normalize(NormalizationForm.FormC).ToUpperInvariant() ?? "";
         return await db.ReferenceEntries.AsNoTracking()
-            .Where(x => x.Kind == kind && x.IsActive && (term == "" || x.NormalizedName.Contains(term) || (x.Code != null && x.Code.Contains(term))))
-            .OrderBy(x => x.NormalizedName).ThenBy(x => x.Id).Take(kind == ReferenceKinds.Diagnoses ? 500 : 50)
+            .Where(x => x.Kind == kind && x.IsActive && (term == "" || x.Name.ToUpper().Contains(term) || (x.Code != null && x.Code.Contains(term))))
+            .OrderBy(x => x.Name.ToUpper()).ThenBy(x => x.Id).Take(kind == ReferenceKinds.Diagnoses ? 500 : 50)
             .Select(x => new ReferenceOption(x.Id, x.Code, x.Name, x.Version)).ToArrayAsync(ct);
     }
 
@@ -162,15 +161,31 @@ public sealed partial class ReferenceCatalogService(DcmsDbContext db, UserManage
         var dentist = effective.Contains(AccountRoles.Dentist);
         if (kind == "medicines" ? !dentist : !(dentist || effective.Contains(AccountRoles.ClinicAssistant))) throw Error("MSG06", 403);
         var term = search?.Trim().Normalize(NormalizationForm.FormC).ToUpperInvariant() ?? "";
+        if (kind == "medicines")
+        {
+            var medicines = db.CatalogMedicines.AsNoTracking().Where(x => x.IsActive && x.PrescriptionEligible);
+            if (term.Length > 0)
+            {
+                var like = $"%{term.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_")}%";
+                medicines = medicines.Where(x => EF.Functions.ILike(x.Name, like) || EF.Functions.ILike(x.Code, like));
+            }
+            return await medicines.OrderBy(x => x.Name.ToUpper()).ThenBy(x => x.Id).Take(50)
+                .Select(x => new ReferenceOption(x.Id, x.Code, x.Name, x.Version)).ToArrayAsync(ct);
+        }
         IQueryable<SupplyEntity> query = kind switch
         {
             "suppliers" => db.CatalogProviders.Where(x => x.Type != ProviderTypes.Lab),
             "lab-providers" => db.CatalogProviders.Where(x => x.Type != ProviderTypes.Supplier),
-            "lab-work-types" => db.LabWorkTypes,
-            _ => db.CatalogMedicines.Where(x => x.PrescriptionEligible)
+            _ => db.LabWorkTypes
         };
-        return await query.AsNoTracking().Where(x => x.IsActive && (term == "" || x.NormalizedName.Contains(term) || x.Code.Contains(term)))
-            .OrderBy(x => x.NormalizedName).ThenBy(x => x.Id).Take(50).Select(x => new ReferenceOption(x.Id, x.Code, x.Name, x.Version)).ToArrayAsync(ct);
+        query = query.AsNoTracking().Where(x => x.IsActive);
+        if (term.Length > 0)
+        {
+            var like = $"%{term.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_")}%";
+            query = query.Where(x => EF.Functions.ILike(x.Name, like) || EF.Functions.ILike(x.Code, like));
+        }
+        return await query.OrderBy(x => x.Name.ToUpper()).ThenBy(x => x.Id).Take(50)
+            .Select(x => new ReferenceOption(x.Id, x.Code, x.Name, x.Version)).ToArrayAsync(ct);
     }
 
     private async Task<ReferenceEntryDto> Command(int actorId, string kind, string action, Guid key, string command, object request,
@@ -234,11 +249,9 @@ public sealed partial class ReferenceCatalogService(DcmsDbContext db, UserManage
         var normalized = name.ToUpperInvariant();
         if (code != null && await db.ReferenceEntries.AnyAsync(x => x.Kind == kind && x.Id != except && x.Code == code, ct))
             throw new BusinessException(409, ReferenceMessages.DuplicateCode);
-        if (await db.ReferenceEntries.AnyAsync(x => x.Kind == kind && x.Id != except && x.NormalizedName == normalized, ct))
+        if (await db.ReferenceEntries.AnyAsync(x => x.Kind == kind && x.Id != except && x.Name.ToUpper() == normalized, ct))
             throw new BusinessException(409, ReferenceMessages.DuplicateName);
     }
-
-    private static void Touch(ReferenceEntry row, int actorId, DateTimeOffset now) { row.Version++; row.UpdatedAt = now; row.UpdatedBy = actorId; }
 
     private async Task<ReferenceEntry> RowAsync(string kind, Guid id, bool tracked, CancellationToken ct) =>
         await (tracked ? db.ReferenceEntries : db.ReferenceEntries.AsNoTracking()).SingleOrDefaultAsync(x => x.Id == id && x.Kind == kind, ct)
@@ -248,12 +261,8 @@ public sealed partial class ReferenceCatalogService(DcmsDbContext db, UserManage
 
     private async Task<ReferenceEntryDto[]> DtosAsync(IReadOnlyList<ReferenceEntry> rows, CancellationToken ct)
     {
-        var ids = rows.SelectMany(x => new[] { x.CreatedBy, x.UpdatedBy }).OfType<int>().Distinct().ToArray();
-        var names = await db.Users.AsNoTracking().Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.FullName, ct);
-        string Name(int? id) => id is { } value && names.TryGetValue(value, out var name) ? name : "Hệ thống";
         var counts = await PatientCountsAsync(rows, ct);
         return rows.Select(x => new ReferenceEntryDto(x.Id, x.Kind, x.Code, x.Name, x.Description, x.IsReserved, x.IsActive, x.Version,
-            x.CreatedAt, Name(x.CreatedBy), x.UpdatedAt, Name(x.UpdatedBy),
             PatientKinds.Contains(x.Kind) ? counts.GetValueOrDefault(x.Id) : null)).ToArray();
     }
 
@@ -270,7 +279,7 @@ public sealed partial class ReferenceCatalogService(DcmsDbContext db, UserManage
                 SELECT "SourceId" AS ref FROM "PATIENT_PROFILE" WHERE NOT "IsArchived"
                 UNION ALL SELECT "CustomerGroupId" FROM "PATIENT_PROFILE" WHERE NOT "IsArchived"
                 UNION ALL SELECT "OccupationId" FROM "PATIENT_PROFILE" WHERE NOT "IsArchived"
-                UNION ALL SELECT unnest("IntakeHistoryIds") FROM "PATIENT_PROFILE" WHERE NOT "IsArchived") used
+                UNION ALL SELECT jsonb_array_elements_text(COALESCE("Details"->'IntakeHistoryIds', '[]'::jsonb))::uuid FROM "PATIENT_PROFILE" WHERE NOT "IsArchived") used
             WHERE ref = ANY({ids}) GROUP BY ref
             """).ToListAsync(ct);
         return usage.ToDictionary(x => x.Id, x => x.Count);

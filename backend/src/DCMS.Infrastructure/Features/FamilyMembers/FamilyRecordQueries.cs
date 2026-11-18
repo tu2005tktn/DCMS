@@ -56,32 +56,38 @@ public sealed partial class FamilyRecordService
         if (scope == "Examinations") {
             var query = from v in db.Visits.AsNoTracking() join e in db.Set<VisitExamination>().AsNoTracking() on v.Id equals e.VisitId
                 join dentist in db.Employees on v.DentistId equals dentist.Id join b in db.Set<SchedulingBranch>() on v.BranchId equals b.Id
-                where v.PatientId == row.PatientId && v.BranchId == row.BranchId && e.Confirmed && v.Status != "Cancelled"
+                where v.PatientId == row.PatientId && v.BranchId == row.BranchId && DCMS.Domain.Features.Visits.VisitStatuses.HasConfirmedExamination.Contains(v.Status)
                 orderby v.ArrivalAt descending, v.Id select new { v.Id, v.ArrivalAt, DentistName = dentist.FullName, BranchName = b.Name, e.ContentJson };
             total = await query.CountAsync(ct);
             items = (await query.Skip(skip).Take(pageSize).ToArrayAsync(ct)).Select(x => {
-                var content = JsonSerializer.Deserialize<ExaminationContent>(x.ContentJson, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+                var content = DCMS.Infrastructure.Features.Examinations.ExaminationService.WithDerivedDiagnoses(JsonSerializer.Deserialize<ExaminationContent>(x.ContentJson, new JsonSerializerOptions(JsonSerializerDefaults.Web))!);
                 return (object)new FamilyExaminationDto(x.Id, x.ArrivalAt, x.DentistName, x.BranchName, content?.Symptoms,
                     content?.Diagnoses?.ToArray() ?? (string.IsNullOrWhiteSpace(content?.Diagnosis) ? [] : [content.Diagnosis]), content?.Conclusion, content?.Advice);
             }).ToArray();
         } else if (scope == "Treatment") {
             var query = db.TreatmentDossiers.AsNoTracking().Include(x => x.Items).Where(x => x.PatientId == row.PatientId
-                && x.BranchId == row.BranchId && x.PlanState == "Committed" && x.State != "Deleted");
+                && x.BranchId == row.BranchId && x.State != "Deleted" && x.Items.Any());
             total = await query.CountAsync(ct);
             items = (await query.OrderByDescending(x => x.StartedOn).ThenBy(x => x.Id).Skip(skip).Take(pageSize).ToArrayAsync(ct))
                 .Select(x => (object)new FamilyTreatmentDto(x.Id, x.Code, x.Diagnosis, x.State, x.StartedOn,
-                    x.Items.Where(i => i.Decision == "Agreed" && !i.SheetDeleted && !i.HiddenFromSheet).OrderBy(i => i.PlannedOrder)
-                        .Select(i => new FamilyTreatmentItem(i.ServiceName, i.Region, i.Progress, i.EstimatedStart, i.EstimatedEnd)).ToArray())).ToArray();
+                    x.Items.OrderBy(i => i.PlannedOrder)
+                        .Select(i => new FamilyTreatmentItem(i.ServiceName, i.Region, i.DisplayCompleted ? "Completed" : "Planned", i.EstimatedStart, null)).ToArray())).ToArray();
         } else if (scope == "Prescriptions") {
-            var query = db.Set<ExternalPrescription>().AsNoTracking().Where(x => x.PatientId == row.PatientId
-                && x.BranchId == row.BranchId && x.Status == PrescriptionStatuses.Finalized);
+            var query = from p in db.PatientPrescriptions.AsNoTracking()
+                join e in db.Employees.AsNoTracking() on p.PrescriberEmployeeId equals e.Id
+                where p.PatientId == row.PatientId && p.BranchId == row.BranchId
+                orderby p.PrescribedOn descending, p.CreatedAt descending, p.Id
+                select new { Prescription = p, PrescriberName = e.FullName };
             total = await query.CountAsync(ct);
-            var prescriptions = await query.OrderByDescending(x => x.FinalizedAt).ThenBy(x => x.Id).Skip(skip).Take(pageSize).ToArrayAsync(ct);
-            var ids = prescriptions.Select(x => x.Id).ToArray();
-            var lines = prescriptions.SelectMany(x => x.Lines).ToArray();
-            items = prescriptions.Select(x => (object)new FamilyPrescriptionDto(x.Id, x.VisitId, x.FinalizedAt, x.Diagnosis, x.GeneralAdvice,
-                lines.Where(l => l.PrescriptionId == x.Id).Select(l => new FamilyMedicineDto(l.MedicineName, l.Strength, l.Unit, l.Quantity,
-                    l.Route, l.MorningDose, l.NoonDose, l.AfternoonDose, l.EveningDose, l.MealTiming, l.Days, l.Instructions)).ToArray())).ToArray();
+            var prescriptions = await query.Skip(skip).Take(pageSize).ToArrayAsync(ct);
+            items = prescriptions.Select(x => (object)new FamilyPrescriptionDto(
+                x.Prescription.Id, x.Prescription.PrescribedOn, x.PrescriberName,
+                string.IsNullOrWhiteSpace(x.Prescription.OtherDiagnosis) ? x.Prescription.Diagnosis
+                    : string.IsNullOrWhiteSpace(x.Prescription.Diagnosis) ? x.Prescription.OtherDiagnosis
+                    : $"{x.Prescription.Diagnosis}; {x.Prescription.OtherDiagnosis}",
+                x.Prescription.Advice,
+                x.Prescription.Items.OrderBy(i => i.Position)
+                    .Select(i => new FamilyMedicineDto(i.MedicineName, i.Strength, i.Unit, i.Quantity, i.Instructions)).ToArray())).ToArray();
         } else {
             var query = Documents(row);
             total = await query.CountAsync(ct);
@@ -97,8 +103,9 @@ public sealed partial class FamilyRecordService
         && (d.DocumentType == "XRay" || d.DocumentType == "IntraoralPhoto" || d.DocumentType == "LabResult" || d.DocumentType == "Referral" || d.DocumentType == "ConsentForm")
         && (d.VisitId != null
             ? db.Visits.Any(v => v.Id == d.VisitId && v.PatientId == row.PatientId && v.BranchId == row.BranchId && v.Status != "Cancelled"
-                && db.Set<VisitExamination>().Any(e => e.VisitId == v.Id && e.Confirmed))
-            : db.TreatmentDossiers.Any(t => t.Id == d.DossierId && t.PatientId == row.PatientId && t.BranchId == row.BranchId && t.PlanState == "Committed" && t.State != "Deleted")));
+                && DCMS.Domain.Features.Visits.VisitStatuses.HasConfirmedExamination.Contains(v.Status) && db.Set<VisitExamination>().Any(e => e.VisitId == v.Id))
+            : db.TreatmentDossiers.Any(t => t.Id == d.DossierId && t.PatientId == row.PatientId && t.BranchId == row.BranchId
+                && t.State != "Deleted" && t.Items.Any())));
 
     public async Task<DocumentContent> DocumentAsync(int actor, Guid memberId, Guid documentId, CancellationToken ct)
     {

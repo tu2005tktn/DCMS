@@ -19,7 +19,6 @@ type Draft = { id: string; kind: 'Plan' | 'Actual'; row: SheetActualPreview; ver
 type Editor = { kind: 'plan' | 'actual'; row?: SheetActualPreview; itemId?: string; activity?: SheetActivity; transferItemId?: string };
 const date = (v: string) => new Date(v).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
 const fees: Record<string, string> = { Pending: 'Chưa ghi nhận phí', Posted: 'Đã ghi nhận phí', Included: 'Đã bao gồm', Free: 'Miễn phí', NotRequested: 'Chưa yêu cầu phí', NeedsRule: 'Chờ quy tắc phí gói', NeedsAdjustment: 'Chờ điều chỉnh phí' };
-const included = (i: TreatmentItem) => !i.sheetDeleted && !i.hiddenFromSheet && (i.entrySource === 'ClinicianEntry' || i.decision === 'Agreed');
 
 export default function TreatmentSheet({ patientId, dossierId, dossierVersion, options, onLoaded, onPlanTotalChange, onUnsavedChange }: {
   patientId: number; dossierId: string; dossierVersion: number; visitId?: string; options: AppointmentOptions | null;
@@ -56,7 +55,7 @@ export default function TreatmentSheet({ patientId, dossierId, dossierVersion, o
   }
   function accept({ value, ctx, rows }: Awaited<ReturnType<typeof load>>) {
     setDossier(value); setContext(ctx); setDrafts(rows.map(r => ({ ...r, row: { ...r.row, id: r.id, draftVersion: r.version } })));
-    onLoaded(value); onPlanTotalChange?.(value.id, value.items.filter(included).reduce((s,i) => s + Math.round(i.quantity * i.agreedUnitPriceVnd) - (i.discount?.status === 'Approved' ? i.discount.amountVnd : 0), 0));
+    onLoaded(value); onPlanTotalChange?.(value.id, value.items.reduce((s,i) => s + Math.round(i.quantity * i.agreedUnitPriceVnd) - (i.discount?.amountVnd ?? 0), 0));
     if (!noteDirty.current) { setNote(value.note ?? ''); noteSaved.current = value.note ?? ''; }
   }
   useEffect(() => { let live = true; setError(undefined); void load().then(v => { if (live) accept(v); }).catch(e => { if (live) setError(e.message); }); return () => { live = false; }; }, [dossierId, dossierVersion, reload, patientId]);
@@ -107,8 +106,7 @@ export default function TreatmentSheet({ patientId, dossierId, dossierVersion, o
         write.current.saved = saved.version;
       }
       await api(`/api/dossiers/${dossierId}/sheet-drafts/${row.id}/confirm-${kind}`, { method: 'POST', body: JSON.stringify({
-        expectedVersion: dossier.version, expectedDraftVersion: write.current.saved, requestKey: key, decision: null,
-        visitId: null, expectedVisitVersion: 0, outcome: row.note ?? '', chargingBasis: 'Separate', completeItem: false, directDecision: null,
+        expectedVersion: dossier.version, expectedDraftVersion: write.current.saved, requestKey: key,
       }) });
     }
     setEditor(null); write.current = null; refresh();
@@ -156,7 +154,7 @@ export default function TreatmentSheet({ patientId, dossierId, dossierVersion, o
       }
       const result = await api<{ dossier: TreatmentDossier }>(`/api/dossiers/${dossierId}/sheet-drafts/${attempt.row.id}/confirm-plan`, { method: 'POST',
         body: JSON.stringify({ expectedVersion: attempt.expected, expectedDraftVersion: attempt.saved,
-          requestKey: attempt.confirmKey, decision: null }) });
+          requestKey: attempt.confirmKey }) });
       accept({ value: result.dossier, ctx: context, rows: drafts.filter(d => d.id !== attempt.row.id) });
       copying.current = null; refresh();
     } catch (e) { setCopyError({ message: (e as Error).message, stale: e instanceof ApiError && e.code === 'MSG111' }); }
@@ -201,7 +199,7 @@ export default function TreatmentSheet({ patientId, dossierId, dossierVersion, o
       discountValue: activity.sheetDiscountValue ?? activity.discountSnapshotVnd ?? 0, discountNote: activity.sheetDiscountReason };
   }
   function beginTransfer(item: TreatmentItem) {
-    const existing = activities?.items.find(a => a.itemId === item.id && a.sourceKind === 'Dossier');
+    const existing = activities?.items.find(a => a.itemId === item.id);
     if (existing) { editActivity(existing); return; }
     setEditor({ kind: 'actual', transferItemId: item.id, row: { id: crypto.randomUUID(), sourceItemId: item.id,
       date: new Intl.DateTimeFormat('sv-SE', {timeZone:'Asia/Ho_Chi_Minh'}).format(new Date()), serviceId: item.serviceId,
@@ -209,7 +207,7 @@ export default function TreatmentSheet({ patientId, dossierId, dossierVersion, o
       dentistId: item.responsibleDentistId ?? dossier!.dentistId, dentistName: '', assistantId: item.assistantId,
       note: item.note ?? undefined, costVnd: Math.round(item.quantity * item.agreedUnitPriceVnd),
       unitPriceVnd: item.agreedUnitPriceVnd, discountType: item.discount?.type === 'Percent' ? 'Percent' : 'VND',
-      discountValue: item.discount?.status === 'Approved' ? item.discount.value : 0, discountNote: item.discount?.reason } });
+      discountValue: item.discount?.value ?? 0, discountNote: item.discount?.reason } });
   }
   async function deleteActivity(activity: SheetActivity) {
     if (!dossier || actionGuard.current) return false;
@@ -233,13 +231,13 @@ export default function TreatmentSheet({ patientId, dossierId, dossierVersion, o
     } catch (e) { setNoteError((e as Error).message); } finally { setNoteBusy(false); }
   }
   if (!dossier || !context) return error ? <Alert type="error" message={error} action={<Button onClick={refresh}>Thử lại</Button>} /> : <Skeleton active />;
-  const items = dossier.items.filter(i => !i.sheetDeleted && !i.hiddenFromSheet);
+  const items = dossier.items;
   const planRows = [
     ...items.map((item,index)=>({id:item.id,day:item.estimatedStart?.slice(0,10) ?? '',order:item.plannedOrder ?? index,item,draft:null as Draft|null})),
     ...drafts.filter(d=>d.kind==='Plan').map(draft=>({id:draft.id,day:draft.row.date?.slice(0,10) ?? '',order:1000000,item:null as TreatmentItem|null,draft}))
-  ].sort((a,b)=>a.day===b.day ? a.order-b.order || a.id.localeCompare(b.id) : !a.day ? 1 : !b.day ? -1 : a.day.localeCompare(b.day));  const gross = items.filter(included).reduce((s,i) => s + Math.round(i.quantity * i.agreedUnitPriceVnd), 0);
-  const discount = items.filter(included).reduce((s,i) => s + (i.discount?.status === 'Approved' ? i.discount.amountVnd : 0), 0);
-  const canPay = dossier.id === dossierId && dossier.state === 'Open' && items.some(included) && (activities?.total ?? 0) > 0
+  ].sort((a,b)=>a.day===b.day ? a.order-b.order || a.id.localeCompare(b.id) : !a.day ? 1 : !b.day ? -1 : a.day.localeCompare(b.day));  const gross = items.reduce((s,i) => s + Math.round(i.quantity * i.agreedUnitPriceVnd), 0);
+  const discount = items.reduce((s,i) => s + (i.discount?.amountVnd ?? 0), 0);
+  const canPay = dossier.id === dossierId && dossier.state === 'Open' && items.length > 0 && (activities?.total ?? 0) > 0
     && billableService?.dossierId === dossierId && billableService.available;
   const member = (id?: number | null) => context.members.find(m => m.id === id)?.name ?? '—';
   const canWrite = context.allowedActions.includes('Draft');
@@ -253,7 +251,7 @@ export default function TreatmentSheet({ patientId, dossierId, dossierVersion, o
       ? <Button disabled={busy} onClick={() => void reloadCopy()}>Đọc lại phiên bản sao chép</Button>
       : <Button disabled={busy} onClick={() => void copyItem()}>Thử lại sao chép</Button>} />}
     <div className="treatment-sheet-tools">
-      {dossier.sourceExaminationId && <Link to={`/visits/${dossier.sourceExaminationId}`}>Mở nguồn khám</Link>}</div>
+      {dossier.sourceExaminationVisitId && <Link to={`/visits/${dossier.sourceExaminationVisitId}`}>Mở nguồn khám</Link>}</div>
     <h2 className="treatment-sheet-print-title">Phiếu điều trị {dossier.code}</h2>
     <section><div className="treatment-sheet-band"><div className="treatment-sheet-band-title"><h3>KẾ HOẠCH ĐIỀU TRỊ/DỊCH VỤ</h3><Button size="small" disabled={!has('treatment.items.create') || !has('treatment.templates.read') || !canWrite || !!editor || busy || noteBusy} title={editor ? 'Lưu hoặc hủy hàng đang nhập trước khi chọn kế hoạch.' : undefined} onClick={() => setSelectPlan(true)}>Kế hoạch điều trị</Button></div><div><span>Tổng dự toán: {money(gross)}</span><span>Giảm giá: {money(discount)}</span><strong>Thành tiền: {money(gross-discount)}</strong></div></div>
       <div className="treatment-sheet-table-scroll"><table className="treatment-sheet-table treatment-sheet-plan-table"><thead><tr>
@@ -262,7 +260,7 @@ export default function TreatmentSheet({ patientId, dossierId, dossierVersion, o
       </tr></thead><tbody>{planRows.map(entry => { if ((entry.item && entry.id===editor?.itemId) || (entry.draft && entry.id===editor?.row?.id)) return rowEditor('plan'); if(entry.draft){const d=entry.draft;return <tr key={d.id}><td>{d.row.date || '—'}</td><td>{d.row.regions?.join(', ')}</td><td>{d.row.serviceName}<small>Nháp</small></td><td>{d.row.estimatedMinutes ?? '—'}</td><td>{d.row.note}</td><td>{member(d.row.dentistId)}</td><td>{money(d.row.costVnd)}</td><td>—</td><td><Button size="small" disabled={!has('treatment.items.create')} onClick={() => setEditor({ kind:'plan',row:d.row })}>Sửa nháp</Button></td></tr>;}const item=entry.item!;return <tr key={item.id} className={item.displayCompleted ? 'treatment-sheet-row-completed' : undefined}>
         <td>{item.estimatedStart ? date(item.estimatedStart) : '—'}</td><td>{item.region || '—'}</td><td>{item.serviceName}</td><td>{item.estimatedMinutes ?? '—'}</td><td>{item.note || '—'}</td>
         <td>{member(item.responsibleDentistId ?? dossier.dentistId)}<small>{member(item.assistantId)}</small></td>
-        <td>{money(Math.round(item.quantity*item.agreedUnitPriceVnd))}</td><td>{item.discount?.status === 'Approved' ? money(item.discount.amountVnd) : '—'}</td>
+        <td>{money(Math.round(item.quantity*item.agreedUnitPriceVnd))}</td><td>{item.discount ? money(item.discount.amountVnd) : '—'}</td>
         <td><Dropdown trigger={['click']} menu={{ items: [
           { key: 'perform', label: 'Thực hiện', disabled: !has('treatment.actuals.create') || !canWrite || busy || !!editor, onClick: () => beginTransfer(item) },
           { key: 'complete', label: item.displayCompleted ? 'Bỏ hoàn tất' : 'Hoàn tất', disabled: !has('treatment.items.update') || !canWrite || busy || !!editor, onClick: () => void act(item,'mark') },

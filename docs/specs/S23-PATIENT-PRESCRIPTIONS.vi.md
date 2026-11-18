@@ -1,5 +1,7 @@
 # S23 — Kê đơn trực tiếp từ hồ sơ bệnh nhân
 
+Cập nhật lưu trữ 18/11/2026: bảng `PRESCRIPTION` rút gọn còn **11 cột** (`PatientPrescription`, loại bỏ hai nhánh cũ `ExternalPrescription` và `PrescriptionTemplate` cùng 22 cột dư) và `CATALOG_MEDICINE` rút gọn còn **10 cột** (đóng gói `ActiveIngredient`, `Strength`, `DosageForm`, `Packaging`, `Instructions` vào `Spec` JSONB, bỏ audit trùng và `Route`/`Contraindications`/`AllergyWarnings`), giữ nguyên toàn bộ luồng kê đơn trực tiếp S23 và API bệnh nhân/nhân viên. Xem [rút gọn bảng PRESCRIPTION và CATALOG_MEDICINE](PRESCRIPTION-AND-MEDICINE-TABLE-SIMPLIFICATION.vi.md).
+
 Cập nhật lưu trữ 12/11/2026 theo [hợp đồng rút gọn database](DATABASE-SIMPLIFICATION.vi.md). Đơn lưu một dòng trong `PRESCRIPTION`; `Items` JSONB chứa ID dòng, ID thuốc, snapshot và thứ tự. Danh mục thuốc dùng chung `CATALOG_MEDICINE`. Các route và DTO bên dưới tiếp tục áp dụng.
 
 Cập nhật 09/11/2026: form kê đơn dạng "tờ đơn thuốc", chọn bác sĩ kê đơn, context phòng khám, mobile hiển thị cùng bố cục và dữ liệu demo đơn thuốc.

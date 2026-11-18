@@ -19,8 +19,8 @@ public sealed class InvestigationService(DcmsDbContext db, ClinicalAccess access
         var dentist = await access.BranchAsync(actorId, visit.BranchId, false, ct);
         var grants = (await permissions.ResolveAsync(actorId, ct)).Permissions;
         var own = await db.Employees.AnyAsync(x => x.Id == visit.DentistId && x.AccountId == actorId, ct);
-        var active = visit.Status == VisitStatuses.InProgress;
-        var confirmed = await db.Set<VisitExamination>().AnyAsync(x => x.VisitId == visitId && x.Confirmed, ct);
+        var active = VisitStatuses.Open.Contains(visit.Status);
+        var confirmed = VisitStatuses.HasConfirmedExamination.Contains(visit.Status);
         var rows = await db.Investigations.AsNoTracking().Where(x => x.VisitId == visitId).OrderBy(x => x.CreatedAt).ThenBy(x => x.Id).ToArrayAsync(ct);
         var users = await db.Users.Where(x => rows.Select(r => r.CreatedBy).Contains(x.Id)
             || rows.Select(r => r.ResultBy).Contains(x.Id) || rows.Select(r => r.ReviewedBy).Contains(x.Id))
@@ -29,7 +29,7 @@ public sealed class InvestigationService(DcmsDbContext db, ClinicalAccess access
         var items = new List<InvestigationDto>();
         foreach (var row in rows) {
             var files = new List<DocumentDto>();
-            foreach (var id in await db.Set<ClinicalDocument>().AsNoTracking().Where(x => x.InvestigationId == row.Id).OrderBy(x => x.UploadedAt).Select(x => x.Id).ToArrayAsync(ct))
+            foreach (var id in await db.Set<ClinicalDocument>().AsNoTracking().Where(x => x.Metadata.InvestigationId == row.Id).OrderBy(x => x.UploadedAt).Select(x => x.Id).ToArrayAsync(ct))
                 files.Add(await documents.DetailAsync(actorId, id, ct));
             var actions = new List<string>();
             if (active && row.State == "Ordered" && (!dentist || own)) {
@@ -74,11 +74,11 @@ public sealed class InvestigationService(DcmsDbContext db, ClinicalAccess access
             await tx.CommitAsync(ct); return await ListAsync(actorId, visitId, ct);
         }
         if (visit.Version != expectedVisit || row != null && row.Version != expectedOrder) throw Error("MSG111",409);
-        if (visit.Status != VisitStatuses.InProgress) throw Error("MSG42",409);
+        if (!VisitStatuses.Open.Contains(visit.Status)) throw Error("MSG42",409);
         int? sourceExaminationVersion = null; string? amendmentReason = null;
         var before = row == null ? "{}" : JsonSerializer.Serialize(row, ExaminationService.Json);
         if (payload is CreateInvestigation create) {
-            if (await db.Set<VisitExamination>().AnyAsync(x => x.VisitId == visitId && x.Confirmed, ct)) {
+            if (visit.Status == VisitStatuses.ExaminationConfirmed) {
                 if (string.IsNullOrWhiteSpace(create.AmendmentReason) || create.AmendmentReason.Length > 1000)
                     throw new BusinessException(400,SystemMessages.Get("MSG02",field:"lý do bổ sung chỉ định sau xác nhận khám") with {Field="amendmentReason"});
                 sourceExaminationVersion = await db.Set<VisitAudit>().CountAsync(x => x.VisitId == visitId && new[]{"SaveExamination","ConfirmExamination","AmendExamination"}.Contains(x.Action),ct);
@@ -95,7 +95,7 @@ public sealed class InvestigationService(DcmsDbContext db, ClinicalAccess access
         } else if (payload is ReceiveInvestigationResult result) {
             if (row!.State != "Ordered") throw Error("MSG42",409);
             if (result.ResultText?.Length > 4000) throw Error("MSG04");
-            var ready = await db.Set<ClinicalDocument>().Where(x => x.InvestigationId == row.Id && x.FileState == "Ready").Select(x => x.Id).ToArrayAsync(ct);
+            var ready = await db.Set<ClinicalDocument>().Where(x => x.Metadata.InvestigationId == row.Id && x.FileState == "Ready").Select(x => x.Id).ToArrayAsync(ct);
             if (string.IsNullOrWhiteSpace(result.ResultText) && ready.Length == 0)
                 throw new BusinessException(400, SystemMessages.Get("MSG02",field:"nội dung kết quả hoặc tệp sẵn sàng"));
             row.ResultText = string.IsNullOrWhiteSpace(result.ResultText) ? null : result.ResultText.Trim();
@@ -105,7 +105,7 @@ public sealed class InvestigationService(DcmsDbContext db, ClinicalAccess access
             if (row!.State != "ResultAvailable") throw Error("MSG42",409);
             if (review.Interpretation?.Length > 4000) throw Error("MSG04");
             var fileIds = JsonSerializer.Deserialize<Guid[]>(row.ResultDocumentIdsJson)!;
-            if (await db.Set<ClinicalDocument>().CountAsync(x => fileIds.Contains(x.Id) && x.InvestigationId == row.Id && x.FileState == "Ready",ct) != fileIds.Length
+            if (await db.Set<ClinicalDocument>().CountAsync(x => fileIds.Contains(x.Id) && x.Metadata.InvestigationId == row.Id && x.FileState == "Ready",ct) != fileIds.Length
                 || fileIds.Length == 0 && string.IsNullOrWhiteSpace(row.ResultText)) throw Error("MSG42",409);
             foreach (var file in await db.Set<ClinicalDocument>().Where(x => fileIds.Contains(x.Id)).ToArrayAsync(ct)) {
                 if (!file.Reviews.Any(x => x.VisitId == visitId)) {

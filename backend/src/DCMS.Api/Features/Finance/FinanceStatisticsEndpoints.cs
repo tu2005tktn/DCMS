@@ -88,7 +88,7 @@ public static class FinanceStatisticsEndpoints
             var dossiers = await db.TreatmentDossiers.AsNoTracking()
                 .Where(x => x.State != "Deleted" && (!branchId.HasValue || x.BranchId == branchId)
                     && (!from.HasValue || x.StartedOn >= from) && (!to.HasValue || x.StartedOn <= to))
-                .Select(x => new { x.Id, x.Code, x.PatientId, x.StartedOn, x.PlanState, x.State, x.Version }).ToArrayAsync(ct);
+                .Select(x => new { x.Id, x.Code, x.PatientId, x.StartedOn, x.State, x.Version }).ToArrayAsync(ct);
             var deletedDossiers = await db.TreatmentDossiers.AsNoTracking()
                 .Where(x => x.State == "Deleted" && (!branchId.HasValue || x.BranchId == branchId)
                     && (!from.HasValue || x.StartedOn >= from) && (!to.HasValue || x.StartedOn <= to))
@@ -105,8 +105,8 @@ public static class FinanceStatisticsEndpoints
                 .Where(x => !x.IsDeleted && (!from.HasValue || x.EnteredOn >= from)
                     && (!to.HasValue || x.EnteredOn <= to))
                 .OrderByDescending(x => x.EnteredOn).ThenByDescending(x => x.CreatedAt)
-                .Select(x => new FinanceMaterialPurchaseEntry(x.Id, x.EnteredOn, x.MaterialName,
-                    x.CategoryName, x.SupplierName, x.Quantity, x.Unit, x.UnitPriceVnd, x.TotalVnd, x.PaidVnd))
+                .Select(x => new FinanceMaterialPurchaseEntry(x.Id, x.EnteredOn, x.Material.Name,
+                    x.Material.Category.Name, x.Supplier != null ? x.Supplier.Name : null, x.Quantity, x.Unit, x.UnitPriceVnd, x.TotalVnd, x.PaidVnd))
                 .ToListAsync(ct);
             var purchaseTotal = purchaseRows.Sum(x => x.TotalVnd);
 
@@ -247,20 +247,22 @@ public static class FinanceStatisticsEndpoints
             var received = receipts.ToDictionary(x => x.DossierId);
 
             var activities = await db.ClinicalActivities.AsNoTracking()
-                .Where(x => x.DossierId.HasValue && ids.Contains(x.DossierId.Value) && x.State == "Posted")
+                .Where(x => ids.Contains(x.DossierId))
                 .Select(x => new { x.Id, x.DossierId, x.ItemId, x.ServiceNameSnapshot, x.Quantity, x.PriceSnapshotVnd,
                     x.DiscountSnapshotVnd }).ToArrayAsync(ct);
             var postedIds = activities.Select(x => x.Id).ToArray();
-            var completedQuantity = activities.Where(x => x.ItemId.HasValue)
+            var completedQuantity = activities
+                .Where(x => x.ItemId.HasValue)
                 .GroupBy(x => x.ItemId!.Value).ToDictionary(x => x.Key, x => x.Sum(y => y.Quantity));
             var items = await db.TreatmentItems.AsNoTracking()
-                .Where(x => ids.Contains(x.DossierId) && !x.SheetDeleted && !x.HiddenFromSheet
-                    && (x.Decision == "Agreed" || x.EntrySource == "ClinicianEntry")
-                    && x.Progress != "Cancelled" && x.Progress != "Stopped")
+                .Where(x => ids.Contains(x.DossierId))
                 .ToArrayAsync(ct);
-            var labs = await db.LabOrders.AsNoTracking()
-                .Where(x => ids.Contains(x.DossierId) && postedIds.Contains(x.ActivityId))
-                .Select(x => new { x.Id, x.DossierId, x.WorkName, x.TotalFeeVnd }).ToArrayAsync(ct);
+            var labs = await (
+                from x in db.LabOrders.AsNoTracking()
+                join a in db.ClinicalActivities.AsNoTracking() on x.ActivityId equals a.Id
+                where ids.Contains(a.DossierId) && postedIds.Contains(x.ActivityId)
+                select new { x.Id, a.DossierId, x.WorkName, x.TotalFeeVnd }
+            ).ToArrayAsync(ct);
 
             var activityNames = activities.ToDictionary(x => x.Id, x => x.ServiceNameSnapshot ?? "Dịch vụ điều trị");
             var labNames = labs.ToDictionary(x => x.Id, x => $"Labo: {x.WorkName}");
@@ -448,19 +450,20 @@ public static class FinanceStatisticsEndpoints
                 var posted = activities.Where(x => x.DossierId == dossier.Id).Sum(x =>
                     Math.Max(0, TreatmentPlanRules.Gross(x.Quantity,
                         checked((long)x.PriceSnapshotVnd)) - x.DiscountSnapshotVnd));
-                var planned = dossier.PlanState == "Committed" ? items.Where(x => x.DossierId == dossier.Id).Sum(item =>
+                var dossierItems = items.Where(x => x.DossierId == dossier.Id).ToArray();
+                var planned = dossierItems.Sum(item =>
                 {
                     var remaining = Math.Max(0, item.Quantity - completedQuantity.GetValueOrDefault(item.Id));
                     if (remaining == 0) return 0L;
                     var gross = TreatmentPlanRules.Gross(remaining, item.AgreedUnitPriceVnd);
-                    if (item.DiscountStatus != "Approved" || item.DiscountType is null || !item.DiscountValue.HasValue)
+                    if (item.DiscountType is not ("Fixed" or "Percent") || item.DiscountValue is not > 0)
                         return gross;
                     var fullGross = TreatmentPlanRules.Gross(item.Quantity, item.AgreedUnitPriceVnd);
                     var fullDiscount = TreatmentPlanRules.Discount(fullGross, item.DiscountType, item.DiscountValue.Value);
                     var remainingDiscount = (long)decimal.Round(fullDiscount * remaining / item.Quantity, 0,
                         MidpointRounding.AwayFromZero);
                     return Math.Max(0, gross - remainingDiscount);
-                }) : 0;
+                });
                 var labCost = labs.Where(x => x.DossierId == dossier.Id).Sum(x => x.TotalFeeVnd);
                 var originalBilled = checked(posted + planned + labCost);
                 var payment = received.GetValueOrDefault(dossier.Id);

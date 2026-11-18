@@ -2,6 +2,10 @@
 
 Nguồn: DCMS_Screen_Specifications_v2.5 "S58 Thiết lập hệ thống chi tiết" §2 (danh sách, Excel), §3 (grant), §6 (Công ty vật liệu, Công ty labo, Loại công việc labo, Thuốc), §6 Đơn vị; UC-51 chi tiết SET-01–06, §9.1, §9.3 (MSG257); SET-AT-15/17/18/30. Đợt trước: [Thiết lập chung](S58-GENERAL-SETTINGS.md), [Danh mục tham chiếu](S58-REFERENCE-CATALOGS.md), [Trường hồ sơ](S58-PATIENT-CATALOG-FIELDS.md).
 
+Cập nhật lưu trữ 18/11/2026:
+- Bảng `CATALOG_MEDICINE` rút gọn từ 22 xuống 10 cột (`Id`, `Code`, `Name`, `BaseUnit`, `ReferencePrice`, `PrescriptionEligible`, `InternalStockTracked`, `IsActive`, `Version`, `Spec` JSONB cho `ActiveIngredient`/`Strength`/`DosageForm`/`Packaging`/`Instructions`; bỏ audit trùng với `COMMAND_RECEIPT`, `NormalizedName` thay bằng `IX_CATALOG_MEDICINE_Name_Upper`, bỏ `Route`/`Contraindications`/`AllergyWarnings`). Xem [rút gọn bảng PRESCRIPTION và CATALOG_MEDICINE](PRESCRIPTION-AND-MEDICINE-TABLE-SIMPLIFICATION.vi.md).
+- Hai bảng `CATALOG_PROVIDER` và `LAB_WORK_TYPE` rút gọn từ 14 xuống **9 cột** mỗi bảng (bỏ lớp cơ sở `SupplyEntity` với 5 cột `NormalizedName`, `CreatedAt`, `CreatedBy`, `UpdatedAt`, `UpdatedBy`; lịch sử thay đổi đọc từ `COMMAND_RECEIPT` / `SystemCatalogChange`; kiểm tra trùng tên bằng functional unique index `IX_CATALOG_PROVIDER_Name_Upper` và `IX_LAB_WORK_TYPE_Name_Upper`). `ProviderDto` và `LabWorkTypeDto` bỏ 4 trường `createdAt`, `createdByName`, `updatedAt`, `updatedByName` giống `MedicineDto`. Xem [rút gọn 9 bảng còn lại](REMAINING-NINE-TABLES-SIMPLIFICATION.vi.md).
+
 ## Phạm vi
 
 CRUD typed (không dùng chung bảng REFERENCE_ENTRY), version, audit, deactivate/restore, không hard-delete:
@@ -55,7 +59,7 @@ Với `{resource}` ∈ `providers`, `lab-work-types`, `medicines` (route cụ th
 | `GET …/{id}/history` | như đợt 2 |
 | `GET /api/settings/catalogs/medicines/export?q=&status=` | xlsx, cùng bộ lọc, không đổi dữ liệu. Mọi ô ghi dạng chuỗi nên ô bắt đầu `=`, `+`, `-`, `@` không thành công thức. |
 
-DTO trả kèm `version`, `active`, `createdAt/ByName`, `updatedAt/ByName`; lab work type kèm `providerName`, `providerActive`.
+DTO trả kèm `version`, `active` (lịch sử `created/updated` đọc từ `GET …/{id}/history` qua `COMMAND_RECEIPT`); lab work type kèm `providerName`, `providerActive`.
 
 ## UI web
 

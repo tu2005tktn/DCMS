@@ -1,6 +1,10 @@
 # S60 — Chăm sóc khách hàng trên web nhân viên
 
+> Cập nhật 18/11/2026: công việc chăm sóc không còn `instructionId` (hướng dẫn tái khám đã bị xóa); xem [FOLLOW-UP-INSTRUCTION-REMOVAL.vi.md](FOLLOW-UP-INSTRUCTION-REMOVAL.vi.md).
+
 Người phụ trách: Ngô Minh Trí (phần giao diện S25/S60 theo [S22-S63-ACTUAL-REVIEW-CARE.md](S22-S63-ACTUAL-REVIEW-CARE.md)). Ngày 09/11/2026.
+
+Cập nhật 18/11/2026: công việc chăm sóc không còn trường `reviewId` (bản ghi đánh giá lâm sàng S63 đã bị xóa); API bỏ qua trường này nếu client còn gửi.
 
 Tài liệu tham chiếu:
 - Màn "Customer cares" của oDental (ảnh chụp do người dùng cung cấp). Chỉ tham khảo bố cục, không dùng dữ liệu oDental.

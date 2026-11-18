@@ -8,7 +8,7 @@ public sealed record SupportBooker(int? AccountId, string Name, string? Phone, b
 public sealed record SupportAppointmentSummary(Guid Id, string Code, int Version, string Status,
     DateTimeOffset StartAt, DateTimeOffset EndAt, int BranchId, string BranchName, int? ChairId,
     int DentistId, string DentistName, int? ServiceId, string ServiceName, int DurationMinutes,
-    SupportAppointmentPerson Attendee, SupportBooker Booker, string ConfirmedToAttend);
+    SupportAppointmentPerson Attendee, SupportBooker Booker);
 public sealed record SupportHistoryEntry(DateTimeOffset At, string Actor, int? ActorUserId, string Action,
     object? Before, object? After, string? Notes);
 public sealed record SupportRequestDto(string Id, Guid AppointmentId, string AppointmentCode, string Kind,
@@ -34,9 +34,6 @@ public sealed record ResolveSupportCommand(Guid RequestKey, int ExpectedVersion,
     string? Notes, string? DecisionReason);
 public sealed record ResolveSupportResult(bool Ok, SupportRequestDetail? Request, string? NotificationCode,
     string? ErrorCode = null, string? ErrorMessage = null);
-public sealed record AttendanceConfirmationCommand(Guid RequestKey, int ExpectedVersion, bool Confirmed);
-public sealed record AttendanceConfirmationResult(Guid AppointmentId, int Version, string Status,
-    string ConfirmedToAttend);
 
 public sealed record CustomerSupportRequestCommand(Guid RequestKey, string Kind, string Reason,
     DateTimeOffset? NewStartAt = null, int? DentistId = null, int? ChairId = null);
@@ -53,8 +50,6 @@ public interface ISupportRequestService
     Task<SupportRequestDetail> VerifyRequesterAsync(int actorId, string id, VerifyRequesterCommand command, CancellationToken ct);
     Task<StaffSupportChangeResult> ChangeAppointmentAsync(int actorId, string id, StaffSupportChangeCommand command, CancellationToken ct);
     Task<ResolveSupportResult> ResolveAsync(int actorId, string id, ResolveSupportCommand command, CancellationToken ct);
-    Task<AttendanceConfirmationResult> SetAttendanceAsync(int actorId, Guid appointmentId,
-        AttendanceConfirmationCommand command, CancellationToken ct);
     Task<SupportCustomerResult> CreateCustomerRequestAsync(int actorId, string code, CustomerSupportRequestCommand command, CancellationToken ct);
     Task<SupportCustomerRequestDto> WithdrawCustomerRequestAsync(int actorId, string id, WithdrawSupportCommand command, CancellationToken ct);
 }

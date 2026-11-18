@@ -31,7 +31,7 @@ public sealed class RecoveryApiTests(ApiFixture fixture) : IClassFixture<ApiFixt
         await using var connection = new Npgsql.NpgsqlConnection(fixture.ConnectionString);
         await connection.OpenAsync();
         await using var command = new Npgsql.NpgsqlCommand(
-            """SELECT "Id" FROM "USER_ACCOUNT" WHERE "NormalizedUserName" = @name """, connection);
+            """SELECT "Id" FROM "USER_ACCOUNT" WHERE UPPER("UserName") = @name """, connection);
         command.Parameters.AddWithValue("name", userName.ToUpperInvariant());
         return (int)(await command.ExecuteScalarAsync())!;
     }
@@ -215,7 +215,7 @@ public sealed class RecoveryApiTests(ApiFixture fixture) : IClassFixture<ApiFixt
         await using var connection = new Npgsql.NpgsqlConnection(fixture.ConnectionString);
         await connection.OpenAsync();
         await using var command = new Npgsql.NpgsqlCommand(
-            """SELECT count(*) FROM "USER_ACCOUNT" u CROSS JOIN LATERAL jsonb_array_elements(u."Recoveries") r WHERE u."Id" = @id AND r->>'UsedAt' IS NOT NULL AND r->>'ResetGrantHash' <> '' """, connection);
+            """SELECT count(*) FROM "USER_ACCOUNT" u CROSS JOIN LATERAL jsonb_array_elements(COALESCE(u."AuthData"->'Recoveries', '[]'::jsonb)) r WHERE u."Id" = @id AND r->>'UsedAt' IS NOT NULL AND r->>'ResetGrantHash' <> '' """, connection);
         command.Parameters.AddWithValue("id", accountId);
         Assert.Equal(1L, (long)(await command.ExecuteScalarAsync())!);
     }
@@ -294,7 +294,7 @@ public sealed class RecoveryApiTests(ApiFixture fixture) : IClassFixture<ApiFixt
         // Scan every recovery table for a plaintext proof, grant or password.
         var tables = new (string Table, string[] Columns)[]
         {
-            ("USER_ACCOUNT", ["Recoveries", "RecoveryDeliveries"]),
+            ("USER_ACCOUNT", ["AuthData"]),
             ("AUDIT_LOG", ["Reason", "ChannelType", "Result"]),
             ("AUDIT_LOG", ["Reason", "BeforeJson", "AfterJson"])
         };
@@ -319,7 +319,7 @@ public sealed class RecoveryApiTests(ApiFixture fixture) : IClassFixture<ApiFixt
 
         // Only the hash forms are persisted, so a leaked database cannot be replayed.
         await using var hashCommand = new Npgsql.NpgsqlCommand("""
-            SELECT count(*) FROM "USER_ACCOUNT" u CROSS JOIN LATERAL jsonb_array_elements(u."Recoveries") r WHERE u."Id" = @id
+            SELECT count(*) FROM "USER_ACCOUNT" u CROSS JOIN LATERAL jsonb_array_elements(COALESCE(u."AuthData"->'Recoveries', '[]'::jsonb)) r WHERE u."Id" = @id
             AND r->>'TokenHash' <> @proof AND r->>'ResetGrantHash' <> @grant
             """, connection);
         hashCommand.Parameters.AddWithValue("id", accountId);
@@ -665,7 +665,7 @@ public sealed class RecoveryApiTests(ApiFixture fixture) : IClassFixture<ApiFixt
         await using var connection = new Npgsql.NpgsqlConnection(fixture.ConnectionString);
         await connection.OpenAsync();
         await using var command = new Npgsql.NpgsqlCommand("""
-            UPDATE "USER_ACCOUNT" SET "Recoveries"=(SELECT jsonb_agg(CASE WHEN r->>'UsedAt' IS NULL THEN jsonb_set(r,'{ExpiresAt}',to_jsonb(now() - interval '1 hour')) ELSE r END) FROM jsonb_array_elements("Recoveries") r) WHERE "Id"=@id
+            UPDATE "USER_ACCOUNT" SET "AuthData"=jsonb_set("AuthData",'{Recoveries}',COALESCE((SELECT jsonb_agg(CASE WHEN r->>'UsedAt' IS NULL THEN jsonb_set(r,'{ExpiresAt}',to_jsonb(now() - interval '1 hour')) ELSE r END) FROM jsonb_array_elements(COALESCE("AuthData"->'Recoveries','[]'::jsonb)) r),'[]'::jsonb)) WHERE "Id"=@id
             """, connection);
         command.Parameters.AddWithValue("id", accountId);
         await command.ExecuteNonQueryAsync();
@@ -676,7 +676,7 @@ public sealed class RecoveryApiTests(ApiFixture fixture) : IClassFixture<ApiFixt
         await using var connection = new Npgsql.NpgsqlConnection(fixture.ConnectionString);
         await connection.OpenAsync();
         await using var command = new Npgsql.NpgsqlCommand("""
-            UPDATE "USER_ACCOUNT" SET "Recoveries"=(SELECT jsonb_agg(CASE WHEN r->>'UsedAt' IS NULL THEN jsonb_set(r,'{LastResentAt}',to_jsonb(@when)) ELSE r END) FROM jsonb_array_elements("Recoveries") r) WHERE "Id"=@id
+            UPDATE "USER_ACCOUNT" SET "AuthData"=jsonb_set("AuthData",'{Recoveries}',COALESCE((SELECT jsonb_agg(CASE WHEN r->>'UsedAt' IS NULL THEN jsonb_set(r,'{LastResentAt}',to_jsonb(@when)) ELSE r END) FROM jsonb_array_elements(COALESCE("AuthData"->'Recoveries','[]'::jsonb)) r),'[]'::jsonb)) WHERE "Id"=@id
             """, connection);
         command.Parameters.AddWithValue("when", when);
         command.Parameters.AddWithValue("id", accountId);
@@ -688,7 +688,7 @@ public sealed class RecoveryApiTests(ApiFixture fixture) : IClassFixture<ApiFixt
         await using var connection = new Npgsql.NpgsqlConnection(fixture.ConnectionString);
         await connection.OpenAsync();
         await using var command = new Npgsql.NpgsqlCommand("""
-            UPDATE "USER_ACCOUNT" SET "Recoveries"=(SELECT jsonb_agg(CASE WHEN r->>'UsedAt' IS NULL THEN jsonb_set(r,'{ResendCount}',to_jsonb(@count)) ELSE r END) FROM jsonb_array_elements("Recoveries") r) WHERE "Id"=@id
+            UPDATE "USER_ACCOUNT" SET "AuthData"=jsonb_set("AuthData",'{Recoveries}',COALESCE((SELECT jsonb_agg(CASE WHEN r->>'UsedAt' IS NULL THEN jsonb_set(r,'{ResendCount}',to_jsonb(@count)) ELSE r END) FROM jsonb_array_elements(COALESCE("AuthData"->'Recoveries','[]'::jsonb)) r),'[]'::jsonb)) WHERE "Id"=@id
             """, connection);
         command.Parameters.AddWithValue("count", count);
         command.Parameters.AddWithValue("id", accountId);

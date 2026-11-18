@@ -6,7 +6,7 @@ namespace DCMS.Infrastructure.Features.SystemSettings;
 
 // Development-only sample data for the instrument/material screens. Rules: docs/specs/MATERIAL-CATALOG-SEED.md.
 // Catalog names and usage units only: no purchases, stock, usage or suppliers.
-public sealed class DevelopmentMaterialSeeder(DcmsDbContext db, TimeProvider clock)
+public sealed class DevelopmentMaterialSeeder(DcmsDbContext db)
 {
     // Category, name, usage unit, purchase unit, conversion factor (1 purchase unit = N usage units), purchase quantity, unit price per purchase unit, shelf life in months (null = no expiry).
     private sealed record Item(string Category, string Name, string UsageUnit, string PurchaseUnit, decimal Factor, decimal Quantity, long Price, int? ShelfMonths);
@@ -48,12 +48,11 @@ public sealed class DevelopmentMaterialSeeder(DcmsDbContext db, TimeProvider clo
     {
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         await db.Database.ExecuteSqlRawAsync("SELECT pg_advisory_xact_lock(6462362001)", ct);
-        var now = clock.GetUtcNow();
 
         var categories = await db.MaterialCategories.Where(x => !x.IsDeleted).ToListAsync(ct); var addedCategories = 0;
-        foreach (var name in Items.Select(i => i.Category).Distinct().Where(n => categories.All(c => c.NormalizedName != n.ToUpperInvariant())))
+        foreach (var name in Items.Select(i => i.Category).Distinct().Where(n => categories.All(c => c.Name.ToUpperInvariant() != n.ToUpperInvariant())))
         {
-            var row = new MaterialCategory { Name = name, NormalizedName = name.ToUpperInvariant(), CreatedAt = now, UpdatedAt = now };
+            var row = new MaterialCategory { Name = name };
             db.Add(row); categories.Add(row); addedCategories++;
         }
         await db.SaveChangesAsync(ct);
@@ -61,9 +60,9 @@ public sealed class DevelopmentMaterialSeeder(DcmsDbContext db, TimeProvider clo
         var materials = await db.MaterialCatalogItems.Where(x => !x.IsDeleted).ToListAsync(ct); var addedItems = 0;
         foreach (var item in Items)
         {
-            var category = categories.First(c => c.NormalizedName == item.Category.ToUpperInvariant());
-            if (materials.Any(m => m.CategoryId == category.Id && m.NormalizedName == item.Name.ToUpperInvariant())) continue;
-            var row = new MaterialCatalogItem { Name = item.Name, NormalizedName = item.Name.ToUpperInvariant(), CategoryId = category.Id, UsageUnit = item.UsageUnit, CreatedAt = now, UpdatedAt = now };
+            var category = categories.First(c => c.Name.ToUpperInvariant() == item.Category.ToUpperInvariant());
+            if (materials.Any(m => m.CategoryId == category.Id && m.Name.ToUpperInvariant() == item.Name.ToUpperInvariant())) continue;
+            var row = new MaterialCatalogItem { Name = item.Name, CategoryId = category.Id, UsageUnit = item.UsageUnit };
             db.Add(row); materials.Add(row); addedItems++;
         }
         await db.SaveChangesAsync(ct);

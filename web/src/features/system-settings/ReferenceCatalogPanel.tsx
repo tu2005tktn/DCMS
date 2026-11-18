@@ -6,7 +6,7 @@ import { useAuth } from '../authentication/AuthContext';
 // S58 danh mục tham chiếu. Contract: docs/specs/S58-REFERENCE-CATALOGS.md.
 type Kind = 'diagnoses' | 'patient-sources' | 'occupations' | 'intake-history' | 'care-types' | 'expense-categories' | 'customer-groups';
 type Entry = { id: string; kind: Kind; code: string | null; name: string; description: string | null; reserved: boolean; active: boolean; version: number;
-  createdAt: string; createdByName: string; updatedAt: string; updatedByName: string; patientCount: number | null };
+  patientCount: number | null };
 type Page = { items: Entry[]; total: number; page: number; pageSize: number };
 type StatePreview = { entry: Entry; allowed: boolean; blockers: string[]; impact: string };
 type HistoryItem = { occurredAt: string; actorName: string; command: string; reason: string | null; before: Entry | null; after: Entry };

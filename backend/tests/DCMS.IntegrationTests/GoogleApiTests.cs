@@ -77,7 +77,7 @@ public sealed class GoogleApiTests(GoogleApiFixture fixture) : IClassFixture<Goo
         Assert.Null(account.PhoneNumber);
         Assert.Null(account.PasswordHash);
         Assert.True(account.EmailConfirmed);
-        Assert.Equal(1, await db.Users.CountAsync(x => x.NormalizedEmail == email.ToUpperInvariant()));
+        Assert.Equal(1, await db.Users.CountAsync(x => x.Email != null && x.Email.ToUpper() == email.ToUpperInvariant()));
         Assert.False(await db.Employees.AnyAsync(x => x.AccountId == account.Id));
         await fixture.AssertPatientUnchangedAsync();
     }
@@ -109,9 +109,9 @@ public sealed class GoogleApiTests(GoogleApiFixture fixture) : IClassFixture<Goo
 
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
-        Assert.Equal(1, await db.Users.CountAsync(x => x.NormalizedEmail == email.ToUpperInvariant()));
+        Assert.Equal(1, await db.Users.CountAsync(x => x.Email != null && x.Email.ToUpper() == email.ToUpperInvariant()));
         Assert.False((await db.Users.SingleAsync(x => x.Id == local.User.Id)).EmailConfirmed);
-        Assert.False(await db.Users.AnyAsync(x => x.Logins.Any(login => login.Provider == "Google" && login.Key == googleSubject)));
+        Assert.False((await db.Users.AsNoTracking().Select(x => x.AuthData).ToListAsync()).Any(x => x.Logins.Any(login => login.Provider == "Google" && login.Key == googleSubject)));
         await fixture.AssertPatientUnchangedAsync();
     }
 
@@ -136,7 +136,7 @@ public sealed class GoogleApiTests(GoogleApiFixture fixture) : IClassFixture<Goo
 
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
-        Assert.Equal(1, await db.Users.CountAsync(x => x.NormalizedEmail == email.ToUpperInvariant()));
+        Assert.Equal(1, await db.Users.CountAsync(x => x.Email != null && x.Email.ToUpper() == email.ToUpperInvariant()));
     }
 
     [Fact]
@@ -153,7 +153,6 @@ public sealed class GoogleApiTests(GoogleApiFixture fixture) : IClassFixture<Goo
             var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
             await db.Users.Where(x => x.Id == accountId).ExecuteUpdateAsync(setters => setters
                 .SetProperty(x => x.Email, (string?)null)
-                .SetProperty(x => x.NormalizedEmail, (string?)null)
                 .SetProperty(x => x.EmailConfirmed, false));
         }
 

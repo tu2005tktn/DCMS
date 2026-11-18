@@ -16,8 +16,7 @@ public sealed partial class TreatmentDossierService
     {
         if (await DentistAsync(actorId, dossier.BranchId, ct) != dossier.DentistId) throw Error("MSG06", 403);
         if (dossier.Version != expectedVersion) throw Error("MSG111", 409);
-        var source = await db.ClinicalActivities.AsNoTracking().SingleOrDefaultAsync(a => a.Id == id && a.DossierId == dossier.Id
-            && a.PatientId == dossier.PatientId && a.BranchId == dossier.BranchId && a.State == "Posted", ct) ?? throw Error("MSG113", 404);
+        var source = await db.ClinicalActivities.AsNoTracking().SingleOrDefaultAsync(a => a.Id == id && a.DossierId == dossier.Id, ct) ?? throw Error("MSG113", 404);
         var overrides = await SheetActivityOverridesAsync(dossier.Id, ct);
         var current = overrides.GetValueOrDefault(id) ?? DirectActivityDto(source);
         if (current.ServiceNameSnapshot == null)
@@ -63,8 +62,8 @@ public sealed partial class TreatmentDossierService
                 await access.RequireAsync(actorId, "treatment.items.price", ct);
                 RecordSheetFeeCorrection(actorId, dossier, before, after);
             }
-            await DCMS.Infrastructure.Features.SystemSettings.MaterialStock.ReplaceAsync(db, clock, source.Id, source.PatientId, source.BranchId,
-                source.DossierId, after.PerformedAt, actorId, row.Materials, ct);
+            await DCMS.Infrastructure.Features.SystemSettings.MaterialStock.ReplaceAsync(db, source.Id,
+                after.PerformedAt, actorId, row.Materials, ct);
             await db.SaveChangesAsync(ct);
             return after;
     }

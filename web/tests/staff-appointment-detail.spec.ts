@@ -16,7 +16,7 @@ async function setup(page: Page, permitted = true) {
     permission: { canResolve: true, canEdit: true, branchMatch: true, ownershipMatch: true }, appointmentActionCommitted: false,
     createdAt: appointment.startAt, updatedAt: appointment.startAt, history: [],
     appointment: { ...appointment, attendee: { name: appointment.attendeeName, relation: 'Self' },
-      booker: { name: 'Booker', isAnonymous: false }, confirmedToAttend: 'Pending' } };
+      booker: { name: 'Booker', isAnonymous: false } } };
   const queries: URL[] = [];
   let fail = false, empty = false;
   const writes: string[] = [];

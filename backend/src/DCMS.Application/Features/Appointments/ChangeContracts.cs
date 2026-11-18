@@ -21,10 +21,3 @@ public interface IAppointmentChangeService
     Task<AppointmentChangeResult> MarkNoShowAsync(int actorId, string code, NoShowAppointmentRequest request, CancellationToken ct);
 }
 
-// Implementations MUST enlist in the caller's scoped DbContext transaction; no external side effects.
-public interface IFollowUpAppointmentChangePort
-{
-    Task ValidateRescheduleAsync(Guid followUpId, Guid appointmentId, int dentistId,
-        DateTimeOffset startAt, CancellationToken ct);
-    Task MarkNeedsBookingAsync(Guid followUpId, Guid appointmentId, CancellationToken ct);
-}

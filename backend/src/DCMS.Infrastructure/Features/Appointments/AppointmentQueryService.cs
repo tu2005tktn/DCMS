@@ -156,8 +156,8 @@ public sealed class AppointmentQueryService(DcmsDbContext db, UserManager<Applic
         var scope = await ScopeAsync(actorId, row.BranchId, ct);
         if (scope.OwnDentistId.HasValue && row.DentistId != scope.OwnDentistId) throw Error("MSG06", 403);
         var item = (await ItemsAsync([row], ct))[0];
-        return new(item, row.BookerName, MaskPhone(row.BookerPhone), MaskEmail(row.BookerEmail), row.BookerAccountId.HasValue,
-            row.Reason, row.ExceptionReason, row.CreatedAt);
+        return new(item, row.BookingInfo.BookerName, MaskPhone(row.BookingInfo.Phone()), MaskEmail(row.BookingInfo.Email()), row.BookerAccountId.HasValue,
+            row.Reason, row.BookingInfo.ExceptionReason, row.CreatedAt);
     }
 
     // Patient app: own bookings plus the account's appointments through a current VERIFIED self link (GBR-031, GBR-073).
@@ -241,10 +241,9 @@ public sealed class AppointmentQueryService(DcmsDbContext db, UserManager<Applic
             }).ToListAsync(ct);
         return new(card.Code, card.Start, card.End, card.DurationMinutes, card.DentistName, card.AttendeeName, card.AttendeeKind,
             card.Status, staff ? "STAFF" : card.Access, card.Version, row.BranchId, branch ?? "", row.DentistId, row.ServiceId, service ?? "Khám và tư vấn",
-            row.BookerName, MaskPhone(row.BookerPhone) ?? MaskEmail(row.BookerEmail) ?? "",
-            row.FollowUpId.HasValue ? new { id = row.FollowUpId, status = row.Status == "Cancelled" ? "NeedsBooking" : "Booked" } : null,
+            row.BookingInfo.BookerName, MaskPhone(row.BookingInfo.Phone()) ?? MaskEmail(row.BookingInfo.Email()) ?? "",
             new(reason == null, Math.Round(hours, 2), reason, reason == "WITHIN_12H"), supportRequests, history,
-            new(configuration["Clinic:Phone"] ?? "0234 3 888 999", configuration["Clinic:Hours"] ?? "Thứ 2 – Thứ 7, 08:00 – 17:00"), row.AssistantId);
+            new(configuration["Clinic:Phone"] ?? "0234 3 888 999", configuration["Clinic:Hours"] ?? "Thứ 2 – Thứ 7, 08:00 – 17:00"));
     }
 
     private static MyAppointmentCard Card(Appointment x, IReadOnlyDictionary<int, string> names, int accountId, int? patientId)
@@ -252,7 +251,7 @@ public sealed class AppointmentQueryService(DcmsDbContext db, UserManager<Applic
         var booked = x.BookerAccountId == accountId;
         var own = patientId.HasValue && x.PatientId == patientId;
         return new(x.Code, x.StartAt, x.EndAt, (int)(x.EndAt - x.StartAt).TotalMinutes, names.GetValueOrDefault(x.DentistId, ""),
-            x.AttendeeName, x.AttendeeRelation == "Self" ? "SELF" : "RELATIVE", x.Status,
+            x.AttendeeName, x.BookingInfo.AttendeeRelation == "Self" ? "SELF" : "RELATIVE", x.Status,
             booked && own ? "BOTH" : own ? "MY_OWN" : "BOOKED_BY_ME", x.Version);
     }
 
@@ -290,7 +289,7 @@ public sealed class AppointmentQueryService(DcmsDbContext db, UserManager<Applic
         return rows.Select(x => new AppointmentListItem(x.Id, x.Code, x.BranchId, branches.GetValueOrDefault(x.BranchId, ""),
             x.StartAt, x.EndAt, (int)(x.EndAt - x.StartAt).TotalMinutes, x.DentistId, names.GetValueOrDefault(x.DentistId, ""),
             x.ChairId, chairs.GetValueOrDefault(x.ChairId, ""), x.ServiceId.HasValue ? services.GetValueOrDefault(x.ServiceId.Value) : null,
-            x.AttendeeName, x.AttendeeRelation, x.Kind, x.Source, x.Status, x.Version)).ToArray();
+            x.AttendeeName, x.BookingInfo.AttendeeRelation, x.Kind, x.Source, x.Status, x.Version)).ToArray();
     }
 
     private static string? MaskPhone(string? phone) => phone is { Length: >= 4 } ? phone[..2] + new string('*', phone.Length - 4) + phone[^2..] : null;

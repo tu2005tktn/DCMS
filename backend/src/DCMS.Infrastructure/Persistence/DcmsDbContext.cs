@@ -24,14 +24,9 @@ public sealed partial class DcmsDbContext(DbContextOptions<DcmsDbContext> option
     public DbSet<DCMS.Domain.Features.SystemSettings.CatalogProvider> CatalogProviders => Set<DCMS.Domain.Features.SystemSettings.CatalogProvider>();
     public DbSet<DCMS.Domain.Features.SystemSettings.LabWorkType> LabWorkTypes => Set<DCMS.Domain.Features.SystemSettings.LabWorkType>();
     public DbSet<DCMS.Domain.Features.SystemSettings.CatalogMedicine> CatalogMedicines => Set<DCMS.Domain.Features.SystemSettings.CatalogMedicine>();
-    public DbSet<DCMS.Domain.Features.Prescriptions.ExternalPrescription> ExternalPrescriptions => Set<DCMS.Domain.Features.Prescriptions.ExternalPrescription>();
-    public DbSet<DCMS.Domain.Features.Prescriptions.PrescriptionTemplate> PrescriptionTemplates => Set<DCMS.Domain.Features.Prescriptions.PrescriptionTemplate>();
+    public DbSet<DCMS.Domain.Features.Prescriptions.PatientPrescription> PatientPrescriptions => Set<DCMS.Domain.Features.Prescriptions.PatientPrescription>();
     public DbSet<DCMS.Domain.Features.Prescriptions.PrescriptionAudit> PrescriptionAudits => Set<DCMS.Domain.Features.Prescriptions.PrescriptionAudit>();
-    public DbSet<DCMS.Domain.Features.Prescriptions.PrescriptionCommandReceipt> PrescriptionCommandReceipts => Set<DCMS.Domain.Features.Prescriptions.PrescriptionCommandReceipt>();
-    public DbSet<DCMS.Domain.Features.Settings.BranchProfile> BranchProfiles => Set<DCMS.Domain.Features.Settings.BranchProfile>();
     public DbSet<EmployeeProfile> Employees => Set<EmployeeProfile>();
-    public IQueryable<AuthSession> AuthSessions => Users.AsNoTracking().SelectMany(x => x.Sessions);
-    public IQueryable<AuthRefreshToken> AuthRefreshTokens => Users.AsNoTracking().SelectMany(x => x.Sessions).SelectMany(x => x.RefreshTokens);
     public DbSet<StaffActivityCommandReceipt> StaffActivityCommandReceipts => Set<StaffActivityCommandReceipt>();
     public DbSet<AccountAudit> AccountAudits => Set<AccountAudit>();
     public DbSet<PatientProfile> Patients => Set<PatientProfile>();
@@ -52,10 +47,7 @@ public sealed partial class DcmsDbContext(DbContextOptions<DcmsDbContext> option
     public DbSet<NotificationDelivery> NotificationDeliveries => Set<NotificationDelivery>();
     public IQueryable<AppointmentReminder> AppointmentReminders => Appointments.AsNoTracking().SelectMany(x => x.Reminders);
     public DbSet<StaffHandlingItem> StaffHandlingItems => Set<StaffHandlingItem>();
-    public IQueryable<RecoveryToken> RecoveryTokens => Users.AsNoTracking().SelectMany(x => x.Recoveries);
-    public IQueryable<EmailVerificationToken> EmailVerificationTokens => Users.AsNoTracking().SelectMany(x => x.EmailVerifications);
     public DbSet<RecoveryAudit> RecoveryAudits => Set<RecoveryAudit>();
-    public IQueryable<RecoveryOutbox> RecoveryOutbox => Users.AsNoTracking().SelectMany(x => x.RecoveryDeliveries);
     public DbSet<TreatmentDossier> TreatmentDossiers => Set<TreatmentDossier>();
     public DbSet<TreatmentItem> TreatmentItems => Set<TreatmentItem>();
     public DbSet<TreatmentEvent> TreatmentEvents => Set<TreatmentEvent>();
@@ -63,25 +55,18 @@ public sealed partial class DcmsDbContext(DbContextOptions<DcmsDbContext> option
     public IQueryable<TreatmentSheetDraft> TreatmentSheetDrafts => TreatmentDossiers.AsNoTracking().SelectMany(x => x.SheetDrafts);
     public DbSet<LabOrder> LabOrders => Set<LabOrder>();
     public IQueryable<LabOrderStatusLog> LabOrderStatusLogs => LabOrders.AsNoTracking().SelectMany(x => x.StatusLogs);
-    public IQueryable<TreatmentRevisionDraft> TreatmentRevisionDrafts => TreatmentDossiers.AsNoTracking().SelectMany(x => x.RevisionDrafts);
     public DbSet<TreatmentTemplate> TreatmentTemplates => Set<TreatmentTemplate>();
-    public IQueryable<TreatmentTemplateVersion> TreatmentTemplateVersions => TreatmentTemplates.AsNoTracking().SelectMany(x => x.Versions);
-    public IQueryable<TreatmentStep> TreatmentSteps => TreatmentItems.AsNoTracking().SelectMany(x => x.Steps);
-    public DbSet<FollowUpInstruction> FollowUpInstructions => Set<FollowUpInstruction>();
     public DbSet<TreatmentProgressionReceipt> TreatmentProgressionReceipts => Set<TreatmentProgressionReceipt>();
     public DbSet<TreatmentProgressionEvent> TreatmentProgressionEvents => Set<TreatmentProgressionEvent>();
     public DbSet<ClinicalActivity> ClinicalActivities => Set<ClinicalActivity>();
-    public DbSet<ClinicalReview> ClinicalReviews => Set<ClinicalReview>();
-    public DbSet<ClinicalCareNote> ClinicalCareNotes => Set<ClinicalCareNote>();
     public DbSet<ClinicalCommandReceipt> ClinicalCommandReceipts => Set<ClinicalCommandReceipt>();
     public DbSet<CareTask> CareTasks => Set<CareTask>();
     public IQueryable<CareContactAttempt> CareContactAttempts => CareTasks.AsNoTracking().SelectMany(x => x.ContactAttempts);
-    public IQueryable<CareEscalation> CareEscalations => CareTasks.AsNoTracking().SelectMany(x => x.Escalations);
 
     public new IQueryable<IdentityRole<int>> Roles => Set<DCMS.Domain.Features.Settings.AccessGroup>()
         .IgnoreQueryFilters().Where(x => x.RecordKind == "IdentityRole")
         .Select(x => new IdentityRole<int> { Id = x.IdentityRoleId!.Value, Name = x.Name,
-            NormalizedName = x.NormalizedName, ConcurrencyStamp = x.RoleConcurrencyStamp });
+            NormalizedName = x.Name.ToUpper(), ConcurrencyStamp = x.Version.ToString() });
     public new IQueryable<IdentityUserRole<int>> UserRoles => Users.SelectMany(user => Roles
         .Where(role => user.AssignedRoles.Contains(role.Name!)), (user, role) => new IdentityUserRole<int> { UserId = user.Id, RoleId = role.Id });
 
@@ -91,17 +76,25 @@ public sealed partial class DcmsDbContext(DbContextOptions<DcmsDbContext> option
     public async Task<ApplicationUser?> LockAccountAsync(int id, CancellationToken ct)
     {
         await Database.ExecuteSqlInterpolatedAsync($"SELECT \"Id\" FROM \"USER_ACCOUNT\" WHERE \"Id\" = {id} FOR UPDATE", ct);
-        var fresh = await Users.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, ct);
-        if (fresh == null) return null;
         var tracked = Users.Local.SingleOrDefault(x => x.Id == id);
         if (tracked != null) Entry(tracked).State = EntityState.Detached;
-        Attach(fresh);
+        var fresh = await Users.SingleOrDefaultAsync(x => x.Id == id, ct);
+        if (fresh != null)
+        {
+            var xmin = Entry(fresh).Property<uint>("xmin").CurrentValue;
+            foreach (var sibling in ChangeTracker.Entries<EmployeeProfile>().Where(x => x.Entity.AccountId == id).Cast<Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry>()
+                .Concat(ChangeTracker.Entries<DCMS.Domain.Features.Settings.StaffAccessAssignment>().Where(x => x.Entity.AccountId == id)))
+            {
+                sibling.Property("xmin").OriginalValue = xmin;
+                sibling.Property("xmin").CurrentValue = xmin;
+            }
+        }
         return fresh;
     }
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
-        await PrepareSchedulingChangesAsync(cancellationToken);
+        PrepareSchedulingChanges();
         await PrepareExaminationChangesAsync(cancellationToken);
         PrepareTreatmentChanges();
         var employees = ChangeTracker.Entries<EmployeeProfile>().ToArray();
@@ -116,22 +109,65 @@ public sealed partial class DcmsDbContext(DbContextOptions<DcmsDbContext> option
         {
             var relatedEmployees = employees.Where(x => x.Entity.AccountId == owner.Entity.Id).ToArray();
             var relatedAssignments = assignments.Where(x => x.Entity.AccountId == owner.Entity.Id).ToArray();
-            if (owner.State == EntityState.Modified || relatedEmployees.Any(x => x.State != EntityState.Unchanged)
-                || relatedAssignments.Any(x => x.State != EntityState.Unchanged))
-                owner.Entity.ConcurrencyStamp = Guid.NewGuid().ToString();
             if (relatedAssignments.Any(x => x.State == EntityState.Deleted)) owner.Property(x => x.Version).IsModified = true;
+            foreach (var relatedEmployee in relatedEmployees)
+            {
+                if (relatedEmployee.State == EntityState.Added)
+                {
+                    relatedEmployee.Entity.FullName = owner.Entity.FullName;
+                    relatedEmployee.Property(x => x.FullName).OriginalValue = owner.Property(x => x.FullName).OriginalValue;
+                }
+                else if (owner.Property(x => x.FullName).IsModified && !relatedEmployee.Property(x => x.FullName).IsModified)
+                {
+                    relatedEmployee.Entity.FullName = owner.Entity.FullName;
+                    relatedEmployee.Property(x => x.FullName).CurrentValue = owner.Entity.FullName;
+                }
+                else if (relatedEmployee.Property(x => x.FullName).IsModified && !owner.Property(x => x.FullName).IsModified)
+                {
+                    owner.Entity.FullName = relatedEmployee.Entity.FullName;
+                    owner.Property(x => x.FullName).CurrentValue = relatedEmployee.Entity.FullName;
+                }
+            }
             foreach (var related in relatedEmployees.Cast<Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry>().Concat(relatedAssignments))
             {
-                related.Property("ConcurrencyStamp").CurrentValue = owner.Entity.ConcurrencyStamp;
-                related.Property(related.Entity is EmployeeProfile ? "Version" : "AccountVersion").CurrentValue = owner.Entity.Version;
                 if (related.State == EntityState.Added)
                 {
-                    related.Property("ConcurrencyStamp").OriginalValue = owner.Property("ConcurrencyStamp").OriginalValue;
-                    related.Property(related.Entity is EmployeeProfile ? "Version" : "AccountVersion").OriginalValue = owner.Property("Version").OriginalValue;
+                    related.Property("xmin").CurrentValue = owner.Property("xmin").CurrentValue;
+                    related.Property("xmin").OriginalValue = owner.Property("xmin").OriginalValue;
                 }
             }
         }
-        return await base.SaveChangesAsync(cancellationToken);
+        var saved = await base.SaveChangesAsync(cancellationToken);
+        // Keep shared xmin and FullName synchronized across sibling tracked table-splitting entries after save.
+        foreach (var owner in ChangeTracker.Entries<ApplicationUser>().ToArray())
+        {
+            var siblingEntries = ChangeTracker.Entries<EmployeeProfile>().Where(x => x.Entity.AccountId == owner.Entity.Id)
+                .Cast<Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry>()
+                .Concat(ChangeTracker.Entries<DCMS.Domain.Features.Settings.StaffAccessAssignment>().Where(x => x.Entity.AccountId == owner.Entity.Id))
+                .ToArray();
+            var latestXmin = new[] { (Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry)owner }
+                .Concat(siblingEntries)
+                .Select(x => (uint)(x.Property("xmin").CurrentValue ?? 0u))
+                .DefaultIfEmpty(0u)
+                .Max();
+            if (latestXmin != 0u)
+            {
+                owner.Property("xmin").OriginalValue = latestXmin;
+                owner.Property("xmin").CurrentValue = latestXmin;
+                foreach (var sibling in siblingEntries)
+                {
+                    sibling.Property("xmin").OriginalValue = latestXmin;
+                    sibling.Property("xmin").CurrentValue = latestXmin;
+                }
+            }
+            foreach (var employee in siblingEntries.OfType<Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry<EmployeeProfile>>())
+            {
+                employee.Entity.FullName = owner.Entity.FullName;
+                employee.Property(x => x.FullName).OriginalValue = owner.Entity.FullName;
+                employee.Property(x => x.FullName).CurrentValue = owner.Entity.FullName;
+            }
+        }
+        return saved;
     }
 
     protected override void OnModelCreating(ModelBuilder model)
@@ -140,6 +176,10 @@ public sealed partial class DcmsDbContext(DbContextOptions<DcmsDbContext> option
         FamilyMemberModel.Configure(model);
         FamilyRecordModel.Configure(model);
         base.OnModelCreating(model);
+        var userType = model.Entity<ApplicationUser>().Metadata;
+        foreach (var index in userType.GetIndexes().Where(i => i.Properties.Any(p =>
+            p.Name is nameof(ApplicationUser.NormalizedUserName) or nameof(ApplicationUser.NormalizedEmail))).ToArray())
+            userType.RemoveIndex(index);
         SchedulingModel.Configure(model);
         AppointmentModel.Configure(model);
         VisitModel.Configure(model);
@@ -153,11 +193,7 @@ public sealed partial class DcmsDbContext(DbContextOptions<DcmsDbContext> option
             b.ToTable("USER_ACCOUNT");
             b.Property(x => x.FullName).HasMaxLength(160);
             b.Property(x => x.AccountType).HasMaxLength(16);
-            b.Property(x => x.Version).IsConcurrencyToken();
-            b.HasIndex(x => x.NormalizedEmail).HasDatabaseName("EmailIndex").IsUnique();
-            b.Property(x => x.NormalizedPhone).HasComputedColumnSql(
-                "NULLIF(regexp_replace(btrim(\"PhoneNumber\"), '[ ()-]', '', 'g'), '')", stored: true);
-            b.HasIndex(x => x.NormalizedPhone).IsUnique();
+            b.Property(x => x.Version).HasColumnName("Version").IsConcurrencyToken(false);
         });
 
 
@@ -180,6 +216,7 @@ public sealed partial class DcmsDbContext(DbContextOptions<DcmsDbContext> option
             b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.ActorId).OnDelete(DeleteBehavior.Restrict);
             b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.TargetId).OnDelete(DeleteBehavior.Restrict);
         });
+        model.Ignore<PatientProfileDetails>();
         model.Entity<PatientProfile>(b =>
         {
             b.ToTable("PATIENT_PROFILE", t => t.HasCheckConstraint("CK_PATIENT_PROFILE_Gender",
@@ -193,13 +230,13 @@ public sealed partial class DcmsDbContext(DbContextOptions<DcmsDbContext> option
             b.Property(x => x.Gender).HasMaxLength(16);
             b.Property(x => x.Phone).HasMaxLength(24);
             b.Property(x => x.Address).HasMaxLength(255);
-            b.Property(x => x.GuardianName).HasMaxLength(160);
-            b.Property(x => x.GuardianRelationship).HasMaxLength(40);
-            b.Property(x => x.GuardianPhone).HasMaxLength(24);
-            b.Property(x => x.Note).HasMaxLength(1000);
-            b.Property(x => x.ArchiveReason).HasMaxLength(500);
             b.Property(x => x.Version).IsConcurrencyToken();
-            b.Property(x => x.IntakeHistoryOther).HasMaxLength(1000);
+            b.Ignore(x => x.GuardianName); b.Ignore(x => x.GuardianRelationship); b.Ignore(x => x.GuardianPhone);
+            b.Ignore(x => x.Note); b.Ignore(x => x.ProfileDate); b.Ignore(x => x.IntakeHistoryIds);
+            b.Ignore(x => x.IntakeHistoryOther); b.Ignore(x => x.IntakeRecordedAt); b.Ignore(x => x.IntakeRecordedBy);
+            b.Ignore(x => x.ArchivedAt); b.Ignore(x => x.ArchiveReason);
+            b.Property(x => x.Details).HasColumnName("Details").HasColumnType("jsonb").HasDefaultValueSql("'{}'::jsonb")
+                .HasConversion(SharedStorageModel.JsonConv<PatientProfileDetails>(), SharedStorageModel.JsonCompare<PatientProfileDetails>());
             b.HasOne<DCMS.Domain.Features.SystemSettings.ReferenceEntry>().WithMany().HasForeignKey(x => x.SourceId).OnDelete(DeleteBehavior.Restrict);
             b.HasOne<DCMS.Domain.Features.SystemSettings.ReferenceEntry>().WithMany().HasForeignKey(x => x.CustomerGroupId).OnDelete(DeleteBehavior.Restrict);
             b.HasOne<DCMS.Domain.Features.SystemSettings.ReferenceEntry>().WithMany().HasForeignKey(x => x.OccupationId).OnDelete(DeleteBehavior.Restrict);
@@ -222,6 +259,7 @@ public sealed partial class DcmsDbContext(DbContextOptions<DcmsDbContext> option
             b.HasOne<PatientProfile>().WithMany().HasForeignKey(x => x.PatientId).OnDelete(DeleteBehavior.Restrict);
             b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.ActorAccountId).OnDelete(DeleteBehavior.Restrict);
         });
+        model.Ignore<PatientAccountLinkDetails>();
         model.Entity<PatientAccountLink>(b =>
         {
             b.ToTable("PATIENT_ACCOUNT_LINK", t => t.HasCheckConstraint("CK_PATIENT_ACCOUNT_LINK_Status",
@@ -229,12 +267,11 @@ public sealed partial class DcmsDbContext(DbContextOptions<DcmsDbContext> option
             b.Property(x => x.RequestCode).HasMaxLength(32);
             b.Property(x => x.Status).HasMaxLength(16);
             b.Property(x => x.DeclaredFullName).HasMaxLength(160);
-            b.Property(x => x.DeclaredPatientCode).HasMaxLength(40);
-            b.Property(x => x.RequestNote).HasMaxLength(1000);
-            b.Property(x => x.VerificationNote).HasMaxLength(1000);
-            b.Property(x => x.DecisionReason).HasMaxLength(500);
-            b.Property(x => x.PublicNote).HasMaxLength(500);
             b.Property(x => x.Version).IsConcurrencyToken();
+            b.Ignore(x => x.DeclaredBirthDate); b.Ignore(x => x.DeclaredPatientCode); b.Ignore(x => x.RequestNote);
+            b.Ignore(x => x.VerificationNote); b.Ignore(x => x.DecisionReason); b.Ignore(x => x.PublicNote);
+            b.Ignore(x => x.ReviewedAt); b.Ignore(x => x.RevokedAt); b.Ignore(x => x.WithdrawnAt);
+            b.ComplexProperty(x => x.Details, d => d.ToJson("Details"));
             b.HasIndex(x => x.RequestCode).IsUnique();
             b.HasIndex(x => new { x.Status, x.RequestedAt });
             // One-to-one active self link and no duplicate request being processed (GBR-072).

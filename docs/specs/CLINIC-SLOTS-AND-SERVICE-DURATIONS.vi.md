@@ -1,5 +1,7 @@
 # Cấu hình khung đặt lịch và thời lượng dịch vụ
 
+> Cập nhật 18/11/2026: hướng dẫn tái khám (`FollowUpInstruction`, `/api/follow-up-instructions`) đã bị xóa. Lịch hẹn tiếp theo gắn với phiếu điều trị qua `APPOINTMENT.DossierId` (thay `FollowUpId`) và được gợi ý từ hạng mục kế hoạch gần nhất còn chờ của phiếu. Các phần bên dưới nói về hướng dẫn tái khám là lịch sử thiết kế. Xem [FOLLOW-UP-INSTRUCTION-REMOVAL.vi.md](FOLLOW-UP-INSTRUCTION-REMOVAL.vi.md).
+
 Ngày chốt: 19/10/2026. Nha sĩ nhập cấu hình linh hoạt; bệnh nhân chọn dịch vụ trước, sau đó chọn giờ còn đủ thời gian.
 
 ## Quyết định triển khai

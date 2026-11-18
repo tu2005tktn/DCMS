@@ -18,15 +18,18 @@ public sealed partial class DcmsDbContext
         foreach (var visit in ChangeTracker.Entries<Visit>().ToArray())
         {
             var examination = examinations.SingleOrDefault(x => x.Entity.VisitId == visit.Entity.Id);
+            var originalVersion = visit.State == EntityState.Added ? visit.Entity.Version : visit.Property(x => x.Version).OriginalValue;
             if (examination != null && examination.State != EntityState.Added
-                && !Equals(examination.Property("StorageStamp").OriginalValue, visit.Property(x => x.StorageStamp).OriginalValue))
+                && !Equals(examination.Property("Version").OriginalValue, originalVersion))
                 throw new DbUpdateConcurrencyException("The visit changed while its examination was being edited.");
-            if (visit.State == EntityState.Modified || examination?.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
-                visit.Entity.StorageStamp = Guid.NewGuid();
+            // Any change to the row raises Version by exactly one, whether or not the service already did.
+            if (visit.State == EntityState.Modified && visit.Entity.Version == originalVersion
+                || visit.State == EntityState.Unchanged && examination?.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
+                visit.Entity.Version = originalVersion + 1;
             if (examination == null) continue;
-            examination.Property("StorageStamp").CurrentValue = visit.Entity.StorageStamp;
+            examination.Property("Version").CurrentValue = visit.Entity.Version;
             if (examination.State == EntityState.Added)
-                examination.Property("StorageStamp").OriginalValue = visit.Property(x => x.StorageStamp).OriginalValue;
+                examination.Property("Version").OriginalValue = originalVersion;
         }
     }
 }

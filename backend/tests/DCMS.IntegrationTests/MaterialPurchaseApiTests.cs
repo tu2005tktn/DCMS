@@ -31,7 +31,7 @@ public sealed class MaterialPurchaseApiTests(ApiFixture fixture) : IClassFixture
     private static async Task<string> Body(HttpResponseMessage r) => await r.Content.ReadAsStringAsync();
 
     [Fact]
-    public async Task CreateComputesTotalRoundsAndSnapshotsNames()
+    public async Task CreateComputesTotalRoundsAndReadsNamesFromCatalog()
     {
         using var c = await Login(); var material = await Material(c);
         var response = await c.PostAsJsonAsync(Purchases, Create(material.Id, quantity: 0.5m, price: 1_333_333, paid: 100_000, received: Today));
@@ -39,13 +39,15 @@ public sealed class MaterialPurchaseApiTests(ApiFixture fixture) : IClassFixture
         var row = (await response.Content.ReadFromJsonAsync<MaterialPurchaseDto>())!;
         Assert.Equal(666_667, row.TotalVnd); Assert.Equal(566_667, row.DueVnd); Assert.Equal(material.Name, row.MaterialName); Assert.Equal(material.CategoryName, row.CategoryName);
         Assert.Equal("hộp", row.Unit); Assert.Equal(1, row.Version);
-        var renamed = await c.PutAsJsonAsync($"/api/system-settings/materials/{material.Id}", new UpdateMaterialRequest("SYNTHETIC renamed " + Guid.NewGuid().ToString("N"), material.CategoryId, material.Version, Guid.NewGuid()));
+        var newName = "SYNTHETIC renamed " + Guid.NewGuid().ToString("N");
+        var renamed = await c.PutAsJsonAsync($"/api/system-settings/materials/{material.Id}", new UpdateMaterialRequest(newName, material.CategoryId, material.Version, Guid.NewGuid()));
         Assert.Equal(HttpStatusCode.OK, renamed.StatusCode);
-        Assert.Equal(material.Name, (await c.GetFromJsonAsync<MaterialPurchaseDto>($"{Purchases}/{row.Id}"))!.MaterialName);
+        // No name snapshot since 18/11/2026: the row shows the catalog's current name (docs/specs/MATERIAL-PURCHASE-TABLE-SIMPLIFICATION.vi.md).
+        Assert.Equal(newName, (await c.GetFromJsonAsync<MaterialPurchaseDto>($"{Purchases}/{row.Id}"))!.MaterialName);
     }
 
     [Fact]
-    public async Task UsageUnitAndConversionFactorAreSnapshottedPerRow()
+    public async Task UsageUnitComesFromCatalogAndQuantityKeepsThePurchaseFactor()
     {
         using var c = await Login(); var material = await Material(c, usageUnit: "  sợi ");
         Assert.Equal("sợi", material.UsageUnit);
@@ -53,8 +55,9 @@ public sealed class MaterialPurchaseApiTests(ApiFixture fixture) : IClassFixture
         Assert.Equal(12, row.ConversionFactor); Assert.Equal(30, row.UsageQuantity); Assert.Equal("sợi", row.UsageUnit); Assert.Equal(4166.67m, row.UsageUnitPriceVnd); Assert.Equal(125_000, row.TotalVnd);
         var cleared = await c.PutAsJsonAsync($"/api/system-settings/materials/{material.Id}", new UpdateMaterialRequest(material.Name, material.CategoryId, material.Version, Guid.NewGuid(), null));
         Assert.Equal(HttpStatusCode.OK, cleared.StatusCode); Assert.Null((await cleared.Content.ReadFromJsonAsync<MaterialDto>())!.UsageUnit);
+        // No unit snapshot since 18/11/2026: the row shows the catalog's current unit, the quantity keeps the factor used at purchase time.
         var after = (await c.GetFromJsonAsync<MaterialPurchaseDto>($"{Purchases}/{row.Id}"))!;
-        Assert.Equal("sợi", after.UsageUnit); Assert.Equal(30, after.UsageQuantity);
+        Assert.Null(after.UsageUnit); Assert.Equal(30, after.UsageQuantity);
         var plain = (await (await c.PostAsJsonAsync(Purchases, Create(material.Id))).Content.ReadFromJsonAsync<MaterialPurchaseDto>())!;
         Assert.Equal(1, plain.ConversionFactor); Assert.Equal(2, plain.UsageQuantity); Assert.Null(plain.UsageUnit);
         var tooLong = await c.PostAsJsonAsync("/api/system-settings/materials", new CreateMaterialRequest(Unique("SYNTHETIC long "), material.CategoryId, Guid.NewGuid(), new string('a', 41)));

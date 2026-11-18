@@ -12,7 +12,7 @@ public sealed record AffectedAppointment(Guid Id, string Code, DateTimeOffset St
 public sealed record SchedulePreview(AffectedAppointment[] AffectedAppointments);
 public sealed record ScheduleAppointment(Guid Id, string Code, int BranchId, string BranchName,
     DateTimeOffset StartAt, DateTimeOffset EndAt, string PatientName, string ServiceName, string Status,
-    bool IsTreatmentPlan, DateTimeOffset? PatientConsentConfirmedAt);
+    bool IsTreatmentPlan);
 public sealed record ScheduleAppointments(IReadOnlyList<ScheduleAppointment> Items);
 public sealed record BranchOption(int Id, string Name);
 public sealed record EmployeeOption(int Id, int BranchId, string Name, bool CanDentist, bool CanEdit, bool Self, bool? CanView = null);
@@ -25,8 +25,8 @@ public sealed record AvailabilitySlot(DateTimeOffset Start, DateTimeOffset End, 
 public sealed record AvailabilityResult(string TimeZone, DateOnly Date, AvailabilitySlot[] Slots);
 public sealed record PreviewAvailabilityRequest(ScheduleCommand Schedule, AvailabilityQuery Query);
 public sealed record ResourceCheck(int BranchId, int DentistId, int? ServiceId, DateTimeOffset Start, int DurationMinutes,
-    int? ChairId, int? AssistantId, string? AttendeeKey, int ExpectedScheduleVersion,
-    int? ExpectedAssistantScheduleVersion = null, Guid? ExcludeReservationId = null, bool Public = false, int? BookingSettingsVersion = null);
+    int? ChairId, int? AssistantId, int? PatientId, int ExpectedScheduleVersion,
+    int? ExpectedAssistantScheduleVersion = null, Guid? ExcludeAppointmentId = null, bool Public = false, int? BookingSettingsVersion = null);
 public sealed record BranchPeriod(int BranchId, int Day, int StartMinute, int EndMinute, string Kind, string Reason = "");
 public sealed record RecurringCommand(int DentistId, DateOnly Date, string Kind, int ExpectedVersion,
     BranchPeriod[] Intervals, Guid RequestKey, string Reason = "");
@@ -56,9 +56,9 @@ public interface IAvailabilityService
 {
     Task<AvailabilityResult> QueryAsync(AvailabilityQuery query, int? staffActorId, CancellationToken ct);
     // Caller must authorize the existing appointment and supply its immutable resource requirements.
-    Task<AvailabilityResult> QueryForReservationAsync(AvailabilityQuery query, Guid reservationId, string? attendeeKey, CancellationToken ct);
-    // TV2: caller MUST begin a transaction on the same scoped DbContext and persist reservations before commit.
+    Task<AvailabilityResult> QueryForAppointmentAsync(AvailabilityQuery query, Guid appointmentId, int? patientId, CancellationToken ct);
+    // TV2: caller MUST begin a transaction on the same scoped DbContext and persist the appointment before commit.
     Task<AvailabilitySlot> CheckInTransactionAsync(ResourceCheck request, CancellationToken ct);
-    // Reception rechecks the existing reservation without replacing or releasing it.
-    Task ValidateReceptionAsync(Guid reservationId, int patientId, CancellationToken ct);
+    // Reception rechecks the existing appointment without replacing or releasing it.
+    Task ValidateReceptionAsync(Guid appointmentId, int patientId, CancellationToken ct);
 }

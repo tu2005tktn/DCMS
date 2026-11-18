@@ -40,9 +40,9 @@ public sealed class PatientLinkReviewService(DcmsDbContext db, UserManager<Appli
         if (term != null)
         {
             var upper = term.ToUpperInvariant();
-            query = query.Where(x => x.link.RequestCode.Contains(upper) || x.user.NormalizedUserName!.Contains(upper)
+            query = query.Where(x => x.link.RequestCode.Contains(upper) || (x.user.UserName != null && x.user.UserName.ToUpper().Contains(upper))
                 || x.user.FullName.ToUpper().Contains(upper) || x.link.DeclaredFullName.ToUpper().Contains(upper)
-                || (x.user.NormalizedEmail != null && x.user.NormalizedEmail.Contains(upper))
+                || (x.user.Email != null && x.user.Email.ToUpper().Contains(upper))
                 || (x.user.PhoneNumber != null && x.user.PhoneNumber.Contains(term)));
         }
         var total = await query.CountAsync(ct);

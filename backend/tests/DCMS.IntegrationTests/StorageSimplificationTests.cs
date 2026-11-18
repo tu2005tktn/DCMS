@@ -34,9 +34,7 @@ public sealed class StorageSimplificationTests(ApiFixture fixture) : IClassFixtu
         var branch = new SchedulingBranch { Name = "SYNTHETIC prescription API" };
         var medicine = new CatalogMedicine
         {
-            Code = "JSON-API", Name = "SYNTHETIC original medicine", NormalizedName = "SYNTHETIC ORIGINAL MEDICINE",
-            BaseUnit = "unit", PrescriptionEligible = true, CreatedBy = employee.AccountId, UpdatedBy = employee.AccountId,
-            CreatedAt = now, UpdatedAt = now
+            Code = "JSON-API", Name = "SYNTHETIC original medicine", BaseUnit = "unit", PrescriptionEligible = true
         };
         db.AddRange(branch, medicine);
         await db.SaveChangesAsync();
@@ -94,30 +92,21 @@ public sealed class StorageSimplificationTests(ApiFixture fixture) : IClassFixtu
         var patient = await db.Patients.FirstAsync();
         var actor = employee.AccountId;
         var now = DateTimeOffset.UtcNow;
-        var branch = new SchedulingBranch { Name = "SYNTHETIC consolidated branch" };
+        var branch = new SchedulingBranch { Code = "JSON-BRANCH", Name = "SYNTHETIC consolidated branch", Phone = "0900000000" };
         var medicine = new CatalogMedicine
         {
-            Code = "JSON-TEST", Name = "SYNTHETIC medicine", NormalizedName = "SYNTHETIC MEDICINE",
-            BaseUnit = "unit", PrescriptionEligible = true, CreatedBy = actor, UpdatedBy = actor,
-            CreatedAt = now, UpdatedAt = now
+            Code = "JSON-TEST", Name = "SYNTHETIC medicine", BaseUnit = "unit", PrescriptionEligible = true,
+            Spec = new CatalogMedicineSpec { ActiveIngredient = "Paracetamol", Strength = "500 mg" }
         };
         db.AddRange(branch, medicine);
         await db.SaveChangesAsync();
-        db.Add(new BranchProfile { Id = branch.Id, Code = "JSON-BRANCH", Name = branch.Name, Phone = "0900000000" });
         await db.AddSchedulingDataAsync(new SchedulingMember { BranchId = branch.Id, EmployeeId = employee.Id, CanDentist = true });
         var prescription = new PatientPrescription
         {
-            PatientId = patient.Id, BranchId = branch.Id, PrescriberEmployeeId = employee.Id, RequiresExternalPurchase = true,
-            PrescribedOn = new DateOnly(2026, 11, 12), CreatedAt = now, UpdatedAt = now, Version = 7,
+            PatientId = patient.Id, BranchId = branch.Id, PrescriberEmployeeId = employee.Id,
+            PrescribedOn = new DateOnly(2026, 11, 12), CreatedAt = now, Version = 7,
             Items = [new() { MedicineId = medicine.Id, MedicineName = "SYNTHETIC saved snapshot", MedicineCode = medicine.Code,
                 Quantity = 3, Unit = medicine.BaseUnit, Instructions = "SYNTHETIC instructions", Position = 0, IsExternalPurchase = true }]
-        };
-        var template = new PrescriptionTemplate
-        {
-            Code = "JSON-TEMPLATE", Name = "SYNTHETIC template", CreatedBy = actor, UpdatedBy = actor,
-            CreatedAt = now, UpdatedAt = now,
-            Lines = [new() { MedicineId = medicine.Id, MedicineCode = medicine.Code, MedicineName = medicine.Name,
-                Unit = medicine.BaseUnit, Quantity = 2, Days = 1 }]
         };
         var week = new WorkingWeek
         {
@@ -127,12 +116,11 @@ public sealed class StorageSimplificationTests(ApiFixture fixture) : IClassFixtu
         };
         var group = new AccessGroup
         {
-            Code = "JSON-GROUP", NormalizedCode = "JSON-GROUP", Name = "SYNTHETIC group",
-            NormalizedName = "SYNTHETIC GROUP", BaseRole = "Dentist",
+            Code = "JSON-GROUP", Name = "SYNTHETIC group", BaseRole = "Dentist",
             Grants = [new() { Permission = "prescriptions.read" }]
         };
         var requestKey = Guid.NewGuid();
-        db.AddRange(prescription, template, week, group,
+        db.AddRange(prescription, week, group,
             new AccountAudit { Id = 700, ActorId = actor, TargetId = actor, Action = "Synthetic", Reason = "SYNTHETIC", OccurredAt = now },
             new RecoveryAudit { Id = 700, ActorId = actor, TargetId = actor, Action = "Synthetic", Reason = "SYNTHETIC", ChannelType = "Email", Result = "Sent", OccurredAt = now },
             new ScheduleReceipt { ActorId = actor, RequestKey = requestKey, Fingerprint = "schedule", ResultJson = "{\"version\":7}" },
@@ -144,18 +132,19 @@ public sealed class StorageSimplificationTests(ApiFixture fixture) : IClassFixtu
         await migrator.MigrateAsync("20261109101904_AdvancePayOs20261109");
         await migrator.MigrateAsync();
 
-        var read = await db.Set<PatientPrescription>().SingleAsync(x => x.Id == prescription.Id);
+        var read = await db.PatientPrescriptions.SingleAsync(x => x.Id == prescription.Id);
         var item = Assert.Single(read.Items);
         Assert.Equal("SYNTHETIC saved snapshot", item.MedicineName);
         Assert.Equal(prescription.Items[0].Id, item.Id);
         Assert.Equal(3, item.Quantity);
         Assert.True(item.IsExternalPurchase);
-        Assert.True(read.RequiresExternalPurchase);
         Assert.Equal(7, read.Version);
-        Assert.Equal(2, Assert.Single((await db.Set<PrescriptionTemplate>().SingleAsync(x => x.Id == template.Id)).Lines).Quantity);
+        var readMed = await db.CatalogMedicines.SingleAsync(x => x.Id == medicine.Id);
+        Assert.Equal("Paracetamol", readMed.Spec.ActiveIngredient);
+        Assert.Equal("500 mg", readMed.Spec.Strength);
         Assert.Equal(480, Assert.Single((await db.Set<WorkingWeek>().SingleAsync(x => x.Id == week.Id)).Periods).StartMinute);
         Assert.Equal("prescriptions.read", Assert.Single((await db.Set<AccessGroup>().SingleAsync(x => x.Id == group.Id)).Grants).Permission);
-        Assert.Equal("0900000000", (await db.Set<BranchProfile>().SingleAsync(x => x.Id == branch.Id)).Phone);
+        Assert.Equal("0900000000", (await db.Set<SchedulingBranch>().SingleAsync(x => x.Id == branch.Id)).Phone);
         Assert.True(await db.AccountAudits.AnyAsync(x => x.Id == 700 && x.Action == "Synthetic"));
         Assert.True(await db.RecoveryAudits.AnyAsync(x => x.Id == 700 && x.Action == "Synthetic"));
         Assert.Equal("schedule", (await db.Set<ScheduleReceipt>().SingleAsync(x => x.RequestKey == requestKey)).Fingerprint);
@@ -164,53 +153,5 @@ public sealed class StorageSimplificationTests(ApiFixture fixture) : IClassFixtu
         db.Add(next);
         await db.SaveChangesAsync();
         Assert.True(next.Id > 700);
-    }
-}
-
-public sealed class LegacyPrescriptionStorageTests(ReceptionFixture fixture) : IClassFixture<ReceptionFixture>
-{
-    [Fact]
-    public async Task VisitApiEditsFinalizesCopiesAndDeletesJsonLinesThroughTheParent()
-    {
-        var reception = new ReceptionApiTests(fixture);
-        var setup = await reception.Prepare();
-        using var assistant = await reception.Login();
-        var visit = await reception.Check(assistant, setup);
-        using (var scope = fixture.Services.CreateScope())
-        {
-            var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
-            var row = await db.Visits.SingleAsync(x => x.Id == visit.VisitId);
-            row.Status = DCMS.Domain.Features.Visits.VisitStatuses.InProgress;
-            row.Version++;
-            await db.SaveChangesAsync();
-        }
-        using var dentist = await reception.Login("dentist.demo");
-        var path = $"/api/prescriptions/visits/{visit.VisitId}";
-        var command = new SavePrescriptionLine(Guid.NewGuid(), 0, null, 1, "Uống", "1", "0", "0", "0",
-            "AfterMeal", 1, "SYNTHETIC instructions", "SYNTHETIC custom medicine", "unit", "unit");
-        var created = await dentist.PostAsJsonAsync($"{path}/lines", command);
-        Assert.True(created.IsSuccessStatusCode, await created.Content.ReadAsStringAsync());
-        var line = (await created.Content.ReadFromJsonAsync<PrescriptionLineDto>())!;
-        var edited = await dentist.PutAsJsonAsync($"{path}/lines/{line.Id}",
-            command with { RequestKey = Guid.NewGuid(), ExpectedVersion = line.Version, Quantity = 2 });
-        Assert.True(edited.IsSuccessStatusCode, await edited.Content.ReadAsStringAsync());
-        var current = (await dentist.GetFromJsonAsync<VisitPrescriptionDto>($"{path}/prescription"))!.Current!;
-        Assert.Equal(2, Assert.Single(current.Lines).Quantity);
-        var finalizedResponse = await dentist.PostAsJsonAsync($"{path}/finalize", new { requestKey = Guid.NewGuid(), expectedVersion = current.Version });
-        Assert.True(finalizedResponse.IsSuccessStatusCode, await finalizedResponse.Content.ReadAsStringAsync());
-        var finalized = (await finalizedResponse.Content.ReadFromJsonAsync<PrescriptionDto>())!;
-        Assert.Equal("Finalized", Assert.Single(finalized.Lines).Status);
-        var correctionResponse = await dentist.PostAsJsonAsync($"{path}/corrections",
-            new { requestKey = Guid.NewGuid(), expectedVersion = finalized.Version, reason = "SYNTHETIC correction" });
-        Assert.True(correctionResponse.IsSuccessStatusCode, await correctionResponse.Content.ReadAsStringAsync());
-        var correction = (await correctionResponse.Content.ReadFromJsonAsync<PrescriptionDto>())!;
-        var copied = Assert.Single(correction.Lines);
-        Assert.Equal(2, copied.Quantity);
-        Assert.NotEqual(line.Id, copied.Id);
-        var deleted = await dentist.DeleteAsync($"{path}/lines/{copied.Id}?requestKey={Guid.NewGuid()}&expectedVersion={copied.Version}");
-        Assert.Equal(HttpStatusCode.NoContent, deleted.StatusCode);
-        var result = (await dentist.GetFromJsonAsync<VisitPrescriptionDto>($"{path}/prescription"))!;
-        Assert.Empty(result.Current!.Lines);
-        Assert.Equal(2, result.History.Length);
     }
 }

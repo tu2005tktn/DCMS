@@ -6,8 +6,8 @@ import { addDays, clinicToday, formatClock, formatDate, newRequestKey, type Appo
 export type NextVisitCandidate = {
   dossierId: string; dossierCode: string; itemId: string; serviceId: number; serviceName: string; region: string | null;
   estimatedStart: string | null; durationMinutes: number; dentistId: number; dentistName: string; branchId: number;
-  status: 'Ready' | 'NeedsBooking' | 'Booked'; followUpId: string | null;
-  appointment: { id: string; code: string; startAt: string } | null; earliestOn: string | null; latestOn: string | null;
+  status: 'Ready' | 'Booked';
+  appointment: { id: string; code: string; startAt: string } | null;
   targetOn?: string | null; windowFrom?: string | null; windowTo?: string | null;
 };
 export type NextVisitPatient = { id: number; fullName: string; phone: string | null };
@@ -31,8 +31,9 @@ function scanOrder(anchor: string, min: string, max: string) {
   return days;
 }
 
-// Books the next treatment-plan item. The planned date is the target; slots only come from the chosen dentist's working
-// schedule (GET /api/availability) and the server rechecks it. See docs/specs/TREATMENT-NEXT-VISIT-BOOKING.md.
+// Books the next visit of a treatment dossier from its nearest pending plan item. The appointment stores only the dossier
+// (dossierId); the item prefills service, duration and the planned date. Slots only come from the chosen dentist's working
+// schedule (GET /api/availability). See docs/specs/FOLLOW-UP-INSTRUCTION-REMOVAL.vi.md.
 export default function NextVisitBookingDrawer({ open, candidate, patient, onClose, onBooked }: {
   open: boolean; candidate: NextVisitCandidate | null; patient: NextVisitPatient;
   onClose: () => void; onBooked: (result: AppointmentResult) => void;
@@ -48,16 +49,15 @@ export default function NextVisitBookingDrawer({ open, candidate, patient, onClo
   const [picked, setPicked] = useState<string[]>([]), [syncError, setSyncError] = useState<string | null>(null);
   const [patientConsent, setPatientConsent] = useState(false);
   const [durationMinutes, setDurationMinutes] = useState<number | null>(null);
-  const requestKeys = useRef<{ instruction: string; appointment: string | null; sync: string }>({ instruction: newRequestKey(), appointment: null, sync: newRequestKey() });
-  const followUpId = useRef<string | null>(null);
+  const requestKeys = useRef<{ appointment: string | null; sync: string }>({ appointment: null, sync: newRequestKey() });
   const generation = useRef(0);
   const today = clinicToday();
   const durationValid = durationMinutes !== null && Number.isInteger(durationMinutes) && durationMinutes >= 1 && durationMinutes <= 480;
   const target = candidate?.targetOn ?? candidate?.estimatedStart ?? null;
   const windowed = !!candidate?.windowFrom && !!candidate.windowTo;
-  const minDate = [today, candidate?.earliestOn, candidate?.windowFrom].reduce<string>((a, b) => (b && b > a ? b : a), today);
-  // The latest bookable day: the plan window (at most 4 days after the planned date), also bounded by an older instruction.
-  const lastDay = (c: NextVisitCandidate) => c.windowTo ? (c.latestOn && c.latestOn < c.windowTo ? c.latestOn : c.windowTo) : c.latestOn ?? addDays(today, scanDays);
+  const minDate = candidate?.windowFrom && candidate.windowFrom > today ? candidate.windowFrom : today;
+  // The latest suggested day: the plan window (at most 4 days after the planned date), otherwise the scan horizon.
+  const lastDay = (c: NextVisitCandidate) => c.windowTo ?? addDays(today, scanDays);
   // Where the search starts: the planned date, or today when there is none (or it already passed).
   const anchorOf = (c: NextVisitCandidate) => { const planned = c.targetOn ?? c.estimatedStart; return planned && planned > minDate ? planned : minDate; };
 
@@ -109,21 +109,20 @@ export default function NextVisitBookingDrawer({ open, candidate, patient, onClo
 
   useEffect(() => {
     if (!open || !candidate) return;
-    requestKeys.current = { instruction: newRequestKey(), appointment: null, sync: newRequestKey() };
-    followUpId.current = candidate.followUpId;
+    requestKeys.current = { appointment: null, sync: newRequestKey() };
     const end = lastDay(candidate);
     setLimitEnd(end); setBookerName(patient.fullName); setBookerContact(patient.phone ?? ''); setExceptionReason('');
     setAfter(null); setPicked([]); setSyncError(null);
     setPatientConsent(false);
     setDurationMinutes(candidate.durationMinutes);
     return () => { generation.current++; };
-  }, [open, candidate?.itemId, candidate?.followUpId]);
+  }, [open, candidate?.dossierId, candidate?.itemId]);
 
   useEffect(() => {
     if (!open || !candidate || !durationValid) return;
     const timer = window.setTimeout(() => void suggest(lastDay(candidate)), 250);
     return () => { window.clearTimeout(timer); generation.current++; };
-  }, [open, candidate?.itemId, candidate?.followUpId, durationMinutes]);
+  }, [open, candidate?.dossierId, candidate?.itemId, durationMinutes]);
 
   const deviation = (day: string) => {
     if (!target) return null;
@@ -140,22 +139,6 @@ export default function NextVisitBookingDrawer({ open, candidate, patient, onClo
     if (!candidate || !slot || !canConfirm) return;
     setBusy(true); setError(null);
     try {
-      // The list this drawer was opened from can be stale (an earlier attempt may already have created the instruction).
-      if (!followUpId.current) {
-        const current = await api<{ items: NextVisitCandidate[] }>(`/api/patients/${patient.id}/next-visit-candidates`);
-        followUpId.current = current.items.find(x => x.itemId === candidate.itemId)?.followUpId ?? null;
-      }
-      if (!followUpId.current) {
-        // The instruction carries the bookable window itself, so the server keeps bookings within 4 days of the plan.
-        const earliest = candidate.windowFrom ?? today, latest = candidate.windowTo ?? addDays(today, scanDays);
-        const anchor = anchorOf(candidate) < earliest ? earliest : anchorOf(candidate) > latest ? latest : anchorOf(candidate);
-        const created = await api<{ instruction: { id: string } }>('/api/follow-up-instructions', { method: 'POST', body: JSON.stringify({
-          patientId: patient.id, branchId: candidate.branchId, source: { dossierId: candidate.dossierId, itemId: candidate.itemId, stepId: null, visitId: null, activityId: null },
-          purpose: 'TreatmentContinuation', reason: `Điều trị theo kế hoạch: ${candidate.serviceName}`, guidance: null,
-          earliestOn: earliest, targetOn: anchor, latestOn: latest,
-          durationMinutes: candidate.durationMinutes, dentistId: candidate.dentistId, capability: null, requestKey: requestKeys.current.instruction }) });
-        followUpId.current = created.instruction.id;
-      }
       requestKeys.current.appointment ??= newRequestKey();
       const contact = bookerContact.trim();
       const reason = needsException ? exceptionReason.trim() : null;
@@ -163,8 +146,8 @@ export default function NextVisitBookingDrawer({ open, candidate, patient, onClo
         branchId: candidate.branchId, booker: { name: bookerName.trim(), phone: contact.includes('@') ? null : contact, email: contact.includes('@') ? contact : null },
         attendee: { patientId: patient.id, name: patient.fullName, birthDate: null }, attendeeRelation: 'Self', kind: 'FollowUp', source: 'InPerson',
         serviceId: candidate.serviceId, reason: `Điều trị theo kế hoạch: ${candidate.serviceName}${candidate.region ? ` · ${candidate.region}` : ''}`,
-        dentistId: candidate.dentistId, assistantId: null, chairId: slot.chairId, startAt: slot.start, durationMinutes,
-        followUpId: followUpId.current, bookingSettingsVersion: slot.bookingSettingsVersion,
+        dentistId: candidate.dentistId, chairId: slot.chairId, startAt: slot.start, durationMinutes,
+        dossierId: candidate.dossierId, bookingSettingsVersion: slot.bookingSettingsVersion,
         patientConsentConfirmed: patientConsent,
         exceptionReason: reason, requestKey: requestKeys.current.appointment,
         scheduleVersion: slot.scheduleVersion, assistantScheduleVersion: slot.assistantScheduleVersion }) });

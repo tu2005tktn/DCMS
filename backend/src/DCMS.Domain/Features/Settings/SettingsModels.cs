@@ -10,13 +10,9 @@ public sealed class AccessGroup
 {
     public string RecordKind { get; set; } = "PermissionGroup";
     public int? IdentityRoleId { get; set; }
-    public string? RoleConcurrencyStamp { get; set; }
-    public List<DCMS.Domain.Features.Authentication.AccountClaim> RoleClaims { get; set; } = [];
     public Guid Id { get; set; } = Guid.NewGuid();
     public string Code { get; set; } = "";
     public string Name { get; set; } = "";
-    public string NormalizedCode { get; set; } = "";
-    public string NormalizedName { get; set; } = "";
     public string? Description { get; set; }
     public string BaseRole { get; set; } = "";
     public bool Active { get; set; } = true;
@@ -27,6 +23,8 @@ public sealed class AccessGroupGrant
 {
     public Guid GroupId { get; set; }
     public string Permission { get; set; } = "";
+    public int? ClaimId { get; set; }
+    public string? ClaimValue { get; set; }
 }
 public sealed class StaffAccessAssignment
 {
@@ -52,38 +50,6 @@ public sealed class SettingsAudit : DCMS.Domain.Common.AuditRecord
 public sealed class SettingsReceipt : DCMS.Domain.Common.CommandReceiptRecord
 {
     public int ActorId { get; set; }
-}
-
-public sealed class BranchProfile
-{
-    public int Id { get; set; }
-    public string Code { get; set; } = "";
-    public string Name { get; set; } = "";
-    public string? Address { get; set; }
-    public string? Phone { get; set; }
-    public string? Email { get; set; }
-    public string? Website { get; set; }
-    public Guid? LogoAssetId { get; set; }
-    public string TimeZoneId { get; set; } = "Asia/Ho_Chi_Minh";
-    public string? BankCode { get; set; }
-    public string? AccountNumber { get; set; }
-    public string? PayeeName { get; set; }
-    public int SlotIntervalMinutes { get; set; } = 15;
-    public int BookingSettingsVersion { get; set; } = 1;
-    public bool IsActive { get; set; } = true;
-    public int Version { get; set; } = 1;
-}
-
-// Logo image stored outside Git and the web root; only verified PNG/JPEG/WebP bytes with metadata removed.
-public sealed class BranchAsset
-{
-    public Guid Id { get; set; } = Guid.NewGuid();
-    public int BranchId { get; set; }
-    public string ContentType { get; set; } = "";
-    public long SizeBytes { get; set; }
-    public string Sha256 { get; set; } = "";
-    public int UploadedBy { get; set; }
-    public DateTimeOffset UploadedAt { get; set; }
 }
 
 public sealed class BranchChair

@@ -85,7 +85,7 @@ public sealed class DevelopmentPrescriptionSeeder(DcmsDbContext db, TimeProvider
         var medicines = await db.CatalogMedicines.AsNoTracking()
             .Where(x => medicineCodes.Contains(x.Code) && x.IsActive && x.PrescriptionEligible).ToDictionaryAsync(x => x.Code, ct);
         var ids = Prescriptions.Select(x => x.Id).ToArray();
-        var existing = await db.Set<PatientPrescription>().AsNoTracking().Where(x => ids.Contains(x.Id)).Select(x => x.Id).ToListAsync(ct);
+        var existing = await db.PatientPrescriptions.AsNoTracking().Where(x => ids.Contains(x.Id)).Select(x => x.Id).ToListAsync(ct);
         var today = DateOnly.FromDateTime(now.ToOffset(TimeSpan.FromHours(7)).DateTime);
         var added = 0;
         foreach (var demo in Prescriptions)
@@ -96,7 +96,7 @@ public sealed class DevelopmentPrescriptionSeeder(DcmsDbContext db, TimeProvider
             {
                 Id = demo.Id, PatientId = patient.Id, BranchId = branch.Id, PrescribedOn = today.AddDays(-demo.DaysAgo),
                 Diagnosis = demo.Diagnosis, OtherDiagnosis = demo.OtherDiagnosis, Advice = demo.Advice,
-                PrescriberEmployeeId = dentist.Employee.Id, CreatedAt = now.AddDays(-demo.DaysAgo), UpdatedAt = now.AddDays(-demo.DaysAgo)
+                PrescriberEmployeeId = dentist.Employee.Id, CreatedAt = now.AddDays(-demo.DaysAgo)
             };
             for (var index = 0; index < demo.Items.Length; index++)
             {
@@ -104,8 +104,9 @@ public sealed class DevelopmentPrescriptionSeeder(DcmsDbContext db, TimeProvider
                 var medicine = medicines[item.MedicineCode];
                 rx.Items.Add(new PatientPrescriptionItem
                 {
+                    IsExternalPurchase = true,
                     PrescriptionId = rx.Id, MedicineId = medicine.Id, MedicineCode = medicine.Code, MedicineName = medicine.Name,
-                    Strength = medicine.Strength, DosageForm = medicine.DosageForm, Unit = medicine.BaseUnit,
+                    Strength = medicine.Spec.Strength, DosageForm = medicine.Spec.DosageForm, Unit = medicine.BaseUnit,
                     Quantity = item.Quantity, Instructions = item.Instructions, Position = index
                 });
             }

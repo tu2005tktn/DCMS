@@ -171,7 +171,7 @@ export default function ExaminationPage() {
     finally { if (token === generation.current) setBusy(false); }
   }
   if (!w || !content) return error ? <Alert type="error" message={error} /> : <Spin />;
-  if(w.visit.purpose === 'TreatmentContinuation') return w.visit.source?.priorCourseId ? <Navigate replace to={`/patients/${w.visit.patientId}?tab=treatment&dossierId=${w.visit.source.priorCourseId}`} /> : <Alert type="info" message="Lượt điều trị chưa được liên kết hồ sơ khi tiếp nhận. Cần chọn đúng hồ sơ điều trị, không tạo thêm phiếu khám mới." description={<Link to={`/patients/${w.visit.patientId}?tab=treatment`}>Mở các hồ sơ điều trị</Link>}/>;
+  if(w.visit.purpose === 'TreatmentContinuation') return <Navigate replace to={`/patients/${w.visit.patientId}?tab=treatment`} />;
   const v = w.visit; const editable = w.allowedActions.includes('save') || amending; const handoff = w.allowedActions.includes('handoff');
   const findings = content.findings;
   function applyTeeth(teeth: number[], condition: string, surfaces: string[], diagnoses: string[], references: ReferenceSnapshot[]) {
@@ -208,8 +208,7 @@ export default function ExaminationPage() {
         { label: 'Lịch hẹn', children: v.appointmentCode }, { label: 'Bác sĩ', children: v.dentistName }, { label: 'Chi nhánh', children: v.branchName },
         { label: 'Giờ đến', children: arrivalClock(v.arrivalAt) }, { label: 'Mục đích', children: purposeLabels[v.purpose] },
         { label: 'Thông tin tiếp nhận', children: v.arrivalReason ?? v.note ?? 'Chưa có' },
-        { label: 'Hồ sơ cũ', children: v.source?.label ?? 'Chưa chọn hồ sơ' },
-      ]} />{v.source?.blocker && <Alert type="warning" message={v.source.blocker} />}
+              ]} />
       {w.allowedActions.includes('start') && <Button aria-label="Bắt đầu khám" type="primary" disabled={busy} loading={busy} onClick={() => void command(true)}>Bắt đầu khám</Button>}
     </Card></section>
     <Tabs activeKey={tab} onChange={setTab} items={[
@@ -243,7 +242,7 @@ export default function ExaminationPage() {
       { key: 'investigations', label: `Cận lâm sàng${w.investigations?.length ? ` (${w.investigations.length})` : ''}`, children: <Card><InvestigationsPanel key={visitId} workspace={w} contexts={contexts} busy={busy} onBusy={setBusy} onChanged={investigationsChanged} amending={amending} amendmentReason={amendReason} onAmendmentReason={value=>{setAmendReason(value);pendingCommand.current=undefined;}} /></Card> },
       ...(has('documents.read') ? [{ key: 'documents', label: 'Ảnh & tài liệu', children: contextError ? <Alert type="error" message={contextError.message} /> :
         <DocumentList patientId={v.patientId} contexts={contexts} filters={lockedFilters} onFiltersChange={setFilters} uploadContext={{ visitId }}
-          review={has('documents.review') && v.status === 'InProgress' && (editable || handoff) ? review : undefined} lockedVisitId={visitId} /> }] : []),
+          review={has('documents.review') && (v.status === 'InProgress' || v.status === 'ExaminationConfirmed') && (editable || handoff) ? review : undefined} lockedVisitId={visitId} /> }] : []),
       { key: 'summary', label: 'Tổng kết khám', children: <Card title="Chẩn đoán và hướng xử trí" className={`examination-summary ${w.examination?.confirmed ? 'clinical-confirmed' : ''}`}>
         <Form layout="vertical" disabled={!editable || busy}>
           <section aria-label="Chẩn đoán đã ghi tại răng và vùng" className="scoped-diagnoses-summary">
@@ -283,9 +282,8 @@ export default function ExaminationPage() {
         </>}
         {!amending && w.allowedActions.includes('amend') && <Button key="amend-examination" aria-label="Đính chính kết quả" disabled={busy} onClick={() => { setAmending(true); setDirty(true); }}>Đính chính kết quả</Button>}
         {!amending && handoff && <Link to={`/patients/${v.patientId}?tab=treatment&sourceExaminationVisitId=${visitId}&examinationVersion=${w.examination?.version ?? 0}`}><Button type="primary">Lập kế hoạch điều trị</Button></Link>}
-        {!amending && w.examination?.confirmed && user?.permissions.includes('examinations.manage') && <Link to={`/visits/${visitId}/prescription`}><Button>Đơn thuốc mua ngoài</Button></Link>}
         {!amending && w.allowedActions.includes('complete') && <Button disabled={busy} onClick={() => { setWorkReviewed(false); setEnding(true); }}>Kết thúc lượt khám</Button>}</Space>
-        {w.examination?.confirmed && v.status === 'InProgress' && <Typography.Paragraph type="secondary" style={{ marginTop: 16 }}>Phiếu khám đã hoàn tất. Kết thúc lượt khám trước khi chuyển sang phiếu điều trị.</Typography.Paragraph>}
+        {v.status === 'ExaminationConfirmed' && <Typography.Paragraph type="secondary" style={{ marginTop: 16 }}>Phiếu khám đã hoàn tất. Kết thúc lượt khám trước khi chuyển sang phiếu điều trị.</Typography.Paragraph>}
       </Card> },
       { key: 'history', label: 'Lịch sử khám', children: <><Typography.Title level={4}>Các phiên bản phiếu hiện tại</Typography.Title>
         {versions.length ? versions.map(version => <Card key={version.version} size="small" title={`Phiên bản ${version.version} · ${version.confirmed ? 'Đã xác nhận' : 'Nháp'}`}>

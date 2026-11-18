@@ -42,3 +42,10 @@ Trên bản sao phục hồi từ DB phát triển, migration EF thật chạy U
 Backend restore/build bằng .NET 10 thành công; model EF khớp migration. Có 100 unit test đạt. Lượt integration toàn bộ chạy tuần tự đạt 509/511, 2 NFR tùy chọn skip, không lỗi. Hai test lưu trữ mới kiểm thay đổi danh mục và hai bảng cũ được giữ qua rollback, và khóa gửi lại vẫn duy nhất trong kho receipt chung. Test tương thích S58 đọc danh mục cũ từ snapshot. Web không thay đổi.
 
 API trên DB phát triển: `GET /health` trả API và database healthy. Đăng nhập Owner demo, đọc thiết lập chung và lịch sử, danh mục chẩn đoán, nhà cung cấp, lịch sử thay đổi của một nhà cung cấp và một mục danh mục, nhật ký thiết lập, tùy chọn chẩn đoán và lần nhập vật tư đều thành công; số mục và số dòng lịch sử khớp DB. Phiên kiểm chứng đã đăng xuất, log API không có lỗi.
+
+## Cập nhật rút gọn ngày 18/11/2026
+
+- `REFERENCE_ENTRY` (`13 -> 8` cột): bỏ `NormalizedName` (dùng `IX_REFERENCE_ENTRY_Kind_Name_Upper`) và 4 cột `CreatedAt`, `CreatedBy`, `UpdatedAt`, `UpdatedBy` (lịch sử đã lưu ở `COMMAND_RECEIPT`).
+- `MATERIAL_CATEGORY` (`7 -> 4` cột): chỉ giữ `Id`, `Name`, `Version`, `IsDeleted` (unique `UPPER("Name") WHERE NOT "IsDeleted"`).
+- `MATERIAL_CATALOG_ITEM` (`9 -> 6` cột): chỉ giữ `Id`, `Name`, `CategoryId`, `UsageUnit`, `Version`, `IsDeleted` (unique `("CategoryId", UPPER("Name")) WHERE NOT "IsDeleted"`).
+- `MATERIAL_USAGE` (`12 -> 6` cột): giữ `Id`, `ActivityId` (FK cascade -> `CLINICAL_ACTIVITY`), `MaterialId`, `Quantity`, `UsedAt`, `RecordedBy`; bỏ `MaterialName`, `UsageUnit`, `PatientId`, `BranchId`, `DossierId`, `CreatedAt`. Xem [rút gọn 8 bảng ít cột còn lại](./REMAINING-EIGHT-SMALL-TABLES-SIMPLIFICATION.vi.md).

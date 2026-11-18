@@ -56,14 +56,11 @@ public sealed class CareTaskService(DcmsDbContext db, UserManager<ApplicationUse
     }
 
     private static CareTaskDto Map(CareTask x) => new(x.Id, x.PatientId, x.BranchId,
-        x.InstructionId, x.AppointmentId, x.ReviewId, x.Type, x.Content, x.OwnerAccountId,
+        x.AppointmentId, x.Type, x.Content, x.OwnerAccountId,
         x.DueAt, x.Status, x.Version, x.Status is "Done" or "Cancelled" ? [] :
-            ["update", "recordContact", "escalate"]);
+            ["update", "recordContact"]);
     private static ContactAttemptDto Map(CareContactAttempt x) => new(x.Id, x.TaskId,
         x.Channel, x.Result, x.NextAction, x.RebookedAppointmentId, x.ActorId, x.OccurredAt);
-    private static EscalationDto Map(CareEscalation x) => new(x.Id, x.TaskId,
-        x.TargetClinicianAccountId, x.Reason, x.Resolution, x.Status, x.CreatedBy,
-        x.CreatedAt, x.Version, x.AcknowledgedAt, x.ResolvedAt);
 
     private async Task<Guid?> ReplayAsync(int actorId, Guid key, string command, object payload,
         CancellationToken ct)
@@ -103,8 +100,7 @@ public sealed class CareTaskService(DcmsDbContext db, UserManager<ApplicationUse
             ?? throw Error("MSG113", 404);
         await ReadableAsync(actorId, row.BranchId, ct);
         var contacts = row.ContactAttempts.OrderBy(x => x.OccurredAt).ToList();
-        var escalations = row.Escalations.OrderBy(x => x.CreatedAt).ToList();
-        return new(Map(row), contacts.Select(Map).ToArray(), escalations.Select(Map).ToArray());
+        return new(Map(row), contacts.Select(Map).ToArray());
     }
 
     public async Task<CareTaskDto> CreateAsync(int actorId, CreateCareTaskRequest request,
@@ -120,24 +116,17 @@ public sealed class CareTaskService(DcmsDbContext db, UserManager<ApplicationUse
             Clean(request.Type) is not { Length: <= 40 } || request.DueAt == default ||
             !await db.Patients.AsNoTracking().AnyAsync(x => x.Id == request.PatientId && !x.IsArchived, ct))
             throw Error("MSG04");
-        if (request.InstructionId.HasValue && !await db.FollowUpInstructions.AsNoTracking()
-            .AnyAsync(x => x.Id == request.InstructionId && x.PatientId == request.PatientId &&
-                x.BranchId == request.BranchId, ct)) throw Error("MSG113", 404);
         if (request.AppointmentId.HasValue && !await db.Appointments.AsNoTracking()
             .AnyAsync(x => x.Id == request.AppointmentId && x.BranchId == request.BranchId &&
                 x.PatientId == request.PatientId, ct)) throw Error("MSG113", 404);
-        if (request.ReviewId.HasValue && !await db.ClinicalReviews.AsNoTracking()
-            .AnyAsync(x => x.Id == request.ReviewId && x.PatientId == request.PatientId &&
-                x.BranchId == request.BranchId, ct)) throw Error("MSG113", 404);
-        var now = clock.GetUtcNow();
         var row = new CareTask
         {
             PatientId = request.PatientId, BranchId = request.BranchId,
-            InstructionId = request.InstructionId, AppointmentId = request.AppointmentId,
-            ReviewId = request.ReviewId, Type = request.Type.Trim(),
+            AppointmentId = request.AppointmentId,
+            Type = request.Type.Trim(),
             Content = request.Content.Trim(), OwnerAccountId = request.OwnerAccountId,
             // Npgsql only writes UTC offsets to timestamptz; the Web sends clinic time (+07:00).
-            DueAt = request.DueAt.ToUniversalTime(), CreatedBy = actorId, CreatedAt = now, UpdatedAt = now
+            DueAt = request.DueAt.ToUniversalTime()
         };
         db.CareTasks.Add(row);
         Receipt(actorId, request.RequestKey, "CareTaskCreate", request, row.Id);
@@ -161,7 +150,7 @@ public sealed class CareTaskService(DcmsDbContext db, UserManager<ApplicationUse
             throw Error("MSG04");
         row.Status = request.Status; row.Content = request.Content.Trim();
         row.OwnerAccountId = request.OwnerAccountId; row.DueAt = request.DueAt.ToUniversalTime();
-        row.Version++; row.UpdatedAt = clock.GetUtcNow();
+        row.Version++;
         Receipt(actorId, request.RequestKey, "CareTaskUpdate", new { id, request }, id);
         await db.SaveChangesAsync(ct);
         return Map(row);
@@ -191,61 +180,9 @@ public sealed class CareTaskService(DcmsDbContext db, UserManager<ApplicationUse
             NextAction = Clean(request.NextAction), RebookedAppointmentId = request.RebookedAppointmentId,
             ActorId = actorId, OccurredAt = clock.GetUtcNow()
         };
-        task.Version++; task.UpdatedAt = row.OccurredAt;
+        task.Version++;
         task.ContactAttempts.Add(row);
         Receipt(actorId, request.RequestKey, "CareContact", new { id, request }, row.Id);
-        await db.SaveChangesAsync(ct);
-        return Map(row);
-    }
-
-    public async Task<EscalationDto> EscalateAsync(int actorId, Guid id,
-        EscalateCareRequest request, CancellationToken ct)
-    {
-        if (request.RequestKey == Guid.Empty) throw Error("MSG04");
-        await using var gate = await ClinicalRequestLock.AcquireAsync(db, request.RequestKey, ct);
-        var replay = await ReplayAsync(actorId, request.RequestKey, "CareEscalate", new { id, request }, ct);
-        if (replay.HasValue) return Map(await db.CareEscalations.AsNoTracking().SingleAsync(x => x.Id == replay, ct));
-        var task = await TaskAsync(actorId, id, ct);
-        if (task.Version != request.ExpectedTaskVersion || task.Status is "Done" or "Cancelled")
-            throw Error("MSG111", 409);
-        if (Clean(request.Reason) is not { Length: <= 1000 } ||
-            !await AuthorizedAsync(request.TargetClinicianAccountId, task.BranchId, ct))
-            throw Error("MSG06", 403);
-        var row = new CareEscalation
-        {
-            TaskId = id, TargetClinicianAccountId = request.TargetClinicianAccountId,
-            Reason = request.Reason.Trim(), CreatedBy = actorId, CreatedAt = clock.GetUtcNow()
-        };
-        task.Version++; task.UpdatedAt = row.CreatedAt;
-        task.Escalations.Add(row);
-        Receipt(actorId, request.RequestKey, "CareEscalate", new { id, request }, row.Id);
-        await db.SaveChangesAsync(ct);
-        return Map(row);
-    }
-
-    public async Task<EscalationDto> ChangeEscalationAsync(int actorId, Guid id, bool resolve,
-        ResolveEscalationRequest request, CancellationToken ct)
-    {
-        if (request.RequestKey == Guid.Empty) throw Error("MSG04");
-        await using var gate = await ClinicalRequestLock.AcquireAsync(db, request.RequestKey, ct);
-        var command = resolve ? "CareResolve" : "CareAcknowledge";
-        var replay = await ReplayAsync(actorId, request.RequestKey, command, new { id, request }, ct);
-        if (replay.HasValue) return Map(await db.CareEscalations.AsNoTracking().SingleAsync(x => x.Id == replay, ct));
-        // The escalation is changed through the tracked task that stores it.
-        var task = await db.CareTasks.SingleOrDefaultAsync(x => x.Escalations.Any(e => e.Id == id), ct)
-            ?? throw Error("MSG113", 404);
-        var row = task.Escalations.Single(x => x.Id == id);
-        if (!await AuthorizedAsync(actorId, task.BranchId, ct) || actorId != row.TargetClinicianAccountId)
-            throw Error("MSG06", 403);
-        if (row.Version != request.ExpectedVersion ||
-            (resolve ? row.Status != "Acknowledged" : row.Status != "Pending"))
-            throw Error("MSG111", 409);
-        if (resolve && Clean(request.Resolution) is not { Length: <= 4000 }) throw Error("MSG04");
-        row.Status = resolve ? "Resolved" : "Acknowledged";
-        row.Version++;
-        if (resolve) { row.Resolution = request.Resolution!.Trim(); row.ResolvedAt = clock.GetUtcNow(); }
-        else row.AcknowledgedAt = clock.GetUtcNow();
-        Receipt(actorId, request.RequestKey, command, new { id, request }, row.Id);
         await db.SaveChangesAsync(ct);
         return Map(row);
     }
@@ -328,7 +265,7 @@ public sealed class CareTaskService(DcmsDbContext db, UserManager<ApplicationUse
         }
         var types = (await db.ReferenceEntries.AsNoTracking()
                 .Where(x => x.Kind == DCMS.Application.Features.SystemSettings.ReferenceKinds.CareTypes && x.IsActive && x.Code != null)
-                .OrderBy(x => x.NormalizedName).Select(x => new { x.Code, x.Name }).ToListAsync(ct))
+                .OrderBy(x => x.Name.ToUpper()).Select(x => new { x.Code, x.Name }).ToListAsync(ct))
             .Select(x => new CareTypeOption(x.Code!, x.Name, false))
             .Concat(SystemTypes.Select(x => new CareTypeOption(x.Key, x.Value, true))).ToArray();
         var today = DateOnly.FromDateTime(clock.GetUtcNow().ToOffset(ClinicOffset).DateTime);
@@ -346,7 +283,7 @@ public sealed class CareTaskService(DcmsDbContext db, UserManager<ApplicationUse
                               EF.Functions.ILike(p.FullName, pattern) ||
                               p.Phone != null && EF.Functions.ILike(p.Phone, pattern))
                           let last = db.Visits.Where(v => v.PatientId == p.Id && v.BranchId == branchId &&
-                                  (v.Status == VisitStatuses.InProgress || v.Status == VisitStatuses.Completed))
+                                  (v.Status == VisitStatuses.InProgress || v.Status == VisitStatuses.ExaminationConfirmed || v.Status == VisitStatuses.Completed))
                               .Max(v => (DateTimeOffset?)v.ArrivalAt)
                           where last != null
                           orderby last descending, p.Id

@@ -285,7 +285,6 @@ export default function AppointmentDetailScreen() {
       <Text style={styles.when}>{formatWeekday(detail.start)}, {formatDate(detail.start)}</Text>
       <Text style={styles.when}>{formatClock(detail.start)} – {formatClock(detail.end)} ({detail.durationMinutes} phút)</Text>
       <Row label="Nha sĩ" value={detail.dentistName} />
-      {detail.followUp && <Row label="Lịch tái khám" value={detail.followUp.status === 'NeedsBooking' ? 'Cần đặt lại' : 'Đã gắn với lịch này'} />}
     </Card>
 
     <Card title="Người khám">
@@ -369,7 +368,7 @@ export default function AppointmentDetailScreen() {
       {errorBanner}
       <Text style={styles.muted}>{!e.canSelfService
         ? 'Lịch hẹn còn dưới 12 giờ. Yêu cầu hủy lịch sẽ được gửi cho nhân viên phòng khám xác nhận. Lịch cũ vẫn được giữ nguyên cho đến khi nhân viên duyệt.'
-        : `Lịch ${detail.code} lúc ${formatDateTime(detail.start)} sẽ bị hủy. ${detail.followUp ? 'Lịch tái khám liên quan sẽ chuyển về trạng thái cần đặt lại.' : ''}`}</Text>
+        : `Lịch ${detail.code} lúc ${formatDateTime(detail.start)} sẽ bị hủy.`}</Text>
       {reasonField}
       <Button title={!e.canSelfService ? 'Gửi yêu cầu hủy lịch' : 'Xác nhận hủy lịch'} variant="danger" busy={busy} onPress={confirmCancel} />
       <Button title="Không hủy" variant="secondary" disabled={busy} onPress={close} />

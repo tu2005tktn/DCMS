@@ -1,5 +1,9 @@
 # S58/S21/S24 — Mẫu, tiến trình điều trị và chỉ định quay lại
 
+> Cập nhật 18/11/2026: hoàn tất bước nhận bằng chứng là hoạt động đã ghi của cùng hạng mục trong phiếu (hoạt động không còn `StepId`). Xem [CLINICAL-ACTIVITY-TABLE-SIMPLIFICATION.vi.md](CLINICAL-ACTIVITY-TABLE-SIMPLIFICATION.vi.md) giai đoạn 4.
+
+> Cập nhật 18/11/2026: hướng dẫn tái khám (`FollowUpInstruction`, `/api/follow-up-instructions`) đã bị xóa. Lịch hẹn tiếp theo gắn với phiếu điều trị qua `APPOINTMENT.DossierId` (thay `FollowUpId`) và được gợi ý từ hạng mục kế hoạch gần nhất còn chờ của phiếu. Các phần bên dưới nói về hướng dẫn tái khám là lịch sử thiết kế. Xem [FOLLOW-UP-INSTRUCTION-REMOVAL.vi.md](FOLLOW-UP-INSTRUCTION-REMOVAL.vi.md).
+
 ## Giao diện kế hoạch dùng lại — 02/11/2026
 Menu `/treatment-templates` nay hiển thị Kế hoạch điều trị dạng hạng mục theo `TREATMENT-ITEM-PLANS.md`. Mẫu bước tiến trình cũ và hợp đồng bên dưới giữ tại `/treatment-templates/legacy`. DefinitionKind LegacySteps/ItemPlan phân biệt nguồn; API progression cũ chỉ đọc/sửa/áp dụng LegacySteps chưa xóa. Kế hoạch ItemPlan CRUD độc lập, chưa áp dụng vào dossier và không tạo bước/actual/lịch/tiền.
 
@@ -24,6 +28,8 @@ Nguồn nghiệp vụ hiện hành: DCMS_Screen_Specifications_v2.3 và DCMS_Use
 - Nguồn chỉ định phải chọn đúng một nhánh: `{dossierId,itemId,stepId?}` hoặc `{visitId,activityId}`; không trộn ID hai nhánh. Nguồn Visit/activity hiện chưa có adapter xác thực Patient/branch nên API từ chối 503 thay vì nhận ID chưa kiểm chứng. Chỉ định từ agreed dossier/item là đường hoạt động trước; nguồn actual/lab từ các module khác phải được nối trước nghiệm thu end-to-end tương ứng.
 
 ### Tích hợp S22/S63 và care backend
+
+Cập nhật 18/11/2026: bản ghi review và care note của S63 đã bị xóa; xem [S22-S63-ACTUAL-REVIEW-CARE.md](S22-S63-ACTUAL-REVIEW-CARE.md).
 
 [S22/S63/care contract](S22-S63-ACTUAL-REVIEW-CARE.md) bổ sung bảng activity/review/care và cổng evidence đọc activity `Posted` đúng Patient/dossier/step. `ITreatmentActualEvidencePort` không còn mặc định trả false; tuy nhiên S22 production vẫn chặn Post khi cổng Visit InProgress và consent đúng version chưa được nối, và bước yêu cầu Labo vẫn chặn khi chưa xác minh Accepted. Đánh giá S63, activity S22 và contact care là các commit riêng. Điều này không biến một activity thành completed step, Appointment hoặc charge nếu chưa có command và bằng chứng tương ứng.
 

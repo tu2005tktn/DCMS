@@ -128,7 +128,7 @@ public sealed class RegistrationApiTests(ApiFixture fixture) : IClassFixture<Api
         var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
         Assert.Equal(1, await db.Users.CountAsync(x => x.UserName == phone));
         Assert.Equal(1, await db.Users.CountAsync(x => x.UserName == concurrentPhone));
-        Assert.Equal(1, await db.Users.CountAsync(x => x.NormalizedEmail == request.Email!.ToUpperInvariant()));
+        Assert.Equal(1, await db.Users.CountAsync(x => x.Email != null && x.Email.ToUpper() == request.Email!.ToUpperInvariant()));
     }
 
     [Fact]

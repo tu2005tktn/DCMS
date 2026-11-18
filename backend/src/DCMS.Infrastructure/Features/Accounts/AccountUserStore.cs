@@ -64,28 +64,49 @@ public sealed class AccountUserStore : UserStore<ApplicationUser, IdentityRole<i
         return Task.CompletedTask;
     }
 
-    public override async Task<IList<ApplicationUser>> GetUsersForClaimAsync(Claim claim, CancellationToken ct = default) =>
-        await db.Users.Where(x => x.Claims.Any(value => value.Type == claim.Type && value.Value == claim.Value)).ToListAsync(ct);
+    public override async Task<IList<ApplicationUser>> GetUsersForClaimAsync(Claim claim, CancellationToken ct = default)
+    {
+        var ids = await db.Database.SqlQuery<int>($"""
+            SELECT u."Id" AS "Value"
+            FROM "USER_ACCOUNT" u
+            CROSS JOIN LATERAL jsonb_array_elements(COALESCE(u."AuthData"->'Claims', '[]'::jsonb)) c
+            WHERE COALESCE(c->>'Type', '') = {claim.Type} AND COALESCE(c->>'Value', '') = {claim.Value}
+            """).ToArrayAsync(ct);
+        return ids.Length == 0 ? [] : await db.Users.Where(x => ids.Contains(x.Id)).ToListAsync(ct);
+    }
 
     public override Task AddLoginAsync(ApplicationUser user, UserLoginInfo login, CancellationToken ct = default)
     {
         user.Logins.Add(new AccountLogin { Provider = login.LoginProvider, Key = login.ProviderKey, DisplayName = login.ProviderDisplayName });
-        if (login.LoginProvider == "Google") user.GoogleSubject = login.ProviderKey;
         return Task.CompletedTask;
     }
 
     public override Task RemoveLoginAsync(ApplicationUser user, string provider, string key, CancellationToken ct = default)
     {
         user.Logins.RemoveAll(x => x.Provider == provider && x.Key == key);
-        if (provider == "Google") user.GoogleSubject = user.Logins.FirstOrDefault(x => x.Provider == provider)?.Key;
         return Task.CompletedTask;
     }
 
     public override Task<IList<UserLoginInfo>> GetLoginsAsync(ApplicationUser user, CancellationToken ct = default) =>
         Task.FromResult<IList<UserLoginInfo>>(user.Logins.Select(x => new UserLoginInfo(x.Provider, x.Key, x.DisplayName)).ToArray());
 
-    public override Task<ApplicationUser?> FindByLoginAsync(string provider, string key, CancellationToken ct = default) =>
-        db.Users.SingleOrDefaultAsync(x => x.Logins.Any(value => value.Provider == provider && value.Key == key), ct);
+    public override async Task<ApplicationUser?> FindByLoginAsync(string provider, string key, CancellationToken ct = default)
+    {
+        var id = await db.Database.SqlQuery<int?>($"""
+            SELECT u."Id" AS "Value"
+            FROM "USER_ACCOUNT" u
+            CROSS JOIN LATERAL jsonb_array_elements(COALESCE(u."AuthData"->'Logins', '[]'::jsonb)) l
+            WHERE l->>'Provider' = {provider} AND l->>'Key' = {key}
+            LIMIT 1
+            """).SingleOrDefaultAsync(ct);
+        return id.HasValue ? await db.Users.SingleOrDefaultAsync(x => x.Id == id.Value, ct) : null;
+    }
+
+    public override Task<ApplicationUser?> FindByNameAsync(string normalizedUserName, CancellationToken ct = default) =>
+        db.Users.FirstOrDefaultAsync(x => x.UserName != null && x.UserName.ToUpper() == normalizedUserName, ct);
+
+    public override Task<ApplicationUser?> FindByEmailAsync(string normalizedEmail, CancellationToken ct = default) =>
+        db.Users.SingleOrDefaultAsync(x => x.Email != null && x.Email.ToUpper() == normalizedEmail, ct);
 
     public override Task SetTokenAsync(ApplicationUser user, string provider, string name, string? value, CancellationToken ct = default)
     {

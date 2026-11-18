@@ -16,16 +16,20 @@ public sealed partial class TreatmentDossierService
         quadrants.SelectMany(q => Enumerable.Range(1, count).Select(n => $"{q}{n}")).ToHashSet();
 
     private static LabOrderDto ToDto(LabOrder x) => new(x.Id, x.ActivityId, x.Code, x.OrderedOn, x.DueOn, x.DeliveredOn, x.DentistId, x.LabProviderId,
-        x.LabWorkTypeId, x.WorkName, x.MarginOuter, x.MarginInner, x.MarginSide, x.BridgeShapes, x.IsChild, x.Teeth, x.Shade, x.Note, x.Material,
-        x.Quantity, x.TotalFeeVnd, x.PaidVnd, x.Warranty, x.Version, x.Status, x.SentOn, x.ReceivedOn);
+        x.LabWorkTypeId, x.WorkName, x.Spec.MarginOuter, x.Spec.MarginInner, x.Spec.MarginSide, x.Spec.BridgeShapes, x.Spec.IsChild, x.Spec.Teeth, x.Spec.Shade, x.Note, x.Spec.Material,
+        x.Quantity, x.TotalFeeVnd, x.PaidVnd, x.Spec.Warranty, x.Version, x.Status, x.Spec.SentOn, x.Spec.ReceivedOn);
 
     private static bool IsLab(CatalogProvider p) => p.Type == "Lab" || p.Type == "Both";
 
     public async Task<IReadOnlyList<LabOrderSummary>> LabOrdersAsync(int actorId, Guid dossierId, CancellationToken ct)
     {
         await DossierAsync(actorId, dossierId, ct);
-        return await db.LabOrders.AsNoTracking().Where(x => x.DossierId == dossierId)
-            .Select(x => new LabOrderSummary(x.ActivityId, x.WorkName, x.TotalFeeVnd, x.DueOn, x.DeliveredOn)).ToListAsync(ct);
+        return await (
+            from x in db.LabOrders.AsNoTracking()
+            join a in db.ClinicalActivities.AsNoTracking() on x.ActivityId equals a.Id
+            where a.DossierId == dossierId
+            select new LabOrderSummary(x.ActivityId, x.WorkName, x.TotalFeeVnd, x.DueOn, x.DeliveredOn)
+        ).ToListAsync(ct);
     }
 
     private async Task<ClinicalActivity> LabActivityAsync(Guid dossierId, Guid activityId, CancellationToken ct) =>
@@ -75,13 +79,18 @@ public sealed partial class TreatmentDossierService
         if (!(await DentistOptionsAsync(dossier.BranchId, ct)).Any(d => d.Id == r.DentistId)) throw Error("MSG04");
         if (r.LabProviderId is { } lab && !await db.Set<CatalogProvider>().AnyAsync(x => x.Id == lab && x.IsActive && (x.Type == "Lab" || x.Type == "Both"), ct)) throw Error("MSG04");
         if (r.LabWorkTypeId is { } type && !await db.LabWorkTypes.AnyAsync(x => x.Id == type, ct)) throw Error("MSG04");
-        if (code != null && await db.LabOrders.AnyAsync(x => x.BranchId == dossier.BranchId && x.Code == code && x.ActivityId != activityId, ct)) throw Error("MSG111", 409);
+        if (code != null && await (
+            from x in db.LabOrders
+            join a in db.ClinicalActivities on x.ActivityId equals a.Id
+            join d in db.TreatmentDossiers on a.DossierId equals d.Id
+            where d.BranchId == dossier.BranchId && x.Code == code && x.ActivityId != activityId
+            select x.Id).AnyAsync(ct)) throw Error("MSG111", 409);
 
         var order = await db.LabOrders.SingleOrDefaultAsync(x => x.ActivityId == activityId, ct);
         var now = clock.GetUtcNow();
         if (order == null)
         {
-            order = new LabOrder { ActivityId = activityId, DossierId = dossierId, PatientId = activity.PatientId, BranchId = dossier.BranchId, CreatedAt = now, CreatedBy = actorId };
+            order = new LabOrder { ActivityId = activityId };
             db.Add(order);
             order.StatusLogs.Add(new LabOrderStatusLog { LabOrderId = order.Id, ToStatus = LabOrderStatus.NotSent, ChangedAt = now, ChangedBy = actorId });
         }
@@ -93,10 +102,13 @@ public sealed partial class TreatmentDossierService
         }
         order.Code = code; order.OrderedOn = r.OrderedOn; order.DueOn = r.DueOn; order.DeliveredOn = r.DeliveredOn; order.DentistId = r.DentistId;
         order.LabProviderId = r.LabProviderId; order.LabWorkTypeId = r.LabWorkTypeId; order.WorkName = work;
-        order.MarginOuter = Clean(r.MarginOuter); order.MarginInner = Clean(r.MarginInner); order.MarginSide = Clean(r.MarginSide);
-        order.BridgeShapes = shapes; order.IsChild = r.IsChild; order.Teeth = teeth; order.Shade = shade; order.Note = note; order.Material = material;
-        order.Quantity = r.Quantity; order.TotalFeeVnd = r.TotalFeeVnd; order.PaidVnd = r.PaidVnd; order.Warranty = warranty;
-        order.UpdatedAt = now; order.UpdatedBy = actorId;
+        order.Note = note; order.Quantity = r.Quantity; order.TotalFeeVnd = r.TotalFeeVnd; order.PaidVnd = r.PaidVnd;
+        order.Spec = new LabOrderSpec
+        {
+            MarginOuter = Clean(r.MarginOuter), MarginInner = Clean(r.MarginInner), MarginSide = Clean(r.MarginSide),
+            BridgeShapes = shapes, IsChild = r.IsChild, Teeth = teeth, Shade = shade,
+            Material = material, Warranty = warranty, SentOn = order.Spec.SentOn, ReceivedOn = order.Spec.ReceivedOn
+        };
         try { await db.SaveChangesAsync(ct); }
         catch (DbUpdateException) { throw Error("MSG111", 409); }
         return ToDto(order);
@@ -106,10 +118,15 @@ public sealed partial class TreatmentDossierService
     {
         await access.RequireAsync(actorId, "treatment.lab.manage", ct);
         await DossierAsync(actorId, dossierId, ct);
-        var order = await db.LabOrders.AsNoTracking().SingleOrDefaultAsync(x => x.ActivityId == activityId && x.DossierId == dossierId, ct) ?? throw Error("MSG113", 404);
+        var order = await (
+            from x in db.LabOrders.AsNoTracking()
+            join a in db.ClinicalActivities.AsNoTracking() on x.ActivityId equals a.Id
+            where x.ActivityId == activityId && a.DossierId == dossierId
+            select new { x.Id, x.Version }
+        ).SingleOrDefaultAsync(ct) ?? throw Error("MSG113", 404);
         if (await PatientPaidLabAsync(order.Id, ct) > 0) throw Error("MSG111", 409);
-        // EF cannot delete a tracked row whose JSONB status history has entries, so delete directly and keep the stamp check.
-        if (await db.LabOrders.Where(x => x.Id == order.Id && x.StorageStamp == order.StorageStamp).ExecuteDeleteAsync(ct) == 0)
+        // EF cannot delete a tracked row whose JSONB status history has entries, so delete directly and keep the Version concurrency check.
+        if (await db.LabOrders.Where(x => x.Id == order.Id && x.Version == order.Version).ExecuteDeleteAsync(ct) == 0)
             throw Error("MSG111", 409);
     }
 

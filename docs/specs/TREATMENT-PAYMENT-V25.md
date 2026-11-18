@@ -1,5 +1,7 @@
 # Điều trị và Thanh toán v2.5
 
+> Cập nhật 18/11/2026: hoạt động điều trị không còn `chargingBasis`, `state`, `postedAt`, `visitId`, `sourceKind`; mọi hoạt động tính phí riêng và được ghi nhận ngay. Xem [CLINICAL-ACTIVITY-TABLE-SIMPLIFICATION.vi.md](CLINICAL-ACTIVITY-TABLE-SIMPLIFICATION.vi.md) giai đoạn 4.
+
 > **Đã gỡ ngày 13/11/2026.** Phân hệ tài chính đã được xóa khỏi backend, web và database theo [CARE-LAB-FINANCE-STORAGE.vi.md](CARE-LAB-FINANCE-STORAGE.vi.md). Tài liệu này chỉ còn giá trị tham khảo khi đặc tả lại chức năng; không mô tả hành vi hiện tại.
 
 **Cập nhật 02/11/2026:** Phần ghi phí và thu tiền điều trị đã nối với ledger chung theo [TREATMENT-LEDGER-INTEGRATION.vi.md](TREATMENT-LEDGER-INTEGRATION.vi.md). Các đoạn bên dưới ghi lại trạng thái và phạm vi từng đợt triển khai trước đó; khi nói adapter tài chính chưa sẵn sàng, áp dụng đặc tả tích hợp mới cho runtime hiện tại.
@@ -61,7 +63,7 @@ Migration giữ dữ liệu cũ, thêm source/display/delete/snapshot, VisitId n
 
 - PUT sheet-drafts giữ `{kind:"Plan"|"Actual", visitId:null, row:{serviceId,dentistId,assistantId?,regions:["25","26"],quantity:1,unitPriceVnd:300000,costVnd:300000,estimatedMinutes:25,note:"...",discountType:"VND",discountValue:0,labWork?},expectedVersion:0,requestKey}`; response có draft ID/version. Với Actual, estimatedMinutes không bắt buộc và labWork chỉ là mô tả.
 - POST confirm-plan dùng `{expectedVersion,expectedDraftVersion,decision:null,requestKey}`. POST confirm-actual dùng cùng version/key, `visitId:null`, `expectedVisitVersion:0`, `directDecision:null`; server ghi nguồn Dossier. `decision:null` không đồng nghĩa Agreed.
-- PUT sheet-items/{itemId}: `{row,expectedVersion,requestKey}`; sửa tại chỗ, giữ item ID/quantity cũ và snapshot actual. PATCH display-completion: `{completed:true|false,expectedVersion,requestKey}`. DELETE sheet-items/{itemId} nhận body `{expectedVersion,requestKey}`. POST perform dùng cùng body; response `{dossier,activity}` gồm item.DisplayCompleted=true, activity.VisitId=null, SourceKind=Dossier và ServiceNameSnapshot.
+- PUT sheet-items/{itemId}: `{row,expectedVersion,requestKey}`; sửa tại chỗ, giữ item ID/quantity cũ và snapshot actual. PATCH display-completion: `{completed:true|false,expectedVersion,requestKey}`. DELETE sheet-items/{itemId} nhận body `{expectedVersion,requestKey}`. POST perform dùng cùng body; response `{dossier,activity}` gồm item.DisplayCompleted=true, activity.VisitId=null, SourceKind=Dossier (suy ra từ VisitId=null, không còn là cột lưu) và ServiceNameSnapshot.
 - Chỉ server quyết allowedActions, IDs nguồn, actor/time và feeStatus. Lỗi quyền 403, sai dossier/item 404, version/requestKey conflict MSG111/409; lỗi không xóa nháp. Transfer retry cùng key/payload trả receipt cũ; key khác với nguồn đã chuyển trả activity cũ, không thêm actual/phí lần hai.
 
 

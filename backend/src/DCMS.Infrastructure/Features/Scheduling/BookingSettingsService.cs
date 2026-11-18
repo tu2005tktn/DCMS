@@ -36,7 +36,7 @@ public sealed class BookingSettingsService(DcmsDbContext db, UserManager<Applica
     private async Task<BookingSettings> Read(int branchId, CancellationToken ct)
     {
         var branch = await db.Set<SchedulingBranch>().AsNoTracking().SingleAsync(x => x.Id == branchId, ct);
-        return new(branchId, branch.SlotIntervalMinutes, branch.BookingSettingsVersion,
+        return new(branchId, branch.SlotIntervalMinutes, branch.Version,
             await db.Set<SchedulingService>().AsNoTracking().Where(x => x.BranchId == branchId).OrderBy(x => x.Id)
                 .Select(x => new BookingServiceSetting(x.Id, x.Name, x.PublicDurationMinutes, x.Active, x.PublicBookable, x.IsInitialExamination)).ToArrayAsync(ct));
     }
@@ -63,7 +63,7 @@ public sealed class BookingSettingsService(DcmsDbContext db, UserManager<Applica
             return JsonSerializer.Deserialize<BookingSettings>(receipt.ResultJson)!;
         }
         var branch = await db.Set<SchedulingBranch>().SingleAsync(x => x.Id == branchId, ct);
-        if (branch.BookingSettingsVersion != command.ExpectedVersion) throw Error("MSG111", 409);
+        if (branch.Version != command.ExpectedVersion) throw Error("MSG111", 409);
         var existing = await db.Set<SchedulingService>().Where(x => x.BranchId == branchId).ToListAsync(ct);
         if (!existing.Select(x => x.Id).Order().SequenceEqual(command.Services.Where(x => x.Id > 0).Select(x => x.Id).Order())) throw Error("MSG04", 400);
         foreach (var item in command.Services)
@@ -76,7 +76,7 @@ public sealed class BookingSettingsService(DcmsDbContext db, UserManager<Applica
         }
         if (!existing.Any(x => x.IsInitialExamination)) db.Add(new SchedulingService {
             BranchId = branchId, Name = "Khám", IsInitialExamination = true, PublicBookable = true, PublicDurationMinutes = 30 });
-        branch.SlotIntervalMinutes = command.SlotIntervalMinutes; branch.BookingSettingsVersion++;
+        branch.SlotIntervalMinutes = command.SlotIntervalMinutes; branch.Version++;
         await db.SaveChangesAsync(ct);
         var result = await Read(branchId, ct);
         db.Add(new ScheduleReceipt { ActorId = actorId, RequestKey = command.RequestKey, Fingerprint = fingerprint, ResultJson = JsonSerializer.Serialize(result) });

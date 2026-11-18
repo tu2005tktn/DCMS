@@ -1,4 +1,4 @@
-import { Alert, Button, Card, Skeleton, Tag, Typography } from 'antd';
+import { Alert, Button, Card, Skeleton, Typography } from 'antd';
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '../../services/api';
 import NextVisitBookingDrawer, { type NextVisitCandidate, type NextVisitPatient } from '../appointments/NextVisitBookingDrawer';
@@ -36,8 +36,7 @@ export default function NextVisitPanel({ patient, active, revision, onBooked }: 
         {next ? <Card className="next-visit-card" size="small"><div className="next-visit-main">
           <div><strong>{line(next)}</strong>
             <div className="next-visit-meta">Phiếu {next.dossierCode} · Ngày dự kiến: {next.estimatedStart ? formatDate(next.estimatedStart) : 'chưa có'}
-              {' '}· Bác sĩ {next.dentistName} · {next.durationMinutes} phút</div>
-            {next.status === 'NeedsBooking' && <Tag color="gold">Đã có chỉ định, chưa có lịch</Tag>}</div>
+              {' '}· Bác sĩ {next.dentistName} · {next.durationMinutes} phút</div></div>
           <Button type="primary" disabled={!has('appointments.create') || !has('treatment.progress.manage')} onClick={() => setBooking(next)}>Đặt lịch</Button></div></Card>
           : <Alert type="info" showIcon message={booked.length > 0 ? 'Mọi hạng mục chưa thực hiện đã có lịch hẹn.' : 'Chưa có hạng mục nào trong kế hoạch cần hẹn.'} />}
       </>}

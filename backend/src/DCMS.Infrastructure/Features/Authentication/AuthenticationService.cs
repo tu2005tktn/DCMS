@@ -30,7 +30,7 @@ public sealed class AuthenticationService(DcmsDbContext db, UserManager<Applicat
         {
             var normalizedEmail = users.NormalizeEmail(identifier);
             // Only an unambiguous Public email match may authenticate; keep the database uniqueness contract.
-            var matches = await db.Users.Where(value => value.AccountType == "Public" && value.NormalizedEmail == normalizedEmail)
+            var matches = await db.Users.Where(value => value.AccountType == "Public" && value.Email != null && value.Email.ToUpper() == normalizedEmail)
                 .Take(2).ToArrayAsync(ct);
             if (matches.Length == 1) user = matches[0];
         }
@@ -115,17 +115,23 @@ public sealed class AuthenticationService(DcmsDbContext db, UserManager<Applicat
         var incomingHash = HashRefreshToken(request.RefreshToken);
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         var now = DateTimeOffset.UtcNow;
-        var existing = await db.AuthRefreshTokens
-            .SingleOrDefaultAsync(x => x.TokenHash == incomingHash, ct);
-        if (existing == null)
+        var accountId = await db.Database.SqlQuery<int?>($"""
+            SELECT u."Id" AS "Value"
+            FROM "USER_ACCOUNT" u
+            CROSS JOIN LATERAL jsonb_array_elements(COALESCE(u."AuthData"->'Sessions', '[]'::jsonb)) s
+            CROSS JOIN LATERAL jsonb_array_elements(COALESCE(s->'RefreshTokens', '[]'::jsonb)) r
+            WHERE r->>'TokenHash' = {incomingHash}
+            LIMIT 1
+            """).SingleOrDefaultAsync(ct);
+        if (!accountId.HasValue)
         {
             // Không tìm thấy — token sai hoặc đã bị xóa. Trả 401, KHÔNG thu hồi chain.
             throw new BusinessException(401, SystemMessages.Get("MSG07"));
         }
         // Tài khoản và session còn hiệu lực?
-        var user = await db.LockAccountAsync(existing.AccountId, ct);
-        var session = user?.Sessions.SingleOrDefault(x => x.Id == existing.SessionId);
-        existing = session?.RefreshTokens.SingleOrDefault(x => x.TokenHash == incomingHash);
+        var user = await db.LockAccountAsync(accountId.Value, ct);
+        var session = user?.Sessions.SingleOrDefault(x => x.RefreshTokens.Any(r => r.TokenHash == incomingHash));
+        var existing = session?.RefreshTokens.SingleOrDefault(x => x.TokenHash == incomingHash);
         if (existing == null) throw new BusinessException(401, SystemMessages.Get("MSG07"));
         if (session?.ClientKind == "StaffWeb" && session.RevokedAt == null
             && session.LastInteractiveActivityAt.AddMinutes(await staffIdle.MinutesAsync(ct)) <= now)
@@ -188,12 +194,16 @@ public sealed class AuthenticationService(DcmsDbContext db, UserManager<Applicat
     public async Task<IReadOnlyList<SessionInfo>> ListSessionsAsync(int accountId, Guid currentSessionId, CancellationToken ct)
     {
         var now = DateTimeOffset.UtcNow;
-        return await db.AuthSessions.AsNoTracking()
+        var authData = await db.Users.AsNoTracking()
+            .Where(x => x.Id == accountId)
+            .Select(x => x.AuthData)
+            .SingleOrDefaultAsync(ct);
+        return (authData?.Sessions ?? [])
             .Where(x => x.AccountId == accountId && x.RevokedAt == null && x.ExpiresAt > now)
             .OrderByDescending(x => x.LastSeenAt)
             .Select(x => new SessionInfo(x.Id, x.DeviceLabel, x.CreatedAt, x.LastSeenAt, x.ExpiresAt,
                 x.Id == currentSessionId))
-            .ToListAsync(ct);
+            .ToList();
     }
 
     private async Task<CurrentUser?> CurrentAsync(ApplicationUser user, CancellationToken ct)

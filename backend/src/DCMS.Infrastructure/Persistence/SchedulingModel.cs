@@ -20,18 +20,20 @@ internal static class SchedulingModel
         });
 
         model.Entity<SchedulingBranch>(b => {
-            b.ToTable("SCHEDULING_BRANCH", t => t.HasCheckConstraint("CK_BRANCH_SLOT_INTERVAL", "\"SlotIntervalMinutes\" BETWEEN 1 AND 120 AND \"BookingSettingsVersion\" > 0"));
+            b.ToTable("SCHEDULING_BRANCH", t => t.HasCheckConstraint("CK_BRANCH_SLOT_INTERVAL", "\"SlotIntervalMinutes\" BETWEEN 1 AND 120 AND \"Version\" > 0"));
+            b.Property(x => x.Code).HasMaxLength(40);
+            b.HasIndex(x => x.Code).IsUnique();
             b.Property(x => x.Name).HasMaxLength(160);
+            b.Property(x => x.Address).HasMaxLength(1000);
+            b.Property(x => x.Phone).HasMaxLength(20);
+            b.Property(x => x.Email).HasMaxLength(254);
             b.Property(x => x.SlotIntervalMinutes).HasDefaultValue(15);
-            b.Property(x => x.BookingSettingsVersion).HasDefaultValue(1).IsConcurrencyToken();
+            b.Property(x => x.Version).HasDefaultValue(1).IsConcurrencyToken();
         });
 
 
         model.Entity<SchedulingService>(b =>
         {
-            // Examination and investigation service fields stay on the shared catalog row after the finance screens were removed.
-            b.Property(x => x.InvestigationKind).HasMaxLength(16);
-            b.Property(x => x.BillingUnit).HasMaxLength(40);
             b.Property(x => x.Unit).HasMaxLength(40).HasDefaultValue("lần");
             b.HasIndex(x => x.BranchId).IsUnique().HasFilter("\"IsInitialExamination\" = TRUE");
             b.Property(x => x.PublicBookable).HasDefaultValue(true);
@@ -51,17 +53,6 @@ internal static class SchedulingModel
 
         });
 
-        model.Entity<ResourceReservation>(b =>
-        {
-
-            b.Property(x => x.Code).HasMaxLength(40); b.Property(x => x.Status).HasMaxLength(16);
-            b.Property(x => x.AttendeeKey).HasMaxLength(160); b.Property(x => x.AttendeeLabel).HasMaxLength(160);
-            b.HasIndex(x => new { x.Start, x.End }); b.HasIndex(x => x.Code).IsUnique();
-            b.HasOne<SchedulingMember>().WithMany().HasForeignKey(x => new { x.BranchId, EmployeeId = x.DentistId }).OnDelete(DeleteBehavior.Restrict);
-            b.HasOne<EmployeeProfile>().WithMany().HasForeignKey(x => x.AssistantId).OnDelete(DeleteBehavior.Restrict);
-            b.HasOne<SchedulingChair>().WithMany().HasForeignKey(x => new { x.ChairId, x.BranchId }).HasPrincipalKey(x => new { x.Id, x.BranchId }).OnDelete(DeleteBehavior.Restrict);
-            b.HasOne<SchedulingService>().WithMany().HasForeignKey(x => new { x.ServiceId, x.BranchId }).HasPrincipalKey(x => new { x.Id, x.BranchId }).OnDelete(DeleteBehavior.Restrict);
-        });
         model.Entity<ScheduleReceipt>(b =>
         {
             b.HasIndex(new[] { "ReceiptType", "ActorId", "RequestKey" }, "UX_ScheduleReceipt_Scope").IsUnique().HasDatabaseName("UX_RECEIPT_ActorId_RequestKey");

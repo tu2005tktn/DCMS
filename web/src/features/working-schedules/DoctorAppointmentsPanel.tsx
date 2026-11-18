@@ -6,7 +6,7 @@ import { usePermissions } from '../authentication/usePermissions';
 import { addDays, formatClock, formatDate } from '../appointments/types';
 
 type Booking = { id: string; code: string; branchId: number; branchName: string; startAt: string; endAt: string;
-  patientName: string; serviceName: string; status: string; isTreatmentPlan: boolean; patientConsentConfirmedAt: string | null };
+  patientName: string; serviceName: string; status: string; isTreatmentPlan: boolean };
 const states: Record<string, string> = { Confirmed: 'Đã xác nhận', CheckedIn: 'Đã tiếp nhận', InProgress: 'Đang khám', Completed: 'Đã hoàn tất', Cancelled: 'Đã hủy', NoShow: 'Không đến' };
 const monday = (day: string) => addDays(day, -((new Date(`${day}T00:00:00Z`).getUTCDay() + 6) % 7));
 const clinicDay = (instant: string) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date(instant));
@@ -44,9 +44,7 @@ export default function DoctorAppointmentsPanel({ dentistId, date }: { dentistId
         { title: 'Mã lịch', render: (_, row) => has('appointments.read') ? <Link to={`/appointments/${row.id}`}>{row.code}</Link> : row.code },
         { title: 'Bệnh nhân', dataIndex: 'patientName' }, { title: 'Dịch vụ', dataIndex: 'serviceName' }, { title: 'Chi nhánh', dataIndex: 'branchName' },
         { title: 'Trạng thái', render: (_, row) => <Tag color={row.status === 'Cancelled' ? 'red' : row.status === 'Confirmed' ? 'blue' : 'default'}>{states[row.status] ?? row.status}</Tag> },
-        { title: 'Đồng ý đặt lịch', render: (_, row) => !row.isTreatmentPlan ? '—' : row.patientConsentConfirmedAt
-          ? <Tag color="green" title={new Date(row.patientConsentConfirmedAt).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}>Đã đồng ý</Tag>
-          : <Tag>Chưa ghi nhận</Tag> },
+        { title: 'Đồng ý đặt lịch', render: (_, row) => !row.isTreatmentPlan ? '—' : <Tag color="green">Đã đồng ý</Tag> },
       ]} />
   </Card>;
 }

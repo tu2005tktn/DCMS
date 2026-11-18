@@ -17,9 +17,9 @@ public sealed class AccountRoleStore(DcmsDbContext db, IdentityErrorDescriber er
     public async Task<IdentityResult> CreateAsync(IdentityRole<int> role, CancellationToken ct)
     {
         role.Id = checked((int)await db.NextAccountEntryIdAsync(ct));
+        role.ConcurrencyStamp = "1";
         db.Add(new AccessGroup { RecordKind = "IdentityRole", IdentityRoleId = role.Id, Code = role.Name!,
-            NormalizedCode = role.NormalizedName!, Name = role.Name!, NormalizedName = role.NormalizedName!,
-            BaseRole = role.Name!, RoleConcurrencyStamp = role.ConcurrencyStamp });
+            Name = role.Name!, BaseRole = role.Name!, Version = 1 });
         await db.SaveChangesAsync(ct);
         return IdentityResult.Success;
     }
@@ -27,13 +27,11 @@ public sealed class AccountRoleStore(DcmsDbContext db, IdentityErrorDescriber er
     public async Task<IdentityResult> UpdateAsync(IdentityRole<int> role, CancellationToken ct)
     {
         var row = await Records.SingleAsync(x => x.IdentityRoleId == role.Id, ct);
-        if (row.RoleConcurrencyStamp != role.ConcurrencyStamp) return IdentityResult.Failed(errors.ConcurrencyFailure());
+        if (row.Version.ToString(CultureInfo.InvariantCulture) != role.ConcurrencyStamp) return IdentityResult.Failed(errors.ConcurrencyFailure());
         var oldName = row.Name;
-        role.ConcurrencyStamp = Guid.NewGuid().ToString();
         row.Name = row.Code = row.BaseRole = role.Name!;
-        row.NormalizedName = row.NormalizedCode = role.NormalizedName!;
-        row.RoleConcurrencyStamp = role.ConcurrencyStamp;
         row.Version++;
+        role.ConcurrencyStamp = row.Version.ToString(CultureInfo.InvariantCulture);
         foreach (var user in await db.Users.Where(x => x.AssignedRoles.Contains(oldName)).ToArrayAsync(ct))
             user.AssignedRoles = user.AssignedRoles.Select(value => value == oldName ? role.Name! : value).ToArray();
         await db.SaveChangesAsync(ct);
@@ -62,21 +60,20 @@ public sealed class AccountRoleStore(DcmsDbContext db, IdentityErrorDescriber er
     public async Task<IList<Claim>> GetClaimsAsync(IdentityRole<int> role, CancellationToken ct = default)
     {
         var row = await Records.SingleAsync(x => x.IdentityRoleId == role.Id, ct);
-        return row.RoleClaims.Select(x => new Claim(x.Type ?? "", x.Value ?? "")).ToArray();
+        return row.Grants.Select(x => new Claim(x.Permission, x.ClaimValue ?? "")).ToArray();
     }
 
     public async Task AddClaimAsync(IdentityRole<int> role, Claim claim, CancellationToken ct = default)
     {
         var row = await Records.SingleAsync(x => x.IdentityRoleId == role.Id, ct);
-        row.RoleClaims.Add(new AccountClaim { Id = checked((int)await db.NextAccountEntryIdAsync(ct)), Type = claim.Type, Value = claim.Value });
-        row.Version++;
+        row.Grants.Add(new AccessGroupGrant { GroupId = row.Id, Permission = claim.Type,
+            ClaimId = checked((int)await db.NextAccountEntryIdAsync(ct)), ClaimValue = claim.Value });
     }
 
     public async Task RemoveClaimAsync(IdentityRole<int> role, Claim claim, CancellationToken ct = default)
     {
         var row = await Records.SingleAsync(x => x.IdentityRoleId == role.Id, ct);
-        row.RoleClaims.RemoveAll(x => x.Type == claim.Type && x.Value == claim.Value);
-        row.Version++;
+        row.Grants.RemoveAll(x => x.Permission == claim.Type && (x.ClaimValue ?? "") == claim.Value);
     }
 
     public void Dispose() { }

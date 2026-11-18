@@ -29,9 +29,13 @@ public sealed class StaffIdleService(DcmsDbContext db, TimeProvider clock) : ISt
         if (!Allowed(request.StaffIdleTimeoutMinutes)) throw Error(400, "MSG04");
         var now = clock.GetUtcNow();
         var current = await MinutesAsync(ct);
-        var affected = await db.AuthSessions.AsNoTracking().CountAsync(x => x.ClientKind == "StaffWeb"
+        var staffAuth = await db.Users.AsNoTracking()
+            .Where(x => x.AccountType == "Staff")
+            .Select(x => x.AuthData)
+            .ToListAsync(ct);
+        var affected = staffAuth.SelectMany(x => x.Sessions).Count(x => x.ClientKind == "StaffWeb"
             && x.RevokedAt == null && x.LastInteractiveActivityAt.AddMinutes(current) > now
-            && x.LastInteractiveActivityAt.AddMinutes(request.StaffIdleTimeoutMinutes) <= now, ct);
+            && x.LastInteractiveActivityAt.AddMinutes(request.StaffIdleTimeoutMinutes) <= now);
         return new(request.StaffIdleTimeoutMinutes, affected, now);
     }
 

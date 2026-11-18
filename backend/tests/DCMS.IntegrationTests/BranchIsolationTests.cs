@@ -53,10 +53,9 @@ public sealed class BranchIsolationTests(ApiFixture fixture) : IClassFixture<Api
             await db.AddSchedulingDataAsync(svc, chair, new SchedulingMember { BranchId = branch.Id, EmployeeId = staff.Id, CanDentist = true });
             await db.SaveChangesAsync();
             var start = DateTimeOffset.UtcNow.AddDays(2); var id = Guid.NewGuid();
-            await db.AddSchedulingDataAsync(new ResourceReservation { Id = id, Code = "RV-" + id.ToString("N"), BranchId = branch.Id, DentistId = staff.Id, ChairId = chair.Id, ServiceId = svc.Id,
-                Start = start, End = start.AddHours(1), AttendeeKey = $"patient:{p.Id}", AttendeeLabel = p.FullName });
-            await db.AddSchedulingDataAsync(new Appointment { Id = id, ReservationId = id, Code = "AP-" + id.ToString("N"), BranchId = branch.Id, PatientId = p.Id, DentistId = staff.Id, ChairId = chair.Id,
-                ServiceId = svc.Id, BookerName = "SYNTHETIC", BookerPhone = "0900000000", AttendeeName = p.FullName, StartAt = start, EndAt = start.AddHours(1), CreatedAt = DateTimeOffset.UtcNow });
+            await db.AddSchedulingDataAsync(new Appointment { Id = id, Code = "AP-" + id.ToString("N"), BranchId = branch.Id, PatientId = p.Id, DentistId = staff.Id, ChairId = chair.Id,
+                ServiceId = svc.Id, AttendeeName = p.FullName, StartAt = start, EndAt = start.AddHours(1), CreatedAt = DateTimeOffset.UtcNow,
+                BookingInfo = new() { BookerName = "SYNTHETIC", BookerContact = "0900000000" } });
             await db.SaveChangesAsync();
             patient = p.Id; branchA = branch.Id; dentist = staff.Id; service = svc.Id;
         }
@@ -69,7 +68,7 @@ public sealed class BranchIsolationTests(ApiFixture fixture) : IClassFixture<Api
         var draftResponse = await dentistA.PutAsJsonAsync($"/api/dossiers/{dossier.Id}/sheet-drafts/{draftId}", new SaveSheetDraftRequest("Plan", null, row, 0, Guid.NewGuid()));
         Assert.True(draftResponse.IsSuccessStatusCode, await draftResponse.Content.ReadAsStringAsync());
         var draft = (await draftResponse.Content.ReadFromJsonAsync<SheetDraftDto>())!;
-        var plan = await dentistA.PostAsJsonAsync($"/api/dossiers/{dossier.Id}/sheet-drafts/{draft.Id}/confirm-plan", new ConfirmSheetPlanRequest(dossier.Version, draft.Version, null, Guid.NewGuid()));
+        var plan = await dentistA.PostAsJsonAsync($"/api/dossiers/{dossier.Id}/sheet-drafts/{draft.Id}/confirm-plan", new ConfirmSheetPlanRequest(dossier.Version, draft.Version, Guid.NewGuid()));
         dossier = (await plan.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
         var performed = await dentistA.PostAsJsonAsync($"/api/dossiers/{dossier.Id}/sheet-items/{Assert.Single(dossier.Items).Id}/perform", new SheetItemActionRequest(dossier.Version, Guid.NewGuid()));
         var activity = (await performed.Content.ReadFromJsonAsync<ConfirmSheetActualResult>())!.Activity;

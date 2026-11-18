@@ -16,8 +16,8 @@ async function prepare(page: Page, canReadAppointments = true) {
       state.calls.push(url);
       if (state.fail) return route.fulfill({ status: 503, json: { code: 'MSG144', message: 'SYNTHETIC cannot load appointments' } });
       return ok({ items: [
-        { id: 'plan-1', code: 'AP-PLAN-1', patientName: 'SYNTHETIC An', serviceName: 'Trám răng', branchId: 1, branchName: 'SYNTHETIC branch', startAt: '2032-01-05T17:30:00Z', endAt: '2032-01-05T18:00:00Z', status: state.cancelled ? 'Cancelled' : 'Confirmed', isTreatmentPlan: true, patientConsentConfirmedAt: '2032-01-01T01:00:00Z' },
-        { id: 'plan-2', code: 'AP-PLAN-2', patientName: 'SYNTHETIC Bình', serviceName: 'Bọc sứ', branchId: 1, branchName: 'SYNTHETIC branch', startAt: '2032-01-06T02:00:00Z', endAt: '2032-01-06T02:30:00Z', status: 'Confirmed', isTreatmentPlan: true, patientConsentConfirmedAt: null },
+        { id: 'plan-1', code: 'AP-PLAN-1', patientName: 'SYNTHETIC An', serviceName: 'Trám răng', branchId: 1, branchName: 'SYNTHETIC branch', startAt: '2032-01-05T17:30:00Z', endAt: '2032-01-05T18:00:00Z', status: state.cancelled ? 'Cancelled' : 'Confirmed', isTreatmentPlan: true },
+        { id: 'plan-2', code: 'AP-PLAN-2', patientName: 'SYNTHETIC Bình', serviceName: 'Bọc sứ', branchId: 1, branchName: 'SYNTHETIC branch', startAt: '2032-01-06T02:00:00Z', endAt: '2032-01-06T02:30:00Z', status: 'Confirmed', isTreatmentPlan: false },
       ] });
     }
     return ok({});
@@ -32,7 +32,7 @@ test('working schedule shows appointments, agreement, clinic-local dates and saf
   const state = await prepare(page);
   const panel = page.locator('[aria-label="Lịch hẹn của bác sĩ trong tuần"]');
   await expect(panel.getByText('Đã đồng ý', { exact: true })).toBeVisible();
-  await expect(panel.getByText('Chưa ghi nhận', { exact: true })).toBeVisible();
+  await expect(panel.getByRole('row').filter({ hasText: 'AP-PLAN-2' })).toContainText('—');
   await expect(panel.getByRole('row').filter({ hasText: 'AP-PLAN-1' })).toContainText('06/01/2032');
   await expect(panel.getByRole('row').filter({ hasText: 'AP-PLAN-1' })).toContainText('00:30–01:00');
   await expect(panel.getByRole('link', { name: 'AP-PLAN-1', exact: true })).toHaveAttribute('href', '/appointments/plan-1');

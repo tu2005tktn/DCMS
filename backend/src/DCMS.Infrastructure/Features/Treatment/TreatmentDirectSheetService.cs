@@ -14,7 +14,7 @@ public sealed partial class TreatmentDossierService
         var employee = await DentistAsync(actorId, dossier.BranchId, ct);
         if (employee != dossier.DentistId) throw Error("MSG06", 403);
         if (dossier.Version != version) throw Error("MSG111", 409);
-        return dossier.Items.SingleOrDefault(x => x.Id == itemId && !x.SheetDeleted) ?? throw Error("MSG113", 404);
+        return dossier.Items.SingleOrDefault(x => x.Id == itemId) ?? throw Error("MSG113", 404);
     }
 
     public Task<TreatmentChange> MarkSheetItemAsync(int actorId, Guid dossierId, Guid itemId, MarkSheetItemRequest request, CancellationToken ct)
@@ -33,11 +33,22 @@ public sealed partial class TreatmentDossierService
         {
             var item = await EditableSheetItemAsync(actorId, dossier, itemId, request.ExpectedVersion, ct);
             var before = ItemDto(item);
-            item.SheetDeleted = true;
-            dossier.PlanVersion++; dossier.Version++; dossier.UpdatedAt = clock.GetUtcNow();
-            await CarryForwardUnchangedProgressionAsync(dossier, actorId, ct);
-            Event(dossier, actorId, "SheetItemDeleted", new { itemId, before, dossier.PlanVersion });
-            RecordDirectPlanSnapshot(dossier, actorId);
+            var activities = await db.ClinicalActivities.Where(x => x.DossierId == dossierId && x.ItemId == itemId).ToListAsync(ct);
+            var fallbackNames = activities.Any(a => a.ServiceNameSnapshot == null)
+                ? await ActivitySourceNamesAsync(activities, dossier, ct)
+                : null;
+            foreach (var activity in activities)
+            {
+                activity.ServiceNameSnapshot ??= fallbackNames?.GetValueOrDefault(activity.Id) ?? item.ServiceName;
+                activity.ItemId = null;
+                activity.IsPlanTransfer = false;
+            }
+            dossier.Items.Remove(item);
+            db.TreatmentItems.Remove(item);
+            var planVersion = (await CurrentPlanVersionAsync(dossier.Id, false, ct)) + 1;
+            dossier.Version++; dossier.UpdatedAt = clock.GetUtcNow();
+            Event(dossier, actorId, "SheetItemDeleted", new { itemId, before, planVersion });
+            RecordDirectPlanSnapshot(dossier, planVersion, actorId);
             await db.SaveChangesAsync(ct);
             return new TreatmentChange(await DetailAsync(dossier, ct), SystemMessages.Get("MSG222", "hạng mục", value: dossier.Code));
         }, ct);
@@ -62,22 +73,17 @@ public sealed partial class TreatmentDossierService
             try { if (row.DiscountValue > 0) _ = TreatmentPlanRules.Discount(row.CostVnd, type!, row.DiscountValue); }
             catch (ArgumentOutOfRangeException) { throw Error("MSG252"); }
             var before = ItemDto(item);
-            if (item.ServiceId != service.Id) { item.ReferenceUnitPriceVnd = service.ReferenceUnitPriceVnd; item.ReferencePriceVersion = service.PriceVersion; }
             item.ServiceId = service.Id; item.ServiceName = service.Name; item.Unit = service.Unit;
             item.Region = Clean(string.Join(", ", row.Regions ?? [])); item.Note = Clean(row.Note);
             item.EstimatedStart = row.Date; item.EstimatedMinutes = row.EstimatedMinutes;
-            item.EstimatedMinMinutes = null; item.EstimatedMaxMinutes = null; item.ReservedMinutes = null;
             item.ResponsibleDentistId = row.DentistId; item.AssistantId = row.AssistantId; item.AgreedUnitPriceVnd = unitPrice;
-            item.DiscountType = row.DiscountValue > 0 ? type : null; item.DiscountValue = row.DiscountValue > 0 ? row.DiscountValue : null;
+            item.DiscountType = row.DiscountValue > 0 ? type : null;
+            item.DiscountValue = row.DiscountValue > 0 ? row.DiscountValue : null;
             item.DiscountReason = row.DiscountValue > 0 ? Clean(row.DiscountNote) : null;
-            item.DiscountStatus = row.DiscountValue > 0 ? "Approved" : null; item.DiscountQualifyingItemId = null;
-            item.DiscountDecidedBy = row.DiscountValue > 0 ? actorId : null; item.DiscountDecidedAt = row.DiscountValue > 0 ? clock.GetUtcNow() : null;
-            item.DiscountBasisHash = row.DiscountValue > 0 ? DiscountBasis(item, null) : null;
-            item.EntrySource = "ClinicianEntry"; item.EntryRecordedBy = actorId; item.EntryRecordedAt = clock.GetUtcNow();
-            dossier.PlanVersion++; dossier.Version++; dossier.UpdatedAt = clock.GetUtcNow();
-            await CarryForwardUnchangedProgressionAsync(dossier, actorId, ct);
-            Event(dossier, actorId, "SheetItemEdited", new { before, after = ItemDto(item), dossier.PlanVersion });
-            RecordDirectPlanSnapshot(dossier, actorId);
+            var planVersion = (await CurrentPlanVersionAsync(dossier.Id, true, ct)) + 1;
+            dossier.Version++; dossier.UpdatedAt = clock.GetUtcNow();
+            Event(dossier, actorId, "SheetItemEdited", new { before, after = ItemDto(item), planVersion });
+            RecordDirectPlanSnapshot(dossier, planVersion, actorId);
             await db.SaveChangesAsync(ct);
             return new TreatmentChange(await DetailAsync(dossier, ct), SystemMessages.Get("MSG222", "hạng mục", value: dossier.Code));
         }, ct);
@@ -104,54 +110,70 @@ public sealed partial class TreatmentDossierService
             return new ConfirmSheetActualResult(await DetailAsync(dossier, ct), activity);
         }, ct);
 
-    private void RecordDirectPlanSnapshot(TreatmentDossier dossier, int actorId) =>
-        Event(dossier, actorId, "PlanCommitted", new { dossier.PlanId, dossier.PlanVersion, dossier.Goals,
-            dossier.PaymentTermsJson, Items = dossier.Items.OrderBy(x => x.PlannedOrder).Select(ItemDto).ToArray() });
+    private void RecordDirectPlanSnapshot(TreatmentDossier dossier, int planVersion, int actorId) =>
+        Event(dossier, actorId, "PlanCommitted", new { planVersion,
+            Items = dossier.Items.OrderBy(x => x.PlannedOrder).Select(ItemDto).ToArray() });
 
     private static long GrossInput(decimal quantity, long price) => TreatmentPlanRules.Gross(quantity, price);
 
-    private static ActivityDto DirectActivityDto(ClinicalActivity x) => new(x.Id, x.VisitId, x.PatientId, x.BranchId,
-        x.DossierId, x.ItemId, x.StepId, x.PlanVersion, x.ServiceId, x.Region, x.Unit, x.Quantity, x.PerformedAt,
-        x.ElapsedMinutes, x.PerformerId, x.Outcome, x.NextSteps, x.ChargingBasis, x.ChargingBasisEvidence,
-        x.PriceSnapshotVnd, x.ReviewId, x.State, x.Version, x.CreatedAt, x.PostedAt, x.FeeStatus,
-        x.DiscountSnapshotVnd, x.AssistantId, x.RecordedBy, x.SourceKind, x.ServiceNameSnapshot, x.LabWorkSnapshot);
+    private static ActivityDto DirectActivityDto(ClinicalActivity x) => ActivityDto.From(x);
 
-    private async Task<ActivityDto> RecordDossierActivityAsync(int actorId, TreatmentDossier dossier, TreatmentItem item,
+    private async Task<ActivityDto> RecordDossierActivityAsync(int actorId, TreatmentDossier dossier, TreatmentItem? item,
         Guid activityId, DateOnly? date, string? note, bool transfer, Guid key, CancellationToken ct, string? labWork = null, SheetRow? input = null)
     {
         var employee = await DentistAsync(actorId, dossier.BranchId, ct);
-        if (employee != dossier.DentistId || item.ResponsibleDentistId.HasValue && item.ResponsibleDentistId != employee) throw Error("MSG06", 403);
-        if (item.SheetDeleted || note?.Length > 1000) throw Error("MSG04");
-        if (await db.TreatmentSteps.AnyAsync(x => x.ItemId == item.Id && x.HoldReason != null, ct)) throw Error("MSG241", 409);
-        var service = input == null ? null : await db.Set<SchedulingService>().AsNoTracking().SingleOrDefaultAsync(x => x.Id == input.ServiceId && x.BranchId == dossier.BranchId && (x.Active || x.Id == item.ServiceId), ct) ?? (input == null ? null : throw Error("MSG04"));
-        var qty = input?.Quantity ?? item.Quantity;
-        var price = input?.UnitPriceVnd ?? (input != null ? checked((long)(input.CostVnd / qty)) : item.AgreedUnitPriceVnd);
-        if (input != null && (input.DentistId != employee || qty != item.Quantity || !TreatmentSheetRules.ValidQuantity(qty, service?.Unit ?? item.Unit) || GrossInput(qty, price) != input.CostVnd)) throw Error("MSG04");
-        var discountType = input == null ? item.DiscountType : input.DiscountType == "VND" ? "Fixed" : input.DiscountType;
-        var discountValue = input?.DiscountValue ?? item.DiscountValue ?? 0;
-        var discountReason = input?.DiscountNote ?? item.DiscountReason;
+        if (employee != dossier.DentistId || item?.ResponsibleDentistId.HasValue == true && item.ResponsibleDentistId != employee) throw Error("MSG06", 403);
+        if (note?.Length > 1000) throw Error("MSG04");
+        if (item == null && input == null) throw Error("MSG04");
+        var service = input == null ? null : await db.Set<SchedulingService>().AsNoTracking()
+            .SingleOrDefaultAsync(x => x.Id == input.ServiceId && x.BranchId == dossier.BranchId && (x.Active || item != null && x.Id == item.ServiceId), ct)
+            ?? throw Error("MSG04");
+        var qty = input?.Quantity ?? item!.Quantity;
+        var unit = service?.Unit ?? item!.Unit;
+        var price = input?.UnitPriceVnd ?? (input != null ? checked((long)(input.CostVnd / qty)) : item!.AgreedUnitPriceVnd);
+        if (input != null && (input.DentistId != employee || item != null && qty != item.Quantity || !TreatmentSheetRules.ValidQuantity(qty, unit) || GrossInput(qty, price) != input.CostVnd))
+            throw Error("MSG04");
+        var discountType = input == null ? item!.DiscountType : input.DiscountType == "VND" ? "Fixed" : input.DiscountType;
+        var discountValue = input?.DiscountValue ?? item?.DiscountValue ?? 0;
+        var discountReason = input?.DiscountNote ?? item?.DiscountReason;
         if (discountValue < 0 || discountValue > 0 && (discountType is not ("Fixed" or "Percent") || Clean(discountReason) == null)) throw Error("MSG252");
         long reduction;
         try { reduction = discountValue > 0 ? TreatmentPlanRules.Discount(GrossInput(qty, price), discountType!, discountValue) : 0; }
         catch (ArgumentOutOfRangeException) { throw Error("MSG252"); }
-        var assistant = input == null ? item.AssistantId : input.AssistantId;
+        var assistant = input == null ? item!.AssistantId : input.AssistantId;
         if (assistant.HasValue && !await db.SchedulingMembers.AnyAsync(x => x.BranchId == dossier.BranchId && x.EmployeeId == assistant && x.Active && !x.CanDentist, ct)) throw Error("MSG04");
-        var activity = new ClinicalActivity { Id = activityId, SourceKind = "Dossier", ServiceNameSnapshot = service == null || service.Id == item.ServiceId ? item.ServiceName : service.Name,
-            LabWorkSnapshot = Clean(labWork), IsPlanTransfer = transfer, PatientId = dossier.PatientId, BranchId = dossier.BranchId, DossierId = dossier.Id,
-            ItemId = item.Id, PlanVersion = dossier.PlanVersion, ServiceId = service?.Id ?? item.ServiceId, Unit = service?.Unit ?? item.Unit,
-            Quantity = qty, Region = input == null ? item.Region : Clean(string.Join(", ", input.Regions ?? [])), PerformerId = employee, AssistantId = assistant,
-            RecordedBy = actorId, Outcome = Clean(note) ?? "", ChargingBasis = "Separate", PriceSnapshotVnd = price, DiscountSnapshotVnd = reduction,
+        var planVersion = item == null ? (int?)null : await CurrentPlanVersionAsync(dossier.Id, true, ct);
+        var activity = new ClinicalActivity
+        {
+            Id = activityId,
+            ServiceNameSnapshot = service == null || item != null && service.Id == item.ServiceId ? item!.ServiceName : service.Name,
+            LabWorkSnapshot = Clean(labWork),
+            IsPlanTransfer = transfer && item != null,
+            DossierId = dossier.Id,
+            ItemId = item?.Id,
+            PlanVersion = planVersion,
+            ServiceId = service?.Id ?? item!.ServiceId,
+            Unit = unit,
+            Quantity = qty,
+            Region = input == null ? item!.Region : Clean(string.Join(", ", input.Regions ?? [])),
+            PerformerId = employee,
+            AssistantId = assistant,
+            Outcome = Clean(note) ?? "",
+            PriceSnapshotVnd = price,
+            DiscountSnapshotVnd = reduction,
             PerformedAt = date.HasValue ? new DateTimeOffset(date.Value.ToDateTime(TimeOnly.MinValue), TimeSpan.FromHours(7)).ToUniversalTime() : clock.GetUtcNow(),
-            CreatedAt = clock.GetUtcNow(), FeeStatus = "NotRequested" };
+            CreatedAt = clock.GetUtcNow(),
+            FeeStatus = "NotRequested"
+        };
         db.ClinicalActivities.Add(activity);
         await db.SaveChangesAsync(ct);
-        await DCMS.Infrastructure.Features.SystemSettings.MaterialStock.ReplaceAsync(db, clock, activity.Id, activity.PatientId, activity.BranchId,
-            activity.DossierId, activity.PerformedAt, actorId, input?.Materials, ct);
+        await DCMS.Infrastructure.Features.SystemSettings.MaterialStock.ReplaceAsync(db, activity.Id,
+            activity.PerformedAt, actorId, input?.Materials, ct);
         await db.SaveChangesAsync(ct);
         return await clinicalWork.PostWithinTransactionAsync(actorId, activity.Id,
-            new PostActivityRequest(activity.Version, 0, null, null, key), ct,
+            new PostActivityRequest(activity.Version, key), ct,
             input == null ? null : new ClinicalFeeRequest($"clinical-fee:{activity.Id}", activity.Id, activity.Version + 1,
-                activity.PatientId, activity.BranchId, activity.DossierId, activity.ItemId, activity.PlanVersion, "Separate",
+                dossier.PatientId, dossier.BranchId, activity.DossierId, activity.ItemId, activity.PlanVersion, "Separate",
                 qty, activity.Unit, price, GrossInput(qty, price), reduction, discountType, discountValue, Clean(discountReason), null,
                 reduction > 0 ? actorId : null, reduction > 0 ? clock.GetUtcNow() : null, actorId));
     }

@@ -16,7 +16,7 @@ public static class ReferenceKinds
 
 // PatientCount (DCMS-127): live count of non-archived patients pointing at the entry; null for kinds patients do not reference.
 public sealed record ReferenceEntryDto(Guid Id, string Kind, string? Code, string Name, string? Description, bool Reserved, bool Active, int Version,
-    DateTimeOffset CreatedAt, string CreatedByName, DateTimeOffset UpdatedAt, string UpdatedByName, int? PatientCount = null);
+    int? PatientCount = null);
 public sealed record ReferenceEntryInput(string? Code, string? Name, string? Description);
 public sealed record CreateReferenceRequest(Guid RequestKey, ReferenceEntryInput? Entry);
 public sealed record UpdateReferenceRequest(int ExpectedVersion, Guid RequestKey, string? Reason, ReferenceEntryInput? Entry);
