@@ -155,7 +155,7 @@ public sealed class ClinicalDocumentService(DcmsDbContext db, ClinicalAccess acc
                 if (d.FileState is not ("Ready" or "Rejected")) d.FileState = "PendingScan";
                 if (d.FileState == "Rejected") d.RejectReason = "Tệp không đạt kiểm tra an toàn.";
                 db.Add(d); Audit(d.Id, actorId, "Uploaded");
-                if (d.FileState != "PendingScan") Audit(d.Id, null, d.FileState == "Ready" ? "ScanPassed" : "ScanRejected");
+                if (d.FileState != "PendingScan") Audit(d.Id, null, d.FileState == "Ready" ? ReadyAudit : "ScanRejected");
                 ids.Add(new(d.Id, null)); results.Add(new(await DtoAsync(d, ct), null));
             }
             if (investigation != null && ids.Any(x => x.Id.HasValue)) {
@@ -210,6 +210,7 @@ public sealed class ClinicalDocumentService(DcmsDbContext db, ClinicalAccess acc
         }
         await tx.CommitAsync(ct); return await DtoAsync(d, ct);
     }
+    private string ReadyAudit => scanner.Enabled ? "ScanPassed" : "ScanSkipped";
     public async Task ScanPendingAsync(CancellationToken ct)
     {
         // Network work is outside the transaction; the guarded update below handles concurrent workers.
@@ -220,7 +221,7 @@ public sealed class ClinicalDocumentService(DcmsDbContext db, ClinicalAccess acc
             await using var tx = await db.Database.BeginTransactionAsync(ct); await LockAsync(ct);
             var row = await db.Set<ClinicalDocument>().SingleAsync(x => x.Id == d.Id, ct);
             if (row.FileState == "PendingScan") { row.FileState = state; row.Version++; row.RejectReason = state == "Rejected" ? "Tệp không đạt kiểm tra an toàn." : null;
-                Audit(row.Id, null, state == "Ready" ? "ScanPassed" : "ScanRejected"); await db.SaveChangesAsync(ct); }
+                Audit(row.Id, null, state == "Ready" ? ReadyAudit : "ScanRejected"); await db.SaveChangesAsync(ct); }
             await tx.CommitAsync(ct); db.ChangeTracker.Clear();
         }
     }

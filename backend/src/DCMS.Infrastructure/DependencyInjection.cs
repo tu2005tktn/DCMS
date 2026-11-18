@@ -105,7 +105,11 @@ public static class DependencyInjection
         services.AddScoped<DCMS.Application.Features.Examinations.IExaminationService, Features.Examinations.ExaminationService>();
         services.AddScoped<DCMS.Application.Features.Examinations.IClinicalDocumentService, Features.Examinations.ClinicalDocumentService>();
         services.AddScoped<DCMS.Application.Features.Examinations.IOwnClinicalRecordService, Features.Examinations.OwnClinicalRecordService>();
-        services.AddSingleton<DCMS.Application.Features.Examinations.IClinicalFileScanner, Features.Examinations.ClamAvClinicalFileScanner>();
+        // ClinicalDocuments:Antivirus: "ClamAv" (default) or "Disabled" for servers without RAM for ClamAV.
+        if (string.Equals(configuration["ClinicalDocuments:Antivirus"], "Disabled", StringComparison.OrdinalIgnoreCase))
+            services.AddSingleton<DCMS.Application.Features.Examinations.IClinicalFileScanner, Features.Examinations.DisabledClinicalFileScanner>();
+        else
+            services.AddSingleton<DCMS.Application.Features.Examinations.IClinicalFileScanner, Features.Examinations.ClamAvClinicalFileScanner>();
         services.AddHostedService<Features.Examinations.ClinicalScanWorker>();
         services.AddScoped<IAppointmentQueryService, AppointmentQueryService>();
         services.AddScoped<IAppointmentChangeService, AppointmentChangeService>();

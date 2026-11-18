@@ -25,6 +25,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # ClamAV is optional (~1.5-2.5 GB RAM); stop it first unless /opt/dcms/.env sets CLINICAL_ANTIVIRUS=ClamAv.
+      - name: Stop ClamAV when antivirus is disabled
+        run: grep -qx 'CLINICAL_ANTIVIRUS=ClamAv' /opt/dcms/.env || $COMPOSE rm -sf clamav
+
       - name: Build API image
         run: $COMPOSE build api
 
