@@ -36,6 +36,14 @@ public sealed class ClamAvClinicalFileScanner(IConfiguration config) : IClinical
     }
 }
 
+// ClinicalDocuments:Antivirus=Disabled. Files already passed MIME, extension, content-signature and size checks
+// at upload; they become Ready without a virus scan. See docs/specs/S19-S20-DCMS-112.md.
+public sealed class DisabledClinicalFileScanner : IClinicalFileScanner
+{
+    public bool Enabled => false;
+    public Task<string> ScanAsync(byte[] content, CancellationToken ct) => Task.FromResult("Ready");
+}
+
 public sealed class ClinicalScanWorker(IServiceScopeFactory scopes, ILogger<ClinicalScanWorker> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)

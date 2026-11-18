@@ -14,12 +14,12 @@ Trình duyệt (máy trong VPN)
   api (ASP.NET Core .NET 10, cổng 8080 nội bộ, ASPNETCORE_ENVIRONMENT=Production)
         │
         ├── postgres (postgres:17-alpine, chỉ trong mạng Docker)
-        └── clamav (quét file hồ sơ lâm sàng, chỉ trong mạng Docker)
+        └── clamav (tùy chọn, profile `antivirus`; mặc định tắt)
 ```
 
 - Web và API dùng **cùng origin**: SPA được build với `VITE_API_BASE_URL=""`, nên mọi request đi tới `/api`, `/hubs`, `/health` trên chính host và được nginx chuyển tới API. Không cần CORS cho web.
 - `Cors__AllowedOrigins__0` vẫn được đặt bằng URL công khai của web, vì PayOS dùng giá trị này làm URL quay lại.
-- Chỉ cổng 80 (web) mở ra ngoài. PostgreSQL, API và ClamAV không publish cổng.
+- Chỉ cổng 80 (web) mở ra ngoài. PostgreSQL, API và ClamAV (nếu bật) không publish cổng.
 - Dữ liệu bền vững nằm trong Docker volume: `dcms_postgres_data`, `dcms_clinical_documents`, `dcms_branch_assets`, `dcms_clamav_data`.
 
 ## Tệp liên quan
@@ -29,7 +29,7 @@ Trình duyệt (máy trong VPN)
 | `backend/Dockerfile` | Build và publish `DCMS.Api` (SDK 10.0 → runtime aspnet 10.0) |
 | `web/Dockerfile` | Build SPA bằng Node rồi phục vụ bằng nginx |
 | `web/nginx.conf` | SPA fallback + reverse proxy `/api`, `/hubs`, `/health` |
-| `infrastructure/docker/compose.prod.yaml` | Stack production: postgres, clamav, api, web, cùng các job `migrate`/`seed` |
+| `infrastructure/docker/compose.prod.yaml` | Stack production: postgres, api, web, clamav (tùy chọn), cùng các job `migrate`/`seed` |
 | `infrastructure/docker/.env.production.example` | Mẫu biến môi trường production |
 
 ## Biến môi trường (`.env` trên server, không commit)
@@ -55,7 +55,7 @@ docker compose --env-file .env -f infrastructure/docker/compose.prod.yaml --prof
 1. Server: cài Docker Engine + Compose plugin.
 2. Máy dev: đóng gói các tệp được Git theo dõi (`git ls-files`) thành tar, chép sang server vào `/opt/dcms` (giữ nguyên `.env` có sẵn trên server).
 3. Server: tạo `/opt/dcms/.env` từ `infrastructure/docker/.env.production.example` (lần đầu), sinh mật khẩu DB và `JWT_SIGNING_KEY` ngẫu nhiên, `chmod 600`.
-4. `docker compose ... up -d --build postgres clamav`, chạy job `migrate` (và `seed` nếu cần), rồi `up -d --build api web`.
+4. `docker compose ... up -d --build postgres`, chạy job `migrate` (và `seed` nếu cần), rồi `up -d --build api web`.
 5. Kiểm tra: `curl http://<IP server>/health` trả về trạng thái healthy; mở `http://<IP server>` từ máy trong VPN.
 
 Cập nhật phiên bản mới: lặp lại bước 2, chạy lại `migrate`, rồi `up -d --build api web`.
@@ -82,6 +82,15 @@ Server có 3,8 GB RAM; ClamAV, PostgreSQL và API dùng khoảng 1,6–2,5 GB kh
 
 Container đang chạy không bị dừng trong lúc build; chỉ bước `up` cuối cùng mới khởi động lại `api`/`web`.
 
+## Quét virus tệp tải lên (ClamAV) — mặc định tắt (18/11/2026)
+
+ClamAV nạp cơ sở dữ liệu mẫu virus vào RAM (1,2–1,5 GB, lên ~2,5 GB khi cập nhật), là thành phần tốn RAM nhất trên server 3,8 GB và góp phần làm máy treo. Production mặc định chạy **không có ClamAV**:
+
+- `CLINICAL_ANTIVIRUS=Disabled` (mặc định trong compose) đặt `ClinicalDocuments__Antivirus=Disabled` cho API: tệp hợp lệ chuyển Ready ngay, audit ghi `ScanSkipped`. Kiểm tra MIME/extension/chữ ký nội dung/kích thước vẫn áp dụng. Xem [S19/S20](../specs/S19-S20-DCMS-112.md#chế-độ-quét-virus-tùy-chọn-18112026).
+- Service `clamav` chỉ chạy khi bật profile `antivirus`.
+- Bật lại khi server đủ RAM (khuyến nghị 8 GB): trong `/opt/dcms/.env` đặt `CLINICAL_ANTIVIRUS=ClamAv` và thêm `antivirus` vào `COMPOSE_PROFILES` (ví dụ `public,antivirus`), rồi chạy lại deploy.
+- Pipeline deploy tự dừng và xóa container `clamav` (trước bước build, để giải phóng RAM) khi `.env` không đặt `CLINICAL_ANTIVIRUS=ClamAv`. Tắt bằng tay: `docker compose ... rm -sf clamav`. Volume `dcms_clamav_data` có thể xóa để lấy lại đĩa.
+
 ## Public ra Internet (Cloudflare Tunnel)
 
 - Domain `nhakhoangockhang.id.vn` dùng nameserver Cloudflare. Container `cloudflared` (profile `public`, bật bằng `COMPOSE_PROFILES=public` trong `.env`) giữ kết nối ra Cloudflare bằng `CLOUDFLARE_TUNNEL_TOKEN` trong `.env`; server không mở cổng ra Internet.
@@ -93,4 +102,4 @@ Container đang chạy không bị dừng trong lúc build; chỉ bước `up` c
 - Trong VPN chỉ có HTTP; HTTPS công khai do Cloudflare đảm nhận.
 - Server đang chứa dữ liệu demo (`seed`). Trước khi dùng dữ liệu bệnh nhân thật cần đổi mật khẩu các tài khoản demo hoặc dựng database mới không seed.
 - Khi chưa cấu hình SMTP, Production không có adapter gửi email: xác nhận email/khôi phục mật khẩu sẽ báo lỗi gửi.
-- ClamAV cần khoảng 1–1,5 GB RAM và tải chữ ký virus khi khởi động lần đầu; trong lúc đó tệp tải lên ở trạng thái PendingScan.
+- ClamAV (khi bật) cần khoảng 1–1,5 GB RAM và tải chữ ký virus khi khởi động lần đầu; trong lúc đó tệp tải lên ở trạng thái PendingScan.
