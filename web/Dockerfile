@@ -1,6 +1,8 @@
 # Build context: web/
 FROM node:22-alpine AS build
 WORKDIR /app
+# Cap the Node heap so the build fits on a small server.
+ENV NODE_OPTIONS=--max-old-space-size=1024
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
