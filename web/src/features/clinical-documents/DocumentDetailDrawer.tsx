@@ -9,7 +9,7 @@ import {
 } from './types';
 
 const historyLabels: Record<string, string> = {
-  Uploaded: 'Tải lên', AiAnalyzed: 'Phân tích AI', AiAnalysisFailed: 'Phân tích AI thất bại', ScanPassed: 'Kiểm tra an toàn đạt', ScanRejected: 'Bị từ chối khi kiểm tra', Viewed: 'Xem', Downloaded: 'Tải về',
+  Uploaded: 'Tải lên', ScanPassed: 'Kiểm tra an toàn đạt', ScanSkipped: 'Không quét virus (đã tắt)', ScanRejected: 'Bị từ chối khi kiểm tra', Viewed: 'Xem', Downloaded: 'Tải về',
 };
 const accessMessage = (e: ApiError) => e.status === 403 ? 'Bạn không có quyền xem tệp này.'
   : e.status === 401 ? 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.' : e.message;

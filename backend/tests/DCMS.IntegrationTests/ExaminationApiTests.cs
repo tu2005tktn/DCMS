@@ -22,6 +22,8 @@ namespace DCMS.IntegrationTests;
 public sealed class ExaminationTestScanner : IClinicalFileScanner
 {
     public string State { get; set; } = "PendingScan";
+    public bool ScanEnabled { get; set; } = true;
+    public bool Enabled => ScanEnabled;
     public Task<string> ScanAsync(byte[] content, CancellationToken ct) => Task.FromResult(State);
 }
 public sealed class ExaminationFixture : ReceptionFixture
@@ -46,7 +48,7 @@ public sealed class ExaminationApiTests(ExaminationFixture fixture) : IClassFixt
         Conclusion: complete ? "SYNTHETIC kết luận" : null, Advice: complete ? "SYNTHETIC dặn dò" : null, Disposition: complete ? "ConsultationOnly" : null);
     private async Task<(ReceptionApiTests.Setup Setup, VisitResult Visit, HttpClient Dentist)> Prepare(bool start = true)
     {
-        fixture.Services.GetRequiredService<ExaminationTestScanner>().State = "PendingScan";
+        var scanner = fixture.Services.GetRequiredService<ExaminationTestScanner>(); scanner.State = "PendingScan"; scanner.ScanEnabled = true;
         var setup = await reception.Prepare(); using var assistant = await reception.Login(); var visit = await reception.Check(assistant, setup);
         var dentist = await reception.Login("dentist.demo");
         if (start) { var result = await dentist.PostAsJsonAsync($"/api/visits/{visit.VisitId}/start", new StartExamination(visit.PatientId, visit.VisitVersion, Guid.NewGuid()));
@@ -157,6 +159,29 @@ public sealed class ExaminationApiTests(ExaminationFixture fixture) : IClassFixt
             var closed=await Ok<ExaminationWorkspace>(await c.PostAsJsonAsync($"/api/visits/{v.VisitId}/complete",new CompleteExaminationVisit(v.PatientId,cancelled.VisitVersion,Guid.NewGuid(),true)));
             Assert.Equal("Completed",closed.Visit.Status);
             Assert.Equal(HttpStatusCode.Conflict,(await c.PostAsJsonAsync(Inv(v.VisitId),Order(closed.Visit))).StatusCode);
+        }
+    }
+    [Fact]
+    public async Task DisabledAntivirusMakesValidUploadsAndPendingFilesReadyAuditedAsSkipped()
+    {
+        var (_, v, c) = await Prepare(); using (c) {
+            var scanner = fixture.Services.GetRequiredService<ExaminationTestScanner>();
+            var pending = (await Ok<UploadBatchResult>(await Upload(c, Metadata(v)))).Document!;
+            Assert.Equal("PendingScan", pending.FileState);
+            scanner.ScanEnabled = false; scanner.State = "Ready";
+            try {
+                var uploaded = (await Ok<UploadBatchResult>(await Upload(c, Metadata(v)))).Document!;
+                Assert.Equal("Ready", uploaded.FileState);
+                Assert.Equal(HttpStatusCode.BadRequest, (await Upload(c, Metadata(v), Encoding.ASCII.GetBytes("not a pdf"))).StatusCode);
+                using (var scope = fixture.Services.CreateScope())
+                    await scope.ServiceProvider.GetRequiredService<IClinicalDocumentService>().ScanPendingAsync(CancellationToken.None);
+                using var check = fixture.Services.CreateScope(); var db = check.ServiceProvider.GetRequiredService<DcmsDbContext>();
+                Assert.Equal("Ready", (await db.Set<ClinicalDocument>().AsNoTracking().SingleAsync(x => x.Id == pending.DocumentId)).FileState);
+                foreach (var id in new[] { uploaded.DocumentId, pending.DocumentId }) {
+                    var actions = await db.Set<DocumentAudit>().AsNoTracking().Where(x => x.DocumentId == id).Select(x => x.Action).ToArrayAsync();
+                    Assert.Contains("ScanSkipped", actions); Assert.DoesNotContain("ScanPassed", actions);
+                }
+            } finally { scanner.ScanEnabled = true; scanner.State = "PendingScan"; }
         }
     }
     [Theory] [InlineData("Ready")] [InlineData("PendingScan")] [InlineData("Rejected")]
