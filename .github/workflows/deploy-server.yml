@@ -20,11 +20,19 @@ jobs:
     timeout-minutes: 45
     env:
       COMPOSE: docker compose -p dcms --env-file /opt/dcms/.env -f infrastructure/docker/compose.prod.yaml
+      # The server has ~4 GB RAM: build one image at a time (docs/implementation/DEPLOY-SERVER-WIREGUARD.vi.md).
+      COMPOSE_PARALLEL_LIMIT: "1"
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build images
-        run: $COMPOSE build api web
+      - name: Build API image
+        run: $COMPOSE build api
+
+      - name: Build web image
+        run: $COMPOSE build web
+
+      - name: Trim build cache
+        run: docker builder prune -f --filter until=168h
 
       - name: Start database and scanner
         run: $COMPOSE up -d --wait postgres

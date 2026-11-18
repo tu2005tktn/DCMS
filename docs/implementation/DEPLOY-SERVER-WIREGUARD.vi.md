@@ -64,11 +64,23 @@ Cập nhật phiên bản mới: lặp lại bước 2, chạy lại `migrate`, 
 
 - Trên server có GitHub Actions **self-hosted runner** tên `dcms-server`, nhãn `dcms-prod`, chạy dưới user `github-runner` (thuộc nhóm `docker`) dưới dạng systemd service. Runner tự kết nối ra GitHub nên server không cần mở cổng nào.
 - Workflow `.github/workflows/deploy-server.yml` chạy khi có push vào `main` (gồm merge PR) hoặc chạy tay (`workflow_dispatch`). Job chỉ nhắm `runs-on: [self-hosted, dcms-prod]`, không chạy cho pull request.
-- Các bước: checkout → `docker compose build api web` → `up -d --wait postgres` → job `migrate` → `up -d --remove-orphans` (mọi service mặc định cùng các profile trong `COMPOSE_PROFILES`) → chờ `/health` trả `healthy` (tối đa ~2 phút) → dọn image cũ.
+- Các bước: checkout → build image `api` → build image `web` (lần lượt, không song song) → dọn build cache → `up -d --wait postgres` → job `migrate` → `up -d --remove-orphans` (mọi service mặc định cùng các profile trong `COMPOSE_PROFILES`) → chờ `/health` trả `healthy` (tối đa ~2 phút) → dọn image cũ.
 - Compose chạy ngay trong thư mục checkout của runner, với project name cố định `dcms` và `--env-file /opt/dcms/.env`, nên dùng lại đúng container và volume đang có. `.env` thuộc nhóm `github-runner`, quyền 640.
 - Chỉ một lần deploy chạy tại một thời điểm (`concurrency: deploy-server`); lần sau chờ lần trước xong.
 - Build hỏng thì container cũ vẫn chạy vì `up` chỉ thực hiện sau khi build thành công. Migration lỗi cũng dừng trước khi khởi động lại API.
 - Repo đang **public**: chỉ workflow này được nhắm vào nhãn `dcms-prod`; không thêm workflow `pull_request` dùng runner này. Nên bật *Settings → Actions → General → Require approval for all external contributors*.
+
+## Build tiết kiệm bộ nhớ (18/11/2026)
+
+Server có 3,8 GB RAM; ClamAV, PostgreSQL và API dùng khoảng 1,6–2,5 GB khi chạy. Ngày 17/11/2026 lần build song song API và web làm máy hết RAM và treo (SSH và web không phản hồi). Từ nay build chậm hơn nhưng ít tốn RAM:
+
+- Workflow build từng image một (`api` rồi `web`) thay vì `build api web` song song, và đặt `COMPOSE_PARALLEL_LIMIT=1`.
+- `backend/Dockerfile`: `dotnet restore`/`publish` chạy với `-maxcpucount:1` (một tiến trình MSBuild), `DOTNET_GCHeapHardLimit` 1 GB và tắt build server/node reuse.
+- `web/Dockerfile`: `NODE_OPTIONS=--max-old-space-size=1024` cho `npm ci` và `vite build`.
+- Sau khi build xong, dọn build cache cũ hơn 7 ngày (`docker builder prune`) để không đầy đĩa.
+- Trên server nên có swap 4 GB (`/swapfile`, `vm.swappiness=10`) làm vùng đệm; tạo một lần bằng tay khi có quyền SSH.
+
+Container đang chạy không bị dừng trong lúc build; chỉ bước `up` cuối cùng mới khởi động lại `api`/`web`.
 
 ## Public ra Internet (Cloudflare Tunnel)
 
