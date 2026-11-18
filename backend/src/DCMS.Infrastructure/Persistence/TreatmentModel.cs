@@ -71,30 +71,28 @@ internal static class TreatmentModel
 
         model.Entity<TreatmentTemplate>(b =>
         {
-            b.Property(x => x.DefinitionKind).HasMaxLength(24).HasDefaultValue("LegacySteps");
             b.ToTable("TREATMENT_TEMPLATE"); b.HasKey(x => x.Id);
             b.HasIndex(x => new { x.BranchId, x.Name });
             b.Property(x => x.Name).HasMaxLength(160);
-            b.Property(x => x.Version).IsConcurrencyToken();
+            b.Property(x => x.Version).HasDefaultValue(1).IsConcurrencyToken();
             b.HasOne<SchedulingBranch>().WithMany().HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Restrict);
         });
 
 
 
 
+        model.Ignore<LabOrderSpec>();
         model.Entity<LabOrder>(b =>
         {
             b.ToTable("LAB_ORDER"); b.HasKey(x => x.Id);
             b.Property(x => x.Code).HasMaxLength(40); b.Property(x => x.WorkName).HasMaxLength(160);
-            b.Property(x => x.MarginOuter).HasMaxLength(20); b.Property(x => x.MarginInner).HasMaxLength(20); b.Property(x => x.MarginSide).HasMaxLength(20);
-            b.Property(x => x.BridgeShapes).HasColumnType("jsonb").HasConversion(JsonConv<string[]>(), JsonCompare<string[]>());
-            b.Property(x => x.Teeth).HasColumnType("jsonb").HasConversion(JsonConv<string[]>(), JsonCompare<string[]>());
-            b.Property(x => x.Shade).HasColumnType("jsonb").HasConversion(JsonConv<Dictionary<string, string>>(), JsonCompare<Dictionary<string, string>>());
-            b.Property(x => x.Note).HasMaxLength(1000); b.Property(x => x.Material).HasMaxLength(100); b.Property(x => x.Warranty).HasMaxLength(100);
-            b.HasIndex(x => x.ActivityId).IsUnique(); b.HasIndex(x => x.DossierId);
-            b.HasIndex(x => new { x.BranchId, x.Code }).IsUnique().HasFilter("\"Code\" IS NOT NULL");
+            b.Property(x => x.Spec).HasColumnType("jsonb").HasConversion(JsonConv<LabOrderSpec>(), JsonCompare<LabOrderSpec>());
+            b.Property(x => x.Note).HasMaxLength(1000);
+            b.Property(x => x.Version).HasDefaultValue(1).ValueGeneratedNever().IsConcurrencyToken();
+            b.HasIndex(x => x.ActivityId).IsUnique();
+            b.HasIndex(x => x.Code).HasFilter("\"Code\" IS NOT NULL");
             b.Property(x => x.Status).HasMaxLength(20).HasDefaultValue(LabOrderStatus.NotSent);
-            b.HasIndex(x => new { x.BranchId, x.Status, x.DueOn });
+            b.HasIndex(x => new { x.Status, x.DueOn });
             b.HasOne<ClinicalActivity>().WithMany().HasForeignKey(x => x.ActivityId).OnDelete(DeleteBehavior.Cascade);
             b.ToTable(t =>
             {

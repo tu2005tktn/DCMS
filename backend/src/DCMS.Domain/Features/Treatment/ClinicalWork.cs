@@ -39,20 +39,14 @@ public sealed class CareTask
     public int PatientId { get; set; }
     public int BranchId { get; set; }
     public Guid? AppointmentId { get; set; }
-    public string? EpisodeKey { get; set; }
     public string Type { get; set; } = "FollowUp";
     public string Content { get; set; } = "";
     public int? OwnerAccountId { get; set; }
     public DateTimeOffset DueAt { get; set; }
     public string Status { get; set; } = "Open";
     public int Version { get; set; } = 1;
-    public int CreatedBy { get; set; }
-    public DateTimeOffset CreatedAt { get; set; }
-    public DateTimeOffset UpdatedAt { get; set; }
-    // Contact attempts and escalations are stored on the task row.
+    // Contact attempts are stored on the task row; Version is the single concurrency token.
     public List<CareContactAttempt> ContactAttempts { get; set; } = [];
-    public List<CareEscalation> Escalations { get; set; } = [];
-    public Guid StorageStamp { get; set; } = Guid.NewGuid();
 }
 
 public sealed class CareContactAttempt
@@ -65,19 +59,4 @@ public sealed class CareContactAttempt
     public Guid? RebookedAppointmentId { get; set; }
     public int ActorId { get; set; }
     public DateTimeOffset OccurredAt { get; set; }
-}
-
-public sealed class CareEscalation
-{
-    public Guid Id { get; set; } = Guid.NewGuid();
-    public Guid TaskId { get; set; }
-    public int TargetClinicianAccountId { get; set; }
-    public string Reason { get; set; } = "";
-    public string? Resolution { get; set; }
-    public string Status { get; set; } = "Pending";
-    public int CreatedBy { get; set; }
-    public DateTimeOffset CreatedAt { get; set; }
-    public int Version { get; set; } = 1;
-    public DateTimeOffset? AcknowledgedAt { get; set; }
-    public DateTimeOffset? ResolvedAt { get; set; }
 }

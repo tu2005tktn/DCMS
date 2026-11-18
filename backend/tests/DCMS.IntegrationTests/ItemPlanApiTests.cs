@@ -7,10 +7,7 @@ using DCMS.Domain.Features.Scheduling;
 using DCMS.Domain.Features.Treatment;
 using DCMS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.DependencyInjection;
-using Npgsql;
 using Xunit;
 namespace DCMS.IntegrationTests;
 
@@ -113,37 +110,5 @@ public sealed class ItemPlanApiTests(ApiFixture fixture) : IClassFixture<ApiFixt
         var key = Guid.NewGuid(); var input = Row(s, plan.Version) with { RequestKey = key }; (await client.PostAsJsonAsync($"{Root}/{plan.Id}/items", input)).EnsureSuccessStatusCode();
         using (var scope = fixture.Services.CreateScope()) { var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>(); var m = await db.LoadMemberAsync(s.Branch, s.Dentist); m!.Active = false; await db.SaveChangesAsync(); }
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync($"{Root}/{plan.Id}/items", input)).StatusCode);
-    }
-    [Fact]
-    public async Task LegacySourcesStaySeparateAndCannotMutateItemPlans() {
-        var s = await Setup(); using var c = await Login(); var plan = await Create(c, s.Branch);
-        var legacy = new DCMS.Domain.Features.Treatment.TreatmentTemplate {
-            BranchId = s.Branch, Name = "Legacy", DefinitionKind = "LegacySteps", Version = 1,
-            CreatedBy = 1, CreatedAt = DateTimeOffset.UtcNow
-        };
-        using (var scope = fixture.Services.CreateScope()) {
-            var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
-            db.TreatmentTemplates.Add(legacy); await db.SaveChangesAsync();
-        }
-        var list = (await c.GetFromJsonAsync<ItemPlanPage>($"{Root}?branchId={s.Branch}"))!; Assert.Equal(plan.Id, Assert.Single(list.Items).Id);
-        Assert.Equal(HttpStatusCode.NotFound, (await c.GetAsync($"{Root}/{legacy.Id}")).StatusCode);
-    }
-    [Fact]
-    public async Task MigrationKeepsLegacyRowsAndIdentifiers() {
-        var schema = "item_plan_migration_" + Guid.NewGuid().ToString("N");
-        var conn = new NpgsqlConnectionStringBuilder(fixture.ConnectionString) { SearchPath = schema }.ConnectionString;
-        await using var connection = new NpgsqlConnection(conn); await connection.OpenAsync();
-        await using (var command = new NpgsqlCommand($"CREATE SCHEMA \"{schema}\"", connection)) await command.ExecuteNonQueryAsync();
-        try {
-            await using var db = new DcmsDbContext(new DbContextOptionsBuilder<DcmsDbContext>().UseNpgsql(conn).Options);
-            var migrations = db.Database.GetMigrations().ToArray();
-            var itemPlanIndex = Array.FindIndex(migrations, x => x.EndsWith("_TreatmentItemPlans", StringComparison.Ordinal));
-            await db.GetService<IMigrator>().MigrateAsync(migrations[itemPlanIndex - 1]);
-            var id = Guid.NewGuid();
-            await db.Database.ExecuteSqlRawAsync("INSERT INTO \"SCHEDULING_BRANCH\" (\"Id\",\"Name\",\"Active\",\"SlotIntervalMinutes\",\"BookingSettingsVersion\") VALUES (919191,'SYNTHETIC',true,15,1)");
-            await db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO \"TREATMENT_TEMPLATE\" (\"Id\",\"BranchId\",\"Name\",\"Version\",\"CreatedBy\",\"CreatedAt\") VALUES ({id},919191,'Legacy preserved',7,1,{DateTimeOffset.UtcNow})");
-            await db.Database.MigrateAsync();
-            var old = await db.TreatmentTemplates.SingleAsync(x => x.Id == id); Assert.Equal("LegacySteps", old.DefinitionKind); Assert.Equal(7, old.Version); Assert.Null(old.DeletedAt); Assert.Equal("Legacy preserved", old.Name);
-        } finally { await using var command = new NpgsqlCommand($"DROP SCHEMA \"{schema}\" CASCADE", connection); await command.ExecuteNonQueryAsync(); }
     }
 }

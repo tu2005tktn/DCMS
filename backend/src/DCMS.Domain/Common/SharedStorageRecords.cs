@@ -12,8 +12,3 @@ public abstract class AuditRecord
 {
     public Guid StorageId { get; set; } = Guid.NewGuid();
 }
-
-public abstract class PrescriptionRecord
-{
-    public Guid Id { get; set; } = Guid.NewGuid();
-}

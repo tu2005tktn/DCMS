@@ -200,9 +200,9 @@ public sealed class AllScreensPermissionApiTests(ReceptionFixture fixture) : ICl
         var setup = await reception.Prepare(); using var assistant = await reception.Login(); var visit = await reception.Check(assistant, setup);
         using var owner = await reception.Login("owner.demo"); var (staff, name) = await Staff(setup.BranchId, AccountRoles.Dentist);
         await Assign(owner, staff, AccountRoles.Dentist, "prescriptions.read"); using var user = await reception.Login(name);
-        Assert.True((await user.GetAsync($"/api/prescriptions/visits/{visit.VisitId}/lines")).IsSuccessStatusCode);
+        Assert.True((await user.GetAsync($"/api/prescriptions/patients/{setup.PatientId}")).IsSuccessStatusCode);
         await Ok<DCMS.Application.Features.Examinations.ExaminationWorkspace>(await user.GetAsync($"/api/visits/{visit.VisitId}/examination"));
-        Assert.Equal(HttpStatusCode.Forbidden, (await user.PostAsJsonAsync($"/api/prescriptions/visits/{visit.VisitId}/lines", new { })).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await user.PostAsJsonAsync($"/api/prescriptions/patients/{setup.PatientId}", new { })).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await user.GetAsync("/api/reception/options")).StatusCode);
     }
 }

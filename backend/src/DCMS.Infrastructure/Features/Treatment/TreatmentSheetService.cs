@@ -127,7 +127,7 @@ public sealed partial class TreatmentDossierService
         {
             if (dossier.Version != request.ExpectedVersion) throw Error("MSG111", 409);
             if (dossier.State != "Open") throw Error("MSG240", 409);
-            var source = await db.TreatmentTemplates.AsNoTracking().SingleOrDefaultAsync(x => x.Id == request.ItemPlanId && x.DefinitionKind == "ItemPlan" && x.DeletedAt == null, ct) ?? throw Error("MSG113", 404);
+            var source = await db.TreatmentTemplates.AsNoTracking().SingleOrDefaultAsync(x => x.Id == request.ItemPlanId && x.DeletedAt == null, ct) ?? throw Error("MSG113", 404);
             if (source.BranchId != dossier.BranchId) throw Error("MSG06", 403);
             if (source.Version != request.ExpectedItemPlanVersion) throw Error("MSG111", 409);
             var rows = await db.TreatmentTemplateItems.AsNoTracking().Where(x => x.TemplateId == source.Id && x.DeletedAt == null).OrderBy(x => x.Position).ThenBy(x => x.Id).ToListAsync(ct);

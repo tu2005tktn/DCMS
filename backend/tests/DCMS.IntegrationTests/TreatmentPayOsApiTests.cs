@@ -104,11 +104,10 @@ public sealed class TreatmentPayOsApiTests(TreatmentPayOsFixture fixture) : ICla
                 PriceSnapshotVnd = 100000, PerformerId = dentistId, PerformedAt = DateTimeOffset.UtcNow,
                 CreatedAt = DateTimeOffset.UtcNow};
             db.ClinicalActivities.Add(activity); await db.SaveChangesAsync(); activityId = activity.Id;
-            var labOrder = new LabOrder { ActivityId = activityId, DossierId = dossierId,
-                PatientId = patientId, BranchId = branchId, DentistId = dentistId,
+            var labOrder = new LabOrder { ActivityId = activityId,
+                DentistId = dentistId,
                 WorkName = "Synthetic lab", OrderedOn = DateOnly.FromDateTime(DateTime.UtcNow),
-                TotalFeeVnd = 50000, PaidVnd = 0, CreatedAt = DateTimeOffset.UtcNow,
-                UpdatedAt = DateTimeOffset.UtcNow, CreatedBy = dentistId, UpdatedBy = dentistId };
+                TotalFeeVnd = 50000, PaidVnd = 0 };
             db.LabOrders.Add(labOrder);
             await db.SaveChangesAsync(); labOrderId = labOrder.Id;
         }

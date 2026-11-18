@@ -1,7 +1,7 @@
-import { Alert, Button, Col, Divider, Drawer, Form, Input, Modal, Row, Select, Space, Spin, Table, Tag, Typography, Upload, message } from 'antd';
+import { Alert, Button, Col, Divider, Drawer, Form, Input, Modal, Row, Space, Spin, Table, Tag, Typography, message } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { api, apiBlob, ApiError, type Blocker } from '../../services/api';
+import { api, ApiError, type Blocker } from '../../services/api';
 import { usePermissions } from '../authentication/usePermissions';
 
 type BranchDto = {
@@ -11,14 +11,7 @@ type BranchDto = {
   address?: string;
   phone?: string;
   email?: string;
-  website?: string;
-  logoAssetId?: string;
-  timeZoneId: string;
-  bankCode?: string;
-  accountNumber?: string;
-  payeeName?: string;
   slotIntervalMinutes: number;
-  bookingSettingsVersion: number;
   isActive: boolean;
   version: number;
   chairCount: number;
@@ -27,7 +20,7 @@ type BranchDto = {
 type ChairDto = { id: number; branchId: number; code: string; name: string; isActive: boolean; version: number };
 type BranchDetailDto = Omit<BranchDto, 'chairCount'> & { chairs: ChairDto[] };
 type ImpactPreviewResult = { allowed: boolean; blockers: Blocker[]; impact: string };
-type BranchForm = { code: string; name: string; address?: string; phone?: string; email?: string; website?: string; timeZoneId: string; bankCode?: string; accountNumber?: string; payeeName?: string };
+type BranchForm = { code: string; name: string; address?: string; phone?: string; email?: string };
 type ChairForm = { code: string; name: string };
 type StateTarget = { kind: 'branch'; branch: BranchDto } | { kind: 'chair'; chair: ChairDto; branchId: number };
 
@@ -65,10 +58,6 @@ export default function BranchesPanel() {
   const [branchError, setBranchError] = useState<ApiError>();
   const [branchDirty, setBranchDirty] = useState(false);
 
-  const [logoAssetId, setLogoAssetId] = useState<string>();
-  const [logoUrl, setLogoUrl] = useState<string>();
-  const [logoUploading, setLogoUploading] = useState(false);
-
   const [stateTarget, setStateTarget] = useState<StateTarget>();
   const [preview, setPreview] = useState<ImpactPreviewResult>();
   const [previewError, setPreviewError] = useState<ApiError>();
@@ -98,23 +87,10 @@ export default function BranchesPanel() {
 
   useEffect(() => { void loadBranches(); }, []);
 
-  // Logo bytes come through the authenticated API and are shown via a revocable blob: URL.
-  useEffect(() => {
-    if (!selected || !logoAssetId) { setLogoUrl(undefined); return; }
-    let url: string | undefined;
-    let active = true;
-    apiBlob(`${base}/${selected.id}/logo/${logoAssetId}`)
-      .then(blob => { if (active) { url = URL.createObjectURL(blob); setLogoUrl(url); } })
-      .catch(() => { if (active) setLogoUrl(undefined); });
-    return () => { active = false; if (url) URL.revokeObjectURL(url); };
-  }, [selected?.id, logoAssetId]);
-
   const fillForm = (detail: BranchDetailDto) => {
     branchForm.setFieldsValue({
-      code: detail.code, name: detail.name, address: detail.address, phone: detail.phone, email: detail.email, website: detail.website,
-      timeZoneId: detail.timeZoneId || 'Asia/Ho_Chi_Minh', bankCode: detail.bankCode, accountNumber: detail.accountNumber, payeeName: detail.payeeName,
+      code: detail.code, name: detail.name, address: detail.address, phone: detail.phone, email: detail.email,
     });
-    setLogoAssetId(detail.logoAssetId);
   };
 
   const refreshDetail = async (id: number, keepForm = false) => {
@@ -131,8 +107,6 @@ export default function BranchesPanel() {
     branchForm.resetFields();
     if (!b) {
       setSelected(null);
-      setLogoAssetId(undefined);
-      branchForm.setFieldsValue({ timeZoneId: 'Asia/Ho_Chi_Minh' });
       setBranchDirty(false);
       setDrawerOpen(true);
       return;
@@ -142,7 +116,7 @@ export default function BranchesPanel() {
   };
 
   const closeDrawer = () => {
-    if (savingBranch || logoUploading) return;
+    if (savingBranch) return;
     if (branchDirty && !window.confirm('Đóng và bỏ thay đổi chưa lưu?')) return;
     setDrawerOpen(false);
   };
@@ -153,8 +127,6 @@ export default function BranchesPanel() {
       expectedVersion: selected?.version ?? 0,
       code: values.code.trim(), name: values.name.trim(),
       address: values.address?.trim() || null, phone: values.phone?.trim() || null, email: values.email?.trim() || null,
-      website: values.website?.trim() || null, logoAssetId: logoAssetId ?? null, timeZoneId: values.timeZoneId || 'Asia/Ho_Chi_Minh',
-      bankCode: values.bankCode?.trim() || null, accountNumber: values.accountNumber?.trim() || null, payeeName: values.payeeName?.trim() || null,
     };
     const target = selected ? `${base}/${selected.id}` : base;
     const requestKey = keyFor(JSON.stringify({ target, ...body }));
@@ -166,7 +138,7 @@ export default function BranchesPanel() {
       setSelected(saved);
       fillForm(saved);
       setBranchDirty(false);
-      toast.success(selected ? 'Đã lưu chi nhánh.' : 'Đã tạo chi nhánh. Có thể tải logo và thêm ghế.');
+      toast.success(selected ? 'Đã lưu chi nhánh.' : 'Đã tạo chi nhánh. Có thể thêm ghế điều trị.');
       void loadBranches();
     } catch (e) {
       const err = e as ApiError;
@@ -176,28 +148,6 @@ export default function BranchesPanel() {
     } finally {
       setSavingBranch(false);
     }
-  };
-
-  const uploadLogo = async (file: File) => {
-    if (!selected) { toast.warning('Lưu chi nhánh trước khi tải logo.'); return false; }
-    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 2 * 1024 * 1024) {
-      toast.error('Chỉ nhận ảnh PNG, JPEG hoặc WebP tối đa 2 MiB.');
-      return false;
-    }
-    setLogoUploading(true);
-    const form = new FormData();
-    form.append('file', file, file.name);
-    try {
-      const result = await api<{ assetId: string }>(`${base}/${selected.id}/logo`, { method: 'POST', body: form });
-      setLogoAssetId(result.assetId);
-      setBranchDirty(true);
-      toast.success('Đã tải logo. Bấm "Lưu chi nhánh" để áp dụng.');
-    } catch (e) {
-      toast.error((e as Error).message);
-    } finally {
-      setLogoUploading(false);
-    }
-    return false;
   };
 
   const openState = async (target: StateTarget) => {
@@ -291,7 +241,7 @@ export default function BranchesPanel() {
       <Space wrap style={{ marginBottom: 16, justifyContent: 'space-between', width: '100%' }}>
         <div>
           <Typography.Title level={3} style={{ margin: 0 }}>Chi nhánh & ghế điều trị</Typography.Title>
-          <Typography.Text type="secondary">Thông tin cơ sở, logo, tài khoản nhận chuyển khoản và ghế điều trị của từng chi nhánh.</Typography.Text>
+          <Typography.Text type="secondary">Thông tin cơ sở, liên hệ và ghế điều trị của từng chi nhánh.</Typography.Text>
         </div>
         {canManage && <Button type="primary" onClick={() => void openBranch(null)}>Thêm chi nhánh</Button>}
       </Space>
@@ -312,12 +262,6 @@ export default function BranchesPanel() {
             render: (v, r) => <div><strong>{v}</strong>{r.address && <div style={{ fontSize: 12, color: '#666' }}>{r.address}</div>}</div>,
           },
           { title: 'Liên hệ', render: (_, r) => <div style={{ fontSize: 13 }}>{r.phone && <div>{r.phone}</div>}{r.email && <div>{r.email}</div>}</div> },
-          {
-            title: 'Tài khoản chuyển khoản',
-            render: (_, r) => (r.accountNumber
-              ? <div><Tag color="geekblue">{r.bankCode}</Tag>{r.accountNumber}{r.payeeName && <div style={{ fontSize: 12, color: '#888' }}>{r.payeeName}</div>}</div>
-              : <Typography.Text type="secondary">Chưa cấu hình</Typography.Text>),
-          },
           { title: 'Ghế đang dùng', width: 120, align: 'center', dataIndex: 'chairCount' },
           { title: 'Trạng thái', width: 140, render: (_, r) => (r.isActive ? <Tag color="success">Hoạt động</Tag> : <Tag>Ngừng hoạt động</Tag>) },
           {
@@ -342,7 +286,7 @@ export default function BranchesPanel() {
         onClose={closeDrawer}
         width={780}
         title={selected ? `Chi nhánh: ${selected.name}` : 'Thêm chi nhánh'}
-        extra={canManage && <Button type="primary" onClick={() => branchForm.submit()} loading={savingBranch} disabled={logoUploading}>Lưu chi nhánh</Button>}
+        extra={canManage && <Button type="primary" onClick={() => branchForm.submit()} loading={savingBranch}>Lưu chi nhánh</Button>}
       >
         {!canManage && <Alert type="info" showIcon message="Bạn chỉ có quyền xem chi nhánh." style={{ marginBottom: 16 }} />}
         {selected && !selected.isActive && <Alert type="warning" showIcon message="Chi nhánh đang ngừng hoạt động: không nhận ghế mới và không nhận lịch hẹn." style={{ marginBottom: 16 }} />}
@@ -367,48 +311,12 @@ export default function BranchesPanel() {
             <Input.TextArea rows={2} />
           </Form.Item>
           <Row gutter={12}>
-            <Col xs={24} sm={8}>
+            <Col xs={24} sm={12}>
               <Form.Item name="phone" label="Điện thoại" rules={[{ pattern: /^\+?[0-9 .()-]{1,20}$/, message: 'Số điện thoại không hợp lệ.' }]}><Input /></Form.Item>
             </Col>
-            <Col xs={24} sm={8}>
+            <Col xs={24} sm={12}>
               <Form.Item name="email" label="Email" rules={[{ type: 'email', message: 'Email không hợp lệ.' }, { max: 254 }]}><Input /></Form.Item>
             </Col>
-            <Col xs={24} sm={8}>
-              <Form.Item name="website" label="Website" rules={[{ type: 'url', message: 'Nhập địa chỉ http(s) hợp lệ.' }, { max: 255 }]}><Input placeholder="https://" /></Form.Item>
-            </Col>
-          </Row>
-          <Form.Item name="timeZoneId" label="Múi giờ" rules={[{ required: true }]}>
-            <Select options={[{ value: 'Asia/Ho_Chi_Minh', label: 'Asia/Ho_Chi_Minh (GMT+7)' }, { value: 'Asia/Bangkok', label: 'Asia/Bangkok (GMT+7)' }]} />
-          </Form.Item>
-
-          <Divider />
-          <Typography.Title level={5}>Logo chi nhánh</Typography.Title>
-          <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-            <div style={{ width: 100, height: 100, border: '1px dashed #d9d9d9', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-              {logoAssetId && !logoUrl ? <Spin size="small" />
-                : logoUrl ? <img src={logoUrl} alt="Logo chi nhánh" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
-                : <Typography.Text type="secondary">Chưa có logo</Typography.Text>}
-            </div>
-            <div>
-              <Space wrap>
-                <Upload beforeUpload={file => uploadLogo(file)} showUploadList={false} accept="image/png,image/jpeg,image/webp" disabled={!selected || !canManage || logoUploading}>
-                  <Button loading={logoUploading} disabled={!selected || !canManage}>Tải logo</Button>
-                </Upload>
-                {logoAssetId && canManage && <Button disabled={logoUploading} onClick={() => { setLogoAssetId(undefined); setBranchDirty(true); }}>Gỡ logo</Button>}
-              </Space>
-              <div style={{ fontSize: 12, color: '#888', marginTop: 4 }}>
-                {selected ? 'PNG, JPEG hoặc WebP tối đa 2 MiB. Máy chủ kiểm tra định dạng thật và xóa metadata.' : 'Lưu chi nhánh trước, sau đó tải logo.'}
-              </div>
-            </div>
-          </div>
-
-          <Divider />
-          <Typography.Title level={5}>Tài khoản nhận chuyển khoản</Typography.Title>
-          <Typography.Paragraph type="secondary">Nhập đủ cả ba trường hoặc để trống cả ba.</Typography.Paragraph>
-          <Row gutter={12}>
-            <Col xs={24} sm={8}><Form.Item name="bankCode" label="Mã ngân hàng" rules={[{ max: 20 }]}><Input placeholder="VCB, MB, TCB..." /></Form.Item></Col>
-            <Col xs={24} sm={8}><Form.Item name="accountNumber" label="Số tài khoản" rules={[{ pattern: /^[0-9]{1,50}$/, message: 'Chỉ gồm chữ số.' }]}><Input inputMode="numeric" /></Form.Item></Col>
-            <Col xs={24} sm={8}><Form.Item name="payeeName" label="Tên chủ tài khoản" rules={[{ max: 160 }]}><Input /></Form.Item></Col>
           </Row>
         </Form>
 

@@ -44,3 +44,8 @@ Test `ClinicalWorkApiTests.ReviewSaveDoesNotPostActivityAndActivityRetryUsesOneI
 API trên DB phát triển đã kiểm tra thành công đăng nhập, đọc phiếu khám, chỉ định, danh sách và chi tiết tài liệu cùng các lần bác sĩ đọc tài liệu. Số chỉ định từ API khớp DB. Phiên đăng nhập kiểm chứng đã đăng xuất. `GET /health` trả API và database healthy.
 
 Log runtime còn ghi lỗi `KeyNotFoundException` tại `CareTaskIngestionService.cs` dòng 55 khi đọc `planVersion` từ sự kiện tiến độ điều trị. Cùng lỗi và vị trí đã có trong log runtime của bước gộp lịch trước bước gộp khám. Kiểm tra health API/DB và các API khám nêu trên đã đạt trong trạng thái này.
+
+## Cập nhật rút gọn ngày 18/11/2026 (`CLINICAL_DOCUMENT`: 21 -> 15 cột)
+
+- `CLINICAL_DOCUMENT` giữ **15 cột**: `Id`, `PatientId`, `VisitId`, `DossierId`, `FileName`, `ContentType`, `DocumentType`, `SourceDate`, `FileState`, `UploaderId`, `UploadedAt`, `Version`, `Metadata` (`jsonb`), `Reviews` (`jsonb`), `AiAnalyses` (`jsonb`).
+- 6 trường (`Source`, `Description`, `SizeBytes`, `Sha256`, `RejectReason`, `InvestigationId`) được gom vào cột `Metadata` (`jsonb`); `PlanId` được loại bỏ khỏi schema, API và UI tải/lọc tài liệu lâm sàng. Xem [rút gọn 9 bảng còn lại](./REMAINING-NINE-TABLES-SIMPLIFICATION.vi.md).

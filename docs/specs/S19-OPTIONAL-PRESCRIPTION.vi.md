@@ -1,5 +1,7 @@
 # S19 — Kê đơn mua ngoài tùy chọn trong Tổng kết khám
 
+> **Lưu ý lịch sử (18/11/2026):** Nhánh `ExternalPrescription` gắn theo `VisitId` đã được gỡ bỏ khi rút gọn bảng `PRESCRIPTION` còn 11 cột phục vụ luồng kê đơn trực tiếp trong hồ sơ bệnh nhân ([S23](S23-PATIENT-PRESCRIPTIONS.vi.md)); tổng kết khám dẫn trực tiếp về tab **Đơn thuốc** của hồ sơ bệnh nhân. Xem [rút gọn bảng PRESCRIPTION và CATALOG_MEDICINE](PRESCRIPTION-AND-MEDICINE-TABLE-SIMPLIFICATION.vi.md).
+
 Ngày 02/11/2026. Theo yêu cầu tích hợp luồng kê đơn của Triển vào phần kết luận khám, **không bắt buộc kê đơn**. Mở rộng [S19/S20](S19-S20-DCMS-112.md), dùng danh mục thuốc S58 và API `/api/prescriptions` đã có; không tạo nguồn đơn thuốc thứ hai.
 
 ## Luồng sử dụng

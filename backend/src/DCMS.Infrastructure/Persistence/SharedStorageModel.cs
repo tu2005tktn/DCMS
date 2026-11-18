@@ -17,12 +17,18 @@ namespace DCMS.Infrastructure.Persistence;
 
 internal static class SharedStorageModel
 {
+    internal static Microsoft.EntityFrameworkCore.Storage.ValueConversion.ValueConverter<T, string> JsonConv<T>() where T : class, new() =>
+        new(v => System.Text.Json.JsonSerializer.Serialize(v, (System.Text.Json.JsonSerializerOptions?)null),
+            v => System.Text.Json.JsonSerializer.Deserialize<T>(v, (System.Text.Json.JsonSerializerOptions?)null) ?? new());
+
+    internal static Microsoft.EntityFrameworkCore.ChangeTracking.ValueComparer<T> JsonCompare<T>() where T : class, new() =>
+        new((a, b) => System.Text.Json.JsonSerializer.Serialize(a, (System.Text.Json.JsonSerializerOptions?)null) == System.Text.Json.JsonSerializer.Serialize(b, (System.Text.Json.JsonSerializerOptions?)null),
+            v => System.Text.Json.JsonSerializer.Serialize(v, (System.Text.Json.JsonSerializerOptions?)null).GetHashCode(),
+            v => System.Text.Json.JsonSerializer.Deserialize<T>(System.Text.Json.JsonSerializer.Serialize(v, (System.Text.Json.JsonSerializerOptions?)null), (System.Text.Json.JsonSerializerOptions?)null)!);
+
     public static void Configure(ModelBuilder model)
     {
         model.HasSequence<long>("audit_log_number_seq");
-        model.Ignore<ExternalPrescriptionLine>();
-        model.Ignore<PatientPrescriptionItem>();
-        model.Ignore<PrescriptionTemplateLine>();
         model.Ignore<WorkingPeriod>();
         model.Ignore<AccessGroupGrant>();
 
@@ -40,26 +46,15 @@ internal static class SharedStorageModel
             b.HasKey(x => x.StorageId);
             b.HasDiscriminator<string>("AuditType");
         });
-        model.Entity<PrescriptionRecord>(b =>
-        {
-            b.ToTable("PRESCRIPTION", table =>
-            {
-                table.HasCheckConstraint("CK_PRESCRIPTION_VISIT_STATUS",
-                    "\"PrescriptionKind\" <> 'ExternalPrescription' OR \"Status\" IN ('Draft','Finalized','Superseded')");
-                table.HasCheckConstraint("CK_PRESCRIPTION_VISIT_REVISION",
-                    "\"PrescriptionKind\" <> 'ExternalPrescription' OR \"Revision\" >= 1");
-            });
-            b.HasKey(x => x.Id);
-            b.HasDiscriminator<string>("PrescriptionKind");
-        });
     }
 
     public static void ShareColumns(ModelBuilder model)
     {
-        model.Entity<ExternalPrescription>().ComplexCollection(x => x.Lines, collection => collection.ToJson("VisitLines"));
-        model.Entity<PatientPrescription>().ComplexCollection(x => x.Items, collection => collection.ToJson("Items"));
-        model.Entity<PrescriptionTemplate>().ComplexCollection(x => x.Lines, collection => collection.ToJson("TemplateLines"));
-        model.Entity<AccessGroup>().ComplexCollection(x => x.Grants, collection => collection.ToJson("Grants"));
+        model.Entity<AccessGroup>().Property(x => x.Grants)
+            .HasColumnName("Grants")
+            .HasColumnType("jsonb")
+            .HasDefaultValueSql("'[]'::jsonb")
+            .HasConversion(JsonConv<List<AccessGroupGrant>>(), JsonCompare<List<AccessGroupGrant>>());
 
         model.Entity<AppointmentChange>().HasIndex(new[] { "AuditType", "Id" }, "UX_AppointmentChange_LegacyId").IsUnique().HasDatabaseName("UX_AUDIT_LOG_Type_Id");
         model.Entity<AppointmentSupportHistory>().HasIndex(new[] { "AuditType", "Id" }, "UX_AppointmentSupportHistory_LegacyId").IsUnique().HasDatabaseName("UX_AUDIT_LOG_Type_Id");
@@ -73,7 +68,7 @@ internal static class SharedStorageModel
         model.Entity<SettingsAudit>().HasIndex(new[] { "AuditType", "Id" }, "UX_SettingsAudit_LegacyId").IsUnique().HasDatabaseName("UX_AUDIT_LOG_Type_Id");
         model.Entity<VisitAudit>().HasIndex(new[] { "AuditType", "Id" }, "UX_VisitAudit_LegacyId").IsUnique().HasDatabaseName("UX_AUDIT_LOG_Type_Id");
 
-        foreach (var root in new[] { typeof(CommandReceiptRecord), typeof(AuditRecord), typeof(PrescriptionRecord) })
+        foreach (var root in new[] { typeof(CommandReceiptRecord), typeof(AuditRecord) })
         {
             var properties = model.Model.GetEntityTypes().Where(type => type.BaseType?.ClrType == root)
                 .SelectMany(type => type.GetDeclaredProperties())

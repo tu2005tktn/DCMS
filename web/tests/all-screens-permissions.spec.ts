@@ -4,7 +4,7 @@ const id = '11111111-1111-4111-8111-111111111111';
 const routes = [
   '/appointments', `/appointments/${id}`, '/working-schedules', '/booking-settings',
   '/patients', '/patients/1', '/patients/1/documents', '/reception', `/reception/appointments/${id}`,
-  `/visits/${id}`, `/visits/${id}/prescription`, `/visits/${id}/payments`,
+  `/visits/${id}`, '/medicines', `/visits/${id}/payments`,
   '/treatment-templates', '/commercial/treatment',
   '/payments', `/payments/${id}/print`, '/clinical-services', '/accounts', '/system-settings',
   '/link-verification', '/support-inbox', '/materials', '/revenue', '/work-statistics',

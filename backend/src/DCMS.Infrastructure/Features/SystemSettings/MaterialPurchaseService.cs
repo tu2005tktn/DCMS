@@ -20,11 +20,13 @@ public sealed class MaterialPurchaseService(DcmsDbContext db, TimeProvider clock
     private static void Version(int actual, int expected) { if (actual != expected) throw Error("MSG111", 409); }
     private sealed record Change(Guid Id, object? Before, MaterialPurchaseDto Result);
 
-    private static MaterialPurchaseDto ToDto(MaterialPurchase x) => new(x.Id, x.EnteredOn, x.ReceivedOn, x.ExpiresOn, x.MaterialId, x.MaterialName, x.CategoryName,
+    // Names and usage unit are read from the catalogs (docs/specs/MATERIAL-PURCHASE-TABLE-SIMPLIFICATION.vi.md); load rows through WithNames.
+    private static MaterialPurchaseDto ToDto(MaterialPurchase x) => new(x.Id, x.EnteredOn, x.ReceivedOn, x.ExpiresOn, x.MaterialId, x.Material.Name, x.Material.Category.Name,
         x.Quantity, x.Unit, x.UnitPriceVnd, x.TotalVnd, x.PaidVnd, x.TotalVnd - x.PaidVnd, x.Version,
-        x.ConversionFactor, x.UsageUnit, x.UsageQuantity, decimal.Round(x.UnitPriceVnd / x.ConversionFactor, 2, MidpointRounding.AwayFromZero), x.SupplierId, x.SupplierName, x.LotNumber);
+        x.ConversionFactor, x.Material.UsageUnit, x.UsageQuantity, decimal.Round(x.UnitPriceVnd / x.ConversionFactor, 2, MidpointRounding.AwayFromZero), x.SupplierId, x.Supplier?.Name, x.LotNumber);
+    private static IQueryable<MaterialPurchase> WithNames(IQueryable<MaterialPurchase> query) => query.Include(x => x.Material).ThenInclude(x => x.Category).Include(x => x.Supplier);
     private async Task<MaterialPurchase> Row(Guid id, CancellationToken ct) =>
-        await db.MaterialPurchases.SingleOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct) ?? throw Error("MSG113", 404);
+        await WithNames(db.MaterialPurchases).SingleOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct) ?? throw Error("MSG113", 404);
 
     private sealed record Fields(DateOnly EnteredOn, DateOnly? ReceivedOn, DateOnly? ExpiresOn, MaterialCatalogItem Material, decimal Quantity, string Unit, decimal Factor, decimal UsageQuantity, long UnitPrice, long Total, long Paid, CatalogProvider? Supplier, string? LotNumber);
     private async Task<Fields> Validate(DateOnly enteredOn, DateOnly? receivedOn, DateOnly? expiresOn, Guid materialId, decimal quantity, string? unit, decimal factor, long unitPrice, long paid, Guid? supplierId, string? lotNumber, CancellationToken ct)
@@ -56,13 +58,13 @@ public sealed class MaterialPurchaseService(DcmsDbContext db, TimeProvider clock
         }
         return new(enteredOn, receivedOn, expiresOn, material, quantity, cleanUnit, factor, usageQuantity, unitPrice, total, paid, supplier, lot);
     }
-    private void Apply(MaterialPurchase row, Fields f, int actorId)
+    private static void Apply(MaterialPurchase row, Fields f)
     {
-        row.MaterialId = f.Material.Id; row.MaterialName = f.Material.Name; row.CategoryName = f.Material.Category.Name;
+        row.Material = f.Material; row.MaterialId = f.Material.Id;
         row.EnteredOn = f.EnteredOn; row.ReceivedOn = f.ReceivedOn; row.ExpiresOn = f.ExpiresOn; row.Quantity = f.Quantity; row.Unit = f.Unit;
-        row.ConversionFactor = f.Factor; row.UsageQuantity = f.UsageQuantity; row.UsageUnit = f.Material.UsageUnit;
-        row.SupplierId = f.Supplier?.Id; row.SupplierName = f.Supplier?.Name; row.LotNumber = f.LotNumber;
-        row.UnitPriceVnd = f.UnitPrice; row.TotalVnd = f.Total; row.PaidVnd = f.Paid; row.UpdatedAt = clock.GetUtcNow(); row.UpdatedBy = actorId;
+        row.ConversionFactor = f.Factor; row.UsageQuantity = f.UsageQuantity;
+        row.Supplier = f.Supplier; row.SupplierId = f.Supplier?.Id; row.LotNumber = f.LotNumber;
+        row.UnitPriceVnd = f.UnitPrice; row.TotalVnd = f.Total; row.PaidVnd = f.Paid;
     }
 
     private async Task<MaterialPurchaseDto> Command(int actorId, string permission, Guid key, string command, object request, Func<Task<Change>> apply, CancellationToken ct)
@@ -93,7 +95,7 @@ public sealed class MaterialPurchaseService(DcmsDbContext db, TimeProvider clock
         if (payment is not (null or "" or "unpaid" or "partial" or "paid")) throw Error("MSG04", field: "payment");
         var search = q?.Trim().Normalize(NormalizationForm.FormC).ToUpperInvariant() ?? "";
         var query = db.MaterialPurchases.AsNoTracking().Where(x => !x.IsDeleted);
-        if (search.Length > 0) query = query.Where(x => x.MaterialName.ToUpper().Contains(search));
+        if (search.Length > 0) query = query.Where(x => x.Material.Name.ToUpper().Contains(search));
         if (from.HasValue) query = query.Where(x => x.EnteredOn >= from);
         if (to.HasValue) query = query.Where(x => x.EnteredOn <= to);
         query = payment switch
@@ -105,20 +107,20 @@ public sealed class MaterialPurchaseService(DcmsDbContext db, TimeProvider clock
         };
         var total = await query.CountAsync(ct);
         var sums = await query.GroupBy(_ => 1).Select(g => new { Total = g.Sum(x => x.TotalVnd), Paid = g.Sum(x => x.PaidVnd) }).SingleOrDefaultAsync(ct);
-        var rows = await query.OrderByDescending(x => x.EnteredOn).ThenByDescending(x => x.CreatedAt).ThenBy(x => x.Id)
+        var rows = await WithNames(query).OrderByDescending(x => x.EnteredOn).ThenByDescending(x => x.CreatedAt).ThenBy(x => x.Id)
             .Skip((page - 1) * pageSize).Take(pageSize).ToArrayAsync(ct);
         var totals = new MaterialPurchaseTotals(sums?.Total ?? 0, sums?.Paid ?? 0, (sums?.Total ?? 0) - (sums?.Paid ?? 0));
         return new(rows.Select(ToDto).ToArray(), total, page, pageSize, totals);
     }
     public async Task<MaterialPurchaseDto> GetAsync(int actorId, Guid id, CancellationToken ct)
-    { await Require(actorId, "materials.purchases.read"); return ToDto(await db.MaterialPurchases.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct) ?? throw Error("MSG113", 404)); }
+    { await Require(actorId, "materials.purchases.read"); return ToDto(await WithNames(db.MaterialPurchases.AsNoTracking()).SingleOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct) ?? throw Error("MSG113", 404)); }
 
     public Task<MaterialPurchaseDto> CreateAsync(int actorId, CreateMaterialPurchaseRequest r, CancellationToken ct) =>
         Command(actorId, "materials.purchases.create", r.RequestKey, "PurchaseCreate", r, async () =>
         {
             var f = await Validate(r.EnteredOn, r.ReceivedOn, r.ExpiresOn, r.MaterialId, r.Quantity, r.Unit, r.ConversionFactor, r.UnitPriceVnd, r.PaidVnd, r.SupplierId, r.LotNumber, ct);
-            var row = new MaterialPurchase { CreatedAt = clock.GetUtcNow(), CreatedBy = actorId };
-            Apply(row, f, actorId); db.MaterialPurchases.Add(row); await db.SaveChangesAsync(ct);
+            var row = new MaterialPurchase { CreatedAt = clock.GetUtcNow() };
+            Apply(row, f); db.MaterialPurchases.Add(row); await db.SaveChangesAsync(ct);
             return new Change(row.Id, null, ToDto(row));
         }, ct);
     public Task<MaterialPurchaseDto> UpdateAsync(int actorId, Guid id, UpdateMaterialPurchaseRequest r, CancellationToken ct) =>
@@ -126,7 +128,7 @@ public sealed class MaterialPurchaseService(DcmsDbContext db, TimeProvider clock
         {
             var row = await Row(id, ct); Version(row.Version, r.ExpectedVersion); var before = ToDto(row);
             var f = await Validate(r.EnteredOn, r.ReceivedOn, r.ExpiresOn, r.MaterialId, r.Quantity, r.Unit, r.ConversionFactor, r.UnitPriceVnd, r.PaidVnd, r.SupplierId, r.LotNumber, ct);
-            Apply(row, f, actorId); row.Version++; await db.SaveChangesAsync(ct);
+            Apply(row, f); row.Version++; await db.SaveChangesAsync(ct);
             await MaterialStock.EnsureNotNegativeAsync(db, [before.MaterialId, row.MaterialId], ct);
             return new Change(id, before, ToDto(row));
         }, ct);
@@ -134,7 +136,7 @@ public sealed class MaterialPurchaseService(DcmsDbContext db, TimeProvider clock
         Command(actorId, "materials.purchases.delete", r.RequestKey, "PurchaseDelete", new { id, r }, async () =>
         {
             var row = await Row(id, ct); Version(row.Version, r.ExpectedVersion); var before = ToDto(row);
-            row.IsDeleted = true; row.Version++; row.UpdatedAt = clock.GetUtcNow(); row.UpdatedBy = actorId; await db.SaveChangesAsync(ct);
+            row.IsDeleted = true; row.Version++; await db.SaveChangesAsync(ct);
             await MaterialStock.EnsureNotNegativeAsync(db, [row.MaterialId], ct);
             return new Change(id, before, ToDto(row));
         }, ct);

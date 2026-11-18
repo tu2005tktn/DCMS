@@ -4,8 +4,12 @@ using System.Net.Http.Json;
 using DCMS.Application.Common;
 using DCMS.Application.Features.Authentication;
 using DCMS.Application.Features.SystemSettings;
+using DCMS.Domain.Features.Patients;
+using DCMS.Domain.Features.Scheduling;
+using DCMS.Domain.Features.Treatment;
 using DCMS.Infrastructure.Features.SystemSettings;
 using DCMS.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 namespace DCMS.IntegrationTests;
@@ -33,8 +37,32 @@ public sealed class MaterialStockApiTests(ApiFixture fixture) : IClassFixture<Ap
     private async Task Use(Guid activity, params MaterialUseLine[]? lines)
     {
         using var scope = fixture.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
+        if (!await db.Set<SchedulingBranch>().AnyAsync(x => x.Name == "S09 - Chi nhánh thử nghiệm"))
+            await scope.ServiceProvider.GetRequiredService<DCMS.Infrastructure.Features.Scheduling.DevelopmentSchedulingSeeder>().SeedAsync();
         await using var tx = await db.Database.BeginTransactionAsync();
-        await MaterialStock.ReplaceAsync(db, TimeProvider.System, activity, 1, 1, null, DateTimeOffset.UtcNow, null, lines, default);
+        if (lines is { Length: > 0 } && !await db.ClinicalActivities.AnyAsync(x => x.Id == activity))
+        {
+            var branch = await db.Set<SchedulingBranch>().AsNoTracking().SingleAsync(x => x.Name == "S09 - Chi nhánh thử nghiệm");
+            var dentistId = await db.SchedulingMembers.AsNoTracking().Where(x => x.BranchId == branch.Id && x.CanDentist).Select(x => x.EmployeeId).FirstAsync();
+            var patientId = await db.Patients.AsNoTracking().Select(x => (int?)x.Id).FirstOrDefaultAsync();
+            if (!patientId.HasValue)
+            {
+                var patient = new PatientProfile { PatientCode = "MS-" + Guid.NewGuid().ToString("N")[..12], FullName = "SYNTHETIC stock patient",
+                    NormalizedName = "SYNTHETIC STOCK PATIENT", CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow };
+                db.Patients.Add(patient); await db.SaveChangesAsync(); patientId = patient.Id;
+            }
+            var now = DateTimeOffset.UtcNow;
+            var dossier = new TreatmentDossier { Code = "MS-" + Guid.NewGuid().ToString("N")[..16], PatientId = patientId.Value, BranchId = branch.Id,
+                DentistId = dentistId, StartedOn = DateOnly.FromDateTime(now.UtcDateTime), Diagnosis = "SYNTHETIC material stock", CreatedAt = now, UpdatedAt = now };
+            var service = new SchedulingService { BranchId = branch.Id, Name = "SYNTHETIC stock service " + Guid.NewGuid().ToString("N")[..8], PublicBookable = false, Unit = "lần" };
+            db.AddRange(dossier, service); await db.SaveChangesAsync();
+            var item = new TreatmentItem { DossierId = dossier.Id, ServiceId = service.Id, ServiceName = service.Name, Unit = service.Unit, Quantity = 1, PlannedOrder = 1, AgreedUnitPriceVnd = 0 };
+            db.TreatmentItems.Add(item);
+            db.ClinicalActivities.Add(new ClinicalActivity { Id = activity, DossierId = dossier.Id, ItemId = item.Id, PlanVersion = 1, ServiceId = service.Id,
+                ServiceNameSnapshot = service.Name, Unit = service.Unit, Quantity = 1, PriceSnapshotVnd = 0, PerformerId = dentistId, PerformedAt = now, CreatedAt = now });
+            await db.SaveChangesAsync();
+        }
+        await MaterialStock.ReplaceAsync(db, activity, DateTimeOffset.UtcNow, null, lines, default);
         await db.SaveChangesAsync(); await tx.CommitAsync();
     }
     private async Task<(decimal Received, decimal Used, decimal Stock)> Stock(HttpClient c, MaterialDto m)

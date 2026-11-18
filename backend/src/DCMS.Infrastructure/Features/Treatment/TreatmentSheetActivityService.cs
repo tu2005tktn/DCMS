@@ -62,8 +62,8 @@ public sealed partial class TreatmentDossierService
                 await access.RequireAsync(actorId, "treatment.items.price", ct);
                 RecordSheetFeeCorrection(actorId, dossier, before, after);
             }
-            await DCMS.Infrastructure.Features.SystemSettings.MaterialStock.ReplaceAsync(db, clock, source.Id, dossier.PatientId, dossier.BranchId,
-                source.DossierId, after.PerformedAt, actorId, row.Materials, ct);
+            await DCMS.Infrastructure.Features.SystemSettings.MaterialStock.ReplaceAsync(db, source.Id,
+                after.PerformedAt, actorId, row.Materials, ct);
             await db.SaveChangesAsync(ct);
             return after;
     }

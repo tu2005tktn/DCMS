@@ -11,16 +11,13 @@ internal static class SchedulingStorageModel
 {
     internal static void Configure(ModelBuilder model)
     {
-        foreach (var type in new[] { typeof(SchedulingMember), typeof(SchedulingChair), typeof(BranchChair), typeof(BranchAsset) }) model.Ignore(type);
+        foreach (var type in new[] { typeof(SchedulingMember), typeof(SchedulingChair), typeof(BranchChair) }) model.Ignore(type);
         model.HasSequence<int>("scheduling_chair_seq");
         model.Entity<SchedulingBranch>(b =>
         {
-            b.Property(x => x.StorageStamp).IsConcurrencyToken();
             b.ComplexCollection(x => x.Members).ToJson();
             b.ComplexCollection(x => x.Chairs).ToJson();
-            b.ComplexCollection(x => x.Assets).ToJson();
         });
-        model.Entity<BranchProfile>().Property<Guid>("StorageStamp").IsConcurrencyToken();
         model.Entity<WorkingScheduleRecord>(b =>
         {
             b.ToTable("WORKING_SCHEDULE", t => t.HasCheckConstraint("CK_WORKING_SCHEDULE_KIND",
@@ -45,11 +42,14 @@ internal static class SchedulingStorageModel
             b.HasIndex(x => x.AccountId);
             b.HasIndex(x => x.Token).IsUnique();
         });
+        model.Ignore<NotificationData>();
         model.Entity<NotificationRecord>(b =>
         {
             b.ToTable("IN_APP_NOTIFICATION");
             b.HasKey(x => x.Id);
             b.HasDiscriminator<string>("NotificationRecordKind");
+            b.Property(x => x.Data).HasColumnName("Data").HasColumnType("jsonb").HasDefaultValueSql("'{}'::jsonb")
+                .HasConversion(SharedStorageModel.JsonConv<NotificationData>(), SharedStorageModel.JsonCompare<NotificationData>());
         });
     }
 }

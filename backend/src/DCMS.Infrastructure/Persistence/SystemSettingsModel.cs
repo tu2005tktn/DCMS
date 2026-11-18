@@ -1,40 +1,46 @@
+using System.Text.Json;
 using DCMS.Domain.Features.SystemSettings;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 namespace DCMS.Infrastructure.Persistence;
 internal static class SystemSettingsModel
 {
+    private static Microsoft.EntityFrameworkCore.Storage.ValueConversion.ValueConverter<T, string> JsonConv<T>() where T : class =>
+        new(v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
+            v => JsonSerializer.Deserialize<T>(v, (JsonSerializerOptions?)null) ?? Activator.CreateInstance<T>());
+    private static Microsoft.EntityFrameworkCore.ChangeTracking.ValueComparer<T> JsonCompare<T>() where T : class =>
+        new((a, b) => JsonSerializer.Serialize(a, (JsonSerializerOptions?)null) == JsonSerializer.Serialize(b, (JsonSerializerOptions?)null),
+            v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null).GetHashCode(),
+            v => JsonSerializer.Deserialize<T>(JsonSerializer.Serialize(v, (JsonSerializerOptions?)null), (JsonSerializerOptions?)null)!);
+
     internal static void Configure(ModelBuilder model)
     {
         model.Entity<MaterialCategory>(b => {
             b.ToTable("MATERIAL_CATEGORY"); b.HasKey(x => x.Id);
-            b.Property(x => x.Name).HasMaxLength(160); b.Property(x => x.NormalizedName).HasMaxLength(160);
+            b.Property(x => x.Name).HasMaxLength(160);
             b.Property(x => x.Version).IsConcurrencyToken();
-            b.HasIndex(x => x.NormalizedName).IsUnique().HasFilter("NOT \"IsDeleted\"");
         });
         model.Entity<MaterialCatalogItem>(b => {
             b.ToTable("MATERIAL_CATALOG_ITEM"); b.HasKey(x => x.Id);
-            b.Property(x => x.Name).HasMaxLength(160); b.Property(x => x.NormalizedName).HasMaxLength(160);
+            b.Property(x => x.Name).HasMaxLength(160);
             b.Property(x => x.UsageUnit).HasMaxLength(40);
             b.Property(x => x.Version).IsConcurrencyToken();
             b.HasOne(x => x.Category).WithMany().HasForeignKey(x => x.CategoryId).OnDelete(DeleteBehavior.Restrict);
-            b.HasIndex(x => new { x.CategoryId, x.NormalizedName }).IsUnique().HasFilter("NOT \"IsDeleted\"");
         });
         model.Entity<MaterialPurchase>(b => {
             b.ToTable("MATERIAL_PURCHASE"); b.HasKey(x => x.Id);
-            b.Property(x => x.MaterialName).HasMaxLength(160); b.Property(x => x.CategoryName).HasMaxLength(160);
             b.Property(x => x.Quantity).HasPrecision(12, 3); b.Property(x => x.Unit).HasMaxLength(40);
-            b.Property(x => x.ConversionFactor).HasPrecision(12, 3); b.Property(x => x.UsageQuantity).HasPrecision(18, 3); b.Property(x => x.UsageUnit).HasMaxLength(40);
+            b.Property(x => x.ConversionFactor).HasPrecision(12, 3); b.Property(x => x.UsageQuantity).HasPrecision(18, 3);
             b.Property(x => x.Version).IsConcurrencyToken();
-            b.Property(x => x.SupplierName).HasMaxLength(160); b.Property(x => x.LotNumber).HasMaxLength(60);
+            b.Property(x => x.LotNumber).HasMaxLength(60);
             b.HasOne(x => x.Material).WithMany().HasForeignKey(x => x.MaterialId).OnDelete(DeleteBehavior.Restrict);
-            b.HasOne<CatalogProvider>().WithMany().HasForeignKey(x => x.SupplierId).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne(x => x.Supplier).WithMany().HasForeignKey(x => x.SupplierId).OnDelete(DeleteBehavior.Restrict);
             b.HasIndex(x => new { x.EnteredOn, x.Id }).HasFilter("NOT \"IsDeleted\"");
         });
         model.Entity<MaterialUsage>(b => {
             b.ToTable("MATERIAL_USAGE"); b.HasKey(x => x.Id);
-            b.Property(x => x.MaterialName).HasMaxLength(160); b.Property(x => x.UsageUnit).HasMaxLength(40);
             b.Property(x => x.Quantity).HasPrecision(18, 3);
+            b.HasOne<DCMS.Domain.Features.Treatment.ClinicalActivity>().WithMany().HasForeignKey(x => x.ActivityId).OnDelete(DeleteBehavior.Cascade);
             b.HasOne<MaterialCatalogItem>().WithMany().HasForeignKey(x => x.MaterialId).OnDelete(DeleteBehavior.Restrict);
             b.HasIndex(x => x.MaterialId); b.HasIndex(x => x.ActivityId); b.HasIndex(x => x.UsedAt);
         });
@@ -50,18 +56,17 @@ internal static class SystemSettingsModel
         model.Entity<ReferenceEntry>(b => {
             b.ToTable("REFERENCE_ENTRY"); b.HasKey(x => x.Id);
             b.Property(x => x.Kind).HasMaxLength(32); b.Property(x => x.Code).HasMaxLength(40);
-            b.Property(x => x.Name).HasMaxLength(160); b.Property(x => x.NormalizedName).HasMaxLength(160); b.Property(x => x.Description).HasMaxLength(1000);
+            b.Property(x => x.Name).HasMaxLength(160); b.Property(x => x.Description).HasMaxLength(1000);
             b.Property(x => x.Version).IsConcurrencyToken();
-            b.HasIndex(x => new { x.Kind, x.NormalizedName }).IsUnique();
             b.HasIndex(x => new { x.Kind, x.Code }).IsUnique().HasFilter("\"Code\" IS NOT NULL");
         });
-        // S58 đợt 4: shared identity columns for typed catalogs.
+        // S58 đợt 4: shared identity columns for typed catalogs (simplified to 9 columns each).
         static void Supply<T>(EntityTypeBuilder<T> b, string table, int nameMax) where T : SupplyEntity
         {
             b.ToTable(table); b.HasKey(x => x.Id);
-            b.Property(x => x.Code).HasMaxLength(40); b.Property(x => x.Name).HasMaxLength(nameMax); b.Property(x => x.NormalizedName).HasMaxLength(nameMax);
-            b.Property(x => x.Version).IsConcurrencyToken();
-            b.HasIndex(x => x.Code).IsUnique(); b.HasIndex(x => x.NormalizedName).IsUnique();
+            b.Property(x => x.Code).HasMaxLength(40); b.Property(x => x.Name).HasMaxLength(nameMax);
+            b.Property(x => x.Version).HasDefaultValue(1).ValueGeneratedNever().IsConcurrencyToken();
+            b.HasIndex(x => x.Code).IsUnique();
         }
         model.Entity<CatalogProvider>(b => {
             Supply(b, "CATALOG_PROVIDER", 160);
@@ -73,11 +78,14 @@ internal static class SystemSettingsModel
             b.Property(x => x.Unit).HasMaxLength(16); b.Property(x => x.Warranty).HasMaxLength(1000);
             b.HasOne<CatalogProvider>().WithMany().HasForeignKey(x => x.ProviderId).OnDelete(DeleteBehavior.Restrict);
         });
+        model.Ignore<CatalogMedicineSpec>();
         model.Entity<CatalogMedicine>(b => {
-            Supply(b, "CATALOG_MEDICINE", 200);
-            b.Property(x => x.ActiveIngredient).HasMaxLength(200); b.Property(x => x.Strength).HasMaxLength(200); b.Property(x => x.DosageForm).HasMaxLength(200);
-            b.Property(x => x.BaseUnit).HasMaxLength(40); b.Property(x => x.Packaging).HasMaxLength(160); b.Property(x => x.Instructions).HasMaxLength(1000);
-            b.Property(x => x.Route).HasMaxLength(40).HasDefaultValue("Uống"); b.Property(x => x.Contraindications).HasMaxLength(1000); b.Property(x => x.AllergyWarnings).HasMaxLength(1000);
+            b.ToTable("CATALOG_MEDICINE"); b.HasKey(x => x.Id);
+            b.Property(x => x.Code).HasMaxLength(40); b.Property(x => x.Name).HasMaxLength(200);
+            b.Property(x => x.BaseUnit).HasMaxLength(40);
+            b.Property(x => x.Version).HasDefaultValue(1).ValueGeneratedNever().IsConcurrencyToken();
+            b.Property(x => x.Spec).HasColumnType("jsonb").HasConversion(JsonConv<CatalogMedicineSpec>(), JsonCompare<CatalogMedicineSpec>());
+            b.HasIndex(x => x.Code).IsUnique();
         });
     }
 }

@@ -5,7 +5,7 @@ import { useAuth } from '../authentication/AuthContext';
 import { api, ApiError, readAccessToken } from '../../services/api';
 
 // S58 đợt 4: companies, lab work types and medicines. Contract: docs/specs/S58-SUPPLY-CATALOGS.md.
-type Row = { id: string; code: string; name: string; active: boolean; version: number; createdByName: string; updatedAt: string; updatedByName: string } & Record<string, unknown>;
+type Row = { id: string; code: string; name: string; active: boolean; version: number; createdByName?: string; updatedAt?: string; updatedByName?: string } & Record<string, unknown>;
 type Page = { items: Row[]; total: number; page: number; pageSize: number };
 type StatePreview = { entry: Row; allowed: boolean; blockers: string[]; impact: string };
 type HistoryItem = { occurredAt: string; actorName: string; command: string; reason: string | null; before: Row | null; after: Row };

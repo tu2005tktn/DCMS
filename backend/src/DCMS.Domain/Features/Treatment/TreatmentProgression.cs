@@ -2,7 +2,6 @@ namespace DCMS.Domain.Features.Treatment;
 
 public sealed class TreatmentTemplate
 {
-    public string DefinitionKind { get; set; } = "LegacySteps";
     public DateTimeOffset? DeletedAt { get; set; }
     public Guid Id { get; set; } = Guid.NewGuid();
     public int BranchId { get; set; }
@@ -10,9 +9,7 @@ public sealed class TreatmentTemplate
     public int Version { get; set; } = 1;
     public int CreatedBy { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
-    public List<TreatmentTemplateVersion> Versions { get; set; } = [];
     public List<TreatmentTemplateItem> Items { get; set; } = [];
-    public Guid StorageStamp { get; set; } = Guid.NewGuid();
 }
 
 public sealed class TreatmentTemplateItem
@@ -32,19 +29,6 @@ public sealed class TreatmentTemplateItem
     public string? AssistantName { get; set; }
     public long CostVnd { get; set; }
     public DateTimeOffset? DeletedAt { get; set; }
-}
-
-public sealed class TreatmentTemplateVersion
-{
-    public Guid Id { get; set; } = Guid.NewGuid();
-    public Guid TemplateId { get; set; }
-    public int Number { get; set; }
-    public string State { get; set; } = "Draft";
-    public string StepsJson { get; set; } = "[]";
-    public int CreatedBy { get; set; }
-    public DateTimeOffset CreatedAt { get; set; }
-    public DateTimeOffset? ActivatedAt { get; set; }
-    public DateTimeOffset? RetiredAt { get; set; }
 }
 
 public sealed class TreatmentProgressionReceipt : DCMS.Domain.Common.CommandReceiptRecord

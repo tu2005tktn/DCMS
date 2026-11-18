@@ -68,7 +68,7 @@ public sealed class SystemNfrReportTests(SystemNfrFixture fixture, ITestOutputHe
         DocumentDto? document = null;
         for (var sample = 1; sample <= 3; sample++)
         {
-            var metadata = new DocumentMetadata(setup.PatientId, null, dossier.Id, null, null, null, "Other", "Clinic",
+            var metadata = new DocumentMetadata(setup.PatientId, null, dossier.Id, null, null, "Other", "Clinic",
                 DateOnly.FromDateTime(fixture.Clock.Now.ToOffset(TimeSpan.FromHours(7)).DateTime), "SYNTHETIC NFR 5 MB", Guid.NewGuid());
             using var form = new MultipartFormDataContent();
             form.Add(new StringContent(JsonSerializer.Serialize(metadata, new JsonSerializerOptions(JsonSerializerDefaults.Web))), "metadata");

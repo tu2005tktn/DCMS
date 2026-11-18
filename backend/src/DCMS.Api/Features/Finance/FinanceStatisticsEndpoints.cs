@@ -105,8 +105,8 @@ public static class FinanceStatisticsEndpoints
                 .Where(x => !x.IsDeleted && (!from.HasValue || x.EnteredOn >= from)
                     && (!to.HasValue || x.EnteredOn <= to))
                 .OrderByDescending(x => x.EnteredOn).ThenByDescending(x => x.CreatedAt)
-                .Select(x => new FinanceMaterialPurchaseEntry(x.Id, x.EnteredOn, x.MaterialName,
-                    x.CategoryName, x.SupplierName, x.Quantity, x.Unit, x.UnitPriceVnd, x.TotalVnd, x.PaidVnd))
+                .Select(x => new FinanceMaterialPurchaseEntry(x.Id, x.EnteredOn, x.Material.Name,
+                    x.Material.Category.Name, x.Supplier != null ? x.Supplier.Name : null, x.Quantity, x.Unit, x.UnitPriceVnd, x.TotalVnd, x.PaidVnd))
                 .ToListAsync(ct);
             var purchaseTotal = purchaseRows.Sum(x => x.TotalVnd);
 
@@ -257,9 +257,12 @@ public static class FinanceStatisticsEndpoints
             var items = await db.TreatmentItems.AsNoTracking()
                 .Where(x => ids.Contains(x.DossierId))
                 .ToArrayAsync(ct);
-            var labs = await db.LabOrders.AsNoTracking()
-                .Where(x => ids.Contains(x.DossierId) && postedIds.Contains(x.ActivityId))
-                .Select(x => new { x.Id, x.DossierId, x.WorkName, x.TotalFeeVnd }).ToArrayAsync(ct);
+            var labs = await (
+                from x in db.LabOrders.AsNoTracking()
+                join a in db.ClinicalActivities.AsNoTracking() on x.ActivityId equals a.Id
+                where ids.Contains(a.DossierId) && postedIds.Contains(x.ActivityId)
+                select new { x.Id, a.DossierId, x.WorkName, x.TotalFeeVnd }
+            ).ToArrayAsync(ct);
 
             var activityNames = activities.ToDictionary(x => x.Id, x => x.ServiceNameSnapshot ?? "Dịch vụ điều trị");
             var labNames = labs.ToDictionary(x => x.Id, x => $"Labo: {x.WorkName}");

@@ -241,38 +241,34 @@ public sealed class TreatmentDossierApiTests(ApiFixture fixture) : IClassFixture
             db.ClinicalActivities.Add(activity);
             await db.SaveChangesAsync();
             activityId = activity.Id;
-            var labOrder = new LabOrder { ActivityId = activity.Id, DossierId = dossierId,
-                PatientId = setup.PatientId, BranchId = setup.BranchId, DentistId = setup.DentistId,
+            var labOrder = new LabOrder { ActivityId = activity.Id,
+                DentistId = setup.DentistId,
                 WorkName = "SYNTHETIC lab", OrderedOn = DateOnly.FromDateTime(DateTime.UtcNow),
-                TotalFeeVnd = 80000, PaidVnd = 10000, CreatedAt = DateTimeOffset.UtcNow,
-                UpdatedAt = DateTimeOffset.UtcNow, CreatedBy = setup.DentistId, UpdatedBy = setup.DentistId };
+                TotalFeeVnd = 80000, PaidVnd = 10000 };
             db.LabOrders.Add(labOrder);
             await db.SaveChangesAsync(); labOrderId = labOrder.Id;
+            var suffix = Guid.NewGuid().ToString("N")[..8];
             var category = new DCMS.Domain.Features.SystemSettings.MaterialCategory
             {
-                Name = "SYNTHETIC finance category", NormalizedName = "SYNTHETIC_FINANCE_" + Guid.NewGuid().ToString("N"),
-                CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow
+                Name = "SYNTHETIC finance category " + suffix
             };
             var material = new DCMS.Domain.Features.SystemSettings.MaterialCatalogItem
             {
-                Name = "SYNTHETIC finance material", NormalizedName = "SYNTHETIC_FINANCE_" + Guid.NewGuid().ToString("N"),
+                Name = "SYNTHETIC finance material " + suffix,
                 Category = category, UsageUnit = "unit"
             };
             db.MaterialCatalogItems.Add(material);
             db.MaterialPurchases.Add(new DCMS.Domain.Features.SystemSettings.MaterialPurchase
             {
-                Material = material, MaterialName = material.Name, CategoryName = category.Name,
+                Material = material,
                 EnteredOn = DateOnly.FromDateTime(DateTime.UtcNow), Quantity = 2, Unit = "unit",
-                UsageQuantity = 2, UsageUnit = "unit", UnitPriceVnd = 10000, TotalVnd = 20000,
-                CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow,
-                CreatedBy = setup.DentistId, UpdatedBy = setup.DentistId
+                UsageQuantity = 2, UnitPriceVnd = 10000, TotalVnd = 20000,
+                CreatedAt = DateTimeOffset.UtcNow
             });
             db.MaterialUsages.Add(new DCMS.Domain.Features.SystemSettings.MaterialUsage
             {
-                ActivityId = activity.Id, DossierId = dossierId, PatientId = setup.PatientId,
-                BranchId = setup.BranchId, MaterialId = material.Id, MaterialName = material.Name,
-                Quantity = 1, UsageUnit = "unit", UsedAt = DateTimeOffset.UtcNow,
-                CreatedAt = DateTimeOffset.UtcNow
+                ActivityId = activity.Id, MaterialId = material.Id,
+                Quantity = 1, UsedAt = DateTimeOffset.UtcNow
             });
             await db.SaveChangesAsync();
         }
@@ -410,11 +406,10 @@ public sealed class TreatmentDossierApiTests(ApiFixture fixture) : IClassFixture
                 PerformedAt = DateTimeOffset.UtcNow, CreatedAt = DateTimeOffset.UtcNow};
             db.ClinicalActivities.AddRange(labActivity, other);
             await db.SaveChangesAsync(); otherId = other.Id;
-            db.LabOrders.Add(new LabOrder { ActivityId = labActivity.Id, DossierId = dossierId,
-                PatientId = setup.PatientId, BranchId = setup.BranchId, DentistId = setup.DentistId,
+            db.LabOrders.Add(new LabOrder { ActivityId = labActivity.Id,
+                DentistId = setup.DentistId,
                 WorkName = "SYNTHETIC lab", OrderedOn = DateOnly.FromDateTime(DateTime.UtcNow),
-                TotalFeeVnd = 100000, PaidVnd = 0, CreatedAt = DateTimeOffset.UtcNow,
-                UpdatedAt = DateTimeOffset.UtcNow, CreatedBy = setup.DentistId, UpdatedBy = setup.DentistId });
+                TotalFeeVnd = 100000, PaidVnd = 0 });
             await db.SaveChangesAsync();
         }
         using var owner = await Login("owner.demo");

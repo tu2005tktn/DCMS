@@ -39,11 +39,11 @@ public interface IExaminationService
     Task<ExaminationWorkspace> CompleteAsync(int actorId, Guid visitId, CompleteExaminationVisit request, CancellationToken ct);
 }
 
-public sealed record DocumentMetadata(int PatientId, Guid? VisitId, Guid? DossierId, Guid? PlanId,
+public sealed record DocumentMetadata(int PatientId, Guid? VisitId, Guid? DossierId,
     Guid? InvestigationId, string? ConsentVersion, string DocumentType, string Source,
     DateOnly SourceDate, string? Description, Guid RequestKey);
 public sealed record DocumentContext(Guid? VisitId, string? VisitLabel, Guid? DossierId, string? DossierLabel,
-    Guid? PlanId, string? PlanLabel, Guid? InvestigationId = null, string? InvestigationLabel = null);
+    Guid? InvestigationId = null, string? InvestigationLabel = null);
 public sealed record DocumentReviewDto(Guid VisitId, int ReviewedBy, DateTimeOffset ReviewedAt);
 public sealed record DocumentDto(Guid DocumentId, int Version, string FileName, string ContentType, long SizeBytes,
     string DocumentType, string Source, DateOnly SourceDate, string? Description, DocumentContext Context,
@@ -52,7 +52,7 @@ public sealed record DocumentDto(Guid DocumentId, int Version, string FileName, 
 public sealed record DocumentConstraints(int MaxFiles, long MaxBytes, string[] ContentTypes, int DescriptionMax);
 public sealed record DocumentPage(IReadOnlyList<DocumentDto> Items, int Total, int Page, int PageSize,
     DocumentConstraints Constraints, string[] AllowedActions);
-public sealed record DocumentQuery(int PatientId, Guid? VisitId = null, Guid? DossierId = null, Guid? PlanId = null,
+public sealed record DocumentQuery(int PatientId, Guid? VisitId = null, Guid? DossierId = null,
     string? Type = null, DateOnly? From = null, DateOnly? To = null, int Page = 1, int PageSize = 20, bool ImagesOnly = false);
 public sealed record DocumentUpload(string FileName, string ContentType, byte[] Content);
 public sealed record DocumentUploadResult(DocumentDto? Document, string? Error);

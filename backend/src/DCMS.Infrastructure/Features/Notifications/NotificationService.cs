@@ -91,10 +91,8 @@ public sealed class NotificationService(
                 "visit-results" => await db.Visits.AsNoTracking().AnyAsync(x => x.Id == id
                     && patients.Contains(x.PatientId) && db.Set<VisitExamination>()
                         .Any(e => e.VisitId == x.Id) && DCMS.Domain.Features.Visits.VisitStatuses.HasConfirmedExamination.Contains(x.Status), ct),
-                "prescriptions" => await db.Set<PatientPrescription>().AsNoTracking().AnyAsync(x =>
-                    x.Id == id && patients.Contains(x.PatientId), ct)
-                    || await db.Set<ExternalPrescription>().AsNoTracking().AnyAsync(x =>
-                        x.VisitId == id && x.Status == PrescriptionStatuses.Finalized && patients.Contains(x.PatientId), ct),
+                "prescriptions" => await db.PatientPrescriptions.AsNoTracking().AnyAsync(x =>
+                    x.Id == id && patients.Contains(x.PatientId), ct),
                 "medical-records" => await db.TreatmentDossiers.AsNoTracking().AnyAsync(x =>
                     x.Id == id && x.State != "Deleted" && x.Items.Any()
                     && patients.Contains(x.PatientId), ct),

@@ -63,8 +63,7 @@ public static class ScreenEndpointPermissions
         }
         if (p.StartsWith("/api/service-prices")) return read ? ScreenEndpointRule.Any("treatment.prices.read", "treatment.read") : Need("treatment.prices.manage");
         if (p.StartsWith("/api/treatment-templates")) return Need(read ? "treatment.templates.read" : "treatment.templates.manage");
-        if (p.StartsWith("/api/care-tasks")) return Need(read ? "care-tasks.read" : p.EndsWith("/escalations") ? "care-tasks.escalate" : "care-tasks.manage");
-        if (p.StartsWith("/api/care-escalations")) return Need("care-tasks.escalate");
+        if (p.StartsWith("/api/care-tasks")) return Need(read ? "care-tasks.read" : "care-tasks.manage");
         if (p.StartsWith("/api/lab-orders")) return Need(read ? "treatment.lab.read" : "treatment.lab.track");
         if (p.StartsWith("/api/dossiers")) {
             if (p.Contains("/payments/payos-orders") || p.Contains("/payments/advance-payos-orders"))

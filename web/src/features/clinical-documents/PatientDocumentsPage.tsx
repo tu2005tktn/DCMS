@@ -20,7 +20,7 @@ export function usePatientDocumentContexts(patientId: number) {
   return { contexts, error };
 }
 
-// S20 page: /patients/:id/documents?visitId=&dossierId=&planId=&investigationId=&consentVersion=&type=&from=&to=
+// S20 page: /patients/:id/documents?visitId=&dossierId=&investigationId=&consentVersion=&type=&from=&to=
 // Filters and context live in the URL so they survive going back and forth. The server rejects any context that does
 // not belong to the Patient; the UI never treats such a request as success.
 export default function PatientDocumentsPage() {
@@ -31,10 +31,10 @@ export default function PatientDocumentsPage() {
   const filters: DocumentFilters = useMemo(() => ({
     type: (search.get('type') as DocumentType) || undefined, from: search.get('from') || undefined,
     to: search.get('to') || undefined, visitId: search.get('visitId') || undefined,
-    dossierId: search.get('dossierId') || undefined, planId: search.get('planId') || undefined,
+    dossierId: search.get('dossierId') || undefined,
   }), [search]);
   const uploadContext = { visitId: search.get('visitId') || undefined, dossierId: search.get('dossierId') || undefined,
-    planId: search.get('planId') || undefined, investigationId: search.get('investigationId') || undefined,
+    investigationId: search.get('investigationId') || undefined,
     consentVersion: search.get('consentVersion') || undefined };
 
   function changeFilters(next: DocumentFilters) {
@@ -47,7 +47,6 @@ export default function PatientDocumentsPage() {
 
   const visit = contexts?.visits.find(v => v.id === uploadContext.visitId);
   const dossier = contexts?.dossiers.find(d => d.id === uploadContext.dossierId);
-  const plan = contexts?.plans.find(p => p.id === uploadContext.planId);
 
   return <>
     <Typography.Paragraph><Link to={`/patients/${patientId}`}>← Hồ sơ bệnh nhân</Link></Typography.Paragraph>
@@ -62,7 +61,6 @@ export default function PatientDocumentsPage() {
           { label: 'Ngày sinh', children: contexts.patient.birthDate ? formatDay(contexts.patient.birthDate) : 'Chưa rõ' },
           ...(visit ? [{ label: 'Lượt khám', children: visit.label }] : []),
           ...(dossier ? [{ label: 'Hồ sơ điều trị', children: dossier.label }] : []),
-          ...(plan ? [{ label: 'Kế hoạch', children: plan.label }] : []),
           ...(uploadContext.investigationId ? [{ label: 'Chỉ định cận lâm sàng', children: uploadContext.investigationId }] : []),
           ...(uploadContext.consentVersion ? [{ label: 'Phiên bản đồng thuận', children: uploadContext.consentVersion }] : []),
         ]} />}

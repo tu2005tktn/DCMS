@@ -102,9 +102,9 @@ public sealed class InAppNotification : NotificationRecord
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? ReadAt { get; set; }
     public Guid? AppointmentId { get; set; }
-    public Guid? RequestId { get; set; }
-    public string? DeepLink { get; set; }
-    public bool HasExternalFailure { get; set; }
+    public Guid? RequestId { get => Data.RequestId; set => Data.RequestId = value; }
+    public string? DeepLink { get => Data.DeepLink; set => Data.DeepLink = value; }
+    public bool HasExternalFailure { get => Data.HasExternalFailure; set => Data.HasExternalFailure = value; }
     public string DedupeKey { get; set; } = "";
     public List<NotificationDelivery> Deliveries { get; set; } = [];
 }
@@ -117,7 +117,7 @@ public sealed class NotificationDelivery : NotificationRecord
     public string Channel { get; set; } = "InApp";
     public string Status { get; set; } = "Pending";
     public int AttemptCount { get; set; }
-    public DateTimeOffset? LastAttemptAt { get; set; }
+    public DateTimeOffset? LastAttemptAt { get => Data.LastAttemptAt; set => Data.LastAttemptAt = value; }
     public DateTimeOffset? NextRetryAt { get; set; }
     public string? LastError { get; set; }
 }
@@ -193,14 +193,34 @@ public sealed class AppointmentReceipt : DCMS.Domain.Common.CommandReceiptRecord
 // Written with the booking transaction; the dispatcher is owned by TV5.
 public sealed class AppointmentOutboxEvent : NotificationRecord
 {
-    public Guid AggregateId { get; set; }
+    public Guid? AggregateId { get; set; }
     public string EventType { get; set; } = "AppointmentConfirmed";
-    public string PayloadJson { get; set; } = "";
+    public string Status { get; set; } = "Pending";
+    public string PayloadJson { get => Data.PayloadJson ?? ""; set => Data.PayloadJson = value; }
     public DateTimeOffset OccurredAt { get; set; }
+    public DateTimeOffset? DispatchedAt
+    {
+        get => Data.DispatchedAt;
+        set
+        {
+            Data.DispatchedAt = value;
+            Status = value.HasValue ? "Dispatched" : "Pending";
+        }
+    }
+}
+
+public sealed class NotificationData
+{
+    public Guid? RequestId { get; set; }
+    public string? DeepLink { get; set; }
+    public bool HasExternalFailure { get; set; }
+    public DateTimeOffset? LastAttemptAt { get; set; }
+    public string? PayloadJson { get; set; }
     public DateTimeOffset? DispatchedAt { get; set; }
 }
 
 public abstract class NotificationRecord
 {
     public Guid Id { get; set; } = Guid.NewGuid();
+    public NotificationData Data { get; set; } = new();
 }

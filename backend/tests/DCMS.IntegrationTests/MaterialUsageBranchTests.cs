@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using DCMS.Application.Features.Authentication;
 using DCMS.Domain.Features.Scheduling;
 using DCMS.Domain.Features.SystemSettings;
+using DCMS.Domain.Features.Treatment;
 using DCMS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -31,12 +32,26 @@ public sealed class MaterialUsageBranchTests(ApiFixture fixture) : IClassFixture
             var db = s.ServiceProvider.GetRequiredService<DcmsDbContext>();
             a = await db.Set<SchedulingBranch>().Where(x => x.Name == "S09 - Chi nhánh thử nghiệm").Select(x => x.Id).SingleAsync();
             b = await db.Set<SchedulingBranch>().Where(x => x.Name == "S09 - Chi nhánh B").Select(x => x.Id).SingleAsync();
-            var cat = new MaterialCategory { Name = name, NormalizedName = name.ToUpperInvariant(), CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow };
-            var item = new MaterialCatalogItem { Name = name, NormalizedName = name.ToUpperInvariant(), CategoryId = cat.Id, CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow };
-            db.AddRange(cat, item); await db.SaveChangesAsync();
+            var cat = new MaterialCategory { Name = name };
+            db.Add(cat);
+            var patientId = await db.Patients.Select(x => x.Id).FirstAsync();
+            var now = DateTimeOffset.UtcNow;
             foreach (var branch in new[] { a, b })
-                db.MaterialUsages.Add(new MaterialUsage { ActivityId = Guid.NewGuid(), MaterialId = item.Id, MaterialName = $"{name}-{branch}", Quantity = 1,
-                    PatientId = await db.Patients.Select(x => x.Id).FirstAsync(), BranchId = branch, UsedAt = DateTimeOffset.UtcNow, CreatedAt = DateTimeOffset.UtcNow });
+            {
+                var item = new MaterialCatalogItem { Name = $"{name}-{branch}", Category = cat };
+                var dentistId = await db.SchedulingMembers.AsNoTracking().Where(x => x.BranchId == branch && x.CanDentist).Select(x => x.EmployeeId).FirstAsync();
+                var service = new SchedulingService { BranchId = branch, Name = $"{name}-{branch}", PublicBookable = false, Unit = "lần" };
+                var dossier = new TreatmentDossier { Code = $"MU-{branch}-{Guid.NewGuid().ToString("N")[..10]}", PatientId = patientId, BranchId = branch,
+                    DentistId = dentistId, StartedOn = DateOnly.FromDateTime(now.UtcDateTime), Diagnosis = "SYNTHETIC usage branch", CreatedAt = now, UpdatedAt = now };
+                db.AddRange(item, service, dossier);
+                await db.SaveChangesAsync();
+                var planItem = new TreatmentItem { DossierId = dossier.Id, ServiceId = service.Id, ServiceName = service.Name, Unit = service.Unit, Quantity = 1, PlannedOrder = 1, AgreedUnitPriceVnd = 0 };
+                db.TreatmentItems.Add(planItem);
+                var activity = new ClinicalActivity { DossierId = dossier.Id, ItemId = planItem.Id, PlanVersion = 1, ServiceId = service.Id,
+                    ServiceNameSnapshot = service.Name, Unit = service.Unit, Quantity = 1, PriceSnapshotVnd = 0, PerformerId = dentistId, PerformedAt = now, CreatedAt = now };
+                db.ClinicalActivities.Add(activity);
+                db.MaterialUsages.Add(new MaterialUsage { ActivityId = activity.Id, MaterialId = item.Id, Quantity = 1, UsedAt = now });
+            }
             await db.SaveChangesAsync();
         }
         string Url() => $"/api/system-settings/material-usage?q={name}&pageSize=100";

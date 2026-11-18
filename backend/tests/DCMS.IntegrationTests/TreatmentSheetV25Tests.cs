@@ -303,8 +303,8 @@ public sealed class TreatmentSheetV25Tests(ApiFixture fixture) : IClassFixture<A
         using (var scope = fixture.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>(); var now = DateTimeOffset.UtcNow;
-            var lab = new DCMS.Domain.Features.SystemSettings.CatalogProvider { Code = "LAB-T-" + Guid.NewGuid().ToString("N")[..6], Name = "Xưởng thử", NormalizedName = "XƯỞNG THỬ", Type = "Lab", CreatedAt = now, UpdatedAt = now };
-            var supplier = new DCMS.Domain.Features.SystemSettings.CatalogProvider { Code = "SUP-T-" + Guid.NewGuid().ToString("N")[..6], Name = "Cung cấp thử", NormalizedName = "CUNG CẤP THỬ", Type = "Supplier", CreatedAt = now, UpdatedAt = now };
+            var lab = new DCMS.Domain.Features.SystemSettings.CatalogProvider { Code = "LAB-T-" + Guid.NewGuid().ToString("N")[..6], Name = "Xưởng thử", Type = "Lab" };
+            var supplier = new DCMS.Domain.Features.SystemSettings.CatalogProvider { Code = "SUP-T-" + Guid.NewGuid().ToString("N")[..6], Name = "Cung cấp thử", Type = "Supplier" };
             db.AddRange(lab, supplier); await db.SaveChangesAsync(); labId = lab.Id; supplierId = supplier.Id;
         }
         var context = (await dentist.GetFromJsonAsync<LabOrderContext>(url))!;
@@ -404,7 +404,8 @@ public sealed class TreatmentSheetV25Tests(ApiFixture fixture) : IClassFixture<A
             null, null, "Mão sứ", null, null, null, [], false, ["36"], new(), null, null, 1, 1_000_000, 0, null, null));
         Assert.True(save.IsSuccessStatusCode, await save.Content.ReadAsStringAsync());
 
-        var command = new DCMS.Application.Features.Settings.BranchStateCommand(Guid.NewGuid(), 1, false, "Thử ngừng");
+        var currentBranch = (await owner.GetFromJsonAsync<DCMS.Application.Features.Settings.BranchDetailDto>($"/api/settings/branches/{setup.Branch}"))!;
+        var command = new DCMS.Application.Features.Settings.BranchStateCommand(Guid.NewGuid(), currentBranch.Version, false, "Thử ngừng");
         var preview = await owner.PostAsJsonAsync($"/api/settings/branches/{setup.Branch}/state-preview", command);
         Assert.True(preview.IsSuccessStatusCode, await preview.Content.ReadAsStringAsync());
         var result = (await preview.Content.ReadFromJsonAsync<DCMS.Application.Features.Settings.ImpactPreviewResult>())!;

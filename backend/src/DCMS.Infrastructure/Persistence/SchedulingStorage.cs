@@ -14,7 +14,6 @@ public sealed partial class DcmsDbContext
         Id = x.Id, BranchId = x.BranchId, Code = x.Code!, Name = x.Name, IsActive = x.Active,
         Version = x.Version, OpenMinute = x.OpenMinute, CloseMinute = x.CloseMinute
     });
-    public IQueryable<BranchAsset> BranchAssets => Set<SchedulingBranch>().AsNoTracking().SelectMany(x => x.Assets);
 
     public Task<int> NextChairIdAsync(CancellationToken ct) => Database.SqlQueryRaw<int>(
         "SELECT nextval('scheduling_chair_seq')::integer AS \"Value\"").SingleAsync(ct);
@@ -40,7 +39,6 @@ public sealed partial class DcmsDbContext
                 SchedulingMember value => value.BranchId,
                 SchedulingChair value => value.BranchId,
                 BranchChair value => value.BranchId,
-                BranchAsset value => value.BranchId,
                 _ => 0
             };
             if (branchId == 0) { Add(row); continue; }
@@ -59,8 +57,6 @@ public sealed partial class DcmsDbContext
                     resource.Code = profile.Code; resource.Name = profile.Name; resource.Active = profile.IsActive;
                     resource.Version = profile.Version; resource.OpenMinute = profile.OpenMinute; resource.CloseMinute = profile.CloseMinute;
                     break;
-                case BranchAsset asset:
-                    owner.Assets.Add(asset); break;
             }
         }
     }
@@ -77,20 +73,10 @@ public sealed partial class DcmsDbContext
         return owner.SupportRequests.Single(x => x.Id == id);
     }
 
-    private async Task PrepareSchedulingChangesAsync(CancellationToken ct)
+    private void PrepareSchedulingChanges()
     {
-        var profiles = ChangeTracker.Entries<BranchProfile>().ToArray();
-        foreach (var profile in profiles.Where(x => x.State is EntityState.Added or EntityState.Modified))
-            _ = await Set<SchedulingBranch>().FindAsync([profile.Entity.Id], ct);
-        foreach (var branch in ChangeTracker.Entries<SchedulingBranch>().ToArray())
-        {
-            var related = profiles.SingleOrDefault(x => x.Entity.Id == branch.Entity.Id);
-            if (related != null) branch.Property("Version").CurrentValue = related.Entity.Version;
-            if (branch.State == EntityState.Modified || related?.State is EntityState.Added or EntityState.Modified)
-                branch.Entity.StorageStamp = Guid.NewGuid();
-            if (related == null) continue;
-            related.Property("StorageStamp").CurrentValue = branch.Entity.StorageStamp;
-            if (related.State == EntityState.Added) related.Property("StorageStamp").OriginalValue = branch.Property(x => x.StorageStamp).OriginalValue;
-        }
+        foreach (var branch in ChangeTracker.Entries<SchedulingBranch>().Where(x => x.State == EntityState.Modified).ToArray())
+            if (!branch.Property(x => x.Version).IsModified)
+                branch.Entity.Version = branch.Property(x => x.Version).OriginalValue + 1;
     }
 }

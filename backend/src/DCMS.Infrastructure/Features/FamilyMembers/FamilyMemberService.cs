@@ -92,9 +92,8 @@ public sealed class FamilyMemberService(DcmsDbContext db, TimeProvider clock) : 
         var result = await Write(actor, command.RequestKey, payload, null, () =>
         {
             RequireContact(gender, phone);
-            var now = clock.GetUtcNow();
             var member = new FamilyMember { OwnerAccountId = actor, FullName = name, Relationship = command.Relationship,
-                BirthDate = command.BirthDate, Gender = gender, ContactPhone = phone, CreatedAt = now, UpdatedAt = now };
+                BirthDate = command.BirthDate, Gender = gender, ContactPhone = phone };
             db.Add(member); return Task.FromResult(Dto(member));
         }, ct);
         return new(result.Result, result.Replayed);
@@ -115,7 +114,7 @@ public sealed class FamilyMemberService(DcmsDbContext db, TimeProvider clock) : 
                 await FamilyRecordService.EndAccessAsync(db, actor, id, "Thông tin định danh người thân đã thay đổi. Vui lòng gửi yêu cầu xác minh mới.", clock.GetUtcNow(), ct);
             member.FullName = name; member.Relationship = command.Relationship; member.BirthDate = command.BirthDate;
             member.Gender = gender; member.ContactPhone = phone;
-            member.Version++; member.UpdatedAt = clock.GetUtcNow(); return Dto(member);
+            member.Version++; return Dto(member);
         }, ct)).Result;
     }
     public async Task<DeletedFamilyMember> DeleteAsync(int actor, Guid id, DeleteFamilyMember command, CancellationToken ct) =>
@@ -124,6 +123,6 @@ public sealed class FamilyMemberService(DcmsDbContext db, TimeProvider clock) : 
             var member = await Owned(actor).SingleOrDefaultAsync(x => x.Id == id && x.DeletedAt == null, ct) ?? throw Missing();
             if (member.Version != command.ExpectedVersion) throw new BusinessException(409, SystemMessages.Get("MSG111"));
             await FamilyRecordService.EndAccessAsync(db, actor, id, "Người thân đã được xóa khỏi danh sách.", clock.GetUtcNow(), ct);
-            member.DeletedAt = member.UpdatedAt = clock.GetUtcNow(); member.Version++; return new DeletedFamilyMember(id, member.Version, true);
+            member.DeletedAt = clock.GetUtcNow(); member.Version++; return new DeletedFamilyMember(id, member.Version, true);
         }, ct)).Result;
 }

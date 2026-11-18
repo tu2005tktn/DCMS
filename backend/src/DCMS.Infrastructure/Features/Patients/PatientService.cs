@@ -458,7 +458,7 @@ public sealed partial class PatientService(DcmsDbContext db, DCMS.Application.Fe
         var verified = await (from link in db.PatientAccountLinks.AsNoTracking()
                               join user in db.Users.AsNoTracking() on link.AccountId equals user.Id
                               where link.PatientId == x.Id && link.Status == PatientLinkStatus.Verified
-                              select new { user.UserName, link.ReviewedAt }).FirstOrDefaultAsync(ct);
+                              select new { user.UserName, ReviewedAt = link.Details.ReviewedAt }).FirstOrDefaultAsync(ct);
         Guid?[] single = [x.SourceId, x.CustomerGroupId, x.OccupationId];
         var ids = single.OfType<Guid>().Concat(x.IntakeHistoryIds).Distinct().ToArray();
         var entries = await db.ReferenceEntries.AsNoTracking().Where(e => ids.Contains(e.Id))

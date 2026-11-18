@@ -33,7 +33,7 @@ public sealed class ClinicalAiAnalysisTests(ExaminationFixture fixture) : IClass
 
     private async Task<DocumentDto> Upload(HttpClient c, VisitResult v, string type, byte[] bytes, string name, string mime)
     {
-        var m = new DocumentMetadata(v.PatientId, v.VisitId, null, null, null, null, type, "Clinic",
+        var m = new DocumentMetadata(v.PatientId, v.VisitId, null, null, null, type, "Clinic",
             DateOnly.FromDateTime(fixture.Clock.Now.ToOffset(TimeSpan.FromHours(7)).DateTime), "SYNTHETIC x-ray", Guid.NewGuid());
         using var form = new MultipartFormDataContent();
         form.Add(new StringContent(JsonSerializer.Serialize(m, new JsonSerializerOptions(JsonSerializerDefaults.Web))), "metadata");

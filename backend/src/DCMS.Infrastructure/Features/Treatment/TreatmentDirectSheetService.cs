@@ -167,8 +167,8 @@ public sealed partial class TreatmentDossierService
         };
         db.ClinicalActivities.Add(activity);
         await db.SaveChangesAsync(ct);
-        await DCMS.Infrastructure.Features.SystemSettings.MaterialStock.ReplaceAsync(db, clock, activity.Id, dossier.PatientId, dossier.BranchId,
-            activity.DossierId, activity.PerformedAt, actorId, input?.Materials, ct);
+        await DCMS.Infrastructure.Features.SystemSettings.MaterialStock.ReplaceAsync(db, activity.Id,
+            activity.PerformedAt, actorId, input?.Materials, ct);
         await db.SaveChangesAsync(ct);
         return await clinicalWork.PostWithinTransactionAsync(actorId, activity.Id,
             new PostActivityRequest(activity.Version, key), ct,

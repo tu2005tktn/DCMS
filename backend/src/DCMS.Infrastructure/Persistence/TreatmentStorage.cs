@@ -21,7 +21,7 @@ public sealed partial class DcmsDbContext
 
     public async Task AddTreatmentDataAsync(params object[] rows)
     {
-        foreach (var row in rows.Where(x => x is not (TreatmentSheetDraft or TreatmentTemplateItem or TreatmentTemplateVersion)))
+        foreach (var row in rows.Where(x => x is not (TreatmentSheetDraft or TreatmentTemplateItem)))
             Add(row);
         foreach (var row in rows)
         {
@@ -36,11 +36,6 @@ public sealed partial class DcmsDbContext
                     var template = await TreatmentTemplates.FindAsync(templateItem.TemplateId)
                         ?? throw new InvalidOperationException("The treatment template must exist before its items are saved.");
                     if (!template.Items.Contains(templateItem)) template.Items.Add(templateItem);
-                    break;
-                case TreatmentTemplateVersion version:
-                    var owner = await TreatmentTemplates.FindAsync(version.TemplateId)
-                        ?? throw new InvalidOperationException("The treatment template must exist before its versions are saved.");
-                    if (!owner.Versions.Contains(version)) owner.Versions.Add(version);
                     break;
             }
         }
@@ -63,11 +58,14 @@ public sealed partial class DcmsDbContext
 
     private void PrepareTreatmentChanges()
     {
-        // Every saved change to an activity moves Version on by exactly one (its concurrency token).
+        // Every saved change to an activity, lab order, care task or template moves Version on by one (its concurrency token).
         foreach (var activity in ChangeTracker.Entries<ClinicalActivity>().Where(x => x.State == EntityState.Modified).ToArray())
             if (!activity.Property(x => x.Version).IsModified) activity.Entity.Version = activity.Property(x => x.Version).OriginalValue + 1;
-        foreach (var entry in ChangeTracker.Entries().Where(x => x.State == EntityState.Modified
-            && x.Entity is TreatmentTemplate or CareTask or LabOrder).ToArray())
-            entry.Property("StorageStamp").CurrentValue = Guid.NewGuid();
+        foreach (var order in ChangeTracker.Entries<LabOrder>().Where(x => x.State == EntityState.Modified).ToArray())
+            if (!order.Property(x => x.Version).IsModified) order.Entity.Version = order.Property(x => x.Version).OriginalValue + 1;
+        foreach (var task in ChangeTracker.Entries<CareTask>().Where(x => x.State == EntityState.Modified).ToArray())
+            if (!task.Property(x => x.Version).IsModified) task.Entity.Version = task.Property(x => x.Version).OriginalValue + 1;
+        foreach (var template in ChangeTracker.Entries<TreatmentTemplate>().Where(x => x.State == EntityState.Modified).ToArray())
+            if (!template.Property(x => x.Version).IsModified) template.Entity.Version = template.Property(x => x.Version).OriginalValue + 1;
     }
 }

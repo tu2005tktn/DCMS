@@ -203,7 +203,7 @@ public static class TreatmentPaymentEndpoints
             if (dossier.State != "Open" || dossier.Version != request.ExpectedVersion)
                 return Results.Conflict("Phiếu đã thay đổi. Vui lòng tải lại.");
             if (await db.ClinicalActivities.AnyAsync(x => x.DossierId == dossierId, ct)
-                || await db.LabOrders.AnyAsync(x => x.DossierId == dossierId, ct))
+                || await (from x in db.LabOrders join a in db.ClinicalActivities on x.ActivityId equals a.Id where a.DossierId == dossierId select x.Id).AnyAsync(ct))
                 return Results.Conflict("Phiếu đã có điều trị hoặc labo, không thể xóa do khách không đến.");
             var current = await ContextAsync(db, dossierId, ct);
             if (current is null || current.AdvanceReceivedVnd <= 0)
@@ -388,11 +388,16 @@ public static class TreatmentPaymentEndpoints
                 activity.ServiceNameSnapshot ?? "Dịch vụ điều trị", price, paidVnd, price - paidVnd);
         }).Where(x => x.PriceVnd > 0).ToArray();
         var activityIds = activities.Select(x => x.Id).ToArray();
-        var labs = await db.LabOrders.AsNoTracking().Where(x => x.DossierId == dossierId
-                && x.PatientId == dossier.PatientId && x.BranchId == dossier.BranchId
-                && activityIds.Contains(x.ActivityId) && x.TotalFeeVnd > 0)
-            .OrderBy(x => x.OrderedOn).ThenBy(x => x.Id)
-            .Select(x => new { x.Id, x.ActivityId, x.WorkName, x.TotalFeeVnd, x.PaidVnd }).ToArrayAsync(ct);
+        var labs = await (
+            from x in db.LabOrders.AsNoTracking()
+            join a in db.ClinicalActivities.AsNoTracking() on x.ActivityId equals a.Id
+            join d in db.TreatmentDossiers.AsNoTracking() on a.DossierId equals d.Id
+            where a.DossierId == dossierId
+                && d.PatientId == dossier.PatientId && d.BranchId == dossier.BranchId
+                && activityIds.Contains(x.ActivityId) && x.TotalFeeVnd > 0
+            orderby x.OrderedOn, x.Id
+            select new { x.Id, x.ActivityId, x.WorkName, x.TotalFeeVnd, x.PaidVnd }
+        ).ToArrayAsync(ct);
         var reserved = await db.Database.SqlQuery<TreatmentPaidRow>($"""
             SELECT (item.row->>'labOrderId')::uuid AS "ActivityId", sum((item.row->>'amountVnd')::bigint)::bigint AS "PaidVnd"
             FROM "AUDIT_LOG" ledger

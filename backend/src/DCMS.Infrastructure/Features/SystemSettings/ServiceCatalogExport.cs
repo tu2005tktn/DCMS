@@ -31,7 +31,7 @@ public sealed class ServiceCatalogExport(DcmsDbContext db, ISettingsAccess acces
         if (prices) header = [.. header, "Giá tham khảo (VND)", "Phiên bản giá"];
         return Xlsx.Write("Dịch vụ", [header, .. list.Select(x =>
         {
-            string?[] cells = [x.Branch, x.s.Name, x.s.IsInitialExamination ? "Khám" : x.s.IsInvestigationService ? "Cận lâm sàng" : "Điều trị",
+            string?[] cells = [x.Branch, x.s.Name, x.s.IsInitialExamination ? "Khám" : "Điều trị",
                 x.s.Unit, x.s.PublicDurationMinutes.ToString(), x.s.PublicBookable ? "Có" : "Không", x.s.Active ? "Đang dùng" : "Ngừng dùng"];
             return prices ? [.. cells, x.s.ReferenceUnitPriceVnd?.ToString() ?? "Chưa xác định", x.s.PriceVersion.ToString()] : cells;
         })]);

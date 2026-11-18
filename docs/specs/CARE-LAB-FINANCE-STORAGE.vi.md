@@ -30,17 +30,15 @@ Ngày 13/11/2026. Yêu cầu của chủ dự án sau bước gộp điều tr�
 
 | Bảng | Dữ liệu |
 | --- | --- |
-| `CARE_TASK` | Công việc chăm sóc, bệnh nhân, chi nhánh, nguồn phát sinh, hạn xử lý, người phụ trách và trạng thái; các lần liên hệ và các lần chuyển cấp trong JSONB |
+| `CARE_TASK` | Công việc chăm sóc (11 cột), bệnh nhân, chi nhánh, lịch hẹn, loại, nội dung, người phụ trách, hạn xử lý, trạng thái, `Version` và các lần liên hệ `ContactAttempts` trong JSONB |
 
-`CARE_CONTACT_ATTEMPT` và `CARE_ESCALATION` chuyển thành hai collection `ContactAttempts` và `Escalations` trên dòng `CARE_TASK`. Mỗi phần tử giữ ID, người thực hiện, thời điểm và nội dung như dòng nguồn; chuyển cấp giữ thêm trạng thái, phiên bản, thời điểm ghi nhận và xử lý. Route, DTO, quyền, quy tắc retry và lỗi phiên bản của màn hình chăm sóc giữ nguyên.
-
-Ghi lần liên hệ hoặc chuyển cấp nạp công việc có tracking và ghi qua dòng cha. Dòng cha có `StorageStamp` làm concurrency token, nên hai thao tác đồng thời trên cùng công việc không ghi đè nhau kể cả khi phiên bản nghiệp vụ của công việc giữ nguyên. Tra cứu một lần chuyển cấp theo ID đi qua công việc chứa nó.
+Cập nhật ngày 18/11/2026: rút gọn `CARE_TASK` từ 17 xuống **11 cột** và gỡ bỏ `CareEscalation` (`Escalations` JSONB, `EscalationDto` và các endpoint `/api/care-tasks/{id}/escalations`, `/api/care-escalations/*`), `EpisodeKey` (thay bằng partial unique index `UX_CARE_TASK_MissedAppointment` trên `AppointmentId` khi `Type = 'MissedAppointment'`), `StorageStamp` (dùng `Version` làm concurrency token duy nhất và tự tăng khi thêm lần liên hệ), cùng `CreatedBy`, `CreatedAt`, `UpdatedAt`. Danh mục `LAB_WORK_TYPE` đồng thời rút còn **9 cột** (bỏ 5 cột kế thừa `SupplyEntity`: `NormalizedName`, `CreatedAt`, `CreatedBy`, `UpdatedAt`, `UpdatedBy`). Xem [rút gọn 9 bảng còn lại](./REMAINING-NINE-TABLES-SIMPLIFICATION.vi.md).
 
 ## Labo
 
 | Bảng | Dữ liệu |
 | --- | --- |
-| `LAB_ORDER` | Phiếu labo theo hoạt động điều trị, xưởng, loại công việc, răng, màu, ngày gửi/nhận/giao, trạng thái, phí labo; lịch sử trạng thái trong JSONB |
+| `LAB_ORDER` | Phiếu labo (18 cột) theo hoạt động điều trị (`ActivityId` -> `CLINICAL_ACTIVITY` -> `TREATMENT_DOSSIER`), xưởng, loại công việc, mốc chính/phí labo, `Version`; thông số kỹ thuật phục hình và mốc `SentOn`/`ReceivedOn` trong `Spec` JSONB; lịch sử trạng thái trong `StatusLogs` JSONB. Xem [rút gọn bảng LAB_ORDER](./LAB-ORDER-TABLE-SIMPLIFICATION.vi.md). |
 | `LAB_WORK_TYPE` | Danh mục labo: loại công việc theo xưởng, đơn vị, giá tham khảo và bảo hành |
 
 `LAB_ORDER_STATUS_LOG` chuyển thành collection `StatusLogs` trên phiếu. Lịch sử vẫn chỉ thêm, giữ ID, trạng thái cũ và mới, thời điểm, người đổi và ghi chú. Danh sách xưởng labo tiếp tục lấy từ danh mục nhà cung cấp dùng chung `CATALOG_PROVIDER`. `TotalFeeVnd` và `PaidVnd` trên phiếu là thông tin của phiếu labo và được giữ.

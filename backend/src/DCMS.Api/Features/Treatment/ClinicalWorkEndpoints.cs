@@ -46,19 +46,5 @@ public static class ClinicalWorkEndpoints
             ContactAttemptRequest request, ICareTaskService service, CancellationToken ct) =>
             Results.Json(await service.ContactAsync(AuthenticationEndpoints.AccountId(http.User), id,
                 request, ct), statusCode: 201));
-        care.MapPost("/{id:guid}/escalations", async (HttpContext http, Guid id,
-            EscalateCareRequest request, ICareTaskService service, CancellationToken ct) =>
-            Results.Json(await service.EscalateAsync(AuthenticationEndpoints.AccountId(http.User), id,
-                request, ct), statusCode: 201));
-        var escalations = app.MapGroup("/api/care-escalations").RequireAuthorization()
-            .WithTags("UC-53 S60 Clinical handoff");
-        escalations.MapPost("/{id:guid}/acknowledge", async (HttpContext http, Guid id,
-            ResolveEscalationRequest request, ICareTaskService service, CancellationToken ct) =>
-            Results.Ok(await service.ChangeEscalationAsync(AuthenticationEndpoints.AccountId(http.User),
-                id, false, request, ct)));
-        escalations.MapPost("/{id:guid}/resolve", async (HttpContext http, Guid id,
-            ResolveEscalationRequest request, ICareTaskService service, CancellationToken ct) =>
-            Results.Ok(await service.ChangeEscalationAsync(AuthenticationEndpoints.AccountId(http.User),
-                id, true, request, ct)));
     }
 }

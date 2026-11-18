@@ -56,7 +56,7 @@ public sealed class ExaminationApiTests(ExaminationFixture fixture) : IClassFixt
     private static async Task<T> Ok<T>(HttpResponseMessage response)
     { Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync()); return (await response.Content.ReadFromJsonAsync<T>())!; }
     private static readonly byte[] Pdf = Encoding.ASCII.GetBytes("%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\n%%EOF");
-    private DocumentMetadata Metadata(VisitResult v) => new(v.PatientId, v.VisitId, null, null, null, null, "Other", "Clinic",
+    private DocumentMetadata Metadata(VisitResult v) => new(v.PatientId, v.VisitId, null, null, null, "Other", "Clinic",
         DateOnly.FromDateTime(fixture.Clock.Now.ToOffset(TimeSpan.FromHours(7)).DateTime), "SYNTHETIC file", Guid.NewGuid());
     private static async Task<HttpResponseMessage> Upload(HttpClient c, DocumentMetadata m, byte[]? bytes = null, string name = "test.pdf", string type = "application/pdf", int count = 1)
     {
@@ -74,7 +74,7 @@ public sealed class ExaminationApiTests(ExaminationFixture fixture) : IClassFixt
             new DCMS.Application.Features.Treatment.CreateDossierRequest(setup.BranchId, setup.DentistId, "SYNTHETIC", null, null, Guid.NewGuid()));
         var dossier = (await Ok<DCMS.Application.Features.Treatment.TreatmentChange>(dossierResult)).Dossier;
         fixture.Services.GetRequiredService<ExaminationTestScanner>().State = "Ready";
-        var metadata = new DocumentMetadata(setup.PatientId, null, dossier.Id, null, null, null, "Other", "Clinic",
+        var metadata = new DocumentMetadata(setup.PatientId, null, dossier.Id, null, null, "Other", "Clinic",
             DateOnly.FromDateTime(fixture.Clock.Now.ToOffset(TimeSpan.FromHours(7)).DateTime), "SYNTHETIC image", Guid.NewGuid());
         var png = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aZ9sAAAAASUVORK5CYII=");
         var uploaded = (await Ok<UploadBatchResult>(await Upload(dentist, metadata, png, "photo.png", "image/png"))).Document!;
@@ -587,7 +587,7 @@ public sealed class ExaminationApiTests(ExaminationFixture fixture) : IClassFixt
     {
         var (_,v,c) = await Prepare(); using(c) {
             Assert.Equal(HttpStatusCode.NotFound, (await c.PutAsJsonAsync(Exam(v.VisitId), new SaveExamination(v.PatientId + 1000, v.VisitVersion, Guid.NewGuid(), Content(), false))).StatusCode);
-            foreach (var m in new[] { Metadata(v) with { PatientId = v.PatientId + 1000 }, Metadata(v) with { DossierId = Guid.NewGuid() }, Metadata(v) with { PlanId = Guid.NewGuid() } })
+            foreach (var m in new[] { Metadata(v) with { PatientId = v.PatientId + 1000 }, Metadata(v) with { DossierId = Guid.NewGuid() } })
                 Assert.Equal(HttpStatusCode.NotFound, (await Upload(c,m)).StatusCode);
             Assert.Equal(HttpStatusCode.NotFound, (await Upload(c, Metadata(v) with { InvestigationId = Guid.NewGuid() })).StatusCode);
         }

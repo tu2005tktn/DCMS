@@ -50,7 +50,7 @@ public sealed class LoginIdentifierApiTests(ApiFixture fixture) : IClassFixture<
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", session.AccessToken);
         var current = await client.GetFromJsonAsync<CurrentUser>("/api/auth/me"); Assert.Equal(user.Id, current!.Id);
         using var scope = fixture.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
-        Assert.Single(await db.AuthSessions.Where(value => value.AccountId == user.Id).ToArrayAsync());
+        Assert.Single((await db.Users.AsNoTracking().SingleAsync(value => value.Id == user.Id)).Sessions);
         Assert.Single(await db.AccountAudits.Where(value => value.TargetId == user.Id && value.Action == "SignIn").ToArrayAsync());
         (await client.PostAsync("/api/auth/sign-out", null)).EnsureSuccessStatusCode();
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/auth/me")).StatusCode);
@@ -76,7 +76,7 @@ public sealed class LoginIdentifierApiTests(ApiFixture fixture) : IClassFixture<
         var response = await client.PostAsJsonAsync("/api/auth/sign-in", new SignInRequest(identifier, scenario == "wrong-password" ? "invalid" : fixture.Password));
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode); Assert.Equal("MSG09", (await response.Content.ReadFromJsonAsync<SystemMessage>())!.Code);
         using var check = fixture.Services.CreateScope(); var db = check.ServiceProvider.GetRequiredService<DcmsDbContext>();
-        Assert.Empty(await db.AuthSessions.Where(value => value.AccountId == user.Id).ToArrayAsync());
+        Assert.Empty((await db.Users.AsNoTracking().SingleAsync(value => value.Id == user.Id)).Sessions);
         Assert.Empty(await db.AccountAudits.Where(value => value.TargetId == user.Id && value.Action == "SignIn").ToArrayAsync());
     }
 
@@ -92,7 +92,7 @@ public sealed class LoginIdentifierApiTests(ApiFixture fixture) : IClassFixture<
         var response = await client.PostAsJsonAsync("/api/auth/sign-in", new SignInRequest(user.Email!, fixture.Password));
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode); Assert.Equal("MSG09", (await response.Content.ReadFromJsonAsync<SystemMessage>())!.Code);
         using var check = fixture.Services.CreateScope(); var context = check.ServiceProvider.GetRequiredService<DcmsDbContext>();
-        Assert.Empty(await context.AuthSessions.Where(value => value.AccountId == user.Id).ToArrayAsync());
+        Assert.Empty((await context.Users.AsNoTracking().SingleAsync(value => value.Id == user.Id)).Sessions);
     }
 
     [Fact]

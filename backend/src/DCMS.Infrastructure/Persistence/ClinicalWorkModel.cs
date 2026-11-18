@@ -33,12 +33,10 @@ internal static class ClinicalWorkModel
         {
             b.ToTable("CARE_TASK"); b.HasKey(x => x.Id);
             b.HasIndex(x => new { x.BranchId, x.DueAt, x.Status });
-            b.HasIndex(x => x.EpisodeKey).IsUnique().HasFilter("\"EpisodeKey\" IS NOT NULL");
-            b.Property(x => x.EpisodeKey).HasMaxLength(200);
             b.Property(x => x.Type).HasMaxLength(40);
             b.Property(x => x.Content).HasMaxLength(4000);
             b.Property(x => x.Status).HasMaxLength(16);
-            b.Property(x => x.Version).IsConcurrencyToken();
+            b.Property(x => x.Version).HasDefaultValue(1).ValueGeneratedNever().IsConcurrencyToken();
         });
     }
 }

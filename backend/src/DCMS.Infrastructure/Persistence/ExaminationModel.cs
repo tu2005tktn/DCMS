@@ -27,17 +27,18 @@ internal static class ExaminationModel
         });
         model.Ignore<InvestigationOrder>();
         model.Ignore<DocumentReview>();
+        model.Ignore<ClinicalDocumentMetadata>();
         model.Entity<ClinicalDocument>(b => {
             b.ToTable("CLINICAL_DOCUMENT", t => {
                 t.HasCheckConstraint("CK_CLINICAL_DOCUMENT_State", "\"FileState\" IN ('PendingScan','Ready','Rejected')");
                 t.HasCheckConstraint("CK_CLINICAL_DOCUMENT_Context", "\"VisitId\" IS NOT NULL OR \"DossierId\" IS NOT NULL");
             });
             b.Property(x => x.FileName).HasMaxLength(255); b.Property(x => x.ContentType).HasMaxLength(64);
-            b.Property(x => x.Sha256).HasMaxLength(64); b.Property(x => x.DocumentType).HasMaxLength(24);
-            b.Property(x => x.Source).HasMaxLength(16); b.Property(x => x.FileState).HasMaxLength(16);
-            b.Property(x => x.Description).HasMaxLength(1000); b.Property(x => x.RejectReason).HasMaxLength(500);
+            b.Property(x => x.DocumentType).HasMaxLength(24); b.Property(x => x.FileState).HasMaxLength(16);
             b.Property(x => x.Version).IsConcurrencyToken(); b.HasIndex(x => new { x.PatientId, x.VisitId });
-            b.HasIndex(x => x.InvestigationId);
+            b.Ignore(x => x.Source); b.Ignore(x => x.Description); b.Ignore(x => x.SizeBytes);
+            b.Ignore(x => x.Sha256); b.Ignore(x => x.RejectReason); b.Ignore(x => x.InvestigationId);
+            b.ComplexProperty(x => x.Metadata, m => m.ToJson("Metadata"));
             b.HasOne<Visit>().WithMany().HasForeignKey(x => x.VisitId).OnDelete(DeleteBehavior.Restrict);
             b.ComplexCollection(x => x.Reviews).ToJson();
             b.ComplexCollection(x => x.AiAnalyses, a => { a.ToJson(); a.ComplexCollection(x => x.Findings); });

@@ -56,3 +56,5 @@ Cập nhật 18/11/2026: cột `SourceKind` của `CLINICAL_ACTIVITY` được b
 Cập nhật 18/11/2026 (2): rút gọn `TREATMENT_DOSSIER` từ 34 xuống 14 cột theo Phương án A (`Version` là khóa đồng thời duy nhất, chỉ giữ JSONB `SheetDrafts`, gỡ `RevisionDrafts` và 19 cột dư); xem [rút gọn bảng TREATMENT_DOSSIER](TREATMENT-DOSSIER-TABLE-SIMPLIFICATION.vi.md).
 
 Cập nhật 18/11/2026 (3): rút gọn `TREATMENT_PLAN_ITEM` từ 65 xuống 18 cột theo Phương án A (chỉ giữ các cột hiển thị trên bảng kế hoạch của phiếu điều trị, bỏ `Steps` JSONB, bảo hành, đồng thuận và 47 cột dư; `CLINICAL_ACTIVITY.ItemId` thành FK nullable `ON DELETE SET NULL`); xem [rút gọn bảng TREATMENT_PLAN_ITEM](TREATMENT-PLAN-ITEM-TABLE-SIMPLIFICATION.vi.md).
+
+Cập nhật 18/11/2026 (4): rút gọn `TREATMENT_TEMPLATE` từ 11 xuống 8 cột (`Id`, `BranchId`, `Name`, `Version`, `CreatedBy`, `CreatedAt`, `DeletedAt`, `Items` JSONB; bỏ `DefinitionKind`, `Versions` JSONB của luồng `LegacySteps` cũ và `StorageStamp`; dùng `Version` làm concurrency token duy nhất); xem [rút gọn 8 bảng ít cột còn lại](REMAINING-EIGHT-SMALL-TABLES-SIMPLIFICATION.vi.md).

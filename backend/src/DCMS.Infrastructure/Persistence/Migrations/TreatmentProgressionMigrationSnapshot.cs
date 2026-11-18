@@ -14,35 +14,36 @@ internal static class TreatmentProgressionMigrationSnapshot
             b.Property<int?>("SourceTemplateVersion").HasColumnType("integer");
             b.HasIndex("SourceTemplateId");
         });
-        model.Entity<TreatmentTemplate>(b =>
+        model.Entity("DCMS.Domain.Features.Treatment.TreatmentTemplate", b =>
         {
-            b.ToTable("TREATMENT_TEMPLATE"); b.HasKey(x => x.Id);
-            b.HasIndex(x => new { x.BranchId, x.Name });
-            b.Property(x => x.Id).HasColumnType("uuid");
-            b.Property(x => x.BranchId).HasColumnType("integer");
-            b.Property(x => x.Name).IsRequired().HasMaxLength(160).HasColumnType("character varying(160)");
-            b.Property(x => x.Version).HasColumnType("integer").IsConcurrencyToken();
-            b.Property(x => x.CreatedBy).HasColumnType("integer");
-            b.Property(x => x.CreatedAt).HasColumnType("timestamp with time zone");
-            b.HasMany(x => x.Versions).WithOne().HasForeignKey(x => x.TemplateId).OnDelete(DeleteBehavior.Restrict);
+            b.ToTable("TREATMENT_TEMPLATE"); b.HasKey("Id");
+            b.HasIndex("BranchId", "Name");
+            b.Property<Guid>("Id").HasColumnType("uuid");
+            b.Property<int>("BranchId").HasColumnType("integer");
+            b.Property<string>("Name").IsRequired().HasMaxLength(160).HasColumnType("character varying(160)");
+            b.Property<int>("Version").HasColumnType("integer").IsConcurrencyToken();
+            b.Property<int>("CreatedBy").HasColumnType("integer");
+            b.Property<DateTimeOffset>("CreatedAt").HasColumnType("timestamp with time zone");
             b.HasOne("DCMS.Domain.Features.Scheduling.SchedulingBranch", null).WithMany()
                 .HasForeignKey("BranchId").OnDelete(DeleteBehavior.Restrict);
         });
-        model.Entity<TreatmentTemplateVersion>(b =>
+        model.Entity("DCMS.Domain.Features.Treatment.TreatmentTemplateVersion", b =>
         {
-            b.ToTable("TREATMENT_TEMPLATE_VERSION"); b.HasKey(x => x.Id);
-            b.HasIndex(x => new { x.TemplateId, x.Number }).IsUnique();
-            b.HasIndex(x => x.TemplateId).IsUnique().HasDatabaseName("IX_TREATMENT_TEMPLATE_VERSION_Active")
+            b.ToTable("TREATMENT_TEMPLATE_VERSION"); b.HasKey("Id");
+            b.HasIndex("TemplateId", "Number").IsUnique();
+            b.HasIndex("TemplateId").IsUnique().HasDatabaseName("IX_TREATMENT_TEMPLATE_VERSION_Active")
                 .HasFilter("\"State\" = 'Active'");
-            b.Property(x => x.Id).HasColumnType("uuid");
-            b.Property(x => x.TemplateId).HasColumnType("uuid");
-            b.Property(x => x.Number).HasColumnType("integer");
-            b.Property(x => x.State).IsRequired().HasMaxLength(16).HasColumnType("character varying(16)");
-            b.Property(x => x.StepsJson).IsRequired().HasColumnType("jsonb");
-            b.Property(x => x.CreatedBy).HasColumnType("integer");
-            b.Property(x => x.CreatedAt).HasColumnType("timestamp with time zone");
-            b.Property(x => x.ActivatedAt).HasColumnType("timestamp with time zone");
-            b.Property(x => x.RetiredAt).HasColumnType("timestamp with time zone");
+            b.Property<Guid>("Id").HasColumnType("uuid");
+            b.Property<Guid>("TemplateId").HasColumnType("uuid");
+            b.Property<int>("Number").HasColumnType("integer");
+            b.Property<string>("State").IsRequired().HasMaxLength(16).HasColumnType("character varying(16)");
+            b.Property<string>("StepsJson").IsRequired().HasColumnType("jsonb");
+            b.Property<int>("CreatedBy").HasColumnType("integer");
+            b.Property<DateTimeOffset>("CreatedAt").HasColumnType("timestamp with time zone");
+            b.Property<DateTimeOffset?>("ActivatedAt").HasColumnType("timestamp with time zone");
+            b.Property<DateTimeOffset?>("RetiredAt").HasColumnType("timestamp with time zone");
+            b.HasOne("DCMS.Domain.Features.Treatment.TreatmentTemplate", null).WithMany()
+                .HasForeignKey("TemplateId").OnDelete(DeleteBehavior.Restrict);
         });
         model.Entity("DCMS.Domain.Features.Treatment.TreatmentStep", b =>
         {

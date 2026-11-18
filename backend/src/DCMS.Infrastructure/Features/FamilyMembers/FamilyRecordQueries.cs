@@ -73,15 +73,21 @@ public sealed partial class FamilyRecordService
                     x.Items.OrderBy(i => i.PlannedOrder)
                         .Select(i => new FamilyTreatmentItem(i.ServiceName, i.Region, i.DisplayCompleted ? "Completed" : "Planned", i.EstimatedStart, null)).ToArray())).ToArray();
         } else if (scope == "Prescriptions") {
-            var query = db.Set<ExternalPrescription>().AsNoTracking().Where(x => x.PatientId == row.PatientId
-                && x.BranchId == row.BranchId && x.Status == PrescriptionStatuses.Finalized);
+            var query = from p in db.PatientPrescriptions.AsNoTracking()
+                join e in db.Employees.AsNoTracking() on p.PrescriberEmployeeId equals e.Id
+                where p.PatientId == row.PatientId && p.BranchId == row.BranchId
+                orderby p.PrescribedOn descending, p.CreatedAt descending, p.Id
+                select new { Prescription = p, PrescriberName = e.FullName };
             total = await query.CountAsync(ct);
-            var prescriptions = await query.OrderByDescending(x => x.FinalizedAt).ThenBy(x => x.Id).Skip(skip).Take(pageSize).ToArrayAsync(ct);
-            var ids = prescriptions.Select(x => x.Id).ToArray();
-            var lines = prescriptions.SelectMany(x => x.Lines).ToArray();
-            items = prescriptions.Select(x => (object)new FamilyPrescriptionDto(x.Id, x.VisitId, x.FinalizedAt, x.Diagnosis, x.GeneralAdvice,
-                lines.Where(l => l.PrescriptionId == x.Id).Select(l => new FamilyMedicineDto(l.MedicineName, l.Strength, l.Unit, l.Quantity,
-                    l.Route, l.MorningDose, l.NoonDose, l.AfternoonDose, l.EveningDose, l.MealTiming, l.Days, l.Instructions)).ToArray())).ToArray();
+            var prescriptions = await query.Skip(skip).Take(pageSize).ToArrayAsync(ct);
+            items = prescriptions.Select(x => (object)new FamilyPrescriptionDto(
+                x.Prescription.Id, x.Prescription.PrescribedOn, x.PrescriberName,
+                string.IsNullOrWhiteSpace(x.Prescription.OtherDiagnosis) ? x.Prescription.Diagnosis
+                    : string.IsNullOrWhiteSpace(x.Prescription.Diagnosis) ? x.Prescription.OtherDiagnosis
+                    : $"{x.Prescription.Diagnosis}; {x.Prescription.OtherDiagnosis}",
+                x.Prescription.Advice,
+                x.Prescription.Items.OrderBy(i => i.Position)
+                    .Select(i => new FamilyMedicineDto(i.MedicineName, i.Strength, i.Unit, i.Quantity, i.Instructions)).ToArray())).ToArray();
         } else {
             var query = Documents(row);
             total = await query.CountAsync(ct);

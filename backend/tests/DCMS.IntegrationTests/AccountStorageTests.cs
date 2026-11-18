@@ -35,8 +35,8 @@ public sealed class AccountStorageTests(ApiFixture fixture) : IClassFixture<ApiF
         Assert.True((await roles.CreateAsync(role)).Succeeded);
         Assert.True((await roles.AddClaimAsync(role, new Claim("SYNTHETIC", "role claim"))).Succeeded);
         var employee = new EmployeeProfile { AccountId = user.Id, EmployeeCode = "ST-" + suffix[..12], FullName = user.FullName };
-        var group = new AccessGroup { Code = "ST-" + suffix[..12], NormalizedCode = suffix, Name = "SYNTHETIC",
-            NormalizedName = suffix, BaseRole = AccountRoles.Dentist, Grants = [new() { Permission = "patients.read" }] };
+        var group = new AccessGroup { Code = "ST-" + suffix[..12], Name = "SYNTHETIC",
+            BaseRole = AccountRoles.Dentist, Grants = [new() { Permission = "patients.read" }] };
         var session = new AuthSession { Id = Guid.NewGuid(), AccountId = user.Id, DeviceLabel = "SYNTHETIC",
             CreatedAt = now, LastSeenAt = now, LastInteractiveActivityAt = now, ExpiresAt = now.AddDays(1), ClientKind = "StaffWeb" };
         session.RefreshTokens.Add(new() { Id = await db.NextAccountEntryIdAsync(default), AccountId = user.Id,

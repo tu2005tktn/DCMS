@@ -78,8 +78,8 @@ public sealed class ClinicalWorkApiTests(ClinicalWorkFixture fixture) : IClassFi
         var detail = await assistant.GetFromJsonAsync<CareTaskDetail>($"/api/care-tasks/{task.Id}");
         Assert.Single(detail!.Contacts);
         Assert.Equal("Open", detail.Task.Status);
-        Assert.Equal(HttpStatusCode.Forbidden, (await dentist.PostAsJsonAsync(
-            $"/api/care-tasks/{task.Id}/escalations", new EscalateCareRequest(-123,
-                "Nhờ bác sĩ đánh giá", detail.Task.Version, Guid.NewGuid()))).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await dentist.PatchAsJsonAsync(
+            $"/api/care-tasks/{task.Id}", new UpdateCareTaskRequest(detail.Task.Version, "Open", -123,
+                detail.Task.DueAt, detail.Task.Content, Guid.NewGuid()))).StatusCode);
     }
 }

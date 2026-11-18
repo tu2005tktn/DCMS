@@ -90,7 +90,7 @@ public sealed class TreatmentStorageTests(ApiFixture fixture) : IClassFixture<Ap
         });
         var template = new TreatmentTemplate
         {
-            BranchId = setup.BranchId, Name = "SYNTHETIC template " + Guid.NewGuid().ToString("N"), DefinitionKind = "ItemPlan",
+            BranchId = setup.BranchId, Name = "SYNTHETIC template " + Guid.NewGuid().ToString("N"),
             Version = 5, CreatedBy = setup.ActorId, CreatedAt = now
         };
         template.Items.Add(new TreatmentTemplateItem
@@ -98,11 +98,6 @@ public sealed class TreatmentStorageTests(ApiFixture fixture) : IClassFixture<Ap
             TemplateId = template.Id, Position = 1, Date = new DateOnly(2026, 12, 1), TeethJson = "[\"16\",\"17\"]",
             ServiceId = setup.ServiceId, ServiceName = "SYNTHETIC storage service", EstimatedMinutes = 30, Note = "SYNTHETIC item",
             DentistId = setup.DentistId, DentistName = "SYNTHETIC dentist", CostVnd = 250000
-        });
-        template.Versions.Add(new TreatmentTemplateVersion
-        {
-            TemplateId = template.Id, Number = 1, State = "Active", StepsJson = "[{\"name\":\"SYNTHETIC\"}]",
-            CreatedBy = setup.ActorId, CreatedAt = now, ActivatedAt = now
         });
         var activity = new ClinicalActivity
         { DossierId = dossier.Id, ItemId = item.Id, PlanVersion = 1, ServiceId = setup.ServiceId, ServiceNameSnapshot = "SYNTHETIC storage service",
@@ -123,7 +118,6 @@ public sealed class TreatmentStorageTests(ApiFixture fixture) : IClassFixture<Ap
 
         var expectedSheetDrafts = dossier.SheetDrafts.Select(Snapshot).ToArray();
         var expectedTemplateItems = template.Items.Select(Snapshot).ToArray();
-        var expectedTemplateVersions = template.Versions.Select(Snapshot).ToArray();
         var expectedActivity = Snapshot(activity);
         var expectedPlanEvent = Snapshot(planEvent);
         var expectedSystemEvent = Snapshot(systemEvent);
@@ -135,7 +129,7 @@ public sealed class TreatmentStorageTests(ApiFixture fixture) : IClassFixture<Ap
         Assert.Equal(0, await Count(db, $"SELECT count(*)::integer AS \"Value\" FROM \"TREATMENT_STEP\" WHERE \"DossierId\"={dossier.Id}"));
         Assert.Equal(1, await Count(db, $"SELECT count(*)::integer AS \"Value\" FROM \"TREATMENT_SHEET_DRAFT\" WHERE \"DossierId\"={dossier.Id}"));
         Assert.Equal(1, await Count(db, $"SELECT count(*)::integer AS \"Value\" FROM \"TREATMENT_TEMPLATE_ITEM\" WHERE \"TemplateId\"={template.Id}"));
-        Assert.Equal(1, await Count(db, $"SELECT count(*)::integer AS \"Value\" FROM \"TREATMENT_TEMPLATE_VERSION\" WHERE \"TemplateId\"={template.Id} AND \"State\"='Active'"));
+        Assert.Equal(0, await Count(db, $"SELECT count(*)::integer AS \"Value\" FROM \"TREATMENT_TEMPLATE_VERSION\" WHERE \"TemplateId\"={template.Id}"));
         Assert.Equal(1, await Count(db, $"SELECT count(*)::integer AS \"Value\" FROM \"CLINICAL_ACTIVITY\" WHERE \"Id\"={activity.Id}"));
         Assert.Equal(1, await Count(db, $"SELECT count(*)::integer AS \"Value\" FROM \"TREATMENT_EVENT\" WHERE \"Id\"={planEvent.Id} AND \"ActorId\"={setup.ActorId}"));
         Assert.Equal(1, await Count(db, $"SELECT count(*)::integer AS \"Value\" FROM \"TREATMENT_PROGRESSION_EVENT\" WHERE \"Id\"={systemEvent.Id} AND \"ActorId\"=0"));
@@ -149,13 +143,10 @@ public sealed class TreatmentStorageTests(ApiFixture fixture) : IClassFixture<Ap
         AssertSame(expectedSheetDrafts, restoredDossier.SheetDrafts.Select(Snapshot));
         var restoredTemplate = await db.TreatmentTemplates.AsNoTracking().SingleAsync(x => x.Id == template.Id);
         AssertSame(expectedTemplateItems, restoredTemplate.Items.Select(Snapshot));
-        AssertSame(expectedTemplateVersions, restoredTemplate.Versions.Select(Snapshot));
         var restoredActivity = await db.ClinicalActivities.AsNoTracking().SingleAsync(x => x.Id == activity.Id);
         AssertSame([expectedActivity], [Snapshot(restoredActivity)]);
         AssertSame([expectedPlanEvent], [Snapshot(await db.TreatmentEvents.AsNoTracking().SingleAsync(x => x.Id == planEvent.Id))]);
         AssertSame([expectedSystemEvent], [Snapshot(await db.TreatmentProgressionEvents.AsNoTracking().SingleAsync(x => x.Id == systemEvent.Id))]);
-        // The JSONB collections stay queryable through the read projections the services use.
-        Assert.Equal(1, await db.TreatmentTemplateVersions.CountAsync(x => x.TemplateId == template.Id && x.State == "Active"));
     }
 
     [Fact]
@@ -167,7 +158,7 @@ public sealed class TreatmentStorageTests(ApiFixture fixture) : IClassFixture<Ap
         var template = new TreatmentTemplate
         {
             BranchId = setup.BranchId, Name = "SYNTHETIC concurrency " + Guid.NewGuid().ToString("N"),
-            DefinitionKind = "ItemPlan", Version = 1, CreatedBy = setup.ActorId, CreatedAt = now
+            Version = 1, CreatedBy = setup.ActorId, CreatedAt = now
         };
         using (var seedScope = fixture.Services.CreateScope())
         {

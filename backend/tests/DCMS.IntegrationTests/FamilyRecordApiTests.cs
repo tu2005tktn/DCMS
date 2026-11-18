@@ -310,20 +310,22 @@ public sealed class FamilyRecordApiTests(ApiFixture fixture) : IClassFixture<Api
             draft.SheetDrafts.Add(new TreatmentSheetDraft { Id = Guid.NewGuid(), DossierId = draft.Id, ActorId = s.DentistAccountId, Kind = "Plan",
                 PayloadJson = "{\"serviceName\":\"SYNTHETIC DRAFT\"}", LastRequestKey = Guid.NewGuid(), LastFingerprint = new string('a', 64), UpdatedAt = DateTimeOffset.UtcNow });
             db.AddRange(committed, draft);
-            var now = DateTimeOffset.UtcNow;
-            db.Add(new ExternalPrescription { VisitId = s.VisitId, PatientId = s.PatientId, BranchId = s.BranchId,
-                PrescribedByDoctorId = s.DentistAccountId, CreatedBy = s.DentistAccountId, UpdatedBy = s.DentistAccountId, Revision = 1,
-                Status = "Finalized", FinalizedAt = now, FinalizedBy = s.DentistAccountId, Diagnosis = "SYNTHETIC signed prescription", GeneralAdvice = "SYNTHETIC signed advice", CreatedAt = now, UpdatedAt = now });
-            db.Add(new ExternalPrescription { VisitId = s.VisitId, PatientId = s.PatientId, BranchId = s.BranchId,
-                PrescribedByDoctorId = s.DentistAccountId, CreatedBy = s.DentistAccountId, UpdatedBy = s.DentistAccountId, Revision = 2,
-                Status = "Draft", Diagnosis = "SYNTHETIC DRAFT PRESCRIPTION", CreatedAt = now, UpdatedAt = now });
+            var otherBranch = new SchedulingBranch { Name = "SYNTHETIC other branch " + Guid.NewGuid().ToString("N") };
+            db.Add(otherBranch);
+            await db.SaveChangesAsync();
+            db.Add(new PatientPrescription { PatientId = s.PatientId, BranchId = s.BranchId,
+                PrescriberEmployeeId = s.DentistId, PrescribedOn = DateOnly.FromDateTime(DateTime.UtcNow),
+                Diagnosis = "SYNTHETIC signed prescription", Advice = "SYNTHETIC signed advice", CreatedAt = DateTimeOffset.UtcNow });
+            db.Add(new PatientPrescription { PatientId = s.PatientId, BranchId = otherBranch.Id,
+                PrescriberEmployeeId = s.DentistId, PrescribedOn = DateOnly.FromDateTime(DateTime.UtcNow),
+                Diagnosis = "SYNTHETIC OTHER BRANCH", Advice = "SYNTHETIC OTHER BRANCH", CreatedAt = DateTimeOffset.UtcNow });
             await db.SaveChangesAsync();
         }
         var treatment = await s.Owner.GetStringAsync(Url(s.Member.Id) + "/record/treatment");
         Assert.Contains("SYNTHETIC agreed item", treatment); Assert.DoesNotContain("DRAFT", treatment);
         Assert.DoesNotContain("INTERNAL", treatment); Assert.DoesNotContain("987654321", treatment);
         var prescription = await s.Owner.GetStringAsync(Url(s.Member.Id) + "/record/prescriptions");
-        Assert.Contains("SYNTHETIC signed advice", prescription); Assert.DoesNotContain("DRAFT", prescription);
+        Assert.Contains("SYNTHETIC signed advice", prescription); Assert.DoesNotContain("OTHER BRANCH", prescription); Assert.DoesNotContain("DRAFT", prescription);
     }
 
     [Fact]
@@ -337,7 +339,7 @@ public sealed class FamilyRecordApiTests(ApiFixture fixture) : IClassFixture<Api
             var employee = new EmployeeProfile { AccountId = staff.Id, FullName = staff.FullName, EmployeeCode = "LIMIT-" + Guid.NewGuid().ToString("N") };
             db.Add(employee); await db.SaveChangesAsync();
             var code = "LIMIT-" + Guid.NewGuid().ToString("N");
-            var group = new AccessGroup { Code = code, Name = code, NormalizedCode = code.ToUpperInvariant(), NormalizedName = code.ToUpperInvariant(), BaseRole = "ClinicAssistant" };
+            var group = new AccessGroup { Code = code, Name = code, BaseRole = "ClinicAssistant" };
             group.Grants.Add(new AccessGroupGrant { GroupId = group.Id, Permission = "patient-links.read" });
             await db.AddSchedulingDataAsync(group, new StaffAccessAssignment { AccountId = actor, GroupId = group.Id, BranchIds = [s.BranchId] }, new SchedulingMember { BranchId = s.BranchId, EmployeeId = employee.Id });
             await db.SaveChangesAsync();

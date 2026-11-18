@@ -186,7 +186,7 @@ public sealed class AppointmentChangeApiTests(AppointmentChangeFixture fixture) 
         Assert.Equal("SYNTHETIC new attendee", replacement.AttendeeName); Assert.Null(replacement.PatientId); Assert.Equal("Confirmed", replacement.Status);
         Assert.Single(await db.AppointmentChanges.Where(x => x.AppointmentId == original.Id).ToArrayAsync());
         Assert.Single(await db.AppointmentOutboxEvents.Where(x => x.AggregateId == original.Id && x.EventType == "appointment.no_show").ToArrayAsync());
-        var payload = await db.AppointmentOutboxEvents.Where(x => x.AggregateId == created.AppointmentId).Select(x => x.PayloadJson).SingleAsync();
+        var payload = (await db.AppointmentOutboxEvents.SingleAsync(x => x.AggregateId == created.AppointmentId)).PayloadJson;
         Assert.Contains(source.AppointmentId.ToString(), payload);
         // Exact replay remains valid after the source window expires; it never creates another booking.
         original.EndAt = fixture.Clock.Now.AddMinutes(-1); await db.SaveChangesAsync();
@@ -204,7 +204,7 @@ public sealed class AppointmentChangeApiTests(AppointmentChangeFixture fixture) 
             Assert.True((await users.CreateAsync(user, fixture.Password)).Succeeded); Assert.True((await users.AddToRoleAsync(user, "ClinicAssistant")).Succeeded); actor = user.Id;
             var employee = new EmployeeProfile { AccountId = actor, FullName = user.FullName, EmployeeCode = username };
             db.Add(employee); await db.SaveChangesAsync();
-            var group = new AccessGroup { Code = username, Name = username, NormalizedCode = username.ToUpperInvariant(), NormalizedName = username.ToUpperInvariant(), BaseRole = "ClinicAssistant" };
+            var group = new AccessGroup { Code = username, Name = username, BaseRole = "ClinicAssistant" };
             foreach (var permission in new[] { "appointments.read", "appointments.no-show", "appointments.create" }) group.Grants.Add(new AccessGroupGrant { GroupId = group.Id, Permission = permission });
             groupId = group.Id; await db.AddSchedulingDataAsync(group, new SchedulingMember { BranchId = s.BranchId, EmployeeId = employee.Id },
                 new StaffAccessAssignment { AccountId = actor, GroupId = group.Id, BranchIds = [s.BranchId] }); await db.SaveChangesAsync();
@@ -336,7 +336,7 @@ public sealed class AppointmentChangeApiTests(AppointmentChangeFixture fixture) 
             Assert.True((await users.CreateAsync(user, fixture.Password)).Succeeded); Assert.True((await users.AddToRoleAsync(user, "ClinicAssistant")).Succeeded); actor = user.Id;
             var employee = new EmployeeProfile { AccountId = actor, FullName = user.FullName, EmployeeCode = username };
             db.Add(employee); await db.SaveChangesAsync();
-            var group = new AccessGroup { Code = username, Name = username, NormalizedCode = username.ToUpperInvariant(), NormalizedName = username.ToUpperInvariant(), BaseRole = "ClinicAssistant" };
+            var group = new AccessGroup { Code = username, Name = username, BaseRole = "ClinicAssistant" };
             foreach (var permission in new[] { "appointments.read", "appointments.reschedule", "appointments.cancel" }) group.Grants.Add(new AccessGroupGrant { GroupId = group.Id, Permission = permission });
             groupId = group.Id;
             await db.AddSchedulingDataAsync(group, new SchedulingMember { BranchId = s.BranchId, EmployeeId = employee.Id }, new StaffAccessAssignment { AccountId = actor, GroupId = group.Id, BranchIds = [s.BranchId] }); await db.SaveChangesAsync();

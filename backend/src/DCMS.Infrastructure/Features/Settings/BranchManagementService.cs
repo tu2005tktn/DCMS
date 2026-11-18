@@ -16,8 +16,8 @@ using Microsoft.EntityFrameworkCore.Storage;
 
 namespace DCMS.Infrastructure.Features.Settings;
 
-// docs/specs/S58-BRANCHES-AND-CHAIRS.md §1.5. SCHEDULING_* rows stay the source for booking; profiles share their keys.
-public sealed partial class BranchManagementService(DcmsDbContext db, ISettingsAccess access, BranchAssetStore assets,
+// docs/specs/S58-BRANCHES-AND-CHAIRS.md §1.5 & docs/specs/SCHEDULING-BRANCH-TABLE-SIMPLIFICATION.vi.md.
+public sealed partial class BranchManagementService(DcmsDbContext db, ISettingsAccess access,
     IBranchLabObligationPort lab, TimeProvider clock) : IBranchManagementService
 {
     private const string Lock = "SELECT pg_advisory_xact_lock(6462362099)";
@@ -25,7 +25,6 @@ public sealed partial class BranchManagementService(DcmsDbContext db, ISettingsA
     private static readonly JsonSerializerOptions Json = ClinicSettingsStore.Json;
 
     [GeneratedRegex("^[A-Za-z0-9_-]{1,40}$")] private static partial Regex CodePattern();
-    [GeneratedRegex("^[0-9]{1,50}$")] private static partial Regex AccountPattern();
     [GeneratedRegex(@"^\+?[0-9 .()-]{1,20}$")] private static partial Regex PhonePattern();
 
     private static BusinessException Fail(string code, int status = 400, string? field = null, string label = "Thông tin", int? currentVersion = null, BlockerItem[]? blockers = null) =>
@@ -60,7 +59,7 @@ public sealed partial class BranchManagementService(DcmsDbContext db, ISettingsA
         if (key != Guid.Empty) db.Add(new SettingsReceipt { ActorId = actor, RequestKey = key, Fingerprint = hash, ResultJson = after });
     }
 
-    private static string BranchCode(int id, BranchProfile? p) => p?.Code ?? $"BR-{id:D2}";
+    private static string BranchCode(SchedulingBranch b) => string.IsNullOrWhiteSpace(b.Code) ? $"BR-{b.Id:D2}" : b.Code;
     private static string ChairCode(int id, BranchChair? c) => c?.Code ?? $"CHAIR-{id:D2}";
     private static int ChairVersion(SchedulingChair chair) => chair.Code == null ? 1 : chair.Version;
 
@@ -77,16 +76,10 @@ public sealed partial class BranchManagementService(DcmsDbContext db, ISettingsA
     {
         await access.RequireAsync(actor, "branches.read", ct);
         var branches = await db.Set<SchedulingBranch>().AsNoTracking().OrderBy(x => x.Id).ToListAsync(ct);
-        var profiles = await db.Set<BranchProfile>().AsNoTracking().ToDictionaryAsync(x => x.Id, ct);
         var chairCounts = await db.SchedulingChairs.AsNoTracking().Where(c => c.Active).GroupBy(c => c.BranchId)
             .ToDictionaryAsync(g => g.Key, g => g.Count(), ct);
-        return branches.Select(s =>
-        {
-            var p = profiles.GetValueOrDefault(s.Id);
-            return new BranchDto(s.Id, BranchCode(s.Id, p), s.Name, p?.Address, p?.Phone, p?.Email, p?.Website, p?.LogoAssetId,
-                p?.TimeZoneId ?? "Asia/Ho_Chi_Minh", p?.BankCode, p?.AccountNumber, p?.PayeeName,
-                s.SlotIntervalMinutes, s.BookingSettingsVersion, s.Active, p?.Version ?? 1, chairCounts.GetValueOrDefault(s.Id));
-        }).ToArray();
+        return branches.Select(s => new BranchDto(s.Id, BranchCode(s), s.Name, s.Address, s.Phone, s.Email,
+            s.SlotIntervalMinutes, s.Active, s.Version, chairCounts.GetValueOrDefault(s.Id))).ToArray();
     }
 
     public async Task<BranchDetailDto> BranchAsync(int actor, int id, CancellationToken ct)
@@ -98,10 +91,8 @@ public sealed partial class BranchManagementService(DcmsDbContext db, ISettingsA
     private async Task<BranchDetailDto> DetailAsync(int id, CancellationToken ct)
     {
         var s = await db.Set<SchedulingBranch>().AsNoTracking().SingleOrDefaultAsync(b => b.Id == id, ct) ?? throw Fail("MSG113", 404);
-        var p = await db.Set<BranchProfile>().AsNoTracking().SingleOrDefaultAsync(b => b.Id == id, ct);
-        return new BranchDetailDto(s.Id, BranchCode(s.Id, p), s.Name, p?.Address, p?.Phone, p?.Email, p?.Website, p?.LogoAssetId,
-            p?.TimeZoneId ?? "Asia/Ho_Chi_Minh", p?.BankCode, p?.AccountNumber, p?.PayeeName,
-            s.SlotIntervalMinutes, s.BookingSettingsVersion, s.Active, p?.Version ?? 1, await ChairRowsAsync(id, ct));
+        return new BranchDetailDto(s.Id, BranchCode(s), s.Name, s.Address, s.Phone, s.Email,
+            s.SlotIntervalMinutes, s.Active, s.Version, await ChairRowsAsync(id, ct));
     }
 
     public async Task<ChairDto[]> ChairsAsync(int actor, int branchId, CancellationToken ct)
@@ -120,8 +111,7 @@ public sealed partial class BranchManagementService(DcmsDbContext db, ISettingsA
 
     // ---------- branch writes ----------
 
-    private sealed record BranchValues(string Code, string Name, string? Address, string? Phone, string? Email, string? Website,
-        string TimeZoneId, string? BankCode, string? AccountNumber, string? PayeeName);
+    private sealed record BranchValues(string Code, string Name, string? Address, string? Phone, string? Email);
 
     private static string? Optional(string? value, int max, string field, string label)
     {
@@ -142,27 +132,17 @@ public sealed partial class BranchManagementService(DcmsDbContext db, ISettingsA
         if (phone != null && !PhonePattern().IsMatch(phone)) throw Fail("MSG04", field: "phone", label: "Số điện thoại");
         var email = Optional(c.Email, 254, "email", "Email");
         if (email != null && (!MailAddress.TryCreate(email, out var parsed) || parsed.Address != email)) throw Fail("MSG04", field: "email", label: "Email");
-        var website = Optional(c.Website, 255, "website", "Website");
-        if (website != null && (!Uri.TryCreate(website, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https")))
-            throw Fail("MSG04", field: "website", label: "Website");
-        var tz = string.IsNullOrWhiteSpace(c.TimeZoneId) ? "Asia/Ho_Chi_Minh" : c.TimeZoneId.Trim();
-        if (tz.Length > 64 || !TimeZoneInfo.TryFindSystemTimeZoneById(tz, out _)) throw Fail("MSG04", field: "timeZoneId", label: "Múi giờ");
-        var bank = Optional(c.BankCode, 20, "bankCode", "Mã ngân hàng");
-        var account = Optional(c.AccountNumber, 50, "accountNumber", "Số tài khoản");
-        if (account != null && !AccountPattern().IsMatch(account)) throw Fail("MSG04", field: "accountNumber", label: "Số tài khoản");
-        var payee = Optional(c.PayeeName, 160, "payeeName", "Tên chủ tài khoản");
-        var filled = new[] { bank, account, payee }.Count(x => x != null);
-        if (filled is not (0 or 3)) throw Fail("MSG02", field: bank == null ? "bankCode" : account == null ? "accountNumber" : "payeeName", label: "Tài khoản nhận chuyển khoản");
-        return new(code, name, Optional(c.Address, 1000, "address", "Địa chỉ"), phone, email, website, tz, bank?.ToUpperInvariant(), account, payee);
+        return new(code, name, Optional(c.Address, 1000, "address", "Địa chỉ"), phone, email);
     }
 
     private async Task EnsureUniqueBranchCodeAsync(string code, int? selfId, CancellationToken ct)
     {
         var upper = code.ToUpperInvariant();
-        if (await db.Set<BranchProfile>().AnyAsync(x => x.Code.ToUpper() == upper && x.Id != selfId, ct)) throw Fail("MSG201", 409, "code", "chi nhánh");
-        // Branches without a profile still display their generated BR-xx code.
-        var withoutProfile = await db.Set<SchedulingBranch>().Where(s => s.Id != selfId && !db.Set<BranchProfile>().Any(p => p.Id == s.Id)).Select(s => s.Id).ToListAsync(ct);
-        if (withoutProfile.Any(id => BranchCode(id, null).Equals(code, StringComparison.OrdinalIgnoreCase))) throw Fail("MSG201", 409, "code", "chi nhánh");
+        if (await db.Set<SchedulingBranch>().AnyAsync(x => (!selfId.HasValue || x.Id != selfId.Value) && x.Code != null && x.Code.ToUpper() == upper, ct))
+            throw Fail("MSG201", 409, "code", "chi nhánh");
+        // Branches without a custom code still display their generated BR-xx code.
+        var uncoded = await db.Set<SchedulingBranch>().Where(s => (!selfId.HasValue || s.Id != selfId.Value) && s.Code == null).Select(s => s.Id).ToListAsync(ct);
+        if (uncoded.Any(id => $"BR-{id:D2}".Equals(code, StringComparison.OrdinalIgnoreCase))) throw Fail("MSG201", 409, "code", "chi nhánh");
     }
 
     public async Task<BranchDetailDto> SaveBranchAsync(int actor, int? id, SaveBranchCommand c, CancellationToken ct)
@@ -177,54 +157,32 @@ public sealed partial class BranchManagementService(DcmsDbContext db, ISettingsA
         if (replay.Found) return replay.Result!;
 
         SchedulingBranch sched;
-        BranchProfile profile;
         var before = "{}";
         if (id is { } branchId)
         {
             sched = await db.Set<SchedulingBranch>().SingleOrDefaultAsync(b => b.Id == branchId, ct) ?? throw Fail("MSG113", 404);
-            var existing = await db.Set<BranchProfile>().SingleOrDefaultAsync(b => b.Id == branchId, ct);
-            var current = existing?.Version ?? 1;
-            if (current != c.ExpectedVersion) throw Fail("MSG111", 409, currentVersion: current);
+            if (sched.Version != c.ExpectedVersion) throw Fail("MSG111", 409, currentVersion: sched.Version);
             before = JsonSerializer.Serialize(await DetailAsync(branchId, ct), Json);
             await EnsureUniqueBranchCodeAsync(v.Code, branchId, ct);
-            profile = existing ?? new BranchProfile { Id = branchId, Version = 1, IsActive = sched.Active };
-            if (existing == null) db.Add(profile);
-            profile.Version++;
+            sched.Version++;
         }
         else
         {
             if (c.ExpectedVersion != 0) throw Fail("MSG111", 409, currentVersion: 0);
-            if (c.LogoAssetId.HasValue) throw Fail("MSG113", 404, "logoAssetId", "Logo");
             await EnsureUniqueBranchCodeAsync(v.Code, null, ct);
-            sched = new SchedulingBranch { Name = v.Name, Active = true };
+            sched = new SchedulingBranch { Active = true, Version = 1 };
             db.Add(sched);
-            await db.SaveChangesAsync(ct);
-            profile = new BranchProfile { Id = sched.Id, Version = 1, IsActive = true };
-            db.Add(profile);
         }
 
-        if (c.LogoAssetId is { } logo && logo != profile.LogoAssetId
-            && !await db.BranchAssets.AnyAsync(x => x.Id == logo && x.BranchId == profile.Id, ct))
-            throw Fail("MSG113", 404, "logoAssetId", "Logo");
-
-        profile.Code = v.Code;
-        profile.Name = v.Name;
-        profile.Address = v.Address;
-        profile.Phone = v.Phone;
-        profile.Email = v.Email;
-        profile.Website = v.Website;
-        profile.LogoAssetId = c.LogoAssetId;
-        profile.TimeZoneId = v.TimeZoneId;
-        profile.BankCode = v.BankCode;
-        profile.AccountNumber = v.AccountNumber;
-        profile.PayeeName = v.PayeeName;
-        profile.SlotIntervalMinutes = sched.SlotIntervalMinutes;
-        profile.BookingSettingsVersion = sched.BookingSettingsVersion;
+        sched.Code = v.Code;
         sched.Name = v.Name;
+        sched.Address = v.Address;
+        sched.Phone = v.Phone;
+        sched.Email = v.Email;
         await db.SaveChangesAsync(ct);
 
-        var result = await DetailAsync(profile.Id, ct);
-        Record(actor, profile.Id, profile.Code, profile.Version, id.HasValue ? "BranchUpdate" : "BranchCreate", "Lưu thông tin chi nhánh", before, result, c.RequestKey, hash);
+        var result = await DetailAsync(sched.Id, ct);
+        Record(actor, sched.Id, sched.Code!, sched.Version, id.HasValue ? "BranchUpdate" : "BranchCreate", "Lưu thông tin chi nhánh", before, result, c.RequestKey, hash);
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
         return result;
@@ -287,9 +245,7 @@ public sealed partial class BranchManagementService(DcmsDbContext db, ISettingsA
         if (replay.Found) return replay.Result!;
 
         var sched = await db.Set<SchedulingBranch>().SingleOrDefaultAsync(b => b.Id == id, ct) ?? throw Fail("MSG113", 404);
-        var profile = await db.Set<BranchProfile>().SingleOrDefaultAsync(b => b.Id == id, ct);
-        var current = profile?.Version ?? 1;
-        if (current != c.ExpectedVersion) throw Fail("MSG111", 409, currentVersion: current);
+        if (sched.Version != c.ExpectedVersion) throw Fail("MSG111", 409, currentVersion: sched.Version);
         if (!c.Active)
         {
             var blockers = await BranchBlockersAsync(id, ct);
@@ -297,76 +253,16 @@ public sealed partial class BranchManagementService(DcmsDbContext db, ISettingsA
         }
 
         var before = JsonSerializer.Serialize(await DetailAsync(id, ct), Json);
-        if (profile == null)
-        {
-            profile = new BranchProfile { Id = id, Code = BranchCode(id, null), Name = sched.Name, Version = 1,
-                SlotIntervalMinutes = sched.SlotIntervalMinutes, BookingSettingsVersion = sched.BookingSettingsVersion };
-            db.Add(profile);
-        }
-        profile.IsActive = c.Active;
-        profile.Version++;
+        sched.Code ??= BranchCode(sched);
         sched.Active = c.Active;
+        sched.Version++;
         await db.SaveChangesAsync(ct);
 
         var result = await DetailAsync(id, ct);
-        Record(actor, id, profile.Code, profile.Version, c.Active ? "BranchRestore" : "BranchDeactivate", reason, before, result, c.RequestKey, hash);
+        Record(actor, id, sched.Code, sched.Version, c.Active ? "BranchRestore" : "BranchDeactivate", reason, before, result, c.RequestKey, hash);
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
         return result;
-    }
-
-    // ---------- logo ----------
-
-    public async Task<BranchLogoUploadResult> UploadLogoAsync(int actor, int id, Stream fileStream, string fileName, string contentType, long length, CancellationToken ct)
-    {
-        await access.RequireAsync(actor, "branches.manage", ct);
-        if (!await db.Set<SchedulingBranch>().AnyAsync(x => x.Id == id, ct)) throw Fail("MSG113", 404);
-        if (length is <= 0 or > BranchAssetStore.MaxBytes) throw Fail("MSG04", field: "file", label: "Tệp logo");
-
-        using var buffer = new MemoryStream();
-        var chunk = new byte[81920];
-        int read;
-        while ((read = await fileStream.ReadAsync(chunk, ct)) > 0)
-        {
-            buffer.Write(chunk, 0, read);
-            if (buffer.Length > BranchAssetStore.MaxBytes) throw Fail("MSG04", field: "file", label: "Tệp logo");
-        }
-        var bytes = buffer.ToArray();
-        var detected = BranchAssetStore.Detect(bytes) ?? throw Fail("MSG04", field: "file", label: "Định dạng logo");
-        var declared = contentType?.Split(';')[0].Trim().ToLowerInvariant() switch { "image/jpg" => "image/jpeg", var x => x };
-        if (declared != detected) throw Fail("MSG04", field: "file", label: "Định dạng logo");
-        var cleaned = BranchAssetStore.StripMetadata(bytes, detected) ?? throw Fail("MSG04", field: "file", label: "Tệp logo");
-
-        var asset = new BranchAsset
-        {
-            BranchId = id, ContentType = detected, SizeBytes = cleaned.Length,
-            Sha256 = Convert.ToHexString(SHA256.HashData(cleaned)), UploadedBy = actor, UploadedAt = clock.GetUtcNow()
-        };
-        await assets.WriteAsync(asset.Id, cleaned, ct);
-        try
-        {
-            await using var tx = await BeginAsync(ct);
-            await db.AddSchedulingDataAsync(asset);
-            var safeName = Path.GetFileName(fileName ?? "");
-            var result = new BranchLogoUploadResult(asset.Id, safeName.Length > 200 ? safeName[..200] : safeName, cleaned.Length, detected);
-            var profile = await db.Set<BranchProfile>().AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, ct);
-            Record(actor, id, BranchCode(id, profile), profile?.Version ?? 1, "LogoUpload", "Tải logo chi nhánh", "{}", result, Guid.Empty, "");
-            await db.SaveChangesAsync(ct);
-            await tx.CommitAsync(ct);
-            return result;
-        }
-        catch
-        {
-            assets.Discard(asset.Id);
-            throw;
-        }
-    }
-
-    public async Task<BranchLogoFile> LogoAsync(int actor, int id, Guid assetId, CancellationToken ct)
-    {
-        await access.RequireAsync(actor, "branches.read", ct);
-        var found = await assets.ReadAsync(id, assetId, ct) ?? throw Fail("MSG113", 404);
-        return new BranchLogoFile(found.Asset.ContentType, found.Bytes);
     }
 
     // ---------- chairs ----------
@@ -505,5 +401,11 @@ public sealed partial class BranchManagementService(DcmsDbContext db, ISettingsA
 public sealed class BranchLabObligationPort(DcmsDbContext db) : IBranchLabObligationPort
 {
     public async Task<BranchObligationResult> OpenLabOrdersAsync(int branchId, CancellationToken ct) =>
-        new(true, await db.LabOrders.AsNoTracking().CountAsync(x => x.BranchId == branchId && x.Status != LabOrderStatus.Delivered, ct));
+        new(true, await (
+            from x in db.LabOrders.AsNoTracking()
+            join a in db.ClinicalActivities.AsNoTracking() on x.ActivityId equals a.Id
+            join d in db.TreatmentDossiers.AsNoTracking() on a.DossierId equals d.Id
+            where d.BranchId == branchId && x.Status != LabOrderStatus.Delivered
+            select x.Id
+        ).CountAsync(ct));
 }

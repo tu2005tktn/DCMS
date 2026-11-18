@@ -24,20 +24,31 @@ public sealed partial class WorkingScheduleService(DcmsDbContext db, TimeProvide
     private Task<WorkingWeek?> Week(int branchId, int employeeId, DateOnly date, CancellationToken ct) => db.Set<WorkingWeek>().AsNoTracking()
         .SingleOrDefaultAsync(x => x.BranchId == branchId && x.EmployeeId == employeeId && x.WeekStart == date, ct);
 
-    private async Task<SchedulingMember[]> ActiveMembers(CancellationToken ct) => await (
-        from member in db.SchedulingMembers.AsNoTracking()
-        join employee in db.Employees on member.EmployeeId equals employee.Id
-        join account in db.Users on employee.AccountId equals account.Id
-        join branch in db.Set<SchedulingBranch>() on member.BranchId equals branch.Id
-        where member.Active && branch.Active && account.AccountType == "Staff" && account.IsActive
-            && (!account.LockoutEnabled || account.LockoutEnd == null || account.LockoutEnd <= DateTimeOffset.UtcNow)
-        select new SchedulingMember
-        {
-            BranchId = member.BranchId, EmployeeId = member.EmployeeId, Active = member.Active,
-            CanManageSchedules = member.CanManageSchedules,
-            CanDentist = member.CanDentist && db.UserRoles.Any(ur => ur.UserId == account.Id
-                && db.Roles.Any(role => role.Id == ur.RoleId && (role.Name == "Dentist" || role.Name == "ClinicOwner")))
-        }).ToArrayAsync(ct);
+    private async Task<SchedulingMember[]> ActiveMembers(CancellationToken ct)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var rows = await (
+            from member in db.SchedulingMembers.AsNoTracking()
+            join employee in db.Employees on member.EmployeeId equals employee.Id
+            join account in db.Users on employee.AccountId equals account.Id
+            join branch in db.Set<SchedulingBranch>() on member.BranchId equals branch.Id
+            where member.Active && branch.Active && account.AccountType == "Staff" && account.IsActive
+            select new
+            {
+                member.BranchId, member.EmployeeId, member.Active, member.CanManageSchedules,
+                CanDentist = member.CanDentist && db.UserRoles.Any(ur => ur.UserId == account.Id
+                    && db.Roles.Any(role => role.Id == ur.RoleId && (role.Name == "Dentist" || role.Name == "ClinicOwner"))),
+                account.AuthData
+            }).ToArrayAsync(ct);
+        return rows
+            .Where(x => !x.AuthData.LockoutEnabled || x.AuthData.LockoutEnd == null || x.AuthData.LockoutEnd <= now)
+            .Select(x => new SchedulingMember
+            {
+                BranchId = x.BranchId, EmployeeId = x.EmployeeId, Active = x.Active,
+                CanManageSchedules = x.CanManageSchedules, CanDentist = x.CanDentist
+            })
+            .ToArray();
+    }
 
     private async Task Authorize(int actorId, int branchId, int? employeeId, CancellationToken ct)
     {
@@ -266,7 +277,7 @@ public sealed partial class WorkingScheduleService(DcmsDbContext db, TimeProvide
         var staff = new[] { q.DentistId, q.AssistantId ?? q.DentistId };
         if (overlaps.Any(r => staff.Contains(r.DentistId) || (patientId.HasValue && r.PatientId == patientId.Value))) return Fail("MSG27");
         var chair = data.Chairs.FirstOrDefault(c => (!chairId.HasValue || c.Id == chairId) && !overlaps.Any(r => r.ChairId == c.Id));
-        return chair == null ? Fail("MSG28") : new(start, end, chair.Id, q.DentistId, q.AssistantId, data.Main?.Version ?? 0, data.Assistant?.Version, data.Branch.BookingSettingsVersion);
+        return chair == null ? Fail("MSG28") : new(start, end, chair.Id, q.DentistId, q.AssistantId, data.Main?.Version ?? 0, data.Assistant?.Version, data.Branch.Version);
     }
     private async Task<AvailabilitySlot?> Find(AvailabilityQuery q, bool isPublic, DateTimeOffset start, int? chairId, int? patientId, Guid? exclude, ScheduleCommand? draft, CancellationToken ct)
     {
@@ -298,10 +309,10 @@ public sealed partial class WorkingScheduleService(DcmsDbContext db, TimeProvide
         var start = request.Start.ToOffset(TimeSpan.FromHours(7));
         var q = new AvailabilityQuery(request.BranchId, request.DentistId, request.ServiceId, DateOnly.FromDateTime(start.DateTime), request.DurationMinutes, request.AssistantId);
         if (request.BookingSettingsVersion.HasValue && request.BookingSettingsVersion != await db.Set<SchedulingBranch>()
-            .Where(x => x.Id == q.BranchId).Select(x => x.BookingSettingsVersion).SingleOrDefaultAsync(ct)) throw Error("MSG111", 409);
+            .Where(x => x.Id == q.BranchId).Select(x => x.Version).SingleOrDefaultAsync(ct)) throw Error("MSG111", 409);
         await ValidateQuery(q, request.Public, ct);
         var data = await Load(q, null, ct);
-        if (request.BookingSettingsVersion.HasValue && request.BookingSettingsVersion != data.Branch.BookingSettingsVersion) throw Error("MSG111", 409);
+        if (request.BookingSettingsVersion.HasValue && request.BookingSettingsVersion != data.Branch.Version) throw Error("MSG111", 409);
         if ((data.Main?.Version ?? 0) != request.ExpectedScheduleVersion || (q.AssistantId.HasValue && data.Assistant?.Version != request.ExpectedAssistantScheduleVersion)) throw Error("MSG111", 409);
         return Evaluate(q, request.Public, start, request.ChairId, request.PatientId, request.ExcludeAppointmentId, data, true)!;
     }

@@ -35,7 +35,7 @@ public sealed class MainSettingsCompatibilityTests(ReceptionFixture fixture):ICl
   Assert.NotEmpty(legacy);
   foreach(var row in legacy)
    Assert.True(merged.Any(x=>x.Id==row.Id&&x.Kind==row.Kind&&x.Version==row.Version&&x.Name==row.Name)
-    ||merged.Any(x=>x.Kind==row.Kind&&(x.NormalizedName==row.NormalizedName||x.Code!=null&&x.Code==row.NormalizedCode)),$"{row.Kind}/{row.Name} was not merged");
+    ||merged.Any(x=>x.Kind==row.Kind&&(x.Name.ToUpperInvariant()==row.NormalizedName||x.Code!=null&&x.Code==row.NormalizedCode)),$"{row.Kind}/{row.Name} was not merged");
   var options=(await dentist.GetFromJsonAsync<ReferenceOption[]>("/api/system-settings/reference-options?kind=diagnoses"))!;
   var activeMerged=merged.Where(x=>x.Kind=="diagnoses"&&x.IsActive).Select(x=>x.Id).ToHashSet();
   Assert.All(legacy.Where(x=>x.Kind=="diagnoses"&&x.Active&&activeMerged.Contains(x.Id)),row=>Assert.Contains(options,o=>o.Id==row.Id&&o.Version==row.Version));

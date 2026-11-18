@@ -15,7 +15,7 @@ export type CareOptions = { clinicDate: string; actorAccountId: number; allBranc
 export type CarePatient = { patientId: number; patientCode: string; fullName: string; phone: string | null; lastVisitAt: string };
 export type ContactAttempt = { id: string; taskId: string; channel: string; result: string; nextAction: string | null;
   rebookedAppointmentId: string | null; actorId: number; occurredAt: string };
-export type CareTaskDetail = { task: CareTask; contacts: ContactAttempt[]; escalations: unknown[] };
+export type CareTaskDetail = { task: CareTask; contacts: ContactAttempt[] };
 export type WorklistFilter = { branchId?: number; from: string; to: string; ownerAccountId?: number; type?: string; status?: StatusFilter; search?: string };
 
 export const statusLabels: Record<CareStatus, string> = { Open: 'Mở', InProgress: 'Đang xử lý', Done: 'Đã xong', Cancelled: 'Đã hủy' };

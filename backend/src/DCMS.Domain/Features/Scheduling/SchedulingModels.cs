@@ -2,15 +2,17 @@ namespace DCMS.Domain.Features.Scheduling;
 
 public sealed class SchedulingBranch
 {
-    public Guid StorageStamp { get; set; } = Guid.NewGuid();
+    public int Id { get; set; }
+    public string? Code { get; set; }
+    public string Name { get; set; } = "";
+    public string? Address { get; set; }
+    public string? Phone { get; set; }
+    public string? Email { get; set; }
+    public bool Active { get; set; } = true;
+    public int SlotIntervalMinutes { get; set; } = 15;
+    public int Version { get; set; } = 1;
     public List<SchedulingMember> Members { get; set; } = [];
     public List<SchedulingChair> Chairs { get; set; } = [];
-    public List<DCMS.Domain.Features.Settings.BranchAsset> Assets { get; set; } = [];
-    public int SlotIntervalMinutes { get; set; } = 15;
-    public int BookingSettingsVersion { get; set; } = 1;
-    public int Id { get; set; }
-    public string Name { get; set; } = "";
-    public bool Active { get; set; } = true;
 }
 public sealed class SchedulingMember
 {
@@ -34,9 +36,6 @@ public sealed class SchedulingChair
 public sealed class SchedulingService
 {
     public string Unit { get; set; } = "lần";
-    public bool IsInvestigationService { get; set; }
-    public string? InvestigationKind { get; set; }
-    public string BillingUnit { get; set; } = "Lần";
     public bool IsInitialExamination { get; set; }
     public bool PublicBookable { get; set; } = true;
     public int Id { get; set; }

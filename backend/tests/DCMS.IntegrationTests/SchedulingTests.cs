@@ -77,7 +77,7 @@ public sealed class SchedulingApiTests(ApiFixture fixture) : IClassFixture<ApiFi
         var savedResponse = await dentist.PutAsJsonAsync(path, command);
         Assert.Equal(HttpStatusCode.OK, savedResponse.StatusCode);
         var saved = (await savedResponse.Content.ReadFromJsonAsync<BookingSettings>())!;
-        Assert.Equal(2, saved.Version); Assert.Equal(20, saved.SlotIntervalMinutes);
+        Assert.Equal(original.Version + 1, saved.Version); Assert.Equal(20, saved.SlotIntervalMinutes);
         Assert.Equal(95, saved.Services.Single(x => x.Name == "Treatment 95").DurationMinutes);
         Assert.True(saved.Services.Single(x => x.Id == s.Service).IsInitialExamination);
         Assert.Equal("Khám", saved.Services.Single(x => x.Id == s.Service).Name);
@@ -95,8 +95,8 @@ public sealed class SchedulingApiTests(ApiFixture fixture) : IClassFixture<ApiFi
         Assert.Equal(saved.Version, replay.Version); Assert.Equal(2, replay.Services.Length);
         await Message(await dentist.PutAsJsonAsync(path, command with { RequestKey = Guid.NewGuid() }), HttpStatusCode.Conflict, "MSG111");
         await Message(await dentist.PutAsJsonAsync(path, command with { SlotIntervalMinutes = 30 }), HttpStatusCode.Conflict, "MSG111");
-        await Message(await dentist.PutAsJsonAsync(path, new SaveBookingSettings(2, Guid.NewGuid(), 0, saved.Services)), HttpStatusCode.BadRequest, "MSG04");
-        await Message(await dentist.PutAsJsonAsync(path, new SaveBookingSettings(2, Guid.NewGuid(), 20,
+        await Message(await dentist.PutAsJsonAsync(path, new SaveBookingSettings(saved.Version, Guid.NewGuid(), 0, saved.Services)), HttpStatusCode.BadRequest, "MSG04");
+        await Message(await dentist.PutAsJsonAsync(path, new SaveBookingSettings(saved.Version, Guid.NewGuid(), 20,
             [saved.Services[0] with { Id = int.MaxValue }, saved.Services[1]])), HttpStatusCode.BadRequest, "MSG04");
         using var assistant = await Login("assistant.demo");
         await Message(await assistant.PostAsJsonAsync("/api/appointments", forged with { Source = "InPerson", RequestKey = Guid.NewGuid() }), HttpStatusCode.BadRequest, "MSG110");

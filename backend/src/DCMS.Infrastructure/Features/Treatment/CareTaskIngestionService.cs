@@ -25,19 +25,18 @@ public sealed class CareTaskIngestionService(DcmsDbContext db, TimeProvider cloc
             if (missedEvents.Count == 0) break;
             foreach (var source in missedEvents)
             {
-            var stableKey = $"appointment-no-show:{source.AggregateId}";
-            if (await db.CareTasks.AnyAsync(x => x.EpisodeKey == stableKey, ct)) continue;
+            if (source.AggregateId is not { } appointmentId) continue;
+            if (await db.CareTasks.AnyAsync(x => x.AppointmentId == appointmentId && x.Type == "MissedAppointment", ct)) continue;
             var appointment = await db.Appointments.AsNoTracking().SingleOrDefaultAsync(x =>
-                x.Id == source.AggregateId, ct);
+                x.Id == appointmentId, ct);
             if (appointment is not { Status: "NoShow", PatientId: not null }) continue;
             db.CareTasks.Add(new CareTask
             {
                 PatientId = appointment.PatientId.Value, BranchId = appointment.BranchId,
                 AppointmentId = appointment.Id,
-                EpisodeKey = stableKey, Type = "MissedAppointment",
+                Type = "MissedAppointment",
                 Content = "Liên hệ hỗ trợ sau khi bệnh nhân vắng mặt theo lịch hẹn.",
-                DueAt = clock.GetUtcNow(), CreatedBy = 0,
-                CreatedAt = clock.GetUtcNow(), UpdatedAt = clock.GetUtcNow()
+                DueAt = clock.GetUtcNow()
             });
                 added++;
             }

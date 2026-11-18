@@ -14,27 +14,37 @@ public sealed class ExaminationReceipt : DCMS.Domain.Common.CommandReceiptRecord
     public Guid VisitId { get; set; }
 }
 
+public sealed class ClinicalDocumentMetadata
+{
+    public string Source { get; set; } = "Clinic";
+    public string? Description { get; set; }
+    public long SizeBytes { get; set; }
+    public string Sha256 { get; set; } = "";
+    public string? RejectReason { get; set; }
+    public Guid? InvestigationId { get; set; }
+}
+
 public sealed class ClinicalDocument
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public int PatientId { get; set; }
     public Guid? VisitId { get; set; }
     public Guid? DossierId { get; set; }
-    public Guid? PlanId { get; set; }
-    public Guid? InvestigationId { get; set; }
     public string FileName { get; set; } = "";
     public string ContentType { get; set; } = "";
-    public long SizeBytes { get; set; }
-    public string Sha256 { get; set; } = "";
     public string DocumentType { get; set; } = "Other";
-    public string Source { get; set; } = "Clinic";
     public DateOnly SourceDate { get; set; }
-    public string? Description { get; set; }
     public string FileState { get; set; } = "PendingScan";
-    public string? RejectReason { get; set; }
     public int UploaderId { get; set; }
     public DateTimeOffset UploadedAt { get; set; }
     public int Version { get; set; } = 1;
+    public ClinicalDocumentMetadata Metadata { get; set; } = new();
+    public string Source { get => Metadata.Source; set => Metadata.Source = value; }
+    public string? Description { get => Metadata.Description; set => Metadata.Description = value; }
+    public long SizeBytes { get => Metadata.SizeBytes; set => Metadata.SizeBytes = value; }
+    public string Sha256 { get => Metadata.Sha256; set => Metadata.Sha256 = value; }
+    public string? RejectReason { get => Metadata.RejectReason; set => Metadata.RejectReason = value; }
+    public Guid? InvestigationId { get => Metadata.InvestigationId; set => Metadata.InvestigationId = value; }
     public List<DocumentReview> Reviews { get; set; } = [];
     // Immutable AI decision-support results (logical AI_ANALYSIS); newest appended last. docs/specs/AI-CARIES-DETECTION.vi.md
     public List<DocumentAiAnalysis> AiAnalyses { get; set; } = [];

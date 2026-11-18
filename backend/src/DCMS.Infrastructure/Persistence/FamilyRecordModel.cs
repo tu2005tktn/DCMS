@@ -10,15 +10,17 @@ internal static class FamilyRecordModel
 {
     public static void Configure(ModelBuilder model)
     {
+        model.Ignore<FamilyRecordAccessDetails>();
         model.Entity<FamilyRecordAccess>(b => {
             b.ToTable("FAMILY_RECORD_ACCESS"); b.HasKey(x => x.Id);
             b.Property(x => x.Code).HasMaxLength(40); b.HasIndex(x => x.Code).IsUnique();
-            b.Property(x => x.Status).HasMaxLength(16); b.Property(x => x.DeclaredFullName).HasMaxLength(100);
-            b.Property(x => x.Relationship).HasMaxLength(20); b.Property(x => x.DeclaredPatientCode).HasMaxLength(40);
-            b.Property(x => x.MatchingInformation).HasMaxLength(1000); b.Property(x => x.VerificationNote).HasMaxLength(1000);
-            b.Property(x => x.SharingBasis).HasMaxLength(32); b.Property(x => x.DecisionReason).HasMaxLength(500);
-            b.Property(x => x.PublicNote).HasMaxLength(500); b.Property(x => x.Version).IsConcurrencyToken();
+            b.Property(x => x.Status).HasMaxLength(16); b.Property(x => x.Version).IsConcurrencyToken();
             b.Property(x => x.Scopes).HasColumnType("text[]");
+            b.Ignore(x => x.DeclaredFullName); b.Ignore(x => x.DeclaredBirthDate); b.Ignore(x => x.Relationship);
+            b.Ignore(x => x.DeclaredPatientCode); b.Ignore(x => x.MatchingInformation); b.Ignore(x => x.SharingBasis);
+            b.Ignore(x => x.VerificationNote); b.Ignore(x => x.DecisionReason); b.Ignore(x => x.PublicNote);
+            b.Ignore(x => x.DecidedAt);
+            b.ComplexProperty(x => x.Details, d => d.ToJson("Details"));
             b.HasIndex(x => x.FamilyMemberId).IsUnique().HasFilter("\"Status\" IN ('Pending','Verified')");
             b.HasIndex(x => new { x.OwnerAccountId, x.RequestedAt });
             b.HasOne<FamilyMember>().WithMany().HasForeignKey(x => x.FamilyMemberId).OnDelete(DeleteBehavior.Restrict);

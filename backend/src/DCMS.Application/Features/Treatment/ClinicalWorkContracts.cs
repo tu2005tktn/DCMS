@@ -33,22 +33,13 @@ public sealed record UpdateCareTaskRequest(int ExpectedVersion, string Status,
     int? OwnerAccountId, DateTimeOffset DueAt, string Content, Guid RequestKey);
 public sealed record ContactAttemptRequest(string Channel, string Result,
     string? NextAction, Guid? RebookedAppointmentId, int ExpectedTaskVersion, Guid RequestKey);
-public sealed record EscalateCareRequest(int TargetClinicianAccountId, string Reason,
-    int ExpectedTaskVersion, Guid RequestKey);
-public sealed record ResolveEscalationRequest(int ExpectedVersion, string? Resolution,
-    Guid RequestKey);
 public sealed record CareTaskDto(Guid Id, int PatientId, int BranchId,
     Guid? AppointmentId, string Type, string Content,
     int? OwnerAccountId, DateTimeOffset DueAt, string Status, int Version,
     string[] AllowedActions);
 public sealed record ContactAttemptDto(Guid Id, Guid TaskId, string Channel, string Result,
     string? NextAction, Guid? RebookedAppointmentId, int ActorId, DateTimeOffset OccurredAt);
-public sealed record EscalationDto(Guid Id, Guid TaskId, int TargetClinicianAccountId,
-    string Reason, string? Resolution, string Status, int CreatedBy,
-    DateTimeOffset CreatedAt, int Version, DateTimeOffset? AcknowledgedAt,
-    DateTimeOffset? ResolvedAt);
-public sealed record CareTaskDetail(CareTaskDto Task, IReadOnlyList<ContactAttemptDto> Contacts,
-    IReadOnlyList<EscalationDto> Escalations);
+public sealed record CareTaskDetail(CareTaskDto Task, IReadOnlyList<ContactAttemptDto> Contacts);
 // S60 staff Web (docs/specs/S60-CUSTOMER-CARE-WEB.vi.md): read-only worklist, pickers and Excel.
 public sealed record CareStaffOption(int AccountId, string Name, string[] Roles);
 public sealed record CareBranchOption(int Id, string Name, bool CanCreate, IReadOnlyList<CareStaffOption> Staff);
@@ -74,9 +65,6 @@ public interface ICareTaskService
     Task<CareTaskDto> CreateAsync(int actorId, CreateCareTaskRequest request, CancellationToken ct);
     Task<CareTaskDto> UpdateAsync(int actorId, Guid id, UpdateCareTaskRequest request, CancellationToken ct);
     Task<ContactAttemptDto> ContactAsync(int actorId, Guid id, ContactAttemptRequest request, CancellationToken ct);
-    Task<EscalationDto> EscalateAsync(int actorId, Guid id, EscalateCareRequest request, CancellationToken ct);
-    Task<EscalationDto> ChangeEscalationAsync(int actorId, Guid id, bool resolve,
-        ResolveEscalationRequest request, CancellationToken ct);
     Task<CareTaskOptions> OptionsAsync(int actorId, CancellationToken ct);
     Task<IReadOnlyList<CarePatientOption>> PatientOptionsAsync(int actorId, int branchId,
         string? search, CancellationToken ct);

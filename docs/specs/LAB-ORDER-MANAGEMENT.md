@@ -1,5 +1,7 @@
 # Quản lý công việc labo
 
+Cập nhật lưu trữ 18/11/2026: phạm vi chi nhánh, hồ sơ, bệnh nhân và kiểm tra trùng mã phiếu đọc qua `ActivityId` -> `CLINICAL_ACTIVITY` -> `TREATMENT_DOSSIER`; các thông số kỹ thuật phục hình và mốc `SentOn`/`ReceivedOn` đọc/ghi trong `Spec` JSONB của `LAB_ORDER`. Xem [rút gọn bảng LAB_ORDER](./LAB-ORDER-TABLE-SIMPLIFICATION.vi.md).
+
 ## Thanh toán của bệnh nhân (15/11/2026)
 
 Trang quản lý labo hiển thị riêng số tiền bệnh nhân đã trả cho **từng phiếu labo** và trạng thái `Chưa thanh toán`, `Thanh toán một phần`, `Đã thanh toán` (hoặc `Không có phí`). Số đã trả được tổng hợp từ các phân bổ labo trong `FinanceLedger` đã xác nhận, gồm tiền mặt, chuyển khoản PayOS đã hoàn tất và phần cọc đã dành cho phiếu labo. QR đang chờ thanh toán không được tính. Trang tự tải lại khi đang mở.

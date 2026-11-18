@@ -90,8 +90,7 @@ public sealed class FamilyMemberApiTests(ApiFixture fixture) : IClassFixture<Api
         {
             var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
             // Emulate a member/receipt committed before contact fields became required.
-            db.Add(new FamilyMember { Id = legacy.Id, OwnerAccountId = owner, FullName = legacy.FullName, Relationship = legacy.Relationship,
-                CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow });
+            db.Add(new FamilyMember { Id = legacy.Id, OwnerAccountId = owner, FullName = legacy.FullName, Relationship = legacy.Relationship });
             var oldPayload = System.Text.Json.JsonSerializer.Serialize(new { action = "Create", name = legacy.FullName, Relationship = "Child", BirthDate = (DateOnly?)null });
             var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(oldPayload)));
             db.Add(new FamilyMemberReceipt { OwnerAccountId = owner, RequestKey = oldKey, Fingerprint = hash, CreatedAt = DateTimeOffset.UtcNow,

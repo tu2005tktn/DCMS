@@ -29,10 +29,10 @@ public sealed partial class AccountService(DcmsDbContext db, UserManager<Applica
         {
             var term = search.Trim().ToUpperInvariant();
             var phone = ContactRules.NormalizePhone(search)!;
-            query = query.Where(x => x.User.Id.ToString() == term || x.User.NormalizedUserName!.Contains(term)
+            query = query.Where(x => x.User.Id.ToString() == term || (x.User.UserName != null && x.User.UserName.ToUpper().Contains(term))
                 || x.User.FullName.ToUpper().Contains(term) || (x.EmployeeCode != null && x.EmployeeCode.Contains(term))
-                || (x.User.NormalizedEmail != null && x.User.NormalizedEmail.Contains(term))
-                || (phone != "" && x.User.NormalizedPhone != null && x.User.NormalizedPhone.Contains(phone)));
+                || (x.User.Email != null && x.User.Email.ToUpper().Contains(term))
+                || (phone != "" && x.User.PhoneNumber != null && x.User.PhoneNumber.Trim().Replace(" ", "").Replace("-", "").Replace("(", "").Replace(")", "").Contains(phone)));
         }
         if (status != null) query = query.Where(x => x.User.IsActive == (status == "Active"));
         if (role != null) query = query.Where(x => db.UserRoles.Any(ur => ur.UserId == x.User.Id
@@ -43,10 +43,10 @@ public sealed partial class AccountService(DcmsDbContext db, UserManager<Applica
         {
             "id" => descending ? query.OrderByDescending(x => x.User.Id) : query.OrderBy(x => x.User.Id),
             "employeeCode" => descending ? query.OrderByDescending(x => x.EmployeeCode) : query.OrderBy(x => x.EmployeeCode),
-            "userName" => descending ? query.OrderByDescending(x => x.User.NormalizedUserName) : query.OrderBy(x => x.User.NormalizedUserName),
+            "userName" => descending ? query.OrderByDescending(x => x.User.UserName!.ToUpper()) : query.OrderBy(x => x.User.UserName!.ToUpper()),
             "fullName" => descending ? query.OrderByDescending(x => x.User.FullName) : query.OrderBy(x => x.User.FullName),
-            "email" => descending ? query.OrderByDescending(x => x.User.NormalizedEmail) : query.OrderBy(x => x.User.NormalizedEmail),
-            "phone" => descending ? query.OrderByDescending(x => x.User.NormalizedPhone) : query.OrderBy(x => x.User.NormalizedPhone),
+            "email" => descending ? query.OrderByDescending(x => x.User.Email == null ? null : x.User.Email.ToUpper()) : query.OrderBy(x => x.User.Email == null ? null : x.User.Email.ToUpper()),
+            "phone" => descending ? query.OrderByDescending(x => x.User.PhoneNumber) : query.OrderBy(x => x.User.PhoneNumber),
             "isActive" => descending ? query.OrderByDescending(x => x.User.IsActive) : query.OrderBy(x => x.User.IsActive),
             "updatedAt" => descending ? query.OrderByDescending(x => x.User.UpdatedAt) : query.OrderBy(x => x.User.UpdatedAt),
             _ => throw new BusinessException(400, SystemMessages.Get("MSG04", "Sắp xếp"))
@@ -178,10 +178,15 @@ public sealed partial class AccountService(DcmsDbContext db, UserManager<Applica
         var normalizedEmail = users.NormalizeEmail(Clean(email));
         var normalizedPhone = ContactRules.NormalizePhone(phone);
         if (normalizedEmail != null && await db.Users.AnyAsync(x => (!excludeId.HasValue || x.Id != excludeId.Value)
-            && x.NormalizedEmail == normalizedEmail, ct))
+            && x.Email != null && x.Email.ToUpper() == normalizedEmail, ct))
             throw new BusinessException(409, StaffAccountConflicts.ForField("email"));
-        if (normalizedPhone != null && await db.Users.AnyAsync(x => (!excludeId.HasValue || x.Id != excludeId.Value)
-            && x.NormalizedPhone == normalizedPhone, ct))
+        if (normalizedPhone != null && await db.Database.SqlQuery<bool>($"""
+            SELECT EXISTS (
+                SELECT 1 FROM "USER_ACCOUNT"
+                WHERE (CAST({excludeId} AS integer) IS NULL OR "Id" <> CAST({excludeId} AS integer))
+                  AND NULLIF(regexp_replace(btrim("PhoneNumber"), '[ ()-]', '', 'g'), '') = {normalizedPhone}
+            ) AS "Value"
+            """).SingleAsync(ct))
             throw new BusinessException(409, StaffAccountConflicts.ForField("phone"));
     }
 
@@ -189,7 +194,7 @@ public sealed partial class AccountService(DcmsDbContext db, UserManager<Applica
     {
         var normalized = users.NormalizeName(name.Trim());
         if (await db.Users.AnyAsync(x => (!excludeId.HasValue || x.Id != excludeId.Value)
-            && x.NormalizedUserName == normalized, ct))
+            && x.UserName != null && x.UserName.ToUpper() == normalized, ct))
             throw new BusinessException(409, StaffAccountConflicts.ForField("userName"));
     }
 

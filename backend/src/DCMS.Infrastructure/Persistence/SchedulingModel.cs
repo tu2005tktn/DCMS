@@ -20,18 +20,20 @@ internal static class SchedulingModel
         });
 
         model.Entity<SchedulingBranch>(b => {
-            b.ToTable("SCHEDULING_BRANCH", t => t.HasCheckConstraint("CK_BRANCH_SLOT_INTERVAL", "\"SlotIntervalMinutes\" BETWEEN 1 AND 120 AND \"BookingSettingsVersion\" > 0"));
+            b.ToTable("SCHEDULING_BRANCH", t => t.HasCheckConstraint("CK_BRANCH_SLOT_INTERVAL", "\"SlotIntervalMinutes\" BETWEEN 1 AND 120 AND \"Version\" > 0"));
+            b.Property(x => x.Code).HasMaxLength(40);
+            b.HasIndex(x => x.Code).IsUnique();
             b.Property(x => x.Name).HasMaxLength(160);
+            b.Property(x => x.Address).HasMaxLength(1000);
+            b.Property(x => x.Phone).HasMaxLength(20);
+            b.Property(x => x.Email).HasMaxLength(254);
             b.Property(x => x.SlotIntervalMinutes).HasDefaultValue(15);
-            b.Property(x => x.BookingSettingsVersion).HasDefaultValue(1).IsConcurrencyToken();
+            b.Property(x => x.Version).HasDefaultValue(1).IsConcurrencyToken();
         });
 
 
         model.Entity<SchedulingService>(b =>
         {
-            // Examination and investigation service fields stay on the shared catalog row after the finance screens were removed.
-            b.Property(x => x.InvestigationKind).HasMaxLength(16);
-            b.Property(x => x.BillingUnit).HasMaxLength(40);
             b.Property(x => x.Unit).HasMaxLength(40).HasDefaultValue("lần");
             b.HasIndex(x => x.BranchId).IsUnique().HasFilter("\"IsInitialExamination\" = TRUE");
             b.Property(x => x.PublicBookable).HasDefaultValue(true);

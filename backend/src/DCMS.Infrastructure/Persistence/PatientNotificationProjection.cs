@@ -32,15 +32,6 @@ public sealed partial class DcmsDbContext
             (entry.State == EntityState.Added || entry.State == EntityState.Modified &&
                 entry.OriginalValues[property] as string != value);
 
-        foreach (var entry in ChangeTracker.Entries<ExternalPrescription>())
-            if (Became(entry, nameof(ExternalPrescription.Status), PrescriptionStatuses.Finalized))
-            {
-                var p = entry.Entity;
-                events.Add(new(p.PatientId, p.BranchId, NotificationKind.PrescriptionReady,
-                    "Đơn thuốc đã sẵn sàng", "Bác sĩ đã hoàn tất đơn thuốc của bạn. Mở ứng dụng để xem.",
-                    $"rx:{p.Id}:{p.Revision}", "/prescriptions"));
-            }
-
         foreach (var entry in ChangeTracker.Entries<PatientPrescription>())
             if (entry.State == EntityState.Added || entry.State == EntityState.Modified &&
                 entry.Property(nameof(PatientPrescription.Version)).IsModified)

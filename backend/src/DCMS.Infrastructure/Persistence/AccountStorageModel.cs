@@ -22,25 +22,37 @@ internal static class AccountStorageModel
         model.Ignore<RecoveryToken>();
         model.Ignore<EmailVerificationToken>();
         model.Ignore<RecoveryOutbox>();
+        model.Ignore<UserAuthData>();
         model.HasSequence<long>("account_entry_seq");
         model.HasSequence<int>("employee_id_seq");
         model.Entity<ApplicationUser>(b =>
         {
             b.Property(x => x.EmployeeId).HasColumnName("EmployeeId").HasDefaultValueSql("nextval('employee_id_seq')");
             b.HasAlternateKey(x => x.EmployeeId).HasName("AK_USER_ACCOUNT_EmployeeId");
+            b.Property(x => x.FullName).HasColumnName("FullName").HasMaxLength(160);
             b.Property(x => x.AssignedRoles).HasColumnType("text[]");
-            b.HasIndex(x => x.GoogleSubject).IsUnique();
-            b.ComplexCollection(x => x.Claims).ToJson();
-            b.ComplexCollection(x => x.Logins).ToJson();
-            b.ComplexCollection(x => x.IdentityTokens).ToJson();
-            b.ComplexCollection(x => x.Sessions, s =>
-            {
-                s.ToJson();
-                s.ComplexCollection(x => x.RefreshTokens);
-            });
-            b.ComplexCollection(x => x.EmailVerifications).ToJson();
-            b.ComplexCollection(x => x.Recoveries).ToJson();
-            b.ComplexCollection(x => x.RecoveryDeliveries).ToJson();
+            b.Ignore(x => x.NormalizedUserName);
+            b.Ignore(x => x.NormalizedEmail);
+            b.Ignore(x => x.NormalizedPhone);
+            b.Ignore(x => x.ConcurrencyStamp);
+            b.Ignore(x => x.SecurityStamp);
+            b.Ignore(x => x.PhoneNumberConfirmed);
+            b.Ignore(x => x.TwoFactorEnabled);
+            b.Ignore(x => x.LockoutEnd);
+            b.Ignore(x => x.LockoutEnabled);
+            b.Ignore(x => x.AccessFailedCount);
+            b.Ignore(x => x.Claims);
+            b.Ignore(x => x.Logins);
+            b.Ignore(x => x.IdentityTokens);
+            b.Ignore(x => x.Sessions);
+            b.Ignore(x => x.EmailVerifications);
+            b.Ignore(x => x.Recoveries);
+            b.Ignore(x => x.RecoveryDeliveries);
+            b.Property(x => x.AuthData)
+                .HasColumnName("AuthData")
+                .HasColumnType("jsonb")
+                .HasDefaultValueSql("'{}'::jsonb")
+                .HasConversion(SharedStorageModel.JsonConv<UserAuthData>(), SharedStorageModel.JsonCompare<UserAuthData>());
         });
         model.Entity<EmployeeProfile>(b =>
         {
@@ -51,33 +63,25 @@ internal static class AccountStorageModel
             b.HasAlternateKey(x => x.Id).HasName("AK_USER_ACCOUNT_EmployeeId");
             b.HasIndex(x => x.EmployeeCode).IsUnique().HasDatabaseName("IX_EMPLOYEE_PROFILE_EmployeeCode");
             b.Property(x => x.EmployeeCode).HasMaxLength(40);
-            b.Property(x => x.FullName).HasColumnName("EmployeeFullName").HasMaxLength(160);
+            b.Property(x => x.FullName).HasColumnName("FullName").HasMaxLength(160);
             b.HasOne<ApplicationUser>().WithOne().HasForeignKey<EmployeeProfile>(x => x.AccountId).OnDelete(DeleteBehavior.Restrict);
         });
         model.Entity<StaffAccessAssignment>(b =>
         {
             b.ToTable("USER_ACCOUNT"); b.HasKey(x => x.AccountId);
             b.Property(x => x.AccountId).HasColumnName("Id");
-            b.Property(x => x.Version).HasColumnName("AccessVersion").IsConcurrencyToken(false);
+            b.Ignore(x => x.Version);
             b.HasOne<ApplicationUser>().WithOne().HasForeignKey<StaffAccessAssignment>(x => x.AccountId).OnDelete(DeleteBehavior.Restrict);
             b.HasOne<AccessGroup>().WithMany().HasForeignKey(x => x.GroupId).OnDelete(DeleteBehavior.Restrict);
         });
-        // Every representation of the shared row participates in its concurrency checks.
+        // PostgreSQL hidden system column xmin serves as the shared row-version concurrency token across all 3 split entities.
         foreach (var type in new[] { typeof(ApplicationUser), typeof(EmployeeProfile), typeof(StaffAccessAssignment) })
-        {
-            var b = model.Entity(type);
-            if (type == typeof(StaffAccessAssignment)) b.Property<int>("AccountVersion").HasColumnName("Version").IsConcurrencyToken();
-            else b.Property<int>("Version").HasColumnName("Version").IsConcurrencyToken();
-            b.Property<string>("ConcurrencyStamp").HasColumnName("ConcurrencyStamp").IsConcurrencyToken();
-        }
+            model.Entity(type).Property<uint>("xmin").IsRowVersion();
         model.Entity<AccessGroup>(b =>
         {
             b.Property(x => x.RecordKind).HasMaxLength(24);
             b.HasQueryFilter(x => x.RecordKind == "PermissionGroup");
             b.HasIndex(x => x.IdentityRoleId).IsUnique();
-            b.HasIndex(x => new { x.RecordKind, x.NormalizedCode }).IsUnique();
-            b.HasIndex(x => new { x.RecordKind, x.NormalizedName }).IsUnique();
-            b.ComplexCollection(x => x.RoleClaims).ToJson();
         });
         // Clinical foreign keys continue to use the historical employee identifier.
         var employee = model.Entity<EmployeeProfile>().Metadata;

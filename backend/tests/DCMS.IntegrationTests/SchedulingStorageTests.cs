@@ -1,6 +1,5 @@
 using DCMS.Domain.Features.Appointments;
 using DCMS.Domain.Features.Scheduling;
-using DCMS.Domain.Features.Settings;
 using DCMS.Application.Common;
 using DCMS.Application.Features.Settings;
 using DCMS.Infrastructure.Persistence;
@@ -22,19 +21,20 @@ public sealed class SchedulingStorageTests(ApiFixture fixture) : IClassFixture<A
         var actor = await db.Users.Where(x => x.UserName == "owner.demo").Select(x => x.Id).SingleAsync();
         var service = scope.ServiceProvider.GetRequiredService<IBranchManagementService>();
         var command = new SaveBranchCommand(Guid.NewGuid(), 0, "ST-" + Guid.NewGuid().ToString("N")[..12],
-            "SYNTHETIC branch", "SYNTHETIC address", null, null, null, null, "Asia/Ho_Chi_Minh", null, null, null);
+            "SYNTHETIC branch", "SYNTHETIC address", null, null);
         var created = await service.SaveBranchAsync(actor, null, command, default);
         var resource = new SchedulingChair { BranchId = created.Id, Name = "SYNTHETIC retained chair" };
         await db.AddSchedulingDataAsync(resource); await db.SaveChangesAsync();
+        var afterChair = await service.BranchAsync(actor, created.Id, default);
         var changed = await service.SaveBranchAsync(actor, created.Id,
-            command with { RequestKey = Guid.NewGuid(), ExpectedVersion = created.Version, Name = "SYNTHETIC changed branch" }, default);
-        Assert.Equal(created.Version + 1, changed.Version);
+            command with { RequestKey = Guid.NewGuid(), ExpectedVersion = afterChair.Version, Name = "SYNTHETIC changed branch" }, default);
+        Assert.Equal(afterChair.Version + 1, changed.Version);
         Assert.Equal(resource.Id, Assert.Single(changed.Chairs).Id);
         db.ChangeTracker.Clear();
         var parent = await db.Set<SchedulingBranch>().SingleAsync(x => x.Id == created.Id);
         Assert.Equal("SYNTHETIC changed branch", parent.Name);
         Assert.Equal(resource.Id, Assert.Single(parent.Chairs).Id);
-        Assert.Equal("SYNTHETIC address", (await db.BranchProfiles.SingleAsync(x => x.Id == created.Id)).Address);
+        Assert.Equal("SYNTHETIC address", parent.Address);
     }
 
     [Fact]
@@ -82,9 +82,7 @@ public sealed class SchedulingStorageTests(ApiFixture fixture) : IClassFixture<A
         var branch = new SchedulingBranch { Name = "SYNTHETIC unified storage" };
         db.Add(branch); await db.SaveChangesAsync();
         var chair = new SchedulingChair { BranchId = branch.Id, Name = "SYNTHETIC chair", Code = "JSON-CHAIR", Version = 4 };
-        var asset = new BranchAsset { BranchId = branch.Id, ContentType = "image/png", SizeBytes = 10,
-            Sha256 = "SYNTHETIC hash", UploadedBy = dentist.AccountId, UploadedAt = DateTimeOffset.UtcNow };
-        await db.AddSchedulingDataAsync(chair, asset, new SchedulingMember { BranchId = branch.Id, EmployeeId = dentist.Id, CanDentist = true });
+        await db.AddSchedulingDataAsync(chair, new SchedulingMember { BranchId = branch.Id, EmployeeId = dentist.Id, CanDentist = true });
         var service = new SchedulingService { BranchId = branch.Id, Name = "SYNTHETIC treatment", PublicDurationMinutes = 30 };
         db.Add(service); await db.SaveChangesAsync();
         var start = DateTimeOffset.UtcNow.AddDays(7);
@@ -127,12 +125,11 @@ public sealed class SchedulingStorageTests(ApiFixture fixture) : IClassFixture<A
         Assert.Equal(reminder.Id, Assert.Single(read.Reminders).Id);
         var parent = await db.Set<SchedulingBranch>().SingleAsync(x => x.Id == branch.Id);
         Assert.Equal(chair.Id, Assert.Single(parent.Chairs).Id); Assert.Equal(4, parent.Chairs[0].Version);
-        Assert.Equal(asset.Id, Assert.Single(parent.Assets).Id);
         Assert.Equal(dentist.Id, Assert.Single(parent.Members).EmployeeId);
         Assert.Equal(720, Assert.Single((await db.Set<WorkingWeek>().SingleAsync(x => x.Id == week.Id)).Periods).EndMinute);
         Assert.Equal(branch.Id, Assert.Single((await db.Set<WorkingScheduleRevision>().SingleAsync(x => x.Id == revision.Id)).Periods).BranchId);
         Assert.True(await db.AppointmentSupportHistories.AnyAsync(x => x.Id == history.Id));
-        Assert.True(await db.AppointmentOutboxEvents.AnyAsync(x => x.Id == outbox.Id && x.DispatchedAt == null));
+        Assert.True(await db.AppointmentOutboxEvents.AnyAsync(x => x.Id == outbox.Id && x.Status == "Pending"));
     }
 
     [Fact]
@@ -146,7 +143,8 @@ public sealed class SchedulingStorageTests(ApiFixture fixture) : IClassFixture<A
         var old = await second.Set<SchedulingBranch>().SingleAsync(x => x.Id == branch.Id);
         branch.Chairs.Add(new() { Id = await first.NextChairIdAsync(default), BranchId = branch.Id, Name = "SYNTHETIC kept chair" });
         await first.SaveChangesAsync();
-        old.Assets.Add(new() { BranchId = old.Id, ContentType = "image/png", UploadedAt = DateTimeOffset.UtcNow });
+        var employeeId = await second.Employees.Select(x => x.Id).FirstAsync();
+        old.Members.Add(new() { BranchId = old.Id, EmployeeId = employeeId });
         await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => second.SaveChangesAsync());
         second.ChangeTracker.Clear();
         Assert.Single((await second.Set<SchedulingBranch>().SingleAsync(x => x.Id == branch.Id)).Chairs);

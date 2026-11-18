@@ -1,5 +1,7 @@
 # Đơn thuốc của bệnh nhân trên web và ứng dụng
 
+> Cập nhật 18/11/2026: `PRESCRIPTION` rút gọn còn 11 cột cho đơn thuốc S23 (`PatientPrescription`) và `CATALOG_MEDICINE` còn 10 cột; xem [rút gọn bảng PRESCRIPTION và CATALOG_MEDICINE](PRESCRIPTION-AND-MEDICINE-TABLE-SIMPLIFICATION.vi.md).
+
 ## Phạm vi
 
 - Web bệnh nhân và ứng dụng Expo giữ chức năng đặt, xem, đổi và hủy lịch hẹn hiện có. Trang chủ và menu phải có lối vào rõ ràng tới danh sách lịch hẹn.
