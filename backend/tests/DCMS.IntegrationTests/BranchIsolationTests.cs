@@ -68,7 +68,7 @@ public sealed class BranchIsolationTests(ApiFixture fixture) : IClassFixture<Api
         var draftResponse = await dentistA.PutAsJsonAsync($"/api/dossiers/{dossier.Id}/sheet-drafts/{draftId}", new SaveSheetDraftRequest("Plan", null, row, 0, Guid.NewGuid()));
         Assert.True(draftResponse.IsSuccessStatusCode, await draftResponse.Content.ReadAsStringAsync());
         var draft = (await draftResponse.Content.ReadFromJsonAsync<SheetDraftDto>())!;
-        var plan = await dentistA.PostAsJsonAsync($"/api/dossiers/{dossier.Id}/sheet-drafts/{draft.Id}/confirm-plan", new ConfirmSheetPlanRequest(dossier.Version, draft.Version, null, Guid.NewGuid()));
+        var plan = await dentistA.PostAsJsonAsync($"/api/dossiers/{dossier.Id}/sheet-drafts/{draft.Id}/confirm-plan", new ConfirmSheetPlanRequest(dossier.Version, draft.Version, Guid.NewGuid()));
         dossier = (await plan.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
         var performed = await dentistA.PostAsJsonAsync($"/api/dossiers/{dossier.Id}/sheet-items/{Assert.Single(dossier.Items).Id}/perform", new SheetItemActionRequest(dossier.Version, Guid.NewGuid()));
         var activity = (await performed.Content.ReadFromJsonAsync<ConfirmSheetActualResult>())!.Activity;

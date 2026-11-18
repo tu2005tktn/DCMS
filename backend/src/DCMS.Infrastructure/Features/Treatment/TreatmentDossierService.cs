@@ -29,51 +29,29 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
 
     private static long DiscountAmount(TreatmentItem item)
     {
-        if (item.DiscountStatus != "Approved" || item.DiscountValue is null) return 0;
+        if (item.DiscountType is not ("Fixed" or "Percent") || item.DiscountValue is not > 0) return 0;
         var gross = Gross(item);
-        return TreatmentPlanRules.Discount(gross, item.DiscountType!, item.DiscountValue.Value);
+        return TreatmentPlanRules.Discount(gross, item.DiscountType, item.DiscountValue.Value);
     }
 
-    private static string DiscountBasis(TreatmentItem item, TreatmentItem? qualifying) => Hash(new
+    private async Task<int> CurrentPlanVersionAsync(Guid dossierId, bool hasItems, CancellationToken ct)
     {
-        item.ServiceId, item.Quantity, item.AgreedUnitPriceVnd, item.DiscountType,
-        item.DiscountValue, item.DiscountQualifyingItemId,
-        QualifyingServiceId = qualifying?.ServiceId, QualifyingDecision = qualifying?.Decision,
-        QualifyingQuantity = qualifying?.Quantity
-    });
+        var count = await db.TreatmentEvents.AsNoTracking().CountAsync(x => x.DossierId == dossierId && x.Kind == "PlanCommitted", ct);
+        return count > 0 ? count : (hasItems ? 1 : 0);
+    }
 
-    private static PlanPricePreviewDto PricePreview(TreatmentDossier dossier)
+    private static PlanPricePreviewDto PricePreview(TreatmentDossier dossier, int planVersion)
     {
-        var lines = dossier.Items.Where(x => !x.SheetDeleted && !x.HiddenFromSheet).OrderBy(x => x.PlannedOrder).Select(x =>
+        var lines = dossier.Items.OrderBy(x => x.PlannedOrder).Select(x =>
         {
             var gross = Gross(x);
             var discount = DiscountAmount(x);
-            return new PlanPricePreviewItem(x.Id, gross, discount, gross - discount,
-                x.ReferenceUnitPriceVnd, x.Decision, x.Decision == "Agreed" || x.EntrySource == "ClinicianEntry");
+            return new PlanPricePreviewItem(x.Id, gross, discount, gross - discount);
         }).ToArray();
-        return new(dossier.Id, dossier.Version, dossier.CurrentPlanVersion(), lines,
-            checked(lines.Where(x => x.IncludedInTotal).Sum(x => x.GrossVnd)),
-            checked(lines.Where(x => x.IncludedInTotal).Sum(x => x.ApprovedDiscountVnd)),
-            checked(lines.Where(x => x.IncludedInTotal).Sum(x => x.NetVnd)));
-    }
-
-    private async Task CommercialAsync(int actorId, int branchId, CancellationToken ct)
-    {
-        var scope = await access.ResolveAsync(actorId, ct);
-        if (scope.Assigned && !scope.Owner && !scope.BranchIds.Contains(branchId)) throw Error("MSG06", 403);
-        var account = await users.FindByIdAsync(actorId.ToString());
-        if (account is not { IsActive: true, AccountType: "Staff" }) throw Error("MSG06", 403);
-        var roles = AccountRoles.Effective(await users.GetRolesAsync(account));
-        if (!roles.Contains(AccountRoles.Admin) && !roles.Contains(AccountRoles.ClinicOwner)
-            && !roles.Contains(AccountRoles.Dentist))
-            throw Error("MSG06", 403);
-        if (roles.Contains(AccountRoles.Admin)) return;
-        var isOwner = roles.Contains(AccountRoles.ClinicOwner);
-        var employee = await db.Employees.AsNoTracking().SingleOrDefaultAsync(x => x.AccountId == actorId, ct);
-        if (employee == null || !await db.SchedulingMembers.AsNoTracking().AnyAsync(x =>
-            x.BranchId == branchId && x.EmployeeId == employee.Id && x.Active &&
-            (isOwner || x.CanDentist), ct))
-            throw Error("MSG06", 403);
+        return new(dossier.Id, dossier.Version, planVersion, lines,
+            checked(lines.Sum(x => x.GrossVnd)),
+            checked(lines.Sum(x => x.ApprovedDiscountVnd)),
+            checked(lines.Sum(x => x.NetVnd)));
     }
 
     private async Task<int> DentistAsync(int actorId, int branchId, CancellationToken ct)
@@ -136,33 +114,26 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
         var actorNames = await db.Users.AsNoTracking().Where(x => actorIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.FullName, ct);
         var finance = await financialPort.ReadAsync(dossier.PatientId, dossier.BranchId, dossier.Id, ct);
         var pendingFeeCount = await db.ClinicalActivities.CountAsync(x => x.DossierId == dossier.Id && x.FeeStatus == "Pending", ct);
-        var planned = PricePreview(dossier).NetBeforeTaxVnd;
+        var commitCount = events.Count(x => x.Kind == "PlanCommitted");
+        var planVersion = commitCount > 0 ? commitCount : (dossier.Items.Count > 0 ? 1 : 0);
+        var planned = PricePreview(dossier, planVersion).NetBeforeTaxVnd;
         finance = finance is { Available: true }
             ? finance with { PlannedVnd = planned, PendingFeeCount = pendingFeeCount }
             : new TreatmentFinancialSummary(false, planned, null, null, null, null, null, PendingFeeCount: pendingFeeCount);
         return new(dossier.Id, dossier.Code, dossier.PatientId, dossier.BranchId, dossier.DentistId,
-            dossier.StartedOn, dossier.Diagnosis, dossier.Note, dossier.State, dossier.Version, dossier.CurrentPlanVersion(),
+            dossier.StartedOn, dossier.Diagnosis, dossier.Note, dossier.State, dossier.Version, planVersion,
             dossier.Items.OrderBy(x => x.PlannedOrder).Select(ItemDto).ToArray(),
             events.Select(x => new TreatmentEventDto(x.Id, x.Kind, x.DossierVersion, x.ActorId,
                 x.OccurredAt, x.PayloadJson, actorNames.GetValueOrDefault(x.ActorId))).ToArray(), finance.Available, dossier.CreatedAt, dossier.UpdatedAt,
             finance, dossier.SourceExaminationVisitId);
     }
 
-    private static TreatmentItemDto ItemDto(TreatmentItem x) => new(x.Id, x.SourceDiagnosisId, x.ServiceId,
+    private static TreatmentItemDto ItemDto(TreatmentItem x) => new(x.Id, x.ServiceId,
         x.ServiceName, x.Region, x.Unit, x.Quantity, x.PlannedOrder, x.EstimatedMinutes, x.EstimatedStart,
-        x.EstimatedEnd, x.AgreedUnitPriceVnd, x.Decision, x.Progress, x.Counseling, x.DecisionMaker,
-        x.RepresentativeBasis, x.DecidedAt, x.ConsentDocumentId, x.ConsentPlanVersion,
-        x.WarrantyPolicy, x.WarrantyPolicyVersion, x.WarrantyScope, x.WarrantyConfirmedAt, x.WarrantyEndsOn,
-        x.Material, x.DecisionPlanVersion, x.EstimatedMinMinutes, x.EstimatedMaxMinutes,
-        x.ReservedMinutes, x.EstimatedSessions, x.ReturnEarliestOn, x.ReturnTargetOn,
-        x.ReturnLatestOn, x.ShortReservationAcknowledgedBy, x.ShortReservationAcknowledgedAt,
-        x.ReferenceUnitPriceVnd, x.ReferencePriceVersion,
-        x.DiscountType == null || x.DiscountValue == null || x.DiscountReason == null || x.DiscountStatus == null
-            ? null : new TreatmentDiscountDto(x.DiscountType, x.DiscountValue.Value, x.DiscountReason,
-                x.DiscountQualifyingItemId, x.DiscountStatus, x.DiscountDecidedBy,
-                x.DiscountDecidedAt, DiscountAmount(x)),
-        x.WarrantyComponent, x.WarrantyExclusions, x.WarrantyActivatedOn, x.WarrantyExplanation,
-        x.ExpectedServiceLifeMonths, x.Note, x.ResponsibleDentistId, x.AssistantId, x.EntrySource, x.DisplayCompleted, x.SheetDeleted, x.HiddenFromSheet);
+        x.AgreedUnitPriceVnd,
+        x.DiscountType == null || x.DiscountValue is not > 0 || x.DiscountReason == null
+            ? null : new TreatmentDiscountDto(x.DiscountType, x.DiscountValue.Value, x.DiscountReason, DiscountAmount(x)),
+        x.Note, x.ResponsibleDentistId, x.AssistantId, x.DisplayCompleted);
 
     public async Task<DossierPage> ListAsync(int actorId, int patientId, int? branchId, int page, int pageSize,
         CancellationToken ct)
@@ -324,7 +295,6 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
             """).AnyAsync(ct)) throw Error("MSG233", 409);
         if (dossier.State != "Open" || dossier.Items.Count != 0
             || await db.TreatmentEvents.AnyAsync(x => x.DossierId == dossierId && x.Kind != "DossierCreated", ct)
-            || await db.TreatmentSteps.AnyAsync(x => x.DossierId == dossierId, ct)
             || await db.Appointments.AnyAsync(x => x.DossierId == dossierId, ct)
             || await db.ClinicalActivities.AnyAsync(x => x.DossierId == dossierId, ct)
             || await db.TreatmentSheetDrafts.AnyAsync(x => x.DossierId == dossierId, ct)
@@ -410,210 +380,6 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
         return result;
     }
 
-    public async Task<TreatmentChange> SaveDraftAsync(int actorId, Guid dossierId, SavePlanDraftRequest request,
-        CancellationToken ct)
-    {
-        var dossier = await DossierAsync(actorId, dossierId, ct);
-        var replay = await ReplayAsync(actorId, request.RequestKey, "Draft", new { dossierId, request }, ct);
-        if (replay != null) return replay;
-        if (dossier.Version != request.ExpectedVersion) throw Error("MSG111", 409);
-        if (dossier.State != "Open" || dossier.HasCommittedPlan()) throw Error("MSG240", 409);
-        if (request.Items is not { Length: >= 1 and <= 100 }) throw Error("MSG04");
-        if (request.Items.Any(x => x.Id == Guid.Empty) || request.Items.Where(x => x.Id.HasValue).Select(x => x.Id).Distinct().Count()
-            != request.Items.Count(x => x.Id.HasValue) || request.Items.Select(x => x.PlannedOrder).Distinct().Count() != request.Items.Length)
-            throw Error("MSG04");
-        var serviceIds = request.Items.Select(x => x.ServiceId).Distinct().ToArray();
-        var services = await db.Set<SchedulingService>().AsNoTracking().Where(x => x.BranchId == dossier.BranchId
-            && x.Active && serviceIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, ct);
-        if (services.Count != serviceIds.Length) throw Error("MSG04");
-        var linkedItems = await db.TreatmentSteps.AsNoTracking().Where(x => x.DossierId == dossierId)
-            .Select(x => x.ItemId).Distinct().ToArrayAsync(ct);
-        if (linkedItems.Any(id => request.Items.All(x => x.Id != id || x.Decision != "Agreed")))
-            throw Error("MSG233", 409);
-        var existing = dossier.Items.ToDictionary(x => x.Id);
-        if (request.Items.Any(x => !x.Id.HasValue)) await access.RequireAsync(actorId, "treatment.items.create", ct);
-        if (existing.Keys.Any(itemId => request.Items.All(x => x.Id != itemId))) await access.RequireAsync(actorId, "treatment.items.delete", ct);
-        var incoming = new HashSet<Guid>();
-        foreach (var input in request.Items)
-        {
-            if (input.Id is { } itemId && existing.TryGetValue(itemId, out var oldItem)
-                && (input.AgreedUnitPriceVnd != oldItem.AgreedUnitPriceVnd
-                    || input.ClearDiscount && oldItem.DiscountType != null
-                    || input.Discount is { } discount && (discount.Type != oldItem.DiscountType
-                        || discount.Value != oldItem.DiscountValue || Clean(discount.Reason) != oldItem.DiscountReason
-                        || discount.QualifyingItemId != oldItem.DiscountQualifyingItemId)))
-                await access.RequireAsync(actorId, "treatment.items.price", ct);
-            if (input.Quantity <= 0 || input.Quantity > 999999999 || decimal.Round(input.Quantity, 3) != input.Quantity
-                || input.AgreedUnitPriceVnd < 0
-                || decimal.Round(input.Quantity * input.AgreedUnitPriceVnd, 0,
-                    MidpointRounding.AwayFromZero) > long.MaxValue
-                || input.PlannedOrder < 1 || input.EstimatedMinutes is < 1 or > 480
-                || !TreatmentPlanRules.ValidDuration(input.EstimatedMinMinutes, input.EstimatedMinutes,
-                    input.EstimatedMaxMinutes, input.ReservedMinutes, input.AcknowledgeShortReservation)
-                || input.EstimatedSessions is < 1 or > 100
-                || !TreatmentPlanRules.ValidReturnWindow(input.ReturnEarliestOn,
-                    input.ReturnTargetOn, input.ReturnLatestOn)
-                || (input.Discount != null && (input.Discount.Type is not ("Fixed" or "Percent")
-                    || input.Discount.Value <= 0 || input.Discount.Type == "Percent" && input.Discount.Value > 100
-                    || Clean(input.Discount.Reason) is not { Length: > 0 and <= 1000 }))
-                || (input.ClearDiscount && input.Discount != null)
-                || (input.EstimatedStart.HasValue && input.EstimatedEnd < input.EstimatedStart)
-                || Clean(input.Unit) is not { Length: > 0 and <= 40 }
-                || Clean(input.Region)?.Length > 80 || Clean(input.Counseling)?.Length > 4000
-                || Clean(input.DecisionMaker)?.Length > 160 || Clean(input.RepresentativeBasis)?.Length > 1000
-                || input.Decision is not ("Proposed" or "Agreed" or "Refused" or "Deferred")) throw Error("MSG04");
-            if (input.SourceDiagnosisId.HasValue) throw Error("MSG239"); // DCMS-93/94 adapter is not available yet.
-            var item = input.Id.HasValue
-                ? existing.GetValueOrDefault(input.Id.Value) ?? throw Error("MSG113", 404)
-                : new TreatmentItem { DossierId = dossier.Id };
-            incoming.Add(item.Id);
-            if (!input.Id.HasValue)
-            {
-                dossier.Items.Add(item);
-                db.TreatmentItems.Add(item);
-            }
-            var serviceChanged = !input.Id.HasValue || item.ServiceId != input.ServiceId;
-            var reservationChanged = item.EstimatedMaxMinutes != input.EstimatedMaxMinutes
-                || item.ReservedMinutes != input.ReservedMinutes;
-            item.ServiceId = input.ServiceId;
-            if (serviceChanged)
-            {
-                item.ReferenceUnitPriceVnd = services[input.ServiceId].ReferenceUnitPriceVnd;
-                item.ReferencePriceVersion = services[input.ServiceId].PriceVersion;
-            }
-            item.ServiceName = services[input.ServiceId].Name;
-            item.Region = Clean(input.Region);
-            item.Unit = input.Unit.Trim();
-            item.Quantity = input.Quantity;
-            item.PlannedOrder = input.PlannedOrder;
-            item.EstimatedMinutes = input.EstimatedMinutes;
-            item.EstimatedMinMinutes = input.EstimatedMinMinutes;
-            item.EstimatedMaxMinutes = input.EstimatedMaxMinutes;
-            item.ReservedMinutes = input.ReservedMinutes;
-            item.EstimatedSessions = input.EstimatedSessions;
-            item.ReturnEarliestOn = input.ReturnEarliestOn;
-            item.ReturnTargetOn = input.ReturnTargetOn;
-            item.ReturnLatestOn = input.ReturnLatestOn;
-            if (input.EstimatedMaxMinutes.HasValue && input.ReservedMinutes < input.EstimatedMaxMinutes)
-            {
-                if (item.ShortReservationAcknowledgedBy == null || reservationChanged)
-                {
-                    item.ShortReservationAcknowledgedBy = actorId;
-                    item.ShortReservationAcknowledgedAt = clock.GetUtcNow();
-                }
-            }
-            else
-            {
-                item.ShortReservationAcknowledgedBy = null;
-                item.ShortReservationAcknowledgedAt = null;
-            }
-            item.EstimatedStart = input.EstimatedStart;
-            item.EstimatedEnd = input.EstimatedEnd;
-            item.AgreedUnitPriceVnd = input.AgreedUnitPriceVnd;
-            if (input.ClearDiscount)
-            {
-                item.DiscountType = null; item.DiscountValue = null; item.DiscountReason = null;
-                item.DiscountQualifyingItemId = null; item.DiscountStatus = null;
-                item.DiscountBasisHash = null; item.DiscountDecidedBy = null; item.DiscountDecidedAt = null;
-            }
-            else if (input.Discount != null && (item.DiscountType != input.Discount.Type
-                || item.DiscountValue != input.Discount.Value
-                || item.DiscountReason != Clean(input.Discount.Reason)
-                || item.DiscountQualifyingItemId != input.Discount.QualifyingItemId))
-            {
-                item.DiscountType = input.Discount.Type; item.DiscountValue = input.Discount.Value;
-                item.DiscountReason = Clean(input.Discount.Reason);
-                item.DiscountQualifyingItemId = input.Discount.QualifyingItemId;
-                item.DiscountStatus = "Proposed"; item.DiscountDecidedBy = null;
-                item.DiscountDecidedAt = null; item.DiscountBasisHash = null;
-            }
-            item.Decision = input.Decision;
-            item.Counseling = Clean(input.Counseling);
-            item.DecisionMaker = Clean(input.DecisionMaker);
-            item.RepresentativeBasis = Clean(input.RepresentativeBasis);
-            item.ConsentDocumentId = input.ConsentDocumentId;
-            item.DecidedAt = input.Decision == "Proposed" ? null : clock.GetUtcNow();
-            item.DecidedBy = input.Decision == "Proposed" ? null : actorId;
-            item.DecisionPlanVersion = null;
-            item.ConsentPlanVersion = null;
-        }
-        foreach (var removed in dossier.Items.Where(x => !incoming.Contains(x.Id)).ToArray())
-        {
-            dossier.Items.Remove(removed);
-            db.TreatmentItems.Remove(removed);
-        }
-        foreach (var item in dossier.Items.Where(x => x.DiscountType != null))
-        {
-            var qualifying = item.DiscountQualifyingItemId.HasValue
-                ? dossier.Items.SingleOrDefault(x => x.Id == item.DiscountQualifyingItemId.Value) : null;
-            if (item.DiscountQualifyingItemId.HasValue && (qualifying == null || qualifying.Id == item.Id))
-                throw Error("MSG04");
-            if (item.Quantity * item.AgreedUnitPriceVnd > long.MaxValue) throw Error("MSG04");
-            var gross = Gross(item);
-            try { TreatmentPlanRules.Discount(gross, item.DiscountType!, item.DiscountValue!.Value); }
-            catch (ArgumentOutOfRangeException) { throw Error("MSG04"); }
-            if (item.DiscountStatus == "Approved" && item.DiscountBasisHash != DiscountBasis(item, qualifying))
-            {
-                item.DiscountStatus = "Proposed"; item.DiscountDecidedBy = null;
-                item.DiscountDecidedAt = null; item.DiscountBasisHash = null;
-            }
-        }
-        decimal totalGross = 0;
-        foreach (var item in dossier.Items.Where(x => x.Decision == "Agreed"))
-        {
-            var gross = decimal.Round(item.Quantity * item.AgreedUnitPriceVnd, 0,
-                MidpointRounding.AwayFromZero);
-            if (gross > long.MaxValue - totalGross) throw Error("MSG04");
-            totalGross += gross;
-        }
-        dossier.Version++;
-        dossier.UpdatedAt = clock.GetUtcNow();
-        await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
-        Event(dossier, actorId, "PlanDraftSaved", new { DossierId = dossier.Id, dossier.Version,
-            Items = dossier.Items.OrderBy(x => x.PlannedOrder).Select(ItemDto).ToArray() });
-        await db.SaveChangesAsync(ct);
-        var result = new TreatmentChange(await DetailAsync(dossier, ct), SystemMessages.Get("MSG222", "nháp kế hoạch", value: dossier.Code));
-        StoreReceipt(actorId, request.RequestKey, "Draft", new { dossierId, request }, result);
-        await db.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
-        return result;
-    }
-
-    public async Task<TreatmentChange> CommitAsync(int actorId, Guid dossierId, CommitPlanRequest request, CancellationToken ct)
-    {
-        var dossier = await DossierAsync(actorId, dossierId, ct);
-        var replay = await ReplayAsync(actorId, request.RequestKey, "Commit", new { dossierId, request }, ct);
-        if (replay != null) return replay;
-        if (dossier.Version != request.ExpectedVersion) throw Error("MSG111", 409);
-        if (dossier.State != "Open" || !dossier.HasDraftPlan() || dossier.Items.Count == 0) throw Error("MSG04");
-        if (dossier.Items.Any(x => x.Decision != "Proposed" && (x.Counseling == null || x.DecisionMaker == null)))
-            throw Error("MSG240");
-        if (dossier.Items.Any(x => x.DiscountStatus == "Proposed")) throw Error("MSG240");
-        if (dossier.Items.Any(x => x.DiscountStatus == "Approved" && x.DiscountQualifyingItemId.HasValue
-            && dossier.Items.All(q => q.Id != x.DiscountQualifyingItemId || q.Decision != "Agreed")))
-            throw Error("MSG240");
-        foreach (var item in dossier.Items.Where(x => x.ConsentDocumentId.HasValue))
-            if (!await db.Set<DCMS.Domain.Features.Examinations.ClinicalDocument>().AnyAsync(x => x.Id == item.ConsentDocumentId
-                && x.PatientId == dossier.PatientId && x.DossierId == dossier.Id && (!x.PlanId.HasValue || x.PlanId == dossier.Id) && x.FileState == "Ready", ct)) throw Error("MSG240");
-        await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
-        var planVersion = dossier.CurrentPlanVersion() + 1;
-        foreach (var item in dossier.Items)
-        {
-            item.DecisionPlanVersion = planVersion;
-            item.ConsentPlanVersion = item.Decision != "Proposed" && item.ConsentDocumentId.HasValue ? planVersion : null;
-        }
-        dossier.Version++;
-        dossier.UpdatedAt = clock.GetUtcNow();
-        Event(dossier, actorId, "PlanCommitted", new { planVersion,
-            Items = dossier.Items.OrderBy(x => x.PlannedOrder).Select(ItemDto).ToArray() });
-        await db.SaveChangesAsync(ct);
-        var result = new TreatmentChange(await DetailAsync(dossier, ct), SystemMessages.Get("MSG222", "kế hoạch điều trị", value: dossier.Code));
-        StoreReceipt(actorId, request.RequestKey, "Commit", new { dossierId, request }, result);
-        await db.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
-        return result;
-    }
-
     public async Task<IReadOnlyList<TreatmentHistoryItem>> HistoryAsync(int actorId, Guid dossierId, CancellationToken ct)
     {
         await DossierAsync(actorId, dossierId, ct);
@@ -642,30 +408,14 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
             !await db.TreatmentEvents.AnyAsync(x => x.DossierId == dossierId && x.Kind == "PlanRevised", ct))
             throw Error("MSG233", 409);
         if (request.Outcome == "CompletedAsAgreed" && !dossier.HasCommittedPlan()) throw Error("MSG243", 409);
-        var unresolved = dossier.Items.Where(x => x.Decision == "Agreed" && x.Progress != "Completed").ToArray();
-        if (request.Dispositions == null || request.Dispositions.Select(x => x.ItemId).Distinct().Count()
-            != request.Dispositions.Length || request.Dispositions.Any(x => !unresolved.Any(item => item.Id == x.ItemId)))
-            throw Error("MSG243", 409);
-        var dispositions = request.Dispositions.ToDictionary(x => x.ItemId);
-        if (unresolved.Any(x => !dispositions.TryGetValue(x.Id, out var d) ||
-            d.Outcome is not ("Stopped" or "Skipped" or "Cancelled") || Clean(d.Reason) is not { Length: > 0 and <= 1000 }))
-            throw Error("MSG243", 409);
-        if (request.Outcome == "CompletedAsAgreed" && unresolved.Length > 0) throw Error("MSG243", 409);
         // An upcoming follow-up appointment of this dossier must be handled before closing it.
         if (await db.Appointments.AsNoTracking().AnyAsync(x => x.DossierId == dossierId &&
             (x.Status == "Confirmed" || x.Status == "CheckedIn"), ct)) throw Error("MSG233", 409);
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
-        foreach (var item in unresolved) item.Progress = dispositions[item.Id].Outcome;
-        var openSteps = await db.LoadTreatmentStepsAsync(db.TreatmentSteps.Where(x => x.DossierId == dossierId && x.Outcome != "Completed"), ct);
-        foreach (var step in openSteps.Where(x => dispositions.ContainsKey(x.ItemId)))
-        {
-            step.Outcome = dispositions[step.ItemId].Outcome;
-            step.Version++;
-        }
         dossier.State = request.Outcome == "StoppedIncomplete" ? "Stopped" : "Completed";
         dossier.Version++;
         dossier.UpdatedAt = clock.GetUtcNow();
-        Event(dossier, actorId, "DossierClosed", new { request.Outcome, reason, request.Dispositions });
+        Event(dossier, actorId, "DossierClosed", new { request.Outcome, reason });
         await db.SaveChangesAsync(ct);
         var result = new TreatmentChange(await DetailAsync(dossier, ct), SystemMessages.Get("MSG222", "kết thúc hồ sơ", value: dossier.Code));
         StoreReceipt(actorId, request.RequestKey, "Close", new { dossierId, request }, result);
@@ -695,140 +445,10 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
         return result;
     }
 
-    public async Task<TreatmentChange> ConfirmWarrantyAsync(int actorId, Guid dossierId, Guid itemId,
-        ConfirmWarrantyRequest request, CancellationToken ct)
+    public async Task<PlanPricePreviewDto> PricePreviewAsync(int actorId, Guid dossierId, CancellationToken ct)
     {
         var dossier = await DossierAsync(actorId, dossierId, ct);
-        var replay = await ReplayAsync(actorId, request.RequestKey, "Warranty", new { dossierId, itemId, request }, ct);
-        if (replay != null) return replay;
-        if (dossier.Version != request.ExpectedVersion) throw Error("MSG111", 409);
-        var item = dossier.Items.SingleOrDefault(x => x.Id == itemId) ?? throw Error("MSG113", 404);
-        var policy = Clean(request.Policy);
-        var version = Clean(request.PolicyVersion);
-        var scope = Clean(request.Scope);
-        var component = Clean(request.Component);
-        var exclusions = Clean(request.Exclusions);
-        var explanation = Clean(request.Explanation);
-        var today = DateOnly.FromDateTime(clock.GetUtcNow().ToOffset(TimeSpan.FromHours(7)).DateTime);
-        if (!dossier.HasCommittedPlan() || item.Decision != "Agreed" || item.Progress != "Completed"
-            || request.EndsOn is { } endsOn && endsOn < today
-            || policy is not { Length: > 0 and <= 160 }
-            || version is not { Length: > 0 and <= 40 } || scope is not { Length: > 0 and <= 1000 }
-            || component is not { Length: > 0 and <= 500 }
-            || exclusions?.Length > 1000 || explanation is not { Length: > 0 and <= 2000 }
-            || request.ActivationOn is null || request.ActivationOn > today
-            || request.EndsOn < request.ActivationOn
-            || request.ExpectedServiceLifeMonths is < 1 or > 1200
-            || item.WarrantyConfirmedAt.HasValue) throw Error("MSG244");
-        await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
-        item.WarrantyPolicy = policy;
-        item.WarrantyPolicyVersion = version;
-        item.WarrantyScope = scope;
-        item.WarrantyConfirmedAt = clock.GetUtcNow();
-        item.WarrantyConfirmedBy = actorId;
-        item.WarrantyEndsOn = request.EndsOn;
-        item.WarrantyComponent = component;
-        item.WarrantyExclusions = exclusions;
-        item.WarrantyActivatedOn = request.ActivationOn;
-        item.WarrantyExplanation = explanation;
-        item.ExpectedServiceLifeMonths = request.ExpectedServiceLifeMonths;
-        dossier.Version++;
-        dossier.UpdatedAt = clock.GetUtcNow();
-        Event(dossier, actorId, "WarrantyConfirmed", new { itemId, policy, version, scope,
-            component, exclusions, explanation, request.ActivationOn, request.EndsOn,
-            request.ExpectedServiceLifeMonths });
-        await db.SaveChangesAsync(ct);
-        var result = new TreatmentChange(await DetailAsync(dossier, ct), SystemMessages.Get("MSG222", "bảo hành điều trị", value: dossier.Code));
-        StoreReceipt(actorId, request.RequestKey, "Warranty", new { dossierId, itemId, request }, result);
-        await db.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
-        return result;
-    }
-
-    public async Task<PlanPricePreviewDto> PricePreviewAsync(int actorId, Guid dossierId, CancellationToken ct) =>
-        PricePreview(await DossierAsync(actorId, dossierId, ct));
-
-    public async Task<CommercialPlanDto> CommercialPlanAsync(int actorId, Guid dossierId, CancellationToken ct)
-    {
-        var dossier = await db.TreatmentDossiers.AsNoTracking().Include(x => x.Items)
-            .SingleOrDefaultAsync(x => x.Id == dossierId, ct) ?? throw Error("MSG113", 404);
-        await CommercialAsync(actorId, dossier.BranchId, ct);
-        return new(dossier.Id, dossier.Code, dossier.BranchId, dossier.Version,
-            dossier.Items.OrderBy(x => x.PlannedOrder).Select(ItemDto).ToArray(),
-            PricePreview(dossier));
-    }
-
-    public async Task<IReadOnlyList<CommercialDossierListItem>> CommercialDossiersAsync(int actorId,
-        CancellationToken ct)
-    {
-        var account = await users.FindByIdAsync(actorId.ToString());
-        if (account is not { IsActive: true, AccountType: "Staff" }) throw Error("MSG06", 403);
-        var roles = AccountRoles.Effective(await users.GetRolesAsync(account));
-        if (!roles.Contains(AccountRoles.Admin) && !roles.Contains(AccountRoles.ClinicOwner)
-            && !roles.Contains(AccountRoles.Dentist))
-            throw Error("MSG06", 403);
-        var query = db.TreatmentDossiers.AsNoTracking().Include(x => x.Items)
-            .Where(x => x.State == "Open" && x.Items.Any(i => !i.SheetDeleted && i.DecisionPlanVersion == null));
-        var scope = await access.ResolveAsync(actorId, ct);
-        if (scope.Assigned && !scope.Owner) query = query.Where(x => scope.BranchIds.Contains(x.BranchId));
-        if (!roles.Contains(AccountRoles.Admin))
-        {
-            var isOwner = roles.Contains(AccountRoles.ClinicOwner);
-            var employeeId = await db.Employees.AsNoTracking().Where(x => x.AccountId == actorId)
-                .Select(x => (int?)x.Id).SingleOrDefaultAsync(ct);
-            if (employeeId == null) throw Error("MSG06", 403);
-            var branches = db.SchedulingMembers.AsNoTracking().Where(x =>
-                x.EmployeeId == employeeId.Value && x.Active &&
-                (isOwner || x.CanDentist)).Select(x => x.BranchId);
-            query = query.Where(x => branches.Contains(x.BranchId));
-        }
-        var dossiers = await query.OrderByDescending(x => x.UpdatedAt).Take(100).ToListAsync(ct);
-        var result = new List<CommercialDossierListItem>();
-        foreach (var dossier in dossiers)
-        {
-            result.Add(new(dossier.Id, dossier.Code, dossier.BranchId, dossier.Version,
-                dossier.Items.Count(x => x.DiscountStatus == "Proposed")));
-        }
-        return result;
-    }
-
-    public async Task<TreatmentChange> DecideDiscountAsync(int actorId, Guid dossierId, Guid itemId,
-        DecideDiscountRequest request, CancellationToken ct)
-    {
-        var dossier = await db.TreatmentDossiers.Include(x => x.Items).SingleOrDefaultAsync(x => x.Id == dossierId, ct)
-            ?? throw Error("MSG113", 404);
-        await CommercialAsync(actorId, dossier.BranchId, ct);
-        var replay = await ReplayAsync(actorId, request.RequestKey, "Discount", new { dossierId, itemId, request }, ct);
-        if (replay != null) return replay;
-        if (dossier.Version != request.ExpectedVersion) throw Error("MSG111", 409);
-        var item = dossier.Items.SingleOrDefault(x => x.Id == itemId) ?? throw Error("MSG113", 404);
-        if (dossier.State != "Open" || !dossier.HasDraftPlan() || item.DiscountStatus != "Proposed"
-            || request.Decision is not ("Approved" or "Rejected")) throw Error("MSG240", 409);
-        var qualifying = item.DiscountQualifyingItemId.HasValue
-            ? dossier.Items.SingleOrDefault(x => x.Id == item.DiscountQualifyingItemId.Value) : null;
-        if (item.Decision != "Agreed" || item.DiscountQualifyingItemId.HasValue &&
-            (qualifying == null || qualifying.Decision != "Agreed"))
-            throw Error("MSG240", 409);
-        if (item.DiscountValue is null || item.DiscountValue <= 0 ||
-            item.DiscountType is not ("Fixed" or "Percent") ||
-            item.DiscountType == "Percent" && item.DiscountValue > 100 ||
-            (item.DiscountType == "Fixed" ? item.DiscountValue : Gross(item) * item.DiscountValue / 100m) > Gross(item))
-            throw Error("MSG04");
-        await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
-        item.DiscountStatus = request.Decision;
-        item.DiscountBasisHash = request.Decision == "Approved" ? DiscountBasis(item, qualifying) : null;
-        item.DiscountDecidedBy = actorId;
-        item.DiscountDecidedAt = clock.GetUtcNow();
-        dossier.Version++;
-        dossier.UpdatedAt = clock.GetUtcNow();
-        Event(dossier, actorId, "DiscountDecision", new { itemId, request.Decision,
-            item.DiscountType, item.DiscountValue, item.DiscountReason, item.DiscountQualifyingItemId });
-        await db.SaveChangesAsync(ct);
-        var result = new TreatmentChange(await DetailAsync(dossier, ct), SystemMessages.Get("MSG222", "giảm trừ", value: dossier.Code));
-        StoreReceipt(actorId, request.RequestKey, "Discount", new { dossierId, itemId, request }, result);
-        await db.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
-        return result;
+        return PricePreview(dossier, await CurrentPlanVersionAsync(dossier.Id, dossier.Items.Count > 0, ct));
     }
 
     public async Task<IReadOnlyList<OwnTreatmentSummaryItem>> OwnSummaryAsync(int accountId, CancellationToken ct)
@@ -836,11 +456,13 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
         var patientIds = db.PatientAccountLinks.AsNoTracking().Where(x => x.AccountId == accountId
             && x.Status == PatientLinkStatus.Verified).Select(x => x.PatientId);
         var dossiers = await db.TreatmentDossiers.AsNoTracking().Include(x => x.Items)
-            .Where(x => patientIds.Contains(x.PatientId) && x.State != "Deleted"
-                && x.Items.Any(i => i.DecisionPlanVersion != null)
-                && !x.Items.Any(i => !i.SheetDeleted && i.DecisionPlanVersion == null))
+            .Where(x => patientIds.Contains(x.PatientId) && x.State != "Deleted" && x.Items.Any())
             .OrderByDescending(x => x.StartedOn).ToListAsync(ct);
         var dossierIds = dossiers.Select(x => x.Id).ToArray();
+        var planCommits = dossierIds.Length == 0 ? [] : await db.TreatmentEvents.AsNoTracking()
+            .Where(x => dossierIds.Contains(x.DossierId) && x.Kind == "PlanCommitted")
+            .GroupBy(x => x.DossierId).Select(g => new { DossierId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.DossierId, x => x.Count, ct);
         var verifiedPatientIds = await patientIds.ToArrayAsync(ct);
         var activities = await db.ClinicalActivities.AsNoTracking()
             .Where(x => dossierIds.Contains(x.DossierId))
@@ -876,7 +498,7 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
                     source == "PAYMENT_RECEIPT" ? "PaymentReceipt" : "DossierPayment")));
         }
         return dossiers.Select(x => new OwnTreatmentSummaryItem(x.Id, x.Code, x.State, x.StartedOn,
-            x.Diagnosis, x.CurrentPlanVersion(), x.Items.Where(item => item.Decision == "Agreed")
+            x.Diagnosis, Math.Max(1, planCommits.GetValueOrDefault(x.Id)), x.Items
                 .OrderBy(item => item.PlannedOrder).Select(ItemDto).ToArray(),
             activities.Where(activity => activity.DossierId == x.Id).Select(activity =>
                 new PerformedTreatmentItem(activity.Id, activity.PerformedAt,

@@ -130,7 +130,7 @@ export default function DossierList({ patientId, visitId, initialDossierId, sour
     try {
       const value = await api<TreatmentDossier>(`/api/dossiers/${item.id}`);
       const payload = completed
-        ? { expectedVersion: value.version, outcome: 'CompletedAsAgreed', reason: null, dispositions: [], requestKey: crypto.randomUUID() }
+        ? { expectedVersion: value.version, outcome: 'CompletedAsAgreed', reason: null, requestKey: crypto.randomUUID() }
         : { expectedVersion: value.version, reason: 'Mở lại phiếu điều trị', requestKey: crypto.randomUUID() };
       await api(`/api/dossiers/${item.id}/${completed ? 'close' : 'reopen'}`, {
         method: 'POST', body: JSON.stringify(payload),

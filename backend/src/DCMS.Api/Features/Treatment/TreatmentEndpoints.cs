@@ -102,9 +102,6 @@ public static class TreatmentEndpoints
         dossier.MapPost("/plan/planned-dates", async (HttpContext context, Guid dossierId, ApplyPlannedDatesRequest request,
             ITreatmentDossierService service, CancellationToken ct) => Results.Ok(await service.ApplyPlannedDatesAsync(
                 AuthenticationEndpoints.AccountId(context.User), dossierId, request, ct)));
-        dossier.MapPost("/plan/items/{itemId:guid}/decision", async (HttpContext context, Guid dossierId, Guid itemId,
-            DecideSheetItemRequest request, ITreatmentDossierService service, CancellationToken ct) => Results.Ok(await service.DecideSheetItemAsync(
-                AuthenticationEndpoints.AccountId(context.User), dossierId, itemId, request, ct)));
         dossier.MapDelete("/", async (HttpContext context, Guid dossierId, [FromBody] DeleteDossierRequest request,
             ITreatmentDossierService service, CancellationToken ct) => Results.Ok(await service.DeleteAsync(
                 AuthenticationEndpoints.AccountId(context.User), dossierId, request, ct)));
@@ -126,28 +123,9 @@ public static class TreatmentEndpoints
                 dossierId, rowId, expectedVersion, ct);
             return Results.NoContent();
         });
-        dossier.MapPost("/plan/draft", async (HttpContext context, Guid dossierId, SavePlanDraftRequest request,
-            ITreatmentDossierService service, CancellationToken ct) =>
-            Results.Ok(await service.SaveDraftAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, request, ct)));
-        dossier.MapPost("/plan/commit", async (HttpContext context, Guid dossierId, CommitPlanRequest request,
-            ITreatmentDossierService service, CancellationToken ct) =>
-            Results.Ok(await service.CommitAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, request, ct)));
         dossier.MapGet("/plan/preview", async (HttpContext context, Guid dossierId,
             ITreatmentDossierService service, CancellationToken ct) => Results.Ok(await service.PricePreviewAsync(
                 AuthenticationEndpoints.AccountId(context.User), dossierId, ct)));
-        var commercial = endpoints.MapGroup("/api/commercial/dossiers/{dossierId:guid}")
-            .RequireAuthorization().WithTags("S21 commercial review");
-        endpoints.MapGet("/api/commercial/dossiers", async (HttpContext context,
-            ITreatmentDossierService service, CancellationToken ct) => Results.Ok(await service.CommercialDossiersAsync(
-                AuthenticationEndpoints.AccountId(context.User), ct))).RequireAuthorization()
-            .WithTags("S21 commercial review");
-        commercial.MapGet("/plan", async (HttpContext context, Guid dossierId,
-            ITreatmentDossierService service, CancellationToken ct) => Results.Ok(await service.CommercialPlanAsync(
-                AuthenticationEndpoints.AccountId(context.User), dossierId, ct)));
-        commercial.MapPost("/items/{itemId:guid}/discount/decision", async (HttpContext context,
-            Guid dossierId, Guid itemId, DecideDiscountRequest request, ITreatmentDossierService service,
-            CancellationToken ct) => Results.Ok(await service.DecideDiscountAsync(
-                AuthenticationEndpoints.AccountId(context.User), dossierId, itemId, request, ct)));
         dossier.MapGet("/plan/history", async (HttpContext context, Guid dossierId, ITreatmentDossierService service, CancellationToken ct) =>
             Results.Ok(await service.HistoryAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, ct)));
         dossier.MapPost("/close", async (HttpContext context, Guid dossierId, CloseDossierRequest request,
@@ -156,62 +134,6 @@ public static class TreatmentEndpoints
         dossier.MapPost("/reopen", async (HttpContext context, Guid dossierId, ReopenDossierRequest request,
             ITreatmentDossierService service, CancellationToken ct) =>
             Results.Ok(await service.ReopenAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, request, ct)));
-        dossier.MapPost("/items/{itemId:guid}/warranty/confirm", async (HttpContext context, Guid dossierId,
-            Guid itemId, ConfirmWarrantyRequest request, ITreatmentDossierService service, CancellationToken ct) =>
-            Results.Ok(await service.ConfirmWarrantyAsync(AuthenticationEndpoints.AccountId(context.User), dossierId,
-                itemId, request, ct)));
-
-        dossier.MapPost("/plan/from-template", async (HttpContext context, Guid dossierId,
-            ApplyTemplateRequest request, ITreatmentProgressionService service, CancellationToken ct) =>
-            Results.Ok(await service.ApplyTemplateAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, request, ct)));
-        dossier.MapGet("/steps", async (HttpContext context, Guid dossierId,
-            ITreatmentProgressionService service, CancellationToken ct) =>
-            Results.Ok(await service.StepsAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, ct)));
-        dossier.MapPost("/steps", async (HttpContext context, Guid dossierId, AddPatientStepRequest request,
-            ITreatmentProgressionService service, CancellationToken ct) =>
-            Results.Ok(await service.AddPatientStepAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, request, ct)));
-        dossier.MapGet("/steps/{stepId:guid}/readiness", async (HttpContext context, Guid dossierId, Guid stepId,
-            ITreatmentProgressionService service, CancellationToken ct) =>
-            Results.Ok((await service.StepsAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, ct))
-                .SingleOrDefault(x => x.Id == stepId)));
-        dossier.MapPost("/steps/{stepId:guid}/progress", async (HttpContext context, Guid dossierId, Guid stepId,
-            StepProgressRequest request, ITreatmentProgressionService service, CancellationToken ct) =>
-            Results.Ok(await service.ProgressAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, stepId, request, ct)));
-        dossier.MapPost("/steps/{stepId:guid}/hold", async (HttpContext context, Guid dossierId, Guid stepId,
-            HoldStepRequest request, ITreatmentProgressionService service, CancellationToken ct) =>
-            Results.Ok(await service.HoldAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, stepId, request, ct)));
-        dossier.MapPost("/steps/{stepId:guid}/release-hold", async (HttpContext context, Guid dossierId, Guid stepId,
-            HoldStepRequest request, ITreatmentProgressionService service, CancellationToken ct) =>
-            Results.Ok(await service.ReleaseHoldAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, stepId, request, ct)));
-        dossier.MapPost("/steps/{stepId:guid}/complete", async (HttpContext context, Guid dossierId, Guid stepId,
-            CompleteStepRequest request, ITreatmentProgressionService service, CancellationToken ct) =>
-            Results.Ok(await service.CompleteStepAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, stepId, request, ct)));
-
-        var templates = endpoints.MapGroup("/api/treatment-templates")
-            .RequireAuthorization(DentistPolicy).WithTags("UC-51 S58 Treatment templates");
-        templates.MapGet("/", async (HttpContext context, int branchId, ITreatmentProgressionService service,
-            CancellationToken ct) => Results.Ok(await service.ListTemplatesAsync(
-                AuthenticationEndpoints.AccountId(context.User), branchId, ct)));
-        templates.MapPost("/", async (HttpContext context, CreateTemplateRequest request,
-            ITreatmentProgressionService service, CancellationToken ct) => Results.Json(await service.CreateTemplateAsync(
-                AuthenticationEndpoints.AccountId(context.User), request, ct), statusCode: 201));
-        templates.MapGet("/{id:guid}", async (HttpContext context, Guid id, ITreatmentProgressionService service,
-            CancellationToken ct) => Results.Ok(await service.GetTemplateAsync(AuthenticationEndpoints.AccountId(context.User), id, ct)));
-        templates.MapPost("/{id:guid}/versions", async (HttpContext context, Guid id, NewTemplateVersionRequest request,
-            ITreatmentProgressionService service, CancellationToken ct) => Results.Ok(await service.NewVersionAsync(
-                AuthenticationEndpoints.AccountId(context.User), id, request, ct)));
-        templates.MapPost("/{id:guid}/versions/{number:int}/draft", async (HttpContext context, Guid id, int number,
-            UpdateTemplateDraftRequest request, ITreatmentProgressionService service, CancellationToken ct) =>
-            Results.Ok(await service.UpdateDraftAsync(AuthenticationEndpoints.AccountId(context.User), id,
-                number, request, ct)));
-        templates.MapPost("/{id:guid}/versions/{number:int}/activate", async (HttpContext context, Guid id, int number,
-            TemplateStateRequest request, ITreatmentProgressionService service, CancellationToken ct) =>
-            Results.Ok(await service.TemplateStateAsync(AuthenticationEndpoints.AccountId(context.User), id,
-                number, "Active", request, ct)));
-        templates.MapPost("/{id:guid}/versions/{number:int}/retire", async (HttpContext context, Guid id, int number,
-            TemplateStateRequest request, ITreatmentProgressionService service, CancellationToken ct) =>
-            Results.Ok(await service.TemplateStateAsync(AuthenticationEndpoints.AccountId(context.User), id,
-                number, "Retired", request, ct)));
 
         endpoints.MapGet("/api/patients/me/treatment-summary", async (HttpContext context,
             ITreatmentDossierService service, CancellationToken ct) =>

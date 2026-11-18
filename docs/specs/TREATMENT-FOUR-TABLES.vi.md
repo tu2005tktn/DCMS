@@ -54,3 +54,5 @@ Kiểm tra cấu hình mẫu, áp dụng và tùy chỉnh hạng mục, bản nh
 Cập nhật 18/11/2026: cột `SourceKind` của `CLINICAL_ACTIVITY` được bỏ, suy ra từ `VisitId`; hai loại bản ghi đánh giá lâm sàng và ghi chú chăm sóc bị xóa, bảng chỉ còn hoạt động điều trị và hướng dẫn tái khám; xem [rút gọn bảng CLINICAL_ACTIVITY](CLINICAL-ACTIVITY-TABLE-SIMPLIFICATION.vi.md).
 
 Cập nhật 18/11/2026 (2): rút gọn `TREATMENT_DOSSIER` từ 34 xuống 14 cột theo Phương án A (`Version` là khóa đồng thời duy nhất, chỉ giữ JSONB `SheetDrafts`, gỡ `RevisionDrafts` và 19 cột dư); xem [rút gọn bảng TREATMENT_DOSSIER](TREATMENT-DOSSIER-TABLE-SIMPLIFICATION.vi.md).
+
+Cập nhật 18/11/2026 (3): rút gọn `TREATMENT_PLAN_ITEM` từ 65 xuống 18 cột theo Phương án A (chỉ giữ các cột hiển thị trên bảng kế hoạch của phiếu điều trị, bỏ `Steps` JSONB, bảo hành, đồng thuận và 47 cột dư; `CLINICAL_ACTIVITY.ItemId` thành FK nullable `ON DELETE SET NULL`); xem [rút gọn bảng TREATMENT_PLAN_ITEM](TREATMENT-PLAN-ITEM-TABLE-SIMPLIFICATION.vi.md).

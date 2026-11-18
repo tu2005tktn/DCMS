@@ -117,15 +117,16 @@ public sealed class ItemPlanApiTests(ApiFixture fixture) : IClassFixture<ApiFixt
     [Fact]
     public async Task LegacySourcesStaySeparateAndCannotMutateItemPlans() {
         var s = await Setup(); using var c = await Login(); var plan = await Create(c, s.Branch);
-        var definition = new StepDefinition(Guid.NewGuid(), null, "Legacy step", null, 20, 30, [], null, null, null, null, null, "IncludedInItem");
-        var created = await c.PostAsJsonAsync("/api/treatment-templates", new CreateTemplateRequest(s.Branch, "Legacy", [definition], Guid.NewGuid())); created.EnsureSuccessStatusCode();
-        var legacy = (await created.Content.ReadFromJsonAsync<TreatmentTemplateDto>())!;
-        Assert.Single((await c.GetFromJsonAsync<TemplateListItem[]>($"/api/treatment-templates?branchId={s.Branch}"))!);
+        var legacy = new DCMS.Domain.Features.Treatment.TreatmentTemplate {
+            BranchId = s.Branch, Name = "Legacy", DefinitionKind = "LegacySteps", Version = 1,
+            CreatedBy = 1, CreatedAt = DateTimeOffset.UtcNow
+        };
+        using (var scope = fixture.Services.CreateScope()) {
+            var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
+            db.TreatmentTemplates.Add(legacy); await db.SaveChangesAsync();
+        }
         var list = (await c.GetFromJsonAsync<ItemPlanPage>($"{Root}?branchId={s.Branch}"))!; Assert.Equal(plan.Id, Assert.Single(list.Items).Id);
-        Assert.Equal(HttpStatusCode.NotFound, (await c.GetAsync($"/api/treatment-templates/{plan.Id}")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await c.GetAsync($"{Root}/{legacy.Id}")).StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await c.PostAsJsonAsync($"/api/treatment-templates/{plan.Id}/versions", new NewTemplateVersionRequest(plan.Version, [definition], Guid.NewGuid()))).StatusCode);
-        var active = await c.PostAsJsonAsync($"/api/treatment-templates/{legacy.Id}/versions/1/activate", new TemplateStateRequest(legacy.Version, Guid.NewGuid())); active.EnsureSuccessStatusCode();
     }
     [Fact]
     public async Task MigrationKeepsLegacyRowsAndIdentifiers() {

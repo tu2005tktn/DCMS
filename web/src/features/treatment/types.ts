@@ -1,37 +1,19 @@
 import type { SystemMessage } from '../../services/api';
 
 export type TreatmentItem = {
-  id: string; sourceDiagnosisId: number | null; serviceId: number; serviceName: string; region: string | null;
-  material: string | null;
-  note?: string | null; responsibleDentistId?: number; assistantId?: number;
+  id: string; serviceId: number; serviceName: string; region: string | null;
   unit: string; quantity: number; plannedOrder: number; estimatedMinutes: number | null;
-  estimatedStart: string | null; estimatedEnd: string | null; agreedUnitPriceVnd: number;
-  decision: 'Proposed' | 'Agreed' | 'Refused' | 'Deferred'; progress: string;
-  counseling: string | null; decisionMaker: string | null; representativeBasis: string | null;
-  decidedAt: string | null; consentDocumentId: string | null; consentPlanVersion: number | null;
-  decisionPlanVersion: number | null;
-  warrantyPolicy: string | null; warrantyPolicyVersion: string | null; warrantyScope: string | null;
-  warrantyConfirmedAt: string | null; warrantyEndsOn: string | null;
-  estimatedMinMinutes: number | null; estimatedMaxMinutes: number | null; reservedMinutes: number | null;
-  estimatedSessions: number | null; returnEarliestOn: string | null; returnTargetOn: string | null;
-  returnLatestOn: string | null; shortReservationAcknowledgedBy: number | null;
-  shortReservationAcknowledgedAt: string | null;
-  referenceUnitPriceVnd: number | null; referencePriceVersion: number | null;
-  discount: TreatmentDiscount | null; warrantyComponent: string | null; warrantyExclusions: string | null;
-  warrantyActivatedOn: string | null; warrantyExplanation: string | null;
-  expectedServiceLifeMonths: number | null;
-  entrySource?: string; displayCompleted?: boolean; sheetDeleted?: boolean; hiddenFromSheet?: boolean;
+  estimatedStart: string | null; agreedUnitPriceVnd: number;
+  discount: TreatmentDiscount | null;
+  note?: string | null; responsibleDentistId?: number; assistantId?: number;
+  displayCompleted?: boolean;
 };
-export type TreatmentDiscount = { type: 'Fixed' | 'Percent'; value: number; reason: string;
-  qualifyingItemId: string | null; status: 'Proposed' | 'Approved' | 'Rejected';
-  decidedBy: number | null; decidedAt: string | null; amountVnd: number };
+export type TreatmentDiscount = { type: 'Fixed' | 'Percent'; value: number; reason: string; amountVnd: number };
 export type ServicePrice = { unit?: string; serviceId: number; branchId: number; name: string;
   referenceUnitPriceVnd: number | null; priceVersion: number };
 export type PricePreview = { dossierId: string; dossierVersion: number; planVersion: number;
-  items: { itemId: string; grossVnd: number; approvedDiscountVnd: number; netVnd: number;
-    referenceUnitPriceVnd: number | null; decision: TreatmentItem['decision'];
-    includedInTotal: boolean }[]; grossVnd: number; approvedDiscountVnd: number;
-  netBeforeTaxVnd: number };
+  items: { itemId: string; grossVnd: number; approvedDiscountVnd: number; netVnd: number }[];
+  grossVnd: number; approvedDiscountVnd: number; netBeforeTaxVnd: number };
 export type TreatmentEvent = { id: string; kind: string; dossierVersion: number; actorId: number;
   occurredAt: string; payloadJson: string; actorName?: string };
 export type TreatmentDossier = {
@@ -54,13 +36,7 @@ export type AppointmentOptions = { branches: { id: number; name: string }[];
   dentists: { id: number; branchId: number; name: string }[];
   services: { id: number; branchId: number; name: string }[] };
 
-export const decisionLabel: Record<TreatmentItem['decision'], string> = {
-  Proposed: 'Đề xuất', Agreed: 'Đã đồng ý', Refused: 'Từ chối', Deferred: 'Hoãn quyết định',
-};
 export const stateLabel: Record<TreatmentDossier['state'], string> = {
   Open: 'Đang điều trị', Completed: 'Đã kết thúc', Stopped: 'Đã dừng', Cancelled: 'Hủy phiếu',
-};
-export const progressLabel: Record<string, string> = {
-  NotStarted: 'Chưa thực hiện', InProgress: 'Đang thực hiện', Partial: 'Đã làm một phần', Completed: 'Đã hoàn tất', Stopped: 'Đã dừng',
 };
 export const money = (amount: number) => `${new Intl.NumberFormat('vi-VN').format(amount)} ₫`;

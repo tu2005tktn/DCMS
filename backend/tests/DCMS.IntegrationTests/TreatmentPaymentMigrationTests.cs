@@ -26,18 +26,17 @@ public sealed class TreatmentPaymentMigrationTests(ApiFixture fixture) : IClassF
             Code = "OLD-" + Guid.NewGuid().ToString("N"), StartedOn = new DateOnly(2026, 10, 26), Diagnosis = "SYNTHETIC old source",
             State = "Open", Version = 4, CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow };
         dossier.Items.Add(new TreatmentItem { DossierId = dossier.Id, ServiceId = service.Id, ServiceName = "SYNTHETIC snapshot",
-            Unit = "răng", Quantity = 2, Region = "25, 26", AgreedUnitPriceVnd = 350000, ReferenceUnitPriceVnd = 400000,
-            Decision = "Agreed", DecisionPlanVersion = 2, Progress = "InProgress" });
+            Unit = "răng", Quantity = 2, Region = "25, 26", AgreedUnitPriceVnd = 350000 });
         db.Add(dossier); await db.SaveChangesAsync();
         db.ChangeTracker.Clear();
         var migrator = db.GetService<IMigrator>();
         await migrator.MigrateAsync("20261026233000_TreatmentSheetDrafts");
         await migrator.MigrateAsync();
         var read = await db.TreatmentDossiers.AsNoTracking().Include(x => x.Items).SingleAsync(x => x.Id == dossier.Id);
-        Assert.Equal("Open", read.State); Assert.Equal(4, read.Version); Assert.Equal(2, read.CurrentPlanVersion());
-        var item = Assert.Single(read.Items); Assert.Equal(350000, item.AgreedUnitPriceVnd); Assert.Equal(400000, item.ReferenceUnitPriceVnd);
-        Assert.False(item.DisplayCompleted); Assert.False(item.SheetDeleted); Assert.False(item.HiddenFromSheet); Assert.Null(item.EntrySource); Assert.Equal(2, item.Quantity);
-        Assert.Equal("răng", item.Unit); Assert.Equal("InProgress", item.Progress); Assert.Null(read.SourceExaminationVisitId);
+        Assert.Equal("Open", read.State); Assert.Equal(4, read.Version); Assert.True(read.HasCommittedPlan());
+        var item = Assert.Single(read.Items); Assert.Equal(350000, item.AgreedUnitPriceVnd);
+        Assert.False(item.DisplayCompleted); Assert.Equal(2, item.Quantity);
+        Assert.Equal("răng", item.Unit); Assert.Null(read.SourceExaminationVisitId);
         Assert.False(await db.ClinicalActivities.AnyAsync(x => x.DossierId == dossier.Id));
     }
 }

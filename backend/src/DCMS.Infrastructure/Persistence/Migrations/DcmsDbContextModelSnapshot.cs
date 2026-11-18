@@ -2191,7 +2191,7 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsPlanTransfer")
                         .HasColumnType("boolean");
 
-                    b.Property<Guid>("ItemId")
+                    b.Property<Guid?>("ItemId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("LabWorkSnapshot")
@@ -2246,7 +2246,7 @@ namespace DCMS.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("ItemId", "PlanVersion")
                         .IsUnique()
-                        .HasFilter("\"IsPlanTransfer\" = TRUE");
+                        .HasFilter("\"IsPlanTransfer\" = TRUE AND \"ItemId\" IS NOT NULL");
 
                     b.ToTable("CLINICAL_ACTIVITY", null, t =>
                         {
@@ -2530,54 +2530,9 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<int?>("AssistantId")
                         .HasColumnType("integer");
 
-                    b.Property<Guid?>("ConsentDocumentId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int?>("ConsentPlanVersion")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Counseling")
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)");
-
-                    b.Property<DateTimeOffset?>("DecidedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("DecidedBy")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Decision")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
-
-                    b.Property<string>("DecisionMaker")
-                        .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
-
-                    b.Property<int?>("DecisionPlanVersion")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("DiscountBasisHash")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
-
-                    b.Property<DateTimeOffset?>("DiscountDecidedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("DiscountDecidedBy")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid?>("DiscountQualifyingItemId")
-                        .HasColumnType("uuid");
-
                     b.Property<string>("DiscountReason")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
-
-                    b.Property<string>("DiscountStatus")
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
 
                     b.Property<string>("DiscountType")
                         .HasMaxLength(16)
@@ -2593,43 +2548,11 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("DossierId")
                         .HasColumnType("uuid");
 
-                    b.Property<DateTimeOffset?>("EntryRecordedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("EntryRecordedBy")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("EntrySource")
-                        .HasMaxLength(24)
-                        .HasColumnType("character varying(24)");
-
-                    b.Property<DateOnly?>("EstimatedEnd")
-                        .HasColumnType("date");
-
-                    b.Property<int?>("EstimatedMaxMinutes")
-                        .HasColumnType("integer");
-
-                    b.Property<int?>("EstimatedMinMinutes")
-                        .HasColumnType("integer");
-
                     b.Property<int?>("EstimatedMinutes")
-                        .HasColumnType("integer");
-
-                    b.Property<int?>("EstimatedSessions")
                         .HasColumnType("integer");
 
                     b.Property<DateOnly?>("EstimatedStart")
                         .HasColumnType("date");
-
-                    b.Property<int?>("ExpectedServiceLifeMonths")
-                        .HasColumnType("integer");
-
-                    b.Property<bool>("HiddenFromSheet")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("Material")
-                        .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
 
                     b.Property<string>("Note")
                         .HasMaxLength(1000)
@@ -2638,43 +2561,16 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<int>("PlannedOrder")
                         .HasColumnType("integer");
 
-                    b.Property<string>("Progress")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
-
                     b.Property<decimal>("Quantity")
                         .HasPrecision(12, 3)
                         .HasColumnType("numeric(12,3)");
-
-                    b.Property<int?>("ReferencePriceVersion")
-                        .HasColumnType("integer");
-
-                    b.Property<long?>("ReferenceUnitPriceVnd")
-                        .HasColumnType("bigint");
 
                     b.Property<string>("Region")
                         .HasMaxLength(80)
                         .HasColumnType("character varying(80)");
 
-                    b.Property<string>("RepresentativeBasis")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.Property<int?>("ReservedMinutes")
-                        .HasColumnType("integer");
-
                     b.Property<int?>("ResponsibleDentistId")
                         .HasColumnType("integer");
-
-                    b.Property<DateOnly?>("ReturnEarliestOn")
-                        .HasColumnType("date");
-
-                    b.Property<DateOnly?>("ReturnLatestOn")
-                        .HasColumnType("date");
-
-                    b.Property<DateOnly?>("ReturnTargetOn")
-                        .HasColumnType("date");
 
                     b.Property<int>("ServiceId")
                         .HasColumnType("integer");
@@ -2684,127 +2580,10 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(160)
                         .HasColumnType("character varying(160)");
 
-                    b.Property<bool>("SheetDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTimeOffset?>("ShortReservationAcknowledgedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("ShortReservationAcknowledgedBy")
-                        .HasColumnType("integer");
-
-                    b.Property<int?>("SourceDiagnosisId")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid>("StorageStamp")
-                        .IsConcurrencyToken()
-                        .HasColumnType("uuid");
-
                     b.Property<string>("Unit")
                         .IsRequired()
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)");
-
-                    b.Property<DateOnly?>("WarrantyActivatedOn")
-                        .HasColumnType("date");
-
-                    b.Property<string>("WarrantyComponent")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<DateTimeOffset?>("WarrantyConfirmedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("WarrantyConfirmedBy")
-                        .HasColumnType("integer");
-
-                    b.Property<DateOnly?>("WarrantyEndsOn")
-                        .HasColumnType("date");
-
-                    b.Property<string>("WarrantyExclusions")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.Property<string>("WarrantyExplanation")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.Property<string>("WarrantyPolicy")
-                        .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
-
-                    b.Property<string>("WarrantyPolicyVersion")
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)");
-
-                    b.Property<string>("WarrantyScope")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.ComplexCollection(typeof(List<Dictionary<string, object>>), "Steps", "DCMS.Domain.Features.Treatment.TreatmentItem.Steps#TreatmentStep", b1 =>
-                        {
-                            b1.IsRequired();
-
-                            b1.Property<string>("Capability");
-
-                            b1.Property<string>("ChargingCoverage")
-                                .IsRequired();
-
-                            b1.Property<DateTimeOffset?>("CompletedAt");
-
-                            b1.Property<Guid?>("CompletionEventId");
-
-                            b1.Property<Guid>("DossierId");
-
-                            b1.Property<int?>("EarliestOffsetDays");
-
-                            b1.Property<int?>("EstimatedMaxMinutes");
-
-                            b1.Property<int?>("EstimatedMinMinutes");
-
-                            b1.Property<int>("EstimatedMinutes");
-
-                            b1.Property<DateTimeOffset?>("HoldEffectiveAt");
-
-                            b1.Property<string>("HoldReason");
-
-                            b1.Property<Guid>("Id");
-
-                            b1.Property<Guid>("ItemId");
-
-                            b1.Property<string>("LabRequirement");
-
-                            b1.Property<int?>("LatestOffsetDays");
-
-                            b1.Property<string>("Name")
-                                .IsRequired();
-
-                            b1.Property<string>("Outcome")
-                                .IsRequired();
-
-                            b1.Property<Guid>("PlanId");
-
-                            b1.Property<int>("PlanVersion");
-
-                            b1.Property<string>("PredecessorsJson")
-                                .IsRequired();
-
-                            b1.Property<string>("Region");
-
-                            b1.Property<int>("ReservedMinutes");
-
-                            b1.Property<string>("ReviewCondition");
-
-                            b1.Property<DateTimeOffset?>("ShortReservationAcknowledgedAt");
-
-                            b1.Property<int?>("ShortReservationAcknowledgedBy");
-
-                            b1.Property<int?>("TargetOffsetDays");
-
-                            b1.Property<int>("Version");
-
-                            b1.ToJson("Steps");
-                        });
 
                     b.HasKey("Id");
 
@@ -2812,8 +2591,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
 
                     b.ToTable("TREATMENT_PLAN_ITEM", null, t =>
                         {
-                            t.HasCheckConstraint("CK_TREATMENT_ITEM_DURATION_V23", "(\"EstimatedMinMinutes\" IS NULL AND \"EstimatedMaxMinutes\" IS NULL OR \"EstimatedMinMinutes\" > 0 AND \"EstimatedMinMinutes\" <= \"EstimatedMinutes\" AND \"EstimatedMinutes\" <= \"EstimatedMaxMinutes\" AND \"EstimatedMaxMinutes\" <= 480) AND (\"ReservedMinutes\" IS NULL OR \"ReservedMinutes\" BETWEEN 15 AND 480 AND \"ReservedMinutes\" % 15 = 0 AND \"ReservedMinutes\" >= \"EstimatedMinutes\")");
-
                             t.HasCheckConstraint("CK_TREATMENT_ITEM_VALUES", "\"Quantity\" > 0 AND \"AgreedUnitPriceVnd\" >= 0");
                         });
                 });
@@ -5616,6 +5393,11 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasForeignKey("DossierId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.HasOne("DCMS.Domain.Features.Treatment.TreatmentItem", null)
+                        .WithMany()
+                        .HasForeignKey("ItemId")
+                        .OnDelete(DeleteBehavior.SetNull);
                 });
 
             modelBuilder.Entity("DCMS.Domain.Features.Treatment.LabOrder", b =>

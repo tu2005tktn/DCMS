@@ -62,7 +62,6 @@ public static class ScreenEndpointPermissions
             return Need(read ? "examinations.read" : "examinations.manage");
         }
         if (p.StartsWith("/api/service-prices")) return read ? ScreenEndpointRule.Any("treatment.prices.read", "treatment.read") : Need("treatment.prices.manage");
-        if (p.StartsWith("/api/commercial")) return Need(read ? "treatment.commercial.read" : "treatment.commercial.approve");
         if (p.StartsWith("/api/treatment-templates")) return Need(read ? "treatment.templates.read" : "treatment.templates.manage");
         if (p.StartsWith("/api/care-tasks")) return Need(read ? "care-tasks.read" : p.EndsWith("/escalations") ? "care-tasks.escalate" : "care-tasks.manage");
         if (p.StartsWith("/api/care-escalations")) return Need("care-tasks.escalate");
@@ -88,7 +87,6 @@ public static class ScreenEndpointPermissions
             if (p.Contains("/sheet-drafts/")) return method == "DELETE" ? ScreenEndpointRule.Any("treatment.items.delete", "treatment.actuals.delete") : Need(p.EndsWith("/confirm-actual") || draftKind?.Equals("actual", StringComparison.OrdinalIgnoreCase) == true ? "treatment.actuals.create" : "treatment.items.create");
             if (p.Contains("/plan/items/")) return Need("treatment.items.update");
             if (p.Contains("/plan/")) return Need("treatment.plan.manage");
-            if (p.Contains("/steps") || p.Contains("/warranty/")) return Need("treatment.progress.manage");
             return Need(method == "DELETE" ? "treatment.dossiers.delete" : "treatment.dossiers.update");
         }
         if (p.StartsWith("/api/patients/")) {

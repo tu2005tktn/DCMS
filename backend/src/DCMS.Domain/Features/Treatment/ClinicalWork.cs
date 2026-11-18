@@ -6,7 +6,7 @@ public sealed class ClinicalActivity
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid DossierId { get; set; }
-    public Guid ItemId { get; set; }
+    public Guid? ItemId { get; set; }
     public int? PlanVersion { get; set; }
     public bool IsPlanTransfer { get; set; }
     public int ServiceId { get; set; }

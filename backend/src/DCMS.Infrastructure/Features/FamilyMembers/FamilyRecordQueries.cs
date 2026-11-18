@@ -66,13 +66,12 @@ public sealed partial class FamilyRecordService
             }).ToArray();
         } else if (scope == "Treatment") {
             var query = db.TreatmentDossiers.AsNoTracking().Include(x => x.Items).Where(x => x.PatientId == row.PatientId
-                && x.BranchId == row.BranchId && x.State != "Deleted"
-                && x.Items.Any(i => i.DecisionPlanVersion != null) && !x.Items.Any(i => !i.SheetDeleted && i.DecisionPlanVersion == null));
+                && x.BranchId == row.BranchId && x.State != "Deleted" && x.Items.Any());
             total = await query.CountAsync(ct);
             items = (await query.OrderByDescending(x => x.StartedOn).ThenBy(x => x.Id).Skip(skip).Take(pageSize).ToArrayAsync(ct))
                 .Select(x => (object)new FamilyTreatmentDto(x.Id, x.Code, x.Diagnosis, x.State, x.StartedOn,
-                    x.Items.Where(i => i.Decision == "Agreed" && !i.SheetDeleted && !i.HiddenFromSheet).OrderBy(i => i.PlannedOrder)
-                        .Select(i => new FamilyTreatmentItem(i.ServiceName, i.Region, i.Progress, i.EstimatedStart, i.EstimatedEnd)).ToArray())).ToArray();
+                    x.Items.OrderBy(i => i.PlannedOrder)
+                        .Select(i => new FamilyTreatmentItem(i.ServiceName, i.Region, i.DisplayCompleted ? "Completed" : "Planned", i.EstimatedStart, null)).ToArray())).ToArray();
         } else if (scope == "Prescriptions") {
             var query = db.Set<ExternalPrescription>().AsNoTracking().Where(x => x.PatientId == row.PatientId
                 && x.BranchId == row.BranchId && x.Status == PrescriptionStatuses.Finalized);
@@ -100,8 +99,7 @@ public sealed partial class FamilyRecordService
             ? db.Visits.Any(v => v.Id == d.VisitId && v.PatientId == row.PatientId && v.BranchId == row.BranchId && v.Status != "Cancelled"
                 && DCMS.Domain.Features.Visits.VisitStatuses.HasConfirmedExamination.Contains(v.Status) && db.Set<VisitExamination>().Any(e => e.VisitId == v.Id))
             : db.TreatmentDossiers.Any(t => t.Id == d.DossierId && t.PatientId == row.PatientId && t.BranchId == row.BranchId
-                && t.State != "Deleted" && t.Items.Any(i => i.DecisionPlanVersion != null)
-                && !t.Items.Any(i => !i.SheetDeleted && i.DecisionPlanVersion == null))));
+                && t.State != "Deleted" && t.Items.Any())));
 
     public async Task<DocumentContent> DocumentAsync(int actor, Guid memberId, Guid documentId, CancellationToken ct)
     {

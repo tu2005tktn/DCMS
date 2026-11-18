@@ -14,19 +14,6 @@ public sealed class TreatmentItemRulesTests
     }
 
     [Fact]
-    public void ExplicitReturnWindowNarrowsButNeverWidensTheTolerance()
-    {
-        var narrow = new TreatmentItem { ReturnEarliestOn = Day.AddDays(-1), ReturnTargetOn = Day, ReturnLatestOn = Day.AddDays(2) };
-        Assert.Equal((Day.AddDays(-1), Day, Day.AddDays(2)), TreatmentItemRules.PlanWindow(narrow));
-        var wide = new TreatmentItem { ReturnEarliestOn = Day.AddDays(-20), ReturnTargetOn = Day, ReturnLatestOn = Day.AddDays(20) };
-        Assert.Equal((Day.AddDays(-4), Day, Day.AddDays(4)), TreatmentItemRules.PlanWindow(wide));
-    }
-
-    [Fact]
-    public void PartialReturnWindowFallsBackToThePlannedDate()
-        => Assert.Equal(Day, TreatmentItemRules.PlannedTarget(new TreatmentItem { EstimatedStart = Day, ReturnTargetOn = Day.AddDays(5) }));
-
-    [Fact]
     public void ItemWithoutAnyDateHasNoWindow()
     {
         Assert.Null(TreatmentItemRules.PlanWindow(new TreatmentItem()));

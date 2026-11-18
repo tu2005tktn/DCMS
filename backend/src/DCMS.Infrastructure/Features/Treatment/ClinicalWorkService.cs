@@ -12,22 +12,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace DCMS.Infrastructure.Features.Treatment;
 
-// A step is evidenced by recorded activities of the same plan item in the same dossier (activities have no StepId).
-public sealed class ClinicalActualEvidencePort(DcmsDbContext db) : ITreatmentActualEvidencePort
-{
-    public async Task<bool> HasDentistConfirmedActualAsync(int patientId, Guid dossierId, Guid stepId,
-        IReadOnlyList<Guid> evidenceIds, CancellationToken ct)
-    {
-        if (evidenceIds.Count == 0 || evidenceIds.Contains(Guid.Empty)) return false;
-        var itemId = await db.TreatmentSteps.AsNoTracking().Where(x => x.Id == stepId && x.DossierId == dossierId)
-            .Select(x => (Guid?)x.ItemId).SingleOrDefaultAsync(ct);
-        if (itemId == null || !await db.TreatmentDossiers.AsNoTracking().AnyAsync(x => x.Id == dossierId && x.PatientId == patientId, ct))
-            return false;
-        var rows = await db.ClinicalActivities.AsNoTracking().Where(x => evidenceIds.Contains(x.Id)).ToListAsync(ct);
-        return rows.Count == evidenceIds.Distinct().Count() && rows.All(x => x.DossierId == dossierId && x.ItemId == itemId);
-    }
-}
-
 // Records the fee of an activity the dossier sheet has just added (docs/specs/CLINICAL-ACTIVITY-TABLE-SIMPLIFICATION.vi.md).
 public sealed class ClinicalWorkService(DcmsDbContext db, UserManager<ApplicationUser> users, IClinicalChargePort charges,
     TimeProvider clock, DCMS.Application.Features.Settings.ISettingsAccess settingsAccess) : IClinicalWorkService
@@ -70,27 +54,35 @@ public sealed class ClinicalWorkService(DcmsDbContext db, UserManager<Applicatio
         var dossier = await db.TreatmentDossiers.Include(x => x.Items).SingleOrDefaultAsync(x => x.Id == row.DossierId, ct)
             ?? throw Error("MSG113", 404);
         var employee = await DentistAsync(actorId, dossier.BranchId, ct);
-        var item = dossier.Items.SingleOrDefault(x => x.Id == row.ItemId) ?? throw Error("MSG113", 404);
-        if (employee != dossier.DentistId || row.PerformerId != employee || dossier.State != "Open" || item.SheetDeleted
-            || row.PlanVersion != dossier.CurrentPlanVersion() || row.Version != request.ExpectedVersion)
+        TreatmentItem? item = null;
+        if (row.ItemId.HasValue)
+            item = dossier.Items.SingleOrDefault(x => x.Id == row.ItemId.Value) ?? throw Error("MSG113", 404);
+        if (employee != dossier.DentistId || row.PerformerId != employee || dossier.State != "Open" || row.Version != request.ExpectedVersion)
             throw Error("MSG111", 409);
         if (row.PriceSnapshotVnd == 0) row.FeeStatus = "NotRequested";
         else if (row.Unit == "gói") row.FeeStatus = "NeedsRule";
         else
         {
             var gross = TreatmentPlanRules.Gross(row.Quantity, checked((long)row.PriceSnapshotVnd));
-            var approved = item is { DiscountStatus: "Approved", DiscountValue: not null }
-                ? TreatmentPlanRules.Discount(TreatmentPlanRules.Gross(item.Quantity, item.AgreedUnitPriceVnd), item.DiscountType!, item.DiscountValue.Value) : 0;
-            var earlier = db.ClinicalActivities.Where(x => x.ItemId == item.Id && x.Id != row.Id);
-            var used = await earlier.SumAsync(x => x.DiscountSnapshotVnd, ct);
-            var share = checked((long)decimal.Round(approved * row.Quantity / item.Quantity, 0, MidpointRounding.AwayFromZero));
-            if (await earlier.SumAsync(x => x.Quantity, ct) + row.Quantity == item.Quantity) share = approved - used;
-            row.DiscountSnapshotVnd = feeSnapshot?.ApprovedDiscountVnd ?? Math.Min(gross, Math.Max(0, Math.Min(approved - used, share)));
+            if (item != null)
+            {
+                var approved = item.DiscountType is "Fixed" or "Percent" && item.DiscountValue is > 0
+                    ? TreatmentPlanRules.Discount(TreatmentPlanRules.Gross(item.Quantity, item.AgreedUnitPriceVnd), item.DiscountType, item.DiscountValue.Value) : 0;
+                var earlier = db.ClinicalActivities.Where(x => x.ItemId == item.Id && x.Id != row.Id);
+                var used = await earlier.SumAsync(x => x.DiscountSnapshotVnd, ct);
+                var share = checked((long)decimal.Round(approved * row.Quantity / item.Quantity, 0, MidpointRounding.AwayFromZero));
+                if (await earlier.SumAsync(x => x.Quantity, ct) + row.Quantity == item.Quantity) share = approved - used;
+                row.DiscountSnapshotVnd = feeSnapshot?.ApprovedDiscountVnd ?? Math.Min(gross, Math.Max(0, Math.Min(approved - used, share)));
+            }
+            else
+            {
+                row.DiscountSnapshotVnd = Math.Min(gross, Math.Max(0, feeSnapshot?.ApprovedDiscountVnd ?? row.DiscountSnapshotVnd));
+            }
             var fee = await charges.PostInTransactionAsync(feeSnapshot ?? new ClinicalFeeRequest($"clinical-fee:{row.Id}", row.Id, row.Version + 1,
                 dossier.PatientId, dossier.BranchId, row.DossierId, row.ItemId, row.PlanVersion, "Separate",
                 row.Quantity, row.Unit, checked((long)row.PriceSnapshotVnd), gross, row.DiscountSnapshotVnd,
-                item.DiscountType, item.DiscountValue, item.DiscountReason, item.DiscountQualifyingItemId,
-                item.DiscountDecidedBy, item.DiscountDecidedAt, actorId), ct);
+                item?.DiscountType, item?.DiscountValue, item?.DiscountReason, null,
+                row.DiscountSnapshotVnd > 0 ? actorId : null, row.DiscountSnapshotVnd > 0 ? clock.GetUtcNow() : null, actorId), ct);
             if (fee.Status is not ("Pending" or "Posted")) throw Error("MSG144", 503);
             row.FeeStatus = fee.Status;
         }

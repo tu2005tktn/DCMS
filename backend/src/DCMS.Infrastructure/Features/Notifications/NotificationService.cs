@@ -96,8 +96,7 @@ public sealed class NotificationService(
                     || await db.Set<ExternalPrescription>().AsNoTracking().AnyAsync(x =>
                         x.VisitId == id && x.Status == PrescriptionStatuses.Finalized && patients.Contains(x.PatientId), ct),
                 "medical-records" => await db.TreatmentDossiers.AsNoTracking().AnyAsync(x =>
-                    x.Id == id && x.State != "Deleted" && x.Items.Any(i => i.DecisionPlanVersion != null)
-                    && !x.Items.Any(i => !i.SheetDeleted && i.DecisionPlanVersion == null)
+                    x.Id == id && x.State != "Deleted" && x.Items.Any()
                     && patients.Contains(x.PatientId), ct),
                 _ => false
             };

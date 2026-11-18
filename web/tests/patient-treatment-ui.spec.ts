@@ -7,8 +7,8 @@ const patient = { id: 123, patientCode: 'SYNTHETIC-123', fullName: 'Bệnh nhân
   isArchived: false, version: 1, createdAt: '2026-10-27T01:00:00Z', updatedAt: '2026-10-27T01:00:00Z',
   link: { verifiedAccountUserName: null, verifiedAt: null } };
 const item = { id: itemId, serviceId: 3, serviceName: 'Trám răng', region: '25, 26', unit: 'răng', quantity: 2,
-  agreedUnitPriceVnd: 300000, decision: 'Agreed', progress: 'NotStarted', estimatedStart: null,
-  material: null, note: 'Ghi chú kế hoạch', discount: null, responsibleDentistId: 7 };
+  agreedUnitPriceVnd: 300000, estimatedStart: null,
+  note: 'Ghi chú kế hoạch', discount: null, responsibleDentistId: 7 };
 async function prepare(page: Page, withItem = true, withFinance = false) {
   const user = { id: 7, userName: 'synthetic.dentist', fullName: 'Bác sĩ thử nghiệm', accountType: 'Staff',
     roles: ['Dentist'], effectiveRoles: ['Dentist'], permissions: ['patients.read', 'treatment.read', 'treatment.dossiers.create', 'treatment.dossiers.update', 'treatment.dossiers.delete', 'treatment.items.create', 'treatment.items.update', 'treatment.items.delete', 'treatment.items.price', 'treatment.actuals.create', 'treatment.actuals.update', 'treatment.actuals.delete', 'treatment.templates.read', 'finance.read', 'finance.payments.create', 'finance.payos.create', 'treatment.lab.manage', 'documents.read', 'documents.upload'] };
@@ -53,7 +53,7 @@ async function prepare(page: Page, withItem = true, withFinance = false) {
     if (path === '/api/patients/123/dossiers') return ok({ items: [{ id: dossierId, code: 'DT-001', version: state.version, state: 'Open' }], total: 1, page: 1, pageSize: 20 });
     if (path.endsWith('/sheet-context')) return ok({ services: [{ id: 3, branchId: 1, name: 'Trám răng', unit: 'răng', referenceUnitPriceVnd: 300000, priceVersion: 1 }],
       members: [{ id: 7, name: user.fullName, canDentist: true }, { id: 8, name: 'Phụ tá thử nghiệm', canDentist: false }],
-      visits: [], steps: [], allowedActions: ['Draft', 'Decide', 'Perform', 'Close'] });
+      visits: [], allowedActions: ['Draft', 'Perform', 'Close'] });
     if (path.endsWith('/activities')) { const items = state.activities.map(a => ({ ...a, ...state.activityEdits.get(a.id) })).filter(a => !a.sheetDeleted); return ok({ items, total: items.length, page: 1, pageSize: 20 }); }
     if (path.endsWith('/sheet-drafts')) return ok([...state.drafts.values()]);
     if (/sheet-drafts\/[^/]+$/.test(path)) {
@@ -66,12 +66,12 @@ async function prepare(page: Page, withItem = true, withFinance = false) {
       if (state.conflict) return route.fulfill({ status: 409, json: { code: 'MSG111', message: 'MSG111 — phiên bản đã thay đổi' } });
       const id = path.split('/').at(-2)!, draft = state.drafts.get(id); const body = r.postDataJSON(); state.requests.push(body);
       state.items.push({ ...item, id, serviceId: draft.row.serviceId, serviceName: draft.row.serviceName,
-        region: draft.row.regions.join(', '), quantity: draft.row.quantity, decision: body.decision?.decision ?? 'Proposed',
-        entrySource: 'ClinicianEntry', estimatedStart: draft.row.date ?? null, estimatedMinutes: draft.row.estimatedMinutes,
+        region: draft.row.regions.join(', '), quantity: draft.row.quantity,
+        estimatedStart: draft.row.date ?? null, estimatedMinutes: draft.row.estimatedMinutes,
         note: draft.row.note, responsibleDentistId: draft.row.dentistId, assistantId: draft.row.assistantId,
-        displayCompleted: false, progress: 'NotStarted', agreedUnitPriceVnd: draft.row.unitPriceVnd,
+        displayCompleted: false, agreedUnitPriceVnd: draft.row.unitPriceVnd,
         discount: draft.row.discountValue > 0 ? { type: draft.row.discountType === 'Percent' ? 'Percent' : 'Fixed', value: draft.row.discountValue,
-          reason: draft.row.discountNote, status: 'Approved', amountVnd: draft.row.discountType === 'Percent'
+          reason: draft.row.discountNote, amountVnd: draft.row.discountType === 'Percent'
             ? Math.round(draft.row.costVnd * draft.row.discountValue / 100) : draft.row.discountValue } : null });
       state.drafts.delete(id); state.version++; return ok({ dossier: detail() });
     }
@@ -112,7 +112,7 @@ async function prepare(page: Page, withItem = true, withFinance = false) {
           performedAt: '2026-10-27T02:00:00Z', outcome: body.row?.note ?? i.note, feeStatus: 'Pending', priceSnapshotVnd: body.row?.unitPriceVnd ?? i.agreedUnitPriceVnd, discountSnapshotVnd: 0 });
         i.displayCompleted = true;
       } else if (path.endsWith('/display-completion')) i.displayCompleted = body.completed;
-      else if (r.method() === 'DELETE') i.sheetDeleted = true;
+      else if (r.method() === 'DELETE') state.items.splice(state.items.indexOf(i), 1);
       else Object.assign(i, { note: body.row.note, region: body.row.regions.join(', '), estimatedMinutes: body.row.estimatedMinutes, agreedUnitPriceVnd: body.row.unitPriceVnd });
       state.version++; return ok({ dossier: detail(), activity: state.activities.at(-1) });
     }
@@ -232,7 +232,7 @@ test('hàng chỉ có răng, thời gian và text; lưu một lần bấm, lỗi
   await expect.poll(() => state.items.length).toBe(1);
   expect(state.requests.filter(r => r.kind === 'Plan')).toHaveLength(1);
   expect(state.items[0].quantity).toBe(1); expect(state.items[0].estimatedMinutes).toBe(25);
-  expect(state.items[0].decision).toBe('Proposed');
+  expect(state.items[0].displayCompleted).toBe(false);
   await expect(page.locator('.ant-drawer')).toHaveCount(0);
 });
 
@@ -312,7 +312,7 @@ test('Hoàn tất chỉ đánh dấu; sửa ngay trên hàng giữ quantity cũ 
   const state = await prepare(page);
   const menu = async (name: string) => { await page.getByRole('button', { name: 'Chức năng Trám răng', exact: true }).click(); await page.getByRole('menuitem', { name, exact: true }).click(); };
   await menu('Hoàn tất'); await expect(page.locator('.treatment-sheet-row-completed')).toHaveCount(1);
-  expect(state.items[0].progress).toBe('NotStarted'); expect(state.activities).toHaveLength(0);
+  expect(state.items[0].displayCompleted).toBe(true); expect(state.activities).toHaveLength(0);
   await menu('Bỏ hoàn tất'); await expect(page.locator('.treatment-sheet-row-completed')).toHaveCount(0);
   await menu('Sửa'); await page.getByLabel('Ghi chú', { exact: true }).fill('Đã sửa');
   await page.getByLabel('Chi phí', { exact: true }).fill('800000');
@@ -600,7 +600,7 @@ for(const width of [390,768,1440]) test('ô thêm ảnh dùng bàn phím và b�
 
 test('Sao chép lưu ngay đủ dữ liệu, không editor/xác nhận và giữ nguyên nguồn',async({page})=>{
   const state=await prepare(page);Object.assign(state.items[0],{estimatedStart:'2026-11-02',estimatedMinutes:35,note:'Ghi chú sao chép',assistantId:8,displayCompleted:true,agreedUnitPriceVnd:275000,
-    discount:{type:'Percent',value:10,reason:'Giảm theo ca',status:'Approved',amountVnd:55000}});
+    discount:{type:'Percent',value:10,reason:'Giảm theo ca',amountVnd:55000}});
   const original=structuredClone(state.items[0]);await page.goto('/patients/123?tab=treatment');
   await expect(page.locator('.treatment-sheet-row-completed')).toHaveCount(1);
   const writes:string[]=[];page.on('request',r=>{if(r.method()!=='GET'&&r.url().includes('/api/'))writes.push(r.url());});
@@ -608,7 +608,7 @@ test('Sao chép lưu ngay đủ dữ liệu, không editor/xác nhận và giữ
   await expect(page.locator('.treatment-sheet-plan-table tbody > tr')).toHaveCount(2);
   await expect(page.getByRole('row',{name:'Nhập hạng mục kế hoạch',exact:true})).toHaveCount(0);await expect(page.getByRole('button',{name:'Đồng ý',exact:true})).toHaveCount(0);
   expect(state.items[0]).toEqual(original);const copy=state.items[1];expect(copy.id).not.toBe(original.id);
-  expect(copy).toMatchObject({estimatedStart:'2026-11-02',estimatedMinutes:35,note:'Ghi chú sao chép',assistantId:8,region:'25, 26',quantity:2,agreedUnitPriceVnd:275000,displayCompleted:false,progress:'NotStarted',decision:'Proposed'});
+  expect(copy).toMatchObject({estimatedStart:'2026-11-02',estimatedMinutes:35,note:'Ghi chú sao chép',assistantId:8,region:'25, 26',quantity:2,agreedUnitPriceVnd:275000,displayCompleted:false});
   expect(copy.discount).toMatchObject(original.discount);expect(state.activities).toHaveLength(0);
   expect(writes.filter(u=>u.endsWith('/confirm-plan'))).toHaveLength(1);expect(writes.some(u=>u.includes('/sheet-items/'))).toBe(false);
   await expect(page.getByText('Tổng dự toán: 1.100.000 ₫',{exact:true})).toBeVisible();await expect(page.getByText('Thành tiền: 990.000 ₫',{exact:true})).toBeVisible();

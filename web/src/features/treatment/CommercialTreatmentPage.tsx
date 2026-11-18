@@ -1,24 +1,14 @@
 import { usePermissions } from '../authentication/usePermissions';
-import { Alert, Button, Card, Empty, Form, InputNumber, Modal, Select, Skeleton, Space, Tag, Typography } from 'antd';
+import { Alert, Button, Card, Empty, Form, InputNumber, Modal, Select, Skeleton, Typography } from 'antd';
 import { useEffect, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
 import { api } from '../../services/api';
-import type { ServicePrice, TreatmentChange, TreatmentItem } from './types';
+import type { ServicePrice } from './types';
 import { money } from './types';
 import './treatment.css';
 
-type CommercialListItem = { dossierId: string; code: string; branchId: number;
-  version: number; pendingDiscounts: number };
-type CommercialPlan = { dossierId: string; code: string; branchId: number; version: number;
-  items: TreatmentItem[]; preview: { grossVnd: number; approvedDiscountVnd: number; netBeforeTaxVnd: number } };
-
 export default function CommercialTreatmentPage() {
   const has = usePermissions();
-  const [search, setSearch] = useSearchParams();
-  const selectedId = search.get('dossier');
-  const [list, setList] = useState<CommercialListItem[] | null>(null);
   const [prices, setPrices] = useState<ServicePrice[] | null>(null);
-  const [plan, setPlan] = useState<CommercialPlan | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -27,36 +17,15 @@ export default function CommercialTreatmentPage() {
   const requestKey = useRef(crypto.randomUUID());
 
   async function reload() {
-    const [dossiers, catalog] = await Promise.all([
-      has('treatment.commercial.read') ? api<CommercialListItem[]>('/api/commercial/dossiers') : Promise.resolve([] as CommercialListItem[]), api<ServicePrice[]>('/api/service-prices'),
-    ]);
-    setList(dossiers); setPrices(catalog);
-    if (selectedId && has('treatment.commercial.read')) setPlan(await api<CommercialPlan>(`/api/commercial/dossiers/${selectedId}/plan`));
-    else setPlan(null);
+    setPrices(await api<ServicePrice[]>('/api/service-prices'));
   }
   useEffect(() => {
     let active = true;
-    Promise.all([has('treatment.commercial.read') ? api<CommercialListItem[]>('/api/commercial/dossiers') : Promise.resolve([] as CommercialListItem[]),
-      api<ServicePrice[]>('/api/service-prices'),
-      selectedId && has('treatment.commercial.read') ? api<CommercialPlan>(`/api/commercial/dossiers/${selectedId}/plan`) : Promise.resolve(null)])
-      .then(([dossiers, catalog, selected]) => { if (active) { setList(dossiers); setPrices(catalog); setPlan(selected); setError(null); } })
+    api<ServicePrice[]>('/api/service-prices')
+      .then(catalog => { if (active) { setPrices(catalog); setError(null); } })
       .catch(failure => { if (active) setError((failure as Error).message); });
     return () => { active = false; };
-  }, [selectedId]);
-
-  async function decide(item: TreatmentItem, decision: 'Approved' | 'Rejected') {
-    if (!plan || busy) return;
-    setBusy(true); setError(null); setNotice(null);
-    try {
-      const result = await api<TreatmentChange>(`/api/commercial/dossiers/${plan.dossierId}/items/${item.id}/discount/decision`, {
-        method: 'POST', body: JSON.stringify({ expectedVersion: plan.version, decision,
-          requestKey: requestKey.current }),
-      });
-      setNotice(result.notification.message); requestKey.current = crypto.randomUUID();
-      await reload();
-    } catch (failure) { setError((failure as Error).message); }
-    finally { setBusy(false); }
-  }
+  }, []);
 
   async function savePrice(values: { referenceUnitPriceVnd: number | null; unit?: string }) {
     if (!priceEditing || busy) return;
@@ -72,36 +41,10 @@ export default function CommercialTreatmentPage() {
   }
 
   return <main className="treatment-page">
-    <div className="treatment-page-heading"><div><Typography.Title level={2}>Duyệt thương mại điều trị</Typography.Title>
-      <Typography.Paragraph>Bác sĩ trong chi nhánh được phân công, Admin hoặc chủ phòng khám có thể cập nhật giá tham chiếu và duyệt giảm trừ. Các thao tác này không ghi nhận khoản thu.</Typography.Paragraph></div></div>
+    <div className="treatment-page-heading"><div><Typography.Title level={2}>Giá tham chiếu điều trị</Typography.Title>
+      <Typography.Paragraph>Bác sĩ trong chi nhánh được phân công, Admin hoặc chủ phòng khám có thể cập nhật giá tham chiếu dịch vụ điều trị.</Typography.Paragraph></div></div>
     {error && <Alert type="error" showIcon message={error} action={<Button onClick={() => void reload()}>Thử lại</Button>} />}
     {notice && <Alert type="success" showIcon message={notice} />}
-    <div className="treatment-detail-grid">
-      <Card title="Kế hoạch đang soạn">{list === null ? <Skeleton active /> : list.length === 0
-        ? <Empty description="Chưa có kế hoạch nháp cần xem." />
-        : list.map(row => <div className="treatment-item-row" key={row.dossierId}>
-          <div><strong>{row.code}</strong><div>Chi nhánh #{row.branchId}</div>
-            {row.pendingDiscounts > 0 && <Tag color="orange">{row.pendingDiscounts} giảm trừ chờ duyệt</Tag>}</div>
-          <Button type={row.dossierId === selectedId ? 'primary' : 'default'}
-            onClick={() => setSearch({ dossier: row.dossierId })}>Xem</Button>
-        </div>)}</Card>
-      <Card title={plan ? `Kế hoạch ${plan.code}` : 'Chi tiết kế hoạch'}>{!plan
-        ? <Empty description="Chọn kế hoạch để xem giảm trừ." /> : <>
-          {plan.items.map(item => <div className="treatment-item-row" key={item.id}>
-            <div><strong>{item.serviceName} {item.region || ''}</strong>
-              <div>Giá thỏa thuận: {money(item.agreedUnitPriceVnd)} × {item.quantity}</div>
-              {item.discount && <><div>Đề xuất: {item.discount.type === 'Fixed'
-                ? money(item.discount.value) : `${item.discount.value}%`} · {item.discount.reason}</div>
-                {item.discount.qualifyingItemId && <div className="treatment-muted">Điều kiện: hạng mục #{item.discount.qualifyingItemId.slice(0, 8)}</div>}
-                <Tag color={item.discount.status === 'Approved' ? 'green' : 'orange'}>{item.discount.status}</Tag></>}</div>
-            {item.discount?.status === 'Proposed' && <Space><Button disabled={!has('treatment.commercial.approve') || busy} onClick={() => void decide(item, 'Rejected')}>Từ chối</Button>
-              <Button type="primary" disabled={!has('treatment.commercial.approve')} loading={busy} onClick={() => void decide(item, 'Approved')}>Duyệt</Button></Space>}
-          </div>)}
-          <div className="treatment-price-summary"><span>Giá trước giảm: {money(plan.preview.grossVnd)}</span>
-            <span>Đã duyệt: {money(plan.preview.approvedDiscountVnd)}</span>
-            <strong>Dự kiến trước thuế: {money(plan.preview.netBeforeTaxVnd)}</strong></div>
-        </>}</Card>
-    </div>
     <Card title="Giá tham chiếu dịch vụ" extra={<Typography.Text type="secondary">Thay đổi catalog không sửa giá đã chốt</Typography.Text>}>
       {prices === null ? <Skeleton active /> : prices.length === 0 ? <Empty description="Chưa có dịch vụ trong phạm vi chi nhánh." />
         : prices.map(price => <div key={price.serviceId} className="treatment-item-row">

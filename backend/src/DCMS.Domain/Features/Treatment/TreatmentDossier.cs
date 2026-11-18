@@ -19,78 +19,29 @@ public sealed class TreatmentDossier
     public List<TreatmentItem> Items { get; set; } = [];
     public List<TreatmentSheetDraft> SheetDrafts { get; set; } = [];
 
-    public int CurrentPlanVersion() => Items.Select(x => x.DecisionPlanVersion).Max() ?? 0;
-    public bool HasDraftPlan() => Items.Any(x => !x.SheetDeleted && x.DecisionPlanVersion == null);
-    public bool HasCommittedPlan() => Items.Any(x => x.DecisionPlanVersion != null) && !HasDraftPlan();
+    public bool HasCommittedPlan() => Items.Count > 0;
 }
 
 public sealed class TreatmentItem
 {
-    public List<TreatmentStep> Steps { get; set; } = [];
-    public Guid StorageStamp { get; set; } = Guid.NewGuid();
-    public string? EntrySource { get; set; }
-    public int? EntryRecordedBy { get; set; }
-    public DateTimeOffset? EntryRecordedAt { get; set; }
-    public bool DisplayCompleted { get; set; }
-    public bool SheetDeleted { get; set; }
-    public bool HiddenFromSheet { get; set; }
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid DossierId { get; set; }
-    public int? SourceDiagnosisId { get; set; }
+    public int PlannedOrder { get; set; }
     public int ServiceId { get; set; }
     public string ServiceName { get; set; } = "";
-    public string? Material { get; set; }
-    public string? Note { get; set; }
-    public int? ResponsibleDentistId { get; set; }
-    public int? AssistantId { get; set; }
     public string? Region { get; set; }
     public string Unit { get; set; } = "";
     public decimal Quantity { get; set; }
-    public int PlannedOrder { get; set; }
-    public int? EstimatedMinutes { get; set; }
-    public int? EstimatedMinMinutes { get; set; }
-    public int? EstimatedMaxMinutes { get; set; }
-    public int? ReservedMinutes { get; set; }
-    public int? ShortReservationAcknowledgedBy { get; set; }
-    public DateTimeOffset? ShortReservationAcknowledgedAt { get; set; }
-    public int? EstimatedSessions { get; set; }
-    public DateOnly? ReturnEarliestOn { get; set; }
-    public DateOnly? ReturnTargetOn { get; set; }
-    public DateOnly? ReturnLatestOn { get; set; }
     public DateOnly? EstimatedStart { get; set; }
-    public DateOnly? EstimatedEnd { get; set; }
+    public int? EstimatedMinutes { get; set; }
+    public string? Note { get; set; }
+    public int? ResponsibleDentistId { get; set; }
+    public int? AssistantId { get; set; }
     public long AgreedUnitPriceVnd { get; set; }
-    public long? ReferenceUnitPriceVnd { get; set; }
-    public int? ReferencePriceVersion { get; set; }
     public string? DiscountType { get; set; }
     public decimal? DiscountValue { get; set; }
     public string? DiscountReason { get; set; }
-    public Guid? DiscountQualifyingItemId { get; set; }
-    public string? DiscountStatus { get; set; }
-    public string? DiscountBasisHash { get; set; }
-    public int? DiscountDecidedBy { get; set; }
-    public DateTimeOffset? DiscountDecidedAt { get; set; }
-    public string Decision { get; set; } = "Proposed";
-    public string Progress { get; set; } = "NotStarted";
-    public string? Counseling { get; set; }
-    public string? DecisionMaker { get; set; }
-    public string? RepresentativeBasis { get; set; }
-    public DateTimeOffset? DecidedAt { get; set; }
-    public int? DecidedBy { get; set; }
-    public int? DecisionPlanVersion { get; set; }
-    public Guid? ConsentDocumentId { get; set; }
-    public int? ConsentPlanVersion { get; set; }
-    public string? WarrantyPolicy { get; set; }
-    public string? WarrantyPolicyVersion { get; set; }
-    public string? WarrantyScope { get; set; }
-    public DateTimeOffset? WarrantyConfirmedAt { get; set; }
-    public DateOnly? WarrantyEndsOn { get; set; }
-    public int? WarrantyConfirmedBy { get; set; }
-    public string? WarrantyComponent { get; set; }
-    public string? WarrantyExclusions { get; set; }
-    public DateOnly? WarrantyActivatedOn { get; set; }
-    public string? WarrantyExplanation { get; set; }
-    public int? ExpectedServiceLifeMonths { get; set; }
+    public bool DisplayCompleted { get; set; }
 }
 
 // One append-only source for plan snapshots, clinical state changes and warranty confirmation.

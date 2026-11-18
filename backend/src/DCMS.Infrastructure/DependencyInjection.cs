@@ -75,15 +75,9 @@ public static class DependencyInjection
         services.AddScoped<DCMS.Application.Features.Prescriptions.IPrescriptionService, Features.Prescriptions.PrescriptionService>();
         // The finance module is not installed: the dossier shows no ledger summary and posted work only records a fee request event.
         services.AddScoped<ITreatmentFinancialSummaryPort, UnavailableTreatmentFinancialSummaryPort>();
-        services.AddScoped<ITreatmentProgressionService, TreatmentProgressionService>();
-        services.AddScoped<ITreatmentActualEvidencePort, ClinicalActualEvidencePort>();
         services.AddScoped<IClinicalWorkService, ClinicalWorkService>();
         services.AddScoped<IClinicalChargePort, OutboxClinicalChargePort>();
         services.AddScoped<ICareTaskService, CareTaskService>();
-        services.AddScoped<ITreatmentLabReadinessPort, UnavailableTreatmentLabReadinessPort>();
-        services.AddScoped<ITreatmentVisitActivitySourcePort, UnavailableTreatmentVisitActivitySourcePort>();
-        services.AddScoped<ITreatmentDentistCapabilityPort, UnavailableTreatmentDentistCapabilityPort>();
-        services.AddScoped<TreatmentDueScanner>();
         services.AddScoped<CareTaskIngestionService>();
         services.AddHostedService<TreatmentDueScanWorker>();
         services.AddSingleton(TimeProvider.System);

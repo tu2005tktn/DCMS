@@ -304,11 +304,11 @@ public sealed class FamilyRecordApiTests(ApiFixture fixture) : IClassFixture<Api
             var committed = new TreatmentDossier { PatientId = s.PatientId, BranchId = s.BranchId, DentistId = s.DentistId,
                 Code = "OFF-" + Guid.NewGuid().ToString("N"),
                 Diagnosis = "SYNTHETIC official treatment", Note = "SYNTHETIC INTERNAL COST NOTE", StartedOn = DateOnly.FromDateTime(DateTime.UtcNow) };
-            committed.Items.Add(new TreatmentItem { DossierId = committed.Id, ServiceId = s.ServiceId, ServiceName = "SYNTHETIC agreed item", Unit = "lần", Quantity = 1, Decision = "Agreed", DecisionPlanVersion = 1, AgreedUnitPriceVnd = 987654321 });
-            committed.Items.Add(new TreatmentItem { DossierId = committed.Id, ServiceId = s.ServiceId, ServiceName = "SYNTHETIC unagreed item", Unit = "lần", Quantity = 1, Decision = "Proposed", DecisionPlanVersion = 1 });
+            committed.Items.Add(new TreatmentItem { DossierId = committed.Id, ServiceId = s.ServiceId, ServiceName = "SYNTHETIC agreed item", Unit = "lần", Quantity = 1, AgreedUnitPriceVnd = 987654321 });
             var draft = new TreatmentDossier { PatientId = s.PatientId, BranchId = s.BranchId, DentistId = s.DentistId,
                 Code = "DRAFT-" + Guid.NewGuid().ToString("N"), Diagnosis = "SYNTHETIC DRAFT TREATMENT", StartedOn = DateOnly.FromDateTime(DateTime.UtcNow) };
-            draft.Items.Add(new TreatmentItem { DossierId = draft.Id, ServiceId = s.ServiceId, ServiceName = "SYNTHETIC draft agreed", Unit = "lần", Quantity = 1, Decision = "Agreed" });
+            draft.SheetDrafts.Add(new TreatmentSheetDraft { Id = Guid.NewGuid(), DossierId = draft.Id, ActorId = s.DentistAccountId, Kind = "Plan",
+                PayloadJson = "{\"serviceName\":\"SYNTHETIC DRAFT\"}", LastRequestKey = Guid.NewGuid(), LastFingerprint = new string('a', 64), UpdatedAt = DateTimeOffset.UtcNow });
             db.AddRange(committed, draft);
             var now = DateTimeOffset.UtcNow;
             db.Add(new ExternalPrescription { VisitId = s.VisitId, PatientId = s.PatientId, BranchId = s.BranchId,
@@ -320,7 +320,7 @@ public sealed class FamilyRecordApiTests(ApiFixture fixture) : IClassFixture<Api
             await db.SaveChangesAsync();
         }
         var treatment = await s.Owner.GetStringAsync(Url(s.Member.Id) + "/record/treatment");
-        Assert.Contains("SYNTHETIC agreed item", treatment); Assert.DoesNotContain("unagreed", treatment); Assert.DoesNotContain("DRAFT", treatment);
+        Assert.Contains("SYNTHETIC agreed item", treatment); Assert.DoesNotContain("DRAFT", treatment);
         Assert.DoesNotContain("INTERNAL", treatment); Assert.DoesNotContain("987654321", treatment);
         var prescription = await s.Owner.GetStringAsync(Url(s.Member.Id) + "/record/prescriptions");
         Assert.Contains("SYNTHETIC signed advice", prescription); Assert.DoesNotContain("DRAFT", prescription);

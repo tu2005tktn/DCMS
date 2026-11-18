@@ -12,9 +12,10 @@ internal static class ClinicalWorkModel
 
             b.Property(x => x.ServiceNameSnapshot).HasMaxLength(160);
             b.Property(x => x.LabWorkSnapshot).HasMaxLength(1000);
-            b.HasIndex(x => new { x.ItemId, x.PlanVersion }).IsUnique().HasFilter("\"IsPlanTransfer\" = TRUE");
+            b.HasIndex(x => new { x.ItemId, x.PlanVersion }).IsUnique().HasFilter("\"IsPlanTransfer\" = TRUE AND \"ItemId\" IS NOT NULL");
             b.HasIndex(x => new { x.DossierId, x.PerformedAt });
             b.HasOne<TreatmentDossier>().WithMany().HasForeignKey(x => x.DossierId).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<TreatmentItem>().WithMany().HasForeignKey(x => x.ItemId).OnDelete(DeleteBehavior.SetNull);
             b.Property(x => x.Unit).HasMaxLength(40);
             b.Property(x => x.Region).HasMaxLength(80);
             b.Property(x => x.Quantity).HasPrecision(12, 3);

@@ -7,7 +7,7 @@ public interface IClinicalChargePort
 }
 
 public sealed record PostActivityRequest(int ExpectedVersion, Guid RequestKey);
-public sealed record ActivityDto(Guid Id, Guid DossierId, Guid ItemId, int? PlanVersion, int ServiceId,
+public sealed record ActivityDto(Guid Id, Guid DossierId, Guid? ItemId, int? PlanVersion, int ServiceId,
     string? Region, string Unit, decimal Quantity, DateTimeOffset PerformedAt, int PerformerId, string Outcome,
     decimal PriceSnapshotVnd, int Version, DateTimeOffset CreatedAt, string FeeStatus = "Unavailable",
     long DiscountSnapshotVnd = 0, int? AssistantId = null, string? ServiceNameSnapshot = null,

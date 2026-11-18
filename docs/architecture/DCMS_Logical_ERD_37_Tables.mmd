@@ -265,6 +265,7 @@ erDiagram
         Integer concurrency_version
     }
 
+    %% Physical schema update 2026-11-18: TREATMENT_PLAN_ITEM reduced to 18 columns (Option A; drops Steps JSONB, warranty, consent, extended duration/return windows and separate discount approval; CLINICAL_ACTIVITY.ItemId is a nullable FK ON DELETE SET NULL). See docs/specs/TREATMENT-PLAN-ITEM-TABLE-SIMPLIFICATION.vi.md.
     TREATMENT_PLAN_SERVICE {
         Integer treatment_plan_id PK, FK
         Integer line_number PK

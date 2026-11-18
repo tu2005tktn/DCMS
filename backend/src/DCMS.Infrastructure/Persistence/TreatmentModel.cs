@@ -38,35 +38,18 @@ internal static class TreatmentModel
         ClinicalWorkModel.Configure(model);
         model.Entity<TreatmentItem>(b =>
         {
-            b.ToTable("TREATMENT_PLAN_ITEM");
+            b.ToTable("TREATMENT_PLAN_ITEM", t =>
+                t.HasCheckConstraint("CK_TREATMENT_ITEM_VALUES", "\"Quantity\" > 0 AND \"AgreedUnitPriceVnd\" >= 0"));
             b.HasKey(x => x.Id);
             b.HasIndex(x => new { x.DossierId, x.PlannedOrder });
             b.Property(x => x.ServiceName).HasMaxLength(160);
-            b.Property(x => x.EntrySource).HasMaxLength(24);
-            b.Property(x => x.Material).HasMaxLength(160);
             b.Property(x => x.Note).HasMaxLength(1000);
-            b.Property(x => x.DecisionPlanVersion).HasColumnType("integer");
             b.Property(x => x.Region).HasMaxLength(80);
             b.Property(x => x.Unit).HasMaxLength(40);
             b.Property(x => x.Quantity).HasPrecision(12, 3);
-            b.Property(x => x.Decision).HasMaxLength(16);
-            b.Property(x => x.Progress).HasMaxLength(16);
-            b.Property(x => x.Counseling).HasMaxLength(4000);
-            b.Property(x => x.DecisionMaker).HasMaxLength(160);
-            b.Property(x => x.RepresentativeBasis).HasMaxLength(1000);
             b.Property(x => x.DiscountType).HasMaxLength(16);
             b.Property(x => x.DiscountReason).HasMaxLength(1000);
-            b.Property(x => x.DiscountStatus).HasMaxLength(16);
-            b.Property(x => x.DiscountBasisHash).HasMaxLength(64);
             b.Property(x => x.DiscountValue).HasPrecision(18, 3);
-            b.Property(x => x.WarrantyPolicy).HasMaxLength(160);
-            b.Property(x => x.WarrantyPolicyVersion).HasMaxLength(40);
-            b.Property(x => x.WarrantyScope).HasMaxLength(1000);
-            b.Property(x => x.WarrantyComponent).HasMaxLength(500);
-            b.Property(x => x.WarrantyExclusions).HasMaxLength(1000);
-            b.Property(x => x.WarrantyExplanation).HasMaxLength(2000);
-            b.ToTable(t => t.HasCheckConstraint("CK_TREATMENT_ITEM_VALUES", "\"Quantity\" > 0 AND \"AgreedUnitPriceVnd\" >= 0"));
-            b.ToTable(t => t.HasCheckConstraint("CK_TREATMENT_ITEM_DURATION_V23", "(\"EstimatedMinMinutes\" IS NULL AND \"EstimatedMaxMinutes\" IS NULL OR \"EstimatedMinMinutes\" > 0 AND \"EstimatedMinMinutes\" <= \"EstimatedMinutes\" AND \"EstimatedMinutes\" <= \"EstimatedMaxMinutes\" AND \"EstimatedMaxMinutes\" <= 480) AND (\"ReservedMinutes\" IS NULL OR \"ReservedMinutes\" BETWEEN 15 AND 480 AND \"ReservedMinutes\" % 15 = 0 AND \"ReservedMinutes\" >= \"EstimatedMinutes\")"));
         });
         model.Entity<TreatmentEvent>(b =>
         {

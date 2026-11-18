@@ -24,8 +24,7 @@ public sealed partial class TreatmentDossierService
         var scope = await access.ResolveAsync(actorId, ct);
         if (scope.Assigned && !scope.Owner) branches = branches.Where(scope.BranchIds.Contains).ToList();
         var dossiers = await db.TreatmentDossiers.AsNoTracking().Include(x => x.Items).Where(x => x.PatientId == patientId
-            && x.State == "Open" && x.Items.Any(i => i.DecisionPlanVersion != null)
-            && !x.Items.Any(i => !i.SheetDeleted && i.DecisionPlanVersion == null) && branches.Contains(x.BranchId)).ToListAsync(ct);
+            && x.State == "Open" && x.Items.Any() && branches.Contains(x.BranchId)).ToListAsync(ct);
         if (dossiers.Count == 0) return new([]);
 
         var dossierIds = dossiers.Select(x => x.Id).ToArray();
@@ -80,9 +79,8 @@ public sealed partial class TreatmentDossierService
         if (shift > 0)
         {
             var performed = await PerformedItemIdsAsync(dossier.Id, ct);
-            foreach (var later in dossier.Items.Where(x => x.Id != item.Id && x.PlannedOrder > item.PlannedOrder && !x.SheetDeleted
-                && !x.HiddenFromSheet && TreatmentItemRules.IsEffective(x) && !x.DisplayCompleted && x.Progress != "Completed"
-                && !performed.Contains(x.Id)).OrderBy(x => x.PlannedOrder))
+            foreach (var later in dossier.Items.Where(x => x.Id != item.Id && x.PlannedOrder > item.PlannedOrder
+                && TreatmentItemRules.IsPendingForBooking(x) && !performed.Contains(x.Id)).OrderBy(x => x.PlannedOrder))
                 if (TreatmentItemRules.PlannedTarget(later) is { } current)
                     changes.Add(new(later.Id, later.ServiceName, later.Region, current, current.AddDays(shift), false));
         }
@@ -101,17 +99,10 @@ public sealed partial class TreatmentDossierService
             foreach (var change in request.Changes)
             {
                 var item = dossier.Items.SingleOrDefault(x => x.Id == change.ItemId) ?? throw Error("MSG113", 404);
-                if (item.SheetDeleted || item.DisplayCompleted || item.Progress == "Completed" || performed.Contains(item.Id)) throw Error("MSG111", 409);
-                var before = new { item.EstimatedStart, item.EstimatedEnd, item.ReturnEarliestOn, item.ReturnTargetOn, item.ReturnLatestOn };
-                var delta = change.PlannedOn.DayNumber - (TreatmentItemRules.PlannedTarget(item)?.DayNumber ?? change.PlannedOn.DayNumber);
+                if (item.DisplayCompleted || performed.Contains(item.Id)) throw Error("MSG111", 409);
+                var before = item.EstimatedStart;
                 item.EstimatedStart = change.PlannedOn;
-                // The explicit return window moves with the target so the allowed range keeps its shape.
-                if (item.ReturnEarliestOn is { } from && item.ReturnTargetOn is { } mid && item.ReturnLatestOn is { } to)
-                {
-                    item.ReturnEarliestOn = from.AddDays(delta); item.ReturnTargetOn = mid.AddDays(delta); item.ReturnLatestOn = to.AddDays(delta);
-                }
-                if (item.EstimatedEnd is { } end) item.EstimatedEnd = end.AddDays(delta) < change.PlannedOn ? change.PlannedOn : end.AddDays(delta);
-                applied.Add(new { itemId = item.Id, before, after = new { item.EstimatedStart, item.EstimatedEnd, item.ReturnEarliestOn, item.ReturnTargetOn, item.ReturnLatestOn } });
+                applied.Add(new { itemId = item.Id, before, after = item.EstimatedStart });
             }
             dossier.Version++; dossier.UpdatedAt = clock.GetUtcNow();
             Event(dossier, actorId, "ItemPlannedDatesChanged", new { changes = applied });

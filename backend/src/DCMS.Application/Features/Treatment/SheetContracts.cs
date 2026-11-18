@@ -8,11 +8,8 @@ public sealed record ImportItemPlanResult(TreatmentDossierDto Dossier, Guid[] Cr
 public sealed record SheetService(int Id, int BranchId, string Name, string Unit, long? ReferenceUnitPriceVnd, int PriceVersion);
 public sealed record SheetMember(int Id, string Name, bool CanDentist);
 public sealed record SheetVisit(Guid Id, int Version, DateTimeOffset ArrivalAt, int DentistId);
-public sealed record SheetStep(Guid Id, Guid ItemId, string Name, int Version, string Outcome, bool Held);
-public sealed record SheetConsentDocument(Guid Id, string FileName, int Version);
 public sealed record TreatmentSheetContext(IReadOnlyList<SheetService> Services, IReadOnlyList<SheetMember> Members,
-    IReadOnlyList<SheetVisit> Visits, string[] AllowedActions, IReadOnlyList<SheetStep> Steps,
-    IReadOnlyList<SheetConsentDocument>? ConsentDocuments = null);
+    IReadOnlyList<SheetVisit> Visits, string[] AllowedActions);
 public sealed record EditSheetActivityRequest(int ExpectedVersion, int ExpectedActivityVersion, int ExpectedSheetVersion,
     System.Text.Json.JsonElement Row, Guid RequestKey);
 public sealed record SheetActivityActionRequest(int ExpectedVersion, int ExpectedActivityVersion, int ExpectedSheetVersion, Guid RequestKey);
@@ -20,16 +17,10 @@ public sealed record PerformSheetItemRequest(int ExpectedVersion, Guid RequestKe
 public sealed record SheetItemActionRequest(int ExpectedVersion, Guid RequestKey);
 public sealed record MarkSheetItemRequest(int ExpectedVersion, bool Completed, Guid RequestKey);
 public sealed record EditSheetItemRequest(int ExpectedVersion, System.Text.Json.JsonElement Row, Guid RequestKey);
-public sealed record SheetDecision(string Decision, string? Counseling, string? DecisionMaker,
-    string? RepresentativeBasis = null, Guid? ConsentDocumentId = null);
-public sealed record SheetEstimate(int? MinMinutes, int? SelectedMinutes, int? MaxMinutes,
-    int? Sessions, DateOnly? EarliestOn, DateOnly? TargetOn, DateOnly? LatestOn);
-public sealed record ConfirmSheetPlanRequest(int ExpectedVersion, int ExpectedDraftVersion, SheetDecision? Decision, Guid RequestKey,
-    SheetEstimate? Estimate = null, Guid? QualifyingItemId = null);
+public sealed record ConfirmSheetPlanRequest(int ExpectedVersion, int ExpectedDraftVersion, Guid RequestKey);
 public sealed record ConfirmSheetActualRequest(int ExpectedVersion, int ExpectedDraftVersion, Guid RequestKey);
 public sealed record ConfirmSheetActualResult(TreatmentDossierDto Dossier, ActivityDto Activity);
 public sealed record ScheduleNoteRequest(int ExpectedVersion, DateOnly? PlannedOn, string? Note, Guid RequestKey);
-public sealed record DecideSheetItemRequest(int ExpectedVersion, SheetDecision Decision, Guid RequestKey);
 public sealed record TreatmentActivityPage(IReadOnlyList<ActivityDto> Items, int Total, int Page, int PageSize);
 public sealed record DossierTotals(int DossierCount, long PlannedGrossVnd, long PlannedDiscountVnd,
     long PlannedNetVnd, bool FinancialAvailable, long? PostedNetVnd, long? ConfirmedAllocatedVnd,

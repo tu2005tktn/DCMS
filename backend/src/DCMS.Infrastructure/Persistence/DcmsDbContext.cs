@@ -65,7 +65,6 @@ public sealed partial class DcmsDbContext(DbContextOptions<DcmsDbContext> option
     public IQueryable<LabOrderStatusLog> LabOrderStatusLogs => LabOrders.AsNoTracking().SelectMany(x => x.StatusLogs);
     public DbSet<TreatmentTemplate> TreatmentTemplates => Set<TreatmentTemplate>();
     public IQueryable<TreatmentTemplateVersion> TreatmentTemplateVersions => TreatmentTemplates.AsNoTracking().SelectMany(x => x.Versions);
-    public IQueryable<TreatmentStep> TreatmentSteps => TreatmentItems.AsNoTracking().SelectMany(x => x.Steps);
     public DbSet<TreatmentProgressionReceipt> TreatmentProgressionReceipts => Set<TreatmentProgressionReceipt>();
     public DbSet<TreatmentProgressionEvent> TreatmentProgressionEvents => Set<TreatmentProgressionEvent>();
     public DbSet<ClinicalActivity> ClinicalActivities => Set<ClinicalActivity>();

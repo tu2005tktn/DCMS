@@ -252,11 +252,10 @@ public static class FinanceStatisticsEndpoints
                     x.DiscountSnapshotVnd }).ToArrayAsync(ct);
             var postedIds = activities.Select(x => x.Id).ToArray();
             var completedQuantity = activities
-                .GroupBy(x => x.ItemId).ToDictionary(x => x.Key, x => x.Sum(y => y.Quantity));
+                .Where(x => x.ItemId.HasValue)
+                .GroupBy(x => x.ItemId!.Value).ToDictionary(x => x.Key, x => x.Sum(y => y.Quantity));
             var items = await db.TreatmentItems.AsNoTracking()
-                .Where(x => ids.Contains(x.DossierId) && !x.SheetDeleted && !x.HiddenFromSheet
-                    && (x.Decision == "Agreed" || x.EntrySource == "ClinicianEntry")
-                    && x.Progress != "Cancelled" && x.Progress != "Stopped")
+                .Where(x => ids.Contains(x.DossierId))
                 .ToArrayAsync(ct);
             var labs = await db.LabOrders.AsNoTracking()
                 .Where(x => ids.Contains(x.DossierId) && postedIds.Contains(x.ActivityId))
@@ -449,20 +448,19 @@ public static class FinanceStatisticsEndpoints
                     Math.Max(0, TreatmentPlanRules.Gross(x.Quantity,
                         checked((long)x.PriceSnapshotVnd)) - x.DiscountSnapshotVnd));
                 var dossierItems = items.Where(x => x.DossierId == dossier.Id).ToArray();
-                var committed = dossierItems.Any(x => x.DecisionPlanVersion != null) && dossierItems.All(x => x.SheetDeleted || x.DecisionPlanVersion != null);
-                var planned = committed ? dossierItems.Sum(item =>
+                var planned = dossierItems.Sum(item =>
                 {
                     var remaining = Math.Max(0, item.Quantity - completedQuantity.GetValueOrDefault(item.Id));
                     if (remaining == 0) return 0L;
                     var gross = TreatmentPlanRules.Gross(remaining, item.AgreedUnitPriceVnd);
-                    if (item.DiscountStatus != "Approved" || item.DiscountType is null || !item.DiscountValue.HasValue)
+                    if (item.DiscountType is not ("Fixed" or "Percent") || item.DiscountValue is not > 0)
                         return gross;
                     var fullGross = TreatmentPlanRules.Gross(item.Quantity, item.AgreedUnitPriceVnd);
                     var fullDiscount = TreatmentPlanRules.Discount(fullGross, item.DiscountType, item.DiscountValue.Value);
                     var remainingDiscount = (long)decimal.Round(fullDiscount * remaining / item.Quantity, 0,
                         MidpointRounding.AwayFromZero);
                     return Math.Max(0, gross - remainingDiscount);
-                }) : 0;
+                });
                 var labCost = labs.Where(x => x.DossierId == dossier.Id).Sum(x => x.TotalFeeVnd);
                 var originalBilled = checked(posted + planned + labCost);
                 var payment = received.GetValueOrDefault(dossier.Id);

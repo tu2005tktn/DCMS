@@ -29,6 +29,6 @@ internal static class TreatmentBookingQueries
     {
         var deleted = (await ActivityOverridesAsync(db, dossierId, ct)).Where(x => x.Value.SheetDeleted).Select(x => x.Key).ToHashSet();
         return (await db.ClinicalActivities.AsNoTracking().Where(x => x.DossierId == dossierId
-            && !deleted.Contains(x.Id)).Select(x => x.ItemId).Distinct().ToListAsync(ct)).ToHashSet();
+            && x.ItemId.HasValue && !deleted.Contains(x.Id)).Select(x => x.ItemId!.Value).Distinct().ToListAsync(ct)).ToHashSet();
     }
 }

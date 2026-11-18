@@ -17,32 +17,16 @@ public sealed partial class DcmsDbContext
         return (await TreatmentDossiers.SingleAsync(x => x.SheetDrafts.Any(d => d.Id == id), ct)).SheetDrafts.Single(x => x.Id == id);
     }
 
-    public async Task<List<TreatmentStep>> LoadTreatmentStepsAsync(IQueryable<TreatmentStep> query, CancellationToken ct)
-    {
-        var ids = await query.Select(x => x.Id).ToArrayAsync(ct);
-        var owners = await TreatmentItems.Where(x => x.Steps.Any(step => ids.Contains(step.Id))).ToArrayAsync(ct);
-        var steps = owners.SelectMany(x => x.Steps).ToDictionary(x => x.Id);
-        return ids.Select(id => steps[id]).ToList();
-    }
-
-    public async Task<TreatmentStep?> LoadTreatmentStepAsync(IQueryable<TreatmentStep> query, CancellationToken ct) =>
-        (await LoadTreatmentStepsAsync(query, ct)).SingleOrDefault();
-
     public Task AddTreatmentDataAsync(IEnumerable<object> rows) => AddTreatmentDataAsync(rows.ToArray());
 
     public async Task AddTreatmentDataAsync(params object[] rows)
     {
-        foreach (var row in rows.Where(x => x is not (TreatmentStep or TreatmentSheetDraft or TreatmentTemplateItem or TreatmentTemplateVersion)))
+        foreach (var row in rows.Where(x => x is not (TreatmentSheetDraft or TreatmentTemplateItem or TreatmentTemplateVersion)))
             Add(row);
         foreach (var row in rows)
         {
             switch (row)
             {
-                case TreatmentStep step:
-                    var item = await TreatmentItems.FindAsync(step.ItemId)
-                        ?? throw new InvalidOperationException("The treatment item must exist before its steps are saved.");
-                    if (!item.Steps.Contains(step)) item.Steps.Add(step);
-                    break;
                 case TreatmentSheetDraft draft:
                     var sheet = await TreatmentDossiers.FindAsync(draft.DossierId)
                         ?? throw new InvalidOperationException("The treatment dossier must exist before its drafts are saved.");
@@ -83,7 +67,7 @@ public sealed partial class DcmsDbContext
         foreach (var activity in ChangeTracker.Entries<ClinicalActivity>().Where(x => x.State == EntityState.Modified).ToArray())
             if (!activity.Property(x => x.Version).IsModified) activity.Entity.Version = activity.Property(x => x.Version).OriginalValue + 1;
         foreach (var entry in ChangeTracker.Entries().Where(x => x.State == EntityState.Modified
-            && x.Entity is TreatmentItem or TreatmentTemplate or CareTask or LabOrder).ToArray())
+            && x.Entity is TreatmentTemplate or CareTask or LabOrder).ToArray())
             entry.Property("StorageStamp").CurrentValue = Guid.NewGuid();
     }
 }
