@@ -54,3 +54,11 @@ B?n sao DB ?? ch?y Up/Down v? ??i chi?u 1.276 d?ng c?a 15 b?ng ngu?n: s? l??ng v
 - Loại bỏ `NormalizedCode`, `NormalizedName` (thay bằng functional unique index `IX_ACCESS_GROUP_RecordKind_Code_Upper` và `IX_ACCESS_GROUP_RecordKind_Name_Upper`).
 - Loại bỏ `RoleConcurrencyStamp` (dùng `Version.ToString()` làm `ConcurrencyStamp` cho `IdentityRole`).
 - Gộp `RoleClaims` vào cột `Grants` (`jsonb`) qua ánh xạ value converter/comparer `AccessGroupGrant` (`GroupId`, `Permission`, `ClaimId?`, `ClaimValue?`). Xem [rút gọn 8 bảng ít cột còn lại](./REMAINING-EIGHT-SMALL-TABLES-SIMPLIFICATION.vi.md).
+
+## Sửa dữ liệu ngày 19/11/2026: mốc thời gian vô cực trong `AuthData.Sessions`
+
+- Lỗi: đăng nhập trả 503 vì `System.Text.Json` không đọc được `"-infinity"` thành `DateTimeOffset` (`$.Sessions[n].LastInteractiveActivityAt`). `UserManager.FindByNameAsync` nạp toàn bộ `AuthData` nên một phiên hỏng chặn đăng nhập của cả tài khoản.
+- Nguồn gốc: migration `S58StaffIdleRuntime` thêm cột `AUTH_SESSION.LastInteractiveActivityAt` với mặc định `DateTimeOffset.MinValue`, PostgreSQL lưu thành `-infinity` cho các phiên đã có. Migration `ConsolidateAccountStorage` chuyển phiên vào JSON bằng `to_jsonb`, ghi nguyên chuỗi `"-infinity"`. Một số phiên cũ cũng có `LastSeenAt = "-infinity"`.
+- Bất biến: mọi mốc thời gian trong `AuthData` (kể cả `Sessions[].RefreshTokens[]`) phải là chuỗi ISO-8601 hữu hạn; không được có `"infinity"`/`"-infinity"`.
+- Migration chỉ sửa dữ liệu `RepairInfiniteSessionTimestamps` (không đổi schema) thay thế trong mỗi phiên: `LastSeenAt` vô cực lấy `CreatedAt`; `LastInteractiveActivityAt` vô cực lấy `LastSeenAt` (sau khi sửa), nếu không có thì `CreatedAt`. Các trường thời gian vô cực khác trong phiên/refresh token còn sót lại lấy `CreatedAt` của phiên; nếu chính `CreatedAt` hỏng thì dùng `1970-01-01T00:00:00+00:00` để phiên chắc chắn hết hạn. Phiên hợp lệ giữ nguyên. Migration idempotent, chạy tự động khi deploy (`migrate`). `Down` không khôi phục giá trị vô cực.
+- Các phiên bị ảnh hưởng đều đã cũ nên sau khi sửa vẫn hết hạn theo chính sách idle/refresh hiện tại; không phiên nào được hồi sinh.
