@@ -1,7 +1,7 @@
 name: Deploy server
 
-# Builds and redeploys the DCMS stack on the self-hosted server runner.
-# See docs/implementation/DEPLOY-SERVER-WIREGUARD.vi.md.
+# Images are built on a GitHub-hosted runner and pushed to ghcr.io; the self-hosted
+# server runner only pulls and restarts. See docs/implementation/DEPLOY-SERVER-WIREGUARD.vi.md.
 on:
   push:
     branches: [main]
@@ -14,31 +14,73 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  REGISTRY: ghcr.io/tu2005tktn
+
 jobs:
-  deploy:
-    runs-on: [self-hosted, dcms-prod]
-    timeout-minutes: 45
-    env:
-      COMPOSE: docker compose -p dcms --env-file /opt/dcms/.env -f infrastructure/docker/compose.prod.yaml
-      # The server has ~4 GB RAM: build one image at a time (docs/implementation/DEPLOY-SERVER-WIREGUARD.vi.md).
-      COMPOSE_PARALLEL_LIMIT: "1"
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - name: dcms-api
+            context: backend
+          - name: dcms-web
+            context: web
     steps:
       - uses: actions/checkout@v4
 
-      # ClamAV is optional (~1.5-2.5 GB RAM); stop it first unless /opt/dcms/.env sets CLINICAL_ANTIVIRUS=ClamAv.
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push ${{ matrix.name }}
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ matrix.name }}:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ matrix.name }}:latest
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+
+  deploy:
+    needs: build
+    runs-on: [self-hosted, dcms-prod]
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: read
+    env:
+      COMPOSE: docker compose -p dcms --env-file /opt/dcms/.env -f infrastructure/docker/compose.prod.yaml
+      DCMS_REGISTRY: ghcr.io/tu2005tktn
+      DCMS_TAG: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to ghcr.io (read-only, this run only)
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      # ClamAV is optional (~1.5-2.5 GB RAM); remove it unless /opt/dcms/.env sets CLINICAL_ANTIVIRUS=ClamAv.
       - name: Stop ClamAV when antivirus is disabled
         run: grep -qx 'CLINICAL_ANTIVIRUS=ClamAv' /opt/dcms/.env || $COMPOSE rm -sf clamav
 
-      - name: Build API image
-        run: $COMPOSE build api
+      - name: Pull images
+        run: $COMPOSE pull api web
 
-      - name: Build web image
-        run: $COMPOSE build web
-
-      - name: Trim build cache
-        run: docker builder prune -f --filter until=168h
-
-      - name: Start database and scanner
+      - name: Start database
         run: $COMPOSE up -d --wait postgres
 
       - name: Apply migrations
@@ -58,6 +100,8 @@ jobs:
           done
           echo "Health check failed"; $COMPOSE logs --tail 80 api; exit 1
 
-      - name: Prune old images
+      - name: Log out and prune old images
         if: always()
-        run: docker image prune -f
+        run: |
+          docker logout ghcr.io || true
+          docker image prune -af --filter "until=168h" --filter "label=org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}" || true
