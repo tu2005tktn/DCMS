@@ -100,7 +100,7 @@ ClamAV nạp cơ sở dữ liệu mẫu virus vào RAM (1,2–1,5 GB, lên ~2,5 
 - `CLINICAL_ANTIVIRUS=Disabled` (mặc định trong compose) đặt `ClinicalDocuments__Antivirus=Disabled` cho API: tệp hợp lệ chuyển Ready ngay, audit ghi `ScanSkipped`. Kiểm tra MIME/extension/chữ ký nội dung/kích thước vẫn áp dụng. Xem [S19/S20](../specs/S19-S20-DCMS-112.md#chế-độ-quét-virus-tùy-chọn-18112026).
 - Service `clamav` chỉ chạy khi bật profile `antivirus`.
 - Bật lại khi server đủ RAM (khuyến nghị 8 GB): trong `/opt/dcms/.env` đặt `CLINICAL_ANTIVIRUS=ClamAv` và thêm `antivirus` vào `COMPOSE_PROFILES` (ví dụ `public,antivirus`), rồi chạy lại deploy.
-- Pipeline deploy tự dừng và xóa container `clamav` (trước bước build, để giải phóng RAM) khi `.env` không đặt `CLINICAL_ANTIVIRUS=ClamAv`. Tắt bằng tay: `docker compose ... rm -sf clamav`. Volume `dcms_clamav_data` có thể xóa để lấy lại đĩa.
+- Pipeline deploy tự dừng và xóa container `clamav` (trước bước build, để giải phóng RAM) khi `.env` không đặt `CLINICAL_ANTIVIRUS=ClamAv`. Tắt bằng tay: `docker compose ... --profile antivirus rm -sf clamav` (phải nêu profile, nếu không compose bỏ qua service `clamav`). Volume `dcms_clamav_data` có thể xóa để lấy lại đĩa.
 
 ## Public ra Internet (Cloudflare Tunnel)
 
