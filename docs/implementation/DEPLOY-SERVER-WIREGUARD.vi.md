@@ -91,7 +91,7 @@ push/merge vào main
 ## Bộ nhớ trên server
 
 - Server có swap 4 GB (`/swapfile`, khai báo trong `/etc/fstab`, `vm.swappiness=10` trong `/etc/sysctl.d/99-swap.conf`), tạo ngày 19/11/2026.
-- `backend/Dockerfile` và `web/Dockerfile` vẫn giữ giới hạn bộ nhớ khi build (MSBuild một tiến trình, GC heap 1 GB; Node heap 1 GB) để build tay trên máy nhỏ vẫn an toàn.
+- `backend/Dockerfile` build bằng một tiến trình MSBuild, **không giới hạn GC heap**: giới hạn 1 GB đặt ngày 18/11/2026 làm trình biên dịch C# hết bộ nhớ (`OutOfMemoryException` khi build `DCMS.Infrastructure`, lần chạy ngày 19/11/2026). Build API cần khoảng 1,5–2 GB RAM nên chỉ build trên runner của GitHub, không build trên server. `web/Dockerfile` giữ giới hạn Node heap 1 GB.
 
 ## Quét virus tệp tải lên (ClamAV) — mặc định tắt (18/11/2026)
 
