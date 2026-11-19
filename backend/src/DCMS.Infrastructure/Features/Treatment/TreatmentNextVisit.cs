@@ -16,12 +16,12 @@ public sealed partial class TreatmentDossierService
     {
         if (!await db.Patients.AsNoTracking().AnyAsync(x => x.Id == patientId, ct)) throw Error("MSG113", 404);
         var account = await users.FindByIdAsync(actorId.ToString());
-        if (account is not { IsActive: true, AccountType: "Staff" }
-            || !AccountRoles.Effective(await users.GetRolesAsync(account)).Contains(AccountRoles.Dentist)) throw Error("MSG06", 403);
-        var employee = await db.Employees.AsNoTracking().SingleOrDefaultAsync(x => x.AccountId == actorId, ct) ?? throw Error("MSG06", 403);
-        var branches = await db.SchedulingMembers.AsNoTracking().Where(x => x.EmployeeId == employee.Id && x.Active && x.CanDentist)
-            .Select(x => x.BranchId).ToListAsync(ct);
         var scope = await access.ResolveAsync(actorId, ct);
+        if (account is not { IsActive: true, AccountType: "Staff" }
+            || !scope.GrantDriven && !AccountRoles.Effective(await users.GetRolesAsync(account)).Contains(AccountRoles.Dentist)) throw Error("MSG06", 403);
+        var employee = await db.Employees.AsNoTracking().SingleOrDefaultAsync(x => x.AccountId == actorId, ct) ?? throw Error("MSG06", 403);
+        var branches = await db.SchedulingMembers.AsNoTracking().Where(x => x.EmployeeId == employee.Id && x.Active && (x.CanDentist || scope.GrantDriven))
+            .Select(x => x.BranchId).ToListAsync(ct);
         if (scope.Assigned && !scope.Owner) branches = branches.Where(scope.BranchIds.Contains).ToList();
         var dossiers = await db.TreatmentDossiers.AsNoTracking().Include(x => x.Items).Where(x => x.PatientId == patientId
             && x.State == "Open" && x.Items.Any() && branches.Contains(x.BranchId)).ToListAsync(ct);

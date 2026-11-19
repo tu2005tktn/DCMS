@@ -31,8 +31,10 @@ public sealed class TreatmentPaidRow
 
 public static class TreatmentPaymentEndpoints
 {
-    private static bool IsOwner(HttpContext context) => context.Items["CurrentUser"] is CurrentUser user
-        && user.EffectiveRoles.Contains(AccountRoles.ClinicOwner);
+    // The owner, or staff in an access group holding the grant (ALL-SCREENS-DYNAMIC-PERMISSIONS 19/11/2026);
+    // unassigned staff keep the owner-only behavior.
+    private static bool IsOwner(HttpContext context, string permission = "finance.payments.create") => context.Items["CurrentUser"] is CurrentUser user
+        && (user.EffectiveRoles.Contains(AccountRoles.ClinicOwner) || user.AccessAssigned && user.Permissions.Contains(permission));
 
     public static void MapTreatmentPaymentEndpoints(this IEndpointRouteBuilder endpoints)
     {
@@ -40,7 +42,7 @@ public static class TreatmentPaymentEndpoints
             .RequireAuthorization().WithTags("Treatment payments");
         group.MapGet("/context", async (HttpContext context, Guid dossierId, DcmsDbContext db, CancellationToken ct) =>
         {
-            if (!IsOwner(context)) return Results.Forbid();
+            if (!IsOwner(context, "finance.read")) return Results.Forbid();
             var result = await ContextAsync(db, dossierId, ct);
             return result is null ? Results.NotFound() : Results.Ok(result);
         });

@@ -4,6 +4,8 @@ import { api, ApiError, onSessionLost, readAccessToken, setAccessToken, setSessi
 export type CurrentUser = {
   id: number; userName: string; fullName: string; accountType: string; roles: string[];
   effectiveRoles: string[]; permissions: string[]; hasVerifiedPatientLink: boolean;
+  /** Staff (not the owner) in an access group: only `permissions` count, never roles (ALL-SCREENS-DYNAMIC-PERMISSIONS 19/11/2026). */
+  accessAssigned?: boolean;
 };
 type AuthState = {
   initializing: boolean;

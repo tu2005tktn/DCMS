@@ -139,8 +139,11 @@ public sealed partial class ReferenceCatalogService(DcmsDbContext db, UserManage
         var assigned = await RolesAsync(actorId);
         var effective = AccountRoles.Effective(assigned);
         if (search?.Length > 100) throw Error("MSG03", label: "Từ khóa", max: 100);
+        // Staff in an access group pick options through any consumer grant the endpoint already required, not their role.
+        var state = await access.ResolveAsync(actorId, ct);
+        if (state.GrantDriven) effective = [AccountRoles.Dentist, AccountRoles.ClinicAssistant];
         if (kind is "suppliers" or "lab-providers" or "lab-work-types" or "medicines") return await SupplyOptionsAsync(kind, effective, search, ct);
-        var allowed = Kind(kind ?? "") switch
+        var allowed = state.GrantDriven ? Kind(kind ?? "") != ReferenceKinds.ExpenseCategories || state.Has("catalog.expense-categories.read") : Kind(kind ?? "") switch
         {
             ReferenceKinds.Diagnoses => effective.Contains(AccountRoles.Dentist),
             ReferenceKinds.ExpenseCategories => assigned.Contains(AccountRoles.ClinicOwner),

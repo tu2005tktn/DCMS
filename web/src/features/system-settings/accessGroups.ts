@@ -16,11 +16,14 @@ export function editableGrants(grants: string[], options: GrantOption[]) {
   }
   return [...values].filter(key => options.some(option => option.key === key));
 }
-export function toggleGrant(values: string[], key: string, checked: boolean, options: GrantOption[]) {
+// Checking a grant also checks its missing parents and every descendant (allowed ones only); users untick what they do not want.
+export function toggleGrant(values: string[], key: string, checked: boolean, options: GrantOption[], allowed: (key: string) => boolean = () => true) {
   const next = new Set(values);
   if (checked) {
     let current: string | null = key;
     while (current) { next.add(current); current = options.find(option => option.key === current)?.parent ?? null; }
+    const descend = (parent: string) => options.filter(option => option.parent === parent && allowed(option.key)).forEach(option => { next.add(option.key); descend(option.key); });
+    descend(key);
   } else {
     const remove = (parent: string) => { next.delete(parent); options.filter(option => option.parent === parent).forEach(option => remove(option.key)); };
     remove(key);

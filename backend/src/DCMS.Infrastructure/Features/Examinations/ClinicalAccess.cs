@@ -20,9 +20,11 @@ public sealed class ClinicalAccess(DcmsDbContext db, UserManager<ApplicationUser
         var roles = AccountRoles.Effective(await users.GetRolesAsync(u));
         var dentist = roles.Contains(AccountRoles.Dentist);
         var assistant = roles.Contains(AccountRoles.ClinicAssistant);
-        if (u.AccountType != "Staff" || !dentist && !assistant || dentistOnly && !dentist) throw Error("MSG06", 403);
+        // Staff in an access group act through the grant and assignment branch checked above, not their role or membership flags.
+        var grantDriven = (await settingsAccess.ResolveAsync(actorId, ct)).GrantDriven;
+        if (u.AccountType != "Staff" || !grantDriven && (!dentist && !assistant || dentistOnly && !dentist)) throw Error("MSG06", 403);
         var e = await db.Employees.AsNoTracking().SingleOrDefaultAsync(x => x.AccountId == actorId, ct);
-        if (e == null || !await (from m in db.SchedulingMembers join b in db.Set<SchedulingBranch>() on m.BranchId equals b.Id
+        if (e == null || !grantDriven && !await (from m in db.SchedulingMembers join b in db.Set<SchedulingBranch>() on m.BranchId equals b.Id
             where m.EmployeeId == e.Id && m.BranchId == branchId && m.Active && b.Active && (dentistOnly ? m.CanDentist : assistant || m.CanDentist)
             select m).AnyAsync(ct)) throw Error("MSG06", 403);
         return dentist && await db.SchedulingMembers.AnyAsync(x => x.EmployeeId == e.Id && x.BranchId == branchId && x.Active && x.CanDentist, ct);
@@ -31,8 +33,15 @@ public sealed class ClinicalAccess(DcmsDbContext db, UserManager<ApplicationUser
     {
         var v = await db.Visits.SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw Error("MSG113", 404);
         await BranchAsync(actorId, v.BranchId, dentistOnly, ct, permission);
-        if (dentistOnly && !await db.Employees.AnyAsync(x => x.Id == v.DentistId && x.AccountId == actorId, ct)) throw Error("MSG06", 403);
+        if (dentistOnly && !await ActsForAsync(actorId, v, ct)) throw Error("MSG06", 403);
         return v;
+    }
+    // The visit's own dentist, or a non-dentist in an access group who was granted the clinical action for the branch.
+    public async Task<bool> ActsForAsync(int actorId, Visit v, CancellationToken ct)
+    {
+        if (await db.Employees.AnyAsync(x => x.Id == v.DentistId && x.AccountId == actorId, ct)) return true;
+        var state = await settingsAccess.ResolveAsync(actorId, ct);
+        return state.GrantDriven && !state.Roles.Contains(AccountRoles.Dentist);
     }
     public async Task<int[]> BranchesAsync(int actorId, CancellationToken ct)
     {

@@ -31,7 +31,7 @@ public sealed class SettingsAccess(DcmsDbContext db, UserManager<ApplicationUser
         else {
             var group = await db.Set<AccessGroup>().AsNoTracking().SingleOrDefaultAsync(x => x.Id == assignment.GroupId,ct);
             permissions = group is {Active:true} && roles.Contains(group.BaseRole)
-                ? group.Grants.Where(x => SettingsGrants.RoleAllows(x.Permission,roles)).Select(x => x.Permission).ToArray() : [];
+                ? group.Grants.Select(x => x.Permission).Where(SettingsGrants.Exists).ToArray() : [];
             branches = branches.Intersect(assignment.BranchIds).ToArray();
         }
         return new(owner,assignment != null,roles,ScreenGrants.Expand(permissions),branches);

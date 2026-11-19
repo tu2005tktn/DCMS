@@ -78,6 +78,7 @@ public static class ScreenGrants
     {
         bool Has(params string[] values) => roles.Any(values.Contains);
         if (permission.StartsWith("materials.")) return Has(AccountRoles.ClinicOwner, AccountRoles.Admin, AccountRoles.Dentist);
+        if (permission == "finance.statistics.read") return Has(AccountRoles.ClinicOwner);
         if (permission == "finance.work-statistics.read") return Has(AccountRoles.ClinicOwner, AccountRoles.Admin, AccountRoles.Dentist, AccountRoles.ClinicAssistant);
         if (permission is "settings.general.read" or "settings.general.manage") return Has(AccountRoles.ClinicOwner, AccountRoles.Admin);
         if (permission.StartsWith("catalog.") && SupplyKinds.Any(kind => permission.StartsWith($"catalog.{kind}.")))

@@ -31,7 +31,7 @@ public sealed class ExaminationService(DcmsDbContext db, ClinicalAccess access, 
         var initial = new ExaminationContent(v.ArrivalReason ?? v.Note, prior == null ? new() : prior.MedicalHistory with { Verified = false },
             prior == null ? new() : prior.Allergies with { Verified = false }, prior == null ? new() : prior.Medications with { Verified = false }, [], null, null);
         var own = await db.Employees.AnyAsync(x => x.Id == v.DentistId && x.AccountId == actorId, ct);
-        var responsible = own && await access.BranchAsync(actorId, v.BranchId, false, ct);
+        var responsible = own && await access.BranchAsync(actorId, v.BranchId, false, ct) || !own && await access.ActsForAsync(actorId, v, ct);
         var state = await permissions.ResolveAsync(actorId, ct);
         var canWrite = responsible && state.Permissions.Contains("examinations.manage");
         string[] actions = canWrite ? v.Status == VisitStatuses.Queued ? ["start"]

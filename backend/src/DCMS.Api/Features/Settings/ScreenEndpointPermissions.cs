@@ -34,7 +34,7 @@ public static class ScreenEndpointPermissions
             var kind = p.Split('/')[5]; if (kind.StartsWith('{')) kind = values?.GetValueOrDefault("kind") ?? "{kind}";
             return Need($"catalog.{kind}.{(read ? p.EndsWith("/export") ? "export" : "read" : p.Contains("/state") ? "deactivate" : method == "POST" ? "create" : "update")}");
         }
-        if (p == "/api/finance/statistics") return Need("finance.read");
+        if (p == "/api/finance/statistics") return Need("finance.statistics.read");
         if (p == "/api/work-statistics") return Need("finance.work-statistics.read");
         if (p.StartsWith("/api/system-settings/material-purchases")) return Need($"materials.purchases.{(read ? "read" : method == "DELETE" ? "delete" : method == "POST" ? "create" : "update")}");
         if (p == "/api/system-settings/material-stock") return Need("materials.stock.read");

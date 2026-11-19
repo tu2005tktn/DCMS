@@ -37,7 +37,9 @@ public sealed class ReceptionService(DcmsDbContext db, UserManager<ApplicationUs
         if (user == null || !user.IsActive || user.LockoutEnabled && user.LockoutEnd > clock.GetUtcNow()) throw Error("MSG07", 401);
         if (user.AccountType != "Staff") throw Error("MSG06", 403);
         var roles = AccountRoles.Effective(await users.GetRolesAsync(user));
-        var assistant = roles.Contains(AccountRoles.ClinicAssistant) || roles.Contains(AccountRoles.ClinicOwner);
+        // Staff in an access group act through reception.* grants and assignment branches, never their role.
+        var assistant = roles.Contains(AccountRoles.ClinicAssistant) || roles.Contains(AccountRoles.ClinicOwner)
+            || (await settingsAccess.ResolveAsync(actorId, ct)).GrantDriven;
         if (!assistant && !roles.Contains(AccountRoles.Dentist)) throw Error("MSG06", 403);
         var employee = await db.Employees.AsNoTracking().SingleOrDefaultAsync(x => x.AccountId == actorId, ct) ?? throw Error("MSG06", 403);
         var backdate = assistant && (await users.GetClaimsAsync(user)).Any(x => x.Type == "permission" && x.Value == "reception.backdate");

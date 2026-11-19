@@ -21,7 +21,7 @@ public sealed class ItemPlanCreateTests
         var pg = await CreateTestKit.NewPostgresDbAsync();
         var branchId = CreateTestKit.NextId();
         var actor = await CreateTestKit.SeedStaffAsync(pg.Db, "bs." + branchId, role, branchId, member);
-        return (pg, new ItemPlanService(pg.Db, CreateTestKit.NewRoleUserManager(pg.Db), TimeProvider.System), actor.Id, branchId);
+        return (pg, new ItemPlanService(pg.Db, CreateTestKit.NewRoleUserManager(pg.Db), TimeProvider.System, new CreateTestKit.AllowAll()), actor.Id, branchId);
     }
 
     [Theory]

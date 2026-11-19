@@ -61,9 +61,10 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
         var account = await users.FindByIdAsync(actorId.ToString());
         if (account == null || !account.IsActive || account.AccountType != "Staff") throw Error("MSG06", 403);
         var roles = AccountRoles.Effective(await users.GetRolesAsync(account));
-        if (!roles.Contains(AccountRoles.Dentist)) throw Error("MSG06", 403);
+        // Staff in an access group act through treatment.* grants within assignment branches (checked above), not their role.
+        if (!scope.GrantDriven && !roles.Contains(AccountRoles.Dentist)) throw Error("MSG06", 403);
         var employee = await db.Employees.AsNoTracking().SingleOrDefaultAsync(x => x.AccountId == actorId, ct);
-        if (employee == null || (scope.Owner ? !scope.BranchIds.Contains(branchId) : !await db.SchedulingMembers.AsNoTracking().AnyAsync(x =>
+        if (employee == null || (scope.Owner || scope.GrantDriven ? !scope.BranchIds.Contains(branchId) : !await db.SchedulingMembers.AsNoTracking().AnyAsync(x =>
                 x.BranchId == branchId && x.EmployeeId == employee.Id && x.Active && x.CanDentist, ct)))
             throw Error("MSG06", 403);
         return employee.Id;
@@ -142,19 +143,19 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
         if (!await db.Patients.AsNoTracking().AnyAsync(x => x.Id == patientId, ct)) throw Error("MSG113", 404);
         var employee = await db.Employees.AsNoTracking().SingleOrDefaultAsync(x => x.AccountId == actorId, ct);
         if (employee == null) throw Error("MSG06", 403);
+        var scope = await access.ResolveAsync(actorId, ct);
         if (branchId.HasValue) await DentistAsync(actorId, branchId.Value, ct);
         else
         {
             var account = await users.FindByIdAsync(actorId.ToString());
             if (account == null || account.AccountType != "Staff" || !account.IsActive ||
-                !AccountRoles.Effective(await users.GetRolesAsync(account)).Contains(AccountRoles.Dentist))
+                !scope.GrantDriven && !AccountRoles.Effective(await users.GetRolesAsync(account)).Contains(AccountRoles.Dentist))
                 throw Error("MSG06", 403);
         }
-        var scope = await access.ResolveAsync(actorId, ct);
         var allowed = db.SchedulingMembers.AsNoTracking().Where(x =>
             x.EmployeeId == employee.Id && x.Active && x.CanDentist).Select(x => x.BranchId);
         var query = db.TreatmentDossiers.AsNoTracking().Where(x => x.PatientId == patientId
-            && x.State != "Deleted" && (scope.Owner ? scope.BranchIds.Contains(x.BranchId) : allowed.Contains(x.BranchId)));
+            && x.State != "Deleted" && (scope.Owner || scope.GrantDriven ? scope.BranchIds.Contains(x.BranchId) : allowed.Contains(x.BranchId)));
         if (scope.Assigned && !scope.Owner) query = query.Where(x => scope.BranchIds.Contains(x.BranchId));
         if (branchId.HasValue) query = query.Where(x => x.BranchId == branchId.Value);
         var total = await query.CountAsync(ct);
@@ -316,12 +317,12 @@ public sealed partial class TreatmentDossierService(DcmsDbContext db, UserManage
     public async Task<DossierCreateContext> CreateContextAsync(int actorId, int patientId, CancellationToken ct)
     {
         var account = await users.FindByIdAsync(actorId.ToString());
-        if (account == null || !account.IsActive || account.AccountType != "Staff" || !AccountRoles.Effective(await users.GetRolesAsync(account)).Contains(AccountRoles.Dentist)) throw Error("MSG06",403);
+        var scope = await access.ResolveAsync(actorId, ct);
+        if (account == null || !account.IsActive || account.AccountType != "Staff" || !scope.GrantDriven && !AccountRoles.Effective(await users.GetRolesAsync(account)).Contains(AccountRoles.Dentist)) throw Error("MSG06",403);
         if (!await db.Patients.AnyAsync(x => x.Id == patientId && !x.IsArchived, ct)) throw Error("MSG113",404);
         var employee = await db.Employees.AsNoTracking().SingleOrDefaultAsync(x => x.AccountId == actorId, ct) ?? throw Error("MSG06",403);
         var branches = await (from m in db.SchedulingMembers join b in db.Set<SchedulingBranch>() on m.BranchId equals b.Id
-            where m.EmployeeId == employee.Id && m.Active && m.CanDentist && b.Active orderby b.Name select new DossierCreateBranch(b.Id,b.Name)).ToListAsync(ct);
-        var scope = await access.ResolveAsync(actorId, ct);
+            where m.EmployeeId == employee.Id && m.Active && (m.CanDentist || scope.GrantDriven) && b.Active orderby b.Name select new DossierCreateBranch(b.Id,b.Name)).ToListAsync(ct);
         if (scope.Assigned && !scope.Owner) branches = branches.Where(x => scope.BranchIds.Contains(x.Id)).ToList();
         return new(employee.Id, branches);
     }
