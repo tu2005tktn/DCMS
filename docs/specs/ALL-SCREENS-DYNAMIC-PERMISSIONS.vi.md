@@ -92,3 +92,48 @@ Các chức năng mới phải xuất hiện thành lựa chọn trong cây phâ
 ## Shared permission keys
 
 A permission key may be referenced by more than one screen definition. The effective grant catalog exposed to APIs and role resolution must contain one canonical entry per key, preserving the existing first declaration and its parent/role metadata. Reusing a key must not make sign-in or permission expansion fail, and must not create duplicate grant choices.
+
+## Cập nhật 19/11/2026: Chủ phòng khám gán được mọi quyền
+
+Yêu cầu người dùng: Chủ phòng khám phải gán được **tất cả** quyền cho bất kỳ nhóm quyền nào; không còn dòng bị mờ "Theo vai trò chuyên môn khác". Mục này thay thế các câu ở trên và trong [S58-DYNAMIC-ACCESS-GROUPS](S58-DYNAMIC-ACCESS-GROUPS.vi.md) nói rằng quyền động là "điều kiện bổ sung cho vai trò chuyên môn", "không cấp nghề nha sĩ bằng checkbox", "giữ giới hạn vai trò hiện có" và `allowedBaseRoles` giới hạn lựa chọn.
+
+### Quy tắc quyền hiệu lực
+
+| Loại tài khoản nhân viên | Quyền hiệu lực |
+| --- | --- |
+| Chủ phòng khám (Owner) | Như hiện hành: mọi quyền phù hợp vai trò, mọi chi nhánh đang hoạt động. |
+| Chưa gán nhóm quyền | Như hiện hành: quyền mặc định theo vai trò (Admin / Bác sĩ / Trợ lý), kể cả các kiểm tra vai trò trong dịch vụ. |
+| Đã gán nhóm quyền | **Chỉ** các grant đã tích trong nhóm + phạm vi chi nhánh của assignment (giao với membership đang hoạt động). Không kiểm vai trò chuyên môn của người thao tác (Admin/Bác sĩ/Trợ lý) và không kiểm cờ membership `CanDentist`/`CanManageSchedules` ở bất kỳ API/dịch vụ/màn hình nào. |
+
+- `grant-options` trả `allowedBaseRoles` gồm cả ba vai trò nền cho mọi grant (giữ trường để không vỡ hợp đồng). Lưu/xem trước nhóm không còn từ chối grant vì vai trò nền. Server vẫn từ chối grant không tồn tại, grant thiếu quyền cha, và người quản lý không phải Owner cấp grant mà chính họ không có.
+- Vai trò nền của nhóm chỉ còn dùng để ghép nhóm với nhân viên khi gán (nhân viên phải có vai trò đó) và mô tả nhóm; không giới hạn grant.
+- Ràng buộc dữ liệu **không phải quyền của người thao tác** giữ nguyên: bác sĩ được chọn cho lịch hẹn, hồ sơ điều trị, lượt khám, dòng thực hiện phải là tài khoản Bác sĩ thành viên chi nhánh; trạng thái, version, requestKey, audit, chi nhánh.
+- Quy tắc phạm vi theo người phụ trách áp dụng cho tài khoản Bác sĩ: bác sĩ chỉ xem lịch hẹn của mình và chỉ ghi khám trên lượt khám mình phụ trách. Nhân viên đã gán nhóm **không phải Bác sĩ** được cấp quyền tương ứng thì thao tác trên toàn chi nhánh trong phạm vi assignment (ví dụ trợ lý được cấp `examinations.manage` ghi khám thay bác sĩ phụ trách của lượt khám).
+- Rủi ro pháp lý hành nghề (kê đơn, ghi khám, điều trị bởi người không phải bác sĩ) thuộc trách nhiệm cấu hình của Chủ phòng khám; hệ thống ghi audit mọi thao tác như hiện có.
+- Phiên `/api/auth/me` (`CurrentUser`) bổ sung `accessAssigned` (bool): `true` khi tài khoản nhân viên (không phải Owner) đã được gán nhóm. Web dùng cờ này thay cho kiểm vai trò ở menu/route/nút: đã gán nhóm → chỉ xét quyền; chưa gán → giữ điều kiện vai trò hiện hành.
+
+### Chức năng bổ sung vào cây phân quyền (rà soát toàn bộ màn hình 19/11/2026)
+
+Rà toàn bộ route web nhân viên, menu, endpoint và các chỗ kiểm vai trò cứng. Các chức năng trước đây chỉ mở theo vai trò, chưa có checkbox hoặc checkbox không có hiệu lực:
+
+| Chức năng | Trước | Sau |
+| --- | --- | --- |
+| Màn **Thống kê tài chính** (`/finance/statistics`, `GET /api/finance/statistics`) | Chỉ Owner, không có grant | Grant mới `finance.statistics.read` "Xem thống kê tài chính", cha `finance.read`. Mặc định theo vai trò: chỉ Owner. |
+| Nút **Trả tiền**, đặt cọc, áp tạm ứng, mất cọc không đến, QR PayOS trên phiếu điều trị | Chỉ Owner; grant `finance.payments.create` không có hiệu lực ở đây | Owner, hoặc nhân viên đã gán nhóm có `finance.payments.create` (đọc ngữ cảnh thanh toán cần `finance.read`). Nhân viên chưa gán nhóm giữ hành vi cũ. |
+| Màn **Chăm sóc khách hàng** | Chỉ Trợ lý/Owner có `care-tasks.read` | Nhân viên đã gán nhóm có `care-tasks.read` mở được bất kể vai trò. |
+| Danh sách / phiếu **hồ sơ điều trị**, **Kế hoạch điều trị dùng lại** | Chỉ Bác sĩ/Owner | Nhân viên đã gán nhóm có `treatment.read` / `treatment.templates.read`. |
+| Tab **Công ty cung cấp vật liệu** trong Thiết lập | Kiểm khóa không tồn tại `catalog.material-suppliers.read` nên chỉ Owner thấy | Dùng đúng grant `catalog.providers.read`. |
+
+Không thêm checkbox cho chức năng chưa tồn tại.
+
+### Chọn quyền trong form
+
+- Tích một quyền (thường là quyền màn hình) tự tích **toàn bộ quyền con, cháu** của nó (kể cả đang bị bộ lọc tìm kiếm che) và các quyền cha còn thiếu. Người dùng bỏ tích từng quyền con không mong muốn; bỏ quyền con không bỏ quyền cha.
+- Bỏ tích quyền cha vẫn bỏ toàn bộ quyền con như hiện hành.
+- Với người quản lý không phải Owner, tự tích con chỉ chọn những quyền họ được phép cấp.
+- Không còn checkbox bị khóa vì vai trò nền; chỉ khóa khi người xem không có quyền sửa nhóm hoặc (không phải Owner) không có chính quyền đó.
+
+### Kiểm chứng
+
+- Unit: grant mặc định theo vai trò không đổi cho Owner và nhân viên chưa gán nhóm; nhóm vai trò nền bất kỳ lưu được mọi grant; nhóm đã gán trả đúng grant đã tích không lọc vai trò; `toggleGrant` tự tích con/cha.
+- API: Owner tạo nhóm nền Bác sĩ có `patients.create`, nền Trợ lý có `prescriptions.manage`/`treatment.read`; nhân viên được gán thao tác được API tương ứng, bị chặn khi thu hồi.

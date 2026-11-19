@@ -93,18 +93,21 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
 });
 builder.Services.AddAuthorizationBuilder()
     .SetFallbackPolicy(new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build())
-    .AddPolicy("ManageAccounts", policy => policy.RequireRole(AccountRoles.Admin))
+    // Staff permissions in the session are already resolved from the DB: role defaults for the owner and
+    // unassigned staff, exactly the group's grants for staff in an access group (ALL-SCREENS-DYNAMIC-PERMISSIONS 19/11/2026).
+    .AddPolicy("ManageAccounts", policy => policy.RequireAssertion(c => c.User.IsInRole(AccountRoles.Admin)
+        || c.User.HasClaim(x => x.Type == "permission" && x.Value.StartsWith("accounts."))))
     // Guest is effective for every public account (Patient inherits it) and never for staff.
     .AddPolicy(PatientLinkEndpoints.PublicAccountPolicy, policy => policy.RequireRole(AccountRoles.Guest))
-    // Admin, Dentist and Clinic Owner do not inherit link verification.
-    .AddPolicy(PatientLinkEndpoints.VerifyPolicy, policy => policy.RequireRole(AccountRoles.ClinicAssistant).RequireAssertion(c => c.User.HasClaim("permission","patient-links.read") || c.User.HasClaim("permission","patient-links.verify")))
-    // S05/S06: Admin has no patient access (GBR-026); Clinic Owner reads through effective Dentist.
-    .AddPolicy(PatientEndpoints.ReadPolicy, policy => policy.RequireRole(AccountRoles.ClinicAssistant, AccountRoles.Dentist).RequireClaim("permission","patients.read"))
-    .AddPolicy(PatientEndpoints.ManagePolicy, policy => policy.RequireRole(AccountRoles.ClinicAssistant).RequireClaim("permission","patients.manage"))
-    .AddPolicy(PatientEndpoints.CreatePolicy, policy => policy.RequireRole(AccountRoles.ClinicAssistant).RequireAssertion(c => c.User.HasClaim("permission","patients.manage") || c.User.HasClaim("permission","patients.create")))
-    .AddPolicy(PatientEndpoints.UpdatePolicy, policy => policy.RequireRole(AccountRoles.ClinicAssistant).RequireAssertion(c => c.User.HasClaim("permission","patients.manage") || c.User.HasClaim("permission","patients.update")))
-    .AddPolicy(PatientEndpoints.ArchivePolicy, policy => policy.RequireRole(AccountRoles.ClinicAssistant).RequireAssertion(c => c.User.HasClaim("permission","patients.manage") || c.User.HasClaim("permission","patients.archive")))
-    .AddPolicy(TreatmentEndpoints.DentistPolicy, policy => policy.RequireRole(AccountRoles.Dentist));
+    .AddPolicy(PatientLinkEndpoints.VerifyPolicy, policy => policy.RequireAssertion(c => c.User.HasClaim("permission","patient-links.read") || c.User.HasClaim("permission","patient-links.verify")))
+    // S05/S06: Admin has no default patient access (GBR-026); Clinic Owner reads through effective Dentist.
+    .AddPolicy(PatientEndpoints.ReadPolicy, policy => policy.RequireClaim("permission","patients.read"))
+    .AddPolicy(PatientEndpoints.ManagePolicy, policy => policy.RequireClaim("permission","patients.manage"))
+    .AddPolicy(PatientEndpoints.CreatePolicy, policy => policy.RequireAssertion(c => c.User.HasClaim("permission","patients.manage") || c.User.HasClaim("permission","patients.create")))
+    .AddPolicy(PatientEndpoints.UpdatePolicy, policy => policy.RequireAssertion(c => c.User.HasClaim("permission","patients.manage") || c.User.HasClaim("permission","patients.update")))
+    .AddPolicy(PatientEndpoints.ArchivePolicy, policy => policy.RequireAssertion(c => c.User.HasClaim("permission","patients.manage") || c.User.HasClaim("permission","patients.archive")))
+    .AddPolicy(TreatmentEndpoints.DentistPolicy, policy => policy.RequireAssertion(c => c.User.IsInRole(AccountRoles.Dentist)
+        || c.User.HasClaim(x => x.Type == "permission" && x.Value.StartsWith("treatment."))));
 
 var webOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 builder.Services.AddCors(options => options.AddPolicy("WebDevelopment", policy =>

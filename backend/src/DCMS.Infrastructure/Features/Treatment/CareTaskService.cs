@@ -32,7 +32,7 @@ public sealed class CareTaskService(DcmsDbContext db, UserManager<ApplicationUse
         var scope = await access.ResolveAsync(actorId, ct);
         if (scope.Assigned && !scope.Owner && !scope.BranchIds.Contains(branchId)) throw Error("MSG06", 403);
         var roles = AccountRoles.Effective(await users.GetRolesAsync(user));
-        if (!roles.Contains(AccountRoles.Dentist) && !roles.Contains(AccountRoles.ClinicAssistant))
+        if (!scope.GrantDriven && !roles.Contains(AccountRoles.Dentist) && !roles.Contains(AccountRoles.ClinicAssistant))
             throw Error("MSG06", 403);
         var employeeId = await db.Employees.AsNoTracking().Where(x => x.AccountId == actorId)
             .Select(x => (int?)x.Id).SingleOrDefaultAsync(ct);

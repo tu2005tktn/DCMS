@@ -79,8 +79,9 @@ public static class FinanceStatisticsEndpoints
         endpoints.MapGet("/api/finance/statistics", async (HttpContext context, DateOnly? from, DateOnly? to, int? branchId,
             DcmsDbContext db, CancellationToken ct) =>
         {
+            // finance.statistics.read defaults to the owner only; an access group may grant it to anyone.
             if (context.Items["CurrentUser"] is not CurrentUser user ||
-                !user.EffectiveRoles.Contains(AccountRoles.ClinicOwner)) return Results.Forbid();
+                !user.Permissions.Contains("finance.statistics.read")) return Results.Forbid();
             if (from > to || branchId is < 1) return Results.BadRequest("Khoảng ngày hoặc chi nhánh không hợp lệ.");
 
             // Select a cohort by dossier opening date, then use lifetime figures for each dossier.

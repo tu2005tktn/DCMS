@@ -37,7 +37,7 @@ public sealed class ItemPlanRowCreateTests
         var pg = await CreateTestKit.NewPostgresDbAsync();
         var branchId = CreateTestKit.NextId();
         var actor = await CreateTestKit.SeedStaffAsync(pg.Db, "bs." + branchId, "Dentist", branchId);
-        var service = new ItemPlanService(pg.Db, CreateTestKit.NewRoleUserManager(pg.Db), TimeProvider.System);
+        var service = new ItemPlanService(pg.Db, CreateTestKit.NewRoleUserManager(pg.Db), TimeProvider.System, new CreateTestKit.AllowAll());
         var plan = await service.CreateAsync(actor.Id, new ItemPlanCreate(branchId, "Điều trị cạo vôi răng", Guid.NewGuid()), default);
         return (pg, service, actor.Id, plan);
     }

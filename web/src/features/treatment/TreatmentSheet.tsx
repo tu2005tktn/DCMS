@@ -26,6 +26,8 @@ export default function TreatmentSheet({ patientId, dossierId, dossierVersion, o
 }) {
   const has = usePermissions();
   const { user } = useAuth();
+  // Owner, or staff in an access group granted treatment payments (ALL-SCREENS-DYNAMIC-PERMISSIONS 19/11/2026).
+  const canCollect = !!user?.effectiveRoles.includes('ClinicOwner') || !!user?.accessAssigned && has('finance.payments.create');
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [billableService, setBillableService] = useState<{ dossierId: string; available: boolean } | null>(null);
   const [dossier, setDossier] = useState<TreatmentDossier | null>(null), [context, setContext] = useState<SheetContext | null>(null);
@@ -61,14 +63,14 @@ export default function TreatmentSheet({ patientId, dossierId, dossierVersion, o
   useEffect(() => { let live = true; setError(undefined); void load().then(v => { if (live) accept(v); }).catch(e => { if (live) setError(e.message); }); return () => { live = false; }; }, [dossierId, dossierVersion, reload, patientId]);
   useEffect(() => { let live = true; void api<LabOrderSummary[]>(`/api/dossiers/${dossierId}/lab-orders`).then(v => { if (live) setLabOrders(v); }).catch(() => undefined); return () => { live = false; }; }, [dossierId, reload]);
   useEffect(() => {
-    if (!user?.effectiveRoles.includes('ClinicOwner') || dossier?.state === 'Cancelled') return;
+    if (!canCollect || dossier?.state === 'Cancelled') return;
     let live = true;
     setBillableService(null);
     void api<{ lines: { priceVnd: number }[] }>(`/api/dossiers/${dossierId}/payments/context`)
       .then(value => { if (live) setBillableService({ dossierId, available: value.lines.some(line => line.priceVnd > 0) }); })
       .catch(() => { if (live) setBillableService({ dossierId, available: false }); });
     return () => { live = false; };
-  }, [dossierId, dossier?.state, reload, user?.effectiveRoles]);
+  }, [dossierId, dossier?.state, reload, canCollect]);
   useEffect(() => {
     let live = true; setActivityError(undefined); setActivities(null);
     void api<ActivityPage>(`/api/dossiers/${dossierId}/activities?page=${page}&pageSize=20`).then(v => { if (live) setActivities(v); }).catch(e => { if (live) setActivityError(e.message); });
@@ -286,7 +288,7 @@ export default function TreatmentSheet({ patientId, dossierId, dossierVersion, o
         {drafts.filter(d => d.kind === 'Actual' && d.id !== editor?.row?.id).map(d => <tr key={d.id}><td>{d.row.date || '—'}</td><td>{d.row.regions?.join(', ')}</td><td>{d.row.serviceName}<small>Nháp</small></td><td>{d.row.note}</td><td>{member(d.row.dentistId)}</td><td>{d.row.labWork}</td><td>{money(d.row.costVnd)}</td><td>—</td><td><Button size="small" disabled={!has('treatment.actuals.create')} onClick={() => setEditor({kind:'actual',row:d.row})}>Sửa nháp</Button></td></tr>)}
         {rowEditor('actual')}
       </tbody></table></div><Button className="treatment-sheet-create" aria-label="Thêm quá trình điều trị" disabled={!has('treatment.actuals.create') || !canWrite || !!editor || busy} onClick={() => setEditor({kind:'actual'})}>+ Thêm việc đã làm</Button>
-      {user?.effectiveRoles.includes('ClinicOwner') && <Button type="primary" style={{ marginLeft: 12 }}
+      {canCollect && <Button type="primary" style={{ marginLeft: 12 }}
         disabled={!canPay} title={!canPay ? 'Cần có dịch vụ có phí trong kế hoạch và quá trình điều trị trước khi thu tiền.' : undefined}
         onClick={() => { if (canPay) setPaymentOpen(true); }}>Trả tiền</Button>}
       {(activities?.total ?? 0) > 20 && <Pagination current={page} total={activities?.total} pageSize={20} onChange={setPage} />}</section>

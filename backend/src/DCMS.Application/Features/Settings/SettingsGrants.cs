@@ -36,6 +36,7 @@ public static class SettingsGrants
         new("finance.read", "Xem giá và chi phí dịch vụ", null, null),
         new("finance.payments.create", "Ghi nhận thanh toán điều trị", null, "finance.read"),
         new("finance.costs.read", "Xem chi phí trong nhật ký thiết lập", null, "finance.read"),
+        new("finance.statistics.read", "Xem thống kê tài chính", null, "finance.read"),
         .. ScreenGrants.Definitions,
         .. CatalogKinds.SelectMany(kind => new[] {
             new GrantDefinition($"catalog.{kind}.read", $"{CatalogLabels[Array.IndexOf(CatalogKinds,kind)]}: Xem", null, "settings.read"),
@@ -47,6 +48,7 @@ public static class SettingsGrants
     public static readonly GrantDefinition[] Definitions = AllDefinitions
         .DistinctBy(x => x.Key, StringComparer.Ordinal)
         .ToArray();
+    public static bool Exists(string permission) => Definitions.Any(x => x.Key == permission);
     public static bool RoleAllows(string permission, string[] roles)
     {
         var definition = Definitions.SingleOrDefault(x => x.Key == permission);

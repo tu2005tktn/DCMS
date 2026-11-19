@@ -346,7 +346,7 @@ public sealed class SupportRequestService(DcmsDbContext db, UserManager<Applicat
         var permissions=await settingsAccess.RequireAsync(actorId,"appointments.support.handle",ct);
         var user = await users.FindByIdAsync(actorId.ToString());
         if (user == null || !user.IsActive || user.AccountType != "Staff"
-            || !await users.IsInRoleAsync(user, AccountRoles.ClinicAssistant)) throw Error("MSG06", 403);
+            || !permissions.GrantDriven && !await users.IsInRoleAsync(user, AccountRoles.ClinicAssistant)) throw Error("MSG06", 403);
         var result = await (from member in db.SchedulingMembers.AsNoTracking()
             join employee in db.Employees.AsNoTracking() on member.EmployeeId equals employee.Id
             join branch in db.Set<SchedulingBranch>().AsNoTracking() on member.BranchId equals branch.Id

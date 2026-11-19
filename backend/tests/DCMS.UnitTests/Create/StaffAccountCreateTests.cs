@@ -31,7 +31,7 @@ public sealed class StaffAccountCreateTests
     {
         using var db = CreateTestKit.NewDb();
         var users = CreateTestKit.NewUserManager(db);
-        var service = new AccountService(db, users);
+        var service = new AccountService(db, users, new CreateTestKit.AllowAll());
 
         var error = await CreateTestKit.ErrorOf(() => service.CreateAsync(1, request, default));
 

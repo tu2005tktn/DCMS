@@ -24,7 +24,7 @@ function rangeOf(mode: Mode, anchor: string): [string, string] {
 
 export default function CustomerCarePage() {
   const { user } = useAuth();
-  const allowed = ['ClinicAssistant', 'ClinicOwner'].some(role => user?.effectiveRoles.includes(role));
+  const allowed = !!user?.accessAssigned || ['ClinicAssistant', 'ClinicOwner'].some(role => user?.effectiveRoles.includes(role));
   const canManage = user?.permissions.includes('care-tasks.manage') ?? false;
   const canManageTypes = (user?.effectiveRoles.includes('ClinicOwner') ?? false) || (user?.permissions.includes('catalog.care-types.read') ?? false);
   const [options, setOptions] = useState<CareOptions | null>(null), [optionsError, setOptionsError] = useState<string>(), [optionsRevision, setOptionsRevision] = useState(0);
