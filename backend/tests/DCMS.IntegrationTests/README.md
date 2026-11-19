@@ -1,11 +1,31 @@
-# DCMS.IntegrationTests
+# DCMS integration tests (create flows)
 
-UC-01/UC-31 integration tests use the real ASP.NET pipeline and PostgreSQL, with a fresh `dcms_test_<random>` schema for each run. They apply the checked-in migration, generate test credentials at runtime and seed only that isolated schema. Synthetic Patient/link sentinel tables verify account operations do not affect patient data. Test schemas are retained; development tables are not deleted or modified.
+Each test calls the real API over HTTP (`WebApplicationFactory<Program>`) against a real PostgreSQL database.
+A throw-away schema is migrated once per run and dropped afterwards, so no existing data is touched.
 
-From the repository root with PostgreSQL running:
+Scope: only the **create** endpoints that the web and mobile screens use.
+
+| File | Endpoint | Cases |
+|---|---|---|
+| `StaffAccountTests` | `POST /api/accounts` | ACC-01..06 |
+| `CustomerRegisterTests` | `POST /api/auth/register` | REG-01..09 |
+| `PatientTests` | `POST /api/patients` | PAT-01..09 |
+| `FamilyMemberTests` | `POST /api/me/family-members` | FAM-01..09 |
+| `TreatmentDossierTests` | `POST /api/patients/{id}/dossiers/quick` | DOS-01..06 |
+| `ItemPlanTests` | `POST /api/treatment-templates/item-plans` and `.../{id}/items` | PLN-01..07, ROW-01..10 |
+| `CatalogTests` | lab work types, material groups, materials | LWT-01..08, CAT-01..05, MAT-01..06 |
+| `AppointmentTests` | `POST /api/appointments` (form validation only) | APT-01..10 |
+
+A successful booking needs a published working schedule and a matching schedule version; it is not covered here yet.
+
+## Run
+
+PostgreSQL must be running and `DEV_SEED_PASSWORD` set (import it from `.env` in the same shell):
 
 ```powershell
-& .\infrastructure\scripts\test-accounts.ps1
+.\infrastructure\scripts\import-development-env.ps1
+dotnet test backend/tests/DCMS.IntegrationTests
 ```
 
-Coverage: sign in/out, current user, session expiry/tampering, role inheritance and multiple roles, authorization on management endpoints, immediate lock/revocation, duplicate identifiers and transactional rollback, stale/concurrent writers, audit and Patient invariants. Browser tests and demo instructions are in [RUN-ACCOUNTS.vi.md](../../../docs/implementation/RUN-ACCOUNTS.vi.md).
+Set `DCMS_IT_TRACE` to a file path to also write every case with its real HTTP exchanges as JSON
+(used to fill the test report sheet).
