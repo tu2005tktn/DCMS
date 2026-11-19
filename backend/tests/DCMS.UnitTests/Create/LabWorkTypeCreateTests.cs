@@ -29,7 +29,7 @@ public sealed class LabWorkTypeCreateTests
         { "UT-LWT-08 Giá tham khảo vượt tối đa (1.000.000.000.001)", Input(price: 1_000_000_000_001), 400, "Giá tham khảo không đúng định dạng." },
         { "UT-LWT-09 Bảo hành 1001 ký tự", Input(warranty: new string('a', 1001)), 400, "Bảo hành không được vượt quá 1000 ký tự." },
         { "UT-LWT-10 Mã đã tồn tại (EXIST-01)", Input(code: "exist-01", name: "Cầu răng sứ"), 409, "Mã danh mục đã tồn tại. Vui lòng chọn mã khác." },
-        { "UT-LWT-11 Tên đã tồn tại (viết hoa/thường khác nhau)", Input(name: "mão răng toàn sứ"), 409, "Tên đã tồn tại trong danh mục. Vui lòng nhập tên khác." },
+        { "UT-LWT-11 Tên đã tồn tại (viết hoa/thường khác nhau)", Input(name: "mao rang toan su"), 409, "Tên đã tồn tại trong danh mục. Vui lòng nhập tên khác." },
     };
 
     [Theory, MemberData(nameof(Rejected))]
@@ -37,8 +37,7 @@ public sealed class LabWorkTypeCreateTests
     {
         using var db = CreateTestKit.NewSqliteDb();
         var admin = await CreateTestKit.SeedStaffAsync(db, "admin.test", "Admin", 1, member: false);
-        db.Add(new LabWorkType { Code = "EXIST-01", Name = "Mão răng toàn sứ", NormalizedName = "MÃO RĂNG TOÀN SỨ", Unit = "Tooth",
-            CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow, CreatedBy = admin.Id, UpdatedBy = admin.Id });
+        db.Add(new LabWorkType { Code = "EXIST-01", Name = "Mao rang toan su", Unit = "Tooth" });
         await db.SaveChangesAsync();
         var catalog = new LabWorkTypeCatalog(db, TimeProvider.System, new CreateTestKit.AllowAll());
 

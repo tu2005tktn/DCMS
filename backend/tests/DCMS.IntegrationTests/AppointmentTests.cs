@@ -13,7 +13,7 @@ public sealed class AppointmentTests(ApiHost host)
         string? bookerEmail = "nam@gmail.com", string? attendeeName = "Lê Văn Nam", DateOnly? birth = null, string? relation = "Self", DateTimeOffset? startAt = null) =>
         new(branchId ?? host.BranchA, new BookerContact(bookerName, bookerPhone, bookerEmail),
             new AppointmentAttendee(null, attendeeName, birth ?? new DateOnly(1990, 1, 1)),
-            relation, "Standard", "App", host.ExamServiceA, "Đau răng", dentistId ?? host.DentistEmployeeId, null, null,
+            relation, "Standard", "App", host.ExamServiceA, "Đau răng", dentistId ?? host.DentistEmployeeId, null,
             startAt ?? new DateTimeOffset(2030, 1, 15, 9, 0, 0, TimeSpan.FromHours(7)), 30, null, null, Guid.NewGuid(), 1, null);
 
     private async Task<ApiResponse> PostAsync(CreateAppointmentRequest body)

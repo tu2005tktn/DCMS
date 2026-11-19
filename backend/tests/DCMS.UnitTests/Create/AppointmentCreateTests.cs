@@ -15,7 +15,7 @@ public sealed class AppointmentCreateTests
         string? attendeeName = "Lê Văn Nam", DateOnly? attendeeBirth = null, string? relation = "Self", string? kind = "Standard") =>
         new(branchId, new BookerContact(bookerName, bookerPhone, bookerEmail),
             new AppointmentAttendee(null, attendeeName, attendeeBirth ?? new DateOnly(1990, 1, 1)),
-            relation, kind, "App", null, "Đau răng", dentistId, null, null, startAt ?? new DateTimeOffset(2030, 1, 15, 9, 0, 0, TimeSpan.FromHours(7)), 30,
+            relation, kind, "App", null, "Đau răng", dentistId, null, startAt ?? new DateTimeOffset(2030, 1, 15, 9, 0, 0, TimeSpan.FromHours(7)), 30,
             null, null, requestKey ?? SampleKey, scheduleVersion, null);
 
     public static TheoryData<string, CreateAppointmentRequest, string> Rejected => new()
@@ -36,7 +36,7 @@ public sealed class AppointmentCreateTests
     public async Task Create_rejects_invalid_input(string caseName, CreateAppointmentRequest request, string message)
     {
         using var db = CreateTestKit.NewDb();
-        var service = new AppointmentService(db, null!, null!, null!, TimeProvider.System, null!, null!);
+        var service = new AppointmentService(db, null!, null!, TimeProvider.System, null!, null!);
 
         var error = await CreateTestKit.ErrorOf(() => service.CreateAsync(null, request, default));
 
