@@ -29,7 +29,8 @@ Trình duyệt (máy trong VPN)
 | `backend/Dockerfile` | Build và publish `DCMS.Api` (SDK 10.0 → runtime aspnet 10.0) |
 | `web/Dockerfile` | Build SPA bằng Node rồi phục vụ bằng nginx |
 | `web/nginx.conf` | SPA fallback + reverse proxy `/api`, `/hubs`, `/health` |
-| `infrastructure/docker/compose.prod.yaml` | Stack production: postgres, api, web, clamav (tùy chọn), cùng các job `migrate`/`seed` |
+| `infrastructure/docker/compose.prod.yaml` | Stack production: postgres, api, web, clamav (tùy chọn), cùng các job `migrate`/`seed`; image lấy từ `ghcr.io` |
+| `.github/workflows/deploy-server.yml` | Build image trên GitHub, đẩy lên `ghcr.io`, server kéo về và chạy |
 | `infrastructure/docker/.env.production.example` | Mẫu biến môi trường production |
 
 ## Biến môi trường (`.env` trên server, không commit)
@@ -58,29 +59,39 @@ docker compose --env-file .env -f infrastructure/docker/compose.prod.yaml --prof
 4. `docker compose ... up -d --build postgres`, chạy job `migrate` (và `seed` nếu cần), rồi `up -d --build api web`.
 5. Kiểm tra: `curl http://<IP server>/health` trả về trạng thái healthy; mở `http://<IP server>` từ máy trong VPN.
 
-Cập nhật phiên bản mới: lặp lại bước 2, chạy lại `migrate`, rồi `up -d --build api web`.
+Cài đặt ban đầu ở trên build tại chỗ. Từ 19/11/2026 các lần cập nhật đi qua pipeline (mục CI/CD bên dưới): image build sẵn trên GitHub, server chỉ `pull` rồi `up -d`.
 
-## Tự động deploy khi merge vào `main` (CI/CD)
+## Tự động deploy khi merge vào `main` (CI/CD) — build trên GitHub, server chỉ kéo image (19/11/2026)
 
-- Trên server có GitHub Actions **self-hosted runner** tên `dcms-server`, nhãn `dcms-prod`, chạy dưới user `github-runner` (thuộc nhóm `docker`) dưới dạng systemd service. Runner tự kết nối ra GitHub nên server không cần mở cổng nào.
-- Workflow `.github/workflows/deploy-server.yml` chạy khi có push vào `main` (gồm merge PR) hoặc chạy tay (`workflow_dispatch`). Job chỉ nhắm `runs-on: [self-hosted, dcms-prod]`, không chạy cho pull request.
-- Các bước: checkout → build image `api` → build image `web` (lần lượt, không song song) → dọn build cache → `up -d --wait postgres` → job `migrate` → `up -d --remove-orphans` (mọi service mặc định cùng các profile trong `COMPOSE_PROFILES`) → chờ `/health` trả `healthy` (tối đa ~2 phút) → dọn image cũ.
-- Compose chạy ngay trong thư mục checkout của runner, với project name cố định `dcms` và `--env-file /opt/dcms/.env`, nên dùng lại đúng container và volume đang có. `.env` thuộc nhóm `github-runner`, quyền 640.
-- Chỉ một lần deploy chạy tại một thời điểm (`concurrency: deploy-server`); lần sau chờ lần trước xong.
-- Build hỏng thì container cũ vẫn chạy vì `up` chỉ thực hiện sau khi build thành công. Migration lỗi cũng dừng trước khi khởi động lại API.
-- Repo đang **public**: chỉ workflow này được nhắm vào nhãn `dcms-prod`; không thêm workflow `pull_request` dùng runner này. Nên bật *Settings → Actions → General → Require approval for all external contributors*.
+Server 3,8 GB RAM từng treo hai lần khi tự build image (17–18/11/2026). Từ 19/11/2026 server **không build nữa**:
 
-## Build tiết kiệm bộ nhớ (18/11/2026)
+```
+push/merge vào main
+  └─ job build  (runner của GitHub, ubuntu-latest)
+       build image api + web → push lên GitHub Container Registry:
+       ghcr.io/tu2005tktn/dcms-api:<commit>, :latest
+       ghcr.io/tu2005tktn/dcms-web:<commit>, :latest
+  └─ job deploy (self-hosted runner dcms-server trên máy chủ, nhãn dcms-prod; chỉ chạy khi build thành công)
+       docker login ghcr.io bằng GITHUB_TOKEN của chính lần chạy (chỉ quyền đọc package)
+       → gỡ ClamAV nếu đang tắt → pull api, web → up -d --wait postgres → job migrate
+       → up -d --remove-orphans → chờ /health → docker logout → dọn image cũ
+```
 
-Server có 3,8 GB RAM; ClamAV, PostgreSQL và API dùng khoảng 1,6–2,5 GB khi chạy. Ngày 17/11/2026 lần build song song API và web làm máy hết RAM và treo (SSH và web không phản hồi). Từ nay build chậm hơn nhưng ít tốn RAM:
+- Workflow: `.github/workflows/deploy-server.yml`, chạy khi push vào `main` hoặc chạy tay (`workflow_dispatch`). Không chạy cho pull request.
+- Image gắn tag bằng SHA commit đầy đủ (`DCMS_TAG`), nên bản đang chạy luôn khớp đúng commit. Quay lại bản cũ: chạy tay workflow trên commit cũ, hoặc trên server đặt `DCMS_TAG=<sha cũ>` rồi `docker compose ... pull api web && docker compose ... up -d`.
+- `compose.prod.yaml`: `api`, `web`, `migrate`, `seed` dùng `${DCMS_REGISTRY:-ghcr.io/tu2005tktn}/dcms-api|dcms-web:${DCMS_TAG:-latest}`. Khối `build:` vẫn giữ để có thể build tay khi cần (`docker compose ... build`), nhưng pipeline không dùng.
+- Đăng nhập registry: job build dùng `GITHUB_TOKEN` với quyền `packages: write`; job deploy dùng `GITHUB_TOKEN` với quyền `packages: read` rồi `docker logout` cuối job. Không cần lưu thêm secret hay mật khẩu nào trên server hoặc GitHub. Image chỉ chứa mã ứng dụng (đã công khai trong repo); mật khẩu, dữ liệu bệnh nhân và model AI nằm ở `/opt/dcms/.env` và volume trên server, không nằm trong image.
+- Build dùng cache của GitHub Actions (`type=gha`), lần sau nhanh hơn.
+- Self-hosted runner chạy dưới user `github-runner` (thuộc nhóm `docker`) dưới dạng systemd service, tự kết nối ra GitHub nên server không mở cổng. Compose chạy trong thư mục checkout của runner với project name `dcms` và `--env-file /opt/dcms/.env`. `.env` thuộc nhóm `github-runner`, quyền 640.
+- Chỉ một lần deploy chạy tại một thời điểm (`concurrency: deploy-server`).
+- Build lỗi thì job deploy không chạy và container cũ vẫn chạy. Pull hoặc migration lỗi cũng dừng trước khi khởi động lại API.
+- Nếu runner offline quá lâu, GitHub có thể xóa đăng ký runner (log: "The runner registration has been deleted from the server"). Khi đó tạo token mới ở *Settings → Actions → Runners → New self-hosted runner* và chạy lại `config.sh --replace` trên server.
+- Repo đang **public**: chỉ workflow này nhắm nhãn `dcms-prod`; không thêm workflow `pull_request` dùng runner này. Nên bật *Settings → Actions → General → Require approval for all external contributors*.
 
-- Workflow build từng image một (`api` rồi `web`) thay vì `build api web` song song, và đặt `COMPOSE_PARALLEL_LIMIT=1`.
-- `backend/Dockerfile`: `dotnet restore`/`publish` chạy với `-maxcpucount:1` (một tiến trình MSBuild), `DOTNET_GCHeapHardLimit` 1 GB và tắt build server/node reuse.
-- `web/Dockerfile`: `NODE_OPTIONS=--max-old-space-size=1024` cho `npm ci` và `vite build`.
-- Sau khi build xong, dọn build cache cũ hơn 7 ngày (`docker builder prune`) để không đầy đĩa.
-- Trên server nên có swap 4 GB (`/swapfile`, `vm.swappiness=10`) làm vùng đệm; tạo một lần bằng tay khi có quyền SSH.
+## Bộ nhớ trên server
 
-Container đang chạy không bị dừng trong lúc build; chỉ bước `up` cuối cùng mới khởi động lại `api`/`web`.
+- Server có swap 4 GB (`/swapfile`, khai báo trong `/etc/fstab`, `vm.swappiness=10` trong `/etc/sysctl.d/99-swap.conf`), tạo ngày 19/11/2026.
+- `backend/Dockerfile` và `web/Dockerfile` vẫn giữ giới hạn bộ nhớ khi build (MSBuild một tiến trình, GC heap 1 GB; Node heap 1 GB) để build tay trên máy nhỏ vẫn an toàn.
 
 ## Quét virus tệp tải lên (ClamAV) — mặc định tắt (18/11/2026)
 

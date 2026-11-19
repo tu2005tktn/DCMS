@@ -1,3 +1,4 @@
+# Production-like stack. Images are built on GitHub and pulled from ghcr.io (DCMS_TAG = commit SHA); `build:` stays for manual builds.
 # Production-like stack for a VPN-only server. See docs/implementation/DEPLOY-SERVER-WIREGUARD.vi.md.
 # Run from the repository root:
 #   docker compose --env-file .env -f infrastructure/docker/compose.prod.yaml up -d --build
@@ -54,7 +55,7 @@ services:
       - dcms_clamav_data:/var/lib/clamav
   api:
     build: { context: ../../backend }
-    image: dcms-api:latest
+    image: ${DCMS_REGISTRY:-ghcr.io/tu2005tktn}/dcms-api:${DCMS_TAG:-latest}
     restart: unless-stopped
     environment: *api-env
     volumes: *api-volumes
@@ -62,7 +63,7 @@ services:
       postgres: { condition: service_healthy }
   web:
     build: { context: ../../web }
-    image: dcms-web:latest
+    image: ${DCMS_REGISTRY:-ghcr.io/tu2005tktn}/dcms-web:${DCMS_TAG:-latest}
     restart: unless-stopped
     ports:
       - "${WEB_PORT:-80}:80"
@@ -78,7 +79,7 @@ services:
     depends_on: [web]
   # One-off jobs: Program.cs only allows these commands in Development, so they run in a short-lived container.
   migrate:
-    image: dcms-api:latest
+    image: ${DCMS_REGISTRY:-ghcr.io/tu2005tktn}/dcms-api:${DCMS_TAG:-latest}
     profiles: ["tools"]
     environment:
       <<: *api-env
@@ -88,7 +89,7 @@ services:
       postgres: { condition: service_healthy }
     command: ["--migrate"]
   seed:
-    image: dcms-api:latest
+    image: ${DCMS_REGISTRY:-ghcr.io/tu2005tktn}/dcms-api:${DCMS_TAG:-latest}
     profiles: ["tools"]
     environment:
       <<: *api-env
