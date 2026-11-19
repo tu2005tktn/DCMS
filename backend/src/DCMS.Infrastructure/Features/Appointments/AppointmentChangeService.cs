@@ -57,7 +57,8 @@ public sealed class AppointmentChangeService(DcmsDbContext db, IAvailabilityServ
         if (user == null || !user.IsActive || (user.LockoutEnabled && user.LockoutEnd > clock.GetUtcNow())) throw Error("MSG07", 401);
         var staff = user.AccountType == "Staff";
         if (!staff && user.AccountType != "Public") throw Error("MSG06", 403);
-        if (staff && !clinicInitiated && !await users.IsInRoleAsync(user, AccountRoles.ClinicAssistant)) throw Error("MSG06", 403);
+        if (staff && !clinicInitiated && !(await access.ResolveAsync(actorId, ct)).GrantDriven
+            && !await users.IsInRoleAsync(user, AccountRoles.ClinicAssistant)) throw Error("MSG06", 403);
         var appointment = await db.Appointments.SingleOrDefaultAsync(x => x.Code == code, ct) ?? throw Error("MSG102", 404);
         if (staff)
         {

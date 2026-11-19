@@ -11,7 +11,7 @@ import { useCanPickBranch } from '../authentication/useCanPickBranch';
 
 export default function ItemPlansPage() {
   const { user } = useAuth();
-  return user?.effectiveRoles.includes('Dentist') ? <ItemPlansWorkspace key={user.id} /> : <Result status="403" title="Bạn không có quyền quản lý kế hoạch điều trị." />;
+  return user?.effectiveRoles.includes('Dentist') || user?.accessAssigned && user.permissions.includes('treatment.templates.read') ? <ItemPlansWorkspace key={user.id} /> : <Result status="403" title="Bạn không có quyền quản lý kế hoạch điều trị." />;
 }
 function ItemPlansWorkspace() {
   const canPickBranch = useCanPickBranch();

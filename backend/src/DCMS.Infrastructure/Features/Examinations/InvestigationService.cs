@@ -18,7 +18,7 @@ public sealed class InvestigationService(DcmsDbContext db, ClinicalAccess access
         var visit = await access.VisitAsync(actorId, visitId, false, ct);
         var dentist = await access.BranchAsync(actorId, visit.BranchId, false, ct);
         var grants = (await permissions.ResolveAsync(actorId, ct)).Permissions;
-        var own = await db.Employees.AnyAsync(x => x.Id == visit.DentistId && x.AccountId == actorId, ct);
+        var own = await access.ActsForAsync(actorId, visit, ct);
         var active = VisitStatuses.Open.Contains(visit.Status);
         var confirmed = VisitStatuses.HasConfirmedExamination.Contains(visit.Status);
         var rows = await db.Investigations.AsNoTracking().Where(x => x.VisitId == visitId).OrderBy(x => x.CreatedAt).ThenBy(x => x.Id).ToArrayAsync(ct);

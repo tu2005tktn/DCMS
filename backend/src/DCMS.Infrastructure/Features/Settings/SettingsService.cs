@@ -40,7 +40,7 @@ public sealed class SettingsService(DcmsDbContext db, ISettingsAccess access, Us
             ||!new[]{AccountRoles.Admin,AccountRoles.Dentist,AccountRoles.ClinicAssistant}.Contains(input.BaseRole)||input.Grants==null||input.Grants.Distinct().Count()!=input.Grants.Length)throw Error("MSG04");
         foreach(var grant in input.Grants){
             var definition=SettingsGrants.Definitions.SingleOrDefault(x=>x.Key==grant)??throw Error("MSG04");
-            if(!SettingsGrants.RoleAllows(grant,[input.BaseRole])||!actor.Owner&&!actor.Permissions.Contains(grant))throw Error("MSG06",403);
+            if(!actor.Owner&&!actor.Permissions.Contains(grant))throw Error("MSG06",403);
             if(definition.Parent!=null&&!input.Grants.Contains(definition.Parent))throw Error("MSG04");
         }
     }

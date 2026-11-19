@@ -10,7 +10,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace DCMS.Infrastructure.Features.Accounts;
 
-public sealed partial class AccountService(DcmsDbContext db, UserManager<ApplicationUser> users) : IAccountService
+public sealed partial class AccountService(DcmsDbContext db, UserManager<ApplicationUser> users, DCMS.Application.Features.Settings.ISettingsAccess access) : IAccountService
 {
     public async Task<AccountPage> ListAsync(string? search, int page, int pageSize, string? role, string? status,
         string? sortBy, string? sortDirection, CancellationToken ct)
@@ -201,7 +201,10 @@ public sealed partial class AccountService(DcmsDbContext db, UserManager<Applica
     private async Task RequireAdminAsync(int actorId, CancellationToken ct)
     {
         var actor = await db.Users.AsNoTracking().SingleOrDefaultAsync(x => x.Id == actorId && x.IsActive, ct);
-        if (actor == null || !await users.IsInRoleAsync(actor, AccountRoles.Admin)) Forbidden();
+        if (actor == null) Forbidden();
+        // Staff in an access group act through their accounts.* grants, never their role.
+        var state = actor!.AccountType == "Staff" ? await access.ResolveAsync(actorId, ct) : null;
+        if (state is { GrantDriven: true } ? !state.Permissions.Any(x => x.StartsWith("accounts.")) : !await users.IsInRoleAsync(actor!, AccountRoles.Admin)) Forbidden();
     }
 
     private async Task<ApplicationUser> GetAsync(int id, CancellationToken ct) =>

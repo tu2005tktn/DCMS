@@ -39,7 +39,10 @@ public sealed class AppointmentQueryService(DcmsDbContext db, UserManager<Applic
         if (user == null || !user.IsActive || user.AccountType != "Staff") throw Error("MSG06", 403);
         var employee = await db.Employees.AsNoTracking().SingleOrDefaultAsync(x => x.AccountId == actorId, ct) ?? throw Error("MSG06", 403);
         var roles = AccountRoles.Effective(await users.GetRolesAsync(user));
-        return (employee.Id, roles.Contains(AccountRoles.ClinicAssistant) || roles.Contains(AccountRoles.ClinicOwner));
+        // Staff in an access group see the whole branch unless they are a dentist, who keeps the own-appointments rule.
+        var grantDriven = (await access.ResolveAsync(actorId, ct)).GrantDriven;
+        return (employee.Id, roles.Contains(AccountRoles.ClinicAssistant) || roles.Contains(AccountRoles.ClinicOwner)
+            || grantDriven && !roles.Contains(AccountRoles.Dentist));
     }
 
     private async Task<Scope> ScopeAsync(int actorId, int branchId, CancellationToken ct)
@@ -55,7 +58,7 @@ public sealed class AppointmentQueryService(DcmsDbContext db, UserManager<Applic
         var membership = await db.SchedulingMembers.AsNoTracking()
             .SingleOrDefaultAsync(x => x.BranchId == branchId && x.EmployeeId == employeeId && x.Active, ct) ?? throw Error("MSG06", 403);
         if (broad || membership.CanManageSchedules) return new(branchId, employeeId, null);
-        if (!membership.CanDentist) throw Error("MSG06", 403);
+        if (!membership.CanDentist && !dynamicScope.GrantDriven) throw Error("MSG06", 403);
         return new(branchId, employeeId, employeeId);
     }
 
@@ -65,7 +68,7 @@ public sealed class AppointmentQueryService(DcmsDbContext db, UserManager<Applic
         var mine = await db.SchedulingMembers.AsNoTracking().Where(x => x.EmployeeId == employeeId && x.Active).ToListAsync(ct);
         var dynamicScope = await access.ResolveAsync(actorId, ct);
         mine = mine.Where(x => !dynamicScope.Assigned || dynamicScope.Owner || dynamicScope.BranchIds.Contains(x.BranchId)).ToList();
-        mine = mine.Where(x => broad || x.CanManageSchedules || x.CanDentist).ToList();
+        mine = mine.Where(x => broad || x.CanManageSchedules || x.CanDentist || dynamicScope.GrantDriven).ToList();
         int[] branchIds;
         if (dynamicScope.Owner)
             branchIds = await db.Set<SchedulingBranch>().AsNoTracking().Where(x => x.Active).Select(x => x.Id).ToArrayAsync(ct);

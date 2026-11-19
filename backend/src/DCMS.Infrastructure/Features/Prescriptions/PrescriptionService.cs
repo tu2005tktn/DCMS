@@ -93,7 +93,7 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
     {
         await ReadablePatientAsync(patientId, ct);
         var state = await access.RequireAsync(actor, "prescriptions.manage", ct);
-        if (!state.Roles.Contains(AccountRoles.Dentist)) throw Fail("MSG06", 403);
+        if (!state.GrantDriven && !state.Roles.Contains(AccountRoles.Dentist)) throw Fail("MSG06", 403);
         var employee = await db.Employees.AsNoTracking().SingleAsync(x => x.AccountId == actor, ct);
         var branchIds = state.BranchIds;
         var schedulingBranches = await db.Set<SchedulingBranch>().AsNoTracking().Where(x => branchIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, ct);
@@ -135,7 +135,7 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
         var patient = await ReadablePatientAsync(patientId, ct);
         var state = await access.RequireAsync(actor, "prescriptions.manage", ct);
         var employee = await db.Employees.AsNoTracking().SingleAsync(x => x.AccountId == actor, ct);
-        if (!state.Roles.Contains(AccountRoles.Dentist) || !state.BranchIds.Contains(c.BranchId)) throw Fail("MSG06", 403);
+        if (!state.GrantDriven && !state.Roles.Contains(AccountRoles.Dentist) || !state.BranchIds.Contains(c.BranchId)) throw Fail("MSG06", 403);
         if (c.RequestKey == Guid.Empty || c.Items is not { Length: > 0 and <= 30 }) throw Fail("MSG04", field: "items", label: "Danh sách thuốc");
         if (c.Diagnosis?.Length > 1000 || c.OtherDiagnosis?.Length > 1000 || c.Advice?.Length > 4000)
             throw Fail("MSG04", field: "diagnosis");

@@ -34,7 +34,8 @@ public sealed partial class SettingsAuditService(DcmsDbContext db, ISettingsAcce
         {
             AuditSections.General => state.Owner,
             AuditSections.Catalogs => kinds.Length > 0,
-            AuditSections.Supplies or AuditSections.Materials => state.Owner || dentist,
+            AuditSections.Supplies or AuditSections.Materials => state.Owner || (state.GrantDriven
+                ? ScreenGrants.SupplyKinds.Any(k => state.Has($"catalog.{k}.read")) : dentist),
             _ => state.Permissions.Contains("access-groups.read")
         }).ToArray();
         if (section != null && !allowed.Contains(section)) throw Error("MSG06", 403);

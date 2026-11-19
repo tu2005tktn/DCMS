@@ -90,19 +90,53 @@ public sealed class SettingsApiTests(ReceptionFixture fixture) : IClassFixture<R
         var setup=await reception.Prepare();using var owner=await Owner();var staff=await NewStaff(setup.BranchId);
         var options=(await owner.GetFromJsonAsync<GrantOption[]>("/api/system-settings/access-groups/grant-options"))!;
         Assert.DoesNotContain(options,x=>x.Key=="patients.manage" || x.Key=="accounts.manage");
-        Assert.Contains(AccountRoles.Admin,options.Single(x=>x.Key=="settings.general.manage").AllowedBaseRoles);
-        Assert.Equal(new[]{AccountRoles.ClinicAssistant},options.Single(x=>x.Key=="patients.create").AllowedBaseRoles);
-        Assert.Equal(new[]{AccountRoles.Dentist},options.Single(x=>x.Key=="examinations.manage").AllowedBaseRoles);
+        // 19/11/2026: base roles no longer limit grants; every option lists all three base roles.
+        string[] baseRoles=[AccountRoles.Admin,AccountRoles.Dentist,AccountRoles.ClinicAssistant];
+        Assert.All(options,x=>Assert.Equal(baseRoles,x.AllowedBaseRoles));
+        Assert.Equal("finance.read",options.Single(x=>x.Key=="finance.statistics.read").Parent);
         foreach (var permission in new[] { "finance.work-statistics.read", "treatment.lab.manage", "materials.purchases.read", "materials.purchases.create", "materials.purchases.update", "materials.purchases.delete", "materials.stock.read", "materials.usage.read" })
             Assert.Contains(options, x => x.Key == permission && x.Parent != null);
-        Assert.Equal(new[]{AccountRoles.Dentist}, options.Single(x=>x.Key=="treatment.lab.manage").AllowedBaseRoles);
-        Assert.Contains(AccountRoles.Admin, options.Single(x=>x.Key=="materials.purchases.read").AllowedBaseRoles);
-        Assert.DoesNotContain(AccountRoles.ClinicAssistant, options.Single(x=>x.Key=="materials.purchases.read").AllowedBaseRoles);
         var metadata=(await owner.GetFromJsonAsync<StaffAccessDto[]>("/api/system-settings/access-groups/staff"))!.Single(x=>x.EmployeeId==staff.EmployeeId);
         Assert.Contains(AccountRoles.ClinicAssistant,metadata.Roles!);Assert.Equal(staff.BranchIds,metadata.MembershipBranchIds);
         Assert.Null(metadata.GroupId);
         using var dentist=await reception.Login("dentist.demo");
         Assert.Equal(HttpStatusCode.Forbidden,(await dentist.GetAsync("/api/system-settings/access-groups/grant-options")).StatusCode);
+    }
+    [Fact] public async Task OwnerGrantsAnyPermissionToAnyBaseRoleAndAssignedStaffUseItRegardlessOfRole() {
+        var setup=await reception.Prepare();using var owner=await Owner();
+        // A dentist group creating patient records (formerly assistant-only).
+        var dentist=await NewStaff(setup.BranchId,AccountRoles.Dentist);using var dentistClient=await reception.Login(dentist.Name);
+        var dentistGroup=await CreateGroup(owner,["patients.read","patients.create"],AccountRoles.Dentist);
+        Assert.Contains("patients.create",dentistGroup.Grants);await Ok<StaffAccessDto>(await Assign(owner,dentist,dentistGroup));
+        var me=(await dentistClient.GetFromJsonAsync<CurrentUser>("/api/auth/me"))!;Assert.True(me.AccessAssigned);Assert.Contains("patients.create",me.Permissions);
+        var create=new DCMS.Application.Features.Patients.CreatePatientRequest(null,"SYNTHETIC bác sĩ thêm "+Guid.NewGuid().ToString("N"),null,null,null,null,null,null,null,null,true);
+        Assert.Equal(HttpStatusCode.Created,(await dentistClient.PostAsJsonAsync("/api/patients",create)).StatusCode);
+        // An assistant group reading treatment dossiers and the finance statistics screen (formerly dentist / owner only).
+        var assistant=await NewStaff(setup.BranchId);using var assistantClient=await reception.Login(assistant.Name);
+        var assistantGroup=await CreateGroup(owner,["treatment.read","finance.read","finance.statistics.read","examinations.read","prescriptions.read","prescriptions.manage"]);
+        await Ok<StaffAccessDto>(await Assign(owner,assistant,assistantGroup));
+        Assert.Equal(HttpStatusCode.OK,(await assistantClient.GetAsync($"/api/patients/{setup.PatientId}/dossiers?branchId={setup.BranchId}")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK,(await assistantClient.GetAsync("/api/finance/statistics")).StatusCode);
+        // An admin group reading patients (formerly no patient access at all).
+        var admin=await NewStaff(setup.BranchId,AccountRoles.Admin);using var adminClient=await reception.Login(admin.Name);
+        Assert.Equal(HttpStatusCode.Forbidden,(await adminClient.GetAsync($"/api/patients/{setup.PatientId}")).StatusCode);
+        var adminGroup=await CreateGroup(owner,["patients.read"],AccountRoles.Admin);await Ok<StaffAccessDto>(await Assign(owner,admin,adminGroup));
+        Assert.Equal(HttpStatusCode.OK,(await adminClient.GetAsync($"/api/patients/{setup.PatientId}")).StatusCode);
+        // Revocation applies to the next request with the same token.
+        await EditGroup(owner,assistantGroup,["treatment.read","finance.read"]);
+        Assert.Equal(HttpStatusCode.Forbidden,(await assistantClient.GetAsync("/api/finance/statistics")).StatusCode);
+        await EditGroup(owner,adminGroup,[]);
+        Assert.Equal(HttpStatusCode.Forbidden,(await adminClient.GetAsync($"/api/patients/{setup.PatientId}")).StatusCode);
+    }
+    [Fact] public async Task RoleDefaultsStayForUnassignedStaffAndTheOwner() {
+        var setup=await reception.Prepare();using var owner=await Owner();
+        var ownerMe=(await owner.GetFromJsonAsync<CurrentUser>("/api/auth/me"))!;Assert.False(ownerMe.AccessAssigned);Assert.Contains("finance.statistics.read",ownerMe.Permissions);
+        Assert.Equal(HttpStatusCode.OK,(await owner.GetAsync("/api/finance/statistics")).StatusCode);
+        var assistant=await NewStaff(setup.BranchId);using var assistantClient=await reception.Login(assistant.Name);
+        var me=(await assistantClient.GetFromJsonAsync<CurrentUser>("/api/auth/me"))!;Assert.False(me.AccessAssigned);
+        Assert.DoesNotContain("finance.statistics.read",me.Permissions);Assert.DoesNotContain("treatment.read",me.Permissions);
+        Assert.Equal(HttpStatusCode.Forbidden,(await assistantClient.GetAsync("/api/finance/statistics")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden,(await assistantClient.GetAsync($"/api/patients/{setup.PatientId}/dossiers?branchId={setup.BranchId}")).StatusCode);
     }
     [Theory] [InlineData("create")] [InlineData("update")] [InlineData("archive")]
     public async Task PatientActionsCanBeGrantedSeparatelyAndRevokedWithoutReplacingTheToken(string action) {
@@ -136,9 +170,9 @@ public sealed class SettingsApiTests(ReceptionFixture fixture) : IClassFixture<R
         var updated=await Ok<DCMS.Application.Features.Patients.PatientChange>(await user.PutAsJsonAsync($"/api/patients/{patient.Id}",new DCMS.Application.Features.Patients.UpdatePatientRequest(patient.Version,patient.FullName+" sửa",null,null,null,null,null,null,null,null,true)));
         await Ok<DCMS.Application.Features.Patients.PatientChange>(await user.PostAsJsonAsync($"/api/patients/{patient.Id}/archive",new DCMS.Application.Features.Patients.ArchivePatientRequest(updated.Patient.Version,"SYNTHETIC ngừng")));
     }
-    [Fact] public async Task RoleGatesSelfAssignmentAndUnknownGrantsAreRejected() {
+    [Fact] public async Task SelfAssignmentAndUnknownGrantsAreRejectedButBaseRolesDoNotLimitGrants() {
         var setup=await reception.Prepare();using var owner=await Owner();
-        Assert.Equal(HttpStatusCode.Forbidden,(await owner.PostAsJsonAsync("/api/system-settings/access-groups/",NewGroup(["examinations.read","examinations.manage"])) ).StatusCode);
+        Assert.Contains("examinations.manage",(await CreateGroup(owner,["examinations.read","examinations.manage"])).Grants);
         Assert.Equal(HttpStatusCode.BadRequest,(await owner.PostAsJsonAsync("/api/system-settings/access-groups/",NewGroup(["ledger.delete"])) ).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest,(await owner.PostAsJsonAsync("/api/system-settings/access-groups/",NewGroup(["catalog.diagnoses.create"])) ).StatusCode);
         var group=await CreateGroup(owner,[],AccountRoles.Dentist);var employees=await owner.GetFromJsonAsync<StaffAccessDto[]>("/api/system-settings/access-groups/staff");

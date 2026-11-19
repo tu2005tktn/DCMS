@@ -42,7 +42,12 @@ public sealed record SettingsCapabilities(string ClinicScope, SectionCapability[
     int[] BranchIds, bool Owner, ScopeBranch[] Branches);
 public sealed record GrantDefinition(string Key, string Label, string? RequiredRole, string? Parent);
 public sealed record GrantOption(string Key, string Label, string? RequiredRole, string? Parent, string[] AllowedBaseRoles);
-public sealed record PermissionState(bool Owner, bool Assigned, string[] Roles, string[] Permissions, int[] BranchIds);
+public sealed record PermissionState(bool Owner, bool Assigned, string[] Roles, string[] Permissions, int[] BranchIds)
+{
+    // Staff in an access group (not the owner) are authorized only by the group's grants and branch scope, never by their role (ALL-SCREENS-DYNAMIC-PERMISSIONS 19/11/2026).
+    public bool GrantDriven => Assigned && !Owner;
+    public bool Has(string permission) => Permissions.Contains(permission);
+}
 
 public interface ISettingsAccess
 {
