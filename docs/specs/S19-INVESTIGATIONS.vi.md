@@ -56,7 +56,7 @@ Visit Completed vẫn cho đính chính lịch sử theo hợp đồng cũ nhưn
 
 API CreateInvestigation bổ sung expectedExaminationVersion?: int và amendmentReason?: string. Audit CreateInvestigation giữ trường order hiện có, thêm sourceExaminationVersion/amendmentReason khi tạo sau xác nhận. Không cần migration. Kiểm thử cần ca confirmed/open/amending, không lý do, stale version, sai bác sĩ/quyền, Completed, replay; browser xác nhận → Đính chính → tạo → nhận/đọc → Lưu đính chính, giữ draft và lý do.
 
-Kiểm chứng PendingScan trên fixture browser riêng cần chế độ antivirus có kiểm soát: prepare-clinical-e2e mặc định không nối ClamAV để giữ nhánh chờ; -UseRealAntivirus giữ cấu hình thật khi kiểm riêng luồng quét. Không đổi scanner hoặc trạng thái tệp của phiên manual.
+Từ 20/11/2026 không còn quét virus ClamAV (xem S19-S20-DCMS-112 mục "Bỏ quét virus ClamAV"): tệp hợp lệ Ready ngay, PendingScan chỉ còn ở bản ghi cũ.
 
 
 Bổ sung giá và thực hiện/thanh toán ngày 27/10: [INVESTIGATION-BILLING.vi.md](INVESTIGATION-BILLING.vi.md). Chỉ định/nhận/đọc không tự tạo phí; xác nhận dịch vụ đã thực hiện theo báo giá mới tạo source charge duy nhất.

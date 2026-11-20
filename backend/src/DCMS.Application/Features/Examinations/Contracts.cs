@@ -96,6 +96,6 @@ public interface IClinicalFileScanner
 {
     // Ready only after an affirmative clean result. Unknown/unavailable remains PendingScan.
     Task<string> ScanAsync(byte[] content, CancellationToken ct);
-    // False when antivirus is turned off (ClinicalDocuments:Antivirus=Disabled); Ready is then audited as ScanSkipped.
+    // False when no virus scan runs (ClamAV removed 20/11/2026); Ready is then audited as ScanSkipped.
     bool Enabled => true;
 }

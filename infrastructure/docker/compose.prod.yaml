@@ -8,10 +8,6 @@ x-api-env: &api-env
   Jwt__SigningKey: ${JWT_SIGNING_KEY:?Set JWT_SIGNING_KEY in .env}
   Cors__AllowedOrigins__0: ${PUBLIC_WEB_URL:?Set PUBLIC_WEB_URL in .env}
   ClinicalDocuments__StoragePath: /data/clinical-documents
-  # Disabled (default) skips virus scanning; ClamAv needs the "antivirus" profile. See DEPLOY-SERVER-WIREGUARD.vi.md.
-  ClinicalDocuments__Antivirus: ${CLINICAL_ANTIVIRUS:-Disabled}
-  ClinicalDocuments__ClamAvHost: clamav
-  ClinicalDocuments__ClamAvPort: "3310"
   BranchAssets__StoragePath: /data/branch-assets
   DevSeed__Password: ${DEV_SEED_PASSWORD:-}
   Google__WebClientId: ${GOOGLE_WEB_CLIENT_ID:-}
@@ -50,13 +46,6 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
-  # Optional virus scanner (~1.2-2.5 GB RAM); enable with COMPOSE_PROFILES=antivirus and CLINICAL_ANTIVIRUS=ClamAv.
-  clamav:
-    image: clamav/clamav:stable
-    profiles: ["antivirus"]
-    restart: unless-stopped
-    volumes:
-      - dcms_clamav_data:/var/lib/clamav
   api:
     build: { context: ../../backend }
     image: ${DCMS_REGISTRY:-ghcr.io/tu2005tktn}/dcms-api:${DCMS_TAG:-latest}
@@ -119,7 +108,6 @@ services:
     entrypoint: ["sh", "-c", "dotnet DCMS.Api.dll --seed-demo && dotnet DCMS.Api.dll --seed-clinic-catalog"]
 volumes:
   dcms_postgres_data:
-  dcms_clamav_data:
   dcms_clinical_documents:
   dcms_branch_assets:
   dcms_dataprotection:

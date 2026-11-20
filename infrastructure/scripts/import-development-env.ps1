@@ -6,7 +6,7 @@ if (-not (Test-Path -LiteralPath $environmentFile)) {
 }
 $settings = @{}
 foreach ($line in Get-Content -LiteralPath $environmentFile) {
-    if ($line -match '^\s*(POSTGRES_DB|POSTGRES_USER|POSTGRES_PASSWORD|POSTGRES_PORT|JWT_SIGNING_KEY|DEV_SEED_PASSWORD|GOOGLE_WEB_CLIENT_ID|SMTP_HOST|SMTP_PORT|SMTP_ENABLE_SSL|SMTP_USERNAME|SMTP_PASSWORD|SMTP_FROM_ADDRESS|SMTP_FROM_NAME|CLINICAL_DOCUMENTS_STORAGE_PATH|BRANCH_ASSETS_STORAGE_PATH|CLAMAV_HOST|CLAMAV_PORT|PAYOS_CLIENT_ID|PAYOS_API_KEY|PAYOS_CHECKSUM_KEY|FIREBASE_SERVICE_ACCOUNT_PATH|DENTAL_AI_BASE_URL|DENTAL_AI_API_KEY|DENTAL_AI_TIMEOUT_SECONDS)=(.*)$') {
+    if ($line -match '^\s*(POSTGRES_DB|POSTGRES_USER|POSTGRES_PASSWORD|POSTGRES_PORT|JWT_SIGNING_KEY|DEV_SEED_PASSWORD|GOOGLE_WEB_CLIENT_ID|SMTP_HOST|SMTP_PORT|SMTP_ENABLE_SSL|SMTP_USERNAME|SMTP_PASSWORD|SMTP_FROM_ADDRESS|SMTP_FROM_NAME|CLINICAL_DOCUMENTS_STORAGE_PATH|BRANCH_ASSETS_STORAGE_PATH|PAYOS_CLIENT_ID|PAYOS_API_KEY|PAYOS_CHECKSUM_KEY|FIREBASE_SERVICE_ACCOUNT_PATH|DENTAL_AI_BASE_URL|DENTAL_AI_API_KEY|DENTAL_AI_TIMEOUT_SECONDS)=(.*)$') {
         $settings[$Matches[1]] = $Matches[2].Trim()
     }
 }
@@ -22,8 +22,6 @@ $connection['Password'] = $settings['POSTGRES_PASSWORD']
 $env:ConnectionStrings__DefaultConnection = $connection.ConnectionString
 $env:ClinicalDocuments__StoragePath = if ($settings['CLINICAL_DOCUMENTS_STORAGE_PATH']) { $settings['CLINICAL_DOCUMENTS_STORAGE_PATH'] } else { Join-Path $env:LOCALAPPDATA 'DCMS\clinical-documents' }
 $env:BranchAssets__StoragePath = if ($settings['BRANCH_ASSETS_STORAGE_PATH']) { $settings['BRANCH_ASSETS_STORAGE_PATH'] } else { Join-Path $env:LOCALAPPDATA 'DCMS\branch-assets' }
-if ($settings['CLAMAV_HOST']) { $env:ClinicalDocuments__ClamAvHost = $settings['CLAMAV_HOST'] }
-if ($settings['CLAMAV_PORT']) { $env:ClinicalDocuments__ClamAvPort = $settings['CLAMAV_PORT'] }
 # Optional AI decision support (docs/specs/AI-CARIES-DETECTION.vi.md); empty URL disables it.
 if ($settings['DENTAL_AI_BASE_URL']) { $env:DentalAi__BaseUrl = $settings['DENTAL_AI_BASE_URL'] }
 if ($settings['DENTAL_AI_API_KEY']) { $env:DentalAi__ApiKey = $settings['DENTAL_AI_API_KEY'] }
