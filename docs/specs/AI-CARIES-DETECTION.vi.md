@@ -32,7 +32,7 @@ Mô hình `recommended_caries_best.pt`: YOLO detect, 1 lớp `caries_lesion`, `i
 3. **Tile**: cắt ô 960×640 ở độ phân giải gốc, chồng lấn 25%, dự đoán từng ô với `imgsz` 960 (không phóng ô lên 1280; phóng to làm mất phần lớn tổn thương khi thử trên ảnh mẫu) rồi đổi tọa độ về ảnh gốc. Mục đích là bắt tổn thương nhỏ.
 4. **Gộp**: gom ứng viên theo IoU ≥ 0.35 (weighted box fusion). Khung là trung bình có trọng số theo độ tin cậy. Độ tin cậy cuối là max của cụm, cộng 0.03 cho mỗi nguồn xác nhận thêm (global/flip/tile), tối đa 0.99.
 5. **Lọc**: giữ cụm có độ tin cậy cuối ≥ `AI_CARIES_MIN_CONFIDENCE` (mặc định 0.25). Nếu chỉ một nguồn phát hiện thì cần ≥ `AI_CARIES_SINGLE_SOURCE_MIN_CONFIDENCE` (mặc định 0.35).
-6. **Vị trí gợi ý**: hàm trên/dưới theo nửa trên/dưới ảnh; bên phải/trái **của bệnh nhân** theo quy ước phim toàn cảnh (nửa trái ảnh = bên phải bệnh nhân). Đây là gợi ý thô, không phải số răng FDI.
+6. **Vị trí gợi ý**: hàm trên/dưới theo nửa trên/dưới ảnh; bên phải/trái **của bệnh nhân** theo quy ước phim toàn cảnh (nửa trái ảnh = bên phải bệnh nhân). Đây là gợi ý thô, không phải số răng FDI. Cập nhật 20/11/2026: giao diện **không hiển thị** vị trí gợi ý vì suy theo nửa ảnh thường sai (người dùng xác nhận); trường `jaw`/`side` vẫn được ai-service trả và lưu như cũ để giữ hợp đồng và các lần phân tích đã có.
 
 Ảnh tối đa 20 MiB (giới hạn S20), cạnh dài tối đa 8000 px. Ảnh xám/RGBA được chuyển sang RGB.
 
@@ -89,7 +89,7 @@ Trong drawer chi tiết tài liệu (S20, dùng ở S19 và trang tài liệu b�
 
 - Nút **Phân tích AI** (hiện khi có quyền `documents.review`). Lần sau đổi thành **Phân tích lại**. Đang chạy thì nút ở trạng thái loading (có thể vài giây đến vài chục giây trên CPU).
 - Cảnh báo cố định: "Kết quả AI chỉ mang tính gợi ý hỗ trợ, không thay thế chẩn đoán của bác sĩ. Mô hình được huấn luyện trên phim toàn cảnh."
-- Ảnh phim với khung đỏ đánh số (F01, F02…) theo kết quả mới nhất. Danh sách vùng nghi sâu: số, độ tin cậy %, hàm, bên; rê chuột vào dòng làm nổi khung. Ô chọn ngưỡng hiển thị độ tin cậy (mặc định 0%, chỉ lọc hiển thị, không đổi dữ liệu).
+- Ảnh phim với khung đỏ đánh số (F01, F02…) theo kết quả mới nhất. Danh sách vùng nghi sâu: số, độ tin cậy % (không hiển thị hàm/bên, xem mục 3.6); rê chuột vào dòng làm nổi khung. Ô chọn ngưỡng hiển thị độ tin cậy (mặc định 0%, chỉ lọc hiển thị, không đổi dữ liệu).
 - Thông tin lần chạy: người chạy, thời điểm, model, thời gian xử lý. Chọn được lần phân tích cũ để xem.
 - Không có vùng nào thì hiển thị "AI không phát hiện vùng nghi sâu răng", kèm nhắc bác sĩ vẫn tự đánh giá.
 

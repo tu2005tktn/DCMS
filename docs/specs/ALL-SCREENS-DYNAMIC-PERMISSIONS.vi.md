@@ -22,7 +22,7 @@ Yêu cầu 02/11/2026: mở rộng phân quyền động cho tất cả màn hì
 | Xác minh liên kết | patient-links.read | verify (quyết định/thu hồi) |
 | Khám / kết luận / lịch sử | examinations.read | manage; các trạng thái nghiệp vụ không đổi |
 | Tiếp nhận kết quả cận lâm sàng | examinations.read | investigations.results.receive; bác sĩ đọc kết quả vẫn cần examinations.manage |
-| Hình ảnh/tài liệu | documents.read | upload, review |
+| Hình ảnh/tài liệu | documents.read | upload, review, delete (xóa mềm, từ 20/11/2026) |
 | Đơn thuốc theo lượt | prescriptions.read | manage |
 | Hồ sơ điều trị | treatment.read | dossiers.create/update/delete; plan.manage; revisions.manage; visits.manage |
 | Dòng kế hoạch điều trị | treatment.read | items.create/update/delete/price |

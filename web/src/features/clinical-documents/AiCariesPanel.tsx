@@ -6,8 +6,6 @@ import { documentsApi } from './documents.api';
 import { formatStamp, newRequestKey, type AiAnalysis, type AiFinding, type DocumentItem } from './types';
 import './aiCariesPanel.css';
 
-const jawLabels: Record<string, string> = { upper: 'Hàm trên', lower: 'Hàm dưới' };
-const sideLabels: Record<string, string> = { right: 'bên phải', left: 'bên trái' };
 const kindLabels: Record<string, string> = { caries: 'Nghi sâu răng', impacted_third_molar: 'Răng khôn ngầm' };
 const percent = (n: number) => `${Math.round(n * 100)}%`;
 
@@ -81,7 +79,6 @@ export default function AiCariesPanel({ doc, onAnalyzed }: { doc: DocumentItem; 
               { title: 'Vùng', dataIndex: 'findingId', width: 70 },
               { title: 'Loại', dataIndex: 'kind', render: k => <Tag color={k === 'caries' ? 'red' : 'blue'}>{kindLabels[k] ?? k}</Tag> },
               { title: 'Độ tin cậy', dataIndex: 'confidence', width: 110, render: c => percent(c) },
-              { title: 'Vị trí gợi ý', render: (_, f) => `${jawLabels[f.jaw] ?? f.jaw} ${sideLabels[f.side] ?? f.side} (bệnh nhân)` },
             ]} />}
       <Typography.Paragraph type="secondary" className="patient-section">
         {analysis.requestedByName} · {formatStamp(analysis.requestedAt)} · model {analysis.modelName} · {(analysis.elapsedMs / 1000).toFixed(1)} giây ({analysis.device}).

@@ -230,3 +230,29 @@
 .examination-heading > .ant-space a { display: inline-flex; align-items: center; height: 32px; padding: 0 15px; border: 1px solid #d0d5dd; border-radius: 10px; background: #fff; color: #1d2939; text-decoration: none; }
 .examination-heading > .ant-space a:hover, .examination-heading > .ant-space a:focus-visible { border-color: #175cd3; color: #175cd3; }
 .examination-heading .ant-typography { margin-bottom: 0; }
+
+/* Bố cục màn Khám 19/11/2026 (docs/specs/S19-S20-DCMS-112.md): chỉ sắp xếp lại, không đổi thành phần. */
+.clinical-alerts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 12px 0; }
+.clinical-alert { display: flex; flex-direction: column; gap: 2px; padding: 8px 12px; border: 1px solid #e4e7ec; border-radius: 8px; background: #f9fafb; color: #667085; min-width: 0; }
+.clinical-alert strong { font-size: 12px; text-transform: uppercase; letter-spacing: .02em; }
+.clinical-alert span { overflow-wrap: anywhere; white-space: pre-wrap; }
+.clinical-alert.present { border-color: #fda29b; background: #fef3f2; color: #912018; }
+.clinical-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 12px; }
+.clinical-facts .clinical-fact { margin-bottom: 0; }
+.exam-workspace { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; align-items: start; margin-bottom: 16px; }
+.exam-chart-column { min-width: 0; }
+.exam-findings-panel { min-width: 0; padding: 16px; border: 1px solid #e4e7ec; border-radius: 12px; background: #fcfcfd; }
+.exam-findings-panel h5.ant-typography { margin-top: 0; }
+.exam-findings-panel .finding-row { display: flex; flex-direction: column; align-items: stretch; gap: 8px !important; margin: 0 0 12px; padding: 12px; border: 1px solid #e4e7ec; border-radius: 10px; background: #fff; }
+.exam-findings-panel .finding-row > .ant-space-item { width: 100%; }
+.exam-findings-panel .finding-row .ant-select { width: 100% !important; min-width: 0 !important; }
+.exam-findings-panel .finding-row > .ant-space-item:last-child { align-self: flex-end; width: auto; }
+.exam-findings-empty { padding: 16px; border: 1px dashed #d0d5dd; border-radius: 10px; text-align: center; }
+.examination-actionbar { position: sticky; bottom: 0; z-index: 5; display: flex; justify-content: flex-end; width: 100%; margin-top: 8px; padding: 12px 0; border-top: 1px solid #eaecf0; background: #fff; }
+@media (min-width: 1200px) {
+  .exam-workspace { grid-template-columns: minmax(0, 3fr) minmax(320px, 2fr); }
+  .exam-findings-panel { position: sticky; top: 12px; max-height: calc(100vh - 24px); overflow-y: auto; }
+}
+@media (max-width: 760px) {
+  .clinical-alerts, .clinical-facts { grid-template-columns: 1fr; }
+}

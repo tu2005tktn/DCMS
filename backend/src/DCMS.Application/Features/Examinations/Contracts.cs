@@ -58,6 +58,8 @@ public sealed record DocumentUpload(string FileName, string ContentType, byte[] 
 public sealed record DocumentUploadResult(DocumentDto? Document, string? Error);
 public sealed record UploadBatchResult(DocumentDto? Document, IReadOnlyList<DocumentUploadResult> Documents);
 public sealed record ReviewDocument(int PatientId, Guid VisitId, int ExpectedVersion, Guid RequestKey);
+// Soft delete (docs/specs/TREATMENT-SHEET-IMAGES.md, 20/11/2026): audited, the record and file are kept.
+public sealed record DeleteDocument(int ExpectedVersion, string? Reason, Guid RequestKey);
 public sealed record DocumentHistoryDto(string Action, string ActorName, DateTimeOffset OccurredAt, string? Note);
 public sealed record DocumentContent(byte[] Bytes, string ContentType, string FileName);
 public interface IClinicalDocumentService
@@ -71,6 +73,7 @@ public interface IClinicalDocumentService
     // Patient app: the caller already resolved patientId from a VERIFIED self link (IOwnClinicalRecordService).
     Task<DocumentContent> PatientContentAsync(int patientId, int accountId, Guid documentId, CancellationToken ct);
     Task<DocumentDto> ReviewAsync(int actorId, Guid documentId, ReviewDocument request, CancellationToken ct);
+    Task DeleteAsync(int actorId, Guid documentId, DeleteDocument request, CancellationToken ct);
     Task ScanPendingAsync(CancellationToken ct);
     Task<AiAnalysisDto> AnalyzeAsync(int actorId, Guid documentId, RunAiAnalysis request, CancellationToken ct);
 }

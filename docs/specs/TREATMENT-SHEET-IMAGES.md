@@ -11,3 +11,11 @@ Migration chỉ cho CLINICAL_DOCUMENT.VisitId nullable và check bắt buộc Vi
 
 ## Kiểm tra
 Backend: upload trực tiếp không Visit, đúng phiếu/bệnh nhân/chi nhánh, replay, từ chối nguồn sai và nội dung chưa Ready; hồi quy upload theo Visit. Web: bấm đúng ô mở file picker, upload metadata đúng phiếu, không đổi route, gallery phiếu/tab Hình ảnh, retry không trùng, JPEG/PNG/size và trạng thái scan; build backend/Web.
+
+## Tải lên và xóa ở tab Hình ảnh của hồ sơ khách hàng (20/11/2026)
+
+- **Tải lên**: tab Hình ảnh của hồ sơ khách hàng có ô "Thêm ảnh" như phiếu điều trị, cần quyền `documents.upload`. Vì mỗi tài liệu phải gắn lượt khám hoặc hồ sơ điều trị (ràng buộc `CK_CLINICAL_DOCUMENT_Context`), giao diện có ô **Gắn với** liệt kê lượt khám đang mở (Chờ khám / Đang khám / Đã xác nhận khám, đúng điều kiện upload hiện có) và hồ sơ điều trị từ `GET /api/patients/{id}/document-contexts` (trong chi nhánh được phép), mặc định lượt khám đang mở gần nhất, nếu không có thì hồ sơ điều trị. API bổ sung trường `acceptsUpload` cho mỗi lượt khám (không đổi trường cũ). Không có lựa chọn hợp lệ thì hiện thông báo cần lượt khám đang mở hoặc hồ sơ điều trị. Giới hạn loại/kích thước/số ảnh, quét an toàn và requestKey giữ như hiện có.
+- **Xóa**: quyền mới `documents.delete` "Xóa hình ảnh / tài liệu" (cha `documents.read`; mặc định theo vai trò như `documents.upload`: Bác sĩ, Trợ lý; nhóm quyền cấp rõ). Mỗi ảnh có nút Xóa, xác nhận và bắt buộc lý do (≤ 500 ký tự).
+- API: `POST /api/clinical-documents/{id}/delete` body `{ expectedVersion, reason, requestKey }`. Kiểm quyền `documents.delete` và chi nhánh của lượt khám/hồ sơ điều trị; sai version trả MSG111/409; lặp lại cùng requestKey trả kết quả cũ.
+- **Xóa mềm**: không xóa bản ghi và file. Ghi `DocumentAudit` hành động `Deleted` với người xóa, thời điểm và lý do. Bộ lọc truy vấn toàn cục loại tài liệu có audit `Deleted` khỏi mọi đọc (danh sách, chi tiết, nội dung, AI, app bệnh nhân, người thân). Không thêm bảng/cột/migration.
+- Không cho xóa tài liệu là kết quả cận lâm sàng (`InvestigationId` khác rỗng) vì luồng đọc kết quả phụ thuộc; trả MSG04 kèm thông báo.
