@@ -14,7 +14,8 @@ Trình duyệt (máy trong VPN)
   api (ASP.NET Core .NET 10, cổng 8080 nội bộ, ASPNETCORE_ENVIRONMENT=Production)
         │
         ├── postgres (postgres:17-alpine, chỉ trong mạng Docker)
-        └── clamav (tùy chọn, profile `antivirus`; mặc định tắt)
+        ├── clamav (tùy chọn, profile `antivirus`; mặc định tắt)
+        └── ai (tùy chọn, profile `ai`; AI X-quang chạy CPU, weights ở /opt/dcms/ai-models)
 ```
 
 - Web và API dùng **cùng origin**: SPA được build với `VITE_API_BASE_URL=""`, nên mọi request đi tới `/api`, `/hubs`, `/health` trên chính host và được nginx chuyển tới API. Không cần CORS cho web.
@@ -114,3 +115,15 @@ ClamAV nạp cơ sở dữ liệu mẫu virus vào RAM (1,2–1,5 GB, lên ~2,5 
 - Server đang chứa dữ liệu demo (`seed`). Trước khi dùng dữ liệu bệnh nhân thật cần đổi mật khẩu các tài khoản demo hoặc dựng database mới không seed.
 - Khi chưa cấu hình SMTP, Production không có adapter gửi email: xác nhận email/khôi phục mật khẩu sẽ báo lỗi gửi.
 - ClamAV (khi bật) cần khoảng 1–1,5 GB RAM và tải chữ ký virus khi khởi động lần đầu; trong lúc đó tệp tải lên ở trạng thái PendingScan.
+
+
+## AI X-quang trên server (profile `ai`, 20/11/2026)
+
+Chi tiết hợp đồng: `docs/specs/AI-CARIES-DETECTION.vi.md` mục 10. Image `dcms-ai` build trên GitHub; server không build.
+
+1. Chép weights lên server (từ máy có file, qua WireGuard): `scp recommended_caries_best.pt <user>@<IP server>:/opt/dcms/ai-models/`. Thư mục cần đọc được bởi user trong container (ví dụ `chmod 755` thư mục, `644` tệp).
+2. Trong `/opt/dcms/.env`: thêm `ai` vào `COMPOSE_PROFILES` (ví dụ `public,ai`), đặt `DENTAL_AI_BASE_URL=http://ai:8090`, `DENTAL_AI_API_KEY=$(openssl rand -hex 32)`.
+3. Chạy lại workflow Deploy server (hoặc merge tiếp vào `main`). Pipeline chỉ kéo image `dcms-ai` khi profile `ai` đang bật.
+4. Kiểm tra: `docker compose -p dcms --env-file /opt/dcms/.env -f infrastructure/docker/compose.prod.yaml exec ai python -c "import urllib.request;print(urllib.request.urlopen('http://localhost:8090/health').read().decode())"` phải trả `"status":"ok"`, `"device":"cpu"`.
+
+RAM: service giới hạn `AI_MEMORY_LIMIT=1500m`, `AI_CPU_THREADS=2`. Không bật đồng thời ClamAV và AI trên server 3,8 GB.

@@ -25,6 +25,10 @@ x-api-env: &api-env
   PayOs__ClientId: ${PAYOS_CLIENT_ID:-}
   PayOs__ApiKey: ${PAYOS_API_KEY:-}
   PayOs__ChecksumKey: ${PAYOS_CHECKSUM_KEY:-}
+  # AI X-ray (docs/specs/AI-CARIES-DETECTION.vi.md §10): http://ai:8090 when the "ai" profile runs; empty disables it.
+  DentalAi__BaseUrl: ${DENTAL_AI_BASE_URL:-}
+  DentalAi__ApiKey: ${DENTAL_AI_API_KEY:-}
+  DentalAi__TimeoutSeconds: ${DENTAL_AI_TIMEOUT_SECONDS:-120}
   TZ: Asia/Ho_Chi_Minh
 x-api-volumes: &api-volumes
   - dcms_clinical_documents:/data/clinical-documents
@@ -68,6 +72,21 @@ services:
     ports:
       - "${WEB_PORT:-80}:80"
     depends_on: [api]
+  # Optional AI X-ray service (CPU). Enable with "ai" in COMPOSE_PROFILES; weights stay on the server, mounted read-only.
+  ai:
+    image: ${DCMS_REGISTRY:-ghcr.io/tu2005tktn}/dcms-ai:${DCMS_TAG:-latest}
+    build: { context: ../../ai-service }
+    profiles: ["ai"]
+    restart: unless-stopped
+    environment:
+      AI_CARIES_WEIGHTS: /models/${AI_CARIES_WEIGHTS_FILE:-recommended_caries_best.pt}
+      AI_SERVICE_API_KEY: ${DENTAL_AI_API_KEY:-}
+      AI_DEVICE: cpu
+      OMP_NUM_THREADS: ${AI_CPU_THREADS:-2}
+      TZ: Asia/Ho_Chi_Minh
+    volumes:
+      - ${AI_MODELS_DIR:-/opt/dcms/ai-models}:/models:ro
+    mem_limit: ${AI_MEMORY_LIMIT:-1500m}
   # Public access through Cloudflare Tunnel; enable with COMPOSE_PROFILES=public in .env.
   cloudflared:
     image: cloudflare/cloudflared:2025.8.1

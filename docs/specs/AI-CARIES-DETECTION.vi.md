@@ -108,3 +108,12 @@ Biến của ai-service xem `ai-service/.env.example`.
 - ai-service: health, ảnh mẫu panorama trả finding hợp lệ trong biên ảnh, ảnh hỏng → 400, sai key → 401.
 - API: tài liệu không phải XRay/PDF → 400; PendingScan → 409; AI tắt → 503 + audit; thành công lưu và tăng Version; replay requestKey không gọi AI lần hai; trợ lý → 403.
 - UI: chạy phân tích trên X-quang thật, khung khớp vị trí ảnh khi co giãn, xem lần cũ.
+
+## 10. Chạy trên server production (20/11/2026)
+
+- `ai-service` được đóng gói thành image `dcms-ai` (`ai-service/Dockerfile`, Python 3.10 + torch bản CPU), build trên GitHub cùng API/web, server chỉ kéo về. Image không chứa weights.
+- Service `ai` trong `infrastructure/docker/compose.prod.yaml` thuộc profile `ai`, mặc định tắt. Chạy bằng CPU (`AI_DEVICE=cpu`), giới hạn RAM `AI_MEMORY_LIMIT` (mặc định 1500m) và số luồng `AI_CPU_THREADS` (mặc định 2) để không làm treo server 3,8 GB. Không publish cổng; API gọi qua mạng Docker `http://ai:8090`.
+- Weights đặt trên server tại `AI_MODELS_DIR` (mặc định `/opt/dcms/ai-models`), mount chỉ đọc vào `/models`; tên tệp `AI_CARIES_WEIGHTS_FILE` (mặc định `recommended_caries_best.pt`). Thiếu tệp thì `/health` của ai-service báo `unavailable` và DCMS trả 503 cho phân tích, các chức năng khác không ảnh hưởng.
+- API production nhận `DENTAL_AI_BASE_URL`, `DENTAL_AI_API_KEY`, `DENTAL_AI_TIMEOUT_SECONDS` từ `/opt/dcms/.env`; `DENTAL_AI_API_KEY` dùng chung làm `AI_SERVICE_API_KEY` của service `ai`.
+- Bật: chép weights vào `/opt/dcms/ai-models/`, trong `/opt/dcms/.env` thêm `ai` vào `COMPOSE_PROFILES`, đặt `DENTAL_AI_BASE_URL=http://ai:8090` và `DENTAL_AI_API_KEY` ngẫu nhiên, rồi chạy lại deploy. Tắt: bỏ `ai` khỏi `COMPOSE_PROFILES` và để trống `DENTAL_AI_BASE_URL`.
+- Trên CPU mỗi lần phân tích có thể mất vài chục giây; `DENTAL_AI_TIMEOUT_SECONDS` mặc định 120.
