@@ -55,7 +55,7 @@ public static class ScreenEndpointPermissions
         if (p.StartsWith("/api/system-settings/branches") || p.StartsWith("/api/settings/branches"))
             return Need(p.Contains("/chairs") ? (read ? "chairs.read" : "chairs.manage") : read ? "branches.read" : "branches.manage");
         if (p.StartsWith("/api/prescriptions")) return Need(read && !p.EndsWith("/medicine-options") ? "prescriptions.read" : "prescriptions.manage");
-        if (p.StartsWith("/api/clinical-documents")) return Need(read ? "documents.read" : p.EndsWith("/review") || p.EndsWith("/ai-analyses") ? "documents.review" : "documents.upload");
+        if (p.StartsWith("/api/clinical-documents")) return Need(read ? "documents.read" : p.EndsWith("/delete") ? "documents.delete" : p.EndsWith("/review") || p.EndsWith("/ai-analyses") ? "documents.review" : "documents.upload");
         if (p.StartsWith("/api/visits")) {
             if (p == "/api/visits/{visitId}") return Need("reception.read");
             if (p.Contains("/investigations/") && p.EndsWith("/result")) return Need("investigations.results.receive");
