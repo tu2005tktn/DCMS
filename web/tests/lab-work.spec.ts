@@ -9,7 +9,7 @@ async function login(page: Page, user: string) {
   await page.getByLabel('Tên đăng nhập', { exact: true }).fill(user);
   await page.getByLabel('Mật khẩu', { exact: true }).fill(password!);
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Tài khoản của tôi' })).toBeVisible();
+  await expect(page).not.toHaveURL(/\/sign-in/);
 }
 
 const item = (over: Record<string, unknown> = {}) => ({ id: 'a1', code: 'LB-001', dossierId: 'd1', dossierCode: 'HS-1', activityId: 'ac1', patientId: 7, patientCode: 'BN-007',

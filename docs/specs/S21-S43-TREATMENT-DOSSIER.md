@@ -99,3 +99,7 @@ Bảng "KẾ HOẠCH ĐIỀU TRỊ/DỊCH VỤ" của phiếu điều trị xế
 ## Bỏ khối "Đơn thuốc sau điều trị" khỏi phiếu điều trị (10/11/2026)
 
 Phiếu điều trị không còn khối "Đơn thuốc sau điều trị" (nút Kê đơn theo lượt khám / thông báo cần có lượt khám đang thực hiện). Kê đơn vẫn thực hiện ở màn đơn thuốc của lượt khám (`/visits/{id}/prescription`); phiếu chỉ còn kế hoạch, quá trình điều trị, thanh toán, hình ảnh và ghi chú.
+
+## Cập nhật 20/11/2026 — Không còn bước "Chốt kế hoạch"
+
+Từ commit `5338722` trên `main` (18/11/2026, rút gọn `TREATMENT_PLAN_ITEM`), phiếu điều trị **không còn** bước "Lưu nháp kế hoạch" / "Chốt kế hoạch", trạng thái "Đã chốt · phiên bản N" hay luồng điều chỉnh kế hoạch. Hạng mục trong bảng KẾ HOẠCH ĐIỀU TRỊ/DỊCH VỤ được lưu ngay khi bấm ✓ và là căn cứ cho việc đã làm; muốn đổi thì sửa trực tiếp hạng mục. Các mục trong tài liệu này nói về chốt kế hoạch, `/plan/draft`, `/plan/commit`, `/plan/decision`, `/warranty`, `/steps*` không còn hiệu lực. Test case 5.3 SYS6-04 đã được viết lại theo luồng này (BUG-03 trong `docs/testing/SYSTEM-TEST-5.3-BUGS-20261120.vi.md`).

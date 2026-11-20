@@ -89,3 +89,7 @@ Bảng của bốn tab (Công ty cung cấp vật liệu, Công ty labo, Loại 
 ## Mã của dữ liệu mẫu labo (06/11/2026)
 
 Dữ liệu mẫu labo (`LAB-CATALOG-SEED.md`) dùng mã không có chữ "DEMO": công ty `LAB-01`, `LAB-02`; loại công việc `LW-01..LW-07`.
+
+## Giá tham khảo âm phải được báo lỗi — 20/11/2026
+
+Phát hiện khi chạy system test SYS7-04: ô **Giá tham khảo (VND)** của Loại công việc labo và Thuốc / Dược phẩm tự đổi số âm thành 0 khi rời ô rồi vẫn lưu, nên người dùng không biết giá mình nhập bị thay. Từ nay ô không tự sửa giá trị: nhập số âm hoặc số lẻ thì hiện ngay dưới ô "Giá là số nguyên không âm (VND)." và không lưu. Máy chủ vẫn từ chối giá âm (MSG257) như trước; để trống vẫn là "chưa xác định", 0 vẫn là giá bằng 0.

@@ -23,7 +23,7 @@ public sealed class CaseAttribute(string key, string description, string preCond
 
 internal static class Trace
 {
-    private sealed record Exchange(string Method, string Path, int Status, string Body);
+    private sealed record Exchange(string Method, string Path, string Actor, string? Request, int Status, string Body);
     private sealed class Entry(CaseAttribute info) { public CaseAttribute Info { get; } = info; public List<Exchange> Exchanges { get; } = []; }
 
     // All API tests share one collection, so they run one after another and a plain static is safe.
@@ -33,8 +33,14 @@ internal static class Trace
     public static void Begin(CaseAttribute info) => current = new Entry(info);
     public static void End() { if (current != null) finished.Add(current); current = null; }
 
-    public static void Record(string method, string path, ApiResponse response) =>
-        current?.Exchanges.Add(new(method, path, response.Status, response.Body.Length > 4000 ? response.Body[..4000] : response.Body));
+    // Secrets never reach the report: password fields and tokens are masked.
+    private static readonly System.Text.RegularExpressions.Regex Secret =
+        new(@"""(password|confirmPassword|newPassword|accessToken|refreshToken)""\s*:\s*""[^""]*""", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+    private static string Mask(string text) => Secret.Replace(text, m => m.Value[..(m.Value.IndexOf(':') + 1)] + "\"***\"");
+
+    public static void Record(string method, string path, string? actor, string? request, ApiResponse response) =>
+        current?.Exchanges.Add(new(method, path, actor ?? "(no token)", request == null ? null : Mask(request), response.Status,
+            Mask(response.Body.Length > 4000 ? response.Body[..4000] : response.Body)));
 
     public static void Flush()
     {

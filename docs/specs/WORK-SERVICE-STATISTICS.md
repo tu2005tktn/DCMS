@@ -99,3 +99,7 @@ Liên kết **Mở phiếu** trong các bảng chi tiết của màn Thống kê
 - API nhận thêm tham số tùy chọn `dossierId` (GUID): chỉ trả phiếu đó, vẫn theo quyền `finance.work-statistics.read` và phạm vi chi nhánh. Phiếu ngoài phạm vi, đã xóa hoặc không tồn tại cho kết quả rỗng, không báo lỗi riêng để không lộ sự tồn tại của phiếu.
 - Phiếu chưa có dịch vụ nào được thực hiện (ví dụ phiếu mới chỉ nhận cọc) không có trong thống kê công việc. Khi đó màn hình báo "Phiếu này chưa có dịch vụ đã thực hiện nên chưa có trong thống kê công việc." và, nếu URL có `patientId`, kèm liên kết **Mở phiếu điều trị** tới `/patients/{patientId}?tab=treatment&dossierId={dossierId}`.
 - Liên kết **Mở phiếu điều trị** trong phần chi tiết vẫn dẫn tới hồ sơ bệnh nhân, là nơi thu tiền.
+
+## Trang mở đầu sau khi đăng nhập (17/11/2026)
+
+Sau khi nhân viên đăng nhập ở `/sign-in`, **mọi tài khoản** đều được chuyển thẳng tới `/work-statistics` (cập nhật cùng ngày theo yêu cầu người dùng; bản đầu chỉ chuyển khi có quyền). Bấm "Tài khoản của tôi" hoặc logo DCMS vẫn mở trang `/`. Theo phân quyền mặc định, Chủ phòng khám, Quản trị, Nha sĩ và Trợ lý đều có quyền `finance.work-statistics.read`; tài khoản thuộc nhóm quyền tùy chỉnh không có quyền này sẽ thấy thông báo "Bạn không có quyền thực hiện thao tác này." kèm liên kết về trang chủ. Cổng khách hàng (`/customer/sign-in`) không thuộc thay đổi này vì khách hàng không xem được màn nhân viên.

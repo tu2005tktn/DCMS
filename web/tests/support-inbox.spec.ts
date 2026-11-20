@@ -8,7 +8,7 @@ async function login(page: Page, user = 'assistant.demo') {
   await page.getByLabel('Tên đăng nhập', { exact: true }).fill(user);
   await page.getByLabel('Mật khẩu', { exact: true }).fill(password!);
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Tài khoản của tôi' })).toBeVisible();
+  await expect(page).not.toHaveURL(/\/sign-in/);
 }
 
 test('staff sees inbox menu, can filter and open a request drawer', async ({ page }) => {
@@ -19,17 +19,19 @@ test('staff sees inbox menu, can filter and open a request drawer', async ({ pag
   await page.getByRole('link', { name: 'Hộp thư hỗ trợ', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Hộp thư hỗ trợ', exact: true })).toBeVisible();
 
-  // Bộ lọc mặc định "Cần xử lý" — phải có ít nhất một dòng.
+  // Chỉ còn hai bộ lọc; mặc định "Đang chờ xử lý" — phải có ít nhất một dòng.
+  await expect(page.getByRole('group', { name: 'Lọc theo trạng thái' }).getByRole('button')).toHaveCount(2);
   const firstRow = page.locator('table tbody tr.ant-table-row').first();
   await expect(firstRow).toBeVisible();
   await expect(firstRow).toContainText('AP-');
+  await expect(firstRow).toContainText('Đang chờ xử lý');
 
-  // Bấm chuyển sang "Đã đóng" và kiểm tra dòng Withdrawn xuất hiện.
+  // Bấm chuyển sang "Đã đóng": yêu cầu khách tự rút cũng hiện là "Đã đóng".
   await page.getByRole('button', { name: 'Đã đóng', exact: true }).click();
-  await expect(page.locator('table tbody tr.ant-table-row').filter({ hasText: 'Đã rút' }).first()).toBeVisible();
+  await expect(page.locator('table tbody tr.ant-table-row').filter({ hasText: 'Đã đóng' }).first()).toBeVisible();
 
-  // Quay lại "Cần xử lý", mở drawer yêu cầu đầu tiên.
-  await page.getByRole('button', { name: 'Cần xử lý', exact: true }).click();
+  // Quay lại "Đang chờ xử lý", mở drawer yêu cầu đầu tiên.
+  await page.getByRole('button', { name: 'Đang chờ xử lý', exact: true }).click();
   await firstRow.click();
   await expect(page.getByRole('dialog')).toBeVisible();
   await expect(page.getByText('Tổng quan', { exact: true })).toBeVisible();
@@ -47,7 +49,7 @@ test('resolve without prior change is blocked for change/cancel requests', async
   page.on('pageerror', e => errors.push(e.message));
   await login(page, 'assistant.demo');
   await page.getByRole('link', { name: 'Hộp thư hỗ trợ', exact: true }).click();
-  await page.getByRole('button', { name: 'Chờ staff', exact: true }).click();
+  await page.getByRole('button', { name: 'Đang chờ xử lý', exact: true }).click();
   // Mở yêu cầu Change (chưa đổi lịch).
   const changeRow = page.locator('table tbody tr.ant-table-row').filter({ hasText: 'Yêu cầu đổi lịch' }).first();
   await changeRow.click();

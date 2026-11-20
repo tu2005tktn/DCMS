@@ -111,7 +111,7 @@ public sealed class ApiHost : WebApplicationFactory<Program>, IAsyncLifetime
             }
             http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         }
-        return new ApiClient(http);
+        return new ApiClient(http, userName);
     }
 
     /// <summary>Runs code directly against the test schema (used only to read back what the API stored).</summary>

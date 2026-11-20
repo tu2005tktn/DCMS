@@ -210,3 +210,26 @@ Hồ sơ bệnh nhân (`PatientProfile`) dùng chung toàn phòng khám nhưng *
 - Kiểm thử: `PatientBranchScopeTests`.
 - **Lọc theo chi nhánh (chủ phòng khám):** `GET /api/patients` nhận thêm `branchId` (tùy chọn). Có `branchId` thì chỉ trả bệnh nhân có lịch hẹn, lượt khám hoặc hồ sơ điều trị tại chi nhánh đó; không có thì trả tất cả. Nhân viên thường chỉ được truyền chi nhánh trong phạm vi được gán, ngoài phạm vi trả `403`. Màn Bệnh nhân chỉ hiện ô "Chi nhánh" (mặc định "Tất cả chi nhánh") cho chủ phòng khám; danh sách chi nhánh lấy từ `/api/appointments/options`.
 - **Lịch làm việc (chủ phòng khám):** `GET /api/working-schedules/options` trả mọi chi nhánh đang hoạt động cùng toàn bộ nhân sự đang hoạt động của từng chi nhánh (chủ không cần là thành viên). Màn Lịch làm việc có ô "Chi nhánh" ở đầu bộ lọc (chỉ chủ và chỉ khi có từ 2 chi nhánh): chọn chi nhánh trước, ô "Nhân viên / bác sĩ" chỉ liệt kê người của chi nhánh đó, sau đó mới xem/sửa lịch. Chủ được xem và sửa lịch của nhân sự mọi chi nhánh (sửa vẫn cần quyền `working-schedules.manage`). Nhân viên thường không có ô chi nhánh và không đổi.
+
+## Nhân sự chi nhánh — 20/11/2026 (sửa BUG-02, SYS7-07 / SYS4-09)
+
+**Vấn đề:** thành viên chi nhánh (`SCHEDULING_BRANCH.Members`) trước đây chỉ do `DevelopmentSchedulingSeeder` tạo. Nhân viên mới tạo qua "Quản lý tài khoản" không có chi nhánh nên không gán được nhóm quyền theo chi nhánh, không xếp lịch làm việc được.
+
+**Giải pháp (cách A):** thêm mục **"Nhân sự chi nhánh"** trong ngăn sửa chi nhánh của màn Chi nhánh & Ghế điều trị.
+
+- Danh sách hiện mọi tài khoản nhân viên đang hoạt động: họ tên, tên đăng nhập, vai trò, trạng thái trong chi nhánh (Đang làm việc / Ngừng / Chưa thuộc chi nhánh), cờ "Khám như nha sĩ" và "Quản lý lịch".
+- Chủ phòng khám (quyền `branches.manage`) bấm "Thêm vào chi nhánh", "Ngừng" hoặc "Làm việc lại", và bật/tắt hai cờ.
+- Không xóa thành viên: "Ngừng" đặt `Active = false`, giữ lịch sử và lịch làm việc cũ.
+- "Khám như nha sĩ" chỉ có hiệu lực với tài khoản có vai trò Nha sĩ hoặc Chủ phòng khám (quy tắc sẵn có của lịch làm việc).
+- Không thêm bảng hay cột: dùng lại `SchedulingMember` trong JSON của `SCHEDULING_BRANCH`. Mỗi thay đổi tăng `Version` của chi nhánh và ghi `SettingsAudit` (`MemberAdd` / `MemberUpdate`).
+
+**API**
+
+| Phương thức | Đường dẫn | Mô tả |
+|---|---|---|
+| GET | `/api/system-settings/branches/{id}/members` | Danh sách nhân viên kèm trạng thái thành viên của chi nhánh. Quyền `branches.read`. |
+| PUT | `/api/system-settings/branches/{id}/members/{employeeId}` | Thêm hoặc cập nhật thành viên. Thân: `{ requestKey, expectedVersion, active, canDentist, canManageSchedules }`. `expectedVersion` là phiên bản chi nhánh. Quyền `branches.manage`. |
+
+Lỗi: chi nhánh không tồn tại → 404 MSG113; phiên bản lệch → 409 MSG111; thêm vào chi nhánh ngừng hoạt động → 409 MSG205; nhân viên không tồn tại → 404 MSG113.
+
+Sau khi thêm, nhân viên xuất hiện trong ô "Chi nhánh nghiệp vụ" khi gán nhóm quyền (màn Phân quyền truy cập) như các thành viên sẵn có.

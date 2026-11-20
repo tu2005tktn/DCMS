@@ -7,7 +7,7 @@ async function ok(response:Awaited<ReturnType<APIRequestContext['post']>>){expec
 async function auth(request:APIRequestContext,userName:string){return {Authorization:`Bearer ${(await ok(await request.post(`${apiUrl}/api/auth/sign-in`,{data:{userName,password}}))).accessToken}`};}
 async function signIn(page:Page,userName:string){
   await page.goto('/sign-in');await page.getByLabel('Tên đăng nhập',{exact:true}).fill(userName);await page.getByLabel('Mật khẩu',{exact:true}).fill(password!);
-  await page.getByRole('button',{name:'Đăng nhập',exact:true}).click();await expect(page.getByRole('heading',{name:'Tài khoản của tôi',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Đăng nhập',exact:true}).click();await expect(page).not.toHaveURL(/\/sign-in/);
 }
 
 test('owner creates checkbox group, assigns staff, then revokes the action for an existing session',async({page,request},testInfo)=>{

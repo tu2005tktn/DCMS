@@ -44,7 +44,7 @@ test('staff sign-in and sign-out still use existing routes', async ({ page }) =>
   await page.getByLabel('Mật khẩu', { exact: true }).fill('Password123!');
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
   await expect(page).toHaveURL('http://localhost:5173/');
-  await expect(page.getByRole('heading', { name: 'Tài khoản của tôi' })).toBeVisible();
+  await expect(page).not.toHaveURL(/\/sign-in/);
   await page.getByRole('button', { name: 'Đăng xuất' }).click();
   await expect(page).toHaveURL(/\/sign-in$/);
 });

@@ -61,6 +61,13 @@ public static class SettingsEndpoints
             branchGroup.MapPost("/{id:int}/state", async (HttpContext c, int id, BranchStateCommand command, IBranchManagementService s, CancellationToken ct) =>
                 Results.Ok(await s.SetBranchStateAsync(Actor(c), id, command, ct)));
 
+            // Branch members (docs/specs/S58-BRANCHES-AND-CHAIRS.md, Nhân sự chi nhánh)
+            branchGroup.MapGet("/{id:int}/members", async (HttpContext c, int id, IBranchManagementService s, CancellationToken ct) =>
+                Results.Ok(await s.MembersAsync(Actor(c), id, ct)));
+
+            branchGroup.MapPut("/{id:int}/members/{employeeId:int}", async (HttpContext c, int id, int employeeId, SaveBranchMemberCommand command, IBranchManagementService s, CancellationToken ct) =>
+                Results.Ok(await s.SaveMemberAsync(Actor(c), id, employeeId, command, ct)));
+
             // Chairs
             branchGroup.MapGet("/{id:int}/chairs", async (HttpContext c, int id, IBranchManagementService s, CancellationToken ct) =>
                 Results.Ok(await s.ChairsAsync(Actor(c), id, ct)));

@@ -51,19 +51,21 @@ export type AttendeeRelation = 'Self' | 'Relative';
 // Labels & colors (dùng cho tag Ant Design)
 // ============================================================================
 
+// Only two statuses are shown to staff (docs/implementation/S26-Staff-Support-Inbox.md, 17/11/2026):
+// open requests are "Đang chờ xử lý", every finished one is "Đã đóng". Stored statuses are unchanged.
 export const statusLabels: Record<SupportRequestStatus, string> = {
-  Pending: 'Chờ staff',
-  InReview: 'Đang xem xét',
-  Resolved: 'Đã xử lý',
-  Rejected: 'Bị từ chối',
-  Withdrawn: 'Đã rút',
+  Pending: 'Đang chờ xử lý',
+  InReview: 'Đang chờ xử lý',
+  Resolved: 'Đã đóng',
+  Rejected: 'Đã đóng',
+  Withdrawn: 'Đã đóng',
 };
 
 export const statusColors: Record<SupportRequestStatus, string> = {
   Pending: 'gold',
-  InReview: 'blue',
-  Resolved: 'green',
-  Rejected: 'red',
+  InReview: 'gold',
+  Resolved: 'default',
+  Rejected: 'default',
   Withdrawn: 'default',
 };
 
@@ -251,12 +253,10 @@ export interface StaffVerifyRequesterCommand {
 // Filters
 // ============================================================================
 
-export type StatusFilterGroup = 'open' | 'pending' | 'inReview' | 'closed';
+export type StatusFilterGroup = 'open' | 'closed';
 
 export const statusFilterOptions: { value: StatusFilterGroup; label: string; statuses: SupportRequestStatus[] }[] = [
-  { value: 'open', label: 'Cần xử lý', statuses: ['Pending', 'InReview'] },
-  { value: 'pending', label: 'Chờ staff', statuses: ['Pending'] },
-  { value: 'inReview', label: 'Đang xem xét', statuses: ['InReview'] },
+  { value: 'open', label: 'Đang chờ xử lý', statuses: ['Pending', 'InReview'] },
   { value: 'closed', label: 'Đã đóng', statuses: ['Resolved', 'Rejected', 'Withdrawn'] },
 ];
 

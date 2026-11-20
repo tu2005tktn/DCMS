@@ -9,7 +9,7 @@ import './accessGroups.css';
 const base = '/api/system-settings/access-groups';
 type Data = { groups: AccessGroup[]; staff: StaffAccess[]; options: GrantOption[]; capabilities: AccessCapabilities };
 type Editor = { row?: AccessGroup; values: GroupValues; writable: boolean };
-type Audit = { id: string; actorId: number; target: string; action: string; reason: string; at: string };
+type Audit = { id: string; actorId?: number; actorName?: string; target: string; action: string; reason: string; at: string };
 const roles = ['ClinicAssistant', 'Dentist', 'Admin'];
 const emptyValues = (): GroupValues => ({ code: '', name: '', description: '', baseRole: 'ClinicAssistant', grants: [], reason: '' });
 
@@ -207,7 +207,7 @@ export default function AccessGroupsPanel() {
     <Drawer open={!!audit} title="Lịch sử phân quyền" aria-label="Lịch sử phân quyền" width="min(900px, 100vw)" onClose={() => setAudit(undefined)}>
       {audit?.error ? <Alert type="error" message={audit.error} action={<Button onClick={() => void openAudit()}>Tải lại lịch sử</Button>} /> : <Table<Audit> rowKey="id" loading={!audit?.rows} dataSource={audit?.rows} locale={{ emptyText: <Empty description="Chưa có thay đổi phân quyền." /> }} columns={[
         { title: 'Thời gian', render: (_, item) => new Date(item.at).toLocaleString('vi-VN') },
-        { title: 'Người thực hiện', render: (_, item) => data.staff.find(staff => staff.accountId === item.actorId)?.name ?? `#${item.actorId}` },
+        { title: 'Người thực hiện', render: (_, item) => item.actorName ?? data.staff.find(staff => staff.accountId === item.actorId)?.name ?? '—' },
         { title: 'Thao tác', render: (_, item) => ({ 'group.save': 'Thiết lập nhóm', 'group.assign': 'Gán nhóm', 'group.state': 'Đổi trạng thái' })[item.action] ?? item.action },
         { title: 'Lý do', dataIndex: 'reason' },
       ]} />}

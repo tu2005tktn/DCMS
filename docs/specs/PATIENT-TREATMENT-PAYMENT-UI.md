@@ -105,3 +105,7 @@ Trong danh sách phiếu điều trị của hồ sơ bệnh nhân, thẻ mỗi 
 Hồ sơ khách hàng (14/11/2026): vùng nội dung các tab dùng gần hết bề rộng màn hình, lề trong thu còn 12px (trước 30px) để các thẻ thông tin dàn kín; màn hình hẹp giữ lề riêng.
 
 Phiếu điều trị: nút "Kế hoạch điều trị" (chọn kế hoạch mẫu) nằm ngay cạnh tiêu đề "KẾ HOẠCH ĐIỀU TRỊ/DỊCH VỤ" ở bên trái; các số tổng dự toán, giảm giá, thành tiền giữ bên phải.
+
+## Cập nhật 20/11/2026 — Không còn bước "Chốt kế hoạch"
+
+Từ commit `5338722` trên `main` (18/11/2026, rút gọn `TREATMENT_PLAN_ITEM`), phiếu điều trị **không còn** bước "Lưu nháp kế hoạch" / "Chốt kế hoạch", trạng thái "Đã chốt · phiên bản N" hay luồng điều chỉnh kế hoạch. Hạng mục trong bảng KẾ HOẠCH ĐIỀU TRỊ/DỊCH VỤ được lưu ngay khi bấm ✓ và là căn cứ cho việc đã làm; muốn đổi thì sửa trực tiếp hạng mục. Các mục trong tài liệu này nói về chốt kế hoạch, `/plan/draft`, `/plan/commit`, `/plan/decision`, `/warranty`, `/steps*` không còn hiệu lực. Test case 5.3 SYS6-04 đã được viết lại theo luồng này (BUG-03 trong `docs/testing/SYSTEM-TEST-5.3-BUGS-20261120.vi.md`).

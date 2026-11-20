@@ -38,7 +38,7 @@ public sealed class ItemPlanTests(ApiHost host)
 
         Assert.Equal(200, response.Status);
         var stored = await host.QueryAsync(db => db.TreatmentTemplates.AsNoTracking().SingleAsync(x => x.Name == name));
-        Assert.Equal("ItemPlan", stored.DefinitionKind);
+        Assert.Equal(name, stored.Name); // DefinitionKind was dropped on main: every TREATMENT_TEMPLATE is an item plan now.
         Assert.Equal(host.BranchA, stored.BranchId);
     }
 

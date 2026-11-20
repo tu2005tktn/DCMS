@@ -26,7 +26,7 @@ test('staff proactively edits and cancels a patient appointment through UI and r
   const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
   await page.goto(`${webUrl}/sign-in`); await page.getByLabel('Tên đăng nhập', { exact: true }).fill('assistant.demo');
   await page.getByLabel('Mật khẩu', { exact: true }).fill(password!); await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Tài khoản của tôi', exact: true })).toBeVisible();
+  await expect(page).not.toHaveURL(/\/sign-in/);
   await page.goto(`${webUrl}/patients/${patient.id}?tab=appointments`);
   const row = page.getByRole('row').filter({ hasText: booking.code });
   await row.getByRole('button', { name: 'Chỉnh sửa lịch', exact: true }).click();

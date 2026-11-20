@@ -88,8 +88,32 @@ public interface IBranchLabObligationPort
     Task<BranchObligationResult> OpenLabOrdersAsync(int branchId, CancellationToken ct);
 }
 
+public sealed record BranchMemberDto(
+    int EmployeeId,
+    string EmployeeCode,
+    string FullName,
+    string UserName,
+    string[] Roles,
+    bool IsMember,
+    bool Active,
+    bool CanDentist,
+    bool CanManageSchedules);
+
+public sealed record BranchMembersDto(int BranchId, int Version, BranchMemberDto[] Members);
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record SaveBranchMemberCommand(
+    Guid RequestKey,
+    int ExpectedVersion,
+    bool Active,
+    bool CanDentist,
+    bool CanManageSchedules);
+
 public interface IBranchManagementService
 {
+    Task<BranchMembersDto> MembersAsync(int actor, int branchId, CancellationToken ct);
+    Task<BranchMembersDto> SaveMemberAsync(int actor, int branchId, int employeeId, SaveBranchMemberCommand command, CancellationToken ct);
+
     Task<BranchDto[]> BranchesAsync(int actor, CancellationToken ct);
     Task<BranchDetailDto> BranchAsync(int actor, int id, CancellationToken ct);
     Task<BranchDetailDto> SaveBranchAsync(int actor, int? id, SaveBranchCommand command, CancellationToken ct);

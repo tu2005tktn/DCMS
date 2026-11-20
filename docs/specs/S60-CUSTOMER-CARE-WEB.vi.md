@@ -164,3 +164,15 @@ Xuất Excel chứa SĐT của bệnh nhân, nên dùng cùng quyền đọc dan
 Trang Chăm sóc khách hàng không còn dùng kiểu căn giữa toàn màn hình của lớp `.page` chung (gây khoảng trống lớn giữa tiêu đề, bộ lọc và bảng). Nay bố cục xếp dọc liền mạch: tiêu đề và nút "Tạo mới", thẻ bộ lọc, dòng "Tìm thấy n phiếu" kèm [Excel] / Tải lại, bảng dàn hết bề rộng.
 
 Thẻ bộ lọc không còn khung trắng và lề trong, các ô lọc dàn trực tiếp trên nền trang theo hết bề rộng để nội dung chiếm đủ màn hình.
+
+## Điều chỉnh 17/11/2026 — bỏ người phụ trách và loại chăm sóc khi tạo phiếu
+
+Theo yêu cầu của người dùng (tài khoản trợ lý):
+
+- **Form "Thêm chăm sóc"** chỉ còn Chi nhánh (khi có từ hai chi nhánh), Ngày/Giờ, Khách hàng và Nội dung. Bỏ ô **Người phụ trách** và ô **Loại chăm sóc** (kèm nút "…" quản lý loại).
+  - Phiếu tạo tay được lưu loại `Manual`, hiển thị "Tạo thủ công". API `POST /api/care-tasks` vẫn nhận `type`; bỏ trống hoặc không gửi thì máy chủ dùng `Manual`. Phiếu do hệ thống tự sinh giữ loại riêng như cũ.
+  - Phiếu tạo mới không gán người phụ trách (`ownerAccountId = null`).
+  - **Người tạo** là tài khoản đang đăng nhập khi lưu phiếu, máy chủ lấy từ phiên (`CreatedBy`), không nhận từ client.
+- **Form "Sửa chăm sóc"** cũng bỏ ô Người phụ trách; khi lưu, giá trị người phụ trách đang có của phiếu được giữ nguyên.
+- **Bỏ các dòng ghi chú dưới ô nhập**: dòng "Chỉ gợi ý khách đã hoặc đang khám tại chi nhánh này.", dòng hướng dẫn khi chưa có loại chăm sóc, và bộ đếm ký tự dưới ô Nội dung / Bước tiếp theo. Giới hạn độ dài vẫn giữ (4000 và 1000 ký tự). Lỗi tìm khách hàng vẫn hiện dưới ô Khách hàng.
+- **Danh sách**: cột và bộ lọc "Người phụ trách" được thay bằng cột **Người tạo**, hiện họ tên và tên đăng nhập của tài khoản tạo phiếu (ví dụ "Trợ lý demo (@assistant.demo)"). Ngăn chi tiết phiếu cũng hiện Người tạo và thời điểm tạo. API worklist trả thêm `createdByName`, `createdByUserName`, `createdAt`; tệp Excel thay cột "Người phụ trách" bằng "Người tạo". Tham số lọc `ownerAccountId` của API vẫn được nhận để tương thích nhưng màn hình không gửi nữa.

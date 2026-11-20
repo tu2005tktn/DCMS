@@ -86,7 +86,7 @@ test('request, verify, reset and landing on sign-in for an existing account', as
   await expect(page.getByText('Thông tin đăng nhập không đúng hoặc tài khoản không thể sử dụng. Vui lòng kiểm tra và thử lại.')).toBeVisible();
   await page.getByLabel('Mật khẩu', { exact: true }).fill(updated);
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Tài khoản của tôi' })).toBeVisible();
+  await expect(page).not.toHaveURL(/\/sign-in/);
 });
 
 test('unknown account produces the same neutral request answer', async ({ page }) => {

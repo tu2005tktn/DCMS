@@ -127,3 +127,14 @@ Mỗi dòng gắn với `AppointmentDto` tối thiểu: `id`, `code`, `version`,
 - GBR: 007, 012, 013, 014, 015, 031, 073, 075, 077, 078, 081, 123.
 - MSG: 31-38, 94, 111, 144.
 - AT: AT16 (phần xử lý hỗ trợ).
+
+## Điều chỉnh 17/11/2026 — chỉ hai trạng thái hiển thị
+
+Theo yêu cầu của người dùng, Hộp thư hỗ trợ chỉ còn hai trạng thái hiển thị, áp dụng cho thanh lọc phía trên, cột Trạng thái trong bảng, ngăn chi tiết yêu cầu và danh sách yêu cầu trong chi tiết lịch hẹn:
+
+| Hiển thị | Màu | Trạng thái lưu trong hệ thống |
+|---|---|---|
+| **Đang chờ xử lý** | vàng | `Pending`, `InReview` |
+| **Đã đóng** | xám | `Resolved`, `Rejected`, `Withdrawn` |
+
+Thanh lọc chỉ có hai nút "Đang chờ xử lý" (mặc định) và "Đã đóng"; bỏ hai nút "Chờ staff" và "Đang xem xét". Backend, API và các trạng thái lưu trữ không đổi; kết quả xử lý cụ thể (đã xử lý, từ chối, khách tự rút) vẫn xem được trong lịch sử của yêu cầu.

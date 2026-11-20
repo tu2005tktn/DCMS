@@ -61,11 +61,14 @@ export default function DossierPaymentModal({ dossierId, open, onClose, onSaved 
     + selectedLabs.reduce((sum, lab) => sum + lab.amountVnd, 0);
   const labFees = context?.labFees.filter(lab => lab.dueVnd > 0) ?? [];
   const labRemaining = labFees.reduce((sum, lab) => sum + lab.priorityRemainingVnd, 0);
+  const overDue = due.some(line => (amounts[line.activityId] ?? 0) > line.dueVnd)
+    || labFees.some(lab => (labAmounts[lab.labOrderId] ?? 0) > lab.dueVnd);
+  const overDueMessage = (dueVnd: number) => `Số tiền thu không được lớn hơn số còn nợ (${money(dueVnd)}).`;
   const violatesLabPriority = selected.length > 0 && labFees.some(lab =>
     lab.paidVnd + (labAmounts[lab.labOrderId] ?? 0) < lab.minimum30PercentVnd);
 
   async function save() {
-    if ((tab === 'advance' ? advanceAmount <= 0 : total <= 0 || violatesLabPriority) || saving) return;
+    if ((tab === 'advance' ? advanceAmount <= 0 : total <= 0 || violatesLabPriority || overDue) || saving) return;
     setSaving(true); setError('');
     try {
       const signature = JSON.stringify({ tab, method, selected, selectedLabs, advanceAmount });
@@ -92,7 +95,7 @@ export default function DossierPaymentModal({ dossierId, open, onClose, onSaved 
   }
 
   async function applyAdvance() {
-    if (saving || total <= 0 || violatesLabPriority || total > (context?.advanceReceivedVnd ?? 0)
+    if (saving || total <= 0 || violatesLabPriority || overDue || total > (context?.advanceReceivedVnd ?? 0)
       || order?.status === 'PENDING') return;
     setSaving(true); setError('');
     try {
@@ -118,9 +121,10 @@ export default function DossierPaymentModal({ dossierId, open, onClose, onSaved 
     <tbody>{lines.map(line => <tr key={line.activityId}>
       <td>{new Date(line.performedAt).toLocaleDateString('vi-VN')}</td><td>{line.serviceName}</td>
       <td>{money(line.priceVnd)}</td><td>{money(line.paidVnd)}</td><td>{money(line.dueVnd)}</td>
-      {editable && <td><InputNumber aria-label={`Số tiền thu cho ${line.serviceName}`} min={0} max={line.dueVnd} precision={0} style={{ width: 150 }}
-        value={amounts[line.activityId] ?? 0} disabled={saving}
-        onChange={value => setAmounts(previous => ({ ...previous, [line.activityId]: value ?? 0 }))} /></td>}
+      {editable && <td><InputNumber aria-label={`Số tiền thu cho ${line.serviceName}`} min={0} precision={0} style={{ width: 150 }}
+        value={amounts[line.activityId] ?? 0} disabled={saving} status={(amounts[line.activityId] ?? 0) > line.dueVnd ? 'error' : undefined}
+        onChange={value => setAmounts(previous => ({ ...previous, [line.activityId]: value ?? 0 }))} />
+        {(amounts[line.activityId] ?? 0) > line.dueVnd && <div className="ant-form-item-explain-error" role="alert">{overDueMessage(line.dueVnd)}</div>}</td>}
     </tr>)}</tbody></table></div> : <p>{editable ? 'Không còn dịch vụ cần thanh toán.' : 'Chưa có dịch vụ đã thanh toán đủ.'}</p>;
 
   return <Modal open={open} title="Thanh toán phiếu điều trị" onCancel={onClose} width={960} footer={null} destroyOnClose>
@@ -141,19 +145,21 @@ export default function DossierPaymentModal({ dossierId, open, onClose, onSaved 
         {!!labFees.length && <div style={{ overflowX: 'auto', marginBottom: 16 }}><h4>Phí labo cần thu riêng</h4>
           <table className="treatment-sheet-table" style={{ width: '100%' }}><thead><tr><th>Phiếu labo</th><th>Chi phí</th><th>Đã thu</th><th>Còn nợ</th><th>Thu lần này (₫)</th></tr></thead>
           <tbody>{labFees.map(lab => <tr key={lab.labOrderId}><td>{lab.workName}</td><td>{money(lab.totalFeeVnd)}</td>
-            <td>{money(lab.paidVnd)}</td><td>{money(lab.dueVnd)}</td><td><InputNumber min={0} max={lab.dueVnd} precision={0}
+            <td>{money(lab.paidVnd)}</td><td>{money(lab.dueVnd)}</td><td><InputNumber min={0} precision={0}
             aria-label={`Số tiền thu cho labo ${lab.workName}`} value={labAmounts[lab.labOrderId] ?? 0} disabled={saving}
-            onChange={value => setLabAmounts(previous => ({ ...previous, [lab.labOrderId]: value ?? 0 }))} /></td></tr>)}</tbody></table>
+            status={(labAmounts[lab.labOrderId] ?? 0) > lab.dueVnd ? 'error' : undefined}
+            onChange={value => setLabAmounts(previous => ({ ...previous, [lab.labOrderId]: value ?? 0 }))} />
+            {(labAmounts[lab.labOrderId] ?? 0) > lab.dueVnd && <div className="ant-form-item-explain-error" role="alert">{overDueMessage(lab.dueVnd)}</div>}</td></tr>)}</tbody></table>
           {labRemaining > 0 && <p>Trước khi thu dịch vụ, cần thu tối thiểu {money(labRemaining)} phí labo. Tiền thu labo không tính vào doanh thu.</p>}
         </div>}
         {columns(due, true)}{violatesLabPriority && <Alert type="warning" showIcon message="Cần thu đủ ít nhất 30% phí labo trước khi thu dịch vụ." style={{ marginTop: 12 }} />}
         <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 16, marginTop: 20 }}>
         <strong>Phân bổ lần này: {money(total)}</strong>
         <span>Số dư cọc: {money(context?.advanceReceivedVnd ?? 0)}</span>
-        <Button loading={saving} disabled={total <= 0 || total > (context?.advanceReceivedVnd ?? 0) || violatesLabPriority || order?.status === 'PENDING'}
+        <Button loading={saving} disabled={total <= 0 || overDue || total > (context?.advanceReceivedVnd ?? 0) || violatesLabPriority || order?.status === 'PENDING'}
           onClick={() => void applyAdvance()}>Dùng cọc</Button>
         <Segmented value={method} onChange={value => setMethod(value as 'Cash' | 'Transfer')} options={[{ label: 'Tiền mặt', value: 'Cash' }, { label: 'Chuyển khoản', value: 'Transfer' }]} />
-        <Button type="primary" loading={saving} disabled={total <= 0 || violatesLabPriority || order?.status === 'PENDING'} onClick={() => void save()}>{method === 'Cash' ? 'Xác nhận thu tiền mặt' : 'Tạo QR và xem bill'}</Button>
+        <Button type="primary" loading={saving} disabled={total <= 0 || overDue || violatesLabPriority || order?.status === 'PENDING'} onClick={() => void save()}>{method === 'Cash' ? 'Xác nhận thu tiền mặt' : 'Tạo QR và xem bill'}</Button>
       </div></> },
       { key: 'paid', label: `Lịch sử dịch vụ đã thanh toán (${paid.length + paidLabs.length})`, children: <>{columns(paid, false)}{paidLabs.length > 0 && <div><h4>Phí labo đã thanh toán</h4><ul>{paidLabs.map(lab => <li key={lab.labOrderId}>{lab.workName}: {money(lab.paidVnd)}</li>)}</ul></div>}</> },
       { key: 'advance', label: 'Nhận trước (cọc)', children: <><p>Số dư cọc có thể dùng: <strong>{money(context?.advanceReceivedVnd ?? 0)}</strong>. Để dùng cọc, chọn số tiền cho từng dịch vụ hoặc labo tại tab Cần thanh toán rồi bấm Dùng cọc.</p>

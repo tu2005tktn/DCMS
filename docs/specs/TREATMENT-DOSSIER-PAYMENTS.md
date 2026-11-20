@@ -99,3 +99,10 @@ Các bảng trong nhóm màn Thanh toán/Doanh thu/Dịch vụ cận lâm sàng/
 `POST /api/dossiers/{dossierId}/payments/cancel-dossier` cho phép chủ phòng khám hoặc người có quyền `treatment.dossiers.update` hủy phiếu điều trị. Vì người không phải chủ phòng khám cũng gọi được, API kiểm tra thêm **chi nhánh của phiếu phải nằm trong các chi nhánh người gọi được phân công**; ngoài phạm vi trả 403 và phiếu giữ nguyên trạng thái. Phiếu không tồn tại hoặc đã xóa trả 404. Kiểm chứng: `BranchIsolationTests.BranchBStaffCannotReadOrChangeBranchAData` (nha sĩ chi nhánh B không hủy được phiếu chi nhánh A).
 
 Phiếu đã hủy (`Cancelled`) giữ các khoản đã thu, phần chưa thu được xóa nợ. Thống kê công việc/dịch vụ áp cùng quy tắc, xem [WORK-SERVICE-STATISTICS.md](WORK-SERVICE-STATISTICS.md).
+
+## Số tiền thu vượt số còn nợ — 20/11/2026
+
+- Ô "Thu lần này" của dịch vụ và phí labo không tự kẹp về số còn nợ nữa. Người dùng nhập bao nhiêu thì ô giữ nguyên số đó.
+- Nếu số nhập lớn hơn số còn nợ của dòng, ô báo lỗi ngay dưới ô: "Số tiền thu không được lớn hơn số còn nợ (X ₫)."
+- Khi còn dòng vượt nợ, các nút "Xác nhận thu tiền mặt", "Tạo QR và xem bill" và "Dùng cọc" bị khóa; không có khoản thu nào được ghi.
+- Kiểm thử: SYS6-09 (5.3 System test), BUG-04 trong `docs/testing/SYSTEM-TEST-5.3-BUGS-20261120.vi.md`.

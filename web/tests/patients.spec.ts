@@ -8,7 +8,7 @@ async function login(page: Page, user = 'assistant.demo') {
   await page.getByLabel('Tên đăng nhập', { exact: true }).fill(user);
   await page.getByLabel('Mật khẩu', { exact: true }).fill(password!);
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Tài khoản của tôi' })).toBeVisible();
+  await expect(page).not.toHaveURL(/\/sign-in/);
 }
 
 test('assistant creates, searches, edits, archives, restores and reads audit using actual APIs', async ({ page }) => {

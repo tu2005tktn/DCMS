@@ -9,7 +9,7 @@ async function login(page: Page, user: string) {
   await page.getByLabel('Tên đăng nhập', { exact: true }).fill(user);
   await page.getByLabel('Mật khẩu', { exact: true }).fill(password!);
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Tài khoản của tôi' })).toBeVisible();
+  await expect(page).not.toHaveURL(/\/sign-in/);
 }
 
 const branch = { id: 901, code: 'BR-TEST', name: 'Chi nhánh thử nghiệm', slotIntervalMinutes: 15, isActive: true, version: 1, chairCount: 1 };

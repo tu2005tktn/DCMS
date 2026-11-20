@@ -26,8 +26,9 @@ public interface IClinicalWorkService
     Task<ActivityDto> PostWithinTransactionAsync(int actorId, Guid id, PostActivityRequest request, CancellationToken ct, ClinicalFeeRequest? feeSnapshot = null);
 }
 
+// Type may be blank: staff-created tickets then use "Manual" (docs/specs/S60-CUSTOMER-CARE-WEB.vi.md, 17/11/2026).
 public sealed record CreateCareTaskRequest(int PatientId, int BranchId,
-    Guid? AppointmentId, string Type, string Content,
+    Guid? AppointmentId, string? Type, string Content,
     int? OwnerAccountId, DateTimeOffset DueAt, Guid RequestKey);
 public sealed record UpdateCareTaskRequest(int ExpectedVersion, string Status,
     int? OwnerAccountId, DateTimeOffset DueAt, string Content, Guid RequestKey);
@@ -54,7 +55,8 @@ public sealed record CareWorklistQuery(int? BranchId, DateOnly? From, DateOnly? 
     string? Type, string? Status, string? Search, int Page = 1, int PageSize = 20);
 public sealed record CareWorklistItem(CareTaskDto Task, string BranchName, string PatientCode, string PatientName,
     string? Phone, string TypeName, string? OwnerName, string? LastContactResult,
-    DateTimeOffset? LastContactAt);
+    DateTimeOffset? LastContactAt, string? CreatedByName = null, string? CreatedByUserName = null,
+    DateTimeOffset? CreatedAt = null);
 public sealed record CareWorklistPage(IReadOnlyList<CareWorklistItem> Items, int Total, int Page,
     int PageSize);
 public interface ICareTaskService

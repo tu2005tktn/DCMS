@@ -55,7 +55,7 @@ const sections: Section[] = [
       </Form.Item>
       <Form.Item name="unit" label="Đơn vị" rules={[{ required: true, message: 'Vui lòng chọn Đơn vị.' }]}><Select options={units} /></Form.Item>
       <Form.Item name="referencePrice" label="Giá tham khảo (VND)" extra="Để trống nếu chưa xác định; 0 là giá tham khảo bằng 0." rules={[priceRule]}>
-        <InputNumber style={{ width: '100%' }} min={0} step={1000} precision={0} /></Form.Item>
+        <InputNumber style={{ width: '100%' }} step={1000} precision={0} /></Form.Item>
       <Form.Item name="warranty" label="Bảo hành" rules={[{ max: 1000, message: 'Bảo hành tối đa 1000 ký tự.' }]}><Input.TextArea rows={2} maxLength={1000} /></Form.Item>
     </> },
   { key: 'medicines', title: 'Thuốc phòng khám & mua ngoài', resource: 'medicines', nameMax: 200, exportable: true, defaults: { prescriptionEligible: true, internalStockTracked: false },
@@ -78,7 +78,7 @@ const sections: Section[] = [
       <Form.Item name="packaging" label="Quy cách đóng gói" rules={[{ max: 160, message: 'Tối đa 160 ký tự.' }]}><Input maxLength={160} placeholder="Hộp 10 vỉ x 10 viên" /></Form.Item>
       <Form.Item name="instructions" label="Hướng dẫn sử dụng mặc định" rules={[{ max: 1000, message: 'Tối đa 1000 ký tự.' }]}><Input.TextArea rows={2} maxLength={1000} showCount /></Form.Item>
       <Form.Item name="referencePrice" label="Giá tham khảo (VND)" extra="Để trống nếu chưa xác định." rules={[priceRule]}>
-        <InputNumber style={{ width: '100%' }} min={0} step={1000} precision={0} /></Form.Item>
+        <InputNumber style={{ width: '100%' }} step={1000} precision={0} /></Form.Item>
       <Form.Item name="prescriptionEligible" valuePropName="checked"><Checkbox>Dùng để kê đơn</Checkbox></Form.Item>
       <Form.Item name="internalStockTracked" valuePropName="checked" extra="Bật cho thuốc dùng tại phòng khám; tắt cho thuốc bệnh nhân mua ngoài."><Checkbox>Thuốc dùng tại phòng khám</Checkbox></Form.Item>
     </> },

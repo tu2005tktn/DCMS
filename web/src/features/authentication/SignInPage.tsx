@@ -1,18 +1,18 @@
 import { ArrowLeftOutlined } from '@ant-design/icons';
 import { Alert, Button, Card, Form, Input, Typography } from 'antd';
 import { useState } from 'react';
-import { Navigate, Link, useNavigate } from 'react-router-dom';
+import { Navigate, Link } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 
 export default function SignInPage() {
   const auth = useAuth();
-  const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  if (auth.user) return <Navigate to="/" replace />;
+  // Every staff account lands on the work/service statistics after signing in (docs/specs/WORK-SERVICE-STATISTICS.md).
+  if (auth.user) return <Navigate to="/work-statistics" replace />;
   async function submit(values: { userName: string; password: string }) {
     setBusy(true); setError(null);
-    try { await auth.signIn(values.userName, values.password); navigate('/', { replace: true }); }
+    try { await auth.signIn(values.userName, values.password); }
     catch (failure) { setError((failure as Error).message); }
     finally { setBusy(false); }
   }

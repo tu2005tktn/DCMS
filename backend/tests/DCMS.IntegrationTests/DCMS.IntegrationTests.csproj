@@ -15,4 +15,18 @@
     </PackageReference>
     <ProjectReference Include="../../src/DCMS.Api/DCMS.Api.csproj" />
   </ItemGroup>
+  <!-- Only the create-flow suite listed in README.md (report 5.2, ITC001..ITC085) is compiled.
+       The other suites still use ApiFixture/ReceptionFixture, which were removed when the tests moved to
+       Infrastructure/ApiHost.cs; they stay in the folder and can be re-added once migrated. -->
+  <ItemGroup>
+    <Compile Remove="*.cs" />
+    <Compile Include="StaffAccountTests.cs" />
+    <Compile Include="CustomerRegisterTests.cs" />
+    <Compile Include="PatientTests.cs" />
+    <Compile Include="FamilyMemberTests.cs" />
+    <Compile Include="AppointmentTests.cs" />
+    <Compile Include="TreatmentDossierTests.cs" />
+    <Compile Include="ItemPlanTests.cs" />
+    <Compile Include="CatalogTests.cs" />
+  </ItemGroup>
 </Project>

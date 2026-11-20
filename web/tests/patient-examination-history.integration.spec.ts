@@ -25,7 +25,7 @@ async function fixture(request: APIRequestContext) {
 async function signIn(page: Page) {
   await page.goto('/sign-in'); await page.getByLabel('Tên đăng nhập', { exact: true }).fill('dentist.demo');
   await page.getByLabel('Mật khẩu', { exact: true }).fill(password!); await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Tài khoản của tôi', exact: true })).toBeVisible();
+  await expect(page).not.toHaveURL(/\/sign-in/);
 }
 
 test('ending an examination opens durable clinical history in the correct patient profile', async ({ page, request }, testInfo) => {

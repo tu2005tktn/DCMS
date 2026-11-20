@@ -71,7 +71,8 @@ export default function CareTaskDrawer({ item, staff, canManage, onClose, onEdit
         <Descriptions.Item label="SĐT">{item.phone ?? '—'}</Descriptions.Item>
         <Descriptions.Item label="Thời gian chăm sóc">{clinicTime(task.dueAt)}</Descriptions.Item>
         <Descriptions.Item label="Loại chăm sóc">{item.typeName}</Descriptions.Item>
-        <Descriptions.Item label="Người phụ trách">{task.ownerAccountId ? names.get(task.ownerAccountId) ?? item.ownerName ?? `Tài khoản #${task.ownerAccountId}` : 'Chưa giao'}</Descriptions.Item>
+        <Descriptions.Item label="Người tạo">{item.createdByName ? `${item.createdByName} (@${item.createdByUserName})` : '—'}
+          {item.createdAt && <Typography.Text type="secondary"> · {clinicTime(item.createdAt)}</Typography.Text>}</Descriptions.Item>
         <Descriptions.Item label="Trạng thái"><Tag color={statusColors[task.status]}>{statusLabels[task.status]}</Tag>
           <Typography.Text type="secondary"> phiên bản {task.version}</Typography.Text></Descriptions.Item>
         <Descriptions.Item label="Nội dung"><Typography.Paragraph style={{ whiteSpace: 'pre-wrap', marginBottom: 0 }}>{task.content}</Typography.Paragraph></Descriptions.Item>
@@ -89,7 +90,7 @@ export default function CareTaskDrawer({ item, staff, canManage, onClose, onEdit
                 options={contactResultChoices.map(value => ({ value, label: contactResultLabels[value] }))} />
             </Form.Item>
           </Space>
-          <Form.Item name="nextAction" label="Bước tiếp theo"><Input.TextArea aria-label="Bước tiếp theo" rows={2} maxLength={1000} showCount /></Form.Item>
+          <Form.Item name="nextAction" label="Bước tiếp theo"><Input.TextArea aria-label="Bước tiếp theo" rows={2} maxLength={1000} /></Form.Item>
           <Button type="primary" loading={busy} onClick={() => void contact()}>Lưu liên hệ</Button>
         </Form>
       </>}

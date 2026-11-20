@@ -1,9 +1,8 @@
-import { Alert, Button, Card, DatePicker, Empty, Input, Modal, Result, Select, Space, Table, Tag, Typography } from 'antd';
+import { Alert, Button, Card, DatePicker, Empty, Input, Result, Select, Space, Table, Tag, Typography } from 'antd';
 import { LeftOutlined, PlusOutlined, RightOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
 import { useAuth } from '../authentication/AuthContext';
-import ReferenceCatalogPanel from '../system-settings/ReferenceCatalogPanel';
 import CareTaskDrawer from './CareTaskDrawer';
 import CareTaskModal from './CareTaskModal';
 import { customerCareApi } from './customerCare.api';
@@ -26,17 +25,16 @@ export default function CustomerCarePage() {
   const { user } = useAuth();
   const allowed = !!user?.accessAssigned || ['ClinicAssistant', 'ClinicOwner'].some(role => user?.effectiveRoles.includes(role));
   const canManage = user?.permissions.includes('care-tasks.manage') ?? false;
-  const canManageTypes = (user?.effectiveRoles.includes('ClinicOwner') ?? false) || (user?.permissions.includes('catalog.care-types.read') ?? false);
   const [options, setOptions] = useState<CareOptions | null>(null), [optionsError, setOptionsError] = useState<string>(), [optionsRevision, setOptionsRevision] = useState(0);
   const [branchId, setBranchId] = useState<number>();
   const [mode, setMode] = useState<Mode>('day'), [from, setFrom] = useState(''), [to, setTo] = useState('');
-  const [ownerAccountId, setOwner] = useState<number>(), [type, setType] = useState<string>(), [status, setStatus] = useState<StatusFilter>();
+  const [type, setType] = useState<string>(), [status, setStatus] = useState<StatusFilter>();
   const [searchText, setSearchText] = useState(''), [search, setSearch] = useState('');
   const [page, setPage] = useState(1), [pageSize, setPageSize] = useState(20), [revision, setRevision] = useState(0);
   const [data, setData] = useState<CareWorklistPage | null>(null), [loading, setLoading] = useState(false), [error, setError] = useState<string>();
   const [exporting, setExporting] = useState(false), [exportError, setExportError] = useState<string>();
   const [selected, setSelected] = useState<CareWorklistItem | null>(null);
-  const [editor, setEditor] = useState<{ item?: CareWorklistItem } | null>(null), [managingTypes, setManagingTypes] = useState(false);
+  const [editor, setEditor] = useState<{ item?: CareWorklistItem } | null>(null);
 
   useEffect(() => {
     if (!allowed) return;
@@ -52,7 +50,7 @@ export default function CustomerCarePage() {
   }, [allowed, optionsRevision]);
 
   const rangeError = from && to && (from > to ? 'Từ ngày phải trước hoặc bằng đến ngày.' : dayjs(to).diff(dayjs(from), 'day') > 366 ? 'Khoảng ngày tối đa 366 ngày.' : undefined);
-  const filter: WorklistFilter | null = options?.branches.length && from && to && !rangeError ? { branchId, from, to, ownerAccountId, type, status, search } : null;
+  const filter: WorklistFilter | null = options?.branches.length && from && to && !rangeError ? { branchId, from, to, type, status, search } : null;
   useEffect(() => {
     if (!filter) return;
     let live = true; setLoading(true); setError(undefined);
@@ -62,12 +60,11 @@ export default function CustomerCarePage() {
       setData(v);
     }).catch(e => { if (live) { setData(null); setError((e as Error).message); } }).finally(() => { if (live) setLoading(false); });
     return () => { live = false; };
-  }, [branchId, from, to, ownerAccountId, type, status, search, page, pageSize, revision, rangeError]);
+  }, [branchId, from, to, type, status, search, page, pageSize, revision, rangeError]);
 
   if (!allowed) return <Result status="403" title="Chỉ Trợ lý và Chủ phòng khám dùng màn Chăm sóc khách hàng." />;
-  const shown = options?.branches.filter(b => branchId == null || b.id === branchId) ?? [];
-  const staff = [...new Map(shown.flatMap(b => b.staff).map(x => [x.accountId, x])).values()].sort((a, b) => a.name.localeCompare(b.name, 'vi'));
   const creatable = options?.branches.filter(b => b.canCreate) ?? [];
+  const shown = options?.branches.filter(b => branchId == null || b.id === branchId) ?? [];
   const multiBranch = shown.length > 1;
   const reset = () => setPage(1);
   function changeMode(next: Mode) { const [f, t] = rangeOf(next, from || options!.clinicDate); setMode(next); setFrom(f); setTo(t); reset(); }
@@ -100,7 +97,7 @@ export default function CustomerCarePage() {
           {options.allBranches && options.branches.length > 1 &&
             <Select aria-label="Chi nhánh" style={{ minWidth: 200 }} value={branchId ?? 0}
               options={[{ value: 0, label: 'Tất cả chi nhánh' }, ...options.branches.map(b => ({ value: b.id, label: b.name }))]}
-              onChange={v => { setBranchId(v || undefined); setOwner(undefined); reset(); }} />}
+              onChange={v => { setBranchId(v || undefined); reset(); }} />}
           <Select aria-label="Xem theo" style={{ width: 140 }} value={mode} onChange={changeMode}
             options={[{ value: 'day', label: 'Xem theo ngày' }, { value: 'week', label: 'Xem theo tuần' }, { value: 'month', label: 'Xem theo tháng' }]} />
           <Space.Compact>
@@ -109,8 +106,6 @@ export default function CustomerCarePage() {
             <DatePicker aria-label="Đến ngày" format="DD/MM/YYYY" allowClear={false} value={to ? dayjs(to) : null} onChange={v => { if (v) { setTo(fmt(v)); reset(); } }} />
             <Button aria-label="Kỳ sau" icon={<RightOutlined />} onClick={() => shift(1)} />
           </Space.Compact>
-          <Select aria-label="Người phụ trách" style={{ minWidth: 180 }} allowClear placeholder="Người phụ trách" value={ownerAccountId}
-            options={staff.map(x => ({ value: x.accountId, label: x.name }))} onChange={v => { setOwner(v); reset(); }} />
           <Select aria-label="Loại chăm sóc" style={{ minWidth: 200 }} allowClear placeholder="Loại chăm sóc" value={type}
             options={[{ label: 'Danh mục', options: options.types.filter(x => !x.system).map(x => ({ value: x.code, label: x.name })) },
               { label: 'Hệ thống tự tạo', options: options.types.filter(x => x.system).map(x => ({ value: x.code, label: x.name })) }]}
@@ -147,7 +142,10 @@ export default function CustomerCarePage() {
             <Typography.Text type="secondary">{x.patientCode}{x.phone ? ` · ${x.phone}` : ''}</Typography.Text></> },
           { title: 'Loại chăm sóc', width: 120, dataIndex: 'typeName' },
           { title: 'Nội dung', render: (_, x) => <div className="care-content">{x.task.content}</div> },
-          { title: 'Người phụ trách', width: 116, render: (_, x) => x.ownerName ?? <Typography.Text type="secondary">Chưa giao</Typography.Text> },
+          // Creator account (docs/specs/S60-CUSTOMER-CARE-WEB.vi.md, 17/11/2026).
+          { title: 'Người tạo', width: 140, render: (_, x) => x.createdByName
+            ? <>{x.createdByName}<div><Typography.Text type="secondary">@{x.createdByUserName}</Typography.Text></div></>
+            : <Typography.Text type="secondary">—</Typography.Text> },
           { title: 'Trạng thái', width: 92, render: (_, x) => <Tag color={statusColors[x.task.status]}>{statusLabels[x.task.status]}</Tag> },
           { title: 'Liên hệ gần nhất', width: 124, render: (_, x) => x.lastContactResult
             ? <>{contactResultLabels[x.lastContactResult] ?? x.lastContactResult}<div><Typography.Text type="secondary">{clinicTime(x.lastContactAt!)}</Typography.Text></div></>
@@ -156,14 +154,10 @@ export default function CustomerCarePage() {
 
       <CareTaskDrawer item={selected} staff={options.branches.flatMap(b => b.staff)} canManage={canManage && creatable.some(b => b.id === selected?.task.branchId)} onClose={() => setSelected(null)}
         onEdit={item => setEditor({ item })} onChanged={() => setRevision(x => x + 1)} />
-      <CareTaskModal open={!!editor} options={options} editing={editor?.item} canManageTypes={canManageTypes}
+      <CareTaskModal open={!!editor} options={options} editing={editor?.item}
         branches={editor?.item ? options.branches.filter(b => b.id === editor.item!.task.branchId) : creatable} initialBranchId={branchId}
-        onManageTypes={() => setManagingTypes(true)} onClose={() => setEditor(null)}
+        onClose={() => setEditor(null)}
         onSaved={() => { setEditor(null); setSelected(null); setRevision(x => x + 1); }} />
-      <Modal open={managingTypes} title="Loại chăm sóc khách hàng" width={1000} footer={null} destroyOnClose
-        onCancel={() => { setManagingTypes(false); setOptionsRevision(x => x + 1); }}>
-        <ReferenceCatalogPanel initialKind="care-types" />
-      </Modal>
     </>}
   </main>;
 }

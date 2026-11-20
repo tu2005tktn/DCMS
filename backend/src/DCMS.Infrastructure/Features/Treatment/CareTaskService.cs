@@ -112,8 +112,9 @@ public sealed class CareTaskService(DcmsDbContext db, UserManager<ApplicationUse
         if (replay.HasValue) return Map(await db.CareTasks.AsNoTracking().SingleAsync(x => x.Id == replay, ct));
         await AuthorizedAsync(actorId, request.BranchId, ct);
         await RequireOwnerAsync(request.OwnerAccountId, request.BranchId, ct);
+        var type = Clean(request.Type) ?? ManualType;
         if (Clean(request.Content) is not { Length: <= 4000 } ||
-            Clean(request.Type) is not { Length: <= 40 } || request.DueAt == default ||
+            type.Length > 40 || request.DueAt == default ||
             !await db.Patients.AsNoTracking().AnyAsync(x => x.Id == request.PatientId && !x.IsArchived, ct))
             throw Error("MSG04");
         if (request.AppointmentId.HasValue && !await db.Appointments.AsNoTracking()
@@ -123,7 +124,7 @@ public sealed class CareTaskService(DcmsDbContext db, UserManager<ApplicationUse
         {
             PatientId = request.PatientId, BranchId = request.BranchId,
             AppointmentId = request.AppointmentId,
-            Type = request.Type.Trim(),
+            Type = type,
             Content = request.Content.Trim(), OwnerAccountId = request.OwnerAccountId,
             // Npgsql only writes UTC offsets to timestamptz; the Web sends clinic time (+07:00).
             DueAt = request.DueAt.ToUniversalTime()
@@ -192,8 +193,9 @@ public sealed class CareTaskService(DcmsDbContext db, UserManager<ApplicationUse
     {
         ["FollowUp"] = "Theo dõi tái khám", ["FollowUpDue"] = "Chỉ định đến hạn đặt lịch",
         ["PrerequisiteBlocked"] = "Bị chặn bởi bước trước", ["LabBlocked"] = "Chờ labo",
-        ["MissedAppointment"] = "Vắng hẹn"
+        ["MissedAppointment"] = "Vắng hẹn", [ManualType] = "Tạo thủ công"
     };
+    private const string ManualType = "Manual";
     private static readonly Dictionary<string, string> StatusLabels = new()
     {
         ["Open"] = "Mở", ["InProgress"] = "Đang xử lý", ["Done"] = "Đã xong", ["Cancelled"] = "Đã hủy"
@@ -335,6 +337,15 @@ public sealed class CareTaskService(DcmsDbContext db, UserManager<ApplicationUse
         var owners = await db.Employees.AsNoTracking().Where(x => ownerIds.Contains(x.AccountId))
             .ToDictionaryAsync(x => x.AccountId, x => x.FullName, ct);
         var taskIds = rows.Select(x => x.Id).ToArray();
+        // Creator: CARE_TASK keeps no creator column, so it is the actor of the task's "CareTaskCreate" command receipt
+        // (signed-in account, taken from the session). Tickets made by ingestion have no receipt and no creator.
+        var createdBy = await db.ClinicalCommandReceipts.AsNoTracking()
+            .Where(x => x.Command == "CareTaskCreate" && taskIds.Contains(x.ResultId))
+            .Select(x => new { x.ResultId, x.ActorId }).ToListAsync(ct);
+        var creatorByTask = createdBy.GroupBy(x => x.ResultId).ToDictionary(x => x.Key, x => x.First().ActorId);
+        var creatorIds = creatorByTask.Values.Distinct().ToArray();
+        var creators = await db.Users.AsNoTracking().Where(x => creatorIds.Contains(x.Id))
+            .ToDictionaryAsync(x => x.Id, x => new { x.FullName, x.UserName }, ct);
         var contacts = (await db.CareContactAttempts.AsNoTracking().Where(x => taskIds.Contains(x.TaskId))
                 .Select(x => new { x.TaskId, x.Result, x.OccurredAt }).ToListAsync(ct))
             .GroupBy(x => x.TaskId).ToDictionary(x => x.Key, x => x.MaxBy(c => c.OccurredAt)!);
@@ -343,10 +354,11 @@ public sealed class CareTaskService(DcmsDbContext db, UserManager<ApplicationUse
         {
             var patient = patients.GetValueOrDefault(x.PatientId);
             var contact = contacts.GetValueOrDefault(x.Id);
+            var creator = creatorByTask.TryGetValue(x.Id, out var creatorId) ? creators.GetValueOrDefault(creatorId) : null;
             return new CareWorklistItem(Map(x), branches.GetValueOrDefault(x.BranchId, ""), patient?.PatientCode ?? "", patient?.FullName ?? "", patient?.Phone,
                 types.GetValueOrDefault(x.Type, x.Type),
                 x.OwnerAccountId is { } owner ? owners.GetValueOrDefault(owner) : null,
-                contact?.Result, contact?.OccurredAt);
+                contact?.Result, contact?.OccurredAt, creator?.FullName, creator?.UserName);
         }).ToArray();
     }
 
@@ -367,11 +379,12 @@ public sealed class CareTaskService(DcmsDbContext db, UserManager<ApplicationUse
             field: $"Bộ lọc (tối đa {ExportLimit} dòng mỗi lần xuất)"));
         string Time(DateTimeOffset value) => value.ToOffset(ClinicOffset).ToString("dd/MM/yyyy HH:mm");
         var header = new string?[] { "Thời gian", "Chi nhánh", "Mã KH", "Khách hàng", "SĐT", "Loại chăm sóc", "Nội dung",
-            "Người phụ trách", "Trạng thái", "Liên hệ gần nhất" };
+            "Người tạo", "Trạng thái", "Liên hệ gần nhất" };
         var items = await ItemsAsync(rows, branches, ct);
         return DCMS.Infrastructure.Features.SystemSettings.Xlsx.Write("Cham soc khach hang", [header, .. items.Select(x => new[]
         {
-            Time(x.Task.DueAt), x.BranchName, x.PatientCode, x.PatientName, x.Phone, x.TypeName, x.Task.Content, x.OwnerName,
+            Time(x.Task.DueAt), x.BranchName, x.PatientCode, x.PatientName, x.Phone, x.TypeName, x.Task.Content,
+            x.CreatedByName == null ? null : $"{x.CreatedByName} (@{x.CreatedByUserName})",
             StatusLabels.GetValueOrDefault(x.Task.Status, x.Task.Status),
             x.LastContactResult == null ? null :
                 $"{ContactLabels.GetValueOrDefault(x.LastContactResult, x.LastContactResult)} · {Time(x.LastContactAt!.Value)}"

@@ -5,7 +5,9 @@ export type CareTask = { id: string; patientId: number; branchId: number; appoin
   type: string; content: string; ownerAccountId: number | null; dueAt: string; status: CareStatus; version: number;
   allowedActions: string[] };
 export type CareWorklistItem = { task: CareTask; branchName: string; patientCode: string; patientName: string; phone: string | null; typeName: string;
-  ownerName: string | null; lastContactResult: string | null; lastContactAt: string | null };
+  ownerName: string | null; lastContactResult: string | null; lastContactAt: string | null;
+  // Account that created the ticket (docs/specs/S60-CUSTOMER-CARE-WEB.vi.md, 17/11/2026).
+  createdByName: string | null; createdByUserName: string | null; createdAt: string | null };
 export type CareWorklistPage = { items: CareWorklistItem[]; total: number; page: number; pageSize: number };
 export type CareStaff = { accountId: number; name: string; roles: string[] };
 export type CareBranch = { id: number; name: string; canCreate: boolean; staff: CareStaff[] };

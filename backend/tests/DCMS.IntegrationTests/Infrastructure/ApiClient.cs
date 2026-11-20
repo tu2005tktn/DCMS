@@ -28,7 +28,7 @@ public sealed record ApiResponse(int Status, string Body)
 }
 
 /// <summary>Thin HTTP wrapper: sends the request, records the exchange for the report, returns status + body.</summary>
-public sealed class ApiClient(HttpClient http)
+public sealed class ApiClient(HttpClient http, string? actor = null)
 {
     public async Task<ApiResponse> GetAsync(string path) => await Send(HttpMethod.Get, path, null);
     public async Task<ApiResponse> PostAsync(string path, object? body) => await Send(HttpMethod.Post, path, body);
@@ -40,7 +40,7 @@ public sealed class ApiClient(HttpClient http)
         if (body != null) request.Content = JsonContent.Create(body);
         using var response = await http.SendAsync(request);
         var result = new ApiResponse((int)response.StatusCode, await response.Content.ReadAsStringAsync());
-        Trace.Record(method.Method, path, result);
+        Trace.Record(method.Method, path, actor, body == null ? null : JsonSerializer.Serialize(body, new JsonSerializerOptions(JsonSerializerDefaults.Web)), result);
         return result;
     }
 }

@@ -20,7 +20,8 @@ export const customerCareApi = {
     api<CareWorklistPage>(`${base}/worklist?${query(filter, { page: String(page), pageSize: String(pageSize) })}`),
   export: (filter: WorklistFilter) => apiBlob(`${base}/export?${query(filter)}`),
   detail: (id: string) => api<CareTaskDetail>(`${base}/${id}`),
-  create: (body: { patientId: number; branchId: number; type: string; content: string; ownerAccountId: number | null; dueAt: string; requestKey: string }) =>
+  // Type is left out: the server stores staff-created tickets as "Manual"; the creator comes from the session.
+  create: (body: { patientId: number; branchId: number; content: string; ownerAccountId: null; dueAt: string; requestKey: string }) =>
     api<CareTask>(base, { method: 'POST', body: JSON.stringify({ ...body, appointmentId: null }) }),
   update: (id: string, body: { expectedVersion: number; status: string; ownerAccountId: number | null; dueAt: string; content: string; requestKey: string }) =>
     api<CareTask>(`${base}/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),

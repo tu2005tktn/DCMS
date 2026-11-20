@@ -89,7 +89,7 @@ test('web: book for a relative without an account, read records by default after
   try {
     await staffPage.goto(`${webUrl}/sign-in`); await staffPage.getByLabel('Tên đăng nhập', { exact: true }).fill('assistant.demo');
     await staffPage.getByLabel('Mật khẩu', { exact: true }).fill(password!); await staffPage.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
-    await expect(staffPage.getByRole('heading', { name: 'Tài khoản của tôi', exact: true })).toBeVisible({ timeout: 15000 });
+    await expect(staffPage).not.toHaveURL(/\/sign-in/, { timeout: 15000 });
     await staffPage.goto(`${webUrl}/link-verification`); await staffPage.getByRole('tab', { name: 'Hồ sơ người thân', exact: true }).click();
     await choose(staffPage, 'Trạng thái quyền người thân', 'Tất cả');
     await staffPage.getByRole('row').filter({ hasText: name }).getByRole('button', { name: 'Đối chiếu', exact: true }).click();

@@ -7,7 +7,7 @@ async function ok(response: Awaited<ReturnType<APIRequestContext['post']>>) { ex
 async function login(request: APIRequestContext, userName: string) { return { Authorization: `Bearer ${(await ok(await request.post(`${base}/api/auth/sign-in`, { data: { userName, password } }))).accessToken}` }; }
 async function signIn(page: Page, userName: string) {
   await page.goto('/sign-in'); await page.getByLabel('Tên đăng nhập', { exact: true }).fill(userName); await page.getByLabel('Mật khẩu', { exact: true }).fill(password!);
-  await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click(); await expect(page.getByRole('heading', { name: 'Tài khoản của tôi', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click(); await expect(page).not.toHaveURL(/\/sign-in/);
 }
 async function setup(request: APIRequestContext, role: string, grants: string[]) {
   const fixtures = JSON.parse(readFileSync(fixtureFile!, 'utf8').replace(/^\uFEFF/, ''));

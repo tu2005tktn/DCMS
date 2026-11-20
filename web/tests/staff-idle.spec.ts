@@ -8,7 +8,7 @@ async function login(page: import('@playwright/test').Page, name:string) {
   await page.getByLabel('Tên đăng nhập', { exact:true }).fill(name);
   await page.getByLabel('Mật khẩu', { exact:true }).fill(password!);
   await page.getByRole('button', { name:'Đăng nhập', exact:true }).click();
-  await expect(page.getByRole('heading', { name:'Tài khoản của tôi' })).toBeVisible();
+  await expect(page).not.toHaveURL(/\/sign-in/);
 }
 
 test('S58 staff idle settings preview uses the real API without saving', async ({ page, request }) => {
@@ -79,6 +79,6 @@ test('S58 expired mock session drops an unsubmitted receipt draft before another
   await page.getByLabel('Tên đăng nhập', {exact:true}).fill('dentist.demo');
   await page.getByLabel('Mật khẩu', {exact:true}).fill(password!);
   await page.getByRole('button', {name:'Đăng nhập',exact:true}).click();
-  await expect(page.getByRole('heading', {name:'Tài khoản của tôi'})).toBeVisible();
+  await expect(page).not.toHaveURL(/\/sign-in/);
   await expect(page.getByRole('dialog', {name:/Thu tiền/})).toHaveCount(0);
 });

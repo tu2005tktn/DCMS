@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, ApiError, type Blocker } from '../../services/api';
 import { usePermissions } from '../authentication/usePermissions';
+import BranchMembersSection from './BranchMembersSection';
 
 type BranchDto = {
   id: number;
@@ -292,7 +293,7 @@ export default function BranchesPanel() {
         {selected && !selected.isActive && <Alert type="warning" showIcon message="Chi nhánh đang ngừng hoạt động: không nhận ghế mới và không nhận lịch hẹn." style={{ marginBottom: 16 }} />}
         {branchError && <Alert type="error" showIcon message={errorText(branchError)} style={{ marginBottom: 16 }} />}
 
-        <Form form={branchForm} layout="vertical" onFinish={values => void saveBranch(values)} onValuesChange={() => setBranchDirty(true)} disabled={!canManage || savingBranch}>
+        <Form name="branch" form={branchForm} layout="vertical" onFinish={values => void saveBranch(values)} onValuesChange={() => setBranchDirty(true)} disabled={!canManage || savingBranch}>
           <Typography.Title level={5}>Thông tin chung</Typography.Title>
           <Row gutter={12}>
             <Col xs={24} sm={8}>
@@ -355,6 +356,7 @@ export default function BranchesPanel() {
                   : []),
               ]}
             />
+            <BranchMembersSection branchId={selected.id} canManage={canManage} />
           </>
         )}
       </Drawer>
@@ -393,7 +395,7 @@ export default function BranchesPanel() {
         confirmLoading={savingChair}
       >
         {chairError && <Alert type="error" showIcon message={errorText(chairError)} style={{ marginBottom: 12 }} />}
-        <Form form={chairForm} layout="vertical" onFinish={values => void saveChair(values)} disabled={savingChair}>
+        <Form name="chair" form={chairForm} layout="vertical" onFinish={values => void saveChair(values)} disabled={savingChair}>
           <Form.Item name="code" label="Mã ghế" rules={[{ required: true, whitespace: true, message: 'Nhập mã ghế.' }, { pattern: /^[A-Za-z0-9_-]{1,40}$/, message: 'Chỉ chữ, số, gạch ngang/dưới; tối đa 40 ký tự.' }]}>
             <Input placeholder="GHE-01" />
           </Form.Item>

@@ -78,3 +78,7 @@ Cập nhật 08/11/2026 ([MOBILE-PATIENT-VISIT-RESULTS](MOBILE-PATIENT-VISIT-RES
 ## Lịch sử giao dịch tại tab Bệnh án (11/11/2026)
 
 Thay thẻ “Thông tin khác” bằng “Lịch sử giao dịch”. Từ cùng response `GET /api/patients/me/treatment-summary` mà cổng bệnh nhân web dùng, gộp `payments` của các hồ sơ thuộc tài khoản có liên kết VERIFIED, sắp xếp mới nhất trước và hiển thị ngày thanh toán, phương thức, số tiền, mã hồ sơ điều trị. Chỉ gồm `DossierPayment` đã ghi và `PaymentReceipt` trạng thái Posted do server trả về; không hiển thị thanh toán Pending/Cancelled, không suy số dư hay tạo dữ liệu giả. Trạng thái chưa tải, rỗng và lỗi đồng bộ theo quy tắc hiện có của màn Bệnh án. Mỗi khoản chỉ xuất hiện một lần theo `source` + `id` nếu API trả trùng. Không thêm API hoặc quyền mới.
+
+## Cập nhật 20/11/2026 — Không còn bước "Chốt kế hoạch"
+
+Từ commit `5338722` trên `main` (18/11/2026, rút gọn `TREATMENT_PLAN_ITEM`), phiếu điều trị **không còn** bước "Lưu nháp kế hoạch" / "Chốt kế hoạch", trạng thái "Đã chốt · phiên bản N" hay luồng điều chỉnh kế hoạch. Hạng mục trong bảng KẾ HOẠCH ĐIỀU TRỊ/DỊCH VỤ được lưu ngay khi bấm ✓ và là căn cứ cho việc đã làm; muốn đổi thì sửa trực tiếp hạng mục. Các mục trong tài liệu này nói về chốt kế hoạch, `/plan/draft`, `/plan/commit`, `/plan/decision`, `/warranty`, `/steps*` không còn hiệu lực. Test case 5.3 SYS6-04 đã được viết lại theo luồng này (BUG-03 trong `docs/testing/SYSTEM-TEST-5.3-BUGS-20261120.vi.md`).

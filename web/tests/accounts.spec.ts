@@ -9,7 +9,7 @@ async function login(page: Page, name = 'admin.demo') {
   const response = page.waitForResponse(r => r.url().endsWith('/api/auth/sign-in') && r.request().method() === 'POST');
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
   const session = await (await response).json() as { accessToken: string };
-  await expect(page.getByRole('heading', { name: 'Tài khoản của tôi' })).toBeVisible();
+  await expect(page).not.toHaveURL(/\/sign-in/);
   return session;
 }
 
