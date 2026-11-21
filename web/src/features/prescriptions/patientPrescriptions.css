@@ -18,17 +18,28 @@
 .rx-box { display: inline-block; min-width: 180px; padding: 5px 8px; border: 1px solid #d9d9d9; border-radius: 4px; font-weight: 600; background: #fafafa; }
 
 .rx-lines { background: #f7f8f9; border-radius: 6px; padding: 10px; display: flex; flex-direction: column; gap: 10px; }
-.rx-line { display: flex; align-items: flex-start; gap: 8px; background: #fff; border: 1px solid #edf0f2; border-radius: 6px; padding: 10px; }
-.rx-index { flex: none; width: 22px; height: 22px; margin-top: 5px; border-radius: 50%; background: #e8f5e9; color: #2e7d32;
-  font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
+.rx-line { display: flex; align-items: flex-start; background: #fff; border: 1px solid #edf0f2; border-radius: 6px; padding: 10px; }
 .rx-line-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
-.rx-line-top { display: flex; gap: 8px; align-items: flex-start; }
+.rx-line-top { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(110px, .34fr) 72px 34px; gap: 6px; align-items: start; }
 .rx-line .ant-form-item { margin-bottom: 0; }
 .rx-medicine { flex: 1; min-width: 0; }
-.rx-qty { width: 96px; flex: none; }
+.rx-unit { min-width: 0; }
+.rx-qty { width: 72px; }
+.rx-catalog-add.ant-btn { width: 34px; padding: 0; color: #2f3b45; }
+.rx-line-bottom { display: flex; align-items: center; gap: 6px; }
+.rx-instructions { flex: 1; min-width: 0; }
 .rx-add { padding: 2px 0; }
 .rx-add-btn.ant-btn { background: #28a745; border-color: #28a745; color: #fff; font-weight: 600; font-size: 12px; }
 .rx-add-btn.ant-btn:not(:disabled):hover { background: #218838 !important; border-color: #218838 !important; color: #fff !important; }
+
+.rx-medicine-modal .ant-modal-content { padding: 0; }
+.rx-medicine-modal .ant-modal-header { padding: 20px 24px 16px; border-bottom: 1px solid #e8e8e8; }
+.rx-medicine-modal .ant-modal-title { font-size: 20px; font-weight: 400; }
+.rx-medicine-modal .ant-modal-body { padding: 20px 24px 8px; }
+.rx-medicine-modal .ant-modal-footer { padding: 12px 20px 16px; border-top: 1px solid #e8e8e8; }
+.rx-medicine-modal .ant-modal-footer .ant-btn-primary { background: #40b36a; border-color: #40b36a; }
+.rx-medicine-modal .ant-modal-footer .ant-btn-primary:not(:disabled):hover { background: #329958; border-color: #329958; }
+.rx-medicine-modal .ant-form-item { margin-bottom: 14px; }
 
 .rx-read-lines { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 10px; }
 .rx-read-top { display: flex; justify-content: space-between; gap: 12px; }
@@ -40,8 +51,12 @@
   .rx-grid { grid-template-columns: 1fr; }
   .rx-clinic { align-items: flex-start; text-align: left; }
   .rx-row { grid-template-columns: 96px minmax(0, 1fr); }
-  .rx-line-top { flex-wrap: wrap; }
-  .rx-medicine { flex-basis: 100%; }
+  .rx-line-top { grid-template-columns: minmax(0, 1fr) 64px 34px; }
+  .rx-medicine { grid-column: 1 / -1; }
+  .rx-unit { grid-column: 1; }
+  .rx-qty { grid-column: 2; width: 64px; }
+  .rx-catalog-add { grid-column: 3; }
+  .rx-medicine-modal .ant-modal-body { padding: 16px 18px 4px; }
 }
 
 /* Gọn lại để vừa màn hình, nội dung cuộn trong hộp thoại, nút Lưu luôn thấy (14/11/2026) */
@@ -56,7 +71,4 @@
   .rx-row { min-height: 32px; margin-bottom: 4px; }
   .rx-lines { padding: 8px; gap: 8px; }
   .rx-line { padding: 8px; }
-  .rx-line-body { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 8px; }
-  .rx-line-body > .rx-line-top { grid-column: 1 / -1; }
-  .rx-index { margin-top: 3px; }
 }

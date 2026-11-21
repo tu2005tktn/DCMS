@@ -43,7 +43,7 @@ public interface IMedicineCatalog : ISupplyCatalog<MedicineInput, MedicineDto>
     Task<byte[]> ExportAsync(int actorId, string? q, string? status, CancellationToken ct);
 }
 
-// Resource-specific authorization: medicines deliberately retain their existing Owner policy.
+// Full-catalog role policy; prescription-time creation is separately controlled by the create grant.
 public static class SupplyCatalogPermissions
 {
     public static string Read(string resource) => resource switch
@@ -53,7 +53,7 @@ public static class SupplyCatalogPermissions
         "medicines" => "catalog.medicines.read",
         _ => throw new ArgumentException(resource)
     };
-    // Role baseline from before dynamic access groups: owner manages every supply catalog, a dentist only the clinical-supply ones.
+    // Coarse full-management policy. Individual read/create actions are enforced through ISettingsAccess grants.
     public static bool CanManage(string resource, IEnumerable<string> roles)
     {
         var set = roles.ToArray();
