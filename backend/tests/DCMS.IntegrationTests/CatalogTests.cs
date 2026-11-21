@@ -9,6 +9,7 @@ namespace DCMS.IntegrationTests;
 public sealed class CatalogTests(ApiHost host)
 {
     private const string LabRoot = "/api/system-settings/settings/catalogs/lab-work-types";
+    private const string Medicines = "/api/system-settings/settings/catalogs/medicines";
     private const string Groups = "/api/system-settings/material-categories";
     private const string Materials = "/api/system-settings/materials";
     private const string Admin = "Chủ phòng khám (owner.demo) đã đăng nhập.";
@@ -19,6 +20,28 @@ public sealed class CatalogTests(ApiHost host)
 
     private static CreateSupplyRequest<LabWorkTypeInput> Lab(string? code = null, string? name = null, string? unit = "Tooth", long? price = 1500000, string? warranty = null) =>
         new(Guid.NewGuid(), new LabWorkTypeInput(code ?? "LW-" + Suffix(), name ?? "Mão răng sứ " + Suffix(), null, unit, price, warranty));
+    private static CreateSupplyRequest<MedicineInput> Medicine() =>
+        new(Guid.NewGuid(), new MedicineInput("MED-" + Suffix(), "SYNTHETIC thuốc kê đơn " + Suffix(), null, null, null, "viên", null, null, 0, true, false));
+
+    [Fact, Case("MED-01", "A dentist can add a medicine while prescribing without catalog-management rights",
+        "Nha sĩ (dentist.demo) đã đăng nhập.",
+        "Step 1: Sign in as dentist.demo without an access-group assignment.",
+        "Step 2: Create a prescription-eligible medicine through the shared catalog API.",
+        "Step 3: Verify the medicine was created and the dentist cannot edit catalog entries.")]
+    public async Task Dentist_can_add_a_prescribable_medicine_but_cannot_manage_catalog()
+    {
+        var client = await host.ClientAsync("dentist.demo");
+        var request = Medicine();
+
+        var response = await client.PostAsync(Medicines, request);
+
+        Assert.Equal(201, response.Status);
+        var created = response.Json<MedicineDto>();
+        Assert.Equal(request.Entry!.Code, created.Code);
+        Assert.True(created.PrescriptionEligible);
+        var update = new UpdateSupplyRequest<MedicineInput>(created.Version, Guid.NewGuid(), "SYNTHETIC preserve catalog", request.Entry);
+        Assert.Equal(403, (await client.PutAsync($"{Medicines}/{created.Id}", update)).Status);
+    }
 
     [Fact, Case("LWT-01", "A clinic owner creates a lab work type", Admin,
         "Step 1: Sign in as owner.demo.",
