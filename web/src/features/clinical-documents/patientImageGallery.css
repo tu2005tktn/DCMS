@@ -8,4 +8,7 @@
 .patient-image-card figcaption { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; margin-top: 4px; }
 .patient-image-placeholder { min-height: 112px; padding: 12px; background: #f5f5f5; display: flex; flex-direction: column; justify-content: center; }
 .patient-image-upload { max-width: 420px; margin-top: 8px; overflow-wrap: anywhere; }
-@media print { .patient-image-gallery .treatment-sheet-image-tile, .patient-image-upload { display: none; } }
+.patient-image-target { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.patient-image-card { position: relative; }
+.patient-image-delete { position: absolute; top: 6px; right: 6px; opacity: .92; }
+@media print { .patient-image-gallery .treatment-sheet-image-tile, .patient-image-upload, .patient-image-target, .patient-image-delete { display: none; } }

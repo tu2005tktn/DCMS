@@ -14,7 +14,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace DCMS.Infrastructure.Features.Treatment;
 
-public sealed class ItemPlanService(DcmsDbContext db, UserManager<ApplicationUser> users, TimeProvider clock) : IItemPlanService
+public sealed class ItemPlanService(DcmsDbContext db, UserManager<ApplicationUser> users, TimeProvider clock, DCMS.Application.Features.Settings.ISettingsAccess access) : IItemPlanService
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     private static BusinessException Missing() => new(404, SystemMessages.Get("MSG113"));
@@ -23,15 +23,19 @@ public sealed class ItemPlanService(DcmsDbContext db, UserManager<ApplicationUse
     private async Task Authorize(int actor, int branch, CancellationToken ct)
     {
         var account = await users.FindByIdAsync(actor.ToString());
+        // Staff in an access group act through treatment.templates.* grants within assignment branches, not their role.
+        var scope = account?.AccountType == "Staff" ? await access.ResolveAsync(actor, ct) : null;
+        var grantDriven = scope?.GrantDriven ?? false;
         if (account is not { IsActive: true, AccountType: "Staff" }
-            || !AccountRoles.Effective(await users.GetRolesAsync(account)).Contains(AccountRoles.Dentist)
+            || grantDriven && !scope!.BranchIds.Contains(branch)
+            || !grantDriven && !AccountRoles.Effective(await users.GetRolesAsync(account)).Contains(AccountRoles.Dentist)
             || !await (from m in db.SchedulingMembers join e in db.Employees on m.EmployeeId equals e.Id
                 join b in db.Set<SchedulingBranch>() on m.BranchId equals b.Id
-                where e.AccountId == actor && b.Id == branch && b.Active && m.Active && m.CanDentist select m).AnyAsync(ct))
+                where e.AccountId == actor && b.Id == branch && b.Active && m.Active && (m.CanDentist || grantDriven) select m).AnyAsync(ct))
             throw new BusinessException(403, SystemMessages.Get("MSG06"));
     }
     private async Task<TreatmentTemplate> Find(Guid id, CancellationToken ct, bool includeDeleted = false) =>
-        await db.TreatmentTemplates.SingleOrDefaultAsync(x => x.Id == id && x.DefinitionKind == "ItemPlan" && (includeDeleted || x.DeletedAt == null), ct) ?? throw Missing();
+        await db.TreatmentTemplates.SingleOrDefaultAsync(x => x.Id == id && (includeDeleted || x.DeletedAt == null), ct) ?? throw Missing();
     private async Task<ItemPlanDto> Dto(TreatmentTemplate plan, CancellationToken ct)
     {
         var rows = await db.TreatmentTemplateItems.AsNoTracking().Where(x => x.TemplateId == plan.Id && x.DeletedAt == null)
@@ -48,7 +52,7 @@ public sealed class ItemPlanService(DcmsDbContext db, UserManager<ApplicationUse
     {
         await Authorize(actor, branchId, ct);
         if (page is < 1 or > 1000000 || pageSize is < 1 or > 100 || keyword?.Length > 160) throw Invalid("pagination");
-        var query = db.TreatmentTemplates.AsNoTracking().Where(x => x.BranchId == branchId && x.DefinitionKind == "ItemPlan" && x.DeletedAt == null);
+        var query = db.TreatmentTemplates.AsNoTracking().Where(x => x.BranchId == branchId && x.DeletedAt == null);
         var term = keyword?.Trim().ToLowerInvariant(); if (!string.IsNullOrEmpty(term)) query = query.Where(x => x.Name.ToLower().Contains(term));
         var count = await query.CountAsync(ct);
         var rows = db.TreatmentTemplateItems.Where(x => x.DeletedAt == null);
@@ -98,7 +102,7 @@ public sealed class ItemPlanService(DcmsDbContext db, UserManager<ApplicationUse
     }
     public Task<ItemPlanDto> CreateAsync(int actor, ItemPlanCreate command, CancellationToken ct) =>
         Write(actor, null, command.BranchId, command.RequestKey, "Create", command, null, async _ => {
-            var plan = new TreatmentTemplate { BranchId = command.BranchId, Name = Name(command.Name), DefinitionKind = "ItemPlan", CreatedBy = actor, CreatedAt = clock.GetUtcNow() };
+            var plan = new TreatmentTemplate { BranchId = command.BranchId, Name = Name(command.Name), CreatedBy = actor, CreatedAt = clock.GetUtcNow() };
             db.Add(plan); await db.SaveChangesAsync(ct); return await Dto(plan, ct);
         }, ct);
     public Task<ItemPlanDto> RenameAsync(int actor, Guid id, ItemPlanRename command, CancellationToken ct) =>

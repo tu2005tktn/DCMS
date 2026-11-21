@@ -89,42 +89,11 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.UseTphMappingStrategy();
                 });
 
-            modelBuilder.Entity("DCMS.Domain.Common.PrescriptionRecord", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("PrescriptionKind")
-                        .IsRequired()
-                        .HasMaxLength(21)
-                        .HasColumnType("character varying(21)");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("PRESCRIPTION", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_PRESCRIPTION_VISIT_REVISION", "\"PrescriptionKind\" <> 'ExternalPrescription' OR \"Revision\" >= 1");
-
-                            t.HasCheckConstraint("CK_PRESCRIPTION_VISIT_STATUS", "\"PrescriptionKind\" <> 'ExternalPrescription' OR \"Status\" IN ('Draft','Finalized','Superseded')");
-                        });
-
-                    b.HasDiscriminator<string>("PrescriptionKind").HasValue("PrescriptionRecord");
-
-                    b.UseTphMappingStrategy();
-                });
-
             modelBuilder.Entity("DCMS.Domain.Features.Accounts.EmployeeProfile", b =>
                 {
                     b.Property<int>("AccountId")
                         .HasColumnType("integer")
                         .HasColumnName("Id");
-
-                    b.Property<string>("ConcurrencyStamp")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("text")
-                        .HasColumnName("ConcurrencyStamp");
 
                     b.Property<string>("EmployeeCode")
                         .IsRequired()
@@ -133,9 +102,10 @@ namespace DCMS.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("FullName")
                         .IsRequired()
+                        .ValueGeneratedOnUpdateSometimes()
                         .HasMaxLength(160)
                         .HasColumnType("character varying(160)")
-                        .HasColumnName("EmployeeFullName");
+                        .HasColumnName("FullName");
 
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -143,11 +113,11 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasColumnName("EmployeeId")
                         .HasDefaultValueSql("nextval('employee_id_seq')");
 
-                    b.Property<int>("Version")
+                    b.Property<uint>("xmin")
                         .IsConcurrencyToken()
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("Version");
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
 
                     b.HasKey("AccountId");
 
@@ -163,113 +133,48 @@ namespace DCMS.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("DCMS.Domain.Features.Appointments.Appointment", b =>
                 {
-                    b.Property<Guid>("ReservationId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("Id");
-
-                    b.Property<int?>("AssistantId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("AssistantId");
-
-                    b.Property<DateOnly?>("AttendeeBirthDate")
-                        .HasColumnType("date");
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
 
                     b.Property<string>("AttendeeName")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
-                    b.Property<string>("AttendeeRelation")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
-
                     b.Property<int?>("BookerAccountId")
                         .HasColumnType("integer");
 
-                    b.Property<string>("BookerEmail")
-                        .HasMaxLength(254)
-                        .HasColumnType("character varying(254)");
-
-                    b.Property<string>("BookerName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("BookerPhone")
-                        .HasMaxLength(24)
-                        .HasColumnType("character varying(24)");
-
                     b.Property<int>("BranchId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("BranchId");
-
-                    b.Property<string>("CancelReason")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<DateTimeOffset?>("CancelledAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("CancelledBy")
                         .HasColumnType("integer");
 
                     b.Property<int>("ChairId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("ChairId");
+                        .HasColumnType("integer");
 
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)");
 
-                    b.Property<string>("ConfirmedToAttend")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
-                        .HasDefaultValue("Pending");
-
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("DentistId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("DentistId");
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("DossierId")
+                        .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("EndAt")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("EndAt");
-
-                    b.Property<string>("ExceptionReason")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid?>("FamilyMemberId")
                         .HasColumnType("uuid");
-
-                    b.Property<Guid?>("FollowUpId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
-                        .HasColumnName("AppointmentId");
 
                     b.Property<string>("Kind")
                         .IsRequired()
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)");
-
-                    b.Property<DateTimeOffset?>("PatientConsentConfirmedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("PatientConsentConfirmedBy")
-                        .HasColumnType("integer");
 
                     b.Property<int?>("PatientId")
                         .HasColumnType("integer");
@@ -279,9 +184,7 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(1000)");
 
                     b.Property<int?>("ServiceId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("ServiceId");
+                        .HasColumnType("integer");
 
                     b.Property<string>("Source")
                         .IsRequired()
@@ -289,22 +192,35 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(24)");
 
                     b.Property<DateTimeOffset>("StartAt")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("StartAt");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(24)
                         .HasColumnType("character varying(24)");
 
-                    b.Property<Guid>("StorageStamp")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("uuid");
-
                     b.Property<int>("Version")
+                        .IsConcurrencyToken()
                         .HasColumnType("integer");
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "BookingInfo", "DCMS.Domain.Features.Appointments.Appointment.BookingInfo#AppointmentBookingInfo", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<DateOnly?>("AttendeeBirthDate");
+
+                            b1.Property<string>("AttendeeRelation")
+                                .IsRequired();
+
+                            b1.Property<string>("BookerContact");
+
+                            b1.Property<string>("BookerName")
+                                .IsRequired();
+
+                            b1.Property<string>("ExceptionReason");
+
+                            b1.ToJson("BookingInfo");
+                        });
 
                     b.ComplexCollection(typeof(List<Dictionary<string, object>>), "Reminders", "DCMS.Domain.Features.Appointments.Appointment.Reminders#AppointmentReminder", b1 =>
                         {
@@ -389,33 +305,32 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                             b1.ToJson("SupportRequests");
                         });
 
-                    b.HasKey("ReservationId");
-
-                    b.HasAlternateKey("Id")
-                        .HasName("AK_APPOINTMENT_AppointmentId");
-
-                    b.HasIndex("CancelledBy");
+                    b.HasKey("Id");
 
                     b.HasIndex("Code")
                         .IsUnique();
 
+                    b.HasIndex("DentistId");
+
+                    b.HasIndex("DossierId");
+
                     b.HasIndex("FamilyMemberId");
-
-                    b.HasIndex("FollowUpId")
-                        .IsUnique()
-                        .HasFilter("\"FollowUpId\" IS NOT NULL AND \"Status\" IN ('Confirmed','CheckedIn')");
-
-                    b.HasIndex("PatientConsentConfirmedBy");
 
                     b.HasIndex("PatientId");
 
                     b.HasIndex("BranchId", "StartAt");
 
+                    b.HasIndex("ServiceId", "BranchId");
+
+                    b.HasIndex("StartAt", "EndAt");
+
                     b.HasIndex("BookerAccountId", "FamilyMemberId", "StartAt");
 
                     b.ToTable("APPOINTMENT", null, t =>
                         {
-                            t.HasCheckConstraint("CK_APPOINTMENT_RANGE", "\"StartAt\" < \"EndAt\" AND (\"AssistantId\" IS NULL OR \"AssistantId\" <> \"DentistId\")");
+                            t.HasCheckConstraint("CK_APPOINTMENT_RANGE", "\"StartAt\" < \"EndAt\"");
+
+                            t.HasCheckConstraint("CK_APPOINTMENT_Status", "\"Status\" IN ('Confirmed','CheckedIn','InProgress','Completed','Cancelled','NoShow')");
                         });
                 });
 
@@ -424,6 +339,13 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
+
+                    b.Property<string>("Data")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("Data")
+                        .HasDefaultValueSql("'{}'::jsonb");
 
                     b.Property<string>("NotificationRecordKind")
                         .IsRequired()
@@ -482,10 +404,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
-                    b.Property<string>("Description")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
                     b.Property<string>("DocumentType")
                         .IsRequired()
                         .HasMaxLength(24)
@@ -504,31 +422,8 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)");
 
-                    b.Property<Guid?>("InvestigationId")
-                        .HasColumnType("uuid");
-
                     b.Property<int>("PatientId")
                         .HasColumnType("integer");
-
-                    b.Property<Guid?>("PlanId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("RejectReason")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<string>("Sha256")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
-
-                    b.Property<long>("SizeBytes")
-                        .HasColumnType("bigint");
-
-                    b.Property<string>("Source")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
 
                     b.Property<DateOnly>("SourceDate")
                         .HasColumnType("date");
@@ -545,6 +440,94 @@ namespace DCMS.Infrastructure.Persistence.Migrations
 
                     b.Property<Guid?>("VisitId")
                         .HasColumnType("uuid");
+
+                    b.ComplexCollection(typeof(List<Dictionary<string, object>>), "AiAnalyses", "DCMS.Domain.Features.Examinations.ClinicalDocument.AiAnalyses#DocumentAiAnalysis", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<Guid>("AnalysisId");
+
+                            b1.Property<string>("Device")
+                                .IsRequired();
+
+                            b1.Property<int>("ElapsedMs");
+
+                            b1.Property<int>("ImageHeight");
+
+                            b1.Property<int>("ImageWidth");
+
+                            b1.Property<string>("InputSha256")
+                                .IsRequired();
+
+                            b1.Property<string>("Kind")
+                                .IsRequired();
+
+                            b1.Property<string>("ModelName")
+                                .IsRequired();
+
+                            b1.Property<string>("ModelSha256")
+                                .IsRequired();
+
+                            b1.Property<DateTimeOffset>("RequestedAt");
+
+                            b1.Property<int>("RequestedBy");
+
+                            b1.Property<string>("SchemaVersion")
+                                .IsRequired();
+
+                            b1.ComplexCollection(typeof(List<Dictionary<string, object>>), "Findings", "DCMS.Domain.Features.Examinations.ClinicalDocument.AiAnalyses#DocumentAiAnalysis.Findings#DocumentAiFinding", b2 =>
+                                {
+                                    b2.IsRequired();
+
+                                    b2.Property<double>("Confidence");
+
+                                    b2.Property<string>("FindingId")
+                                        .IsRequired();
+
+                                    b2.Property<string>("Jaw")
+                                        .IsRequired();
+
+                                    b2.Property<string>("Kind")
+                                        .IsRequired();
+
+                                    b2.Property<string>("Label")
+                                        .IsRequired();
+
+                                    b2.Property<string>("Side")
+                                        .IsRequired();
+
+                                    b2.Property<double>("X1");
+
+                                    b2.Property<double>("X2");
+
+                                    b2.Property<double>("Y1");
+
+                                    b2.Property<double>("Y2");
+                                });
+
+                            b1.ToJson("AiAnalyses");
+                        });
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "Metadata", "DCMS.Domain.Features.Examinations.ClinicalDocument.Metadata#ClinicalDocumentMetadata", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<string>("Description");
+
+                            b1.Property<Guid?>("InvestigationId");
+
+                            b1.Property<string>("RejectReason");
+
+                            b1.Property<string>("Sha256")
+                                .IsRequired();
+
+                            b1.Property<long>("SizeBytes");
+
+                            b1.Property<string>("Source")
+                                .IsRequired();
+
+                            b1.ToJson("Metadata");
+                        });
 
                     b.ComplexCollection(typeof(List<Dictionary<string, object>>), "Reviews", "DCMS.Domain.Features.Examinations.ClinicalDocument.Reviews#DocumentReview", b1 =>
                         {
@@ -564,8 +547,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("DossierId");
-
-                    b.HasIndex("InvestigationId");
 
                     b.HasIndex("UploaderId");
 
@@ -587,27 +568,23 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("Id");
 
-                    b.Property<bool>("Confirmed")
-                        .HasColumnType("boolean")
-                        .HasColumnName("ExaminationConfirmed");
-
                     b.Property<string>("ContentJson")
                         .IsRequired()
                         .HasColumnType("jsonb")
                         .HasColumnName("ExaminationContentJson");
 
-                    b.Property<Guid>("StorageStamp")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("uuid");
-
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("ExaminationUpdatedAt");
+                        .HasColumnName("UpdatedAt");
 
                     b.Property<int>("UpdatedBy")
                         .HasColumnType("integer")
-                        .HasColumnName("ExaminationUpdatedBy");
+                        .HasColumnName("UpdatedBy");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnUpdateSometimes()
+                        .HasColumnType("integer");
 
                     b.HasKey("VisitId");
 
@@ -629,9 +606,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)");
 
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<DateTimeOffset?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -651,9 +625,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("Version")
                         .IsConcurrencyToken()
@@ -680,27 +651,8 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)");
 
-                    b.Property<DateTimeOffset?>("DecidedAt")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<int?>("DecidedBy")
                         .HasColumnType("integer");
-
-                    b.Property<string>("DecisionReason")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<DateOnly?>("DeclaredBirthDate")
-                        .HasColumnType("date");
-
-                    b.Property<string>("DeclaredFullName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("DeclaredPatientCode")
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)");
 
                     b.Property<DateTimeOffset?>("ExpiresAt")
                         .HasColumnType("timestamp with time zone");
@@ -708,24 +660,11 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("FamilyMemberId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("MatchingInformation")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
                     b.Property<int>("OwnerAccountId")
                         .HasColumnType("integer");
 
                     b.Property<int?>("PatientId")
                         .HasColumnType("integer");
-
-                    b.Property<string>("PublicNote")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<string>("Relationship")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
 
                     b.Property<DateTimeOffset>("RequestedAt")
                         .HasColumnType("timestamp with time zone");
@@ -734,22 +673,43 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("text[]");
 
-                    b.Property<string>("SharingBasis")
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
-
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)");
 
-                    b.Property<string>("VerificationNote")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
                     b.Property<int>("Version")
                         .IsConcurrencyToken()
                         .HasColumnType("integer");
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "Details", "DCMS.Domain.Features.FamilyMembers.FamilyRecordAccess.Details#FamilyRecordAccessDetails", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<DateTimeOffset?>("DecidedAt");
+
+                            b1.Property<string>("DecisionReason");
+
+                            b1.Property<DateOnly?>("DeclaredBirthDate");
+
+                            b1.Property<string>("DeclaredFullName")
+                                .IsRequired();
+
+                            b1.Property<string>("DeclaredPatientCode");
+
+                            b1.Property<string>("MatchingInformation");
+
+                            b1.Property<string>("PublicNote");
+
+                            b1.Property<string>("Relationship")
+                                .IsRequired();
+
+                            b1.Property<string>("SharingBasis");
+
+                            b1.Property<string>("VerificationNote");
+
+                            b1.ToJson("Details");
+                        });
 
                     b.HasKey("Id");
 
@@ -782,49 +742,24 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<int>("AccountId")
                         .HasColumnType("integer");
 
-                    b.Property<string>("DecisionReason")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<DateOnly?>("DeclaredBirthDate")
-                        .HasColumnType("date");
-
                     b.Property<string>("DeclaredFullName")
                         .IsRequired()
                         .HasMaxLength(160)
                         .HasColumnType("character varying(160)");
 
-                    b.Property<string>("DeclaredPatientCode")
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)");
-
                     b.Property<int?>("PatientId")
                         .HasColumnType("integer");
-
-                    b.Property<string>("PublicNote")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
 
                     b.Property<string>("RequestCode")
                         .IsRequired()
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
 
-                    b.Property<string>("RequestNote")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
                     b.Property<DateTimeOffset>("RequestedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTimeOffset?>("ReviewedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<int?>("ReviewingEmployeeId")
                         .HasColumnType("integer");
-
-                    b.Property<DateTimeOffset?>("RevokedAt")
-                        .HasColumnType("timestamp with time zone");
 
                     b.Property<int?>("RevokingEmployeeId")
                         .HasColumnType("integer");
@@ -834,16 +769,34 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)");
 
-                    b.Property<string>("VerificationNote")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
                     b.Property<int>("Version")
                         .IsConcurrencyToken()
                         .HasColumnType("integer");
 
-                    b.Property<DateTimeOffset?>("WithdrawnAt")
-                        .HasColumnType("timestamp with time zone");
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "Details", "DCMS.Domain.Features.PatientLinks.PatientAccountLink.Details#PatientAccountLinkDetails", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<string>("DecisionReason");
+
+                            b1.Property<DateOnly?>("DeclaredBirthDate");
+
+                            b1.Property<string>("DeclaredPatientCode");
+
+                            b1.Property<string>("PublicNote");
+
+                            b1.Property<string>("RequestNote");
+
+                            b1.Property<DateTimeOffset?>("ReviewedAt");
+
+                            b1.Property<DateTimeOffset?>("RevokedAt");
+
+                            b1.Property<string>("VerificationNote");
+
+                            b1.Property<DateTimeOffset?>("WithdrawnAt");
+
+                            b1.ToJson("Details");
+                        });
 
                     b.HasKey("Id");
 
@@ -886,13 +839,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)");
 
-                    b.Property<string>("ArchiveReason")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<DateTimeOffset?>("ArchivedAt")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<DateOnly?>("BirthDate")
                         .HasColumnType("date");
 
@@ -901,6 +847,13 @@ namespace DCMS.Infrastructure.Persistence.Migrations
 
                     b.Property<Guid?>("CustomerGroupId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("Details")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("Details")
+                        .HasDefaultValueSql("'{}'::jsonb");
 
                     b.Property<string>("FullName")
                         .IsRequired()
@@ -911,32 +864,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)");
 
-                    b.Property<string>("GuardianName")
-                        .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
-
-                    b.Property<string>("GuardianPhone")
-                        .HasMaxLength(24)
-                        .HasColumnType("character varying(24)");
-
-                    b.Property<string>("GuardianRelationship")
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)");
-
-                    b.PrimitiveCollection<Guid[]>("IntakeHistoryIds")
-                        .IsRequired()
-                        .HasColumnType("uuid[]");
-
-                    b.Property<string>("IntakeHistoryOther")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.Property<DateTimeOffset?>("IntakeRecordedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("IntakeRecordedBy")
-                        .HasColumnType("integer");
-
                     b.Property<bool>("IsArchived")
                         .HasColumnType("boolean");
 
@@ -944,10 +871,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(160)
                         .HasColumnType("character varying(160)");
-
-                    b.Property<string>("Note")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
 
                     b.Property<Guid?>("OccupationId")
                         .HasColumnType("uuid");
@@ -960,9 +883,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<string>("Phone")
                         .HasMaxLength(24)
                         .HasColumnType("character varying(24)");
-
-                    b.Property<DateOnly?>("ProfileDate")
-                        .HasColumnType("date");
 
                     b.Property<Guid?>("SourceId")
                         .HasColumnType("uuid");
@@ -995,96 +915,89 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("DCMS.Domain.Features.Scheduling.ResourceReservation", b =>
+            modelBuilder.Entity("DCMS.Domain.Features.Prescriptions.PatientPrescription", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("AppointmentKey")
-                        .HasColumnType("uuid")
-                        .HasColumnName("AppointmentId");
-
-                    b.Property<int?>("AssistantId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("AssistantId");
-
-                    b.Property<string>("AttendeeKey")
-                        .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
-
-                    b.Property<string>("AttendeeLabel")
-                        .IsRequired()
-                        .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
+                    b.Property<string>("Advice")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
 
                     b.Property<int>("BranchId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("BranchId");
+                        .HasColumnType("integer");
 
-                    b.Property<int>("ChairId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("ChairId");
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("Code")
+                    b.Property<string>("Diagnosis")
                         .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
-                        .HasColumnName("ReservationCode");
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
 
-                    b.Property<int>("DentistId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("DentistId");
+                    b.Property<string>("OtherDiagnosis")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
 
-                    b.Property<DateTimeOffset>("End")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("EndAt");
+                    b.Property<int>("PatientId")
+                        .HasColumnType("integer");
 
-                    b.Property<int?>("ServiceId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("ServiceId");
+                    b.Property<DateOnly>("PrescribedOn")
+                        .HasColumnType("date");
 
-                    b.Property<DateTimeOffset>("Start")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("StartAt");
+                    b.Property<int>("PrescriberEmployeeId")
+                        .HasColumnType("integer");
 
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
-                        .HasColumnName("ReservationStatus");
-
-                    b.Property<Guid>("StorageStamp")
+                    b.Property<int>("Version")
                         .IsConcurrencyToken()
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("uuid");
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
+
+                    b.ComplexCollection(typeof(List<Dictionary<string, object>>), "Items", "DCMS.Domain.Features.Prescriptions.PatientPrescription.Items#PatientPrescriptionItem", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<string>("DosageForm");
+
+                            b1.Property<Guid>("Id");
+
+                            b1.Property<string>("Instructions")
+                                .IsRequired();
+
+                            b1.Property<bool>("IsExternalPurchase");
+
+                            b1.Property<string>("MedicineCode")
+                                .IsRequired();
+
+                            b1.Property<Guid>("MedicineId");
+
+                            b1.Property<string>("MedicineName")
+                                .IsRequired();
+
+                            b1.Property<int>("Position");
+
+                            b1.Property<Guid>("PrescriptionId");
+
+                            b1.Property<int>("Quantity");
+
+                            b1.Property<string>("Strength");
+
+                            b1.Property<string>("Unit")
+                                .IsRequired();
+
+                            b1.ToJson("Items");
+                        });
 
                     b.HasKey("Id");
 
-                    b.HasAlternateKey("AppointmentKey")
-                        .HasName("AK_APPOINTMENT_AppointmentId");
-
-                    b.HasIndex("AssistantId");
-
                     b.HasIndex("BranchId");
 
-                    b.HasIndex("Code")
-                        .IsUnique();
+                    b.HasIndex("PrescriberEmployeeId");
 
-                    b.HasIndex("DentistId");
+                    b.HasIndex("PatientId", "PrescribedOn");
 
-                    b.HasIndex("ServiceId", "BranchId");
-
-                    b.HasIndex("Start", "End");
-
-                    b.ToTable("APPOINTMENT", (string)null);
+                    b.ToTable("PRESCRIPTION", (string)null);
                 });
 
             modelBuilder.Entity("DCMS.Domain.Features.Scheduling.SchedulingBranch", b =>
@@ -1096,62 +1009,39 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<bool>("Active")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("boolean")
-                        .HasColumnName("Active");
+                        .HasColumnType("boolean");
 
-                    b.Property<int>("BookingSettingsVersion")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(1)
-                        .HasColumnName("BookingSettingsVersion");
+                    b.Property<string>("Address")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("Code")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)");
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .ValueGeneratedOnUpdateSometimes()
                         .HasMaxLength(160)
-                        .HasColumnType("character varying(160)")
-                        .HasColumnName("Name");
+                        .HasColumnType("character varying(160)");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
 
                     b.Property<int>("SlotIntervalMinutes")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
-                        .HasDefaultValue(15)
-                        .HasColumnName("SlotIntervalMinutes");
-
-                    b.Property<Guid>("StorageStamp")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("uuid");
+                        .HasDefaultValue(15);
 
                     b.Property<int>("Version")
                         .IsConcurrencyToken()
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer");
-
-                    b.ComplexCollection(typeof(List<Dictionary<string, object>>), "Assets", "DCMS.Domain.Features.Scheduling.SchedulingBranch.Assets#BranchAsset", b1 =>
-                        {
-                            b1.IsRequired();
-
-                            b1.Property<int>("BranchId");
-
-                            b1.Property<string>("ContentType")
-                                .IsRequired();
-
-                            b1.Property<Guid>("Id");
-
-                            b1.Property<string>("Sha256")
-                                .IsRequired();
-
-                            b1.Property<long>("SizeBytes");
-
-                            b1.Property<DateTimeOffset>("UploadedAt");
-
-                            b1.Property<int>("UploadedBy");
-
-                            b1.ToJson("Assets");
-                        });
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
 
                     b.ComplexCollection(typeof(List<Dictionary<string, object>>), "Chairs", "DCMS.Domain.Features.Scheduling.SchedulingBranch.Chairs#SchedulingChair", b1 =>
                         {
@@ -1196,9 +1086,12 @@ namespace DCMS.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("Code")
+                        .IsUnique();
+
                     b.ToTable("SCHEDULING_BRANCH", null, t =>
                         {
-                            t.HasCheckConstraint("CK_BRANCH_SLOT_INTERVAL", "\"SlotIntervalMinutes\" BETWEEN 1 AND 120 AND \"BookingSettingsVersion\" > 0");
+                            t.HasCheckConstraint("CK_BRANCH_SLOT_INTERVAL", "\"SlotIntervalMinutes\" BETWEEN 1 AND 120 AND \"Version\" > 0");
                         });
                 });
 
@@ -1213,22 +1106,10 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<bool>("Active")
                         .HasColumnType("boolean");
 
-                    b.Property<string>("BillingUnit")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)");
-
                     b.Property<int>("BranchId")
                         .HasColumnType("integer");
 
-                    b.Property<string>("InvestigationKind")
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
-
                     b.Property<bool>("IsInitialExamination")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IsInvestigationService")
                         .HasColumnType("boolean");
 
                     b.Property<string>("Name")
@@ -1364,20 +1245,17 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
 
+                    b.Property<string>("Grants")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("Grants")
+                        .HasDefaultValueSql("'[]'::jsonb");
+
                     b.Property<int?>("IdentityRoleId")
                         .HasColumnType("integer");
 
                     b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
-
-                    b.Property<string>("NormalizedCode")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)");
-
-                    b.Property<string>("NormalizedName")
                         .IsRequired()
                         .HasMaxLength(160)
                         .HasColumnType("character varying(160)");
@@ -1387,141 +1265,16 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(24)
                         .HasColumnType("character varying(24)");
 
-                    b.Property<string>("RoleConcurrencyStamp")
-                        .HasColumnType("text");
-
                     b.Property<int>("Version")
                         .IsConcurrencyToken()
                         .HasColumnType("integer");
-
-                    b.ComplexCollection(typeof(List<Dictionary<string, object>>), "Grants", "DCMS.Domain.Features.Settings.AccessGroup.Grants#AccessGroupGrant", b1 =>
-                        {
-                            b1.IsRequired();
-
-                            b1.Property<Guid>("GroupId");
-
-                            b1.Property<string>("Permission")
-                                .IsRequired();
-
-                            b1.ToJson("Grants");
-                        });
-
-                    b.ComplexCollection(typeof(List<Dictionary<string, object>>), "RoleClaims", "DCMS.Domain.Features.Settings.AccessGroup.RoleClaims#AccountClaim", b1 =>
-                        {
-                            b1.IsRequired();
-
-                            b1.Property<int>("Id");
-
-                            b1.Property<string>("Type");
-
-                            b1.Property<string>("Value");
-
-                            b1.ToJson("RoleClaims");
-                        });
 
                     b.HasKey("Id");
 
                     b.HasIndex("IdentityRoleId")
                         .IsUnique();
 
-                    b.HasIndex("RecordKind", "NormalizedCode")
-                        .IsUnique();
-
-                    b.HasIndex("RecordKind", "NormalizedName")
-                        .IsUnique();
-
                     b.ToTable("ACCESS_GROUP", (string)null);
-                });
-
-            modelBuilder.Entity("DCMS.Domain.Features.Settings.BranchProfile", b =>
-                {
-                    b.Property<int>("Id")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("AccountNumber")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<string>("Address")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.Property<string>("BankCode")
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<int>("BookingSettingsVersion")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(1)
-                        .HasColumnName("BookingSettingsVersion");
-
-                    b.Property<string>("Code")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)");
-
-                    b.Property<string>("Email")
-                        .HasMaxLength(254)
-                        .HasColumnType("character varying(254)");
-
-                    b.Property<bool>("IsActive")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("boolean")
-                        .HasColumnName("Active");
-
-                    b.Property<Guid?>("LogoAssetId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasMaxLength(160)
-                        .HasColumnType("character varying(160)")
-                        .HasColumnName("Name");
-
-                    b.Property<string>("PayeeName")
-                        .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
-
-                    b.Property<string>("Phone")
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<int>("SlotIntervalMinutes")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(15)
-                        .HasColumnName("SlotIntervalMinutes");
-
-                    b.Property<Guid>("StorageStamp")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("TimeZoneId")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasDefaultValue("Asia/Ho_Chi_Minh");
-
-                    b.Property<int>("Version")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Website")
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Code")
-                        .IsUnique();
-
-                    b.ToTable("SCHEDULING_BRANCH", (string)null);
                 });
 
             modelBuilder.Entity("DCMS.Domain.Features.Settings.StaffAccessAssignment", b =>
@@ -1530,28 +1283,18 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("Id");
 
-                    b.Property<int>("AccountVersion")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("Version");
-
                     b.PrimitiveCollection<int[]>("BranchIds")
                         .IsRequired()
                         .HasColumnType("integer[]");
 
-                    b.Property<string>("ConcurrencyStamp")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("text")
-                        .HasColumnName("ConcurrencyStamp");
-
                     b.Property<Guid>("GroupId")
                         .HasColumnType("uuid");
 
-                    b.Property<int>("Version")
-                        .HasColumnType("integer")
-                        .HasColumnName("AccessVersion");
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
 
                     b.HasKey("AccountId");
 
@@ -1566,14 +1309,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<string>("ActiveIngredient")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<string>("AllergyWarnings")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
                     b.Property<string>("BaseUnit")
                         .IsRequired()
                         .HasMaxLength(40)
@@ -1583,24 +1318,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)");
-
-                    b.Property<string>("Contraindications")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("CreatedBy")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("DosageForm")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<string>("Instructions")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
 
                     b.Property<bool>("InternalStockTracked")
                         .HasColumnType("boolean");
@@ -1613,48 +1330,24 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
-                    b.Property<string>("NormalizedName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<string>("Packaging")
-                        .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
-
                     b.Property<bool>("PrescriptionEligible")
                         .HasColumnType("boolean");
 
                     b.Property<long?>("ReferencePrice")
                         .HasColumnType("bigint");
 
-                    b.Property<string>("Route")
+                    b.Property<string>("Spec")
                         .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
-                        .HasDefaultValue("Uống");
-
-                    b.Property<string>("Strength")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("UpdatedBy")
-                        .HasColumnType("integer");
+                        .HasColumnType("jsonb");
 
                     b.Property<int>("Version")
                         .IsConcurrencyToken()
-                        .HasColumnType("integer");
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
 
                     b.HasKey("Id");
 
                     b.HasIndex("Code")
-                        .IsUnique();
-
-                    b.HasIndex("NormalizedName")
                         .IsUnique();
 
                     b.ToTable("CATALOG_MEDICINE", (string)null);
@@ -1675,12 +1368,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)");
 
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("CreatedBy")
-                        .HasColumnType("integer");
-
                     b.Property<string>("Email")
                         .HasMaxLength(254)
                         .HasColumnType("character varying(254)");
@@ -1689,11 +1376,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean");
 
                     b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
-
-                    b.Property<string>("NormalizedName")
                         .IsRequired()
                         .HasMaxLength(160)
                         .HasColumnType("character varying(160)");
@@ -1707,22 +1389,14 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)");
 
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("UpdatedBy")
-                        .HasColumnType("integer");
-
                     b.Property<int>("Version")
                         .IsConcurrencyToken()
-                        .HasColumnType("integer");
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
 
                     b.HasKey("Id");
 
                     b.HasIndex("Code")
-                        .IsUnique();
-
-                    b.HasIndex("NormalizedName")
                         .IsUnique();
 
                     b.ToTable("CATALOG_PROVIDER", (string)null);
@@ -1767,21 +1441,10 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)");
 
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("CreatedBy")
-                        .HasColumnType("integer");
-
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
                     b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
-
-                    b.Property<string>("NormalizedName")
                         .IsRequired()
                         .HasMaxLength(160)
                         .HasColumnType("character varying(160)");
@@ -1797,15 +1460,10 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)");
 
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("UpdatedBy")
-                        .HasColumnType("integer");
-
                     b.Property<int>("Version")
                         .IsConcurrencyToken()
-                        .HasColumnType("integer");
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
 
                     b.Property<string>("Warranty")
                         .HasMaxLength(1000)
@@ -1814,9 +1472,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("Code")
-                        .IsUnique();
-
-                    b.HasIndex("NormalizedName")
                         .IsUnique();
 
                     b.HasIndex("ProviderId");
@@ -1833,9 +1488,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("CategoryId")
                         .HasColumnType("uuid");
 
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
@@ -1843,14 +1495,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(160)
                         .HasColumnType("character varying(160)");
-
-                    b.Property<string>("NormalizedName")
-                        .IsRequired()
-                        .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("UsageUnit")
                         .HasMaxLength(40)
@@ -1862,9 +1506,7 @@ namespace DCMS.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CategoryId", "NormalizedName")
-                        .IsUnique()
-                        .HasFilter("NOT \"IsDeleted\"");
+                    b.HasIndex("CategoryId");
 
                     b.ToTable("MATERIAL_CATALOG_ITEM", (string)null);
                 });
@@ -1875,9 +1517,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
@@ -1886,23 +1525,11 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(160)
                         .HasColumnType("character varying(160)");
 
-                    b.Property<string>("NormalizedName")
-                        .IsRequired()
-                        .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<int>("Version")
                         .IsConcurrencyToken()
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("NormalizedName")
-                        .IsUnique()
-                        .HasFilter("NOT \"IsDeleted\"");
 
                     b.ToTable("MATERIAL_CATEGORY", (string)null);
                 });
@@ -1913,20 +1540,12 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<string>("CategoryName")
-                        .IsRequired()
-                        .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
-
                     b.Property<decimal>("ConversionFactor")
                         .HasPrecision(12, 3)
                         .HasColumnType("numeric(12,3)");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("CreatedBy")
-                        .HasColumnType("integer");
 
                     b.Property<DateOnly>("EnteredOn")
                         .HasColumnType("date");
@@ -1944,11 +1563,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("MaterialId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("MaterialName")
-                        .IsRequired()
-                        .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
-
                     b.Property<long>("PaidVnd")
                         .HasColumnType("bigint");
 
@@ -1962,10 +1576,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("SupplierId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("SupplierName")
-                        .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
-
                     b.Property<long>("TotalVnd")
                         .HasColumnType("bigint");
 
@@ -1977,19 +1587,9 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<long>("UnitPriceVnd")
                         .HasColumnType("bigint");
 
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("UpdatedBy")
-                        .HasColumnType("integer");
-
                     b.Property<decimal>("UsageQuantity")
                         .HasPrecision(18, 3)
                         .HasColumnType("numeric(18,3)");
-
-                    b.Property<string>("UsageUnit")
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)");
 
                     b.Property<int>("Version")
                         .IsConcurrencyToken()
@@ -2016,25 +1616,8 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("ActivityId")
                         .HasColumnType("uuid");
 
-                    b.Property<int>("BranchId")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("DossierId")
-                        .HasColumnType("uuid");
-
                     b.Property<Guid>("MaterialId")
                         .HasColumnType("uuid");
-
-                    b.Property<string>("MaterialName")
-                        .IsRequired()
-                        .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
-
-                    b.Property<int>("PatientId")
-                        .HasColumnType("integer");
 
                     b.Property<decimal>("Quantity")
                         .HasPrecision(18, 3)
@@ -2042,10 +1625,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
 
                     b.Property<int?>("RecordedBy")
                         .HasColumnType("integer");
-
-                    b.Property<string>("UsageUnit")
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)");
 
                     b.Property<DateTimeOffset>("UsedAt")
                         .HasColumnType("timestamp with time zone");
@@ -2071,12 +1650,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)");
 
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("CreatedBy")
-                        .HasColumnType("integer");
-
                     b.Property<string>("Description")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
@@ -2097,17 +1670,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(160)
                         .HasColumnType("character varying(160)");
 
-                    b.Property<string>("NormalizedName")
-                        .IsRequired()
-                        .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("UpdatedBy")
-                        .HasColumnType("integer");
-
                     b.Property<int>("Version")
                         .IsConcurrencyToken()
                         .HasColumnType("integer");
@@ -2117,9 +1679,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasIndex("Kind", "Code")
                         .IsUnique()
                         .HasFilter("\"Code\" IS NOT NULL");
-
-                    b.HasIndex("Kind", "NormalizedName")
-                        .IsUnique();
 
                     b.ToTable("REFERENCE_ENTRY", (string)null);
                 });
@@ -2141,21 +1700,8 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)");
 
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("CreatedBy")
-                        .HasColumnType("integer");
-
                     b.Property<DateTimeOffset>("DueAt")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("EpisodeKey")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<Guid?>("InstructionId")
-                        .HasColumnType("uuid");
 
                     b.Property<int?>("OwnerAccountId")
                         .HasColumnType("integer");
@@ -2163,29 +1709,20 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<int>("PatientId")
                         .HasColumnType("integer");
 
-                    b.Property<Guid?>("ReviewId")
-                        .HasColumnType("uuid");
-
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)");
-
-                    b.Property<Guid>("StorageStamp")
-                        .IsConcurrencyToken()
-                        .HasColumnType("uuid");
 
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)");
 
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<int>("Version")
                         .IsConcurrencyToken()
-                        .HasColumnType("integer");
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
 
                     b.ComplexCollection(typeof(List<Dictionary<string, object>>), "ContactAttempts", "DCMS.Domain.Features.Treatment.CareTask.ContactAttempts#CareContactAttempt", b1 =>
                         {
@@ -2212,46 +1749,101 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                             b1.ToJson("ContactAttempts");
                         });
 
-                    b.ComplexCollection(typeof(List<Dictionary<string, object>>), "Escalations", "DCMS.Domain.Features.Treatment.CareTask.Escalations#CareEscalation", b1 =>
-                        {
-                            b1.IsRequired();
-
-                            b1.Property<DateTimeOffset?>("AcknowledgedAt");
-
-                            b1.Property<DateTimeOffset>("CreatedAt");
-
-                            b1.Property<int>("CreatedBy");
-
-                            b1.Property<Guid>("Id");
-
-                            b1.Property<string>("Reason")
-                                .IsRequired();
-
-                            b1.Property<string>("Resolution");
-
-                            b1.Property<DateTimeOffset?>("ResolvedAt");
-
-                            b1.Property<string>("Status")
-                                .IsRequired();
-
-                            b1.Property<int>("TargetClinicianAccountId");
-
-                            b1.Property<Guid>("TaskId");
-
-                            b1.Property<int>("Version");
-
-                            b1.ToJson("Escalations");
-                        });
-
                     b.HasKey("Id");
-
-                    b.HasIndex("EpisodeKey")
-                        .IsUnique()
-                        .HasFilter("\"EpisodeKey\" IS NOT NULL");
 
                     b.HasIndex("BranchId", "DueAt", "Status");
 
                     b.ToTable("CARE_TASK", (string)null);
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Treatment.ClinicalActivity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("AssistantId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("DiscountSnapshotVnd")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("DossierId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("FeeStatus")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)")
+                        .HasDefaultValue("Unavailable");
+
+                    b.Property<bool>("IsPlanTransfer")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid?>("ItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("LabWorkSnapshot")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<DateTimeOffset>("PerformedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("PerformerId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("PlanVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("PriceSnapshotVnd")
+                        .HasPrecision(18)
+                        .HasColumnType("numeric(18,0)");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(12, 3)
+                        .HasColumnType("numeric(12,3)");
+
+                    b.Property<string>("Region")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<int>("ServiceId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ServiceNameSnapshot")
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DossierId", "PerformedAt");
+
+                    b.HasIndex("ItemId", "PlanVersion")
+                        .IsUnique()
+                        .HasFilter("\"IsPlanTransfer\" = TRUE AND \"ItemId\" IS NOT NULL");
+
+                    b.ToTable("CLINICAL_ACTIVITY", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_CLINICAL_ACTIVITY_VALUES", "\"Quantity\" > 0 AND \"PriceSnapshotVnd\" >= 0");
+                        });
                 });
 
             modelBuilder.Entity("DCMS.Domain.Features.Treatment.LabOrder", b =>
@@ -2263,22 +1855,9 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("ActivityId")
                         .HasColumnType("uuid");
 
-                    b.Property<int>("BranchId")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("BridgeShapes")
-                        .IsRequired()
-                        .HasColumnType("jsonb");
-
                     b.Property<string>("Code")
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("CreatedBy")
-                        .HasColumnType("integer");
 
                     b.Property<DateOnly?>("DeliveredOn")
                         .HasColumnType("date");
@@ -2286,36 +1865,14 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<int>("DentistId")
                         .HasColumnType("integer");
 
-                    b.Property<Guid>("DossierId")
-                        .HasColumnType("uuid");
-
                     b.Property<DateOnly?>("DueOn")
                         .HasColumnType("date");
-
-                    b.Property<bool>("IsChild")
-                        .HasColumnType("boolean");
 
                     b.Property<Guid?>("LabProviderId")
                         .HasColumnType("uuid");
 
                     b.Property<Guid?>("LabWorkTypeId")
                         .HasColumnType("uuid");
-
-                    b.Property<string>("MarginInner")
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<string>("MarginOuter")
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<string>("MarginSide")
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<string>("Material")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("Note")
                         .HasMaxLength(1000)
@@ -2327,19 +1884,10 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<long>("PaidVnd")
                         .HasColumnType("bigint");
 
-                    b.Property<int>("PatientId")
-                        .HasColumnType("integer");
-
                     b.Property<int>("Quantity")
                         .HasColumnType("integer");
 
-                    b.Property<DateOnly?>("ReceivedOn")
-                        .HasColumnType("date");
-
-                    b.Property<DateOnly?>("SentOn")
-                        .HasColumnType("date");
-
-                    b.Property<string>("Shade")
+                    b.Property<string>("Spec")
                         .IsRequired()
                         .HasColumnType("jsonb");
 
@@ -2350,29 +1898,13 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(20)")
                         .HasDefaultValue("NotSent");
 
-                    b.Property<Guid>("StorageStamp")
-                        .IsConcurrencyToken()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Teeth")
-                        .IsRequired()
-                        .HasColumnType("jsonb");
-
                     b.Property<long>("TotalFeeVnd")
                         .HasColumnType("bigint");
 
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("UpdatedBy")
-                        .HasColumnType("integer");
-
                     b.Property<int>("Version")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Warranty")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
 
                     b.Property<string>("WorkName")
                         .IsRequired()
@@ -2406,13 +1938,10 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasIndex("ActivityId")
                         .IsUnique();
 
-                    b.HasIndex("DossierId");
-
-                    b.HasIndex("BranchId", "Code")
-                        .IsUnique()
+                    b.HasIndex("Code")
                         .HasFilter("\"Code\" IS NOT NULL");
 
-                    b.HasIndex("BranchId", "Status", "DueOn");
+                    b.HasIndex("Status", "DueOn");
 
                     b.ToTable("LAB_ORDER", null, t =>
                         {
@@ -2433,20 +1962,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<int>("BranchId")
                         .HasColumnType("integer");
 
-                    b.Property<DateTimeOffset?>("ClosedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("ClosedBy")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("ClosureOutcome")
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
-
-                    b.Property<string>("ClosureReason")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasMaxLength(40)
@@ -2458,27 +1973,8 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<int>("DentistId")
                         .HasColumnType("integer");
 
-                    b.Property<DateTimeOffset?>("DepositExceptionAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("DepositExceptionBy")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("DepositExceptionReason")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
                     b.Property<string>("Diagnosis")
                         .IsRequired()
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)");
-
-                    b.Property<bool>("DisplayCompleted")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false);
-
-                    b.Property<string>("Goals")
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)");
 
@@ -2489,38 +1985,8 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<int>("PatientId")
                         .HasColumnType("integer");
 
-                    b.Property<string>("PaymentTermsJson")
-                        .IsRequired()
-                        .HasColumnType("jsonb");
-
-                    b.Property<Guid>("PlanId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("PlanState")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
-
-                    b.Property<int>("PlanVersion")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid?>("SourceExaminationId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("SourceExaminationJson")
-                        .HasColumnType("jsonb");
-
-                    b.Property<int?>("SourceExaminationVersion")
-                        .HasColumnType("integer");
-
                     b.Property<Guid?>("SourceExaminationVisitId")
                         .HasColumnType("uuid");
-
-                    b.Property<Guid?>("SourceTemplateId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int?>("SourceTemplateVersion")
-                        .HasColumnType("integer");
 
                     b.Property<DateOnly>("StartedOn")
                         .HasColumnType("date");
@@ -2530,40 +1996,12 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)");
 
-                    b.Property<Guid>("StorageStamp")
-                        .IsConcurrencyToken()
-                        .HasColumnType("uuid");
-
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("Version")
                         .IsConcurrencyToken()
                         .HasColumnType("integer");
-
-                    b.ComplexCollection(typeof(List<Dictionary<string, object>>), "RevisionDrafts", "DCMS.Domain.Features.Treatment.TreatmentDossier.RevisionDrafts#TreatmentRevisionDraft", b1 =>
-                        {
-                            b1.IsRequired();
-
-                            b1.Property<int>("ActorId");
-
-                            b1.Property<int>("BasePlanVersion");
-
-                            b1.Property<Guid>("DossierId");
-
-                            b1.Property<Guid>("Id");
-
-                            b1.Property<Guid>("ItemId");
-
-                            b1.Property<string>("PayloadJson")
-                                .IsRequired();
-
-                            b1.Property<DateTimeOffset>("UpdatedAt");
-
-                            b1.Property<int>("Version");
-
-                            b1.ToJson("RevisionDrafts");
-                        });
 
                     b.ComplexCollection(typeof(List<Dictionary<string, object>>), "SheetDrafts", "DCMS.Domain.Features.Treatment.TreatmentDossier.SheetDrafts#TreatmentSheetDraft", b1 =>
                         {
@@ -2604,8 +2042,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("SourceExaminationVisitId");
 
-                    b.HasIndex("SourceTemplateId");
-
                     b.HasIndex("PatientId", "BranchId", "UpdatedAt");
 
                     b.ToTable("TREATMENT_DOSSIER", (string)null);
@@ -2623,54 +2059,9 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<int?>("AssistantId")
                         .HasColumnType("integer");
 
-                    b.Property<Guid?>("ConsentDocumentId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int?>("ConsentPlanVersion")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Counseling")
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)");
-
-                    b.Property<DateTimeOffset?>("DecidedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("DecidedBy")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Decision")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
-
-                    b.Property<string>("DecisionMaker")
-                        .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
-
-                    b.Property<int?>("DecisionPlanVersion")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("DiscountBasisHash")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
-
-                    b.Property<DateTimeOffset?>("DiscountDecidedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("DiscountDecidedBy")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid?>("DiscountQualifyingItemId")
-                        .HasColumnType("uuid");
-
                     b.Property<string>("DiscountReason")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
-
-                    b.Property<string>("DiscountStatus")
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
 
                     b.Property<string>("DiscountType")
                         .HasMaxLength(16)
@@ -2686,43 +2077,11 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("DossierId")
                         .HasColumnType("uuid");
 
-                    b.Property<DateTimeOffset?>("EntryRecordedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("EntryRecordedBy")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("EntrySource")
-                        .HasMaxLength(24)
-                        .HasColumnType("character varying(24)");
-
-                    b.Property<DateOnly?>("EstimatedEnd")
-                        .HasColumnType("date");
-
-                    b.Property<int?>("EstimatedMaxMinutes")
-                        .HasColumnType("integer");
-
-                    b.Property<int?>("EstimatedMinMinutes")
-                        .HasColumnType("integer");
-
                     b.Property<int?>("EstimatedMinutes")
-                        .HasColumnType("integer");
-
-                    b.Property<int?>("EstimatedSessions")
                         .HasColumnType("integer");
 
                     b.Property<DateOnly?>("EstimatedStart")
                         .HasColumnType("date");
-
-                    b.Property<int?>("ExpectedServiceLifeMonths")
-                        .HasColumnType("integer");
-
-                    b.Property<bool>("HiddenFromSheet")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("Material")
-                        .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
 
                     b.Property<string>("Note")
                         .HasMaxLength(1000)
@@ -2731,43 +2090,16 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<int>("PlannedOrder")
                         .HasColumnType("integer");
 
-                    b.Property<string>("Progress")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
-
                     b.Property<decimal>("Quantity")
                         .HasPrecision(12, 3)
                         .HasColumnType("numeric(12,3)");
-
-                    b.Property<int?>("ReferencePriceVersion")
-                        .HasColumnType("integer");
-
-                    b.Property<long?>("ReferenceUnitPriceVnd")
-                        .HasColumnType("bigint");
 
                     b.Property<string>("Region")
                         .HasMaxLength(80)
                         .HasColumnType("character varying(80)");
 
-                    b.Property<string>("RepresentativeBasis")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.Property<int?>("ReservedMinutes")
-                        .HasColumnType("integer");
-
                     b.Property<int?>("ResponsibleDentistId")
                         .HasColumnType("integer");
-
-                    b.Property<DateOnly?>("ReturnEarliestOn")
-                        .HasColumnType("date");
-
-                    b.Property<DateOnly?>("ReturnLatestOn")
-                        .HasColumnType("date");
-
-                    b.Property<DateOnly?>("ReturnTargetOn")
-                        .HasColumnType("date");
 
                     b.Property<int>("ServiceId")
                         .HasColumnType("integer");
@@ -2777,127 +2109,10 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(160)
                         .HasColumnType("character varying(160)");
 
-                    b.Property<bool>("SheetDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTimeOffset?>("ShortReservationAcknowledgedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("ShortReservationAcknowledgedBy")
-                        .HasColumnType("integer");
-
-                    b.Property<int?>("SourceDiagnosisId")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid>("StorageStamp")
-                        .IsConcurrencyToken()
-                        .HasColumnType("uuid");
-
                     b.Property<string>("Unit")
                         .IsRequired()
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)");
-
-                    b.Property<DateOnly?>("WarrantyActivatedOn")
-                        .HasColumnType("date");
-
-                    b.Property<string>("WarrantyComponent")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<DateTimeOffset?>("WarrantyConfirmedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("WarrantyConfirmedBy")
-                        .HasColumnType("integer");
-
-                    b.Property<DateOnly?>("WarrantyEndsOn")
-                        .HasColumnType("date");
-
-                    b.Property<string>("WarrantyExclusions")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.Property<string>("WarrantyExplanation")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.Property<string>("WarrantyPolicy")
-                        .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
-
-                    b.Property<string>("WarrantyPolicyVersion")
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)");
-
-                    b.Property<string>("WarrantyScope")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.ComplexCollection(typeof(List<Dictionary<string, object>>), "Steps", "DCMS.Domain.Features.Treatment.TreatmentItem.Steps#TreatmentStep", b1 =>
-                        {
-                            b1.IsRequired();
-
-                            b1.Property<string>("Capability");
-
-                            b1.Property<string>("ChargingCoverage")
-                                .IsRequired();
-
-                            b1.Property<DateTimeOffset?>("CompletedAt");
-
-                            b1.Property<Guid?>("CompletionEventId");
-
-                            b1.Property<Guid>("DossierId");
-
-                            b1.Property<int?>("EarliestOffsetDays");
-
-                            b1.Property<int?>("EstimatedMaxMinutes");
-
-                            b1.Property<int?>("EstimatedMinMinutes");
-
-                            b1.Property<int>("EstimatedMinutes");
-
-                            b1.Property<DateTimeOffset?>("HoldEffectiveAt");
-
-                            b1.Property<string>("HoldReason");
-
-                            b1.Property<Guid>("Id");
-
-                            b1.Property<Guid>("ItemId");
-
-                            b1.Property<string>("LabRequirement");
-
-                            b1.Property<int?>("LatestOffsetDays");
-
-                            b1.Property<string>("Name")
-                                .IsRequired();
-
-                            b1.Property<string>("Outcome")
-                                .IsRequired();
-
-                            b1.Property<Guid>("PlanId");
-
-                            b1.Property<int>("PlanVersion");
-
-                            b1.Property<string>("PredecessorsJson")
-                                .IsRequired();
-
-                            b1.Property<string>("Region");
-
-                            b1.Property<int>("ReservedMinutes");
-
-                            b1.Property<string>("ReviewCondition");
-
-                            b1.Property<DateTimeOffset?>("ShortReservationAcknowledgedAt");
-
-                            b1.Property<int?>("ShortReservationAcknowledgedBy");
-
-                            b1.Property<int?>("TargetOffsetDays");
-
-                            b1.Property<int>("Version");
-
-                            b1.ToJson("Steps");
-                        });
 
                     b.HasKey("Id");
 
@@ -2905,48 +2120,8 @@ namespace DCMS.Infrastructure.Persistence.Migrations
 
                     b.ToTable("TREATMENT_PLAN_ITEM", null, t =>
                         {
-                            t.HasCheckConstraint("CK_TREATMENT_ITEM_DURATION_V23", "(\"EstimatedMinMinutes\" IS NULL AND \"EstimatedMaxMinutes\" IS NULL OR \"EstimatedMinMinutes\" > 0 AND \"EstimatedMinMinutes\" <= \"EstimatedMinutes\" AND \"EstimatedMinutes\" <= \"EstimatedMaxMinutes\" AND \"EstimatedMaxMinutes\" <= 480) AND (\"ReservedMinutes\" IS NULL OR \"ReservedMinutes\" BETWEEN 15 AND 480 AND \"ReservedMinutes\" % 15 = 0 AND \"ReservedMinutes\" >= \"EstimatedMinutes\")");
-
                             t.HasCheckConstraint("CK_TREATMENT_ITEM_VALUES", "\"Quantity\" > 0 AND \"AgreedUnitPriceVnd\" >= 0");
                         });
-                });
-
-            modelBuilder.Entity("DCMS.Domain.Features.Treatment.TreatmentProcessRecord", b =>
-                {
-                    b.Property<Guid>("StorageId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("Id");
-
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
-                        .HasColumnName("RecordId");
-
-                    b.Property<string>("ProcessKind")
-                        .IsRequired()
-                        .HasMaxLength(34)
-                        .HasColumnType("character varying(34)");
-
-                    b.Property<Guid>("StorageStamp")
-                        .IsConcurrencyToken()
-                        .HasColumnType("uuid");
-
-                    b.HasKey("StorageId");
-
-                    b.HasIndex("ProcessKind", "Id")
-                        .IsUnique();
-
-                    b.ToTable("CLINICAL_ACTIVITY", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_CLINICAL_ACTIVITY_VALUES", "\"ProcessKind\" <> 'ClinicalActivity' OR (\"Quantity\" > 0 AND \"PriceSnapshotVnd\" >= 0)");
-
-                            t.HasCheckConstraint("CK_FOLLOW_UP_DURATION", "\"ProcessKind\" <> 'FollowUpInstruction' OR \"DurationMinutes\" BETWEEN 15 AND 480 AND \"DurationMinutes\" % 15 = 0");
-
-                            t.HasCheckConstraint("CK_FOLLOW_UP_WINDOW", "\"ProcessKind\" <> 'FollowUpInstruction' OR (\"EarliestOn\" <= \"TargetOn\" AND \"TargetOn\" <= \"LatestOn\")");
-                        });
-
-                    b.HasDiscriminator<string>("ProcessKind").HasValue("TreatmentProcessRecord");
-
-                    b.UseTphMappingStrategy();
                 });
 
             modelBuilder.Entity("DCMS.Domain.Features.Treatment.TreatmentTemplate", b =>
@@ -2964,13 +2139,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<int>("CreatedBy")
                         .HasColumnType("integer");
 
-                    b.Property<string>("DefinitionKind")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(24)
-                        .HasColumnType("character varying(24)")
-                        .HasDefaultValue("LegacySteps");
-
                     b.Property<DateTimeOffset?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -2979,13 +2147,11 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(160)
                         .HasColumnType("character varying(160)");
 
-                    b.Property<Guid>("StorageStamp")
-                        .IsConcurrencyToken()
-                        .HasColumnType("uuid");
-
                     b.Property<int>("Version")
                         .IsConcurrencyToken()
-                        .HasColumnType("integer");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
 
                     b.ComplexCollection(typeof(List<Dictionary<string, object>>), "Items", "DCMS.Domain.Features.Treatment.TreatmentTemplate.Items#TreatmentTemplateItem", b1 =>
                         {
@@ -3024,33 +2190,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                             b1.Property<Guid>("TemplateId");
 
                             b1.ToJson("Items");
-                        });
-
-                    b.ComplexCollection(typeof(List<Dictionary<string, object>>), "Versions", "DCMS.Domain.Features.Treatment.TreatmentTemplate.Versions#TreatmentTemplateVersion", b1 =>
-                        {
-                            b1.IsRequired();
-
-                            b1.Property<DateTimeOffset?>("ActivatedAt");
-
-                            b1.Property<DateTimeOffset>("CreatedAt");
-
-                            b1.Property<int>("CreatedBy");
-
-                            b1.Property<Guid>("Id");
-
-                            b1.Property<int>("Number");
-
-                            b1.Property<DateTimeOffset?>("RetiredAt");
-
-                            b1.Property<string>("State")
-                                .IsRequired();
-
-                            b1.Property<string>("StepsJson")
-                                .IsRequired();
-
-                            b1.Property<Guid>("TemplateId");
-
-                            b1.ToJson("Versions");
                         });
 
                     b.HasKey("Id");
@@ -3094,29 +2233,17 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)");
 
-                    b.Property<DateTimeOffset>("RecordedAt")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<int>("RecordedBy")
                         .HasColumnType("integer");
-
-                    b.Property<bool>("RequiresClinicalSourceReview")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("SourceJson")
-                        .HasColumnType("jsonb");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(24)
                         .HasColumnType("character varying(24)");
 
-                    b.Property<Guid>("StorageStamp")
+                    b.Property<int>("Version")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("Version")
                         .HasColumnType("integer");
 
                     b.ComplexCollection(typeof(List<Dictionary<string, object>>), "Investigations", "DCMS.Domain.Features.Visits.Visit.Investigations#InvestigationOrder", b1 =>
@@ -3220,11 +2347,9 @@ namespace DCMS.Infrastructure.Persistence.Migrations
 
                     b.ToTable("VISIT", null, t =>
                         {
-                            t.HasCheckConstraint("CK_VISIT_Arrival", "\"ArrivalAt\" <= \"RecordedAt\"");
-
                             t.HasCheckConstraint("CK_VISIT_Purpose", "\"Purpose\" IN ('InitialExamination','TreatmentContinuation','PostoperativeOrWarrantyReview','PeriodicOrNewProblem')");
 
-                            t.HasCheckConstraint("CK_VISIT_Status", "\"Status\" IN ('Queued','InProgress','Completed','Cancelled')");
+                            t.HasCheckConstraint("CK_VISIT_Status", "\"Status\" IN ('Queued','InProgress','ExaminationConfirmed','Completed','Cancelled')");
                         });
                 });
 
@@ -3236,9 +2361,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<int>("AccessFailedCount")
-                        .HasColumnType("integer");
-
                     b.Property<string>("AccountType")
                         .IsRequired()
                         .HasMaxLength(16)
@@ -3248,11 +2370,12 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("text[]");
 
-                    b.Property<string>("ConcurrencyStamp")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("text")
-                        .HasColumnName("ConcurrencyStamp");
+                    b.Property<string>("AuthData")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("AuthData")
+                        .HasDefaultValueSql("'{}'::jsonb");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -3272,48 +2395,19 @@ namespace DCMS.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("FullName")
                         .IsRequired()
+                        .ValueGeneratedOnUpdateSometimes()
                         .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
-
-                    b.Property<string>("GoogleSubject")
-                        .HasColumnType("text");
+                        .HasColumnType("character varying(160)")
+                        .HasColumnName("FullName");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
-
-                    b.Property<bool>("LockoutEnabled")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTimeOffset?>("LockoutEnd")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("NormalizedEmail")
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
-
-                    b.Property<string>("NormalizedPhone")
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("text")
-                        .HasComputedColumnSql("NULLIF(regexp_replace(btrim(\"PhoneNumber\"), '[ ()-]', '', 'g'), '')", true);
-
-                    b.Property<string>("NormalizedUserName")
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
 
                     b.Property<string>("PasswordHash")
                         .HasColumnType("text");
 
                     b.Property<string>("PhoneNumber")
                         .HasColumnType("text");
-
-                    b.Property<bool>("PhoneNumberConfirmed")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("SecurityStamp")
-                        .HasColumnType("text");
-
-                    b.Property<bool>("TwoFactorEnabled")
-                        .HasColumnType("boolean");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -3323,217 +2417,19 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(256)");
 
                     b.Property<int>("Version")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnUpdateSometimes()
                         .HasColumnType("integer")
                         .HasColumnName("Version");
 
-                    b.ComplexCollection(typeof(List<Dictionary<string, object>>), "Claims", "DCMS.Infrastructure.Features.Accounts.ApplicationUser.Claims#AccountClaim", b1 =>
-                        {
-                            b1.IsRequired();
-
-                            b1.Property<int>("Id");
-
-                            b1.Property<string>("Type");
-
-                            b1.Property<string>("Value");
-
-                            b1.ToJson("Claims");
-                        });
-
-                    b.ComplexCollection(typeof(List<Dictionary<string, object>>), "EmailVerifications", "DCMS.Infrastructure.Features.Accounts.ApplicationUser.EmailVerifications#EmailVerificationToken", b1 =>
-                        {
-                            b1.IsRequired();
-
-                            b1.Property<int>("AccountId");
-
-                            b1.Property<string>("CodeHash")
-                                .IsRequired();
-
-                            b1.Property<DateTimeOffset>("CreatedAt");
-
-                            b1.Property<DateTimeOffset>("ExpiresAt");
-
-                            b1.Property<long>("Id");
-
-                            b1.Property<DateTimeOffset>("LastSentAt");
-
-                            b1.Property<string>("NormalizedEmail")
-                                .IsRequired();
-
-                            b1.Property<int>("ResendCount");
-
-                            b1.Property<DateTimeOffset?>("UsedAt");
-
-                            b1.Property<int>("VerifyAttempts");
-
-                            b1.ToJson("EmailVerifications");
-                        });
-
-                    b.ComplexCollection(typeof(List<Dictionary<string, object>>), "IdentityTokens", "DCMS.Infrastructure.Features.Accounts.ApplicationUser.IdentityTokens#AccountIdentityToken", b1 =>
-                        {
-                            b1.IsRequired();
-
-                            b1.Property<string>("Name")
-                                .IsRequired();
-
-                            b1.Property<string>("Provider")
-                                .IsRequired();
-
-                            b1.Property<string>("Value");
-
-                            b1.ToJson("IdentityTokens");
-                        });
-
-                    b.ComplexCollection(typeof(List<Dictionary<string, object>>), "Logins", "DCMS.Infrastructure.Features.Accounts.ApplicationUser.Logins#AccountLogin", b1 =>
-                        {
-                            b1.IsRequired();
-
-                            b1.Property<string>("DisplayName");
-
-                            b1.Property<string>("Key")
-                                .IsRequired();
-
-                            b1.Property<string>("Provider")
-                                .IsRequired();
-
-                            b1.ToJson("Logins");
-                        });
-
-                    b.ComplexCollection(typeof(List<Dictionary<string, object>>), "Recoveries", "DCMS.Infrastructure.Features.Accounts.ApplicationUser.Recoveries#RecoveryToken", b1 =>
-                        {
-                            b1.IsRequired();
-
-                            b1.Property<int>("AccountId");
-
-                            b1.Property<string>("ChannelType")
-                                .IsRequired();
-
-                            b1.Property<DateTimeOffset>("CreatedAt");
-
-                            b1.Property<DateTimeOffset>("ExpiresAt");
-
-                            b1.Property<int>("Id");
-
-                            b1.Property<DateTimeOffset?>("LastResentAt");
-
-                            b1.Property<string>("NormalizedDestination")
-                                .IsRequired();
-
-                            b1.Property<int>("ResendCount");
-
-                            b1.Property<string>("ResetGrantHash")
-                                .IsRequired();
-
-                            b1.Property<string>("TokenHash")
-                                .IsRequired();
-
-                            b1.Property<DateTimeOffset?>("UsedAt");
-
-                            b1.Property<int>("VerifyAttempts");
-
-                            b1.ToJson("Recoveries");
-                        });
-
-                    b.ComplexCollection(typeof(List<Dictionary<string, object>>), "RecoveryDeliveries", "DCMS.Infrastructure.Features.Accounts.ApplicationUser.RecoveryDeliveries#RecoveryOutbox", b1 =>
-                        {
-                            b1.IsRequired();
-
-                            b1.Property<int>("AccountId");
-
-                            b1.Property<string>("ChannelType")
-                                .IsRequired();
-
-                            b1.Property<string>("Destination")
-                                .IsRequired();
-
-                            b1.Property<long>("Id");
-
-                            b1.Property<DateTimeOffset>("OccurredAt");
-
-                            b1.Property<string>("Provider")
-                                .IsRequired();
-
-                            b1.Property<string>("ProviderMessageId");
-
-                            b1.Property<string>("Status")
-                                .IsRequired();
-
-                            b1.ToJson("RecoveryDeliveries");
-                        });
-
-                    b.ComplexCollection(typeof(List<Dictionary<string, object>>), "Sessions", "DCMS.Infrastructure.Features.Accounts.ApplicationUser.Sessions#AuthSession", b1 =>
-                        {
-                            b1.IsRequired();
-
-                            b1.Property<int>("AccountId");
-
-                            b1.Property<int>("ActivityVersion");
-
-                            b1.Property<string>("ClientKind")
-                                .IsRequired();
-
-                            b1.Property<DateTimeOffset>("CreatedAt");
-
-                            b1.Property<string>("DeviceLabel")
-                                .IsRequired();
-
-                            b1.Property<DateTimeOffset>("ExpiresAt");
-
-                            b1.Property<Guid>("Id");
-
-                            b1.Property<DateTimeOffset>("LastInteractiveActivityAt");
-
-                            b1.Property<DateTimeOffset>("LastSeenAt");
-
-                            b1.Property<DateTimeOffset?>("RevokedAt");
-
-                            b1.ComplexCollection(typeof(List<Dictionary<string, object>>), "RefreshTokens", "DCMS.Infrastructure.Features.Accounts.ApplicationUser.Sessions#AuthSession.RefreshTokens#AuthRefreshToken", b2 =>
-                                {
-                                    b2.IsRequired();
-
-                                    b2.Property<int>("AccountId");
-
-                                    b2.Property<DateTimeOffset>("ExpiresAt");
-
-                                    b2.Property<long>("Id");
-
-                                    b2.Property<DateTimeOffset>("IssuedAt");
-
-                                    b2.Property<long?>("ReplacedById");
-
-                                    b2.Property<DateTimeOffset?>("RevokedAt");
-
-                                    b2.Property<Guid>("SessionId");
-
-                                    b2.Property<string>("Status")
-                                        .IsRequired();
-
-                                    b2.Property<string>("TokenHash")
-                                        .IsRequired();
-                                });
-
-                            b1.ToJson("Sessions");
-                        });
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
 
                     b.HasKey("Id");
 
                     b.HasAlternateKey("EmployeeId")
                         .HasName("AK_USER_ACCOUNT_EmployeeId");
-
-                    b.HasIndex("GoogleSubject")
-                        .IsUnique();
-
-                    b.HasIndex("NormalizedEmail")
-                        .IsUnique()
-                        .HasDatabaseName("EmailIndex");
-
-                    b.HasIndex("NormalizedPhone")
-                        .IsUnique();
-
-                    b.HasIndex("NormalizedUserName")
-                        .IsUnique()
-                        .HasDatabaseName("UserNameIndex");
 
                     b.ToTable("USER_ACCOUNT", (string)null);
                 });
@@ -4602,24 +3498,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasDiscriminator().HasValue("PatientPrescriptionReceipt");
                 });
 
-            modelBuilder.Entity("DCMS.Domain.Features.Prescriptions.PrescriptionCommandReceipt", b =>
-                {
-                    b.HasBaseType("DCMS.Domain.Common.CommandReceiptRecord");
-
-                    b.Property<int>("ActorId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("ActorId");
-
-                    b.HasIndex("ActorId");
-
-                    b.HasIndex(new[] { "ReceiptType", "ActorId", "RequestKey" }, "UX_PrescriptionCommandReceipt_Scope")
-                        .IsUnique()
-                        .HasDatabaseName("UX_RECEIPT_ActorId_RequestKey");
-
-                    b.HasDiscriminator().HasValue("PrescriptionCommandReceipt");
-                });
-
             modelBuilder.Entity("DCMS.Domain.Features.Scheduling.ScheduleReceipt", b =>
                 {
                     b.HasBaseType("DCMS.Domain.Common.CommandReceiptRecord");
@@ -4797,458 +3675,38 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasDiscriminator().HasValue("ReceptionReceipt");
                 });
 
-            modelBuilder.Entity("DCMS.Domain.Features.Prescriptions.ExternalPrescription", b =>
-                {
-                    b.HasBaseType("DCMS.Domain.Common.PrescriptionRecord");
-
-                    b.Property<int>("BranchId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("BranchId");
-
-                    b.Property<string>("CorrectionReason")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("CorrectionReason");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("CreatedAt");
-
-                    b.Property<int>("CreatedBy")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("CreatedBy");
-
-                    b.Property<string>("Diagnosis")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
-                        .HasColumnName("Diagnosis");
-
-                    b.Property<DateTimeOffset?>("FinalizedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("FinalizedAt");
-
-                    b.Property<int?>("FinalizedBy")
-                        .HasColumnType("integer")
-                        .HasColumnName("FinalizedBy");
-
-                    b.Property<string>("GeneralAdvice")
-                        .IsRequired()
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
-                        .HasColumnName("GeneralAdvice");
-
-                    b.Property<int>("PatientId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("PatientId");
-
-                    b.Property<int>("PrescribedByDoctorId")
-                        .HasColumnType("integer")
-                        .HasColumnName("PrescribedByDoctorId");
-
-                    b.Property<int>("Revision")
-                        .HasColumnType("integer")
-                        .HasColumnName("Revision");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("Status");
-
-                    b.Property<Guid?>("SupersedesId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("SupersedesId");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("UpdatedAt");
-
-                    b.Property<int>("UpdatedBy")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("UpdatedBy");
-
-                    b.Property<string>("VerificationCode")
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
-                        .HasColumnName("VerificationCode");
-
-                    b.Property<int>("Version")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("Version");
-
-                    b.Property<Guid>("VisitId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("VisitId");
-
-                    b.ComplexCollection(typeof(List<Dictionary<string, object>>), "Lines", "DCMS.Domain.Features.Prescriptions.ExternalPrescription.Lines#ExternalPrescriptionLine", b1 =>
-                        {
-                            b1.IsRequired();
-
-                            b1.Property<string>("ActiveIngredient");
-
-                            b1.Property<string>("AfternoonDose")
-                                .IsRequired();
-
-                            b1.Property<int>("BranchId");
-
-                            b1.Property<DateTimeOffset>("CreatedAt");
-
-                            b1.Property<int>("CreatedBy");
-
-                            b1.Property<int>("Days");
-
-                            b1.Property<string>("DosageForm");
-
-                            b1.Property<string>("EveningDose")
-                                .IsRequired();
-
-                            b1.Property<DateTimeOffset?>("FinalizedAt");
-
-                            b1.Property<Guid>("Id");
-
-                            b1.Property<string>("Instructions")
-                                .IsRequired();
-
-                            b1.Property<string>("MealTiming")
-                                .IsRequired();
-
-                            b1.Property<string>("MedicineCode")
-                                .IsRequired();
-
-                            b1.Property<Guid?>("MedicineId");
-
-                            b1.Property<string>("MedicineName")
-                                .IsRequired();
-
-                            b1.Property<string>("MorningDose")
-                                .IsRequired();
-
-                            b1.Property<string>("NoonDose")
-                                .IsRequired();
-
-                            b1.Property<int>("PatientId");
-
-                            b1.Property<int>("PrescribedByDoctorId");
-
-                            b1.Property<Guid>("PrescriptionId");
-
-                            b1.Property<int>("Quantity");
-
-                            b1.Property<string>("Route")
-                                .IsRequired();
-
-                            b1.Property<string>("Status")
-                                .IsRequired();
-
-                            b1.Property<string>("Strength");
-
-                            b1.Property<string>("Unit")
-                                .IsRequired();
-
-                            b1.Property<DateTimeOffset>("UpdatedAt");
-
-                            b1.Property<int>("UpdatedBy");
-
-                            b1.Property<int>("Version");
-
-                            b1.Property<Guid>("VisitId");
-
-                            b1.ToJson("VisitLines");
-                        });
-
-                    b.HasIndex("FinalizedBy");
-
-                    b.HasIndex("PrescribedByDoctorId");
-
-                    b.HasIndex("SupersedesId");
-
-                    b.HasIndex("PatientId", "Status");
-
-                    b.HasIndex("VisitId", "Revision")
-                        .IsUnique();
-
-                    b.ToTable(t =>
-                        {
-                            t.HasCheckConstraint("CK_PRESCRIPTION_VISIT_REVISION", "\"PrescriptionKind\" <> 'ExternalPrescription' OR \"Revision\" >= 1");
-
-                            t.HasCheckConstraint("CK_PRESCRIPTION_VISIT_STATUS", "\"PrescriptionKind\" <> 'ExternalPrescription' OR \"Status\" IN ('Draft','Finalized','Superseded')");
-                        });
-
-                    b.HasDiscriminator().HasValue("ExternalPrescription");
-                });
-
-            modelBuilder.Entity("DCMS.Domain.Features.Prescriptions.PatientPrescription", b =>
-                {
-                    b.HasBaseType("DCMS.Domain.Common.PrescriptionRecord");
-
-                    b.Property<string>("Advice")
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)")
-                        .HasColumnName("Advice");
-
-                    b.Property<int>("BranchId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("BranchId");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("CreatedAt");
-
-                    b.Property<string>("Diagnosis")
-                        .IsRequired()
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
-                        .HasColumnName("Diagnosis");
-
-                    b.Property<string>("OtherDiagnosis")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
-                        .HasColumnName("OtherDiagnosis");
-
-                    b.Property<int>("PatientId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("PatientId");
-
-                    b.Property<DateOnly>("PrescribedOn")
-                        .HasColumnType("date")
-                        .HasColumnName("PrescribedOn");
-
-                    b.Property<int>("PrescriberEmployeeId")
-                        .HasColumnType("integer")
-                        .HasColumnName("PrescriberEmployeeId");
-
-                    b.Property<bool>("RequiresExternalPurchase")
-                        .HasColumnType("boolean")
-                        .HasColumnName("RequiresExternalPurchase");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("UpdatedAt");
-
-                    b.Property<int>("Version")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("Version");
-
-                    b.ComplexCollection(typeof(List<Dictionary<string, object>>), "Items", "DCMS.Domain.Features.Prescriptions.PatientPrescription.Items#PatientPrescriptionItem", b1 =>
-                        {
-                            b1.IsRequired();
-
-                            b1.Property<string>("DosageForm");
-
-                            b1.Property<Guid>("Id");
-
-                            b1.Property<string>("Instructions")
-                                .IsRequired();
-
-                            b1.Property<bool>("IsExternalPurchase");
-
-                            b1.Property<string>("MedicineCode")
-                                .IsRequired();
-
-                            b1.Property<Guid>("MedicineId");
-
-                            b1.Property<string>("MedicineName")
-                                .IsRequired();
-
-                            b1.Property<int>("Position");
-
-                            b1.Property<Guid>("PrescriptionId");
-
-                            b1.Property<int>("Quantity");
-
-                            b1.Property<string>("Strength");
-
-                            b1.Property<string>("Unit")
-                                .IsRequired();
-
-                            b1.ToJson("Items");
-                        });
-
-                    b.HasIndex("BranchId");
-
-                    b.HasIndex("PrescriberEmployeeId");
-
-                    b.HasIndex("PatientId", "PrescribedOn");
-
-                    b.ToTable(t =>
-                        {
-                            t.HasCheckConstraint("CK_PRESCRIPTION_VISIT_REVISION", "\"PrescriptionKind\" <> 'ExternalPrescription' OR \"Revision\" >= 1");
-
-                            t.HasCheckConstraint("CK_PRESCRIPTION_VISIT_STATUS", "\"PrescriptionKind\" <> 'ExternalPrescription' OR \"Status\" IN ('Draft','Finalized','Superseded')");
-                        });
-
-                    b.HasDiscriminator().HasValue("PatientPrescription");
-                });
-
-            modelBuilder.Entity("DCMS.Domain.Features.Prescriptions.PrescriptionTemplate", b =>
-                {
-                    b.HasBaseType("DCMS.Domain.Common.PrescriptionRecord");
-
-                    b.Property<string>("Code")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
-                        .HasColumnName("Code");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("CreatedAt");
-
-                    b.Property<int>("CreatedBy")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("CreatedBy");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
-                        .HasColumnName("Description");
-
-                    b.Property<string>("DiagnosisKind")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("DiagnosisKind");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean")
-                        .HasColumnName("IsActive");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("Name");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("UpdatedAt");
-
-                    b.Property<int>("UpdatedBy")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("UpdatedBy");
-
-                    b.Property<int>("Version")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("Version");
-
-                    b.ComplexCollection(typeof(List<Dictionary<string, object>>), "Lines", "DCMS.Domain.Features.Prescriptions.PrescriptionTemplate.Lines#PrescriptionTemplateLine", b1 =>
-                        {
-                            b1.IsRequired();
-
-                            b1.Property<string>("ActiveIngredient");
-
-                            b1.Property<string>("AfternoonDose")
-                                .IsRequired();
-
-                            b1.Property<int>("Days");
-
-                            b1.Property<string>("DosageForm");
-
-                            b1.Property<string>("EveningDose")
-                                .IsRequired();
-
-                            b1.Property<Guid>("Id");
-
-                            b1.Property<string>("Instructions")
-                                .IsRequired();
-
-                            b1.Property<string>("MealTiming")
-                                .IsRequired();
-
-                            b1.Property<string>("MedicineCode")
-                                .IsRequired();
-
-                            b1.Property<Guid>("MedicineId");
-
-                            b1.Property<string>("MedicineName")
-                                .IsRequired();
-
-                            b1.Property<string>("MorningDose")
-                                .IsRequired();
-
-                            b1.Property<string>("NoonDose")
-                                .IsRequired();
-
-                            b1.Property<int>("Quantity");
-
-                            b1.Property<string>("Route")
-                                .IsRequired();
-
-                            b1.Property<int>("SortOrder");
-
-                            b1.Property<string>("Strength");
-
-                            b1.Property<Guid>("TemplateId");
-
-                            b1.Property<string>("Unit")
-                                .IsRequired();
-
-                            b1.ToJson("TemplateLines");
-                        });
-
-                    b.HasIndex("Code")
-                        .IsUnique();
-
-                    b.HasIndex("CreatedBy");
-
-                    b.HasIndex("UpdatedBy");
-
-                    b.ToTable(t =>
-                        {
-                            t.HasCheckConstraint("CK_PRESCRIPTION_VISIT_REVISION", "\"PrescriptionKind\" <> 'ExternalPrescription' OR \"Revision\" >= 1");
-
-                            t.HasCheckConstraint("CK_PRESCRIPTION_VISIT_STATUS", "\"PrescriptionKind\" <> 'ExternalPrescription' OR \"Status\" IN ('Draft','Finalized','Superseded')");
-                        });
-
-                    b.HasDiscriminator().HasValue("PrescriptionTemplate");
-                });
-
             modelBuilder.Entity("DCMS.Domain.Features.Appointments.AppointmentOutboxEvent", b =>
                 {
                     b.HasBaseType("DCMS.Domain.Features.Appointments.NotificationRecord");
 
-                    b.Property<Guid>("AggregateId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset?>("DispatchedAt")
-                        .HasColumnType("timestamp with time zone");
+                    b.Property<Guid?>("AggregateId")
+                        .ValueGeneratedOnUpdateSometimes()
+                        .HasColumnType("uuid")
+                        .HasColumnName("AppointmentId");
 
                     b.Property<string>("EventType")
                         .IsRequired()
+                        .ValueGeneratedOnUpdateSometimes()
                         .HasMaxLength(80)
-                        .HasColumnType("character varying(80)");
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("Kind");
 
                     b.Property<DateTimeOffset>("OccurredAt")
-                        .HasColumnType("timestamp with time zone");
+                        .ValueGeneratedOnUpdateSometimes()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("CreatedAt");
 
-                    b.Property<string>("PayloadJson")
+                    b.Property<string>("Status")
                         .IsRequired()
-                        .HasColumnType("jsonb");
+                        .ValueGeneratedOnUpdateSometimes()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("Status");
 
                     b.HasIndex("AggregateId");
 
-                    b.HasIndex("DispatchedAt", "OccurredAt");
+                    b.HasIndex("Status", "OccurredAt")
+                        .HasFilter("\"NotificationRecordKind\" = 'AppointmentOutboxEvent'");
 
                     b.HasDiscriminator().HasValue("AppointmentOutboxEvent");
                 });
@@ -5285,18 +3743,11 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(160)
                         .HasColumnType("character varying(160)");
 
-                    b.Property<string>("DeepLink")
-                        .HasMaxLength(300)
-                        .HasColumnType("character varying(300)");
-
-                    b.Property<bool>("HasExternalFailure")
-                        .HasColumnType("boolean");
-
                     b.Property<string>("Kind")
                         .IsRequired()
                         .ValueGeneratedOnUpdateSometimes()
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
                         .HasColumnName("Kind");
 
                     b.Property<string>("PublicId")
@@ -5306,9 +3757,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
 
                     b.Property<DateTimeOffset?>("ReadAt")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("RequestId")
-                        .HasColumnType("uuid");
 
                     b.Property<string>("Title")
                         .IsRequired()
@@ -5342,12 +3790,11 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)");
 
-                    b.Property<DateTimeOffset?>("LastAttemptAt")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<string>("LastError")
+                        .ValueGeneratedOnUpdateSometimes()
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("Error");
 
                     b.Property<DateTimeOffset?>("NextRetryAt")
                         .HasColumnType("timestamp with time zone");
@@ -5399,15 +3846,16 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasColumnName("CreatedAt");
 
                     b.Property<string>("Error")
-                        .IsRequired()
+                        .ValueGeneratedOnUpdateSometimes()
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("Error");
 
                     b.Property<string>("Kind")
                         .IsRequired()
                         .ValueGeneratedOnUpdateSometimes()
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
                         .HasColumnName("Kind");
 
                     b.Property<Guid?>("NotificationId")
@@ -5427,6 +3875,7 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasIndex("NotificationId");
 
                     b.HasIndex("Status", "CreatedAt")
+                        .HasDatabaseName("IX_IN_APP_NOTIFICATION_Status_CreatedAt1")
                         .HasFilter("\"NotificationRecordKind\" = 'StaffHandlingItem'");
 
                     b.HasDiscriminator().HasValue("StaffHandlingItem");
@@ -5484,518 +3933,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasDiscriminator().HasValue("WorkingWeek");
                 });
 
-            modelBuilder.Entity("DCMS.Domain.Features.Treatment.ClinicalActivity", b =>
-                {
-                    b.HasBaseType("DCMS.Domain.Features.Treatment.TreatmentProcessRecord");
-
-                    b.Property<int?>("AssistantId")
-                        .HasColumnType("integer")
-                        .HasColumnName("AssistantId");
-
-                    b.Property<int>("BranchId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("BranchId");
-
-                    b.Property<string>("ChargingBasis")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
-                        .HasColumnName("ChargingBasis");
-
-                    b.Property<string>("ChargingBasisEvidence")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
-                        .HasColumnName("ChargingBasisEvidence");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("CreatedAt");
-
-                    b.Property<long>("DiscountSnapshotVnd")
-                        .HasColumnType("bigint")
-                        .HasColumnName("DiscountSnapshotVnd");
-
-                    b.Property<Guid?>("DossierId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("uuid")
-                        .HasColumnName("DossierId");
-
-                    b.Property<int?>("ElapsedMinutes")
-                        .HasColumnType("integer")
-                        .HasColumnName("ElapsedMinutes");
-
-                    b.Property<string>("FeeStatus")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(24)
-                        .HasColumnType("character varying(24)")
-                        .HasDefaultValue("Unavailable")
-                        .HasColumnName("FeeStatus");
-
-                    b.Property<bool>("IsPlanTransfer")
-                        .HasColumnType("boolean")
-                        .HasColumnName("IsPlanTransfer");
-
-                    b.Property<Guid?>("ItemId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("uuid")
-                        .HasColumnName("ItemId");
-
-                    b.Property<string>("LabWorkSnapshot")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
-                        .HasColumnName("LabWorkSnapshot");
-
-                    b.Property<string>("NextSteps")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)")
-                        .HasColumnName("NextSteps");
-
-                    b.Property<string>("Outcome")
-                        .IsRequired()
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)")
-                        .HasColumnName("Outcome");
-
-                    b.Property<int>("PatientId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("PatientId");
-
-                    b.Property<DateTimeOffset>("PerformedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("PerformedAt");
-
-                    b.Property<int>("PerformerId")
-                        .HasColumnType("integer")
-                        .HasColumnName("PerformerId");
-
-                    b.Property<int?>("PlanVersion")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("PlanVersion");
-
-                    b.Property<DateTimeOffset?>("PostedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("PostedAt");
-
-                    b.Property<decimal>("PriceSnapshotVnd")
-                        .HasPrecision(18)
-                        .HasColumnType("numeric(18,0)")
-                        .HasColumnName("PriceSnapshotVnd");
-
-                    b.Property<decimal>("Quantity")
-                        .HasPrecision(12, 3)
-                        .HasColumnType("numeric(12,3)")
-                        .HasColumnName("Quantity");
-
-                    b.Property<int?>("RecordedBy")
-                        .HasColumnType("integer")
-                        .HasColumnName("RecordedBy");
-
-                    b.Property<string>("Region")
-                        .HasMaxLength(80)
-                        .HasColumnType("character varying(80)")
-                        .HasColumnName("Region");
-
-                    b.Property<Guid?>("ReviewId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("uuid")
-                        .HasColumnName("ReviewId");
-
-                    b.Property<int>("ServiceId")
-                        .HasColumnType("integer")
-                        .HasColumnName("ServiceId");
-
-                    b.Property<string>("ServiceNameSnapshot")
-                        .HasMaxLength(160)
-                        .HasColumnType("character varying(160)")
-                        .HasColumnName("ServiceNameSnapshot");
-
-                    b.Property<string>("SourceKind")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
-                        .HasDefaultValue("Visit")
-                        .HasColumnName("SourceKind");
-
-                    b.Property<string>("State")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
-                        .HasColumnName("State");
-
-                    b.Property<Guid?>("StepId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("uuid")
-                        .HasColumnName("StepId");
-
-                    b.Property<string>("Unit")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
-                        .HasColumnName("Unit");
-
-                    b.Property<int>("Version")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("Version");
-
-                    b.Property<Guid?>("VisitId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("uuid")
-                        .HasColumnName("VisitId");
-
-                    b.HasIndex("ItemId", "PlanVersion")
-                        .IsUnique()
-                        .HasFilter("\"IsPlanTransfer\" = TRUE");
-
-                    b.HasIndex("VisitId", "State");
-
-                    b.HasIndex("PatientId", "DossierId", "StepId");
-
-                    b.ToTable(t =>
-                        {
-                            t.HasCheckConstraint("CK_CLINICAL_ACTIVITY_VALUES", "\"ProcessKind\" <> 'ClinicalActivity' OR (\"Quantity\" > 0 AND \"PriceSnapshotVnd\" >= 0)");
-
-                            t.HasCheckConstraint("CK_FOLLOW_UP_DURATION", "\"ProcessKind\" <> 'FollowUpInstruction' OR \"DurationMinutes\" BETWEEN 15 AND 480 AND \"DurationMinutes\" % 15 = 0");
-
-                            t.HasCheckConstraint("CK_FOLLOW_UP_WINDOW", "\"ProcessKind\" <> 'FollowUpInstruction' OR (\"EarliestOn\" <= \"TargetOn\" AND \"TargetOn\" <= \"LatestOn\")");
-                        });
-
-                    b.HasDiscriminator().HasValue("ClinicalActivity");
-                });
-
-            modelBuilder.Entity("DCMS.Domain.Features.Treatment.ClinicalCareNote", b =>
-                {
-                    b.HasBaseType("DCMS.Domain.Features.Treatment.TreatmentProcessRecord");
-
-                    b.Property<int>("ActorId")
-                        .HasColumnType("integer")
-                        .HasColumnName("ActorId");
-
-                    b.Property<int>("BranchId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("BranchId");
-
-                    b.Property<string>("Content")
-                        .IsRequired()
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)")
-                        .HasColumnName("Content");
-
-                    b.Property<int>("PatientId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("PatientId");
-
-                    b.Property<DateTimeOffset>("RecordedAt")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("RecordedAt");
-
-                    b.Property<string>("Response")
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)")
-                        .HasColumnName("Response");
-
-                    b.Property<Guid?>("ReviewId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("uuid")
-                        .HasColumnName("ReviewId");
-
-                    b.Property<Guid?>("SourceActivityId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("uuid")
-                        .HasColumnName("SourceActivityId");
-
-                    b.Property<Guid>("VisitId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("uuid")
-                        .HasColumnName("VisitId");
-
-                    b.HasIndex("VisitId", "RecordedAt");
-
-                    b.ToTable(t =>
-                        {
-                            t.HasCheckConstraint("CK_CLINICAL_ACTIVITY_VALUES", "\"ProcessKind\" <> 'ClinicalActivity' OR (\"Quantity\" > 0 AND \"PriceSnapshotVnd\" >= 0)");
-
-                            t.HasCheckConstraint("CK_FOLLOW_UP_DURATION", "\"ProcessKind\" <> 'FollowUpInstruction' OR \"DurationMinutes\" BETWEEN 15 AND 480 AND \"DurationMinutes\" % 15 = 0");
-
-                            t.HasCheckConstraint("CK_FOLLOW_UP_WINDOW", "\"ProcessKind\" <> 'FollowUpInstruction' OR (\"EarliestOn\" <= \"TargetOn\" AND \"TargetOn\" <= \"LatestOn\")");
-                        });
-
-                    b.HasDiscriminator().HasValue("ClinicalCareNote");
-                });
-
-            modelBuilder.Entity("DCMS.Domain.Features.Treatment.ClinicalReview", b =>
-                {
-                    b.HasBaseType("DCMS.Domain.Features.Treatment.TreatmentProcessRecord");
-
-                    b.Property<string>("Basis")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
-                        .HasColumnName("Basis");
-
-                    b.Property<int>("BranchId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("BranchId");
-
-                    b.Property<string>("Complaint")
-                        .IsRequired()
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)")
-                        .HasColumnName("Complaint");
-
-                    b.Property<string>("Coverage")
-                        .IsRequired()
-                        .HasMaxLength(24)
-                        .HasColumnType("character varying(24)")
-                        .HasColumnName("Coverage");
-
-                    b.Property<string>("CoveredComponent")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("CoveredComponent");
-
-                    b.Property<int>("DentistAccountId")
-                        .HasColumnType("integer")
-                        .HasColumnName("DentistAccountId");
-
-                    b.Property<string>("Exclusions")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
-                        .HasColumnName("Exclusions");
-
-                    b.Property<string>("Findings")
-                        .IsRequired()
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)")
-                        .HasColumnName("Findings");
-
-                    b.Property<string>("NextAction")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)")
-                        .HasColumnName("NextAction");
-
-                    b.Property<string>("Outcome")
-                        .IsRequired()
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)")
-                        .HasColumnName("Outcome");
-
-                    b.Property<int>("PatientId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("PatientId");
-
-                    b.Property<string>("Policy")
-                        .HasMaxLength(160)
-                        .HasColumnType("character varying(160)")
-                        .HasColumnName("Policy");
-
-                    b.Property<string>("PolicyVersion")
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
-                        .HasColumnName("PolicyVersion");
-
-                    b.Property<DateTimeOffset>("RecordedAt")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("RecordedAt");
-
-                    b.Property<Guid?>("SourceActivityId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("uuid")
-                        .HasColumnName("SourceActivityId");
-
-                    b.Property<Guid?>("SourceItemId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("SourceItemId");
-
-                    b.Property<int>("Version")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("Version");
-
-                    b.Property<Guid>("VisitId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("uuid")
-                        .HasColumnName("VisitId");
-
-                    b.HasIndex("SourceActivityId", "SourceItemId");
-
-                    b.HasIndex("VisitId", "RecordedAt");
-
-                    b.ToTable(t =>
-                        {
-                            t.HasCheckConstraint("CK_CLINICAL_ACTIVITY_VALUES", "\"ProcessKind\" <> 'ClinicalActivity' OR (\"Quantity\" > 0 AND \"PriceSnapshotVnd\" >= 0)");
-
-                            t.HasCheckConstraint("CK_FOLLOW_UP_DURATION", "\"ProcessKind\" <> 'FollowUpInstruction' OR \"DurationMinutes\" BETWEEN 15 AND 480 AND \"DurationMinutes\" % 15 = 0");
-
-                            t.HasCheckConstraint("CK_FOLLOW_UP_WINDOW", "\"ProcessKind\" <> 'FollowUpInstruction' OR (\"EarliestOn\" <= \"TargetOn\" AND \"TargetOn\" <= \"LatestOn\")");
-                        });
-
-                    b.HasDiscriminator().HasValue("ClinicalReview");
-                });
-
-            modelBuilder.Entity("DCMS.Domain.Features.Treatment.FollowUpInstruction", b =>
-                {
-                    b.HasBaseType("DCMS.Domain.Features.Treatment.TreatmentProcessRecord");
-
-                    b.Property<Guid?>("ActiveAppointmentId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("ActiveAppointmentId");
-
-                    b.Property<int>("BranchId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("BranchId");
-
-                    b.Property<string>("Capability")
-                        .HasMaxLength(160)
-                        .HasColumnType("character varying(160)")
-                        .HasColumnName("Capability");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("CreatedAt");
-
-                    b.Property<int>("CreatedBy")
-                        .HasColumnType("integer")
-                        .HasColumnName("CreatedBy");
-
-                    b.Property<int?>("DentistId")
-                        .HasColumnType("integer")
-                        .HasColumnName("DentistId");
-
-                    b.Property<Guid?>("DossierId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("uuid")
-                        .HasColumnName("DossierId");
-
-                    b.Property<int>("DurationMinutes")
-                        .HasColumnType("integer")
-                        .HasColumnName("DurationMinutes");
-
-                    b.Property<DateOnly>("EarliestOn")
-                        .HasColumnType("date")
-                        .HasColumnName("EarliestOn");
-
-                    b.Property<string>("Guidance")
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)")
-                        .HasColumnName("Guidance");
-
-                    b.Property<Guid?>("ItemId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("uuid")
-                        .HasColumnName("ItemId");
-
-                    b.Property<DateOnly>("LatestOn")
-                        .HasColumnType("date")
-                        .HasColumnName("LatestOn");
-
-                    b.Property<int>("PatientId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("PatientId");
-
-                    b.Property<int?>("PlanVersion")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("PlanVersion");
-
-                    b.Property<string>("Purpose")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
-                        .HasColumnName("Purpose");
-
-                    b.Property<string>("Reason")
-                        .IsRequired()
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)")
-                        .HasColumnName("Reason");
-
-                    b.Property<Guid?>("SourceActivityId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("uuid")
-                        .HasColumnName("SourceActivityId");
-
-                    b.Property<Guid?>("SourceCompletionEventId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("SourceCompletionEventId");
-
-                    b.Property<Guid?>("SourceVisitId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("SourceVisitId");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("Status");
-
-                    b.Property<Guid?>("StepId")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("uuid")
-                        .HasColumnName("StepId");
-
-                    b.Property<DateOnly>("TargetOn")
-                        .HasColumnType("date")
-                        .HasColumnName("TargetOn");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("UpdatedAt");
-
-                    b.Property<int>("Version")
-                        .ValueGeneratedOnUpdateSometimes()
-                        .HasColumnType("integer")
-                        .HasColumnName("Version");
-
-                    b.HasIndex("ActiveAppointmentId")
-                        .IsUnique()
-                        .HasFilter("\"ActiveAppointmentId\" IS NOT NULL");
-
-                    b.HasIndex("StepId")
-                        .IsUnique()
-                        .HasDatabaseName("IX_FOLLOW_UP_INSTRUCTION_ActiveStep")
-                        .HasFilter("\"StepId\" IS NOT NULL AND \"Status\" IN ('NeedsBooking','Booked')");
-
-                    b.HasIndex("DossierId", "ItemId")
-                        .IsUnique()
-                        .HasDatabaseName("IX_FOLLOW_UP_INSTRUCTION_ActiveItemOnly")
-                        .HasFilter("\"DossierId\" IS NOT NULL AND \"ItemId\" IS NOT NULL AND \"StepId\" IS NULL AND \"Status\" IN ('NeedsBooking','Booked')");
-
-                    b.HasIndex("PatientId", "Status");
-
-                    b.HasIndex("StepId", "SourceCompletionEventId")
-                        .IsUnique()
-                        .HasDatabaseName("IX_FOLLOW_UP_INSTRUCTION_Step_Completion")
-                        .HasFilter("\"StepId\" IS NOT NULL AND \"SourceCompletionEventId\" IS NOT NULL");
-
-                    b.ToTable(t =>
-                        {
-                            t.HasCheckConstraint("CK_CLINICAL_ACTIVITY_VALUES", "\"ProcessKind\" <> 'ClinicalActivity' OR (\"Quantity\" > 0 AND \"PriceSnapshotVnd\" >= 0)");
-
-                            t.HasCheckConstraint("CK_FOLLOW_UP_DURATION", "\"ProcessKind\" <> 'FollowUpInstruction' OR \"DurationMinutes\" BETWEEN 15 AND 480 AND \"DurationMinutes\" % 15 = 0");
-
-                            t.HasCheckConstraint("CK_FOLLOW_UP_WINDOW", "\"ProcessKind\" <> 'FollowUpInstruction' OR (\"EarliestOn\" <= \"TargetOn\" AND \"TargetOn\" <= \"LatestOn\")");
-                        });
-
-                    b.HasDiscriminator().HasValue("FollowUpInstruction");
-                });
-
             modelBuilder.Entity("DCMS.Domain.Features.Accounts.EmployeeProfile", b =>
                 {
                     b.HasOne("DCMS.Infrastructure.Features.Accounts.ApplicationUser", null)
@@ -6012,9 +3949,22 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasForeignKey("BookerAccountId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("DCMS.Infrastructure.Features.Accounts.ApplicationUser", null)
+                    b.HasOne("DCMS.Domain.Features.Scheduling.SchedulingBranch", null)
                         .WithMany()
-                        .HasForeignKey("CancelledBy")
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DCMS.Domain.Features.Accounts.EmployeeProfile", null)
+                        .WithMany()
+                        .HasForeignKey("DentistId")
+                        .HasPrincipalKey("Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DCMS.Domain.Features.Treatment.TreatmentDossier", null)
+                        .WithMany()
+                        .HasForeignKey("DossierId")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("DCMS.Domain.Features.FamilyMembers.FamilyMember", null)
@@ -6022,21 +3972,16 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .HasForeignKey("FamilyMemberId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("DCMS.Infrastructure.Features.Accounts.ApplicationUser", null)
-                        .WithMany()
-                        .HasForeignKey("PatientConsentConfirmedBy")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.HasOne("DCMS.Domain.Features.Patients.PatientProfile", null)
                         .WithMany()
                         .HasForeignKey("PatientId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("DCMS.Domain.Features.Scheduling.ResourceReservation", null)
-                        .WithOne()
-                        .HasForeignKey("DCMS.Domain.Features.Appointments.Appointment", "ReservationId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                    b.HasOne("DCMS.Domain.Features.Scheduling.SchedulingService", null)
+                        .WithMany()
+                        .HasForeignKey("ServiceId", "BranchId")
+                        .HasPrincipalKey("Id", "BranchId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("DCMS.Domain.Features.Appointments.PushDevice", b =>
@@ -6165,32 +4110,26 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
                 });
 
-            modelBuilder.Entity("DCMS.Domain.Features.Scheduling.ResourceReservation", b =>
+            modelBuilder.Entity("DCMS.Domain.Features.Prescriptions.PatientPrescription", b =>
                 {
-                    b.HasOne("DCMS.Domain.Features.Accounts.EmployeeProfile", null)
-                        .WithMany()
-                        .HasForeignKey("AssistantId")
-                        .HasPrincipalKey("Id")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.HasOne("DCMS.Domain.Features.Scheduling.SchedulingBranch", null)
                         .WithMany()
                         .HasForeignKey("BranchId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("DCMS.Domain.Features.Accounts.EmployeeProfile", null)
+                    b.HasOne("DCMS.Domain.Features.Patients.PatientProfile", null)
                         .WithMany()
-                        .HasForeignKey("DentistId")
-                        .HasPrincipalKey("Id")
+                        .HasForeignKey("PatientId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("DCMS.Domain.Features.Scheduling.SchedulingService", null)
+                    b.HasOne("DCMS.Domain.Features.Accounts.EmployeeProfile", null)
                         .WithMany()
-                        .HasForeignKey("ServiceId", "BranchId")
-                        .HasPrincipalKey("Id", "BranchId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .HasForeignKey("PrescriberEmployeeId")
+                        .HasPrincipalKey("Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("DCMS.Domain.Features.Scheduling.SchedulingService", b =>
@@ -6214,15 +4153,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasOne("DCMS.Infrastructure.Features.Accounts.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("PublishedBy")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("DCMS.Domain.Features.Settings.BranchProfile", b =>
-                {
-                    b.HasOne("DCMS.Domain.Features.Scheduling.SchedulingBranch", null)
-                        .WithOne()
-                        .HasForeignKey("DCMS.Domain.Features.Settings.BranchProfile", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
@@ -6269,21 +4199,43 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("DCMS.Domain.Features.SystemSettings.CatalogProvider", null)
+                    b.HasOne("DCMS.Domain.Features.SystemSettings.CatalogProvider", "Supplier")
                         .WithMany()
                         .HasForeignKey("SupplierId")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Material");
+
+                    b.Navigation("Supplier");
                 });
 
             modelBuilder.Entity("DCMS.Domain.Features.SystemSettings.MaterialUsage", b =>
                 {
+                    b.HasOne("DCMS.Domain.Features.Treatment.ClinicalActivity", null)
+                        .WithMany()
+                        .HasForeignKey("ActivityId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.HasOne("DCMS.Domain.Features.SystemSettings.MaterialCatalogItem", null)
                         .WithMany()
                         .HasForeignKey("MaterialId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("DCMS.Domain.Features.Treatment.ClinicalActivity", b =>
+                {
+                    b.HasOne("DCMS.Domain.Features.Treatment.TreatmentDossier", null)
+                        .WithMany()
+                        .HasForeignKey("DossierId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DCMS.Domain.Features.Treatment.TreatmentItem", null)
+                        .WithMany()
+                        .HasForeignKey("ItemId")
+                        .OnDelete(DeleteBehavior.SetNull);
                 });
 
             modelBuilder.Entity("DCMS.Domain.Features.Treatment.LabOrder", b =>
@@ -6336,9 +4288,8 @@ namespace DCMS.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("DCMS.Domain.Features.Visits.Visit", b =>
                 {
                     b.HasOne("DCMS.Domain.Features.Appointments.Appointment", null)
-                        .WithMany()
-                        .HasForeignKey("AppointmentId")
-                        .HasPrincipalKey("Id")
+                        .WithOne()
+                        .HasForeignKey("DCMS.Domain.Features.Visits.Visit", "AppointmentId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
@@ -6394,7 +4345,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasOne("DCMS.Domain.Features.Appointments.Appointment", null)
                         .WithMany()
                         .HasForeignKey("AppointmentId")
-                        .HasPrincipalKey("Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
@@ -6409,7 +4359,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasOne("DCMS.Domain.Features.Appointments.Appointment", null)
                         .WithMany()
                         .HasForeignKey("AppointmentId")
-                        .HasPrincipalKey("Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
@@ -6543,7 +4492,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasOne("DCMS.Domain.Features.Appointments.Appointment", null)
                         .WithMany()
                         .HasForeignKey("AppointmentId")
-                        .HasPrincipalKey("Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
@@ -6553,7 +4501,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasOne("DCMS.Domain.Features.Appointments.Appointment", null)
                         .WithMany()
                         .HasForeignKey("AppointmentId")
-                        .HasPrincipalKey("Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
@@ -6630,15 +4577,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("DCMS.Domain.Features.Prescriptions.PrescriptionCommandReceipt", b =>
-                {
-                    b.HasOne("DCMS.Infrastructure.Features.Accounts.ApplicationUser", null)
-                        .WithMany()
-                        .HasForeignKey("ActorId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("DCMS.Domain.Features.Scheduling.ScheduleReceipt", b =>
                 {
                     b.HasOne("DCMS.Infrastructure.Features.Accounts.ApplicationUser", null)
@@ -6681,76 +4619,12 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("DCMS.Domain.Features.Prescriptions.ExternalPrescription", b =>
-                {
-                    b.HasOne("DCMS.Infrastructure.Features.Accounts.ApplicationUser", null)
-                        .WithMany()
-                        .HasForeignKey("FinalizedBy")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("DCMS.Infrastructure.Features.Accounts.ApplicationUser", null)
-                        .WithMany()
-                        .HasForeignKey("PrescribedByDoctorId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("DCMS.Domain.Features.Prescriptions.ExternalPrescription", null)
-                        .WithMany()
-                        .HasForeignKey("SupersedesId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("DCMS.Domain.Features.Visits.Visit", null)
-                        .WithMany()
-                        .HasForeignKey("VisitId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("DCMS.Domain.Features.Prescriptions.PatientPrescription", b =>
-                {
-                    b.HasOne("DCMS.Domain.Features.Scheduling.SchedulingBranch", null)
-                        .WithMany()
-                        .HasForeignKey("BranchId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("DCMS.Domain.Features.Patients.PatientProfile", null)
-                        .WithMany()
-                        .HasForeignKey("PatientId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("DCMS.Domain.Features.Accounts.EmployeeProfile", null)
-                        .WithMany()
-                        .HasForeignKey("PrescriberEmployeeId")
-                        .HasPrincipalKey("Id")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("DCMS.Domain.Features.Prescriptions.PrescriptionTemplate", b =>
-                {
-                    b.HasOne("DCMS.Infrastructure.Features.Accounts.ApplicationUser", null)
-                        .WithMany()
-                        .HasForeignKey("CreatedBy")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("DCMS.Infrastructure.Features.Accounts.ApplicationUser", null)
-                        .WithMany()
-                        .HasForeignKey("UpdatedBy")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("DCMS.Domain.Features.Appointments.AppointmentOutboxEvent", b =>
                 {
                     b.HasOne("DCMS.Domain.Features.Appointments.Appointment", null)
                         .WithMany()
                         .HasForeignKey("AggregateId")
-                        .HasPrincipalKey("Id")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("DCMS.Domain.Features.Appointments.InAppNotification", b =>
@@ -6763,7 +4637,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasOne("DCMS.Domain.Features.Appointments.Appointment", null)
                         .WithMany()
                         .HasForeignKey("AppointmentId")
-                        .HasPrincipalKey("Id")
                         .OnDelete(DeleteBehavior.Restrict);
                 });
 
@@ -6781,7 +4654,6 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.HasOne("DCMS.Domain.Features.Appointments.Appointment", null)
                         .WithMany()
                         .HasForeignKey("AppointmentId")
-                        .HasPrincipalKey("Id")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("DCMS.Domain.Features.Appointments.InAppNotification", null)

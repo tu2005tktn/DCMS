@@ -34,7 +34,7 @@ public static class ScreenEndpointPermissions
             var kind = p.Split('/')[5]; if (kind.StartsWith('{')) kind = values?.GetValueOrDefault("kind") ?? "{kind}";
             return Need($"catalog.{kind}.{(read ? p.EndsWith("/export") ? "export" : "read" : p.Contains("/state") ? "deactivate" : method == "POST" ? "create" : "update")}");
         }
-        if (p == "/api/finance/statistics") return Need("finance.read");
+        if (p == "/api/finance/statistics") return Need("finance.statistics.read");
         if (p == "/api/work-statistics") return Need("finance.work-statistics.read");
         if (p.StartsWith("/api/system-settings/material-purchases")) return Need($"materials.purchases.{(read ? "read" : method == "DELETE" ? "delete" : method == "POST" ? "create" : "update")}");
         if (p == "/api/system-settings/material-stock") return Need("materials.stock.read");
@@ -50,29 +50,20 @@ public static class ScreenEndpointPermissions
         if (p.StartsWith("/api/availability") || p == "/api/appointments/options") return ScreenEndpointRule.Any("appointments.read", "working-schedules.read", "booking-settings.read", "reception.read", "treatment.read", "treatment.templates.read", "treatment.prices.read");
         if (p.StartsWith("/api/support-requests")) return Need("appointments.support.handle");
         if (p.StartsWith("/api/appointments")) return Need(read ? "appointments.read" : p.EndsWith("/reschedule") ? "appointments.reschedule" : p.EndsWith("/cancel") ? "appointments.cancel"
-            : p.EndsWith("/no-show") ? "appointments.no-show" : p.EndsWith("/attendance-confirmation") || p.Contains("/support-requests") ? "appointments.support.handle" : "appointments.create");
+            : p.EndsWith("/no-show") ? "appointments.no-show" : p.Contains("/support-requests") ? "appointments.support.handle" : "appointments.create");
         if (p.StartsWith("/api/reception")) return Need(read ? "reception.read" : "reception.check-in");
         if (p.StartsWith("/api/system-settings/branches") || p.StartsWith("/api/settings/branches"))
             return Need(p.Contains("/chairs") ? (read ? "chairs.read" : "chairs.manage") : read ? "branches.read" : "branches.manage");
         if (p.StartsWith("/api/prescriptions")) return Need(read && !p.EndsWith("/medicine-options") ? "prescriptions.read" : "prescriptions.manage");
-        if (p.StartsWith("/api/clinical-documents")) return Need(read ? "documents.read" : p.EndsWith("/review") ? "documents.review" : "documents.upload");
+        if (p.StartsWith("/api/clinical-documents")) return Need(read ? "documents.read" : p.EndsWith("/delete") ? "documents.delete" : p.EndsWith("/review") || p.EndsWith("/ai-analyses") ? "documents.review" : "documents.upload");
         if (p.StartsWith("/api/visits")) {
             if (p == "/api/visits/{visitId}") return Need("reception.read");
-            if (p.EndsWith("/treatment-context") || p.EndsWith("/reviews")) return Need(read ? "treatment.read" : "treatment.progress.manage");
-            if (p.EndsWith("/activities/drafts") || p.EndsWith("/care-notes")) return Need("treatment.actuals.create");
             if (p.Contains("/investigations/") && p.EndsWith("/result")) return Need("investigations.results.receive");
             return Need(read ? "examinations.read" : "examinations.manage");
         }
         if (p.StartsWith("/api/service-prices")) return read ? ScreenEndpointRule.Any("treatment.prices.read", "treatment.read") : Need("treatment.prices.manage");
-        if (p.StartsWith("/api/commercial")) return Need(read ? "treatment.commercial.read" : "treatment.commercial.approve");
         if (p.StartsWith("/api/treatment-templates")) return Need(read ? "treatment.templates.read" : "treatment.templates.manage");
-        if (p.StartsWith("/api/clinical-services")) return Need("treatment.read");
-        if (p.StartsWith("/api/clinical-activities") || p.StartsWith("/api/activities")) return Need(read ? "treatment.read" : p.EndsWith("/correct") ? "treatment.actuals.update" : "treatment.actuals.create");
-        if (p.StartsWith("/api/care-tasks")) return Need(read ? "care-tasks.read" : p.EndsWith("/escalations") ? "care-tasks.escalate" : "care-tasks.manage");
-        if (p.StartsWith("/api/care-escalations")) return Need("care-tasks.escalate");
-        if (p.StartsWith("/api/postoperative-reviews")) return Need("treatment.read");
-        if (p.StartsWith("/api/reviews/")) return Need("treatment.read");
-        if (p.StartsWith("/api/follow-up-instructions")) return Need(read ? "treatment.read" : "treatment.progress.manage");
+        if (p.StartsWith("/api/care-tasks")) return Need(read ? "care-tasks.read" : "care-tasks.manage");
         if (p.StartsWith("/api/lab-orders")) return Need(read ? "treatment.lab.read" : "treatment.lab.track");
         if (p.StartsWith("/api/dossiers")) {
             if (p.Contains("/payments/payos-orders") || p.Contains("/payments/advance-payos-orders"))
@@ -93,10 +84,8 @@ public static class ScreenEndpointPermissions
             if (p.Contains("/sheet-activities/")) return Need(method == "DELETE" ? "treatment.actuals.delete" : "treatment.actuals.update");
             if (p.Contains("/sheet-items/")) return Need(method == "DELETE" ? "treatment.items.delete" : p.EndsWith("/perform") ? "treatment.actuals.create" : "treatment.items.update");
             if (p.Contains("/sheet-drafts/")) return method == "DELETE" ? ScreenEndpointRule.Any("treatment.items.delete", "treatment.actuals.delete") : Need(p.EndsWith("/confirm-actual") || draftKind?.Equals("actual", StringComparison.OrdinalIgnoreCase) == true ? "treatment.actuals.create" : "treatment.items.create");
-            if (p.Contains("/revision")) return Need("treatment.revisions.manage");
             if (p.Contains("/plan/items/")) return Need("treatment.items.update");
             if (p.Contains("/plan/")) return Need("treatment.plan.manage");
-            if (p.Contains("/steps") || p.Contains("/warranty/")) return Need("treatment.progress.manage");
             return Need(method == "DELETE" ? "treatment.dossiers.delete" : "treatment.dossiers.update");
         }
         if (p.StartsWith("/api/patients/")) {

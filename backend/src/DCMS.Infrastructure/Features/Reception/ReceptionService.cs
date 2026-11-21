@@ -20,7 +20,7 @@ using Microsoft.EntityFrameworkCore;
 namespace DCMS.Infrastructure.Features.Reception;
 
 public sealed class ReceptionService(DcmsDbContext db, UserManager<ApplicationUser> users,
-    IAppointmentQueryService appointments, IAvailabilityService availability, IReceptionSourceReader sources,
+    IAppointmentQueryService appointments, IAvailabilityService availability,
     TimeProvider clock, DCMS.Application.Features.Settings.ISettingsAccess settingsAccess) : IReceptionService
 {
     private static readonly string[] AppointmentStatuses = ["Confirmed", "CheckedIn", "InProgress", "Completed", "Cancelled", "NoShow"];
@@ -37,7 +37,9 @@ public sealed class ReceptionService(DcmsDbContext db, UserManager<ApplicationUs
         if (user == null || !user.IsActive || user.LockoutEnabled && user.LockoutEnd > clock.GetUtcNow()) throw Error("MSG07", 401);
         if (user.AccountType != "Staff") throw Error("MSG06", 403);
         var roles = AccountRoles.Effective(await users.GetRolesAsync(user));
-        var assistant = roles.Contains(AccountRoles.ClinicAssistant) || roles.Contains(AccountRoles.ClinicOwner);
+        // Staff in an access group act through reception.* grants and assignment branches, never their role.
+        var assistant = roles.Contains(AccountRoles.ClinicAssistant) || roles.Contains(AccountRoles.ClinicOwner)
+            || (await settingsAccess.ResolveAsync(actorId, ct)).GrantDriven;
         if (!assistant && !roles.Contains(AccountRoles.Dentist)) throw Error("MSG06", 403);
         var employee = await db.Employees.AsNoTracking().SingleOrDefaultAsync(x => x.AccountId == actorId, ct) ?? throw Error("MSG06", 403);
         var backdate = assistant && (await users.GetClaimsAsync(user)).Any(x => x.Type == "permission" && x.Value == "reception.backdate");
@@ -127,8 +129,8 @@ public sealed class ReceptionService(DcmsDbContext db, UserManager<ApplicationUs
             var patient = a.PatientId.HasValue ? patients.GetValueOrDefault(a.PatientId.Value) : null;
             Guid? visitId = visits.TryGetValue(a.Id, out var id) ? id : null; var reason = Ineligible(a, now);
             return new ReceptionAppointment(a.Id, a.Code, a.BranchId, branches[a.BranchId], a.DentistId, dentists[a.DentistId], a.ChairId,
-                chairs[a.ChairId], a.AssistantId, a.StartAt, a.EndAt, a.Status, a.Version, a.PatientId, patient?.PatientCode, patient?.FullName,
-                a.BookerName, a.BookerPhone, a.BookerEmail, a.AttendeeName, a.AttendeeBirthDate, a.AttendeeRelation, visitId,
+                chairs[a.ChairId], a.StartAt, a.EndAt, a.Status, a.Version, a.PatientId, patient?.PatientCode, patient?.FullName,
+                a.BookingInfo.BookerName, a.BookingInfo.Phone(), a.BookingInfo.Email(), a.AttendeeName, a.BookingInfo.AttendeeBirthDate, a.BookingInfo.AttendeeRelation, visitId,
                 assistant && visitId == null && reason == null, reason);
         }).ToArray();
     }
@@ -140,15 +142,6 @@ public sealed class ReceptionService(DcmsDbContext db, UserManager<ApplicationUs
         var dto = (await AppointmentDtosAsync([a], actor.Assistant, ct))[0];
         return new(dto, dto.VisitId.HasValue ? await VisitAsync(actorId, dto.VisitId.Value, ct) : null,
             ClinicDate(clock.GetUtcNow()), clock.GetUtcNow(), actor.CanBackdate);
-    }
-    public async Task<IReadOnlyList<ReceptionCourse>> CoursesAsync(int actorId, Guid appointmentId, int patientId, CancellationToken ct)
-    {
-        var detail = await DetailAsync(actorId, appointmentId, ct);
-        if (patientId <= 0 || detail.Appointment.PatientId.HasValue && detail.Appointment.PatientId != patientId) throw Error("MSG43", 409);
-        var patient = await db.Patients.AsNoTracking().SingleOrDefaultAsync(x => x.Id == patientId && !x.IsArchived, ct) ?? throw Error("MSG113", 404);
-        if (!detail.Appointment.PatientId.HasValue && (PatientLinkSupport.NormalizeName(detail.Appointment.AttendeeName) != PatientLinkSupport.NormalizeName(patient.FullName)
-            || detail.Appointment.AttendeeBirthDate.HasValue && detail.Appointment.AttendeeBirthDate != patient.BirthDate)) throw Error("MSG43", 409);
-        return await sources.CoursesAsync(detail.Appointment.BranchId, patientId, ct);
     }
     public async Task<ReceptionPage<VisitResult>> QueueAsync(int actorId, ReceptionQuery query, CancellationToken ct)
     {
@@ -182,9 +175,8 @@ public sealed class ReceptionService(DcmsDbContext db, UserManager<ApplicationUs
         var now = clock.GetUtcNow();
         return visits.Select(v => { var a = appointmentsById[v.AppointmentId]; var p = patients[v.PatientId];
         return new VisitResult(v.Id, p.Id, p.PatientCode, p.FullName, a.Id, a.Code, v.BranchId, branches[v.BranchId], v.DentistId, dentists[v.DentistId],
-            a.ChairId, a.AssistantId, a.StartAt, v.ArrivalAt, v.RecordedAt, v.Status, a.Status, v.Version, a.Version,
-            v.Purpose, v.Note, v.ArrivalReason, v.SourceJson == null ? null : JsonSerializer.Deserialize<VisitSource>(v.SourceJson),
-            v.RequiresClinicalSourceReview, v.Status == VisitStatuses.Queued ? Math.Max(0, (int)(now - v.ArrivalAt).TotalMinutes) : 0,
+            a.ChairId, a.StartAt, v.ArrivalAt, v.Status, a.Status, v.Version, a.Version,
+            v.Purpose, v.Note, v.ArrivalReason, v.Status == VisitStatuses.Queued ? Math.Max(0, (int)(now - v.ArrivalAt).TotalMinutes) : 0,
             replayed, $"/visits/{v.Id}"); }).ToArray();
     }
 
@@ -192,10 +184,9 @@ public sealed class ReceptionService(DcmsDbContext db, UserManager<ApplicationUs
     {
         var note = Clean(request.Note); var arrivalReason = Clean(request.ArrivalReason);
         if (appointmentId == Guid.Empty || request.PatientId <= 0 || request.ExpectedVersion <= 0 || request.RequestKey == Guid.Empty
-            || !request.IdentityConfirmed || !AttendancePurposes.All.Contains(request.Purpose) || note?.Length > 1000 || arrivalReason?.Length > 500
-            || request.PriorCourseId == Guid.Empty) throw Error("MSG04");
+            || !request.IdentityConfirmed || !AttendancePurposes.All.Contains(request.Purpose) || note?.Length > 1000 || arrivalReason?.Length > 500) throw Error("MSG04");
         var canonical = new { appointmentId, request.PatientId, request.ExpectedVersion, request.IdentityConfirmed,
-            ArrivalAt = request.ArrivalAt?.ToUniversalTime(), arrivalReason, request.Purpose, request.PriorCourseId, note };
+            ArrivalAt = request.ArrivalAt?.ToUniversalTime(), arrivalReason, request.Purpose, note };
         var fingerprint = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(canonical))));
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
         // Same lock and ordering as booking/change; this also serializes newly identified Patient reservations.
@@ -207,7 +198,7 @@ public sealed class ReceptionService(DcmsDbContext db, UserManager<ApplicationUs
         if (patient.IsArchived) throw Error("MSG202", 409);
         if (a.PatientId.HasValue ? a.PatientId != patient.Id
             : PatientLinkSupport.NormalizeName(a.AttendeeName) != PatientLinkSupport.NormalizeName(patient.FullName)
-                || a.AttendeeBirthDate.HasValue && a.AttendeeBirthDate != patient.BirthDate) throw Error("MSG43", 409);
+                || a.BookingInfo.AttendeeBirthDate.HasValue && a.BookingInfo.AttendeeBirthDate != patient.BirthDate) throw Error("MSG43", 409);
         var receipt = await db.Set<ReceptionReceipt>().AsNoTracking().SingleOrDefaultAsync(x => x.ActorAccountId == actorId && x.RequestKey == request.RequestKey, ct);
         if (receipt != null && receipt.Fingerprint != fingerprint) throw Error("MSG111", 409);
         var existing = await db.Visits.AsNoTracking().SingleOrDefaultAsync(x => x.AppointmentId == a.Id, ct);
@@ -229,28 +220,15 @@ public sealed class ReceptionService(DcmsDbContext db, UserManager<ApplicationUs
             if (!actor.CanBackdate) throw Error("MSG06", 403);
             if (arrivalReason == null) throw Error("MSG02");
         }
-        VisitSource? source = null;
-        if (request.PriorCourseId.HasValue)
-        {
-            source = await sources.ResolveAsync(a.BranchId, patient.Id, request.PriorCourseId.Value, ct);
-            if (source.PriorCourseId != request.PriorCourseId || source.CourseVersion is not > 0) throw Error("MSG43", 409);
-        }
-        if (a.FollowUpId.HasValue) source = (source ?? new VisitSource()) with { FollowUpId = a.FollowUpId };
-        var reservation = await db.Set<ResourceReservation>().SingleOrDefaultAsync(x => x.Id == a.ReservationId, ct) ?? throw Error("MSG47", 409);
-        if (reservation.Status != "Confirmed" || reservation.BranchId != a.BranchId || reservation.DentistId != a.DentistId
-            || reservation.AssistantId != a.AssistantId || reservation.ChairId != a.ChairId || reservation.Start != a.StartAt || reservation.End != a.EndAt
-            || reservation.AttendeeKey != null && reservation.AttendeeKey != $"patient:{patient.Id}") throw Error("MSG47", 409);
-        await availability.ValidateReceptionAsync(reservation.Id, patient.Id, ct);
+        await availability.ValidateReceptionAsync(a.Id, patient.Id, ct);
         var before = JsonSerializer.Serialize(new { a.PatientId, a.Status, a.Version });
         var visit = new Visit { AppointmentId = a.Id, BranchId = a.BranchId, PatientId = patient.Id, DentistId = a.DentistId,
-            ArrivalAt = arrival, RecordedAt = now, RecordedBy = actorId, ArrivalReason = arrivalReason, Purpose = request.Purpose, Note = note,
-            SourceJson = source == null ? null : JsonSerializer.Serialize(source), RequiresClinicalSourceReview = request.Purpose != AttendancePurposes.InitialExamination };
+            ArrivalAt = arrival, RecordedBy = actorId, ArrivalReason = arrivalReason, Purpose = request.Purpose, Note = note };
         a.PatientId = patient.Id; a.Status = "CheckedIn"; a.Version++;
-        reservation.AttendeeKey = $"patient:{patient.Id}"; reservation.AttendeeLabel = patient.FullName;
         db.Visits.Add(visit);
         db.Add(new VisitAudit { VisitId = visit.Id, ActorAccountId = actorId, OccurredAt = now, BeforeJson = before,
-            AfterJson = JsonSerializer.Serialize(new { visit.PatientId, visit.AppointmentId, visit.ArrivalAt, visit.RecordedAt,
-                visit.ArrivalReason, visit.Purpose, request.IdentityConfirmed, source, visit.Note, a.Version }) });
+            AfterJson = JsonSerializer.Serialize(new { visit.PatientId, visit.AppointmentId, visit.ArrivalAt, RecordedAt = now,
+                visit.ArrivalReason, visit.Purpose, request.IdentityConfirmed, a.DossierId, visit.Note, a.Version }) });
         db.Add(new ReceptionReceipt { ActorAccountId = actorId, RequestKey = request.RequestKey, VisitId = visit.Id, Fingerprint = fingerprint });
         db.AppointmentChanges.Add(new AppointmentChange { AppointmentId = a.Id, ActorAccountId = actorId, ActorKind = "STAFF", Action = "CHECK_IN",
             OldStart = a.StartAt, OldEnd = a.EndAt, OldDentistId = a.DentistId, OldChairId = a.ChairId,

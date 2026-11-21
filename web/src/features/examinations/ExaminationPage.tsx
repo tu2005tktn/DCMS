@@ -171,7 +171,7 @@ export default function ExaminationPage() {
     finally { if (token === generation.current) setBusy(false); }
   }
   if (!w || !content) return error ? <Alert type="error" message={error} /> : <Spin />;
-  if(w.visit.purpose === 'TreatmentContinuation') return w.visit.source?.priorCourseId ? <Navigate replace to={`/patients/${w.visit.patientId}?tab=treatment&dossierId=${w.visit.source.priorCourseId}`} /> : <Alert type="info" message="Lượt điều trị chưa được liên kết hồ sơ khi tiếp nhận. Cần chọn đúng hồ sơ điều trị, không tạo thêm phiếu khám mới." description={<Link to={`/patients/${w.visit.patientId}?tab=treatment`}>Mở các hồ sơ điều trị</Link>}/>;
+  if(w.visit.purpose === 'TreatmentContinuation') return <Navigate replace to={`/patients/${w.visit.patientId}?tab=treatment`} />;
   const v = w.visit; const editable = w.allowedActions.includes('save') || amending; const handoff = w.allowedActions.includes('handoff');
   const findings = content.findings;
   function applyTeeth(teeth: number[], condition: string, surfaces: string[], diagnoses: string[], references: ReferenceSnapshot[]) {
@@ -208,8 +208,15 @@ export default function ExaminationPage() {
         { label: 'Lịch hẹn', children: v.appointmentCode }, { label: 'Bác sĩ', children: v.dentistName }, { label: 'Chi nhánh', children: v.branchName },
         { label: 'Giờ đến', children: arrivalClock(v.arrivalAt) }, { label: 'Mục đích', children: purposeLabels[v.purpose] },
         { label: 'Thông tin tiếp nhận', children: v.arrivalReason ?? v.note ?? 'Chưa có' },
-        { label: 'Hồ sơ cũ', children: v.source?.label ?? 'Chưa chọn hồ sơ' },
-      ]} />{v.source?.blocker && <Alert type="warning" message={v.source.blocker} />}
+              ]} />
+      <div className="clinical-alerts" aria-label="Cảnh báo y khoa">
+        {(['allergies','medicalHistory','medications'] as const).map(name => {
+          const detail = content[name].detail?.trim();
+          return <div key={name} className={detail ? 'clinical-alert present' : 'clinical-alert'}>
+            <strong>{{ allergies: 'Dị ứng', medicalHistory: 'Tiền sử', medications: 'Thuốc đang dùng' }[name]}</strong>
+            <span>{detail || 'Chưa ghi'}</span></div>;
+        })}
+      </div>
       {w.allowedActions.includes('start') && <Button aria-label="Bắt đầu khám" type="primary" disabled={busy} loading={busy} onClick={() => void command(true)}>Bắt đầu khám</Button>}
     </Card></section>
     <Tabs activeKey={tab} onChange={setTab} items={[
@@ -217,15 +224,19 @@ export default function ExaminationPage() {
         {w.examination?.confirmed && !amending && <Alert type="success" message="Đã hoàn tất khám" description="Kết quả đã được lưu. Xem tổng kết để chọn bước tiếp theo." />}
         <Form layout="vertical" disabled={!editable || busy}>
           <Form.Item label="Lý do khám / triệu chứng" required><Input.TextArea id="exam-symptoms" aria-label="Lý do khám / triệu chứng" value={content.symptoms ?? ''} maxLength={4000} onChange={e => change({ symptoms: e.target.value })} /></Form.Item>
-          {(['medicalHistory','allergies','medications'] as const).map((name,i) => <Card size="small" key={name} title={['Tiền sử','Dị ứng','Thuốc đang dùng'][i]} className="clinical-fact">
+          <div className="clinical-facts">{(['medicalHistory','allergies','medications'] as const).map((name,i) => <Card size="small" key={name} title={['Tiền sử','Dị ứng','Thuốc đang dùng'][i]} className="clinical-fact">
             <Input.TextArea aria-label={['Tiền sử','Dị ứng','Thuốc đang dùng'][i]} placeholder="Có thông tin thì ghi vào, không có thì để trống" rows={2} value={content[name].detail ?? ''} maxLength={4000}
               onChange={e => change({ [name]: { detail: e.target.value, state: e.target.value.trim() ? 'Present' : 'Unknown', verified: false } })} />
-          </Card>)}
+          </Card>)}</div>
           {diagnosisOptionsError && <Alert type="error" message="Không tải được danh mục chẩn đoán" description={diagnosisOptionsError} action={<Button onClick={reloadDiagnosisOptions}>Thử lại</Button>} />}
+          <div className="exam-workspace">
+          <div className="exam-chart-column">
           <ToothChart key={visitId} findings={findings} disabled={!editable || busy} onApply={applyTeeth} diagnosisOptions={diagnosisOptions} />
+          </div>
+          <section className="exam-findings-panel" aria-label="Kết quả khám">
+          <Typography.Title level={5}>Kết quả khám{findings.length ? ` (${findings.length})` : ''}</Typography.Title>
           {editable && <Typography.Paragraph type="secondary">Ghi mô tả hoặc chọn chẩn đoán tại răng/vùng. Tổng kết tự tập hợp chẩn đoán; không cần nhập lại. Khám bình thường có thể chọn Chưa phát hiện bất thường ở Tổng kết.</Typography.Paragraph>}
-          <Button id="exam-add-region" onClick={() => change({ findings: [...findings, { region: '', condition: '' }] })}>Thêm vùng khám</Button>
-          <Typography.Paragraph type="secondary">Khám tổng quát: thêm vùng “Toàn hàm”, ghi mô tả hoặc chọn chẩn đoán tại cùng dòng.</Typography.Paragraph>
+          {!findings.length && <Typography.Paragraph type="secondary" className="exam-findings-empty">Chưa có kết quả. Chọn răng trên sơ đồ hoặc thêm vùng khám.</Typography.Paragraph>}
           {findings.map((f,i) => <Space key={i} align="start" className="finding-row">
             {f.tooth ? <Tag>Răng {f.tooth}</Tag> : <Input id={`exam-region-${i}`} aria-label={`Vùng ${i+1}`} placeholder="Vùng khám, ví dụ: Toàn hàm" value={f.region ?? ''} maxLength={200}
               onChange={e => change({ findings: findings.map((x,n) => n === i ? { ...x, region: e.target.value } : x) })} />}
@@ -235,15 +246,19 @@ export default function ExaminationPage() {
               onChange={values => change({ findings: findings.map((x,n) => n === i ? { ...x, diagnoses: uniqueDiagnoses(values) } : x) })} />
             {f.tooth && <Select aria-label={`Bề mặt ${i+1}`} mode="multiple" placeholder="Bề mặt (nếu cần)" options={surfaceOptions} value={f.surfaces ?? []} style={{ minWidth: 180 }} onChange={surfaces => change({ findings: findings.map((x,n) => n === i ? { ...x, surfaces } : x) })} />}
             <Button onClick={() => change({ findings: findings.filter((_,n) => i !== n) })}>Bỏ</Button></Space>)}
+          <Button id="exam-add-region" onClick={() => change({ findings: [...findings, { region: '', condition: '' }] })}>Thêm vùng khám</Button>
+          <Typography.Paragraph type="secondary">Khám tổng quát: thêm vùng “Toàn hàm”, ghi mô tả hoặc chọn chẩn đoán tại cùng dòng.</Typography.Paragraph>
+          </section>
+          </div>
           <Form.Item label="Ghi chú khám"><Input.TextArea aria-label="Ghi chú khám" value={content.notes ?? ''} maxLength={8000} onChange={e => change({ notes: e.target.value })} /></Form.Item>
         </Form>
-        {editable && <Space>{!amending && <Button aria-label="Lưu nháp" disabled={busy} loading={busy && tab === 'exam'} onClick={() => void command(false)}>Lưu nháp</Button>}
+        {editable && <Space className="examination-actionbar">{!amending && <Button aria-label="Lưu nháp" disabled={busy} loading={busy && tab === 'exam'} onClick={() => void command(false)}>Lưu nháp</Button>}
           <Button type="primary" onClick={() => setTab('summary')}>Chẩn đoán & hướng xử trí</Button></Space>}
       </Card> },
       { key: 'investigations', label: `Cận lâm sàng${w.investigations?.length ? ` (${w.investigations.length})` : ''}`, children: <Card><InvestigationsPanel key={visitId} workspace={w} contexts={contexts} busy={busy} onBusy={setBusy} onChanged={investigationsChanged} amending={amending} amendmentReason={amendReason} onAmendmentReason={value=>{setAmendReason(value);pendingCommand.current=undefined;}} /></Card> },
       ...(has('documents.read') ? [{ key: 'documents', label: 'Ảnh & tài liệu', children: contextError ? <Alert type="error" message={contextError.message} /> :
         <DocumentList patientId={v.patientId} contexts={contexts} filters={lockedFilters} onFiltersChange={setFilters} uploadContext={{ visitId }}
-          review={has('documents.review') && v.status === 'InProgress' && (editable || handoff) ? review : undefined} lockedVisitId={visitId} /> }] : []),
+          review={has('documents.review') && (v.status === 'InProgress' || v.status === 'ExaminationConfirmed') && (editable || handoff) ? review : undefined} lockedVisitId={visitId} /> }] : []),
       { key: 'summary', label: 'Tổng kết khám', children: <Card title="Chẩn đoán và hướng xử trí" className={`examination-summary ${w.examination?.confirmed ? 'clinical-confirmed' : ''}`}>
         <Form layout="vertical" disabled={!editable || busy}>
           <section aria-label="Chẩn đoán đã ghi tại răng và vùng" className="scoped-diagnoses-summary">
@@ -283,9 +298,8 @@ export default function ExaminationPage() {
         </>}
         {!amending && w.allowedActions.includes('amend') && <Button key="amend-examination" aria-label="Đính chính kết quả" disabled={busy} onClick={() => { setAmending(true); setDirty(true); }}>Đính chính kết quả</Button>}
         {!amending && handoff && <Link to={`/patients/${v.patientId}?tab=treatment&sourceExaminationVisitId=${visitId}&examinationVersion=${w.examination?.version ?? 0}`}><Button type="primary">Lập kế hoạch điều trị</Button></Link>}
-        {!amending && w.examination?.confirmed && user?.permissions.includes('examinations.manage') && <Link to={`/visits/${visitId}/prescription`}><Button>Đơn thuốc mua ngoài</Button></Link>}
         {!amending && w.allowedActions.includes('complete') && <Button disabled={busy} onClick={() => { setWorkReviewed(false); setEnding(true); }}>Kết thúc lượt khám</Button>}</Space>
-        {w.examination?.confirmed && v.status === 'InProgress' && <Typography.Paragraph type="secondary" style={{ marginTop: 16 }}>Phiếu khám đã hoàn tất. Kết thúc lượt khám trước khi chuyển sang phiếu điều trị.</Typography.Paragraph>}
+        {v.status === 'ExaminationConfirmed' && <Typography.Paragraph type="secondary" style={{ marginTop: 16 }}>Phiếu khám đã hoàn tất. Kết thúc lượt khám trước khi chuyển sang phiếu điều trị.</Typography.Paragraph>}
       </Card> },
       { key: 'history', label: 'Lịch sử khám', children: <><Typography.Title level={4}>Các phiên bản phiếu hiện tại</Typography.Title>
         {versions.length ? versions.map(version => <Card key={version.version} size="small" title={`Phiên bản ${version.version} · ${version.confirmed ? 'Đã xác nhận' : 'Nháp'}`}>

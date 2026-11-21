@@ -1,24 +1,31 @@
 namespace DCMS.Domain.Features.Treatment;
 
-// One lab order (Phiếu labo) per treatment-sheet activity. Rules: docs/specs/LAB-ORDER.md.
+// One lab order (Phiếu labo) per treatment-sheet activity. Rules: docs/specs/LAB-ORDER.md, docs/specs/LAB-ORDER-TABLE-SIMPLIFICATION.vi.md.
 public sealed class LabOrder
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid ActivityId { get; set; }
-    public Guid DossierId { get; set; }
-    public int PatientId { get; set; }
-    public int BranchId { get; set; }
     public string? Code { get; set; }
-    public DateOnly OrderedOn { get; set; }
-    public DateOnly? DueOn { get; set; }
-    public DateOnly? DeliveredOn { get; set; }
-    public DateOnly? SentOn { get; set; }
-    public DateOnly? ReceivedOn { get; set; }
-    public string Status { get; set; } = LabOrderStatus.NotSent;
     public int DentistId { get; set; }
     public Guid? LabProviderId { get; set; }
     public Guid? LabWorkTypeId { get; set; }
     public string WorkName { get; set; } = "";
+    public DateOnly OrderedOn { get; set; }
+    public DateOnly? DueOn { get; set; }
+    public DateOnly? DeliveredOn { get; set; }
+    public int Quantity { get; set; } = 1;
+    public long TotalFeeVnd { get; set; }
+    public long PaidVnd { get; set; }
+    public string? Note { get; set; }
+    public string Status { get; set; } = LabOrderStatus.NotSent;
+    public int Version { get; set; } = 1;
+    public LabOrderSpec Spec { get; set; } = new();
+    // Append-only status history, stored on the order row.
+    public List<LabOrderStatusLog> StatusLogs { get; set; } = [];
+}
+
+public sealed class LabOrderSpec
+{
     public string? MarginOuter { get; set; }
     public string? MarginInner { get; set; }
     public string? MarginSide { get; set; }
@@ -26,20 +33,10 @@ public sealed class LabOrder
     public bool IsChild { get; set; }
     public string[] Teeth { get; set; } = [];
     public Dictionary<string, string> Shade { get; set; } = [];
-    public string? Note { get; set; }
     public string? Material { get; set; }
-    public int Quantity { get; set; } = 1;
-    public long TotalFeeVnd { get; set; }
-    public long PaidVnd { get; set; }
     public string? Warranty { get; set; }
-    public int Version { get; set; } = 1;
-    public DateTimeOffset CreatedAt { get; set; }
-    public int CreatedBy { get; set; }
-    public DateTimeOffset UpdatedAt { get; set; }
-    public int UpdatedBy { get; set; }
-    // Append-only status history, stored on the order row.
-    public List<LabOrderStatusLog> StatusLogs { get; set; } = [];
-    public Guid StorageStamp { get; set; } = Guid.NewGuid();
+    public DateOnly? SentOn { get; set; }
+    public DateOnly? ReceivedOn { get; set; }
 }
 
 public static class LabOrderStatus

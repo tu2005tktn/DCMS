@@ -21,7 +21,7 @@ namespace DCMS.Infrastructure.Features.Appointments;
 
 public sealed class AppointmentChangeService(DcmsDbContext db, IAvailabilityService availability,
     IAppointmentQueryService queries, UserManager<ApplicationUser> users,
-    IFollowUpAppointmentChangePort followUps, TimeProvider clock, ISettingsAccess access) : IAppointmentChangeService
+    TimeProvider clock, ISettingsAccess access) : IAppointmentChangeService
 {
     private static BusinessException Error(string code, int status = 409) => new(status, SystemMessages.Get(code));
     private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
@@ -32,11 +32,10 @@ public sealed class AppointmentChangeService(DcmsDbContext db, IAvailabilityServ
         var (appointment, staff) = await AuthorizeAsync(actorId, code, ct, clinicInitiated: true);
         RequireAvailabilityEligible(appointment, clock.GetUtcNow());
         var selectedDentistId = dentistId ?? appointment.DentistId;
-        if (selectedDentistId <= 0 || selectedDentistId == appointment.AssistantId) throw Error("MSG04", 400);
-        var reservation = await db.Set<ResourceReservation>().AsNoTracking().SingleAsync(x => x.Id == appointment.ReservationId, ct);
-        var result = await availability.QueryForReservationAsync(new(appointment.BranchId, selectedDentistId,
-            appointment.ServiceId, date, (int)(appointment.EndAt - appointment.StartAt).TotalMinutes, appointment.AssistantId),
-            reservation.Id, reservation.AttendeeKey, ct);
+        if (selectedDentistId <= 0) throw Error("MSG04", 400);
+        var result = await availability.QueryForAppointmentAsync(new(appointment.BranchId, selectedDentistId,
+            appointment.ServiceId, date, (int)(appointment.EndAt - appointment.StartAt).TotalMinutes),
+            appointment.Id, appointment.PatientId, ct);
         return result with { Slots = result.Slots.Where(x => selectedDentistId != appointment.DentistId || x.Start != appointment.StartAt).ToArray() };
     }
 
@@ -58,7 +57,8 @@ public sealed class AppointmentChangeService(DcmsDbContext db, IAvailabilityServ
         if (user == null || !user.IsActive || (user.LockoutEnabled && user.LockoutEnd > clock.GetUtcNow())) throw Error("MSG07", 401);
         var staff = user.AccountType == "Staff";
         if (!staff && user.AccountType != "Public") throw Error("MSG06", 403);
-        if (staff && !clinicInitiated && !await users.IsInRoleAsync(user, AccountRoles.ClinicAssistant)) throw Error("MSG06", 403);
+        if (staff && !clinicInitiated && !(await access.ResolveAsync(actorId, ct)).GrantDriven
+            && !await users.IsInRoleAsync(user, AccountRoles.ClinicAssistant)) throw Error("MSG06", 403);
         var appointment = await db.Appointments.SingleOrDefaultAsync(x => x.Code == code, ct) ?? throw Error("MSG102", 404);
         if (staff)
         {
@@ -100,11 +100,7 @@ public sealed class AppointmentChangeService(DcmsDbContext db, IAvailabilityServ
         var now = clock.GetUtcNow();
         if (appointment.Version != request.ExpectedVersion) throw Error("MSG111");
         if (appointment.Status != "Confirmed" || appointment.StartAt > now || await db.Visits.AnyAsync(x => x.AppointmentId == appointment.Id, ct)) throw Error("MSG31");
-        var reservation = await db.Set<ResourceReservation>().SingleAsync(x => x.Id == appointment.ReservationId, ct);
-        if (reservation.Status != "Confirmed" || reservation.Start != appointment.StartAt || reservation.End != appointment.EndAt) throw Error("MSG111");
-        if (appointment.FollowUpId.HasValue)
-            await followUps.MarkNeedsBookingAsync(appointment.FollowUpId.Value, appointment.Id, ct);
-        appointment.Status = reservation.Status = "NoShow";
+        appointment.Status = "NoShow";
         appointment.Version++;
         db.AppointmentChanges.Add(new AppointmentChange
         {
@@ -117,7 +113,7 @@ public sealed class AppointmentChangeService(DcmsDbContext db, IAvailabilityServ
         {
             AggregateId = appointment.Id, EventType = "appointment.no_show", OccurredAt = now,
             PayloadJson = JsonSerializer.Serialize(new { appointmentId = appointment.Id,
-                appointment.Code, appointment.Version, appointment.FollowUpId })
+                appointment.Code, appointment.Version, appointment.DossierId })
         });
         await db.SaveChangesAsync(ct);
         var result = new AppointmentChangeResult(await queries.ChangeDetailAsync(actorId, code, ct),
@@ -173,9 +169,6 @@ public sealed class AppointmentChangeService(DcmsDbContext db, IAvailabilityServ
         var now = clock.GetUtcNow();
         if (appointment.Version != expectedVersion) throw Error("MSG111");
         RequireEligible(appointment, staff, now);
-        var reservation = await db.Set<ResourceReservation>().SingleAsync(x => x.Id == appointment.ReservationId, ct);
-        if (reservation.Status != "Confirmed" || reservation.Start != appointment.StartAt || reservation.End != appointment.EndAt)
-            throw Error("MSG111");
         var change = new AppointmentChange
         {
             AppointmentId = appointment.Id, ActorAccountId = actorId, ActorKind = staff ? "STAFF" : "SELF",
@@ -188,35 +181,29 @@ public sealed class AppointmentChangeService(DcmsDbContext db, IAvailabilityServ
             var selectedDentistId = move.DentistId ?? appointment.DentistId;
             if (staff && clinicInitiated && !(await queries.OptionsAsync(actorId, ct)).Dentists.Any(x => x.BranchId == appointment.BranchId && x.Id == selectedDentistId))
                 throw Error("MSG06", 403);
-            if (selectedDentistId <= 0 || selectedDentistId == appointment.AssistantId) throw Error("MSG34");
+            if (selectedDentistId <= 0) throw Error("MSG34");
             if (!AppointmentRules.PublicLeadTimeValid(now, move.NewStart)) throw Error("MSG34");
             if (move.NewStart == appointment.StartAt && move.ChairId == appointment.ChairId
                 && selectedDentistId == appointment.DentistId) throw Error("MSG34");
-            if (appointment.FollowUpId.HasValue)
-                await followUps.ValidateRescheduleAsync(appointment.FollowUpId.Value, appointment.Id,
-                    selectedDentistId, move.NewStart, ct);
             AvailabilitySlot slot;
             try
             {
                 slot = await availability.CheckInTransactionAsync(new ResourceCheck(appointment.BranchId,
                     selectedDentistId, appointment.ServiceId, move.NewStart.ToUniversalTime(),
-                    (int)(appointment.EndAt - appointment.StartAt).TotalMinutes, move.ChairId, appointment.AssistantId,
-                    reservation.AttendeeKey, move.ScheduleVersion, move.AssistantScheduleVersion, reservation.Id, Public: false, BookingSettingsVersion: move.BookingSettingsVersion), ct);
+                    (int)(appointment.EndAt - appointment.StartAt).TotalMinutes, move.ChairId, null,
+                    appointment.PatientId, move.ScheduleVersion, move.AssistantScheduleVersion, appointment.Id, Public: false, BookingSettingsVersion: move.BookingSettingsVersion), ct);
             }
             catch (BusinessException error) when (error.Response.Code != "MSG111") { throw Error("MSG34"); }
-            appointment.StartAt = reservation.Start = slot.Start.ToUniversalTime();
-            appointment.EndAt = reservation.End = slot.End.ToUniversalTime();
-            appointment.ChairId = reservation.ChairId = slot.ChairId;
-            appointment.DentistId = reservation.DentistId = slot.DentistId;
+            appointment.StartAt = slot.Start.ToUniversalTime();
+            appointment.EndAt = slot.End.ToUniversalTime();
+            appointment.ChairId = slot.ChairId;
+            appointment.DentistId = slot.DentistId;
             change.NewStart = appointment.StartAt; change.NewEnd = appointment.EndAt;
             change.NewDentistId = appointment.DentistId; change.NewChairId = appointment.ChairId;
         }
         else
         {
-            if (appointment.FollowUpId.HasValue)
-                await followUps.MarkNeedsBookingAsync(appointment.FollowUpId.Value, appointment.Id, ct);
-            appointment.Status = reservation.Status = "Cancelled";
-            appointment.CancelledAt = now; appointment.CancelledBy = actorId; appointment.CancelReason = reason;
+            appointment.Status = "Cancelled";
         }
         appointment.Version++;
         db.AppointmentChanges.Add(change);

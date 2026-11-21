@@ -22,6 +22,8 @@ namespace DCMS.IntegrationTests;
 public sealed class ExaminationTestScanner : IClinicalFileScanner
 {
     public string State { get; set; } = "PendingScan";
+    public bool ScanEnabled { get; set; } = true;
+    public bool Enabled => ScanEnabled;
     public Task<string> ScanAsync(byte[] content, CancellationToken ct) => Task.FromResult(State);
 }
 public sealed class ExaminationFixture : ReceptionFixture
@@ -31,7 +33,8 @@ public sealed class ExaminationFixture : ReceptionFixture
     {
         base.ConfigureWebHost(builder);
         builder.ConfigureAppConfiguration((_, c) => c.AddInMemoryCollection(new Dictionary<string,string?> { ["ClinicalDocuments:StoragePath"] = StoragePath }));
-        builder.ConfigureServices(s => { s.RemoveAll<IClinicalFileScanner>(); s.AddSingleton<ExaminationTestScanner>(); s.AddSingleton<IClinicalFileScanner>(p => p.GetRequiredService<ExaminationTestScanner>()); });
+        builder.ConfigureServices(s => { s.RemoveAll<IClinicalFileScanner>(); s.AddSingleton<ExaminationTestScanner>(); s.AddSingleton<IClinicalFileScanner>(p => p.GetRequiredService<ExaminationTestScanner>());
+            s.RemoveAll<IDentalAiClient>(); s.AddSingleton<ExaminationTestDentalAi>(); s.AddSingleton<IDentalAiClient>(p => p.GetRequiredService<ExaminationTestDentalAi>()); });
     }
 }
 
@@ -45,7 +48,7 @@ public sealed class ExaminationApiTests(ExaminationFixture fixture) : IClassFixt
         Conclusion: complete ? "SYNTHETIC kết luận" : null, Advice: complete ? "SYNTHETIC dặn dò" : null, Disposition: complete ? "ConsultationOnly" : null);
     private async Task<(ReceptionApiTests.Setup Setup, VisitResult Visit, HttpClient Dentist)> Prepare(bool start = true)
     {
-        fixture.Services.GetRequiredService<ExaminationTestScanner>().State = "PendingScan";
+        var scanner = fixture.Services.GetRequiredService<ExaminationTestScanner>(); scanner.State = "PendingScan"; scanner.ScanEnabled = true;
         var setup = await reception.Prepare(); using var assistant = await reception.Login(); var visit = await reception.Check(assistant, setup);
         var dentist = await reception.Login("dentist.demo");
         if (start) { var result = await dentist.PostAsJsonAsync($"/api/visits/{visit.VisitId}/start", new StartExamination(visit.PatientId, visit.VisitVersion, Guid.NewGuid()));
@@ -55,7 +58,7 @@ public sealed class ExaminationApiTests(ExaminationFixture fixture) : IClassFixt
     private static async Task<T> Ok<T>(HttpResponseMessage response)
     { Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync()); return (await response.Content.ReadFromJsonAsync<T>())!; }
     private static readonly byte[] Pdf = Encoding.ASCII.GetBytes("%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\n%%EOF");
-    private DocumentMetadata Metadata(VisitResult v) => new(v.PatientId, v.VisitId, null, null, null, null, "Other", "Clinic",
+    private DocumentMetadata Metadata(VisitResult v) => new(v.PatientId, v.VisitId, null, null, null, "Other", "Clinic",
         DateOnly.FromDateTime(fixture.Clock.Now.ToOffset(TimeSpan.FromHours(7)).DateTime), "SYNTHETIC file", Guid.NewGuid());
     private static async Task<HttpResponseMessage> Upload(HttpClient c, DocumentMetadata m, byte[]? bytes = null, string name = "test.pdf", string type = "application/pdf", int count = 1)
     {
@@ -73,7 +76,7 @@ public sealed class ExaminationApiTests(ExaminationFixture fixture) : IClassFixt
             new DCMS.Application.Features.Treatment.CreateDossierRequest(setup.BranchId, setup.DentistId, "SYNTHETIC", null, null, Guid.NewGuid()));
         var dossier = (await Ok<DCMS.Application.Features.Treatment.TreatmentChange>(dossierResult)).Dossier;
         fixture.Services.GetRequiredService<ExaminationTestScanner>().State = "Ready";
-        var metadata = new DocumentMetadata(setup.PatientId, null, dossier.Id, null, null, null, "Other", "Clinic",
+        var metadata = new DocumentMetadata(setup.PatientId, null, dossier.Id, null, null, "Other", "Clinic",
             DateOnly.FromDateTime(fixture.Clock.Now.ToOffset(TimeSpan.FromHours(7)).DateTime), "SYNTHETIC image", Guid.NewGuid());
         var png = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aZ9sAAAAASUVORK5CYII=");
         var uploaded = (await Ok<UploadBatchResult>(await Upload(dentist, metadata, png, "photo.png", "image/png"))).Document!;
@@ -156,6 +159,29 @@ public sealed class ExaminationApiTests(ExaminationFixture fixture) : IClassFixt
             var closed=await Ok<ExaminationWorkspace>(await c.PostAsJsonAsync($"/api/visits/{v.VisitId}/complete",new CompleteExaminationVisit(v.PatientId,cancelled.VisitVersion,Guid.NewGuid(),true)));
             Assert.Equal("Completed",closed.Visit.Status);
             Assert.Equal(HttpStatusCode.Conflict,(await c.PostAsJsonAsync(Inv(v.VisitId),Order(closed.Visit))).StatusCode);
+        }
+    }
+    [Fact]
+    public async Task DisabledAntivirusMakesValidUploadsAndPendingFilesReadyAuditedAsSkipped()
+    {
+        var (_, v, c) = await Prepare(); using (c) {
+            var scanner = fixture.Services.GetRequiredService<ExaminationTestScanner>();
+            var pending = (await Ok<UploadBatchResult>(await Upload(c, Metadata(v)))).Document!;
+            Assert.Equal("PendingScan", pending.FileState);
+            scanner.ScanEnabled = false; scanner.State = "Ready";
+            try {
+                var uploaded = (await Ok<UploadBatchResult>(await Upload(c, Metadata(v)))).Document!;
+                Assert.Equal("Ready", uploaded.FileState);
+                Assert.Equal(HttpStatusCode.BadRequest, (await Upload(c, Metadata(v), Encoding.ASCII.GetBytes("not a pdf"))).StatusCode);
+                using (var scope = fixture.Services.CreateScope())
+                    await scope.ServiceProvider.GetRequiredService<IClinicalDocumentService>().ScanPendingAsync(CancellationToken.None);
+                using var check = fixture.Services.CreateScope(); var db = check.ServiceProvider.GetRequiredService<DcmsDbContext>();
+                Assert.Equal("Ready", (await db.Set<ClinicalDocument>().AsNoTracking().SingleAsync(x => x.Id == pending.DocumentId)).FileState);
+                foreach (var id in new[] { uploaded.DocumentId, pending.DocumentId }) {
+                    var actions = await db.Set<DocumentAudit>().AsNoTracking().Where(x => x.DocumentId == id).Select(x => x.Action).ToArrayAsync();
+                    Assert.Contains("ScanSkipped", actions); Assert.DoesNotContain("ScanPassed", actions);
+                }
+            } finally { scanner.ScanEnabled = true; scanner.State = "PendingScan"; }
         }
     }
     [Theory] [InlineData("Ready")] [InlineData("PendingScan")] [InlineData("Rejected")]
@@ -368,7 +394,7 @@ public sealed class ExaminationApiTests(ExaminationFixture fixture) : IClassFixt
             using(var scope = fixture.Services.CreateScope()) {
                 var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
                 var p = await db.Patients.SingleAsync(x => x.Id == v.PatientId); p.BirthDate = birth; p.Gender = gender;
-                var a = await db.Appointments.SingleAsync(x => x.Id == v.AppointmentId); a.AttendeeBirthDate = today.AddYears(-10);
+                var a = await db.Appointments.SingleAsync(x => x.Id == v.AppointmentId); a.BookingInfo.AttendeeBirthDate = today.AddYears(-10);
                 await db.SaveChangesAsync();
             }
             var w = await c.GetFromJsonAsync<ExaminationWorkspace>(Exam(v.VisitId));
@@ -409,10 +435,8 @@ public sealed class ExaminationApiTests(ExaminationFixture fixture) : IClassFixt
             Assert.Equal(HttpStatusCode.BadRequest, (await c.PutAsJsonAsync(Exam(v.VisitId), draft with { ExpectedVersion = saved.Visit.VisitVersion, RequestKey = Guid.NewGuid(), Confirm = true })).StatusCode);
             var confirmed = await Ok<ExaminationWorkspace>(await c.PutAsJsonAsync(Exam(v.VisitId), draft with { ExpectedVersion = saved.Visit.VisitVersion, RequestKey = Guid.NewGuid(), Content = Content(true), Confirm = true }));
             var handoff = await c.GetFromJsonAsync<ClinicalHandoff>($"/api/visits/{v.VisitId}/clinical-handoff"); Assert.Equal(v.VisitId, handoff!.VisitId); Assert.Contains(16, handoff.Teeth); Assert.Empty(handoff.Documents);
-            // Native Vinh context is readable for an active Visit; reading it creates no treatment data.
-            var treatment = await c.GetAsync($"/api/visits/{v.VisitId}/treatment-context"); Assert.Equal(HttpStatusCode.OK, treatment.StatusCode);
             using var scope = fixture.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
-            Assert.Equal(0, await db.ClinicalActivities.CountAsync(x => x.VisitId == v.VisitId)); Assert.Equal(0, await db.TreatmentDossiers.CountAsync(x => x.PatientId == s.PatientId));
+            Assert.Equal(0, await db.TreatmentDossiers.CountAsync(x => x.PatientId == s.PatientId));
             Assert.Equal(HttpStatusCode.Conflict, (await c.PutAsJsonAsync(Exam(v.VisitId), draft with { ExpectedVersion = confirmed.Visit.VisitVersion, RequestKey = Guid.NewGuid() })).StatusCode);
         }
     }
@@ -422,7 +446,7 @@ public sealed class ExaminationApiTests(ExaminationFixture fixture) : IClassFixt
             var close = new CompleteExaminationVisit(v.PatientId, v.VisitVersion, Guid.NewGuid(), true);
             Assert.Equal(HttpStatusCode.Conflict, (await c.PostAsJsonAsync($"/api/visits/{v.VisitId}/complete", close)).StatusCode);
             var confirmed = await Ok<ExaminationWorkspace>(await c.PutAsJsonAsync(Exam(v.VisitId), new SaveExamination(v.PatientId,v.VisitVersion,Guid.NewGuid(),Content(true),true)));
-            Assert.Equal("InProgress", confirmed.Visit.Status); Assert.Equal("InProgress", confirmed.Visit.AppointmentStatus);
+            Assert.Equal("ExaminationConfirmed", confirmed.Visit.Status); Assert.Equal("InProgress", confirmed.Visit.AppointmentStatus);
             Assert.Equal(1, confirmed.Examination!.Version); Assert.Equal(v.VisitId, confirmed.Examination.Id);
             var list = await c.GetFromJsonAsync<PatientExamination[]>($"/api/patients/{v.PatientId}/examinations");
             Assert.Contains(list!, x => x.VisitId == v.VisitId && x.Examination!.Version == 1);
@@ -450,7 +474,6 @@ public sealed class ExaminationApiTests(ExaminationFixture fixture) : IClassFixt
             Assert.Equal(2,versions!.Length); Assert.Equal("SYNTHETIC đính chính",versions[0].Content.Conclusion);
             Assert.Equal(Content(true).Conclusion,versions[1].Content.Conclusion); Assert.Equal(amendment.Reason,versions[0].Reason);
             using var scope = fixture.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
-            Assert.False(await db.ClinicalActivities.AnyAsync(x => x.VisitId == v.VisitId));
             Assert.False(await db.TreatmentDossiers.AnyAsync(x => x.PatientId == v.PatientId));
             Assert.Equal(1,await db.Set<DCMS.Domain.Features.Visits.VisitAudit>().CountAsync(x=>x.VisitId==v.VisitId && x.Action=="CompleteVisit"));
             Assert.Equal(history.CompletedAt, (await db.Set<DCMS.Domain.Features.Visits.VisitAudit>().SingleAsync(x=>x.VisitId==v.VisitId && x.Action=="CompleteVisit")).OccurredAt);
@@ -471,23 +494,19 @@ public sealed class ExaminationApiTests(ExaminationFixture fixture) : IClassFixt
             Assert.True(saved.Examination!.Confirmed);
         }
     }
-    [Theory] [InlineData(false)] [InlineData(true)]
-    public async Task VisitClosingBlocksDraftWorkButDoesNotRequirePromisedTreatmentToBePerformed(bool draftWork)
+    [Fact]
+    public async Task VisitClosingDoesNotRequirePromisedTreatmentToBePerformed()
     {
         var (_,v,c) = await Prepare(); using(c) {
             var saved = await Ok<ExaminationWorkspace>(await c.PutAsJsonAsync(Exam(v.VisitId),new SaveExamination(v.PatientId,v.VisitVersion,Guid.NewGuid(),
-                Content(true) with { Disposition = draftWork ? "ConsultationOnly" : "ProceedToTreatment" },true)));
-            if(draftWork) { using var scope=fixture.Services.CreateScope(); var db=scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
-                db.ClinicalActivities.Add(new ClinicalActivity { VisitId=v.VisitId,PatientId=v.PatientId,BranchId=v.BranchId,State="Draft",Quantity=1,PerformedAt=fixture.Clock.Now,CreatedAt=fixture.Clock.Now });
-                await db.SaveChangesAsync(); }
+                Content(true) with { Disposition = "ProceedToTreatment" },true)));
             var complete=new CompleteExaminationVisit(v.PatientId,saved.Visit.VisitVersion,Guid.NewGuid(),true);
             var response=await c.PostAsJsonAsync($"/api/visits/{v.VisitId}/complete",complete);
-            if(draftWork){Assert.Equal(HttpStatusCode.Conflict,response.StatusCode);Assert.Equal("InProgress",(await c.GetFromJsonAsync<ExaminationWorkspace>(Exam(v.VisitId)))!.Visit.Status);}
-            else {
+            {
                 var closed=await Ok<ExaminationWorkspace>(response);Assert.Equal("Completed",closed.Visit.Status);Assert.Contains("handoff",closed.AllowedActions);
                 var handoff=await Ok<ClinicalHandoff>(await c.GetAsync($"/api/visits/{v.VisitId}/clinical-handoff"));Assert.Equal("Completed",handoff.VisitStatus);Assert.Equal(v.VisitId,handoff.VisitId);
                 var replay=await Ok<ExaminationWorkspace>(await c.PostAsJsonAsync($"/api/visits/{v.VisitId}/complete",complete));Assert.True(replay.Replayed);
-                using var scope=fixture.Services.CreateScope();var db=scope.ServiceProvider.GetRequiredService<DcmsDbContext>();Assert.False(await db.ClinicalActivities.AnyAsync(x=>x.VisitId==v.VisitId));Assert.Equal("Completed",(await db.Appointments.SingleAsync(x=>x.Id==v.AppointmentId)).Status);
+                using var scope=fixture.Services.CreateScope();var db=scope.ServiceProvider.GetRequiredService<DcmsDbContext>();Assert.Equal("Completed",(await db.Appointments.SingleAsync(x=>x.Id==v.AppointmentId)).Status);
             }
         }
     }
@@ -552,20 +571,6 @@ public sealed class ExaminationApiTests(ExaminationFixture fixture) : IClassFixt
             Assert.Equal(1, await db.Set<DCMS.Domain.Features.Visits.VisitAudit>().CountAsync(x => x.VisitId == v.VisitId && x.Action == "SaveExamination"));
         }
     }
-    [Fact] public async Task ConcurrentDraftCreationAndVisitCompletionCannotLeaveDraftOnCompletedVisit()
-    {
-        var (s,v,c) = await Prepare(); using(c) {
-            var saved = await Ok<ExaminationWorkspace>(await c.PutAsJsonAsync(Exam(v.VisitId),new SaveExamination(v.PatientId,v.VisitVersion,Guid.NewGuid(),Content(true),true)));
-            var activity = new DCMS.Application.Features.Treatment.ActivityInput(v.VisitId,null,null,null,null,s.ServiceId,"Toàn hàm","lần",1,fixture.Clock.Now,10,"SYNTHETIC ghi nhận",null,"Separate",null,100000,null);
-            var results = await Task.WhenAll(
-                c.PostAsJsonAsync($"/api/visits/{v.VisitId}/activities/drafts",new DCMS.Application.Features.Treatment.CreateActivityDraftRequest(activity,saved.Visit.VisitVersion,Guid.NewGuid())),
-                c.PostAsJsonAsync($"/api/visits/{v.VisitId}/complete",new CompleteExaminationVisit(v.PatientId,saved.Visit.VisitVersion,Guid.NewGuid(),true)));
-            Assert.Single(results,x=>x.IsSuccessStatusCode); Assert.Single(results,x=>x.StatusCode==HttpStatusCode.Conflict);
-            using var scope=fixture.Services.CreateScope(); var db=scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
-            var visit=await db.Visits.SingleAsync(x=>x.Id==v.VisitId);
-            Assert.False(visit.Status=="Completed" && await db.ClinicalActivities.AnyAsync(x=>x.VisitId==v.VisitId && x.State=="Draft"));
-        }
-    }
     [Fact] public async Task AnotherVisitKeepsPreviousResultsAndOpensExistingDossier()
     {
         var (s,v,c) = await Prepare(); using (c) {
@@ -578,10 +583,9 @@ public sealed class ExaminationApiTests(ExaminationFixture fixture) : IClassFixt
                 a.BranchId = s.BranchId;
                 a.ChairId = s.ChairId;
                 a.ServiceId = s.ServiceId;
-                var reservation = await db.Set<ResourceReservation>().SingleAsync(x => x.Id == a.ReservationId); reservation.AttendeeKey = $"patient:{s.PatientId}";
                 // Attach a second already-checked-in Visit to the same Patient. Check-in itself is covered through real API in the other cases.
                 a.Status = "CheckedIn"; var visit = new DCMS.Domain.Features.Visits.Visit { AppointmentId = a.Id, PatientId = s.PatientId, BranchId = s.BranchId, DentistId = s.DentistId,
-                    ArrivalAt = fixture.Clock.Now, RecordedAt = fixture.Clock.Now, RecordedBy = (await db.Employees.SingleAsync(x => x.Id == s.AssistantId)).AccountId };
+                    ArrivalAt = fixture.Clock.Now, RecordedBy = (await db.Employees.SingleAsync(x => x.Id == s.AssistantId)).AccountId };
                 db.Add(visit); var dossier = new TreatmentDossier { PatientId = s.PatientId, BranchId = s.BranchId, DentistId = s.DentistId, Code = "SYNTHETIC-OLD", Diagnosis = "SYNTHETIC cũ", StartedOn = DateOnly.FromDateTime(fixture.Clock.Now.DateTime), CreatedAt = fixture.Clock.Now, UpdatedAt = fixture.Clock.Now }; db.Add(dossier);
                 await db.SaveChangesAsync(); dossierId = dossier.Id; other = other with { AppointmentId = a.Id };
             }
@@ -608,7 +612,7 @@ public sealed class ExaminationApiTests(ExaminationFixture fixture) : IClassFixt
     {
         var (_,v,c) = await Prepare(); using(c) {
             Assert.Equal(HttpStatusCode.NotFound, (await c.PutAsJsonAsync(Exam(v.VisitId), new SaveExamination(v.PatientId + 1000, v.VisitVersion, Guid.NewGuid(), Content(), false))).StatusCode);
-            foreach (var m in new[] { Metadata(v) with { PatientId = v.PatientId + 1000 }, Metadata(v) with { DossierId = Guid.NewGuid() }, Metadata(v) with { PlanId = Guid.NewGuid() } })
+            foreach (var m in new[] { Metadata(v) with { PatientId = v.PatientId + 1000 }, Metadata(v) with { DossierId = Guid.NewGuid() } })
                 Assert.Equal(HttpStatusCode.NotFound, (await Upload(c,m)).StatusCode);
             Assert.Equal(HttpStatusCode.NotFound, (await Upload(c, Metadata(v) with { InvestigationId = Guid.NewGuid() })).StatusCode);
         }

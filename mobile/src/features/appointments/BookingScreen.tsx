@@ -133,8 +133,8 @@ export default function BookingScreen() {
           email: /^0\d{9}$/.test(contact.trim()) ? null : contact.trim() },
         attendee: { patientId: null, name: usesFamilyMember && member ? member.fullName : attendeeName.trim(), birthDate: usesFamilyMember && member ? member.birthDate : null },
         attendeeRelation: relation, ...(usesFamilyMember && member ? { familyMemberId: member.id } : {}), kind: 'Standard', source: 'App', serviceId: service.id,
-        reason: reason.trim() || null, dentistId, assistantId: null, chairId: null,
-        startAt: slot.start, durationMinutes: service.publicDurationMinutes, followUpId: null,
+        reason: reason.trim() || null, dentistId, chairId: null,
+        startAt: slot.start, durationMinutes: service.publicDurationMinutes, dossierId: null,
         exceptionReason: null, requestKey: key, scheduleVersion: slot.scheduleVersion,
         assistantScheduleVersion: null, bookingSettingsVersion: slot.bookingSettingsVersion,
       }, token);

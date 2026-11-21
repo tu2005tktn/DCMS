@@ -1,5 +1,7 @@
 # Phân hệ Quản lý & Kê đơn thuốc (Prescription Management)
 
+> **Cập nhật rút gọn 18/11/2026:** Theo [rút gọn bảng PRESCRIPTION và CATALOG_MEDICINE](./PRESCRIPTION-AND-MEDICINE-TABLE-SIMPLIFICATION.vi.md), hai nhánh cũ `ExternalPrescription` (kê đơn theo lượt khám `/api/prescriptions/visits/*`) và `PrescriptionTemplate` (mẫu đơn `/api/prescriptions/templates/*`) đã được gỡ bỏ khỏi bảng `PRESCRIPTION` (còn 11 cột chỉ phục vụ `PatientPrescription` S23); danh mục thuốc `CATALOG_MEDICINE` rút gọn còn 10 cột với `Spec` JSONB. Nội dung chi tiết về kê đơn theo Visit/mẫu dưới đây chỉ còn tính chất tham khảo lịch sử.
+
 Cập nhật lưu trữ 12/11/2026 theo [hợp đồng rút gọn database](DATABASE-SIMPLIFICATION.vi.md). Đơn từ hồ sơ, phiên bản theo Visit và mẫu cũ dùng chung `PRESCRIPTION`, phân biệt bằng `PrescriptionKind`; các dòng thuốc nằm trong JSONB. Danh mục dùng `CATALOG_MEDICINE`. Audit và kết quả chống gửi trùng dùng hai kho chung toàn hệ thống. Các tên bảng chi tiết ở phần lịch sử bên dưới chỉ cấu trúc nguồn của migration.
 
 > Luồng staff/mobile đơn giản hiện hành được quy định tại [S23 — Kê đơn trực tiếp từ hồ sơ bệnh nhân](./S23-PATIENT-PRESCRIPTIONS.vi.md). Không hiển thị mục/quản lý mẫu đơn thuốc hoặc bắt staff đi qua luồng nhiều bước theo Visit. Các contract Visit/template bên dưới được giữ để tương thích dữ liệu và API cũ; chúng không phải đường đi mặc định cho demo hoặc thao tác kê đơn mới.

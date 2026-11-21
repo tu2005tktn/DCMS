@@ -40,3 +40,9 @@ Trên bản sao phục hồi từ DB phát triển, migration EF thật chạy U
 Backend restore/build bằng .NET 10 thành công; model EF khớp migration. Có 100 unit test đạt. Lượt integration toàn bộ chạy tuần tự đạt 511/513, 2 NFR tùy chọn skip, không lỗi; gồm hai test lưu trữ mới kiểm lượt gửi và việc xử lý giữ qua rollback, và lượt gửi trùng kênh của cùng thông báo bị từ chối. Web không thay đổi.
 
 API trên DB phát triển: `GET /health` trả API và database healthy. Đăng nhập trợ lý demo, số thông báo chưa đọc khớp DB; danh sách thông báo trả mỗi thông báo kèm đúng lượt gửi của nó. Phiên kiểm chứng đã đăng xuất; log API và worker gửi thông báo không có lỗi.
+
+## Cập nhật rút gọn ngày 18/11/2026 (`IN_APP_NOTIFICATION`: 28 -> 19 cột)
+
+- Giữ nguyên 1 bảng TPH cho 4 loại dòng (`InAppNotification`, `NotificationDelivery`, `StaffHandlingItem`, `AppointmentOutboxEvent`) nhưng rút gọn từ 28 xuống **19 cột**: `Id`, `NotificationRecordKind`, `PublicId`, `DedupeKey`, `AccountId`, `BranchId`, `AppointmentId` (`Guid?`), `NotificationId`, `Kind` (`varchar(80)`), `Title`, `Body`, `Channel`, `Status`, `AttemptCount`, `CreatedAt`, `ReadAt`, `NextRetryAt`, `Error`, `Data` (`jsonb`).
+- `AppointmentOutboxEvent.AggregateId` (`Guid?`) dùng chung cột `"AppointmentId"` và khóa ngoại tới `APPOINTMENT`; `EventType` dùng chung `"Kind"` (`80` ký tự); `OccurredAt` dùng chung `"CreatedAt"`; `NotificationDelivery.LastError` dùng chung `"Error"`.
+- `RequestId`, `DeepLink`, `HasExternalFailure`, `LastAttemptAt`, `PayloadJson` và `DispatchedAt` được đóng gói trong `Data` JSONB; trạng thái chờ/đã gửi outbox dùng `"Status"` (`Pending` / `Dispatched`) với index `(Status, CreatedAt)` lọc theo `AppointmentOutboxEvent`. Xem [rút gọn 9 bảng còn lại](./REMAINING-NINE-TABLES-SIMPLIFICATION.vi.md).

@@ -14,7 +14,7 @@ export const fileStateColors: Record<FileState, string> = { PendingScan: 'gold',
 
 export type DocumentContextRef = {
   visitId?: string | null; visitLabel?: string | null; dossierId?: string | null; dossierLabel?: string | null;
-  planId?: string | null; planLabel?: string | null; investigationId?: string | null; investigationLabel?: string | null;
+  investigationId?: string | null; investigationLabel?: string | null;
   consentVersion?: string | null;
 };
 export type DocumentItem = {
@@ -23,6 +23,17 @@ export type DocumentItem = {
   context: DocumentContextRef; uploaderName: string; uploadedAt: string; fileState: FileState; rejectReason?: string | null;
   allowedActions: DocumentAction[];
   reviews?: { visitId: string; reviewedBy: number; reviewedAt: string }[];
+  aiAnalyses?: AiAnalysis[] | null;
+};
+// AI decision support on X-ray images: docs/specs/AI-CARIES-DETECTION.vi.md §5. Coordinates are original image pixels.
+export type AiFinding = {
+  findingId: string; kind: string; label: string; confidence: number; x1: number; y1: number; x2: number; y2: number;
+  jaw: 'upper' | 'lower' | string; side: 'right' | 'left' | string;
+};
+export type AiAnalysis = {
+  analysisId: string; kind: string; schemaVersion: string; modelName: string; modelSha256: string; inputSha256: string;
+  requestedBy: number; requestedByName: string; requestedAt: string; elapsedMs: number; device: string;
+  imageWidth: number; imageHeight: number; findings: AiFinding[];
 };
 export type DocumentConstraints = { maxFiles: number; maxBytes: number; contentTypes: string[]; descriptionMax: number };
 export type DocumentPage = {
@@ -31,17 +42,16 @@ export type DocumentPage = {
 export type DocumentHistoryEntry = { action: string; actorName: string; occurredAt: string; note?: string | null };
 export type PatientDocumentContexts = {
   patient: { id: number; patientCode: string; fullName: string; birthDate: string | null };
-  visits: { id: string; label: string; date: string }[];
+  visits: { id: string; label: string; date: string; acceptsUpload?: boolean }[];
   dossiers: { id: string; label: string }[];
-  plans: { id: string; label: string; dossierId: string }[];
 };
 export type DocumentQuery = {
   imagesOnly?: boolean;
-  patientId: number; visitId?: string; dossierId?: string; planId?: string; type?: DocumentType; from?: string; to?: string;
+  patientId: number; visitId?: string; dossierId?: string; type?: DocumentType; from?: string; to?: string;
   page: number; pageSize: number;
 };
 export type UploadMetadata = {
-  patientId: number; visitId?: string | null; dossierId?: string | null; planId?: string | null;
+  patientId: number; visitId?: string | null; dossierId?: string | null;
   investigationId?: string | null; consentVersion?: string | null; documentType: DocumentType; source: DocumentSource;
   sourceDate: string; description: string; requestKey: string;
 };
@@ -55,7 +65,7 @@ export const formatBytes = (n: number) => n < 1024 * 1024 ? `${Math.max(1, Math.
 export const formatDay = (iso: string) => iso.slice(0, 10).split('-').reverse().join('/');
 export const formatStamp = (iso: string) => new Date(iso).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
 export function contextLabel(c: DocumentContextRef) {
-  return [c.visitLabel, c.dossierLabel, c.planLabel, c.investigationLabel].filter(Boolean).join(' · ') || 'Hồ sơ chung';
+  return [c.visitLabel, c.dossierLabel, c.investigationLabel].filter(Boolean).join(' · ') || 'Hồ sơ chung';
 }
 export function newRequestKey() {
   return typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID()

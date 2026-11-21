@@ -5,6 +5,7 @@ using DCMS.Application.Common;
 using DCMS.Application.Features.Accounts;
 using DCMS.Application.Features.Authentication;
 using DCMS.Application.Features.Scheduling;
+using DCMS.Domain.Features.Appointments;
 using DCMS.Domain.Features.Scheduling;
 using DCMS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -108,8 +109,9 @@ public sealed class RecurringSchedulingTests(ApiFixture fixture) : IClassFixture
         {
             var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
             var start = new DateTimeOffset(later.ToDateTime(new TimeOnly(8, 0)), TimeSpan.FromHours(7));
-            db.Add(new ResourceReservation { BranchId = s.Branch, DentistId = s.Employee, ChairId = s.Chair, ServiceId = s.Service,
-                Code = Guid.NewGuid().ToString("N"), Start = start.ToUniversalTime(), End = start.AddMinutes(60).ToUniversalTime(), AttendeeLabel = "Synthetic", Status = "Confirmed" });
+            db.Add(new Appointment { BranchId = s.Branch, DentistId = s.Employee, ChairId = s.Chair, ServiceId = s.Service,
+                Code = "AP-" + Guid.NewGuid().ToString("N"), StartAt = start.ToUniversalTime(), EndAt = start.AddMinutes(60).ToUniversalTime(),
+                AttendeeName = "Synthetic", Status = "Confirmed", CreatedAt = DateTimeOffset.UtcNow, BookingInfo = new() { BookerName = "Synthetic" } });
             await db.SaveChangesAsync();
         }
         var removal = Command(s, 1) with { Intervals = [new(s.OtherBranch, 0, 480, 1020, "Work")] };

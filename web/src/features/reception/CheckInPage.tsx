@@ -7,9 +7,9 @@ import { useAuth } from '../authentication/AuthContext';
 import PatientFormDrawer from '../patients/PatientFormDrawer';
 import type { PatientDetail, PatientListItem } from '../patients/types';
 import { formatDate, newRequestKey } from '../appointments/types';
-import { arrivalClock, purposeLabels, type Course, type ReceptionDetail, type VisitResult } from './types';
+import { arrivalClock, purposeLabels, type ReceptionDetail, type VisitResult } from './types';
 
-type Values = { patientId?: number; purpose: string; note?: string; identityConfirmed?: boolean; backdate?: boolean; arrivalAt?: string; arrivalReason?: string; priorCourseId?: string };
+type Values = { patientId?: number; purpose: string; note?: string; identityConfirmed?: boolean; backdate?: boolean; arrivalAt?: string; arrivalReason?: string };
 export default function CheckInPage() {
   const { appointmentId } = useParams(); const auth = useAuth(); const [form] = Form.useForm<Values>();
   const navigate = useNavigate(); const [modal, modalContext] = Modal.useModal(); const [dirty, setDirty] = useState(false);
@@ -17,7 +17,7 @@ export default function CheckInPage() {
   const purpose = Form.useWatch('purpose', form) as string | undefined;
   const backdate = Form.useWatch('backdate', form) as boolean | undefined;
   const [detail, setDetail] = useState<ReceptionDetail>(); const [patient, setPatient] = useState<PatientDetail>();
-  const [patients, setPatients] = useState<PatientListItem[]>([]); const [courses, setCourses] = useState<Course[]>([]);
+  const [patients, setPatients] = useState<PatientListItem[]>([]);
   const [error, setError] = useState<Error>(); const [searchError, setSearchError] = useState<string>(); const [patientError, setPatientError] = useState<string>();
   const [loading, setLoading] = useState(false); const [busy, setBusy] = useState(false); const [creating, setCreating] = useState(false);
   const [result, setResult] = useState<VisitResult>(); const [loadedAt, setLoadedAt] = useState(0); const [tick, setTick] = useState(Date.now());
@@ -35,12 +35,10 @@ export default function CheckInPage() {
   }
   useEffect(() => { setDetail(undefined); setResult(undefined); form.resetFields(); void load(true); }, [appointmentId]);
   useEffect(() => {
-    let active = true; setPatient(undefined); setPatientError(undefined); setSearchError(undefined); setCourses([]); form.setFieldValue('identityConfirmed', false); form.setFieldValue('priorCourseId', undefined);
+    let active = true; setPatient(undefined); setPatientError(undefined); setSearchError(undefined); form.setFieldValue('identityConfirmed', false);
     if (patientId) {
       api<PatientDetail>(`/api/patients/${patientId}`).then(value => { if (active) setPatient(value); })
         .catch(e => { if (active) setPatientError((e as Error).message); });
-      api<Course[]>(`/api/reception/appointments/${appointmentId}/courses?patientId=${patientId}`).then(value => { if (active) setCourses(value); })
-        .catch(e => { if (active) setSearchError((e as Error).message); });
     }
     return () => { active = false; };
   }, [patientId, appointmentId]);
@@ -72,7 +70,7 @@ export default function CheckInPage() {
     const payload = { patientId: patient.id, expectedVersion: detail.appointment.version, identityConfirmed: values.identityConfirmed === true,
       arrivalAt: arrival?.toISOString() ?? null,
       arrivalReason: values.backdate ? values.arrivalReason?.trim() ?? null : null, purpose: values.purpose,
-      priorCourseId: values.priorCourseId ?? null, note: values.note?.trim() || null };
+      note: values.note?.trim() || null };
     const serialized = JSON.stringify(payload);
     if (request.current?.payload !== serialized) request.current = { payload: serialized, key: newRequestKey() };
     setBusy(true); setError(undefined);
@@ -125,8 +123,6 @@ export default function CheckInPage() {
           </Form.Item>
           <Form.Item name="purpose" label="Lý do đến" rules={[{ required: true }]}><Select options={Object.entries(purposeLabels).map(([value, label]) => ({ value, label }))} /></Form.Item>
           {purpose !== 'InitialExamination' && <>
-            <Form.Item name="priorCourseId" label="Đợt điều trị cũ (nếu có)"><Select allowClear disabled={courses.length === 0} placeholder="Chưa có đợt điều trị để chọn"
-              options={courses.map(c => ({ value: c.id, label: c.label }))} /></Form.Item>
             <Alert type="info" message="Bác sĩ xác nhận nguồn và hạng mục chuyên môn sau. Thiếu đợt hoặc bước tùy chọn không chặn tiếp nhận." />
           </>}
           <Form.Item name="note" label="Ghi chú thêm"><Input.TextArea maxLength={1000} showCount rows={3} /></Form.Item>

@@ -18,8 +18,9 @@ public sealed record TreatmentPayOsOrderState(TreatmentPayOsOrder Order, string 
 public static class TreatmentPayOsEndpoints
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-    private static bool Owner(HttpContext context) => context.Items["CurrentUser"] is CurrentUser user
-        && user.EffectiveRoles.Contains(AccountRoles.ClinicOwner);
+    // The owner, or staff in an access group holding the grant; unassigned staff keep the owner-only behavior.
+    private static bool Owner(HttpContext context, string permission = "finance.payments.create") => context.Items["CurrentUser"] is CurrentUser user
+        && (user.EffectiveRoles.Contains(AccountRoles.ClinicOwner) || user.AccessAssigned && user.Permissions.Contains(permission));
 
     public static void MapWebhook(IEndpointRouteBuilder endpoints) => endpoints.MapPost("/api/payments/payos/webhook",
         async (JsonElement body, DcmsDbContext db, TreatmentPayOsGateway gateway, CancellationToken ct) =>
@@ -146,7 +147,7 @@ public static class TreatmentPayOsEndpoints
     private static async Task<IResult> Active(HttpContext http, Guid dossierId, string purpose,
         DcmsDbContext db, TreatmentPayOsGateway gateway, CancellationToken ct)
     {
-        if (!Owner(http)) return Results.Forbid();
+        if (!Owner(http, "finance.read")) return Results.Forbid();
         var order = await LatestOrder(db, dossierId, purpose, ct);
         if (order is null || order.ExpiresAt <= DateTimeOffset.UtcNow || await Settled(db, order.Id, ct))
             return Results.Ok((TreatmentPayOsOrderState?)null);
@@ -156,7 +157,7 @@ public static class TreatmentPayOsEndpoints
     private static async Task<IResult> Refresh(HttpContext http, Guid dossierId, Guid orderId, string purpose,
         DcmsDbContext db, TreatmentPayOsGateway gateway, CancellationToken ct)
     {
-        if (!Owner(http)) return Results.Forbid();
+        if (!Owner(http, "finance.read")) return Results.Forbid();
         var order = await ReadOrder(db, orderId, dossierId, ct);
         if (order is null || order.Purpose != purpose) return Results.NotFound();
         return await Settle(order, dossierId, db, gateway, ct);

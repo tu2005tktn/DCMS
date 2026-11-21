@@ -94,24 +94,23 @@ public sealed partial class WorkingScheduleService
     private async Task<AffectedAppointment[]> AffectedRecurring(RecurringCommand c, CancellationToken ct)
     {
         var from = Local(c.Date).ToUniversalTime();
-        var reservations = await db.Set<ResourceReservation>().AsNoTracking().Where(r => r.Status == "Confirmed"
-            && (r.DentistId == c.DentistId || r.AssistantId == c.DentistId) && r.End > from
-            && r.End > clock.GetUtcNow()).ToArrayAsync(ct);
+        var appointments = await db.Appointments.AsNoTracking().Where(r => r.Status == "Confirmed"
+            && r.DentistId == c.DentistId && r.EndAt > from && r.EndAt > clock.GetUtcNow()).ToArrayAsync(ct);
         var affected = new List<AffectedAppointment>();
-        foreach (var r in reservations)
+        foreach (var r in appointments)
         {
-            var local = r.Start.ToOffset(TimeSpan.FromHours(7));
+            var local = r.StartAt.ToOffset(TimeSpan.FromHours(7));
             var date = DateOnly.FromDateTime(local.DateTime);
             // A date exception only changes its own date. Later templates and other exceptions still win.
             if (date < c.Date || (c.Kind == "Exception" && date != c.Date)) continue;
-            var q = new AvailabilityQuery(r.BranchId, r.DentistId, r.ServiceId, date, (int)(r.End - r.Start).TotalMinutes, r.AssistantId);
+            var q = new AvailabilityQuery(r.BranchId, r.DentistId, r.ServiceId, date, (int)(r.EndAt - r.StartAt).TotalMinutes);
             try
             {
                 await ValidateQuery(q, false, ct);
-                if (Evaluate(q, false, local, r.ChairId, r.AttendeeKey, r.Id, await Load(q, null, ct, c)) != null) continue;
+                if (Evaluate(q, false, local, r.ChairId, r.PatientId, r.Id, await Load(q, null, ct, c)) != null) continue;
             }
             catch (BusinessException) { }
-            affected.Add(new(r.Id, r.Code, r.Start, r.End, r.AttendeeLabel, r.Status));
+            affected.Add(new(r.Id, r.Code, r.StartAt, r.EndAt, r.AttendeeName, r.Status));
         }
         return affected.ToArray();
     }

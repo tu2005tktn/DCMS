@@ -2,15 +2,17 @@ namespace DCMS.Domain.Features.Scheduling;
 
 public sealed class SchedulingBranch
 {
-    public Guid StorageStamp { get; set; } = Guid.NewGuid();
+    public int Id { get; set; }
+    public string? Code { get; set; }
+    public string Name { get; set; } = "";
+    public string? Address { get; set; }
+    public string? Phone { get; set; }
+    public string? Email { get; set; }
+    public bool Active { get; set; } = true;
+    public int SlotIntervalMinutes { get; set; } = 15;
+    public int Version { get; set; } = 1;
     public List<SchedulingMember> Members { get; set; } = [];
     public List<SchedulingChair> Chairs { get; set; } = [];
-    public List<DCMS.Domain.Features.Settings.BranchAsset> Assets { get; set; } = [];
-    public int SlotIntervalMinutes { get; set; } = 15;
-    public int BookingSettingsVersion { get; set; } = 1;
-    public int Id { get; set; }
-    public string Name { get; set; } = "";
-    public bool Active { get; set; } = true;
 }
 public sealed class SchedulingMember
 {
@@ -34,9 +36,6 @@ public sealed class SchedulingChair
 public sealed class SchedulingService
 {
     public string Unit { get; set; } = "lần";
-    public bool IsInvestigationService { get; set; }
-    public string? InvestigationKind { get; set; }
-    public string BillingUnit { get; set; } = "Lần";
     public bool IsInitialExamination { get; set; }
     public bool PublicBookable { get; set; } = true;
     public int Id { get; set; }
@@ -73,24 +72,6 @@ public sealed class WorkingPeriod
     public int EndMinute { get; set; }
     public string Kind { get; set; } = "Work";
     public string Reason { get; set; } = "";
-}
-// Shared persistence seam for TV2; no appointment creation API is exposed by S09.
-public sealed class ResourceReservation
-{
-    public Guid AppointmentKey { get; set; } = Guid.NewGuid();
-    public Guid StorageStamp { get; set; } = Guid.NewGuid();
-    public Guid Id { get; set; } = Guid.NewGuid();
-    public string Code { get; set; } = "";
-    public int BranchId { get; set; }
-    public int DentistId { get; set; }
-    public int? AssistantId { get; set; }
-    public int ChairId { get; set; }
-    public int? ServiceId { get; set; }
-    public DateTimeOffset Start { get; set; }
-    public DateTimeOffset End { get; set; }
-    public string? AttendeeKey { get; set; }
-    public string AttendeeLabel { get; set; } = "";
-    public string Status { get; set; } = "Confirmed";
 }
 public sealed class ScheduleReceipt : DCMS.Domain.Common.CommandReceiptRecord
 {

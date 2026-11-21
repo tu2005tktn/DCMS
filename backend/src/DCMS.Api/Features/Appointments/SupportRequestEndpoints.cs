@@ -26,10 +26,5 @@ public static class SupportRequestEndpoints
         group.MapPost("/{id}/reject", async (HttpContext context, string id, ResolveSupportCommand command,
             ISupportRequestService service, CancellationToken ct) => Results.Ok(await service.ResolveAsync(
                 AuthenticationEndpoints.AccountId(context.User), id, command with { Decision = "Reject" }, ct)));
-
-        endpoints.MapPatch("/api/appointments/{id:guid}/attendance-confirmation", async (HttpContext context, Guid id,
-            AttendanceConfirmationCommand command, ISupportRequestService service, CancellationToken ct) => Results.Ok(
-                await service.SetAttendanceAsync(AuthenticationEndpoints.AccountId(context.User), id, command, ct)))
-            .RequireAuthorization().WithTags("S12 Attendance confirmation");
     }
 }

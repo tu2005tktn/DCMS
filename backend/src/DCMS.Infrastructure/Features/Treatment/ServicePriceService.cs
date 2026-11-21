@@ -23,6 +23,8 @@ public sealed class ServicePriceService(DcmsDbContext db, UserManager<Applicatio
         if (scope.Assigned && !scope.Owner && !scope.BranchIds.Contains(branchId)) throw Error("MSG06", 403);
         var user = await users.FindByIdAsync(actorId.ToString());
         if (user is not { IsActive: true, AccountType: "Staff" }) throw Error("MSG06", 403);
+        // Staff in an access group act through treatment.prices.* grants within their assignment branches.
+        if (scope.GrantDriven) return;
         var roles = AccountRoles.Effective(await users.GetRolesAsync(user));
         if (manage && !roles.Contains(AccountRoles.Admin) && !roles.Contains(AccountRoles.ClinicOwner)
             && !roles.Contains(AccountRoles.Dentist))
@@ -41,13 +43,13 @@ public sealed class ServicePriceService(DcmsDbContext db, UserManager<Applicatio
         var account = await users.FindByIdAsync(actorId.ToString());
         if (account is not { IsActive: true, AccountType: "Staff" }) throw Error("MSG06", 403);
         var roles = AccountRoles.Effective(await users.GetRolesAsync(account));
-        if (!roles.Contains(AccountRoles.Admin) && !roles.Contains(AccountRoles.ClinicOwner)
+        var scope = await access.ResolveAsync(actorId, ct);
+        if (!scope.GrantDriven && !roles.Contains(AccountRoles.Admin) && !roles.Contains(AccountRoles.ClinicOwner)
             && !roles.Contains(AccountRoles.Dentist))
             throw Error("MSG06", 403);
         var query = db.Set<SchedulingService>().AsNoTracking().Where(x => x.Active);
-        var scope = await access.ResolveAsync(actorId, ct);
         if (scope.Assigned && !scope.Owner) query = query.Where(x => scope.BranchIds.Contains(x.BranchId));
-        if (!roles.Contains(AccountRoles.Admin))
+        if (!scope.GrantDriven && !roles.Contains(AccountRoles.Admin))
         {
             var isOwner = roles.Contains(AccountRoles.ClinicOwner);
             var employeeId = await db.Employees.AsNoTracking().Where(x => x.AccountId == actorId)

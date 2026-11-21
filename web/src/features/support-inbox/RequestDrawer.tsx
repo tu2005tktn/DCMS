@@ -278,8 +278,6 @@ export default function RequestDrawer({ id, refreshToken, onClose, onChanged }: 
                 { label: 'Kết thúc', children: formatDateTime(detail.appointment.endAt) },
                 { label: 'Bệnh nhân', children: `${detail.appointment.attendee.name}${detail.appointment.attendee.relation === 'Relative' ? ' (người thân)' : ''}` },
                 { label: 'Booker', children: <>{detail.appointment.booker.name}{detail.appointment.booker.isAnonymous && ' (vãng lai)'}</> },
-                { label: 'Xác nhận tham dự', children: detail.appointment.confirmedToAttend === 'Yes' ? 'Đã xác nhận'
-                  : detail.appointment.confirmedToAttend === 'No' ? 'Đã từ chối' : 'Chờ xác nhận' },
                 { label: 'Phiên bản lịch', children: `v${detail.appointment.version}` },
               ]} />
 

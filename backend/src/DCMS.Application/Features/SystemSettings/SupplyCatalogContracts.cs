@@ -14,16 +14,14 @@ public static class LabWorkUnits
 }
 
 public sealed record ProviderInput(string? Code, string? Name, string? Type, string? Address, string? Phone, string? Email);
-public sealed record ProviderDto(Guid Id, string Code, string Name, string Type, string? Address, string? Phone, string? Email, bool Active, int Version,
-    DateTimeOffset CreatedAt, string CreatedByName, DateTimeOffset UpdatedAt, string UpdatedByName);
+public sealed record ProviderDto(Guid Id, string Code, string Name, string Type, string? Address, string? Phone, string? Email, bool Active, int Version);
 public sealed record LabWorkTypeInput(string? Code, string? Name, Guid? ProviderId, string? Unit, long? ReferencePrice, string? Warranty);
 public sealed record LabWorkTypeDto(Guid Id, string Code, string Name, Guid? ProviderId, string? ProviderName, bool? ProviderActive, string Unit,
-    long? ReferencePrice, string? Warranty, bool Active, int Version, DateTimeOffset CreatedAt, string CreatedByName, DateTimeOffset UpdatedAt, string UpdatedByName);
+    long? ReferencePrice, string? Warranty, bool Active, int Version);
 public sealed record MedicineInput(string? Code, string? Name, string? ActiveIngredient, string? Strength, string? DosageForm, string? BaseUnit,
-    string? Route, string? Packaging, string? Contraindications, string? AllergyWarnings, string? Instructions, long? ReferencePrice, bool PrescriptionEligible, bool InternalStockTracked);
+    string? Packaging, string? Instructions, long? ReferencePrice, bool PrescriptionEligible, bool InternalStockTracked);
 public sealed record MedicineDto(Guid Id, string Code, string Name, string? ActiveIngredient, string? Strength, string? DosageForm, string BaseUnit,
-    string Route, string? Packaging, string? Contraindications, string? AllergyWarnings, string? Instructions, long? ReferencePrice, bool PrescriptionEligible, bool InternalStockTracked, bool Active, int Version,
-    DateTimeOffset CreatedAt, string CreatedByName, DateTimeOffset UpdatedAt, string UpdatedByName);
+    string? Packaging, string? Instructions, long? ReferencePrice, bool PrescriptionEligible, bool InternalStockTracked, bool Active, int Version);
 
 public sealed record CreateSupplyRequest<T>(Guid RequestKey, T? Entry) where T : class;
 public sealed record UpdateSupplyRequest<T>(int ExpectedVersion, Guid RequestKey, string? Reason, T? Entry) where T : class;

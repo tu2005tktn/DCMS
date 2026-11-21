@@ -97,11 +97,11 @@ public sealed class AppointmentQueryApiTests(ApiFixture fixture) : IClassFixture
 
     private static CreateAppointmentRequest Public(Setup s, AvailabilitySlot slot, string relation = "Self", string attendee = "Người khám") =>
         new(s.BranchId, new BookerContact(null, "0912345678", null), new AppointmentAttendee(null, attendee, null), relation,
-            "Standard", "App", s.ServiceId, null, s.DentistId, null, null, slot.Start, 30, null, null, Guid.NewGuid(), slot.ScheduleVersion, null);
+            "Standard", "App", s.ServiceId, null, s.DentistId, null, slot.Start, 30, null, null, Guid.NewGuid(), slot.ScheduleVersion, null);
 
     private static CreateAppointmentRequest Staff(Setup s, AvailabilitySlot slot, int dentistId, int duration, int? patientId = null, string kind = "WalkIn") =>
         new(s.BranchId, new BookerContact("Lễ tân ghi nhận", "0987654321", null), new AppointmentAttendee(patientId, "Khách tại quầy", null), "Self",
-            kind, "InPerson", s.ServiceId, null, dentistId, null, null, slot.Start, duration, null, null, Guid.NewGuid(), slot.ScheduleVersion, null);
+            kind, "InPerson", s.ServiceId, null, dentistId, null, slot.Start, duration, null, null, Guid.NewGuid(), slot.ScheduleVersion, null);
 
     private static string Range(Setup s) => $"branchId={s.BranchId}&from={s.Date:yyyy-MM-dd}&to={s.Date:yyyy-MM-dd}";
 
@@ -130,12 +130,10 @@ public sealed class AppointmentQueryApiTests(ApiFixture fixture) : IClassFixture
             {
                 var chair = await db.SchedulingChairs.FirstAsync(x => x.BranchId == branch.BranchId);
                 var id = Guid.NewGuid(); var start = now.AddDays(days);
-                db.Set<ResourceReservation>().Add(new ResourceReservation { Id = id, Code = "RS-" + id.ToString("N"),
+                db.Appointments.Add(new Appointment { Id = id, Code = "AP-" + id.ToString("N"),
                     BranchId = branch.BranchId, DentistId = dentist, ChairId = chair.Id, ServiceId = branch.ServiceId,
-                    Start = start, End = start.AddMinutes(30), AttendeeLabel = patient.FullName, Status = status });
-                db.Appointments.Add(new Appointment { Id = id, ReservationId = id, Code = "AP-" + id.ToString("N"),
-                    BranchId = branch.BranchId, DentistId = dentist, ChairId = chair.Id, ServiceId = branch.ServiceId,
-                    PatientId = patientKey, AttendeeName = patient.FullName, BookerName = "Synthetic booker",
+                    PatientId = patientKey, AttendeeName = patient.FullName,
+                    BookingInfo = new AppointmentBookingInfo { BookerName = "Synthetic booker" },
                     StartAt = start, EndAt = start.AddMinutes(30), Status = status, CreatedAt = now });
                 return id;
             }

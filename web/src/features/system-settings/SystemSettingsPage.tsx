@@ -77,7 +77,7 @@ export default function SystemSettingsPage() {
       : []),
 
     // 4. material-suppliers
-    ...(has('catalog.material-suppliers.read')
+    ...(has('catalog.providers.read')
       ? [{ key: 'material-suppliers', label: 'Công ty cung cấp vật liệu', children: <SupplyCatalogPanel initialKey="suppliers" /> }]
       : []),
 
@@ -87,7 +87,7 @@ export default function SystemSettingsPage() {
       : []),
 
     // 6. lab-providers
-    ...(has('catalog.lab-work-types.read') || has('catalog.material-suppliers.read')
+    ...(has('catalog.lab-work-types.read') || has('catalog.providers.read')
       ? [{ key: 'lab-providers', label: 'Công ty labo', children: <SupplyCatalogPanel initialKey="labs" /> }]
       : []),
 

@@ -52,6 +52,6 @@ export const investigationStateLabels: Record<string, string> = {
   Ordered: 'Đã chỉ định', ResultAvailable: 'Đã có kết quả, chờ bác sĩ đọc', Reviewed: 'Bác sĩ đã đọc kết quả',
 };
 export const visitStatusLabels: Record<string, string> = {
-  Queued: 'Chờ khám', InProgress: 'Đang khám', Completed: 'Đã kết thúc', Cancelled: 'Đã hủy',
+  Queued: 'Chờ khám', InProgress: 'Đang khám', ExaminationConfirmed: 'Đã xác nhận phiếu khám', Completed: 'Đã kết thúc', Cancelled: 'Đã hủy',
 };
 export const isImage = (doc: Pick<OwnDocument, 'contentType'>) => doc.contentType.startsWith('image/');

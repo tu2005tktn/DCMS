@@ -32,15 +32,6 @@ public sealed partial class DcmsDbContext
             (entry.State == EntityState.Added || entry.State == EntityState.Modified &&
                 entry.OriginalValues[property] as string != value);
 
-        foreach (var entry in ChangeTracker.Entries<ExternalPrescription>())
-            if (Became(entry, nameof(ExternalPrescription.Status), PrescriptionStatuses.Finalized))
-            {
-                var p = entry.Entity;
-                events.Add(new(p.PatientId, p.BranchId, NotificationKind.PrescriptionReady,
-                    "Đơn thuốc đã sẵn sàng", "Bác sĩ đã hoàn tất đơn thuốc của bạn. Mở ứng dụng để xem.",
-                    $"rx:{p.Id}:{p.Revision}", "/prescriptions"));
-            }
-
         foreach (var entry in ChangeTracker.Entries<PatientPrescription>())
             if (entry.State == EntityState.Added || entry.State == EntityState.Modified &&
                 entry.Property(nameof(PatientPrescription.Version)).IsModified)
@@ -51,9 +42,14 @@ public sealed partial class DcmsDbContext
                     $"patient-rx:{prescription.Id}:{prescription.Version}", $"/prescriptions/{prescription.Id}"));
             }
 
-        var examinations = ChangeTracker.Entries<VisitExamination>().Where(e => e.Entity.Confirmed &&
+        // A confirmed examination is announced when it becomes confirmed or its confirmed content changes.
+        var trackedVisits = ChangeTracker.Entries<Visit>().ToDictionary(v => v.Entity.Id);
+        bool ConfirmedNow(Guid id) => trackedVisits.TryGetValue(id, out var v) && VisitStatuses.HasConfirmedExamination.Contains(v.Entity.Status);
+        bool ConfirmedBefore(Guid id) => trackedVisits.TryGetValue(id, out var v) && v.State != EntityState.Added
+            && VisitStatuses.HasConfirmedExamination.Contains((string)v.OriginalValues[nameof(Visit.Status)]!);
+        var examinations = ChangeTracker.Entries<VisitExamination>().Where(e => ConfirmedNow(e.Entity.VisitId) &&
             (e.State == EntityState.Added || e.State == EntityState.Modified &&
-                (e.OriginalValues[nameof(VisitExamination.Confirmed)] as bool? != true ||
+                (!ConfirmedBefore(e.Entity.VisitId) ||
                  e.OriginalValues[nameof(VisitExamination.ContentJson)] as string != e.Entity.ContentJson))).ToArray();
         if (examinations.Length > 0)
         {
@@ -76,33 +72,30 @@ public sealed partial class DcmsDbContext
                     $"visit-complete:{v.Id}:{v.Version}", $"/visit-results/{v.Id}"));
             }
 
-        foreach (var entry in ChangeTracker.Entries<FollowUpInstruction>())
-            if (Became(entry, nameof(FollowUpInstruction.Status), "NeedsBooking"))
-            {
-                var followUp = entry.Entity;
-                events.Add(new(followUp.PatientId, followUp.BranchId, NotificationKind.FollowUpBookingRequested,
-                    "Bác sĩ đề nghị đặt lịch", "Bạn có lịch tái khám cần đặt. Mở ứng dụng để xem hướng dẫn.",
-                    $"follow-up:{followUp.Id}:{followUp.Version}", "/book-appointment"));
-            }
-
-        foreach (var entry in ChangeTracker.Entries<TreatmentDossier>())
-            if (Became(entry, nameof(TreatmentDossier.PlanState), "Committed"))
-            {
-                var dossier = entry.Entity;
+        foreach (var group in ChangeTracker.Entries<TreatmentEvent>()
+            .Where(e => e.State == EntityState.Added && e.Entity.Kind == "PlanCommitted")
+            .GroupBy(e => e.Entity.DossierId).ToArray())
+        {
+            var evt = group.Last().Entity;
+            var dossier = ChangeTracker.Entries<TreatmentDossier>().Select(x => x.Entity).FirstOrDefault(x => x.Id == evt.DossierId)
+                ?? await TreatmentDossiers.AsNoTracking().SingleOrDefaultAsync(x => x.Id == evt.DossierId, ct);
+            if (dossier != null)
                 events.Add(new(dossier.PatientId, dossier.BranchId, NotificationKind.TreatmentUpdated,
                     "Kế hoạch điều trị đã cập nhật", "Phòng khám đã cập nhật kế hoạch điều trị của bạn.",
-                    $"plan:{dossier.Id}:{dossier.PlanVersion}", $"/medical-records/{dossier.Id}"));
-            }
+                    $"plan:{dossier.Id}:{evt.DossierVersion}", $"/medical-records/{dossier.Id}"));
+        }
 
-        foreach (var entry in ChangeTracker.Entries<ClinicalActivity>())
-            if (Became(entry, nameof(ClinicalActivity.State), "Posted"))
-            {
-                var activity = entry.Entity;
-                events.Add(new(activity.PatientId, activity.BranchId, NotificationKind.TreatmentUpdated,
+        // Activities are recorded as soon as they are added; patient and branch come from the dossier.
+        foreach (var entry in ChangeTracker.Entries<ClinicalActivity>().Where(x => x.State == EntityState.Added).ToArray())
+        {
+            var activity = entry.Entity;
+            var dossier = ChangeTracker.Entries<TreatmentDossier>().Select(x => x.Entity).FirstOrDefault(x => x.Id == activity.DossierId)
+                ?? await TreatmentDossiers.AsNoTracking().SingleOrDefaultAsync(x => x.Id == activity.DossierId, ct);
+            if (dossier != null)
+                events.Add(new(dossier.PatientId, dossier.BranchId, NotificationKind.TreatmentUpdated,
                     "Hồ sơ điều trị đã cập nhật", "Phòng khám đã ghi nhận một buổi điều trị của bạn.",
-                    $"activity:{activity.Id}:{activity.Version}",
-                    activity.DossierId is { } id ? $"/medical-records/{id}" : null));
-            }
+                    $"activity:{activity.Id}", $"/medical-records/{activity.DossierId}"));
+        }
 
         foreach (var entry in ChangeTracker.Entries<ClinicalDocument>())
             if (Became(entry, nameof(ClinicalDocument.FileState), "Ready"))

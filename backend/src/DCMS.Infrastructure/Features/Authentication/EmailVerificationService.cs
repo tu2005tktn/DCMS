@@ -39,8 +39,8 @@ public sealed class EmailVerificationService(
             throw new BusinessException(400, SystemMessages.Get("MSG04", "Email"));
 
         var now = DateTimeOffset.UtcNow;
-        var hourlyCount = await db.EmailVerificationTokens.CountAsync(x =>
-            x.AccountId == accountId && x.CreatedAt >= now.AddHours(-1), ct);
+        var hourlyCount = user.EmailVerifications.Count(x =>
+            x.AccountId == accountId && x.CreatedAt >= now.AddHours(-1));
         if (hourlyCount >= settings.RateLimitPerAccountPerHour)
             return new("Đã đạt giới hạn gửi mã. Vui lòng thử lại sau.", 3600);
 

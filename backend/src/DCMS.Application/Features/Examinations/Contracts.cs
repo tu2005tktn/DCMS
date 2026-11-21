@@ -25,7 +25,7 @@ public sealed record ExaminationWorkspace(VisitResult Visit, ExaminationDto? Exa
     ExaminationContent InitialContent, IReadOnlyList<string> AllowedActions, ExaminationPatient Patient, bool Replayed = false, IReadOnlyList<InvestigationDto>? Investigations = null);
 public sealed record ExaminationHistory(Guid VisitId, DateTimeOffset ArrivalAt, ExaminationDto Examination);
 public sealed record ClinicalHandoff(Guid VisitId, int PatientId, int BranchId, int Version, ExaminationContent Examination,
-    IReadOnlyList<int> Teeth, IReadOnlyList<DocumentDto> Documents, VisitSource? Source, int ExaminationVersion = 0, string VisitStatus = "InProgress");
+    IReadOnlyList<int> Teeth, IReadOnlyList<DocumentDto> Documents, int ExaminationVersion = 0, string VisitStatus = "InProgress");
 public interface IExaminationService
 {
     Task<ExaminationWorkspace> GetAsync(int actorId, Guid visitId, CancellationToken ct);
@@ -39,25 +39,27 @@ public interface IExaminationService
     Task<ExaminationWorkspace> CompleteAsync(int actorId, Guid visitId, CompleteExaminationVisit request, CancellationToken ct);
 }
 
-public sealed record DocumentMetadata(int PatientId, Guid? VisitId, Guid? DossierId, Guid? PlanId,
+public sealed record DocumentMetadata(int PatientId, Guid? VisitId, Guid? DossierId,
     Guid? InvestigationId, string? ConsentVersion, string DocumentType, string Source,
     DateOnly SourceDate, string? Description, Guid RequestKey);
 public sealed record DocumentContext(Guid? VisitId, string? VisitLabel, Guid? DossierId, string? DossierLabel,
-    Guid? PlanId, string? PlanLabel, Guid? InvestigationId = null, string? InvestigationLabel = null);
+    Guid? InvestigationId = null, string? InvestigationLabel = null);
 public sealed record DocumentReviewDto(Guid VisitId, int ReviewedBy, DateTimeOffset ReviewedAt);
 public sealed record DocumentDto(Guid DocumentId, int Version, string FileName, string ContentType, long SizeBytes,
     string DocumentType, string Source, DateOnly SourceDate, string? Description, DocumentContext Context,
     string UploaderName, DateTimeOffset UploadedAt, string FileState, string? RejectReason,
-    IReadOnlyList<string> AllowedActions, IReadOnlyList<DocumentReviewDto> Reviews);
+    IReadOnlyList<string> AllowedActions, IReadOnlyList<DocumentReviewDto> Reviews, IReadOnlyList<AiAnalysisDto>? AiAnalyses = null);
 public sealed record DocumentConstraints(int MaxFiles, long MaxBytes, string[] ContentTypes, int DescriptionMax);
 public sealed record DocumentPage(IReadOnlyList<DocumentDto> Items, int Total, int Page, int PageSize,
     DocumentConstraints Constraints, string[] AllowedActions);
-public sealed record DocumentQuery(int PatientId, Guid? VisitId = null, Guid? DossierId = null, Guid? PlanId = null,
+public sealed record DocumentQuery(int PatientId, Guid? VisitId = null, Guid? DossierId = null,
     string? Type = null, DateOnly? From = null, DateOnly? To = null, int Page = 1, int PageSize = 20, bool ImagesOnly = false);
 public sealed record DocumentUpload(string FileName, string ContentType, byte[] Content);
 public sealed record DocumentUploadResult(DocumentDto? Document, string? Error);
 public sealed record UploadBatchResult(DocumentDto? Document, IReadOnlyList<DocumentUploadResult> Documents);
 public sealed record ReviewDocument(int PatientId, Guid VisitId, int ExpectedVersion, Guid RequestKey);
+// Soft delete (docs/specs/TREATMENT-SHEET-IMAGES.md, 20/11/2026): audited, the record and file are kept.
+public sealed record DeleteDocument(int ExpectedVersion, string? Reason, Guid RequestKey);
 public sealed record DocumentHistoryDto(string Action, string ActorName, DateTimeOffset OccurredAt, string? Note);
 public sealed record DocumentContent(byte[] Bytes, string ContentType, string FileName);
 public interface IClinicalDocumentService
@@ -71,10 +73,29 @@ public interface IClinicalDocumentService
     // Patient app: the caller already resolved patientId from a VERIFIED self link (IOwnClinicalRecordService).
     Task<DocumentContent> PatientContentAsync(int patientId, int accountId, Guid documentId, CancellationToken ct);
     Task<DocumentDto> ReviewAsync(int actorId, Guid documentId, ReviewDocument request, CancellationToken ct);
+    Task DeleteAsync(int actorId, Guid documentId, DeleteDocument request, CancellationToken ct);
     Task ScanPendingAsync(CancellationToken ct);
+    Task<AiAnalysisDto> AnalyzeAsync(int actorId, Guid documentId, RunAiAnalysis request, CancellationToken ct);
 }
+// AI decision support on X-ray documents: docs/specs/AI-CARIES-DETECTION.vi.md
+public sealed record RunAiAnalysis(Guid RequestKey);
+public sealed record AiFindingDto(string FindingId, string Kind, string Label, double Confidence, double X1, double Y1, double X2, double Y2, string Jaw, string Side);
+public sealed record AiAnalysisDto(Guid AnalysisId, string Kind, string SchemaVersion, string ModelName, string ModelSha256, string InputSha256,
+    int RequestedBy, string RequestedByName, DateTimeOffset RequestedAt, int ElapsedMs, string Device, int ImageWidth, int ImageHeight,
+    IReadOnlyList<AiFindingDto> Findings);
+public sealed record DentalAiFinding(string FindingId, string Kind, string Label, double Confidence, double X1, double Y1, double X2, double Y2, string Jaw, string Side);
+public sealed record DentalAiResult(string SchemaVersion, string ModelName, string ModelSha256, int ImageWidth, int ImageHeight,
+    int ElapsedMs, string Device, IReadOnlyList<DentalAiFinding> Findings);
+public interface IDentalAiClient
+{
+    // Throws DentalAiUnavailableException when the service is not configured, unreachable, times out or rejects the image.
+    Task<DentalAiResult> AnalyzeXRayAsync(byte[] image, string contentType, string fileName, CancellationToken ct);
+}
+public sealed class DentalAiUnavailableException(string reason, Exception? inner = null) : Exception(reason, inner);
 public interface IClinicalFileScanner
 {
     // Ready only after an affirmative clean result. Unknown/unavailable remains PendingScan.
     Task<string> ScanAsync(byte[] content, CancellationToken ct);
+    // False when no virus scan runs (ClamAV removed 20/11/2026); Ready is then audited as ScanSkipped.
+    bool Enabled => true;
 }

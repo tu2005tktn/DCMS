@@ -29,7 +29,7 @@ Nguồn: danh mục nhà phân phối (Dentsply Sirona, SigmaGraft, Henry Schein
 | Ngày nhập | Bắt buộc, ngày ghi nhận vào sổ (mặc định hôm nay theo giờ phòng khám UTC+7), không ở tương lai |
 | Ngày nhận | Không bắt buộc (trống = chưa nhận hàng), không ở tương lai, không trước Ngày nhập |
 | Hạn dùng | Không bắt buộc (dụng cụ không hết hạn để trống), ngày ghi trên nhãn của lô nhập, không trước Ngày nhập (có thể ở tương lai xa). Hiển thị nhãn: "Hết hạn" khi đã qua hôm nay, "Sắp hết hạn" khi còn ≤ 90 ngày; chữ, không chỉ màu. Chỉ là một ngày cho cả dòng nhập, chưa có số lô, chưa theo dõi tồn theo lô |
-| Dụng cụ/Vật liệu | Bắt buộc, chọn từ danh mục đang dùng; lưu thêm bản chụp tên và danh mục lúc nhập để lịch sử không đổi khi danh mục bị đổi tên hoặc xóa |
+| Dụng cụ/Vật liệu | Bắt buộc, chọn từ danh mục đang dùng. Chỉ lưu `MaterialId`; tên và nhóm đọc từ danh mục lúc hiển thị, nên đổi tên hoặc đổi nhóm trong danh mục thì dòng cũ hiển thị theo tên mới (cập nhật 18/11/2026, xem [MATERIAL-PURCHASE-TABLE-SIMPLIFICATION.vi.md](MATERIAL-PURCHASE-TABLE-SIMPLIFICATION.vi.md)). Danh mục chỉ xóa mềm nên dòng cũ vẫn có tên |
 | Số lượng | Bắt buộc, số dương tối đa 3 chữ số thập phân, tối đa 1.000.000 |
 | Đơn vị | Bắt buộc, 1–40 ký tự (cái, lọ, hộp…). Không có trong danh sách trường người dùng yêu cầu nhưng cần để số lượng có nghĩa |
 | Đơn giá | Bắt buộc, VND nguyên ≥ 0, tối đa 1.000.000.000.000 |
@@ -46,13 +46,13 @@ Lúc nhập ghi theo đơn vị chứng từ (hộp, tuýp, thùng…) nhưng l�
 | Trường dòng nhập | Ràng buộc |
 |---|---|
 | `conversionFactor` (Hệ số quy đổi) | Số 1 đơn vị nhập = bao nhiêu đơn vị dùng. Mặc định 1; > 0, tối đa 3 chữ số thập phân, tối đa 1.000.000. Request không gửi = 1 |
-| `usageUnit` (đơn vị dùng, bản chụp) | Server chụp từ danh mục lúc lưu (null nếu danh mục chưa khai báo); client không gửi. Giữ nguyên khi danh mục đổi sau này |
+| `usageUnit` (đơn vị dùng) | Chỉ trong DTO, không lưu trên dòng nhập (từ 18/11/2026): đọc `usageUnit` của mục danh mục (null nếu chưa khai báo); client không gửi. Đổi đơn vị dùng trong danh mục làm dòng cũ hiển thị đơn vị mới, còn `usageQuantity` giữ nguyên số đã tính |
 | `usageQuantity` | Server tính, không nhập: Số lượng × Hệ số, làm tròn 3 chữ số thập phân (nửa lên); phải ≤ 1.000.000.000 |
 | `usageUnitPriceVnd` | Chỉ trong DTO, không lưu: Đơn giá ÷ Hệ số, làm tròn 2 chữ số thập phân (nửa lên), để xem giá vốn mỗi đơn vị dùng |
 
-Hệ số và bản chụp đơn vị chốt theo từng lần nhập; đổi hệ số hay đơn vị dùng trong danh mục không đổi dòng cũ. Tổng, Đã thanh toán và Còn nợ không phụ thuộc hệ số. Lỗi hệ số: MSG04 kèm `field=conversionFactor`. Khi danh mục chưa có đơn vị dùng, form ẩn ô hệ số (gửi 1). Dòng nhập cũ: `conversionFactor=1`, `usageQuantity=Quantity`, `usageUnit=null`.
+Hệ số và `usageQuantity` chốt theo từng lần nhập; đơn vị dùng lấy từ danh mục lúc đọc, không quy đổi lại khi danh mục đổi đơn vị. Tổng, Đã thanh toán và Còn nợ không phụ thuộc hệ số. Lỗi hệ số: MSG04 kèm `field=conversionFactor`. Khi danh mục chưa có đơn vị dùng, form ẩn ô hệ số (gửi 1). Dòng nhập cũ: `conversionFactor=1`, `usageQuantity=Quantity`, `usageUnit=null`.
 
-API: `POST`/`PUT` nhận thêm `conversionFactor` (không bắt buộc); DTO thêm `conversionFactor`, `usageUnit`, `usageQuantity`, `usageUnitPriceVnd`. Cột `ConversionFactor` numeric(12,3) not null default 1, `UsageUnit` varchar(40) null, `UsageQuantity` numeric(18,3) not null trên `MATERIAL_PURCHASE`; migration cộng thêm, dòng cũ nhận mặc định và `UsageQuantity=Quantity`.
+API: `POST`/`PUT` nhận thêm `conversionFactor` (không bắt buộc); DTO thêm `conversionFactor`, `usageUnit`, `usageQuantity`, `usageUnitPriceVnd`. Cột `ConversionFactor` numeric(12,3) not null default 1 và `UsageQuantity` numeric(18,3) not null trên `MATERIAL_PURCHASE`; migration cộng thêm, dòng cũ nhận mặc định và `UsageQuantity=Quantity`. Cột bản chụp `UsageUnit` đã bỏ ngày 18/11/2026.
 
 UI: trong modal, khi mục được chọn có đơn vị dùng, hiện dòng "1 {Đơn vị} = [Hệ số] {đơn vị dùng}" (ô Hệ số mặc định 1) và dòng xem "Quy ra: {usageQuantity} {đơn vị dùng} · {giá mỗi đơn vị dùng}". Bảng: dưới Số lượng ghi nhỏ "= {usageQuantity} {đơn vị dùng}" khi có đơn vị dùng và hệ số khác 1.
 
@@ -63,9 +63,9 @@ Mỗi dòng nhập có thể ghi công ty cung cấp, lấy từ danh mục **C�
 | Trường | Ràng buộc |
 |---|---|
 | `supplierId` | Không bắt buộc. Nếu có: công ty phải đang dùng và loại ≠ Labo, không thì 400 `PURCHASE_SUPPLIER_INVALID` field=`supplierId` "Công ty cung cấp không còn dùng. Vui lòng chọn công ty khác." |
-| `supplierName` | Server chụp tên lúc lưu (null nếu không chọn); đổi tên hay ngừng dùng công ty sau đó không đổi dòng cũ |
+| `supplierName` | Chỉ trong DTO, không lưu (từ 18/11/2026): đọc tên hiện tại của `CATALOG_PROVIDER` (null nếu không chọn). Đổi tên công ty thì dòng cũ hiển thị tên mới; ngừng dùng công ty không ảnh hưởng dòng cũ |
 
-API: `POST`/`PUT` nhận thêm `supplierId`; DTO thêm `supplierId`, `supplierName`. Cột `SupplierId` uuid null (FK Restrict tới `CATALOG_PROVIDER`) và `SupplierName` varchar(160) null; migration cộng thêm, dòng cũ để trống. Bộ lọc danh sách chưa có theo công ty.
+API: `POST`/`PUT` nhận thêm `supplierId`; DTO thêm `supplierId`, `supplierName`. Cột `SupplierId` uuid null (FK Restrict tới `CATALOG_PROVIDER`); migration cộng thêm, dòng cũ để trống. Cột bản chụp `SupplierName` đã bỏ ngày 18/11/2026. Bộ lọc danh sách chưa có theo công ty.
 
 UI: trong modal có ô chọn "Công ty cung cấp" (không bắt buộc, tìm kiếm, tải từ `GET /api/system-settings/reference-options?kind=suppliers`) kèm nút "+" bên cạnh. Bấm "+" mở hộp nhỏ **Thêm công ty cung cấp** (chỉ có ô Tên công ty, bắt buộc; số điện thoại, email, địa chỉ để trống và bổ sung sau trong Thiết lập hệ thống) và lưu qua API danh mục công ty hiện có (`POST /api/system-settings/settings/catalogs/providers`, loại `Supplier`, mã tự sinh dạng `NCC-XXXXXX`, người dùng đổi được trong Thiết lập hệ thống). Lưu xong, công ty mới được chọn sẵn trong ô. Nút "+" chỉ bật khi có quyền `catalog.providers.create`. Tên trùng báo lỗi tại ô Tên và giữ hộp. Bảng nhập hàng hiển thị công ty dưới tên vật liệu ("NCC: …") khi có.
 
@@ -91,7 +91,7 @@ Quy tắc chung như danh mục: `requestKey` bắt buộc, chạy trong transac
 
 ## Dữ liệu và rollout
 
-Bảng `MATERIAL_PURCHASE`: Id, MaterialId (FK Restrict tới `MATERIAL_CATALOG_ITEM`), MaterialName/CategoryName (bản chụp), EnteredOn (date), ReceivedOn (date, null), ExpiresOn (date, null; cột thêm bằng migration `20261105090000_MaterialPurchaseExpiry`, dòng cũ để trống), Quantity (numeric(12,3)), Unit (40), UnitPriceVnd (bigint), TotalVnd (bigint), PaidVnd (bigint), Version (concurrency token), IsDeleted, CreatedAt/UpdatedAt, CreatedBy/UpdatedBy. Chỉ mục (EnteredOn desc, Id) lọc `NOT IsDeleted`. Migration cộng thêm, không seed, không đổi dữ liệu cũ. Áp migration vào `dcms_dev` cần người dùng duyệt riêng (API chỉ migrate khi chạy với `-Migrate`).
+Bảng `MATERIAL_PURCHASE` (17 cột từ 18/11/2026, xem [MATERIAL-PURCHASE-TABLE-SIMPLIFICATION.vi.md](MATERIAL-PURCHASE-TABLE-SIMPLIFICATION.vi.md)): Id, MaterialId (FK Restrict tới `MATERIAL_CATALOG_ITEM`), SupplierId (FK Restrict tới `CATALOG_PROVIDER`, null), EnteredOn (date), ReceivedOn (date, null), ExpiresOn (date, null; cột thêm bằng migration `20261105090000_MaterialPurchaseExpiry`, dòng cũ để trống), LotNumber (60, null), Quantity (numeric(12,3)), Unit (40), ConversionFactor (numeric(12,3)), UsageQuantity (numeric(18,3)), UnitPriceVnd (bigint), TotalVnd (bigint), PaidVnd (bigint), Version (concurrency token), IsDeleted, CreatedAt. Người thao tác và thời điểm sửa nằm trong receipt `SystemCatalogChange` của `COMMAND_RECEIPT`. Chỉ mục (EnteredOn desc, Id) lọc `NOT IsDeleted`. Migration cộng thêm, không seed, không đổi dữ liệu cũ. Áp migration vào `dcms_dev` cần người dùng duyệt riêng (API chỉ migrate khi chạy với `-Migrate`).
 
 ## UI (web)
 
@@ -105,7 +105,7 @@ Bảng `MATERIAL_PURCHASE`: Id, MaterialId (FK Restrict tới `MATERIAL_CATALOG_
 
 ## Nghiệm thu
 
-Backend (PostgreSQL cách ly): tạo/đọc/sửa/xóa, tính Tổng làm tròn, Đã thanh toán > Tổng bị chặn, ngày nhận trước ngày nhập hoặc ở tương lai, số lượng 0/âm/>3 số thập phân, vật liệu đã xóa, bản chụp tên giữ nguyên khi danh mục đổi tên, lọc/tổng theo bộ lọc, requestKey replay/khác payload, version lệch, quyền. Web (API mock): tab, bảng và hàng tổng, form tính Tổng/Còn nợ, lỗi giữ form, xóa, bộ lọc, responsive. Build backend/web.
+Backend (PostgreSQL cách ly): tạo/đọc/sửa/xóa, tính Tổng làm tròn, Đã thanh toán > Tổng bị chặn, ngày nhận trước ngày nhập hoặc ở tương lai, số lượng 0/âm/>3 số thập phân, vật liệu đã xóa, tên và đơn vị dùng hiển thị theo danh mục sau khi danh mục thay đổi, lọc/tổng theo bộ lọc, requestKey replay/khác payload, version lệch, quyền. Web (API mock): tab, bảng và hàng tổng, form tính Tổng/Còn nợ, lỗi giữ form, xóa, bộ lọc, responsive. Build backend/web.
 
 ## Giới hạn
 

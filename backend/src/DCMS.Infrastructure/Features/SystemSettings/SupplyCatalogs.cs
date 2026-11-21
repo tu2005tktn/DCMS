@@ -10,19 +10,126 @@ using DCMS.Application.Features.SystemSettings;
 using DCMS.Domain.Features.SystemSettings;
 using DCMS.Infrastructure.Features.Accounts;
 using DCMS.Infrastructure.Persistence;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
 namespace DCMS.Infrastructure.Features.SystemSettings;
 
-// S58 đợt 4 (docs/specs/S58-SUPPLY-CATALOGS.md): shared command/audit/version flow; each catalog only validates and maps its own fields.
-public abstract partial class SupplyCatalog<TEntity, TInput, TDto>(DcmsDbContext db, TimeProvider clock, DCMS.Application.Features.Settings.ISettingsAccess access)
+// Shared validation, command replay and audit helpers for S58 typed supply catalogs.
+internal static partial class SupplyCatalogSupport
+{
+    public const long MaxPrice = 1_000_000_000_000;
+    public static readonly int[] PageSizes = [20, 50, 100];
+    public sealed record HistoryChange<TDto>(string? Reason, TDto? Before) where TDto : class;
+
+    public static BusinessException Error(string code, int status = 400, string label = "Thông tin", string? field = null, int max = 0) =>
+        new(status, SystemMessages.Get(code, label, max) with { Field = field });
+
+    public static (string Code, string Name, string NormalizedName) ValidateIdentity(string? code, string? name, int nameMax)
+    {
+        var cleanCode = code?.Trim().ToUpperInvariant() ?? "";
+        if (cleanCode.Length == 0) throw Error("MSG02", label: "Mã", field: "code");
+        if (cleanCode.Length > 40) throw Error("MSG03", label: "Mã", field: "code", max: 40);
+        if (!CodePattern().IsMatch(cleanCode)) throw Error("MSG04", label: "Mã", field: "code");
+        var cleanName = name?.Trim().Normalize(NormalizationForm.FormC) ?? "";
+        if (cleanName.Length == 0) throw Error("MSG02", label: "Tên", field: "name");
+        if (cleanName.Length > nameMax) throw Error("MSG03", label: "Tên", field: "name", max: nameMax);
+        return (cleanCode, cleanName, cleanName.ToUpperInvariant());
+    }
+
+    public static string ValidateSearchTerm(string? q, int page, int pageSize)
+    {
+        if (q?.Length > 100) throw Error("MSG03", label: "Từ khóa", max: 100);
+        if (page < 1 || !PageSizes.Contains(pageSize) || page > int.MaxValue / pageSize) throw Error("MSG04", label: "Phân trang");
+        return q?.Trim().Normalize(NormalizationForm.FormC).ToUpperInvariant() ?? "";
+    }
+
+    public static string? Text(string? value, string label, string field, int max)
+    {
+        var text = string.IsNullOrWhiteSpace(value) ? null : value.Trim().Normalize(NormalizationForm.FormC);
+        return text?.Length > max ? throw Error("MSG03", label: label, field: field, max: max) : text;
+    }
+
+    public static long? Price(long? value) => value switch
+    {
+        < 0 => throw new BusinessException(400, SystemMessages.Get("MSG257") with { Field = "referencePrice" }),
+        > MaxPrice => throw Error("MSG04", label: "Giá tham khảo", field: "referencePrice"),
+        _ => value
+    };
+
+    public static string Reason(string? value)
+    {
+        var reason = value?.Trim() ?? "";
+        if (reason.Length == 0) throw Error("MSG02", label: "Lý do", field: "reason");
+        return reason.Length <= 500 ? reason : throw Error("MSG03", label: "Lý do", field: "reason", max: 500);
+    }
+
+    public static string StateImpactMessage(bool active) => active
+        ? "Mục sẽ được chọn lại cho giao dịch mới."
+        : "Mục sẽ không còn được chọn cho giao dịch mới; dữ liệu đã ghi giữ nguyên.";
+
+    public static async Task<TDto> CommandAsync<TDto>(DcmsDbContext db, TimeProvider clock, DCMS.Application.Features.Settings.ISettingsAccess access,
+        string resource, int actorId, Guid key, string command, object request,
+        Func<DateTimeOffset, Task<(Guid Id, string? Reason, TDto? Before, TDto Result)>> apply, CancellationToken ct) where TDto : class
+    {
+        // Write grants are enforced here too, not only by the route middleware (docs/specs/S58-BRANCHES-AND-CHAIRS.md §2.2).
+        var action = command.Split(':')[^1] switch { "create" => "create", "update" => "update", _ => "deactivate" };
+        await access.RequireAsync(actorId, $"catalog.{resource}.{action}", ct);
+        if (key == Guid.Empty) throw Error("MSG04", label: "Mã yêu cầu", field: "requestKey");
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        await db.Database.ExecuteSqlRawAsync("SELECT pg_advisory_xact_lock(6462362060)", ct);
+        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(request, ClinicSettingsStore.Json))));
+        var prior = await db.SystemCatalogChanges.AsNoTracking().SingleOrDefaultAsync(x => x.RequestKey == key, ct);
+        if (prior != null)
+        {
+            if (prior.ActorId != actorId || prior.Command != command || prior.Fingerprint != hash) throw Error("MSG111", 409);
+            return JsonSerializer.Deserialize<TDto>(prior.ResultJson, ClinicSettingsStore.Json) ?? throw Error("MSG144", 503);
+        }
+        var now = clock.GetUtcNow();
+        var (id, reason, before, result) = await apply(now);
+        db.SystemCatalogChanges.Add(new SystemCatalogChange
+        {
+            RequestKey = key, ActorId = actorId, Command = command, ResourceId = id, Fingerprint = hash,
+            BeforeJson = JsonSerializer.Serialize(new HistoryChange<TDto>(reason, before), ClinicSettingsStore.Json),
+            ResultJson = JsonSerializer.Serialize(result, ClinicSettingsStore.Json), OccurredAt = now
+        });
+        await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
+        return result;
+    }
+
+    public static async Task SaveWithUniqueCheckAsync(DcmsDbContext db, CancellationToken ct)
+    {
+        try { await db.SaveChangesAsync(ct); }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation } pg)
+        {
+            throw new BusinessException(409, pg.ConstraintName?.Contains("Code") == true ? ReferenceMessages.DuplicateCode : ReferenceMessages.DuplicateName);
+        }
+    }
+
+    public static async Task<IReadOnlyList<SupplyHistoryItem<TDto>>> HistoryAsync<TDto>(DcmsDbContext db, Guid id, CancellationToken ct) where TDto : class
+    {
+        var rows = await (from change in db.SystemCatalogChanges.AsNoTracking()
+                          join user in db.Users.AsNoTracking() on change.ActorId equals user.Id
+                          where change.ResourceId == id
+                          orderby change.OccurredAt descending
+                          select new { change, user.FullName }).ToListAsync(ct);
+        return rows.Select(x =>
+        {
+            var before = x.change.BeforeJson == null ? null : JsonSerializer.Deserialize<HistoryChange<TDto>>(x.change.BeforeJson, ClinicSettingsStore.Json);
+            return new SupplyHistoryItem<TDto>(x.change.OccurredAt, x.FullName, x.change.Command.Split(':')[^1], before?.Reason, before?.Before,
+                JsonSerializer.Deserialize<TDto>(x.change.ResultJson, ClinicSettingsStore.Json)!);
+        }).ToArray();
+    }
+
+    [GeneratedRegex("^[A-Z0-9][A-Z0-9._-]*$")]
+    private static partial Regex CodePattern();
+}
+
+    // S58 đợt 4 (docs/specs/S58-SUPPLY-CATALOGS.md): shared command/audit/version flow; each catalog only validates and maps its own fields.
+public abstract class SupplyCatalog<TEntity, TInput, TDto>(DcmsDbContext db, TimeProvider clock, DCMS.Application.Features.Settings.ISettingsAccess access)
     : ISupplyCatalog<TInput, TDto> where TEntity : SupplyEntity where TInput : class where TDto : class
 {
-    private const long MaxPrice = 1_000_000_000_000;
-    private static readonly int[] PageSizes = [20, 50, 100];
-    private sealed record Change(string? Reason, TDto? Before);
     protected DcmsDbContext Db => db;
     protected abstract string Resource { get; }
     protected abstract DbSet<TEntity> Set { get; }
@@ -31,39 +138,38 @@ public abstract partial class SupplyCatalog<TEntity, TInput, TDto>(DcmsDbContext
     protected abstract Task<TEntity> NormalizeAsync(TInput? input, TEntity? current, CancellationToken ct);
     protected abstract bool SameContent(TEntity current, TEntity next);
     protected abstract void Copy(TEntity from, TEntity to);
-    protected abstract Task<TDto[]> MapAsync(IReadOnlyList<TEntity> rows, Func<int, string> actorName, CancellationToken ct);
+    protected abstract Task<TDto[]> MapAsync(IReadOnlyList<TEntity> rows, CancellationToken ct);
     protected virtual IQueryable<TEntity> Filter(IQueryable<TEntity> query, string? type) => type == null ? query : throw Error("MSG04", label: "Loại", field: "type");
     protected virtual Task UpdateGuardAsync(TEntity current, TEntity next, CancellationToken ct) => Task.CompletedTask;
     protected virtual Task<string?> StateImpactAsync(TEntity row, bool active, CancellationToken ct) => Task.FromResult<string?>(null);
 
     protected static BusinessException Error(string code, int status = 400, string label = "Thông tin", string? field = null, int max = 0) =>
-        new(status, SystemMessages.Get(code, label, max) with { Field = field });
+        SupplyCatalogSupport.Error(code, status, label, field, max);
 
-    // Same rule as the other S58 sections: an assigned ClinicOwner until an explicit grant store exists.
-    protected async Task AuthorizeAsync(int actorId)
-    {
+    protected async Task AuthorizeAsync(int actorId) =>
         await access.RequireAsync(actorId, $"catalog.{Resource}.read", CancellationToken.None);
-    }
-
 
     protected IQueryable<TEntity> Search(string? q, string? status, string? type)
     {
-        if (q?.Length > 100) throw Error("MSG03", label: "Từ khóa", max: 100);
-        var term = q?.Trim().Normalize(NormalizationForm.FormC).ToUpperInvariant() ?? "";
+        var term = q?.Trim().Normalize(NormalizationForm.FormC) ?? "";
         var query = Filter(Set.AsNoTracking(), type);
         query = (status ?? "Active") switch
         {
             "Active" => query.Where(x => x.IsActive), "Inactive" => query.Where(x => !x.IsActive), "All" => query,
             _ => throw Error("MSG04", label: "Trạng thái", field: "status")
         };
-        if (term.Length > 0) query = query.Where(x => x.NormalizedName.Contains(term) || x.Code.Contains(term));
-        return query.OrderBy(x => x.NormalizedName).ThenBy(x => x.Id);
+        if (term.Length > 0)
+        {
+            var like = $"%{term.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_")}%";
+            query = query.Where(x => EF.Functions.ILike(x.Name, like) || EF.Functions.ILike(x.Code, like));
+        }
+        return query.OrderBy(x => x.Name.ToUpper()).ThenBy(x => x.Id);
     }
 
     public async Task<CatalogPage<TDto>> ListAsync(int actorId, string? q, string? status, string? type, int page, int pageSize, CancellationToken ct)
     {
         await AuthorizeAsync(actorId);
-        if (page < 1 || !PageSizes.Contains(pageSize) || page > int.MaxValue / pageSize) throw Error("MSG04", label: "Phân trang");
+        SupplyCatalogSupport.ValidateSearchTerm(q, page, pageSize);
         var query = Search(q, status, type);
         var total = await query.CountAsync(ct);
         return new(await DtosAsync(await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(ct), ct), total, page, pageSize);
@@ -76,19 +182,19 @@ public abstract partial class SupplyCatalog<TEntity, TInput, TDto>(DcmsDbContext
     }
 
     public Task<TDto> CreateAsync(int actorId, CreateSupplyRequest<TInput> request, CancellationToken ct) =>
-        Command(actorId, request.RequestKey, $"{Resource}:create", request, async now =>
+        SupplyCatalogSupport.CommandAsync<TDto>(db, clock, access, Resource, actorId, request.RequestKey, $"{Resource}:create", request, async _ =>
         {
             var next = await NormalizeAsync(request.Entry, null, ct);
             await UniqueAsync(next, null, ct);
-            next.CreatedAt = next.UpdatedAt = now; next.CreatedBy = next.UpdatedBy = actorId;
             Set.Add(next);
-            return (next, new Change(null, null));
+            await SupplyCatalogSupport.SaveWithUniqueCheckAsync(db, ct);
+            return (next.Id, null, null, await DtoAsync(next, ct));
         }, ct);
 
     public Task<TDto> UpdateAsync(int actorId, Guid id, UpdateSupplyRequest<TInput> request, CancellationToken ct) =>
-        Command(actorId, request.RequestKey, $"{Resource}:update", new { id, request }, async now =>
+        SupplyCatalogSupport.CommandAsync<TDto>(db, clock, access, Resource, actorId, request.RequestKey, $"{Resource}:update", new { id, request }, async _ =>
         {
-            var reason = Reason(request.Reason);
+            var reason = SupplyCatalogSupport.Reason(request.Reason);
             var row = await RowAsync(id, tracked: true, ct);
             if (row.Version != request.ExpectedVersion) throw Error("MSG111", 409);
             var next = await NormalizeAsync(request.Entry, row, ct);
@@ -96,140 +202,64 @@ public abstract partial class SupplyCatalog<TEntity, TInput, TDto>(DcmsDbContext
             await UniqueAsync(next, id, ct);
             await UpdateGuardAsync(row, next, ct);
             var before = await DtoAsync(row, ct);
-            Copy(next, row); row.Code = next.Code; row.Name = next.Name; row.NormalizedName = next.NormalizedName;
-            Touch(row, actorId, now);
-            return (row, new Change(reason, before));
+            Copy(next, row); row.Code = next.Code; row.Name = next.Name;
+            row.Version++;
+            await SupplyCatalogSupport.SaveWithUniqueCheckAsync(db, ct);
+            return (row.Id, reason, before, await DtoAsync(row, ct));
         }, ct);
 
     public async Task<SupplyStatePreview<TDto>> StatePreviewAsync(int actorId, Guid id, ReferenceStatePreviewRequest request, CancellationToken ct)
     {
         await AuthorizeAsync(actorId);
         var row = await RowAsync(id, tracked: false, ct);
-        var impact = request.Active ? "Mục sẽ được chọn lại cho giao dịch mới." : "Mục sẽ không còn được chọn cho giao dịch mới; dữ liệu đã ghi giữ nguyên.";
+        var impact = SupplyCatalogSupport.StateImpactMessage(request.Active);
         if (await StateImpactAsync(row, request.Active, ct) is { } extra) impact += " " + extra;
         return new(await DtoAsync(row, ct), row.IsActive != request.Active, [], impact);
     }
 
     public Task<TDto> SetStateAsync(int actorId, Guid id, ReferenceStateRequest request, CancellationToken ct) =>
-        Command(actorId, request.RequestKey, $"{Resource}:state", new { id, request }, async now =>
+        SupplyCatalogSupport.CommandAsync<TDto>(db, clock, access, Resource, actorId, request.RequestKey, $"{Resource}:state", new { id, request }, async _ =>
         {
-            var reason = Reason(request.Reason);
+            var reason = SupplyCatalogSupport.Reason(request.Reason);
             var row = await RowAsync(id, tracked: true, ct);
             if (row.Version != request.ExpectedVersion || row.IsActive == request.Active) throw Error("MSG111", 409);
             var before = await DtoAsync(row, ct);
             row.IsActive = request.Active;
-            Touch(row, actorId, now);
-            return (row, new Change(reason, before));
+            row.Version++;
+            await SupplyCatalogSupport.SaveWithUniqueCheckAsync(db, ct);
+            return (row.Id, reason, before, await DtoAsync(row, ct));
         }, ct);
 
     public async Task<IReadOnlyList<SupplyHistoryItem<TDto>>> HistoryAsync(int actorId, Guid id, CancellationToken ct)
     {
         await AuthorizeAsync(actorId);
         await RowAsync(id, tracked: false, ct);
-        var rows = await (from change in db.SystemCatalogChanges.AsNoTracking()
-                          join user in db.Users.AsNoTracking() on change.ActorId equals user.Id
-                          where change.ResourceId == id
-                          orderby change.OccurredAt descending
-                          select new { change, user.FullName }).ToListAsync(ct);
-        return rows.Select(x =>
-        {
-            var before = x.change.BeforeJson == null ? null : JsonSerializer.Deserialize<Change>(x.change.BeforeJson, ClinicSettingsStore.Json);
-            return new SupplyHistoryItem<TDto>(x.change.OccurredAt, x.FullName, x.change.Command.Split(':')[^1], before?.Reason, before?.Before,
-                JsonSerializer.Deserialize<TDto>(x.change.ResultJson, ClinicSettingsStore.Json)!);
-        }).ToArray();
+        return await SupplyCatalogSupport.HistoryAsync<TDto>(db, id, ct);
     }
 
-    private async Task<TDto> Command(int actorId, Guid key, string command, object request,
-        Func<DateTimeOffset, Task<(TEntity Row, Change Change)>> apply, CancellationToken ct)
-    {
-        // Write grants are enforced here too, not only by the route middleware (docs/specs/S58-BRANCHES-AND-CHAIRS.md §2.2).
-        var action = command.Split(':')[^1] switch { "create" => "create", "update" => "update", _ => "deactivate" };
-        await access.RequireAsync(actorId, $"catalog.{Resource}.{action}", ct);
-        if (key == Guid.Empty) throw Error("MSG04", label: "Mã yêu cầu", field: "requestKey");
-        await using var tx = await db.Database.BeginTransactionAsync(ct);
-        await db.Database.ExecuteSqlRawAsync("SELECT pg_advisory_xact_lock(6462362060)", ct);
-        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(request, ClinicSettingsStore.Json))));
-        var prior = await db.SystemCatalogChanges.AsNoTracking().SingleOrDefaultAsync(x => x.RequestKey == key, ct);
-        if (prior != null)
-        {
-            if (prior.ActorId != actorId || prior.Command != command || prior.Fingerprint != hash) throw Error("MSG111", 409);
-            return JsonSerializer.Deserialize<TDto>(prior.ResultJson, ClinicSettingsStore.Json) ?? throw Error("MSG144", 503);
-        }
-        var now = clock.GetUtcNow();
-        var (row, change) = await apply(now);
-        try { await db.SaveChangesAsync(ct); }
-        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation } pg)
-        {
-            throw new BusinessException(409, pg.ConstraintName?.EndsWith("_Code") == true ? ReferenceMessages.DuplicateCode : ReferenceMessages.DuplicateName);
-        }
-        var result = await DtoAsync(row, ct);
-        db.SystemCatalogChanges.Add(new SystemCatalogChange
-        {
-            RequestKey = key, ActorId = actorId, Command = command, ResourceId = row.Id, Fingerprint = hash,
-            BeforeJson = JsonSerializer.Serialize(change, ClinicSettingsStore.Json), ResultJson = JsonSerializer.Serialize(result, ClinicSettingsStore.Json), OccurredAt = now
-        });
-        await db.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
-        return result;
-    }
-
-    // Fills Code/Name/NormalizedName on a new detached entity (SET-03).
     protected T Identity<T>(T entity, string? code, string? name) where T : TEntity
     {
-        var value = code?.Trim().ToUpperInvariant() ?? "";
-        if (value.Length == 0) throw Error("MSG02", label: "Mã", field: "code");
-        if (value.Length > 40) throw Error("MSG03", label: "Mã", field: "code", max: 40);
-        if (!CodePattern().IsMatch(value)) throw Error("MSG04", label: "Mã", field: "code");
-        var label = name?.Trim().Normalize(NormalizationForm.FormC) ?? "";
-        if (label.Length == 0) throw Error("MSG02", label: "Tên", field: "name");
-        if (label.Length > NameMax) throw Error("MSG03", label: "Tên", field: "name", max: NameMax);
-        entity.Code = value; entity.Name = label; entity.NormalizedName = label.ToUpperInvariant();
+        (entity.Code, entity.Name, _) = SupplyCatalogSupport.ValidateIdentity(code, name, NameMax);
         return entity;
     }
 
-    protected static string? Text(string? value, string label, string field, int max)
-    {
-        var text = string.IsNullOrWhiteSpace(value) ? null : value.Trim().Normalize(NormalizationForm.FormC);
-        return text?.Length > max ? throw Error("MSG03", label: label, field: field, max: max) : text;
-    }
-
-    protected static long? Price(long? value) => value switch
-    {
-        < 0 => throw new BusinessException(400, SystemMessages.Get("MSG257") with { Field = "referencePrice" }),
-        > MaxPrice => throw Error("MSG04", label: "Giá tham khảo", field: "referencePrice"),
-        _ => value
-    };
-
-    private static string Reason(string? value)
-    {
-        var reason = value?.Trim() ?? "";
-        if (reason.Length == 0) throw Error("MSG02", label: "Lý do", field: "reason");
-        return reason.Length <= 500 ? reason : throw Error("MSG03", label: "Lý do", field: "reason", max: 500);
-    }
+    protected static string? Text(string? value, string label, string field, int max) => SupplyCatalogSupport.Text(value, label, field, max);
+    protected static long? Price(long? value) => SupplyCatalogSupport.Price(value);
 
     // Uniqueness includes inactive rows: deactivation never frees a code or name (SET-01/03).
     private async Task UniqueAsync(TEntity next, Guid? except, CancellationToken ct)
     {
         if (await Set.AnyAsync(x => x.Id != except && x.Code == next.Code, ct)) throw new BusinessException(409, ReferenceMessages.DuplicateCode);
-        if (await Set.AnyAsync(x => x.Id != except && x.NormalizedName == next.NormalizedName, ct)) throw new BusinessException(409, ReferenceMessages.DuplicateName);
+        var upperName = next.Name.ToUpperInvariant();
+        if (await Set.AnyAsync(x => x.Id != except && x.Name.ToUpper() == upperName, ct)) throw new BusinessException(409, ReferenceMessages.DuplicateName);
     }
-
-    private static void Touch(TEntity row, int actorId, DateTimeOffset now) { row.Version++; row.UpdatedAt = now; row.UpdatedBy = actorId; }
 
     protected async Task<TEntity> RowAsync(Guid id, bool tracked, CancellationToken ct) =>
         await (tracked ? Set : Set.AsNoTracking()).SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw Error("MSG113", 404);
 
     private async Task<TDto> DtoAsync(TEntity row, CancellationToken ct) => (await DtosAsync([row], ct))[0];
 
-    protected async Task<TDto[]> DtosAsync(IReadOnlyList<TEntity> rows, CancellationToken ct)
-    {
-        var ids = rows.SelectMany(x => new[] { x.CreatedBy, x.UpdatedBy }).Distinct().ToArray();
-        var names = await db.Users.AsNoTracking().Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.FullName, ct);
-        return await MapAsync(rows, id => names.GetValueOrDefault(id, "—"), ct);
-    }
-
-    [GeneratedRegex("^[A-Z0-9][A-Z0-9._-]*$")]
-    private static partial Regex CodePattern();
+    protected Task<TDto[]> DtosAsync(IReadOnlyList<TEntity> rows, CancellationToken ct) => MapAsync(rows, ct);
 }
 
 public sealed partial class ProviderCatalog(DcmsDbContext db, TimeProvider clock, DCMS.Application.Features.Settings.ISettingsAccess access)
@@ -279,9 +309,8 @@ public sealed partial class ProviderCatalog(DcmsDbContext db, TimeProvider clock
         return count > 0 ? $"{count} loại công việc labo đang dùng công ty này làm mặc định vẫn giữ liên kết." : null;
     }
 
-    protected override Task<ProviderDto[]> MapAsync(IReadOnlyList<CatalogProvider> rows, Func<int, string> actor, CancellationToken ct) =>
-        Task.FromResult(rows.Select(x => new ProviderDto(x.Id, x.Code, x.Name, x.Type, x.Address, x.Phone, x.Email, x.IsActive, x.Version,
-            x.CreatedAt, actor(x.CreatedBy), x.UpdatedAt, actor(x.UpdatedBy))).ToArray());
+    protected override Task<ProviderDto[]> MapAsync(IReadOnlyList<CatalogProvider> rows, CancellationToken ct) =>
+        Task.FromResult(rows.Select(x => new ProviderDto(x.Id, x.Code, x.Name, x.Type, x.Address, x.Phone, x.Email, x.IsActive, x.Version)).ToArray());
 
     [GeneratedRegex(@"^\+?[0-9 ().-]+$")]
     private static partial Regex PhonePattern();
@@ -317,7 +346,7 @@ public sealed class LabWorkTypeCatalog(DcmsDbContext db, TimeProvider clock, DCM
 
     protected override void Copy(LabWorkType from, LabWorkType to) { to.ProviderId = from.ProviderId; to.Unit = from.Unit; to.ReferencePrice = from.ReferencePrice; to.Warranty = from.Warranty; }
 
-    protected override async Task<LabWorkTypeDto[]> MapAsync(IReadOnlyList<LabWorkType> rows, Func<int, string> actor, CancellationToken ct)
+    protected override async Task<LabWorkTypeDto[]> MapAsync(IReadOnlyList<LabWorkType> rows, CancellationToken ct)
     {
         var ids = rows.Select(x => x.ProviderId).OfType<Guid>().Distinct().ToArray();
         var providers = await Db.CatalogProviders.AsNoTracking().Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id, ct);
@@ -325,74 +354,168 @@ public sealed class LabWorkTypeCatalog(DcmsDbContext db, TimeProvider clock, DCM
         {
             var provider = x.ProviderId is { } id ? providers.GetValueOrDefault(id) : null;
             return new LabWorkTypeDto(x.Id, x.Code, x.Name, x.ProviderId, provider?.Name, provider?.IsActive, x.Unit, x.ReferencePrice, x.Warranty,
-                x.IsActive, x.Version, x.CreatedAt, actor(x.CreatedBy), x.UpdatedAt, actor(x.UpdatedBy));
+                x.IsActive, x.Version);
         }).ToArray();
     }
 }
 
-public sealed class MedicineCatalog(DcmsDbContext db, TimeProvider clock, DCMS.Application.Features.Settings.ISettingsAccess access)
-    : SupplyCatalog<CatalogMedicine, MedicineInput, MedicineDto>(db, clock, access), IMedicineCatalog
+public sealed class MedicineCatalog(DcmsDbContext db, TimeProvider clock, DCMS.Application.Features.Settings.ISettingsAccess access) : IMedicineCatalog
 {
-    protected override string Resource => "medicines";
-    protected override DbSet<CatalogMedicine> Set => Db.CatalogMedicines;
-    protected override int NameMax => 200;
-    protected override IQueryable<CatalogMedicine> Filter(IQueryable<CatalogMedicine> query, string? type) => type switch
-    {
-        null => query,
-        "Clinic" => query.Where(x => x.InternalStockTracked),
-        "External" => query.Where(x => !x.InternalStockTracked),
-        _ => throw Error("MSG04", label: "Loại thuốc", field: "type")
-    };
+    private const string Resource = "medicines";
+    private const int NameMax = 200;
 
-    protected override Task<CatalogMedicine> NormalizeAsync(MedicineInput? input, CatalogMedicine? current, CancellationToken ct)
+    private async Task AuthorizeReadAsync(int actorId) =>
+        await access.RequireAsync(actorId, $"catalog.{Resource}.read", CancellationToken.None);
+
+    private static MedicineDto ToDto(CatalogMedicine x) => new(
+        x.Id, x.Code, x.Name, x.Spec.ActiveIngredient, x.Spec.Strength, x.Spec.DosageForm, x.BaseUnit,
+        x.Spec.Packaging, x.Spec.Instructions, x.ReferencePrice, x.PrescriptionEligible, x.InternalStockTracked, x.IsActive, x.Version);
+
+    private IQueryable<CatalogMedicine> SearchQuery(string? q, string? status, string? type)
     {
-        if (input == null) throw Error("MSG04", label: "Thuốc", field: "entry");
-        var row = Identity(new CatalogMedicine(), input.Code, input.Name);
-        row.ActiveIngredient = Text(input.ActiveIngredient, "Hoạt chất", "activeIngredient", 200);
-        row.Strength = Text(input.Strength, "Hàm lượng", "strength", 200);
-        row.DosageForm = Text(input.DosageForm, "Dạng bào chế", "dosageForm", 200);
-        row.BaseUnit = Text(input.BaseUnit, "Đơn vị gốc", "baseUnit", 40) ?? throw Error("MSG02", label: "Đơn vị gốc", field: "baseUnit");
-        row.Route = Text(input.Route, "Đường dùng", "route", 40) ?? "Uống";
-        row.Packaging = Text(input.Packaging, "Quy cách đóng gói", "packaging", 160);
-        row.Contraindications = Text(input.Contraindications, "Chống chỉ định", "contraindications", 1000);
-        row.AllergyWarnings = Text(input.AllergyWarnings, "Cảnh báo dị ứng", "allergyWarnings", 1000);
-        row.Instructions = Text(input.Instructions, "Hướng dẫn sử dụng", "instructions", 1000);
-        row.ReferencePrice = Price(input.ReferencePrice);
-        row.PrescriptionEligible = input.PrescriptionEligible;
-        row.InternalStockTracked = input.InternalStockTracked;
-        return Task.FromResult(row);
+        var term = q?.Trim().Normalize(NormalizationForm.FormC) ?? "";
+        IQueryable<CatalogMedicine> query = type switch
+        {
+            null => db.CatalogMedicines.AsNoTracking(),
+            "Clinic" => db.CatalogMedicines.AsNoTracking().Where(x => x.InternalStockTracked),
+            "External" => db.CatalogMedicines.AsNoTracking().Where(x => !x.InternalStockTracked),
+            _ => throw SupplyCatalogSupport.Error("MSG04", label: "Loại thuốc", field: "type")
+        };
+        query = (status ?? "Active") switch
+        {
+            "Active" => query.Where(x => x.IsActive), "Inactive" => query.Where(x => !x.IsActive), "All" => query,
+            _ => throw SupplyCatalogSupport.Error("MSG04", label: "Trạng thái", field: "status")
+        };
+        if (term.Length > 0)
+        {
+            var like = $"%{term.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_")}%";
+            query = query.Where(x => EF.Functions.ILike(x.Name, like) || EF.Functions.ILike(x.Code, like));
+        }
+        return query.OrderBy(x => x.Name.ToUpper()).ThenBy(x => x.Id);
     }
 
-    protected override bool SameContent(CatalogMedicine a, CatalogMedicine b) => a.Code == b.Code && a.Name == b.Name && a.ActiveIngredient == b.ActiveIngredient
-        && a.Strength == b.Strength && a.DosageForm == b.DosageForm && a.BaseUnit == b.BaseUnit && a.Route == b.Route && a.Packaging == b.Packaging
-        && a.Contraindications == b.Contraindications && a.AllergyWarnings == b.AllergyWarnings
-        && a.Instructions == b.Instructions && a.ReferencePrice == b.ReferencePrice && a.PrescriptionEligible == b.PrescriptionEligible
-        && a.InternalStockTracked == b.InternalStockTracked;
-
-    protected override void Copy(CatalogMedicine from, CatalogMedicine to)
+    private static CatalogMedicine ValidateAndBuild(MedicineInput? input)
     {
-        to.ActiveIngredient = from.ActiveIngredient; to.Strength = from.Strength; to.DosageForm = from.DosageForm; to.BaseUnit = from.BaseUnit;
-        to.Route = from.Route; to.Packaging = from.Packaging; to.Contraindications = from.Contraindications; to.AllergyWarnings = from.AllergyWarnings;
-        to.Instructions = from.Instructions; to.ReferencePrice = from.ReferencePrice;
-        to.PrescriptionEligible = from.PrescriptionEligible; to.InternalStockTracked = from.InternalStockTracked;
+        if (input == null) throw SupplyCatalogSupport.Error("MSG04", label: "Thuốc", field: "entry");
+        var (code, name, _) = SupplyCatalogSupport.ValidateIdentity(input.Code, input.Name, NameMax);
+        return new CatalogMedicine
+        {
+            Code = code,
+            Name = name,
+            BaseUnit = SupplyCatalogSupport.Text(input.BaseUnit, "Đơn vị gốc", "baseUnit", 40)
+                ?? throw SupplyCatalogSupport.Error("MSG02", label: "Đơn vị gốc", field: "baseUnit"),
+            ReferencePrice = SupplyCatalogSupport.Price(input.ReferencePrice),
+            PrescriptionEligible = input.PrescriptionEligible,
+            InternalStockTracked = input.InternalStockTracked,
+            Spec = new CatalogMedicineSpec
+            {
+                ActiveIngredient = SupplyCatalogSupport.Text(input.ActiveIngredient, "Hoạt chất", "activeIngredient", 200),
+                Strength = SupplyCatalogSupport.Text(input.Strength, "Hàm lượng", "strength", 200),
+                DosageForm = SupplyCatalogSupport.Text(input.DosageForm, "Dạng bào chế", "dosageForm", 200),
+                Packaging = SupplyCatalogSupport.Text(input.Packaging, "Quy cách đóng gói", "packaging", 160),
+                Instructions = SupplyCatalogSupport.Text(input.Instructions, "Hướng dẫn sử dụng", "instructions", 1000)
+            }
+        };
     }
 
-    protected override Task<MedicineDto[]> MapAsync(IReadOnlyList<CatalogMedicine> rows, Func<int, string> actor, CancellationToken ct) =>
-        Task.FromResult(rows.Select(x => new MedicineDto(x.Id, x.Code, x.Name, x.ActiveIngredient, x.Strength, x.DosageForm, x.BaseUnit,
-            x.Route, x.Packaging, x.Contraindications, x.AllergyWarnings,
-            x.Instructions, x.ReferencePrice, x.PrescriptionEligible, x.InternalStockTracked, x.IsActive, x.Version,
-            x.CreatedAt, actor(x.CreatedBy), x.UpdatedAt, actor(x.UpdatedBy))).ToArray());
+    private async Task EnsureUniqueAsync(string code, string name, Guid? except, CancellationToken ct)
+    {
+        if (await db.CatalogMedicines.AnyAsync(x => x.Id != except && x.Code == code, ct))
+            throw new BusinessException(409, ReferenceMessages.DuplicateCode);
+        var upperName = name.ToUpperInvariant();
+        if (await db.CatalogMedicines.AnyAsync(x => x.Id != except && x.Name.ToUpper() == upperName, ct))
+            throw new BusinessException(409, ReferenceMessages.DuplicateName);
+    }
+
+    private static bool SameContent(CatalogMedicine a, CatalogMedicine b) =>
+        a.Code == b.Code && a.Name == b.Name && a.BaseUnit == b.BaseUnit && a.ReferencePrice == b.ReferencePrice
+        && a.PrescriptionEligible == b.PrescriptionEligible && a.InternalStockTracked == b.InternalStockTracked
+        && a.Spec.ActiveIngredient == b.Spec.ActiveIngredient && a.Spec.Strength == b.Spec.Strength
+        && a.Spec.DosageForm == b.Spec.DosageForm && a.Spec.Packaging == b.Spec.Packaging && a.Spec.Instructions == b.Spec.Instructions;
+
+    private async Task<CatalogMedicine> RowAsync(Guid id, bool tracked, CancellationToken ct) =>
+        await (tracked ? db.CatalogMedicines : db.CatalogMedicines.AsNoTracking()).SingleOrDefaultAsync(x => x.Id == id, ct)
+        ?? throw SupplyCatalogSupport.Error("MSG113", 404);
+
+    public async Task<CatalogPage<MedicineDto>> ListAsync(int actorId, string? q, string? status, string? type, int page, int pageSize, CancellationToken ct)
+    {
+        await AuthorizeReadAsync(actorId);
+        SupplyCatalogSupport.ValidateSearchTerm(q, page, pageSize);
+        var query = SearchQuery(q, status, type);
+        var total = await query.CountAsync(ct);
+        var rows = await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(ct);
+        return new(rows.Select(ToDto).ToArray(), total, page, pageSize);
+    }
+
+    public async Task<MedicineDto> GetAsync(int actorId, Guid id, CancellationToken ct)
+    {
+        await AuthorizeReadAsync(actorId);
+        return ToDto(await RowAsync(id, tracked: false, ct));
+    }
+
+    public Task<MedicineDto> CreateAsync(int actorId, CreateSupplyRequest<MedicineInput> request, CancellationToken ct) =>
+        SupplyCatalogSupport.CommandAsync<MedicineDto>(db, clock, access, Resource, actorId, request.RequestKey, $"{Resource}:create", request, async _ =>
+        {
+            var next = ValidateAndBuild(request.Entry);
+            await EnsureUniqueAsync(next.Code, next.Name, null, ct);
+            db.CatalogMedicines.Add(next);
+            await SupplyCatalogSupport.SaveWithUniqueCheckAsync(db, ct);
+            return (next.Id, null, null, ToDto(next));
+        }, ct);
+
+    public Task<MedicineDto> UpdateAsync(int actorId, Guid id, UpdateSupplyRequest<MedicineInput> request, CancellationToken ct) =>
+        SupplyCatalogSupport.CommandAsync<MedicineDto>(db, clock, access, Resource, actorId, request.RequestKey, $"{Resource}:update", new { id, request }, async _ =>
+        {
+            var reason = SupplyCatalogSupport.Reason(request.Reason);
+            var row = await RowAsync(id, tracked: true, ct);
+            if (row.Version != request.ExpectedVersion) throw SupplyCatalogSupport.Error("MSG111", 409);
+            var next = ValidateAndBuild(request.Entry);
+            if (SameContent(row, next)) throw new BusinessException(400, GeneralSettingsMessages.NoChange);
+            await EnsureUniqueAsync(next.Code, next.Name, id, ct);
+            var before = ToDto(row);
+            row.Code = next.Code; row.Name = next.Name; row.BaseUnit = next.BaseUnit; row.ReferencePrice = next.ReferencePrice;
+            row.PrescriptionEligible = next.PrescriptionEligible; row.InternalStockTracked = next.InternalStockTracked;
+            row.Spec = next.Spec; row.Version++;
+            await SupplyCatalogSupport.SaveWithUniqueCheckAsync(db, ct);
+            return (row.Id, reason, before, ToDto(row));
+        }, ct);
+
+    public async Task<SupplyStatePreview<MedicineDto>> StatePreviewAsync(int actorId, Guid id, ReferenceStatePreviewRequest request, CancellationToken ct)
+    {
+        await AuthorizeReadAsync(actorId);
+        var row = await RowAsync(id, tracked: false, ct);
+        return new(ToDto(row), row.IsActive != request.Active, [], SupplyCatalogSupport.StateImpactMessage(request.Active));
+    }
+
+    public Task<MedicineDto> SetStateAsync(int actorId, Guid id, ReferenceStateRequest request, CancellationToken ct) =>
+        SupplyCatalogSupport.CommandAsync<MedicineDto>(db, clock, access, Resource, actorId, request.RequestKey, $"{Resource}:state", new { id, request }, async _ =>
+        {
+            var reason = SupplyCatalogSupport.Reason(request.Reason);
+            var row = await RowAsync(id, tracked: true, ct);
+            if (row.Version != request.ExpectedVersion || row.IsActive == request.Active) throw SupplyCatalogSupport.Error("MSG111", 409);
+            var before = ToDto(row);
+            row.IsActive = request.Active; row.Version++;
+            await SupplyCatalogSupport.SaveWithUniqueCheckAsync(db, ct);
+            return (row.Id, reason, before, ToDto(row));
+        }, ct);
+
+    public async Task<IReadOnlyList<SupplyHistoryItem<MedicineDto>>> HistoryAsync(int actorId, Guid id, CancellationToken ct)
+    {
+        await AuthorizeReadAsync(actorId);
+        await RowAsync(id, tracked: false, ct);
+        return await SupplyCatalogSupport.HistoryAsync<MedicineDto>(db, id, ct);
+    }
 
     // Same filter as the list, read-only; at most 10 000 rows per file.
     public async Task<byte[]> ExportAsync(int actorId, string? q, string? status, CancellationToken ct)
     {
-        await AuthorizeAsync(actorId);
-        var rows = await Search(q, status, null).Take(10_000).ToListAsync(ct);
+        await AuthorizeReadAsync(actorId);
+        var rows = await SearchQuery(q, status, null).Take(10_000).ToListAsync(ct);
         string[] header = ["Mã", "Tên thuốc", "Hoạt chất", "Hàm lượng", "Dạng bào chế", "Đơn vị gốc", "Quy cách đóng gói", "Hướng dẫn sử dụng",
             "Giá tham khảo (VND)", "Dùng kê đơn", "Theo dõi tồn nội bộ", "Trạng thái"];
-        return Xlsx.Write("Thuốc", [header, .. rows.Select(x => new[] { x.Code, x.Name, x.ActiveIngredient, x.Strength, x.DosageForm, x.BaseUnit,
-            x.Packaging, x.Instructions, x.ReferencePrice?.ToString(), x.PrescriptionEligible ? "Có" : "Không", x.InternalStockTracked ? "Có" : "Không",
-            x.IsActive ? "Đang dùng" : "Ngừng dùng" })]);
+        return Xlsx.Write("Thuốc", [header, .. rows.Select(x => new[] { x.Code, x.Name, x.Spec.ActiveIngredient, x.Spec.Strength, x.Spec.DosageForm,
+            x.BaseUnit, x.Spec.Packaging, x.Spec.Instructions, x.ReferencePrice?.ToString(), x.PrescriptionEligible ? "Có" : "Không",
+            x.InternalStockTracked ? "Có" : "Không", x.IsActive ? "Đang dùng" : "Ngừng dùng" })]);
     }
 }
 

@@ -1,5 +1,7 @@
 # Đặt buổi hẹn kế tiếp theo kế hoạch điều trị — 03/11/2026
 
+> Cập nhật 18/11/2026: hướng dẫn tái khám (`FollowUpInstruction`, `/api/follow-up-instructions`) đã bị xóa. Lịch hẹn tiếp theo gắn với phiếu điều trị qua `APPOINTMENT.DossierId` (thay `FollowUpId`) và được gợi ý từ hạng mục kế hoạch gần nhất còn chờ của phiếu. Các phần bên dưới nói về hướng dẫn tái khám là lịch sử thiết kế. Xem [FOLLOW-UP-INSTRUCTION-REMOVAL.vi.md](FOLLOW-UP-INSTRUCTION-REMOVAL.vi.md).
+
 Tab **Lịch hẹn** của hồ sơ bệnh nhân lấy hạng mục trong **KẾ HOẠCH ĐIỀU TRỊ/DỊCH VỤ** có ngày dự kiến gần nhất mà chưa thực hiện để bác sĩ đặt buổi hẹn điều trị tiếp theo. Lịch hẹn phải nằm trong thời gian bác sĩ phụ trách có lịch làm. Giao diện ở [PATIENT-APPOINTMENTS-TAB.md](PATIENT-APPOINTMENTS-TAB.md).
 
 ## Vì sao đi qua chỉ định hẹn tái khám

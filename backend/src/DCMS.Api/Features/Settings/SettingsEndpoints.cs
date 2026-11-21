@@ -28,7 +28,7 @@ public static class SettingsEndpoints
             await access.RequireAsync(Actor(c), "access-groups.read", ct);
             string[] baseRoles = [Domain.Features.Accounts.AccountRoles.Admin, Domain.Features.Accounts.AccountRoles.Dentist, Domain.Features.Accounts.AccountRoles.ClinicAssistant];
             return Results.Ok(SettingsGrants.Definitions.Where(x => x.Key is not ("patients.manage" or "accounts.manage"))
-                .Select(x => new GrantOption(x.Key, x.Label, x.RequiredRole, x.Parent, baseRoles.Where(role => SettingsGrants.RoleAllows(x.Key, [role])).ToArray())));
+                .Select(x => new GrantOption(x.Key, x.Label, x.RequiredRole, x.Parent, baseRoles)));
         });
         groups.MapGet("/staff", async (HttpContext c, ISettingsService s, CancellationToken ct) => Results.Ok(await s.StaffAsync(Actor(c), ct)));
         groups.MapGet("/{id:guid}", async (HttpContext c, Guid id, ISettingsService s, CancellationToken ct) =>
@@ -60,22 +60,6 @@ public static class SettingsEndpoints
 
             branchGroup.MapPost("/{id:int}/state", async (HttpContext c, int id, BranchStateCommand command, IBranchManagementService s, CancellationToken ct) =>
                 Results.Ok(await s.SetBranchStateAsync(Actor(c), id, command, ct)));
-
-            branchGroup.MapPost("/{id:int}/logo", async (HttpContext c, int id, IFormFile file, IBranchManagementService s, CancellationToken ct) =>
-            {
-                if (file == null || file.Length == 0) return Results.BadRequest(DCMS.Application.Common.SystemMessages.Get("MSG02", "Tệp logo") with { Field = "file" });
-                await using var stream = file.OpenReadStream();
-                var result = await s.UploadLogoAsync(Actor(c), id, stream, file.FileName, file.ContentType, file.Length, ct);
-                return Results.Ok(result);
-            }).DisableAntiforgery();
-
-            branchGroup.MapGet("/{id:int}/logo/{assetId:guid}", async (HttpContext c, int id, Guid assetId, IBranchManagementService s, CancellationToken ct) =>
-            {
-                var logo = await s.LogoAsync(Actor(c), id, assetId, ct);
-                c.Response.Headers.XContentTypeOptions = "nosniff";
-                c.Response.Headers.CacheControl = "private, max-age=300";
-                return Results.File(logo.Bytes, logo.ContentType);
-            });
 
             // Chairs
             branchGroup.MapGet("/{id:int}/chairs", async (HttpContext c, int id, IBranchManagementService s, CancellationToken ct) =>

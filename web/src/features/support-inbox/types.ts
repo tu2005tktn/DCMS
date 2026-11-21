@@ -147,7 +147,6 @@ export interface AppointmentSummary {
     phone: string | null;
     isAnonymous: boolean;
   };
-  confirmedToAttend: 'Pending' | 'Yes' | 'No';
 }
 
 /** Support request — UI list/detail. */

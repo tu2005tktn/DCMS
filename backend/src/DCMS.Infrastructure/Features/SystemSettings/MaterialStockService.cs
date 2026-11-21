@@ -19,8 +19,8 @@ public sealed class MaterialStockService(DcmsDbContext db, DCMS.Application.Feat
         if (pageSize is not (20 or 50 or 100) || page < 1 || page > int.MaxValue / pageSize || q?.Length > 160) throw Bad();
         var search = Search(q);
         var query = db.MaterialPurchases.AsNoTracking().Where(x => !x.IsDeleted && x.ReceivedOn != null);
-        if (search.Length > 0) query = query.Where(x => x.MaterialName.ToUpper().Contains(search));
-        var batches = await query.ToListAsync(ct);
+        if (search.Length > 0) query = query.Where(x => x.Material.Name.ToUpper().Contains(search));
+        var batches = await query.Include(x => x.Material).ThenInclude(x => x.Category).Include(x => x.Supplier).ToListAsync(ct);
         var ids = batches.Select(x => x.MaterialId).Distinct().ToArray();
         var used = await db.MaterialUsages.AsNoTracking().Where(x => ids.Contains(x.MaterialId))
             .GroupBy(x => x.MaterialId).Select(g => new { Id = g.Key, Sum = g.Sum(x => x.Quantity) }).ToDictionaryAsync(x => x.Id, x => x.Sum, ct);
@@ -32,7 +32,7 @@ public sealed class MaterialStockService(DcmsDbContext db, DCMS.Application.Feat
             foreach (var b in group.OrderBy(x => x.ExpiresOn == null).ThenBy(x => x.ExpiresOn).ThenBy(x => x.ReceivedOn).ThenBy(x => x.CreatedAt))
             {
                 var take = Math.Min(left, b.UsageQuantity); left -= take;
-                rows.Add(new(b.Id, b.MaterialId, b.MaterialName, b.CategoryName, b.UsageUnit, b.SupplierName, b.LotNumber, b.ReceivedOn!.Value, b.ExpiresOn,
+                rows.Add(new(b.Id, b.MaterialId, b.Material.Name, b.Material.Category.Name, b.Material.UsageUnit, b.Supplier?.Name, b.LotNumber, b.ReceivedOn!.Value, b.ExpiresOn,
                     b.UsageQuantity, take, b.UsageQuantity - take));
             }
         }
@@ -59,7 +59,13 @@ public sealed class MaterialStockService(DcmsDbContext db, DCMS.Application.Feat
         var scope = await access.RequireAsync(actorId, "materials.usage.read", ct);
         if (pageSize is not (20 or 50 or 100) || page < 1 || page > int.MaxValue / pageSize || q?.Length > 160 || from > to) throw Bad();
         var search = Search(q);
-        var query = db.MaterialUsages.AsNoTracking().Where(x => scope.BranchIds.Contains(x.BranchId));
+        var query = from u in db.MaterialUsages.AsNoTracking()
+                    join a in db.ClinicalActivities.AsNoTracking() on u.ActivityId equals a.Id
+                    join d in db.TreatmentDossiers.AsNoTracking() on a.DossierId equals d.Id
+                    join m in db.MaterialCatalogItems.AsNoTracking() on u.MaterialId equals m.Id
+                    where scope.BranchIds.Contains(d.BranchId)
+                    select new { u.Id, u.UsedAt, u.MaterialId, MaterialName = m.Name, m.UsageUnit, u.Quantity, u.ActivityId, u.RecordedBy,
+                        d.PatientId, d.BranchId, DossierId = (Guid?)d.Id, DossierCode = (string?)d.Code };
         if (materialId.HasValue) query = query.Where(x => x.MaterialId == materialId);
         if (activityId.HasValue) query = query.Where(x => x.ActivityId == activityId);
         if (search.Length > 0) query = query.Where(x => x.MaterialName.ToUpper().Contains(search));
@@ -67,19 +73,16 @@ public sealed class MaterialStockService(DcmsDbContext db, DCMS.Application.Feat
         if (from.HasValue) query = query.Where(x => x.UsedAt >= new DateTimeOffset(from.Value.ToDateTime(TimeOnly.MinValue), TimeSpan.FromHours(7)));
         if (to.HasValue) query = query.Where(x => x.UsedAt < new DateTimeOffset(to.Value.AddDays(1).ToDateTime(TimeOnly.MinValue), TimeSpan.FromHours(7)));
         var total = await query.CountAsync(ct);
-        var rows = await query.OrderByDescending(x => x.UsedAt).ThenByDescending(x => x.CreatedAt).ThenBy(x => x.Id)
+        var rows = await query.OrderByDescending(x => x.UsedAt).ThenBy(x => x.Id)
             .Skip((page - 1) * pageSize).Take(pageSize).ToArrayAsync(ct);
         var patientIds = rows.Select(x => x.PatientId).Distinct().ToArray();
         var branchIds = rows.Select(x => x.BranchId).Distinct().ToArray();
-        var dossierIds = rows.Where(x => x.DossierId.HasValue).Select(x => x.DossierId!.Value).Distinct().ToArray();
         var accountIds = rows.Where(x => x.RecordedBy.HasValue).Select(x => x.RecordedBy!.Value).Distinct().ToArray();
         var patients = await db.Patients.AsNoTracking().Where(x => patientIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.FullName, ct);
         var branches = await db.Set<SchedulingBranch>().AsNoTracking().Where(x => branchIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.Name, ct);
-        var dossiers = await db.TreatmentDossiers.AsNoTracking().Where(x => dossierIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.Code, ct);
         var staff = await db.Employees.AsNoTracking().Where(x => accountIds.Contains(x.AccountId)).ToDictionaryAsync(x => x.AccountId, x => x.FullName, ct);
         return new(rows.Select(x => new MaterialUsageDto(x.Id, x.UsedAt, x.MaterialId, x.MaterialName, x.Quantity, x.UsageUnit, x.PatientId,
             patients.GetValueOrDefault(x.PatientId, ""), x.BranchId, branches.GetValueOrDefault(x.BranchId, ""), x.DossierId,
-            x.DossierId.HasValue ? dossiers.GetValueOrDefault(x.DossierId.Value) : null,
-            x.RecordedBy.HasValue ? staff.GetValueOrDefault(x.RecordedBy.Value) : null)).ToArray(), total, page, pageSize);
+            x.DossierCode, x.RecordedBy.HasValue ? staff.GetValueOrDefault(x.RecordedBy.Value) : null)).ToArray(), total, page, pageSize);
     }
 }

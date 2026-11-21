@@ -30,11 +30,9 @@ public sealed record FamilyTreatmentItem(string ServiceName, string? Region, str
     DateOnly? EstimatedStart, DateOnly? EstimatedEnd);
 public sealed record FamilyTreatmentDto(Guid Id, string Code, string Diagnosis, string State,
     DateOnly StartedOn, IReadOnlyList<FamilyTreatmentItem> Items);
-public sealed record FamilyMedicineDto(string MedicineName, string? Strength, string Unit, int Quantity,
-    string Route, string MorningDose, string NoonDose, string AfternoonDose, string EveningDose,
-    string MealTiming, int Days, string Instructions);
-public sealed record FamilyPrescriptionDto(Guid Id, Guid VisitId, DateTimeOffset? FinalizedAt, string? Diagnosis,
-    string GeneralAdvice, IReadOnlyList<FamilyMedicineDto> Lines);
+public sealed record FamilyMedicineDto(string MedicineName, string? Strength, string Unit, int Quantity, string Instructions);
+public sealed record FamilyPrescriptionDto(Guid Id, DateOnly PrescribedOn, string PrescriberName, string? Diagnosis,
+    string? Advice, IReadOnlyList<FamilyMedicineDto> Items);
 public sealed record FamilyDocumentDto(Guid Id, string FileName, string ContentType, long SizeBytes,
     string DocumentType, DateOnly SourceDate);
 

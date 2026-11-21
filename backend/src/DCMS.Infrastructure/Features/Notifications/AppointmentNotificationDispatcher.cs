@@ -36,7 +36,7 @@ public sealed class AppointmentNotificationDispatcher(
     public async Task<int> ProcessPendingAsync(CancellationToken ct)
     {
         var processed = 0;
-        var events = await db.AppointmentOutboxEvents.Where(x => x.DispatchedAt == null)
+        var events = await db.AppointmentOutboxEvents.Where(x => x.Status == "Pending")
             .OrderBy(x => x.OccurredAt).Take(50).ToListAsync(ct);
         foreach (var item in events)
         {

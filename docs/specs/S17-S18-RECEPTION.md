@@ -1,5 +1,7 @@
 # DCMS-111 S17 S18 Tiếp nhận check-in và hàng chờ khám
 
+> Cập nhật 18/11/2026: hướng dẫn tái khám (`FollowUpInstruction`, `/api/follow-up-instructions`) đã bị xóa. Lịch hẹn tiếp theo gắn với phiếu điều trị qua `APPOINTMENT.DossierId` (thay `FollowUpId`) và được gợi ý từ hạng mục kế hoạch gần nhất còn chờ của phiếu. Các phần bên dưới nói về hướng dẫn tái khám là lịch sử thiết kế. Xem [FOLLOW-UP-INSTRUCTION-REMOVAL.vi.md](FOLLOW-UP-INSTRUCTION-REMOVAL.vi.md).
+
 Ngày chốt contract: **25/10/2026**. Trạng thái ngày **26/10/2026**: đã triển khai phần tiếp nhận DCMS-111 và đọc Visit bàn giao; xem [bằng chứng và giới hạn](../implementation/DCMS-111-RECEPTION.md). Nguồn: yêu cầu người dùng trong phiên này; [DCMS-111](https://capstone-fpt-fa26.atlassian.net/browse/DCMS-111), [luồng DCMS-110](CLINIC-FLOW-DCMS-110.vi.md), [UC/GBR/MSG v2.5](DCMS_Use_Cases_Business_Rules_Messages_v2.5.docx) UC-07 và [Screen Specifications v2.5](DCMS_Screen_Specifications_v2.5.docx) S17/S18.
 
 ## Quyết định triển khai ngày 25/10/2026
@@ -192,3 +194,7 @@ Bộ lọc, tab và bảng của trang Tiếp nhận không còn nằm trong m�
 Trang Tiếp nhận dùng toàn bộ bề rộng vùng nội dung (bỏ giới hạn 1680px, lề ngoài còn 12px, tiêu đề và khoảng cách dọc thu gọn) để bảng chiếm hết màn hình.
 
 Trang tiếp nhận bệnh nhân (check-in): tiêu đề bên trái, nút "Về danh sách tiếp nhận" (có mũi tên) nằm cùng hàng ở góc phải.
+
+## Bỏ chọn đợt điều trị cũ khi tiếp nhận (17/11/2026)
+
+Theo [rút gọn bảng VISIT](VISIT-TABLE-SIMPLIFICATION.vi.md), check-in không còn trường "Đợt điều trị cũ (nếu có)" và không còn cờ "cần bác sĩ xác nhận nguồn". Bỏ `priorCourseId` khỏi request check-in, bỏ `source`, `requiresClinicalSourceReview`, `recordedAt` khỏi `VisitResult` và bỏ `GET /api/reception/appointments/{appointmentId}/courses`. Lượt "Tiếp tục điều trị" mở tab Điều trị của bệnh nhân để bác sĩ chọn hồ sơ. Hàng chờ hiển thị thêm trạng thái lượt "Đã xác nhận phiếu khám".

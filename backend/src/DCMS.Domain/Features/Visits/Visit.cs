@@ -4,9 +4,14 @@ public static class VisitStatuses
 {
     public const string Queued = "Queued";
     public const string InProgress = "InProgress";
+    public const string ExaminationConfirmed = "ExaminationConfirmed";
     public const string Completed = "Completed";
     public const string Cancelled = "Cancelled";
-    public static readonly string[] All = [Queued, InProgress, Completed, Cancelled];
+    public static readonly string[] All = [Queued, InProgress, ExaminationConfirmed, Completed, Cancelled];
+    // The visit is open for clinical work (orders, prescriptions, documents, activities).
+    public static readonly string[] Open = [InProgress, ExaminationConfirmed];
+    // The examination form has been confirmed by the dentist.
+    public static readonly string[] HasConfirmedExamination = [ExaminationConfirmed, Completed];
 }
 
 public static class AttendancePurposes
@@ -28,16 +33,12 @@ public sealed class Visit
     public int DentistId { get; set; }
     public string Status { get; set; } = VisitStatuses.Queued;
     public int Version { get; set; } = 1;
-    public Guid StorageStamp { get; set; } = Guid.NewGuid();
     public List<DCMS.Domain.Features.Examinations.InvestigationOrder> Investigations { get; set; } = [];
     public DateTimeOffset ArrivalAt { get; set; }
-    public DateTimeOffset RecordedAt { get; set; }
     public int RecordedBy { get; set; }
     public string? ArrivalReason { get; set; }
     public string Purpose { get; set; } = AttendancePurposes.InitialExamination;
     public string? Note { get; set; }
-    public string? SourceJson { get; set; }
-    public bool RequiresClinicalSourceReview { get; set; }
 }
 
 public sealed class ReceptionReceipt : DCMS.Domain.Common.CommandReceiptRecord

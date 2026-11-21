@@ -12,22 +12,38 @@ async function login(page: Page, user: string) {
   await expect(page.getByRole('heading', { name: 'Tài khoản của tôi' })).toBeVisible();
 }
 
-const branch = { id: 901, code: 'BR-TEST', name: 'Chi nhánh thử nghiệm', timeZoneId: 'Asia/Ho_Chi_Minh', slotIntervalMinutes: 15, bookingSettingsVersion: 1, isActive: true, version: 1, chairCount: 1 };
+const branch = { id: 901, code: 'BR-TEST', name: 'Chi nhánh thử nghiệm', slotIntervalMinutes: 15, isActive: true, version: 1, chairCount: 1 };
 
 test('deactivating a branch lists every blocker with a label and a link', async ({ page }) => {
   await page.route('**/api/settings/branches', route => route.request().method() === 'GET' ? route.fulfill({ json: [branch] }) : route.fallback());
+  await page.route('**/api/settings/branches/901', route => route.request().method() === 'GET'
+    ? route.fulfill({ json: { ...branch, address: '123 Cầu Giấy', phone: '0901234567', email: 'cs1@dcms.test', chairs: [] } })
+    : route.fallback());
   await page.route('**/api/settings/branches/901/state-preview', route => route.fulfill({ json: { allowed: false, impact: 'Không thể ngừng chi nhánh vì còn 3 nhóm nghĩa vụ cần xử lý trước.', blockers: [
-    { kind: 'PayOsOrders', message: 'Còn 1 đơn chuyển khoản PayOS chưa hoàn tất.', count: 1, navigationUrl: '/payments?branchId=901' },
+    { kind: 'Appointments', message: 'Còn 1 lịch hẹn tương lai chưa hủy tại chi nhánh.', count: 1, navigationUrl: '/appointments?branchId=901' },
     { kind: 'TreatmentDossiers', message: 'Còn 2 hồ sơ điều trị đang mở tại chi nhánh.', count: 2, navigationUrl: '/patients' },
     { kind: 'LabOrders', message: 'Còn 4 phiếu labo chưa giao bệnh nhân.', count: 4, navigationUrl: '/lab-orders' }] } }));
   await login(page, 'owner.demo');
   await page.goto('/settings/branches');
   await page.getByRole('button', { name: 'Ngừng', exact: true }).first().click();
   const dialog = page.getByRole('dialog');
-  await expect(dialog.getByText('Chuyển khoản PayOS:')).toBeVisible();
+  await expect(dialog.getByText('Lịch hẹn:')).toBeVisible();
   await expect(dialog.getByText('Hồ sơ điều trị:')).toBeVisible();
   await expect(dialog.getByText('Phiếu labo:')).toBeVisible();
   await expect(dialog.getByText('Còn 4 phiếu labo chưa giao bệnh nhân.')).toBeVisible();
   await expect(dialog.getByRole('link', { name: 'Mở để xử lý' })).toHaveCount(3);
   await expect(dialog.locator('a[href="/lab-orders"]')).toHaveCount(1);
+
+  await dialog.getByRole('button', { name: 'Close' }).click();
+  await page.getByRole('button', { name: 'Sửa', exact: true }).first().click();
+  const drawer = page.getByRole('dialog');
+  await expect(drawer.getByLabel('Mã chi nhánh')).toHaveValue('BR-TEST');
+  await expect(drawer.getByLabel('Tên chi nhánh')).toHaveValue('Chi nhánh thử nghiệm');
+  await expect(drawer.getByLabel('Địa chỉ')).toHaveValue('123 Cầu Giấy');
+  await expect(drawer.getByLabel('Điện thoại')).toHaveValue('0901234567');
+  await expect(drawer.getByLabel('Email')).toHaveValue('cs1@dcms.test');
+  await expect(drawer.getByText('Website')).toHaveCount(0);
+  await expect(drawer.getByText('Múi giờ')).toHaveCount(0);
+  await expect(drawer.getByText('Logo chi nhánh')).toHaveCount(0);
+  await expect(drawer.getByText('Tài khoản nhận chuyển khoản')).toHaveCount(0);
 });

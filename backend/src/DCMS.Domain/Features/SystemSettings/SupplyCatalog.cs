@@ -6,13 +6,8 @@ public abstract class SupplyEntity
     public Guid Id { get; set; } = Guid.NewGuid();
     public string Code { get; set; } = "";
     public string Name { get; set; } = "";
-    public string NormalizedName { get; set; } = "";
     public bool IsActive { get; set; } = true;
     public int Version { get; set; } = 1;
-    public DateTimeOffset CreatedAt { get; set; }
-    public int CreatedBy { get; set; }
-    public DateTimeOffset UpdatedAt { get; set; }
-    public int UpdatedBy { get; set; }
 }
 
 // One company row serves both the material-supplier and lab tabs (Type Both is never duplicated).
@@ -33,18 +28,26 @@ public sealed class LabWorkType : SupplyEntity
     public string? Warranty { get; set; }
 }
 
-public sealed class CatalogMedicine : SupplyEntity
+// Simplified to 10 physical columns; descriptive pharmaceutical fields are packed in Spec JSONB.
+public sealed class CatalogMedicine
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public string Code { get; set; } = "";
+    public string Name { get; set; } = "";
+    public string BaseUnit { get; set; } = "";
+    public long? ReferencePrice { get; set; }
+    public bool PrescriptionEligible { get; set; }
+    public bool InternalStockTracked { get; set; }
+    public bool IsActive { get; set; } = true;
+    public int Version { get; set; } = 1;
+    public CatalogMedicineSpec Spec { get; set; } = new();
+}
+
+public sealed class CatalogMedicineSpec
 {
     public string? ActiveIngredient { get; set; }
     public string? Strength { get; set; }
     public string? DosageForm { get; set; }
-    public string BaseUnit { get; set; } = "";
-    public string Route { get; set; } = "Uống";
     public string? Packaging { get; set; }
-    public string? Contraindications { get; set; }
-    public string? AllergyWarnings { get; set; }
     public string? Instructions { get; set; }
-    public long? ReferencePrice { get; set; }
-    public bool PrescriptionEligible { get; set; }
-    public bool InternalStockTracked { get; set; }
 }

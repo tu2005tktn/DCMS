@@ -26,7 +26,8 @@ public sealed class AccountRecoveryService(
     IContactDeliveryAdapter delivery,
     IOptions<RecoverySettings> options,
     IMemoryCache cache,
-    ILogger<AccountRecoveryService> logger) : IAccountRecoveryService
+    ILogger<AccountRecoveryService> logger,
+    DCMS.Application.Features.Settings.ISettingsAccess access) : IAccountRecoveryService
 {
     private readonly RecoverySettings settings = options.Value;
 
@@ -454,10 +455,14 @@ public sealed class AccountRecoveryService(
     private async Task<RecoveryToken?> LatestTokenAsync(int accountId, CancellationToken ct)
     {
         var now = DateTimeOffset.UtcNow;
-        var tokens = await db.RecoveryTokens.AsNoTracking()
+        var authData = await db.Users.AsNoTracking()
+            .Where(x => x.Id == accountId)
+            .Select(x => x.AuthData)
+            .SingleOrDefaultAsync(ct);
+        var tokens = (authData?.Recoveries ?? [])
             .Where(x => x.AccountId == accountId)
             .OrderByDescending(x => x.Id)
-            .ToListAsync(ct);
+            .ToList();
         // An unexpired unused proof wins; an expired one is still returned so the caller can report
         // "expired" instead of "never requested".
         return tokens.FirstOrDefault(x => x.UsedAt == null && x.ExpiresAt > now)
@@ -514,13 +519,13 @@ public sealed class AccountRecoveryService(
         var value = identifier.Trim();
         var normalizedUserName = value.ToUpperInvariant();
         // One tracked query: the entity is reused by both the read-only paths and the reset path.
-        var user = await db.Users.FirstOrDefaultAsync(x => x.NormalizedUserName == normalizedUserName, ct);
+        var user = await db.Users.FirstOrDefaultAsync(x => x.UserName != null && x.UserName.ToUpper() == normalizedUserName, ct);
         if (user != null) return !publicOnly || user.AccountType == "Public" ? user : null;
 
         if (!delivery.IsValid(value)) return null;
         var contact = delivery.Normalize(value).ToUpperInvariant();
         return await db.Users.FirstOrDefaultAsync(x => (!publicOnly || x.AccountType == "Public")
-            && (x.NormalizedEmail == contact || (x.PhoneNumber != null && x.PhoneNumber.ToUpper() == contact)), ct);
+            && ((x.Email != null && x.Email.ToUpper() == contact) || (x.PhoneNumber != null && x.PhoneNumber.ToUpper() == contact)), ct);
     }
 
     private void ValidateCustomerEmail(string identifier, bool publicOnly)
@@ -583,7 +588,8 @@ public sealed class AccountRecoveryService(
     private async Task RequireAdminAsync(int actorId, CancellationToken ct)
     {
         var actor = await db.Users.AsNoTracking().SingleOrDefaultAsync(x => x.Id == actorId && x.IsActive, ct);
-        if (actor == null || !await users.IsInRoleAsync(actor, AccountRoles.Admin))
+        var state = actor?.AccountType == "Staff" ? await access.ResolveAsync(actorId, ct) : null;
+        if (actor == null || (state is { GrantDriven: true } ? !state.Permissions.Any(x => x.StartsWith("accounts.")) : !await users.IsInRoleAsync(actor, AccountRoles.Admin)))
             throw new BusinessException(403, SystemMessages.Get("MSG06"));
     }
 

@@ -2,15 +2,13 @@ export type SheetContext = {
   services: { id: number; branchId: number; name: string; unit: string; referenceUnitPriceVnd: number | null; priceVersion: number }[];
   members: { id: number; name: string; canDentist: boolean }[];
   visits: { id: string; version: number; arrivalAt: string; dentistId: number }[];
-  steps: { id: string; itemId: string; name: string; version: number; outcome: string; held: boolean }[];
   allowedActions: string[];
-  consentDocuments?: { id: string; fileName: string; version: number }[];
 };
 export type SheetActivity = {
-  id: string; visitId: string | null; dossierId: string; itemId: string; planVersion: number;
+  id: string; dossierId: string; itemId: string | null; planVersion: number | null;
   serviceId: number; region: string | null; unit: string; quantity: number; performedAt: string;
   performerId: number; outcome: string; version: number; priceSnapshotVnd: number;
-  sheetVersion?: number; sheetDeleted?: boolean; sheetDiscountType?: string; sheetDiscountValue?: number; sheetDiscountReason?: string; sourceKind?: string; serviceNameSnapshot?: string; labWorkSnapshot?: string; chargingBasis: string; feeStatus: string; discountSnapshotVnd: number; assistantId?: number;
+  sheetVersion?: number; sheetDeleted?: boolean; sheetDiscountType?: string; sheetDiscountValue?: number; sheetDiscountReason?: string; serviceNameSnapshot?: string; labWorkSnapshot?: string; feeStatus: string; discountSnapshotVnd: number; assistantId?: number;
 };
 export type ActivityPage = { items: SheetActivity[]; total: number; page: number; pageSize: number };
 

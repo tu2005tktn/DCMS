@@ -70,10 +70,8 @@ public sealed class NotificationService(
                 x.AccountId == accountId && x.Status == PatientLinkStatus.Verified, ct), null);
         if (deepLink == "/book-appointment")
         {
-            var canBook = await db.FollowUpInstructions.AsNoTracking().AnyAsync(x =>
-                x.Status == "NeedsBooking" && db.PatientAccountLinks.Any(link =>
-                    link.AccountId == accountId && link.Status == PatientLinkStatus.Verified
-                    && link.PatientId == x.PatientId), ct);
+            var canBook = await db.PatientAccountLinks.AsNoTracking().AnyAsync(link =>
+                link.AccountId == accountId && link.Status == PatientLinkStatus.Verified, ct);
             return canBook ? new CheckDeepLinkResult(true, null)
                 : new CheckDeepLinkResult(false, "Yêu cầu đặt lịch không còn hiệu lực.");
         }
@@ -92,13 +90,11 @@ public sealed class NotificationService(
             {
                 "visit-results" => await db.Visits.AsNoTracking().AnyAsync(x => x.Id == id
                     && patients.Contains(x.PatientId) && db.Set<VisitExamination>()
-                        .Any(e => e.VisitId == x.Id && e.Confirmed), ct),
-                "prescriptions" => await db.Set<PatientPrescription>().AsNoTracking().AnyAsync(x =>
-                    x.Id == id && patients.Contains(x.PatientId), ct)
-                    || await db.Set<ExternalPrescription>().AsNoTracking().AnyAsync(x =>
-                        x.VisitId == id && x.Status == PrescriptionStatuses.Finalized && patients.Contains(x.PatientId), ct),
+                        .Any(e => e.VisitId == x.Id) && DCMS.Domain.Features.Visits.VisitStatuses.HasConfirmedExamination.Contains(x.Status), ct),
+                "prescriptions" => await db.PatientPrescriptions.AsNoTracking().AnyAsync(x =>
+                    x.Id == id && patients.Contains(x.PatientId), ct),
                 "medical-records" => await db.TreatmentDossiers.AsNoTracking().AnyAsync(x =>
-                    x.Id == id && x.PlanState == "Committed" && x.State != "Deleted"
+                    x.Id == id && x.State != "Deleted" && x.Items.Any()
                     && patients.Contains(x.PatientId), ct),
                 _ => false
             };

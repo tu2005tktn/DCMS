@@ -2,7 +2,6 @@ using System.Text.Json;
 using DCMS.Application.Features.Examinations;
 using DCMS.Domain.Features.Examinations;
 using DCMS.Domain.Features.PatientLinks;
-using DCMS.Domain.Features.Prescriptions;
 using DCMS.Domain.Features.Scheduling;
 using DCMS.Domain.Features.Visits;
 using DCMS.Infrastructure.Persistence;
@@ -41,7 +40,7 @@ public sealed class OwnClinicalRecordService(DcmsDbContext db, IClinicalDocument
         join e in db.Set<VisitExamination>() on v.Id equals e.VisitId
         join b in db.Set<SchedulingBranch>() on v.BranchId equals b.Id
         join d in db.Employees on v.DentistId equals d.Id
-        where v.PatientId == patientId && e.Confirmed
+        where v.PatientId == patientId && VisitStatuses.HasConfirmedExamination.Contains(v.Status)
         select new OwnVisitRow {
             Id = v.Id, ArrivalAt = v.ArrivalAt, BranchName = b.Name, DentistName = d.FullName, Status = v.Status, ContentJson = e.ContentJson,
             CompletedAt = v.Status == VisitStatuses.Completed
@@ -49,8 +48,8 @@ public sealed class OwnClinicalRecordService(DcmsDbContext db, IClinicalDocument
                 : null,
             Version = db.Set<VisitAudit>().Count(a => a.VisitId == v.Id && SaveActions.Contains(a.Action)),
             DocumentCount = db.Set<ClinicalDocument>().Count(x => x.PatientId == patientId && x.FileState == "Ready"
-                && (x.VisitId == v.Id || db.Investigations.Any(o => o.VisitId == v.Id && o.Id == x.InvestigationId))),
-            HasPrescription = db.Set<ExternalPrescription>().Any(p => p.VisitId == v.Id && p.PatientId == patientId && p.Status == PrescriptionStatuses.Finalized) };
+                && (x.VisitId == v.Id || db.Investigations.Any(o => o.VisitId == v.Id && o.Id == x.Metadata.InvestigationId))),
+            HasPrescription = false };
 
     // Member-init (not a positional record) so EF can order, filter and count on the projected columns.
     private sealed class OwnVisitRow
@@ -67,7 +66,7 @@ public sealed class OwnClinicalRecordService(DcmsDbContext db, IClinicalDocument
         public bool HasPrescription { get; init; }
     }
 
-    private static ExaminationContent Content(string json) => JsonSerializer.Deserialize<ExaminationContent>(json, ExaminationService.Json)!;
+    private static ExaminationContent Content(string json) => ExaminationService.WithDerivedDiagnoses(JsonSerializer.Deserialize<ExaminationContent>(json, ExaminationService.Json)!);
 
     private static IReadOnlyList<string> Diagnoses(ExaminationContent c) =>
         c.Diagnoses is { Count: > 0 } list ? list : string.IsNullOrWhiteSpace(c.Diagnosis) ? [] : [c.Diagnosis.Trim()];
@@ -113,7 +112,7 @@ public sealed class OwnClinicalRecordService(DcmsDbContext db, IClinicalDocument
         if (visitId.HasValue) {
             if (!await Visits(patientId).AnyAsync(x => x.Id == visitId, ct)) throw Error("MSG113", 404);
             var investigations = VisitInvestigations(visitId.Value);
-            query = query.Where(d => d.VisitId == visitId || (d.InvestigationId != null && investigations.Contains(d.InvestigationId.Value)));
+            query = query.Where(d => d.VisitId == visitId || (d.Metadata.InvestigationId != null && investigations.Contains(d.Metadata.InvestigationId.Value)));
         }
         var total = await query.CountAsync(ct);
         var items = await query.OrderByDescending(d => d.SourceDate).ThenByDescending(d => d.UploadedAt).ThenBy(d => d.Id)

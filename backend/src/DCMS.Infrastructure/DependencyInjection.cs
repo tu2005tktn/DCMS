@@ -59,7 +59,6 @@ public static class DependencyInjection
         services.AddScoped<DCMS.Application.Features.Settings.ISettingsAccess, Features.Settings.SettingsAccess>();
         services.AddScoped<DCMS.Application.Features.Settings.ISettingsService, Features.Settings.SettingsService>();
         services.AddScoped<DCMS.Application.Features.Settings.IBranchManagementService, Features.Settings.BranchManagementService>();
-        services.AddScoped<Features.Settings.BranchAssetStore>();
         services.AddScoped<DCMS.Application.Features.Settings.IBranchLabObligationPort, Features.Settings.BranchLabObligationPort>();
         services.AddScoped<IRegistrationService, RegistrationService>();
         services.AddHttpClient();
@@ -75,20 +74,9 @@ public static class DependencyInjection
         services.AddScoped<DCMS.Application.Features.Prescriptions.IPrescriptionService, Features.Prescriptions.PrescriptionService>();
         // The finance module is not installed: the dossier shows no ledger summary and posted work only records a fee request event.
         services.AddScoped<ITreatmentFinancialSummaryPort, UnavailableTreatmentFinancialSummaryPort>();
-        services.AddScoped<ITreatmentRevisionService, TreatmentRevisionService>();
-        services.AddScoped<ITreatmentRevisionActualPort, UnavailableRevisionActualPort>();
-        services.AddScoped<ITreatmentRevisionFinancePort, UnavailableRevisionFinancePort>();
-        services.AddScoped<ITreatmentProgressionService, TreatmentProgressionService>();
-        services.AddScoped<ITreatmentActualEvidencePort, ClinicalActualEvidencePort>();
         services.AddScoped<IClinicalWorkService, ClinicalWorkService>();
-        services.AddScoped<IClinicalVisitPort, Features.Examinations.ClinicalVisitPort>();
-        services.AddScoped<IClinicalConsentPort, ClinicalConsentPort>();
         services.AddScoped<IClinicalChargePort, OutboxClinicalChargePort>();
         services.AddScoped<ICareTaskService, CareTaskService>();
-        services.AddScoped<ITreatmentLabReadinessPort, UnavailableTreatmentLabReadinessPort>();
-        services.AddScoped<ITreatmentVisitActivitySourcePort, UnavailableTreatmentVisitActivitySourcePort>();
-        services.AddScoped<ITreatmentDentistCapabilityPort, UnavailableTreatmentDentistCapabilityPort>();
-        services.AddScoped<TreatmentDueScanner>();
         services.AddScoped<CareTaskIngestionService>();
         services.AddHostedService<TreatmentDueScanWorker>();
         services.AddSingleton(TimeProvider.System);
@@ -99,26 +87,23 @@ public static class DependencyInjection
         services.AddScoped<Features.Scheduling.DevelopmentSchedulingSeeder>();
         services.AddScoped<IAppointmentService, AppointmentService>();
         services.AddScoped<DCMS.Application.Features.Reception.IReceptionService, Features.Reception.ReceptionService>();
-        services.AddScoped<DCMS.Application.Features.Reception.IReceptionSourceReader, Features.Examinations.ReceptionTreatmentSourceReader>();
         services.AddScoped<Features.Examinations.ClinicalAccess>();
         services.AddScoped<DCMS.Application.Features.Examinations.IInvestigationService, Features.Examinations.InvestigationService>();
         services.AddScoped<DCMS.Application.Features.Examinations.IExaminationService, Features.Examinations.ExaminationService>();
         services.AddScoped<DCMS.Application.Features.Examinations.IClinicalDocumentService, Features.Examinations.ClinicalDocumentService>();
         services.AddScoped<DCMS.Application.Features.Examinations.IOwnClinicalRecordService, Features.Examinations.OwnClinicalRecordService>();
-        services.AddSingleton<DCMS.Application.Features.Examinations.IClinicalFileScanner, Features.Examinations.ClamAvClinicalFileScanner>();
+        services.AddSingleton<DCMS.Application.Features.Examinations.IClinicalFileScanner, Features.Examinations.DisabledClinicalFileScanner>();
+        services.AddSingleton<DCMS.Application.Features.Examinations.IDentalAiClient, Features.Examinations.HttpDentalAiClient>();
         services.AddHostedService<Features.Examinations.ClinicalScanWorker>();
         services.AddScoped<IAppointmentQueryService, AppointmentQueryService>();
         services.AddScoped<IAppointmentChangeService, AppointmentChangeService>();
         services.AddScoped<ISupportRequestService, SupportRequestService>();
-        services.AddScoped<FollowUpAppointmentPort>();
-        services.AddScoped<IFollowUpAppointmentChangePort>(sp => sp.GetRequiredService<FollowUpAppointmentPort>());
         services.AddScoped<DevelopmentAppointmentSeeder>();
         services.AddScoped<Features.Treatment.DevelopmentTreatmentCatalogSeeder>();
         services.AddScoped<Features.SystemSettings.DevelopmentMaterialSeeder>();
         services.AddScoped<Features.SystemSettings.DevelopmentLabSeeder>();
         services.AddScoped<Features.SystemSettings.DevelopmentMedicineSeeder>();
         services.AddScoped<Features.Prescriptions.DevelopmentPrescriptionSeeder>();
-        services.AddScoped<IFollowUpBookingPort>(sp => sp.GetRequiredService<FollowUpAppointmentPort>());
         services.AddScoped<IAppointmentNotificationDispatcher, AppointmentNotificationDispatcher>();
         services.AddScoped<IExternalNotificationAdapter, FirebasePushAdapter>();
         // S03 recovery delivery: a configured SMTP server sends real email in any environment; otherwise

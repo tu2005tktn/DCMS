@@ -1,5 +1,11 @@
 # S22 actual treatment, S63 review and S25/S60 care backend
 
+> Cập nhật 18/11/2026: luồng ghi điều trị theo lượt khám (S22: `treatment-context`, `activities/drafts`, `activities/{id}/draft|post`) đã bị xóa; hoạt động điều trị chỉ được ghi trên phiếu điều trị. Xem [CLINICAL-ACTIVITY-TABLE-SIMPLIFICATION.vi.md](CLINICAL-ACTIVITY-TABLE-SIMPLIFICATION.vi.md) giai đoạn 4.
+
+> Cập nhật 18/11/2026: công việc chăm sóc không còn `instructionId` (hướng dẫn tái khám đã bị xóa); xem [FOLLOW-UP-INSTRUCTION-REMOVAL.vi.md](FOLLOW-UP-INSTRUCTION-REMOVAL.vi.md).
+
+Cập nhật 18/11/2026: **S63 đánh giá lâm sàng (review) và ghi chú chăm sóc (care note) đã bị xóa** theo yêu cầu người dùng, vì không có giao diện web/mobile nào dùng. Đã gỡ các route `GET/POST /api/visits/{visitId}/reviews`, `GET /api/reviews/{id}`, `POST /api/visits/{visitId}/care-notes`; trường `reviewId` bị bỏ khỏi đầu vào và DTO của hoạt động và khỏi công việc chăm sóc (`CARE_TASK.ReviewId`). Hoạt động `Free` chỉ còn một nhánh hợp lệ: có hạng mục kế hoạch (`itemId`), giá 0 và căn cứ (`chargingBasisEvidence`) rõ ràng. Các phần bên dưới nói về S63/review/care note là lịch sử thiết kế, không còn hiệu lực. Xem [rút gọn CLINICAL_ACTIVITY](CLINICAL-ACTIVITY-TABLE-SIMPLIFICATION.vi.md).
+
 S22 tích hợp S43 hiện áp dụng [TREATMENT-PAYMENT-V25.md](TREATMENT-PAYMENT-V25.md): Visit/consent dùng nguồn thật; Separate actual ghi outbox `clinical.fee.requested` cùng transaction với feeStatus Pending khi chưa có ledger. Không còn trả 503 chỉ vì thiếu dispatcher tài chính. Lab vẫn fail-closed khi chưa có xác nhận authoritative. Hoạt động Free/Included không sinh yêu cầu phí mới; Separate giá 0 yêu cầu chọn lại căn cứ Free rõ ràng (MSG244).
 
 Source: DCMS Screen Specifications v2.3 and DCMS Use Cases Business Rules Messages v2.3, revised 24 October 2026, with the Vinh assignment updated 25 October 2026. Screens S22/S63 belong to the staff Web. Trí owns the S25/S60 UI; this module owns its backend. Relevant workflows: UC-10/14/17/18/25/39/40/43/53, GBR-154/155/159, AT43/44/45/50 and MSG230/237/240/242/244/246.

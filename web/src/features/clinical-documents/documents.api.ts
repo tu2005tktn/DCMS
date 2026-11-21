@@ -1,6 +1,6 @@
 import { api, ApiError, readAccessToken, type SystemMessage } from '../../services/api';
 import type {
-  DocumentHistoryEntry, DocumentItem, DocumentPage, DocumentQuery, PatientDocumentContexts, UploadMetadata,
+  AiAnalysis, DocumentHistoryEntry, DocumentItem, DocumentPage, DocumentQuery, PatientDocumentContexts, UploadMetadata,
 } from './types';
 
 // S20 data access. Endpoints follow the [PROPOSED] DCMS-95 contract in docs/implementation/S20-CLINICAL-DOCUMENTS-UI.md;
@@ -12,6 +12,8 @@ export type DocumentsApi = {
   history: (documentId: string) => Promise<DocumentHistoryEntry[]>;
   upload: (metadata: UploadMetadata, file: File, onProgress: (percent: number) => void, signal: AbortSignal) => Promise<DocumentItem>;
   content: (documentId: string, disposition: 'inline' | 'attachment') => Promise<Blob>;
+  analyze: (documentId: string, requestKey: string) => Promise<AiAnalysis>;
+  remove: (documentId: string, expectedVersion: number, reason: string, requestKey: string) => Promise<void>;
 };
 
 const base = (import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5080').replace(/\/$/, '');
@@ -26,11 +28,14 @@ const httpDocumentsApi: DocumentsApi = {
   contexts: patientId => api(`/api/patients/${patientId}/document-contexts`),
   list: q => {
     const query = new URLSearchParams({ patientId: String(q.patientId), page: String(q.page), pageSize: String(q.pageSize) });
-    for (const key of ['visitId', 'dossierId', 'planId', 'type', 'from', 'to', 'imagesOnly'] as const) if (q[key]) query.set(key, String(q[key]));
+    for (const key of ['visitId', 'dossierId', 'type', 'from', 'to', 'imagesOnly'] as const) if (q[key]) query.set(key, String(q[key]));
     return api(`/api/clinical-documents?${query}`);
   },
   detail: id => api(`/api/clinical-documents/${encodeURIComponent(id)}`),
   history: id => api(`/api/clinical-documents/${encodeURIComponent(id)}/history`),
+  remove: (id, expectedVersion, reason, requestKey) => api(`/api/clinical-documents/${encodeURIComponent(id)}/delete`,
+    { method: 'POST', body: JSON.stringify({ expectedVersion, reason, requestKey }) }),
+  analyze: (id, requestKey) => api(`/api/clinical-documents/${encodeURIComponent(id)}/ai-analyses`, { method: 'POST', body: JSON.stringify({ requestKey }) }),
   // XHR rather than fetch so each file reports its own upload progress.
   upload: (metadata, file, onProgress, signal) => new Promise<DocumentItem>((resolve, reject) => {
     const form = new FormData();

@@ -18,13 +18,8 @@ public sealed class ReferenceEntry
     public string Kind { get; set; } = "";
     public string? Code { get; set; }
     public string Name { get; set; } = "";
-    public string NormalizedName { get; set; } = "";
     public string? Description { get; set; }
     public bool IsReserved { get; set; }
     public bool IsActive { get; set; } = true;
     public int Version { get; set; } = 1;
-    public DateTimeOffset CreatedAt { get; set; }
-    public int? CreatedBy { get; set; }
-    public DateTimeOffset UpdatedAt { get; set; }
-    public int? UpdatedBy { get; set; }
 }

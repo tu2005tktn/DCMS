@@ -35,8 +35,8 @@ public sealed partial class FamilyRecordService(DcmsDbContext db, TimeProvider c
         row.RequestedAt, row.DecidedAt, row.ExpiresAt, row.Scopes, row.PublicNote, row.Version);
     private async Task PublicAsync(int actor, CancellationToken ct)
     {
-        if (!await db.Users.AsNoTracking().AnyAsync(x => x.Id == actor && x.AccountType == "Public" && x.IsActive
-            && (!x.LockoutEnabled || x.LockoutEnd == null || x.LockoutEnd <= clock.GetUtcNow()), ct)) throw Denied();
+        var actorAccount = await db.Users.AsNoTracking().SingleOrDefaultAsync(x => x.Id == actor && x.AccountType == "Public" && x.IsActive, ct);
+        if (actorAccount == null || (actorAccount.LockoutEnabled && actorAccount.LockoutEnd > clock.GetUtcNow())) throw Denied();
     }
     private async Task<FamilyMember> MemberAsync(int actor, Guid memberId, CancellationToken ct)
     {
@@ -47,7 +47,7 @@ public sealed partial class FamilyRecordService(DcmsDbContext db, TimeProvider c
     private async Task<int[]> StaffAsync(int actor, string permission, CancellationToken ct)
     {
         var state = await access.RequireAsync(actor, permission, ct);
-        if (!state.Roles.Contains(AccountRoles.ClinicAssistant)) throw Denied();
+        if (!state.GrantDriven && !state.Roles.Contains(AccountRoles.ClinicAssistant)) throw Denied();
         return state.BranchIds;
     }
     private async Task<FamilyRecordAccess> ReviewRowAsync(int actor, Guid id, string permission, CancellationToken ct)
@@ -139,7 +139,7 @@ public sealed partial class FamilyRecordService(DcmsDbContext db, TimeProvider c
             where r.BranchId == null || branches.Contains(r.BranchId.Value) select new { r, u };
         if (filter == "Expired") query = query.Where(x => x.r.Status == "Expired" || x.r.Status == "Verified" && x.r.ExpiresAt <= now);
         else if (filter != "All") query = query.Where(x => x.r.Status == filter && (filter != "Verified" || x.r.ExpiresAt > now));
-        if (term != null) query = query.Where(x => x.r.DeclaredFullName.Contains(term) || x.r.Code.Contains(term) || x.u.UserName!.Contains(term));
+        if (term != null) query = query.Where(x => x.r.Details.DeclaredFullName.Contains(term) || x.r.Code.Contains(term) || x.u.UserName!.Contains(term));
         var total = await query.CountAsync(ct);
         var rows = await query.OrderByDescending(x => x.r.RequestedAt).ThenBy(x => x.r.Id).Skip((page - 1) * pageSize).Take(pageSize).ToArrayAsync(ct);
         return new(rows.Select(x => new FamilyReviewRow(x.r.Id, x.r.Code, x.u.UserName!, x.u.FullName, x.r.DeclaredFullName,

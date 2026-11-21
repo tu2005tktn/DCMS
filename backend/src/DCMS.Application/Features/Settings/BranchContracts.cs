@@ -9,14 +9,7 @@ public sealed record BranchDto(
     string? Address,
     string? Phone,
     string? Email,
-    string? Website,
-    Guid? LogoAssetId,
-    string TimeZoneId,
-    string? BankCode,
-    string? AccountNumber,
-    string? PayeeName,
     int SlotIntervalMinutes,
-    int BookingSettingsVersion,
     bool IsActive,
     int Version,
     int ChairCount);
@@ -38,14 +31,7 @@ public sealed record BranchDetailDto(
     string? Address,
     string? Phone,
     string? Email,
-    string? Website,
-    Guid? LogoAssetId,
-    string TimeZoneId,
-    string? BankCode,
-    string? AccountNumber,
-    string? PayeeName,
     int SlotIntervalMinutes,
-    int BookingSettingsVersion,
     bool IsActive,
     int Version,
     ChairDto[] Chairs);
@@ -58,13 +44,7 @@ public sealed record SaveBranchCommand(
     string Name,
     string? Address,
     string? Phone,
-    string? Email,
-    string? Website,
-    Guid? LogoAssetId,
-    string? TimeZoneId,
-    string? BankCode,
-    string? AccountNumber,
-    string? PayeeName);
+    string? Email);
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record SaveChairCommand(
@@ -100,14 +80,6 @@ public sealed record ImpactPreviewResult(
     BlockerItem[] Blockers,
     string Impact);
 
-public sealed record BranchLogoUploadResult(
-    Guid AssetId,
-    string FileName,
-    long SizeBytes,
-    string ContentType);
-
-public sealed record BranchLogoFile(string ContentType, byte[] Bytes);
-
 public sealed record BranchObligationResult(bool Available, int Count);
 
 // Lab orders are not modelled yet; the default adapter reports Available = false so branch deactivation stops with 503 MSG144.
@@ -123,8 +95,6 @@ public interface IBranchManagementService
     Task<BranchDetailDto> SaveBranchAsync(int actor, int? id, SaveBranchCommand command, CancellationToken ct);
     Task<ImpactPreviewResult> BranchStatePreviewAsync(int actor, int id, bool targetActive, CancellationToken ct);
     Task<BranchDetailDto> SetBranchStateAsync(int actor, int id, BranchStateCommand command, CancellationToken ct);
-    Task<BranchLogoUploadResult> UploadLogoAsync(int actor, int id, Stream fileStream, string fileName, string contentType, long length, CancellationToken ct);
-    Task<BranchLogoFile> LogoAsync(int actor, int id, Guid assetId, CancellationToken ct);
 
     Task<ChairDto[]> ChairsAsync(int actor, int branchId, CancellationToken ct);
     Task<ChairDto> SaveChairAsync(int actor, int branchId, int? chairId, SaveChairCommand command, CancellationToken ct);

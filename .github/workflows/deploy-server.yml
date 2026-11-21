@@ -1,7 +1,7 @@
 name: Deploy server
 
-# Builds and redeploys the DCMS stack on the self-hosted server runner.
-# See docs/implementation/DEPLOY-SERVER-WIREGUARD.vi.md.
+# Images are built on a GitHub-hosted runner and pushed to ghcr.io; the self-hosted
+# server runner only pulls and restarts. See docs/implementation/DEPLOY-SERVER-WIREGUARD.vi.md.
 on:
   push:
     branches: [main]
@@ -14,19 +14,74 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  REGISTRY: ghcr.io/tu2005tktn
+
 jobs:
-  deploy:
-    runs-on: [self-hosted, dcms-prod]
-    timeout-minutes: 45
-    env:
-      COMPOSE: docker compose -p dcms --env-file /opt/dcms/.env -f infrastructure/docker/compose.prod.yaml
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - name: dcms-api
+            context: backend
+          - name: dcms-web
+            context: web
+          - name: dcms-ai
+            context: ai-service
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build images
-        run: $COMPOSE build api web
+      - uses: docker/setup-buildx-action@v3
 
-      - name: Start database and scanner
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push ${{ matrix.name }}
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ matrix.name }}:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ matrix.name }}:latest
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+
+  deploy:
+    needs: build
+    runs-on: [self-hosted, dcms-prod]
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: read
+    env:
+      COMPOSE: docker compose -p dcms --env-file /opt/dcms/.env -f infrastructure/docker/compose.prod.yaml
+      DCMS_REGISTRY: ghcr.io/tu2005tktn
+      DCMS_TAG: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to ghcr.io (read-only, this run only)
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Pull images
+        run: |
+          $COMPOSE pull api web
+          # The AI image (~1 GB) is pulled only when /opt/dcms/.env enables the "ai" profile.
+          if $COMPOSE config --services | grep -qx ai; then $COMPOSE pull ai; fi
+
+      - name: Start database
         run: $COMPOSE up -d --wait postgres
 
       - name: Apply migrations
@@ -46,6 +101,8 @@ jobs:
           done
           echo "Health check failed"; $COMPOSE logs --tail 80 api; exit 1
 
-      - name: Prune old images
+      - name: Log out and prune old images
         if: always()
-        run: docker image prune -f
+        run: |
+          docker logout ghcr.io || true
+          docker image prune -af --filter "until=168h" --filter "label=org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}" || true

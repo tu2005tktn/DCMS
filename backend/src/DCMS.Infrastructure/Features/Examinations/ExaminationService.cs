@@ -19,25 +19,25 @@ public sealed class ExaminationService(DcmsDbContext db, ClinicalAccess access, 
     internal static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     internal static string Hash(object value) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(value, Json))));
     private static readonly string[] SaveActions = ["SaveExamination", "ConfirmExamination", "AmendExamination"];
-    private static ExaminationDto Dto(VisitExamination e, int version = 0) => new(JsonSerializer.Deserialize<ExaminationContent>(e.ContentJson, Json)!, e.Confirmed, e.UpdatedBy, e.UpdatedAt, e.VisitId, version);
+    private static ExaminationDto Dto(VisitExamination e, string visitStatus, int version = 0) => new(WithDerivedDiagnoses(JsonSerializer.Deserialize<ExaminationContent>(e.ContentJson, Json)!), VisitStatuses.HasConfirmedExamination.Contains(visitStatus), e.UpdatedBy, e.UpdatedAt, e.VisitId, version);
     public async Task<ExaminationWorkspace> GetAsync(int actorId, Guid visitId, CancellationToken ct)
     {
         var v = await access.VisitAsync(actorId, visitId, false, ct);
         var row = await db.Set<VisitExamination>().AsNoTracking().SingleOrDefaultAsync(x => x.VisitId == visitId, ct);
         var previous = await (from e in db.Set<VisitExamination>().AsNoTracking() join visit in db.Visits on e.VisitId equals visit.Id
-            where visit.PatientId == v.PatientId && visit.BranchId == v.BranchId && visit.Id != v.Id && e.Confirmed
+            where visit.PatientId == v.PatientId && visit.BranchId == v.BranchId && visit.Id != v.Id && VisitStatuses.HasConfirmedExamination.Contains(visit.Status)
             orderby e.UpdatedAt descending select e).FirstOrDefaultAsync(ct);
-        var prior = previous == null ? null : Dto(previous).Content;
+        var prior = previous == null ? null : Dto(previous, VisitStatuses.Completed).Content;
         var initial = new ExaminationContent(v.ArrivalReason ?? v.Note, prior == null ? new() : prior.MedicalHistory with { Verified = false },
             prior == null ? new() : prior.Allergies with { Verified = false }, prior == null ? new() : prior.Medications with { Verified = false }, [], null, null);
         var own = await db.Employees.AnyAsync(x => x.Id == v.DentistId && x.AccountId == actorId, ct);
-        var responsible = own && await access.BranchAsync(actorId, v.BranchId, false, ct);
+        var responsible = own && await access.BranchAsync(actorId, v.BranchId, false, ct) || !own && await access.ActsForAsync(actorId, v, ct);
         var state = await permissions.ResolveAsync(actorId, ct);
         var canWrite = responsible && state.Permissions.Contains("examinations.manage");
         string[] actions = canWrite ? v.Status == VisitStatuses.Queued ? ["start"]
-            : v.Status == VisitStatuses.InProgress && row?.Confirmed != true ? ["save", "confirm"]
-            : row?.Confirmed == true && v.Status == VisitStatuses.InProgress ? ["amend", "complete"]
-            : row?.Confirmed == true && v.Status == VisitStatuses.Completed ? (Dto(row).Content.Disposition == "ProceedToTreatment" ? ["handoff", "amend"] : ["amend"]) : [] : [];
+            : v.Status == VisitStatuses.InProgress ? ["save", "confirm"]
+            : row != null && v.Status == VisitStatuses.ExaminationConfirmed ? ["amend", "complete"]
+            : row != null && v.Status == VisitStatuses.Completed ? (Dto(row, v.Status).Content.Disposition == "ProceedToTreatment" ? ["handoff", "amend"] : ["amend"]) : [] : [];
         var visitResult = await reception.VisitAsync(actorId, visitId, ct, clinical: true);
         var patient = await db.Patients.AsNoTracking().Where(p => p.Id == v.PatientId)
             .Select(p => new { p.Id, p.PatientCode, p.FullName, p.BirthDate, p.Gender }).SingleAsync(ct);
@@ -50,9 +50,9 @@ public sealed class ExaminationService(DcmsDbContext db, ClinicalAccess access, 
         var orders = (await investigations.ListAsync(actorId,visitId,ct)).Items;
         if(orders.Any(x=>x.RequiredForDiagnosis && x.State is not ("Reviewed" or "Cancelled"))) actions = actions.Where(x=>x!="handoff").ToArray();
         if (!state.Permissions.Contains("treatment.dossiers.create")) actions = actions.Where(x => x != "handoff").ToArray();
-        if (responsible && v.Status == VisitStatuses.InProgress && state.Permissions.Contains("prescriptions.manage")) actions = [..actions, "prescribe"];
+        if (responsible && VisitStatuses.Open.Contains(v.Status) && state.Permissions.Contains("prescriptions.manage")) actions = [..actions, "prescribe"];
         var examinationVersion = await db.Set<VisitAudit>().CountAsync(x => x.VisitId == visitId && SaveActions.Contains(x.Action), ct);
-        return new(visitResult, row == null ? null : Dto(row, examinationVersion), initial, actions,
+        return new(visitResult, row == null ? null : Dto(row, v.Status, examinationVersion), initial, actions,
             new(patient.Id, patient.PatientCode, patient.FullName, patient.BirthDate, patient.Gender, age), Investigations: orders);
     }
     public Task<ExaminationWorkspace> StartAsync(int actorId, Guid visitId, StartExamination request, CancellationToken ct) =>
@@ -87,11 +87,10 @@ public sealed class ExaminationService(DcmsDbContext db, ClinicalAccess access, 
         var e = await db.Set<VisitExamination>().SingleOrDefaultAsync(x => x.VisitId == visitId, ct);
         if (action == "Complete") {
             var request = (CompleteExaminationVisit)payload;
-            if (!request.WorkReviewed || e?.Confirmed != true || v.Status != VisitStatuses.InProgress || a.Status != "InProgress") throw new BusinessException(409, SystemMessages.Get("MSG239", field: "hoàn tất phiếu khám và kiểm tra công việc trước khi kết thúc lượt"));
-            if (await db.ClinicalActivities.AnyAsync(x => x.VisitId == visitId && x.State == "Draft", ct)) throw new BusinessException(409, SystemMessages.Get("MSG239", field: "lượt còn hoạt động điều trị nháp"));
+            if (!request.WorkReviewed || e == null || v.Status != VisitStatuses.ExaminationConfirmed || a.Status != "InProgress") throw new BusinessException(409, SystemMessages.Get("MSG239", field: "hoàn tất phiếu khám và kiểm tra công việc trước khi kết thúc lượt"));
             if (await db.Investigations.AnyAsync(x => x.VisitId == visitId && x.State != "Reviewed" && x.State != "Cancelled", ct))
                 throw new BusinessException(409, SystemMessages.Get("MSG239",field:"còn chỉ định cận lâm sàng chưa được bác sĩ đọc hoặc hủy") with { Field = "investigations" });
-            var content = Dto(e).Content;
+            var content = Dto(e, v.Status).Content;
             if (!HasDiagnosis(content) || string.IsNullOrWhiteSpace(content.Disposition)) throw new BusinessException(409, SystemMessages.Get("MSG239", field: "phiếu khám còn thiếu chẩn đoán hoặc hướng xử trí"));
             v.Status = VisitStatuses.Completed; a.Status = "Completed"; a.Version++;
         } else if (save == null) {
@@ -100,17 +99,19 @@ public sealed class ExaminationService(DcmsDbContext db, ClinicalAccess access, 
         } else {
             if (action == "Amend") {
                 var amendment = (AmendExamination)payload;
-                if (e?.Confirmed != true || (v.Status != VisitStatuses.InProgress && v.Status != VisitStatuses.Completed)) throw Error("MSG42", 409);
+                if (e == null || !VisitStatuses.HasConfirmedExamination.Contains(v.Status)) throw Error("MSG42", 409);
                 if (string.IsNullOrWhiteSpace(amendment.Reason) || amendment.Reason.Length > 1000) throw new BusinessException(400, SystemMessages.Get("MSG04", field: "Lý do đính chính (tối đa 1000 ký tự)"));
-            } else if (v.Status != VisitStatuses.InProgress || a.Status != "InProgress" || e?.Confirmed == true) throw Error("MSG42", 409);
+            } else if (v.Status != VisitStatuses.InProgress || a.Status != "InProgress") throw Error("MSG42", 409);
             if (save.Confirm && await db.Investigations.AnyAsync(x => x.VisitId == visitId && x.RequiredForDiagnosis && x.State != "Reviewed" && x.State != "Cancelled", ct))
                 throw new BusinessException(409, SystemMessages.Get("MSG239",field:"cần nhận và đọc kết quả cận lâm sàng trước khi hoàn tất khám") with { Field = "investigations" });
             Validate(save.Content, save.Confirm);
             await ValidateDiagnosisReferences(save.Content,e == null ? null : JsonSerializer.Deserialize<ExaminationContent>(e.ContentJson,Json),ct);
             save = save with { Content = NormalizeDiagnoses(save.Content) };
+            var stored = WithoutDerivedDiagnoses(save.Content);
             old = e?.ContentJson ?? "{}";
             if (e == null) { e = new VisitExamination { VisitId = visitId }; db.Add(e); }
-            e.ContentJson = JsonSerializer.Serialize(save.Content, Json); e.Confirmed = save.Confirm;
+            e.ContentJson = JsonSerializer.Serialize(stored, StoreJson);
+            if (action != "Amend" && save.Confirm) v.Status = VisitStatuses.ExaminationConfirmed;
             e.UpdatedAt = clock.GetUtcNow(); e.UpdatedBy = actorId;
         }
         v.Version++;
@@ -140,9 +141,33 @@ public sealed class ExaminationService(DcmsDbContext db, ClinicalAccess access, 
     }
     private static string[] EffectiveDiagnoses(ExaminationContent c) =>
         (c.UnscopedDiagnoses ?? c.Diagnoses ?? (string.IsNullOrWhiteSpace(c.Diagnosis) ? Array.Empty<string>() : new[] { c.Diagnosis }))
-        .Concat(c.Findings.SelectMany(f => f.Diagnoses ?? Array.Empty<string>()))
+        .Concat((c.Findings ?? []).SelectMany(f => f.Diagnoses ?? Array.Empty<string>()))
         .Select(value => value.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
     private static bool HasDiagnosis(ExaminationContent c) => EffectiveDiagnoses(c).Length > 0;
+    // diagnoses, diagnosis and conclusion are derived from findings + unscopedDiagnoses and are not stored.
+    private static readonly JsonSerializerOptions StoreJson = new(JsonSerializerDefaults.Web) { DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull };
+    // Legacy content stores only free-text Diagnosis without diagnosis lists; it is kept and returned as written.
+    private static bool LegacyText(ExaminationContent c) =>
+        c.UnscopedDiagnoses == null && c.Diagnoses == null && !(c.Findings ?? []).Any(f => f.Diagnoses is { Count: > 0 });
+    internal static ExaminationContent WithDerivedDiagnoses(ExaminationContent c)
+    {
+        if (LegacyText(c)) return string.IsNullOrWhiteSpace(c.Conclusion) ? c with { Conclusion = c.Diagnosis } : c;
+        var values = EffectiveDiagnoses(c);
+        var text = string.Join("; ", values);
+        return c with { Diagnoses = values, Diagnosis = string.IsNullOrWhiteSpace(c.Diagnosis) ? text : c.Diagnosis,
+            Conclusion = string.IsNullOrWhiteSpace(c.Conclusion) ? text : c.Conclusion };
+    }
+    private static ExaminationContent WithoutDerivedDiagnoses(ExaminationContent c)
+    {
+        if (LegacyText(c)) return c.Conclusion == c.Diagnosis ? c with { Conclusion = null } : c;
+        var values = EffectiveDiagnoses(c);
+        var text = string.Join("; ", values);
+        var scoped = (c.Findings ?? []).SelectMany(f => f.Diagnoses ?? Array.Empty<string>()).Select(x => x.Trim()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var unscoped = c.UnscopedDiagnoses ?? values.Where(x => !scoped.Contains(x)).ToArray();
+        // Keep a legacy free-text diagnosis/conclusion only when it says more than the derived text.
+        string? Keep(string? value) => string.IsNullOrWhiteSpace(value) || value.Trim() == text ? null : value;
+        return c with { UnscopedDiagnoses = unscoped, Diagnoses = null, Diagnosis = Keep(c.Diagnosis), Conclusion = Keep(c.Conclusion) };
+    }
     private static bool NormalOnly(ExaminationContent c) => EffectiveDiagnoses(c) is [var only] && only.Equals("Chưa phát hiện bất thường", StringComparison.OrdinalIgnoreCase);
     private static ExaminationContent NormalizeDiagnoses(ExaminationContent c)
     {
@@ -204,15 +229,15 @@ public sealed class ExaminationService(DcmsDbContext db, ClinicalAccess access, 
         var v = await access.VisitAsync(actorId, visitId, false, ct);
         var rows = await (from e in db.Set<VisitExamination>().AsNoTracking() join visit in db.Visits on e.VisitId equals visit.Id
             where visit.PatientId == v.PatientId && visit.BranchId == v.BranchId && visit.Id != visitId
-            orderby visit.ArrivalAt descending select new { visit.Id, visit.ArrivalAt, Examination = e,
+            orderby visit.ArrivalAt descending select new { visit.Id, visit.ArrivalAt, visit.Status, Examination = e,
                 Version = db.Set<VisitAudit>().Count(a => a.VisitId == visit.Id && SaveActions.Contains(a.Action)) }).Take(100).ToArrayAsync(ct);
-        return rows.Select(x => new ExaminationHistory(x.Id, x.ArrivalAt, Dto(x.Examination, x.Version))).ToArray();
+        return rows.Select(x => new ExaminationHistory(x.Id, x.ArrivalAt, Dto(x.Examination, x.Status, x.Version))).ToArray();
     }
     public async Task<ClinicalHandoff> HandoffAsync(int actorId, Guid visitId, CancellationToken ct)
     {
         await access.VisitAsync(actorId, visitId, true, ct);
         var w = await GetAsync(actorId, visitId, ct);
-        if (w.Examination?.Confirmed != true || (w.Visit.Status != VisitStatuses.InProgress && !(w.Visit.Status == VisitStatuses.Completed && w.Examination.Content.Disposition == "ProceedToTreatment"))) throw Error("MSG42", 409);
+        if (w.Examination?.Confirmed != true || (w.Visit.Status != VisitStatuses.ExaminationConfirmed && !(w.Visit.Status == VisitStatuses.Completed && w.Examination.Content.Disposition == "ProceedToTreatment"))) throw Error("MSG42", 409);
         if(w.Investigations?.Any(x=>x.RequiredForDiagnosis && x.State is not ("Reviewed" or "Cancelled"))==true) throw new BusinessException(409,SystemMessages.Get("MSG239",field:"cần nhận và đọc kết quả cận lâm sàng bổ sung") with {Field="investigations"});
         var files = new List<DocumentDto>();
         for (var pageNumber = 1; ; pageNumber++) {
@@ -220,7 +245,7 @@ public sealed class ExaminationService(DcmsDbContext db, ClinicalAccess access, 
             files.AddRange(page.Items); if (files.Count >= page.Total) break;
         }
         return new(visitId, w.Visit.PatientId, w.Visit.BranchId, w.Visit.VisitVersion, w.Examination.Content,
-            w.Examination.Content.Findings.Where(x => x.Tooth.HasValue).Select(x => x.Tooth!.Value).Distinct().ToArray(), files, w.Visit.Source, w.Examination.Version, w.Visit.Status);
+            w.Examination.Content.Findings.Where(x => x.Tooth.HasValue).Select(x => x.Tooth!.Value).Distinct().ToArray(), files, w.Examination.Version, w.Visit.Status);
     }
 
     public async Task<IReadOnlyList<PatientExamination>> ListAsync(int actorId, int patientId, CancellationToken ct)
@@ -244,7 +269,7 @@ public sealed class ExaminationService(DcmsDbContext db, ClinicalAccess access, 
                 Version = db.Set<VisitAudit>().Count(audit => audit.VisitId == v.Id && SaveActions.Contains(audit.Action)) })
             .Take(100).ToArrayAsync(ct);
         return rows.Select(x => new PatientExamination(x.Visit.Id, x.Code, x.Visit.BranchId, x.BranchName, x.DentistName,
-            x.Visit.ArrivalAt, x.Visit.Status, x.Examination == null ? null : Dto(x.Examination, x.Version), x.CompletedAt)).ToArray();
+            x.Visit.ArrivalAt, x.Visit.Status, x.Examination == null ? null : Dto(x.Examination, x.Visit.Status, x.Version), x.CompletedAt)).ToArray();
     }
 
     public async Task<IReadOnlyList<ExaminationVersion>> VersionsAsync(int actorId, Guid visitId, CancellationToken ct)

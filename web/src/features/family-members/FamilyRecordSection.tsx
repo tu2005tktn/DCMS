@@ -8,13 +8,12 @@ import { recordDateTime, type RecordPage } from './recordTypes';
 
 type Visit = { visitId: string; arrivalAt: string; dentistName: string; branchName: string; symptoms: string | null; diagnoses: string[]; conclusion: string | null; advice: string | null };
 type Treatment = { id: string; code: string; diagnosis: string; state: string; startedOn: string; items: { serviceName: string; region: string | null; progress: string; estimatedStart: string | null; estimatedEnd: string | null }[] };
-type Medicine = { medicineName: string; strength: string | null; unit: string; quantity: number; route: string; morningDose: string; noonDose: string; afternoonDose: string; eveningDose: string; mealTiming: string; days: number; instructions: string };
-type Prescription = { id: string; finalizedAt: string | null; diagnosis: string | null; generalAdvice: string; lines: Medicine[] };
+type Medicine = { medicineName: string; strength: string | null; unit: string; quantity: number; instructions: string };
+type Prescription = { id: string; prescribedOn: string; prescriberName: string; diagnosis: string | null; advice: string | null; items: Medicine[] };
 type RecordDocument = { id: string; fileName: string; documentType: string; sourceDate: string; sizeBytes: number };
 type Booking = { code: string; startAt: string; status: string; branchName: string; dentistName: string };
 const progressLabels: Record<string, string> = { NotStarted: 'Chưa thực hiện', InProgress: 'Đang thực hiện', Completed: 'Đã hoàn thành', Partial: 'Một phần', Cancelled: 'Đã hủy', Stopped: 'Đã dừng' };
-const appointmentLabels: Record<string, string> = { Confirmed: 'Đã đặt', CheckedIn: 'Đã đến khám', Queued: 'Chờ khám', InProgress: 'Đang khám', Completed: 'Đã hoàn thành', Cancelled: 'Đã hủy', NoShow: 'Không đến' };
-const meals: Record<string, string> = { BeforeMeal: 'Trước ăn', AfterMeal: 'Sau ăn', WithMeal: 'Cùng bữa ăn' };
+const appointmentLabels: Record<string, string> = { Confirmed: 'Đã đặt', CheckedIn: 'Đã đến khám', Queued: 'Chờ khám', ExaminationConfirmed: 'Đã xác nhận phiếu khám', InProgress: 'Đang khám', Completed: 'Đã hoàn thành', Cancelled: 'Đã hủy', NoShow: 'Không đến' };
 
 export default function FamilyRecordSection({ memberId, section, denied }: { memberId: string; section: string; denied: () => void }) {
   const request = useFamilyApi(); const { state, expire } = useCustomerAuth();
@@ -61,7 +60,7 @@ export default function FamilyRecordSection({ memberId, section, denied }: { mem
       { label: 'Kết luận', children: item.conclusion || '—' }, { label: 'Lời dặn', children: item.advice || '—' },
     ]} /> }))} />}
     {section === 'treatment' && (data?.items as Treatment[] | undefined)?.map(item => <Card size="small" key={item.id} title={`${item.code} · ${familyDate(item.startedOn)}`}><p>{item.diagnosis}</p>{item.items.map((line, index) => <p key={index}><strong>{line.serviceName}</strong>{line.region ? ` · ${line.region}` : ''} · {progressLabels[line.progress] ?? line.progress}<br />{familyDate(line.estimatedStart)} – {familyDate(line.estimatedEnd)}</p>)}</Card>)}
-    {section === 'prescriptions' && (data?.items as Prescription[] | undefined)?.map(item => <Card size="small" key={item.id} title={`Đơn ngày ${recordDateTime(item.finalizedAt)}`}><p>{item.diagnosis}</p>{item.lines.map((line, index) => <div className="family-medicine-line" key={index}><Typography.Text strong>{line.medicineName} {line.strength} · {line.quantity} {line.unit}</Typography.Text><p>{line.route} · {line.days} ngày · Sáng {line.morningDose}, trưa {line.noonDose}, chiều {line.afternoonDose}, tối {line.eveningDose} · {meals[line.mealTiming]}</p><p>{line.instructions}</p></div>)}{item.generalAdvice && <p><strong>Lời dặn: </strong>{item.generalAdvice}</p>}</Card>)}
+    {section === 'prescriptions' && (data?.items as Prescription[] | undefined)?.map(item => <Card size="small" key={item.id} title={`Đơn ngày ${familyDate(item.prescribedOn)} · BS ${item.prescriberName}`}>{item.diagnosis && <p>{item.diagnosis}</p>}{item.items.map((line, index) => <div className="family-medicine-line" key={index}><Typography.Text strong>{line.medicineName} {line.strength} · {line.quantity} {line.unit}</Typography.Text>{line.instructions && <p>{line.instructions}</p>}</div>)}{item.advice && <p><strong>Lời dặn: </strong>{item.advice}</p>}</Card>)}
     {section === 'documents' && (data?.items as RecordDocument[] | undefined)?.map(item => <Card size="small" key={item.id}><strong>{item.fileName}</strong><p>{familyDate(item.sourceDate)} · {Math.ceil(item.sizeBytes / 1024)} KB</p><Button loading={download === item.id} disabled={download !== null && download !== item.id} onClick={() => void downloadFile(item)}>Tải tài liệu</Button></Card>)}
     {!!data?.total && <Pagination current={page} pageSize={10} total={data.total} showSizeChanger={false} onChange={setPage} />}
   </div>;

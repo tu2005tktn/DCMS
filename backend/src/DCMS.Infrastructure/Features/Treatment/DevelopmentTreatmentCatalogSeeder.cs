@@ -94,7 +94,7 @@ public sealed class DevelopmentTreatmentCatalogSeeder(DcmsDbContext db, TimeProv
         var addedServices = 0;
         foreach (var s in Services.Where(s => existing.All(x => x.Name != s.Name)))
         {
-            var row = new SchedulingService { BranchId = branch.Id, Name = s.Name, Unit = s.Unit, BillingUnit = s.Unit, PublicDurationMinutes = s.Minutes,
+            var row = new SchedulingService { BranchId = branch.Id, Name = s.Name, Unit = s.Unit, PublicDurationMinutes = s.Minutes,
                 PublicBookable = false, ReferenceUnitPriceVnd = s.Price };
             db.Add(row); existing.Add(row); addedServices++;
         }
@@ -106,15 +106,15 @@ public sealed class DevelopmentTreatmentCatalogSeeder(DcmsDbContext db, TimeProv
         if (refresh)
         {
             var names = Plans.Select(p => p.Name).ToArray();
-            foreach (var old in await db.TreatmentTemplates.Where(x => x.BranchId == branch.Id && x.DefinitionKind == "ItemPlan" && x.DeletedAt == null && names.Contains(x.Name)).ToListAsync(ct))
+            foreach (var old in await db.TreatmentTemplates.Where(x => x.BranchId == branch.Id && x.DeletedAt == null && names.Contains(x.Name)).ToListAsync(ct))
                 old.DeletedAt = clock.GetUtcNow();
             await db.SaveChangesAsync(ct);
         }
-        var planNames = await db.TreatmentTemplates.Where(x => x.BranchId == branch.Id && x.DefinitionKind == "ItemPlan" && x.DeletedAt == null).Select(x => x.Name).ToListAsync(ct);
+        var planNames = await db.TreatmentTemplates.Where(x => x.BranchId == branch.Id && x.DeletedAt == null).Select(x => x.Name).ToListAsync(ct);
         var addedPlans = 0;
         foreach (var plan in Plans.Where(p => !planNames.Contains(p.Name)))
         {
-            var template = new TreatmentTemplate { BranchId = branch.Id, Name = plan.Name, DefinitionKind = "ItemPlan", CreatedBy = creator, CreatedAt = clock.GetUtcNow() };
+            var template = new TreatmentTemplate { BranchId = branch.Id, Name = plan.Name, CreatedBy = creator, CreatedAt = clock.GetUtcNow() };
             db.Add(template); var position = 0;
             foreach (var step in plan.Steps)
             {

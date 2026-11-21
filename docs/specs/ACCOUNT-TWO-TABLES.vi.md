@@ -41,3 +41,24 @@ B?n sao DB ?? ch?y Up/Down v? ??i chi?u 1.276 d?ng c?a 15 b?ng ngu?n: s? l??ng v
 - C?c ki?m tra m?i bao ph? Identity claims/logins/tokens/role claims, gi? d? li?u qua Up/Down, x?a g?n nh?m v?n gi? t?i kho?n v? nh?n vi?n, t? ch?i ghi ?? t?i kho?n c?, refresh ??ng th?i ch? xoay m?t l?n, ph?t hi?n d?ng l?i thu h?i m?i phi?n, heartbeat idempotent v? thu h?i khi h?t h?n kh?ng ho?t ??ng.
 - API ch?y tr?n c?ng 5080. `/health` x?c nh?n API v? database healthy. ??ng nh?p t?i kho?n demo hi?n c?, ??c `/api/auth/me`, ??ng xu?t v? x?c nh?n token c? b? t? ch?i ?? th?nh c?ng tr?n DB ph?t tri?n; kh?ng l?u token ho?c m?t kh?u trong b?o c?o.
 - N?m database b?n sao t?m ?? ???c x?a; gi? b?n sao l?u v? manifest ki?m ch?ng ngo?i Git.
+
+## Cập nhật rút gọn ngày 18/11/2026 (`USER_ACCOUNT`: 37 -> 18 cột)
+
+- Gom `SecurityStamp`, `PhoneNumberConfirmed`, `TwoFactorEnabled`, `LockoutEnd`, `LockoutEnabled`, `AccessFailedCount` cùng 7 collection (`Claims`, `Logins`, `IdentityTokens`, `Sessions` gồm `RefreshTokens`, `EmailVerifications`, `Recoveries`, `RecoveryDeliveries`) vào cột `AuthData` (`jsonb`).
+- Loại bỏ `ConcurrencyStamp`, `NormalizedUserName`, `NormalizedEmail`, `NormalizedPhone`, `GoogleSubject`, `EmployeeFullName`, `AccessVersion`. Tính duy nhất không phân biệt hoa thường cho `UserName`/`Email` và số điện thoại chuẩn hóa được bảo vệ bằng 3 functional unique index (`UserNameIndex`, `EmailIndex`, `IX_USER_ACCOUNT_NormalizedPhone`).
+- `EmployeeProfile` chia sẻ cột `FullName` với `ApplicationUser` và giữ `EmployeeCode` làm cột phân biệt; `StaffAccessAssignment` đọc/trả `Version` của tài khoản.
+- `Version` trở thành phiên bản nghiệp vụ quản trị thuần túy (`IsConcurrencyToken(false)`); đồng thời ghi ở cấp DB được bảo vệ bởi cột hệ thống ẩn `xmin` (`attnum = -2`, `.IsRowVersion()`) trên cả 3 thực thể dùng chung `USER_ACCOUNT`. Xem [rút gọn 9 bảng còn lại](./REMAINING-NINE-TABLES-SIMPLIFICATION.vi.md).
+
+## Cập nhật rút gọn ngày 18/11/2026 (`ACCESS_GROUP`: 14 -> 10 cột)
+
+- Loại bỏ `NormalizedCode`, `NormalizedName` (thay bằng functional unique index `IX_ACCESS_GROUP_RecordKind_Code_Upper` và `IX_ACCESS_GROUP_RecordKind_Name_Upper`).
+- Loại bỏ `RoleConcurrencyStamp` (dùng `Version.ToString()` làm `ConcurrencyStamp` cho `IdentityRole`).
+- Gộp `RoleClaims` vào cột `Grants` (`jsonb`) qua ánh xạ value converter/comparer `AccessGroupGrant` (`GroupId`, `Permission`, `ClaimId?`, `ClaimValue?`). Xem [rút gọn 8 bảng ít cột còn lại](./REMAINING-EIGHT-SMALL-TABLES-SIMPLIFICATION.vi.md).
+
+## Sửa dữ liệu ngày 19/11/2026: mốc thời gian vô cực trong `AuthData.Sessions`
+
+- Lỗi: đăng nhập trả 503 vì `System.Text.Json` không đọc được `"-infinity"` thành `DateTimeOffset` (`$.Sessions[n].LastInteractiveActivityAt`). `UserManager.FindByNameAsync` nạp toàn bộ `AuthData` nên một phiên hỏng chặn đăng nhập của cả tài khoản.
+- Nguồn gốc: migration `S58StaffIdleRuntime` thêm cột `AUTH_SESSION.LastInteractiveActivityAt` với mặc định `DateTimeOffset.MinValue`, PostgreSQL lưu thành `-infinity` cho các phiên đã có. Migration `ConsolidateAccountStorage` chuyển phiên vào JSON bằng `to_jsonb`, ghi nguyên chuỗi `"-infinity"`. Một số phiên cũ cũng có `LastSeenAt = "-infinity"`.
+- Bất biến: mọi mốc thời gian trong `AuthData` (kể cả `Sessions[].RefreshTokens[]`) phải là chuỗi ISO-8601 hữu hạn; không được có `"infinity"`/`"-infinity"`.
+- Migration chỉ sửa dữ liệu `RepairInfiniteSessionTimestamps` (không đổi schema) thay thế trong mỗi phiên: `LastSeenAt` vô cực lấy `CreatedAt`; `LastInteractiveActivityAt` vô cực lấy `LastSeenAt` (sau khi sửa), nếu không có thì `CreatedAt`. Các trường thời gian vô cực khác trong phiên/refresh token còn sót lại lấy `CreatedAt` của phiên; nếu chính `CreatedAt` hỏng thì dùng `1970-01-01T00:00:00+00:00` để phiên chắc chắn hết hạn. Phiên hợp lệ giữ nguyên. Migration idempotent, chạy tự động khi deploy (`migrate`). `Down` không khôi phục giá trị vô cực.
+- Các phiên bị ảnh hưởng đều đã cũ nên sau khi sửa vẫn hết hạn theo chính sách idle/refresh hiện tại; không phiên nào được hồi sinh.

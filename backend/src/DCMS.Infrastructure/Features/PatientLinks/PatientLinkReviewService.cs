@@ -12,7 +12,7 @@ using static DCMS.Infrastructure.Features.PatientLinks.PatientLinkSupport;
 namespace DCMS.Infrastructure.Features.PatientLinks;
 
 // S08: only an active Clinic Assistant with an employee profile decides; every decision rechecks state in one transaction.
-public sealed class PatientLinkReviewService(DcmsDbContext db, UserManager<ApplicationUser> users) : IPatientLinkReviewService
+public sealed class PatientLinkReviewService(DcmsDbContext db, UserManager<ApplicationUser> users, DCMS.Application.Features.Settings.ISettingsAccess access) : IPatientLinkReviewService
 {
     public async Task<LinkQueuePage> QueueAsync(string? status, DateOnly? from, DateOnly? to, string? keyword,
         int page, int pageSize, CancellationToken ct)
@@ -40,9 +40,9 @@ public sealed class PatientLinkReviewService(DcmsDbContext db, UserManager<Appli
         if (term != null)
         {
             var upper = term.ToUpperInvariant();
-            query = query.Where(x => x.link.RequestCode.Contains(upper) || x.user.NormalizedUserName!.Contains(upper)
+            query = query.Where(x => x.link.RequestCode.Contains(upper) || (x.user.UserName != null && x.user.UserName.ToUpper().Contains(upper))
                 || x.user.FullName.ToUpper().Contains(upper) || x.link.DeclaredFullName.ToUpper().Contains(upper)
-                || (x.user.NormalizedEmail != null && x.user.NormalizedEmail.Contains(upper))
+                || (x.user.Email != null && x.user.Email.ToUpper().Contains(upper))
                 || (x.user.PhoneNumber != null && x.user.PhoneNumber.Contains(term)));
         }
         var total = await query.CountAsync(ct);
@@ -172,7 +172,8 @@ public sealed class PatientLinkReviewService(DcmsDbContext db, UserManager<Appli
     private async Task<EmployeeProfile> RequireAssistantAsync(int actorId, CancellationToken ct)
     {
         var actor = await db.Users.AsNoTracking().SingleOrDefaultAsync(x => x.Id == actorId && x.IsActive && x.AccountType == "Staff", ct);
-        if (actor == null || !await users.IsInRoleAsync(actor, AccountRoles.ClinicAssistant)) throw Forbidden();
+        // Staff in an access group verify through patient-links.* grants (enforced per endpoint), not their role.
+        if (actor == null || !(await access.ResolveAsync(actorId, ct)).GrantDriven && !await users.IsInRoleAsync(actor, AccountRoles.ClinicAssistant)) throw Forbidden();
         return await db.Employees.AsNoTracking().SingleOrDefaultAsync(x => x.AccountId == actorId, ct) ?? throw Forbidden();
     }
 

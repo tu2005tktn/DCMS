@@ -24,7 +24,7 @@ public static class MaterialStock
     }
 
     /// <summary>Replaces the activity's usage lines. null = keep as is. Throws 409 MATERIAL_STOCK_INSUFFICIENT when stock is short.</summary>
-    public static async Task ReplaceAsync(DcmsDbContext db, TimeProvider clock, Guid activityId, int patientId, int branchId, Guid? dossierId,
+    public static async Task ReplaceAsync(DcmsDbContext db, Guid activityId,
         DateTimeOffset usedAt, int? actorId, IReadOnlyList<MaterialUseLine>? lines, CancellationToken ct)
     {
         if (lines is null) return;
@@ -47,11 +47,9 @@ public static class MaterialStock
             throw Fail(MaterialStockMessages.Insufficient(text));
         }
         db.MaterialUsages.RemoveRange(old);
-        var now = clock.GetUtcNow();
         foreach (var l in lines)
-            db.MaterialUsages.Add(new MaterialUsage { ActivityId = activityId, MaterialId = l.MaterialId, MaterialName = items[l.MaterialId].Name,
-                UsageUnit = items[l.MaterialId].UsageUnit, Quantity = l.Quantity, PatientId = patientId, BranchId = branchId, DossierId = dossierId,
-                UsedAt = usedAt, RecordedBy = actorId, CreatedAt = now });
+            db.MaterialUsages.Add(new MaterialUsage { ActivityId = activityId, MaterialId = l.MaterialId,
+                Quantity = l.Quantity, UsedAt = usedAt, RecordedBy = actorId });
     }
 
     public static async Task ReleaseAsync(DcmsDbContext db, Guid activityId, CancellationToken ct)

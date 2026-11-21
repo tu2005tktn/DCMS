@@ -1,8 +1,8 @@
 // S60 Chăm sóc khách hàng. Contract: docs/specs/S60-CUSTOMER-CARE-WEB.vi.md §6.
 export type CareStatus = 'Open' | 'InProgress' | 'Done' | 'Cancelled';
 export type StatusFilter = CareStatus | 'Pending';
-export type CareTask = { id: string; patientId: number; branchId: number; instructionId: string | null; appointmentId: string | null;
-  reviewId: string | null; type: string; content: string; ownerAccountId: number | null; dueAt: string; status: CareStatus; version: number;
+export type CareTask = { id: string; patientId: number; branchId: number; appointmentId: string | null;
+  type: string; content: string; ownerAccountId: number | null; dueAt: string; status: CareStatus; version: number;
   allowedActions: string[] };
 export type CareWorklistItem = { task: CareTask; branchName: string; patientCode: string; patientName: string; phone: string | null; typeName: string;
   ownerName: string | null; lastContactResult: string | null; lastContactAt: string | null };
@@ -15,7 +15,7 @@ export type CareOptions = { clinicDate: string; actorAccountId: number; allBranc
 export type CarePatient = { patientId: number; patientCode: string; fullName: string; phone: string | null; lastVisitAt: string };
 export type ContactAttempt = { id: string; taskId: string; channel: string; result: string; nextAction: string | null;
   rebookedAppointmentId: string | null; actorId: number; occurredAt: string };
-export type CareTaskDetail = { task: CareTask; contacts: ContactAttempt[]; escalations: unknown[] };
+export type CareTaskDetail = { task: CareTask; contacts: ContactAttempt[] };
 export type WorklistFilter = { branchId?: number; from: string; to: string; ownerAccountId?: number; type?: string; status?: StatusFilter; search?: string };
 
 export const statusLabels: Record<CareStatus, string> = { Open: 'Mở', InProgress: 'Đang xử lý', Done: 'Đã xong', Cancelled: 'Đã hủy' };

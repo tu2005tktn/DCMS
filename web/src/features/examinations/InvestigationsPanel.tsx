@@ -28,7 +28,7 @@ export default function InvestigationsPanel({ workspace, contexts, busy, onBusy,
   const active = useRef(true), pending = useRef<{ fingerprint: string; key: string } | undefined>(undefined);
   const orders = workspace.investigations ?? [];
   const visitId = workspace.visit.visitId;
-  const amendmentOrder = amending && workspace.examination?.confirmed === true && workspace.visit.status === 'InProgress' && workspace.allowedActions.includes('amend');
+  const amendmentOrder = amending && workspace.visit.status === 'ExaminationConfirmed' && workspace.allowedActions.includes('amend');
   const canCreate = workspace.allowedActions.includes('save') || amendmentOrder;
   useEffect(() => { active.current = true; return () => { active.current = false; }; }, []);
   async function load(mutation = false) {
@@ -74,7 +74,7 @@ export default function InvestigationsPanel({ workspace, contexts, busy, onBusy,
     </Space>
     {error && !mode && <Alert role="alert" type="error" showIcon message={error} />}
     {workspace.examination?.confirmed && workspace.visit.status === 'Completed' && <Alert type="info" message="Lượt khám đã kết thúc. Có thể đính chính hồ sơ cũ; cần tạo lượt khám mới để lập chỉ định mới." />}
-    {workspace.examination?.confirmed && workspace.visit.status === 'InProgress' && !amending && workspace.allowedActions.includes('amend') && <Alert type="info" message="Để bổ sung chỉ định, vào Tổng kết khám và bấm Đính chính kết quả." />}
+    {workspace.visit.status === 'ExaminationConfirmed' && !amending && workspace.allowedActions.includes('amend') && <Alert type="info" message="Để bổ sung chỉ định, vào Tổng kết khám và bấm Đính chính kết quả." />}
     {amendmentOrder && <Alert type="info" message="Chỉ định bổ sung được lưu ngay. Hủy đính chính không tự hủy chỉ định đã tạo." />}
     {!orders.length && <Empty description="Chưa có chỉ định. Tạo khi bác sĩ cần thêm kết quả để đánh giá." />}
     {orders.map(order => <Card key={order.id} size="small" className="investigation-card" title={<Space wrap><span>{order.name}</span><Tag color={order.state === 'Reviewed' ? 'green' : order.state === 'Cancelled' ? 'default' : 'gold'}>{stateLabels[order.state]}</Tag>{order.requiredForDiagnosis && order.state !== 'Cancelled' && <Tag>Cần để kết luận</Tag>}</Space>}>

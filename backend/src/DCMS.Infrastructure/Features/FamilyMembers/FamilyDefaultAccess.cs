@@ -25,10 +25,10 @@ public sealed partial class FamilyRecordService
             where appointment.BookerAccountId == actor && appointment.FamilyMemberId == memberId
                 && appointment.PatientId == patient.Id && appointment.BranchId == visit.BranchId
                 && visit.Status != VisitStatuses.Cancelled && !patient.IsArchived && recorder.AccountType == "Staff"
-            orderby visit.RecordedAt descending, visit.Id
+            orderby visit.ArrivalAt descending, visit.Id
             select new { AppointmentId = appointment.Id, VisitId = visit.Id, visit.RecordedBy, visit.BranchId, patient.Id,
                 PatientName = patient.FullName, PatientBirthDate = patient.BirthDate, patient.PatientCode,
-                appointment.AttendeeName, appointment.AttendeeBirthDate }).ToArrayAsync(ct);
+                appointment.AttendeeName, appointment.BookingInfo.AttendeeBirthDate }).ToArrayAsync(ct);
         var name = PatientLinkSupport.NormalizeName(member.FullName);
         var matching = links.Where(x => PatientLinkSupport.NormalizeName(x.PatientName) == name
             && PatientLinkSupport.NormalizeName(x.AttendeeName) == name
