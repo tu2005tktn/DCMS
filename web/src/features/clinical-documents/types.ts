@@ -42,7 +42,7 @@ export type DocumentPage = {
 export type DocumentHistoryEntry = { action: string; actorName: string; occurredAt: string; note?: string | null };
 export type PatientDocumentContexts = {
   patient: { id: number; patientCode: string; fullName: string; birthDate: string | null };
-  visits: { id: string; label: string; date: string }[];
+  visits: { id: string; label: string; date: string; acceptsUpload?: boolean }[];
   dossiers: { id: string; label: string }[];
 };
 export type DocumentQuery = {

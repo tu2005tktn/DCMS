@@ -14,13 +14,13 @@ Trình duyệt (máy trong VPN)
   api (ASP.NET Core .NET 10, cổng 8080 nội bộ, ASPNETCORE_ENVIRONMENT=Production)
         │
         ├── postgres (postgres:17-alpine, chỉ trong mạng Docker)
-        └── clamav (tùy chọn, profile `antivirus`; mặc định tắt)
+        └── ai (tùy chọn, profile `ai`; AI X-quang chạy CPU, weights ở /opt/dcms/ai-models)
 ```
 
 - Web và API dùng **cùng origin**: SPA được build với `VITE_API_BASE_URL=""`, nên mọi request đi tới `/api`, `/hubs`, `/health` trên chính host và được nginx chuyển tới API. Không cần CORS cho web.
 - `Cors__AllowedOrigins__0` vẫn được đặt bằng URL công khai của web, vì PayOS dùng giá trị này làm URL quay lại.
-- Chỉ cổng 80 (web) mở ra ngoài. PostgreSQL, API và ClamAV (nếu bật) không publish cổng.
-- Dữ liệu bền vững nằm trong Docker volume: `dcms_postgres_data`, `dcms_clinical_documents`, `dcms_branch_assets`, `dcms_clamav_data`.
+- Chỉ cổng 80 (web) mở ra ngoài. PostgreSQL, API và AI (nếu bật) không publish cổng.
+- Dữ liệu bền vững nằm trong Docker volume: `dcms_postgres_data`, `dcms_clinical_documents`, `dcms_branch_assets`.
 
 ## Tệp liên quan
 
@@ -29,7 +29,7 @@ Trình duyệt (máy trong VPN)
 | `backend/Dockerfile` | Build và publish `DCMS.Api` (SDK 10.0 → runtime aspnet 10.0) |
 | `web/Dockerfile` | Build SPA bằng Node rồi phục vụ bằng nginx |
 | `web/nginx.conf` | SPA fallback + reverse proxy `/api`, `/hubs`, `/health` |
-| `infrastructure/docker/compose.prod.yaml` | Stack production: postgres, api, web, clamav (tùy chọn), cùng các job `migrate`/`seed`; image lấy từ `ghcr.io` |
+| `infrastructure/docker/compose.prod.yaml` | Stack production: postgres, api, web, ai (tùy chọn), cùng các job `migrate`/`seed`; image lấy từ `ghcr.io` |
 | `.github/workflows/deploy-server.yml` | Build image trên GitHub, đẩy lên `ghcr.io`, server kéo về và chạy |
 | `infrastructure/docker/.env.production.example` | Mẫu biến môi trường production |
 
@@ -73,7 +73,7 @@ push/merge vào main
        ghcr.io/tu2005tktn/dcms-web:<commit>, :latest
   └─ job deploy (self-hosted runner dcms-server trên máy chủ, nhãn dcms-prod; chỉ chạy khi build thành công)
        docker login ghcr.io bằng GITHUB_TOKEN của chính lần chạy (chỉ quyền đọc package)
-       → gỡ ClamAV nếu đang tắt → pull api, web → up -d --wait postgres → job migrate
+       → pull api, web → up -d --wait postgres → job migrate
        → up -d --remove-orphans → chờ /health → docker logout → dọn image cũ
 ```
 
@@ -93,14 +93,9 @@ push/merge vào main
 - Server có swap 4 GB (`/swapfile`, khai báo trong `/etc/fstab`, `vm.swappiness=10` trong `/etc/sysctl.d/99-swap.conf`), tạo ngày 19/11/2026.
 - `backend/Dockerfile` build bằng một tiến trình MSBuild, **không giới hạn GC heap**: giới hạn 1 GB đặt ngày 18/11/2026 làm trình biên dịch C# hết bộ nhớ (`OutOfMemoryException` khi build `DCMS.Infrastructure`, lần chạy ngày 19/11/2026). Build API cần khoảng 1,5–2 GB RAM nên chỉ build trên runner của GitHub, không build trên server. `web/Dockerfile` giữ giới hạn Node heap 1 GB.
 
-## Quét virus tệp tải lên (ClamAV) — mặc định tắt (18/11/2026)
+## Quét virus tệp tải lên — đã gỡ ClamAV (20/11/2026)
 
-ClamAV nạp cơ sở dữ liệu mẫu virus vào RAM (1,2–1,5 GB, lên ~2,5 GB khi cập nhật), là thành phần tốn RAM nhất trên server 3,8 GB và góp phần làm máy treo. Production mặc định chạy **không có ClamAV**:
-
-- `CLINICAL_ANTIVIRUS=Disabled` (mặc định trong compose) đặt `ClinicalDocuments__Antivirus=Disabled` cho API: tệp hợp lệ chuyển Ready ngay, audit ghi `ScanSkipped`. Kiểm tra MIME/extension/chữ ký nội dung/kích thước vẫn áp dụng. Xem [S19/S20](../specs/S19-S20-DCMS-112.md#chế-độ-quét-virus-tùy-chọn-18112026).
-- Service `clamav` chỉ chạy khi bật profile `antivirus`.
-- Bật lại khi server đủ RAM (khuyến nghị 8 GB): trong `/opt/dcms/.env` đặt `CLINICAL_ANTIVIRUS=ClamAv` và thêm `antivirus` vào `COMPOSE_PROFILES` (ví dụ `public,antivirus`), rồi chạy lại deploy.
-- Pipeline deploy tự dừng và xóa container `clamav` (trước bước build, để giải phóng RAM) khi `.env` không đặt `CLINICAL_ANTIVIRUS=ClamAv`. Tắt bằng tay: `docker compose ... --profile antivirus rm -sf clamav` (phải nêu profile, nếu không compose bỏ qua service `clamav`). Volume `dcms_clamav_data` có thể xóa để lấy lại đĩa.
+ClamAV đã bị gỡ khỏi hệ thống (service, cấu hình, biến môi trường, bước pipeline). Tệp tải lên qua kiểm tra MIME/extension/chữ ký/kích thước thì Ready ngay, audit `ScanSkipped`. Chi tiết: `docs/specs/S19-S20-DCMS-112.md` mục "Bỏ quét virus ClamAV". Trên server có thể xóa volume cũ để lấy lại đĩa: `docker volume rm dcms_clamav_data` (nếu còn).
 
 ## Public ra Internet (Cloudflare Tunnel)
 
@@ -113,4 +108,15 @@ ClamAV nạp cơ sở dữ liệu mẫu virus vào RAM (1,2–1,5 GB, lên ~2,5 
 - Trong VPN chỉ có HTTP; HTTPS công khai do Cloudflare đảm nhận.
 - Server đang chứa dữ liệu demo (`seed`). Trước khi dùng dữ liệu bệnh nhân thật cần đổi mật khẩu các tài khoản demo hoặc dựng database mới không seed.
 - Khi chưa cấu hình SMTP, Production không có adapter gửi email: xác nhận email/khôi phục mật khẩu sẽ báo lỗi gửi.
-- ClamAV (khi bật) cần khoảng 1–1,5 GB RAM và tải chữ ký virus khi khởi động lần đầu; trong lúc đó tệp tải lên ở trạng thái PendingScan.
+
+
+## AI X-quang trên server (profile `ai`, 20/11/2026)
+
+Chi tiết hợp đồng: `docs/specs/AI-CARIES-DETECTION.vi.md` mục 10. Image `dcms-ai` build trên GitHub; server không build.
+
+1. Chép weights lên server (từ máy có file, qua WireGuard): `scp recommended_caries_best.pt <user>@<IP server>:/opt/dcms/ai-models/`. Thư mục cần đọc được bởi user trong container (ví dụ `chmod 755` thư mục, `644` tệp).
+2. Trong `/opt/dcms/.env`: thêm `ai` vào `COMPOSE_PROFILES` (ví dụ `public,ai`), đặt `DENTAL_AI_BASE_URL=http://ai:8090`, `DENTAL_AI_API_KEY=$(openssl rand -hex 32)`.
+3. Chạy lại workflow Deploy server (hoặc merge tiếp vào `main`). Pipeline chỉ kéo image `dcms-ai` khi profile `ai` đang bật.
+4. Kiểm tra: `docker compose -p dcms --env-file /opt/dcms/.env -f infrastructure/docker/compose.prod.yaml exec ai python -c "import urllib.request;print(urllib.request.urlopen('http://localhost:8090/health').read().decode())"` phải trả `"status":"ok"`, `"device":"cpu"`.
+
+RAM: service giới hạn `AI_MEMORY_LIMIT=1500m`, `AI_CPU_THREADS=2`.

@@ -13,6 +13,7 @@ export type DocumentsApi = {
   upload: (metadata: UploadMetadata, file: File, onProgress: (percent: number) => void, signal: AbortSignal) => Promise<DocumentItem>;
   content: (documentId: string, disposition: 'inline' | 'attachment') => Promise<Blob>;
   analyze: (documentId: string, requestKey: string) => Promise<AiAnalysis>;
+  remove: (documentId: string, expectedVersion: number, reason: string, requestKey: string) => Promise<void>;
 };
 
 const base = (import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5080').replace(/\/$/, '');
@@ -32,6 +33,8 @@ const httpDocumentsApi: DocumentsApi = {
   },
   detail: id => api(`/api/clinical-documents/${encodeURIComponent(id)}`),
   history: id => api(`/api/clinical-documents/${encodeURIComponent(id)}/history`),
+  remove: (id, expectedVersion, reason, requestKey) => api(`/api/clinical-documents/${encodeURIComponent(id)}/delete`,
+    { method: 'POST', body: JSON.stringify({ expectedVersion, reason, requestKey }) }),
   analyze: (id, requestKey) => api(`/api/clinical-documents/${encodeURIComponent(id)}/ai-analyses`, { method: 'POST', body: JSON.stringify({ requestKey }) }),
   // XHR rather than fetch so each file reports its own upload progress.
   upload: (metadata, file, onProgress, signal) => new Promise<DocumentItem>((resolve, reject) => {

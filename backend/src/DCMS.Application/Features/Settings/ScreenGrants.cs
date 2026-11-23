@@ -21,6 +21,7 @@ public static class ScreenGrants
         new("documents.read", "Xem hình ảnh và tài liệu", null, "examinations.read"),
         new("documents.upload", "Tải tài liệu lên hồ sơ", null, "documents.read"),
         new("documents.review", "Đọc và xác nhận tài liệu lâm sàng", AccountRoles.Dentist, "documents.read"),
+        new("documents.delete", "Xóa hình ảnh / tài liệu", null, "documents.read"),
         new("investigations.results.receive", "Nhận kết quả cận lâm sàng", null, "examinations.read"),
         new("prescriptions.read", "Xem đơn thuốc", AccountRoles.Dentist, "examinations.read"),
         new("prescriptions.manage", "Kê và sửa đơn thuốc", AccountRoles.Dentist, "prescriptions.read"),
