@@ -14,7 +14,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace DCMS.Infrastructure.Features.Treatment;
 
-public sealed class ItemPlanService(DcmsDbContext db, UserManager<ApplicationUser> users, TimeProvider clock) : IItemPlanService
+public sealed class ItemPlanService(DcmsDbContext db, UserManager<ApplicationUser> users, TimeProvider clock, DCMS.Application.Features.Settings.ISettingsAccess access) : IItemPlanService
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     private static BusinessException Missing() => new(404, SystemMessages.Get("MSG113"));
@@ -23,11 +23,15 @@ public sealed class ItemPlanService(DcmsDbContext db, UserManager<ApplicationUse
     private async Task Authorize(int actor, int branch, CancellationToken ct)
     {
         var account = await users.FindByIdAsync(actor.ToString());
+        // Staff in an access group act through treatment.templates.* grants within assignment branches, not their role.
+        var scope = account?.AccountType == "Staff" ? await access.ResolveAsync(actor, ct) : null;
+        var grantDriven = scope?.GrantDriven ?? false;
         if (account is not { IsActive: true, AccountType: "Staff" }
-            || !AccountRoles.Effective(await users.GetRolesAsync(account)).Contains(AccountRoles.Dentist)
+            || grantDriven && !scope!.BranchIds.Contains(branch)
+            || !grantDriven && !AccountRoles.Effective(await users.GetRolesAsync(account)).Contains(AccountRoles.Dentist)
             || !await (from m in db.SchedulingMembers join e in db.Employees on m.EmployeeId equals e.Id
                 join b in db.Set<SchedulingBranch>() on m.BranchId equals b.Id
-                where e.AccountId == actor && b.Id == branch && b.Active && m.Active && m.CanDentist select m).AnyAsync(ct))
+                where e.AccountId == actor && b.Id == branch && b.Active && m.Active && (m.CanDentist || grantDriven) select m).AnyAsync(ct))
             throw new BusinessException(403, SystemMessages.Get("MSG06"));
     }
     private async Task<TreatmentTemplate> Find(Guid id, CancellationToken ct, bool includeDeleted = false) =>

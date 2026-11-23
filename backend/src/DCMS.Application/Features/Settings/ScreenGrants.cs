@@ -21,6 +21,7 @@ public static class ScreenGrants
         new("documents.read", "Xem hình ảnh và tài liệu", null, "examinations.read"),
         new("documents.upload", "Tải tài liệu lên hồ sơ", null, "documents.read"),
         new("documents.review", "Đọc và xác nhận tài liệu lâm sàng", AccountRoles.Dentist, "documents.read"),
+        new("documents.delete", "Xóa hình ảnh / tài liệu", null, "documents.read"),
         new("investigations.results.receive", "Nhận kết quả cận lâm sàng", null, "examinations.read"),
         new("prescriptions.read", "Xem đơn thuốc", AccountRoles.Dentist, "examinations.read"),
         new("prescriptions.manage", "Kê và sửa đơn thuốc", AccountRoles.Dentist, "prescriptions.read"),
@@ -78,6 +79,7 @@ public static class ScreenGrants
     {
         bool Has(params string[] values) => roles.Any(values.Contains);
         if (permission.StartsWith("materials.")) return Has(AccountRoles.ClinicOwner, AccountRoles.Admin, AccountRoles.Dentist);
+        if (permission == "finance.statistics.read") return Has(AccountRoles.ClinicOwner);
         if (permission == "finance.work-statistics.read") return Has(AccountRoles.ClinicOwner, AccountRoles.Admin, AccountRoles.Dentist, AccountRoles.ClinicAssistant);
         if (permission is "settings.general.read" or "settings.general.manage") return Has(AccountRoles.ClinicOwner, AccountRoles.Admin);
         if (permission.StartsWith("catalog.") && SupplyKinds.Any(kind => permission.StartsWith($"catalog.{kind}.")))

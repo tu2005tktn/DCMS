@@ -12,7 +12,7 @@ type Statistics = {
   remainingReceivableVnd: number;
   materialPurchaseVnd: number;
   profitVnd: number;
-  profitableDossierCount: number;
+  treatmentSessionCount: number;
   outstandingDossiers: OutstandingDossier[];
   serviceDossiers?: ServiceDossier[];
   actualPayments?: PaymentEntry[];
@@ -121,7 +121,7 @@ export default function FinanceStatisticsPage() {
     const s = data ?? {
       serviceAmountVnd: 0, actualReceivedVnd: 0, advanceReceivedVnd: 0,
       remainingReceivableVnd: 0, materialPurchaseVnd: 0, profitVnd: 0,
-      profitableDossierCount: 0, outstandingDossiers: [],
+      treatmentSessionCount: 0, outstandingDossiers: [],
     };
     return [
       { key: 'service' as DetailModalKind, label: 'Số tiền cần thu dịch vụ', short: 'Cần thu DV', value: s.serviceAmountVnd, color: '#1677ff', bg: '#eff8ff', count: `${(s.serviceDossiers ?? []).length} phiếu` },
@@ -129,7 +129,7 @@ export default function FinanceStatisticsPage() {
       { key: 'advance' as DetailModalKind, label: 'Tiền nhận trước', short: 'Nhận trước', value: s.advanceReceivedVnd, color: '#06aed4', bg: '#ecfdff', count: `${(s.advanceEntries ?? []).length} biến động` },
       { key: 'outstanding' as DetailModalKind, label: 'Tiền còn cần thu', short: 'Còn cần thu', value: s.remainingReceivableVnd, color: '#f79009', bg: '#fffaeb', count: `${(s.outstandingDossiers ?? []).length} phiếu nợ` },
       { key: 'materials' as DetailModalKind, label: 'Tiền dụng cụ vật liệu', short: 'Vật liệu', value: s.materialPurchaseVnd, color: '#7a5af8', bg: '#f4f3ff', count: `${(s.materialPurchases ?? []).length} lần nhập` },
-      { key: 'profit' as DetailModalKind, label: 'Lãi', short: 'Lãi ròng', value: s.profitVnd, color: s.profitVnd >= 0 ? '#16a34a' : '#ef4444', bg: s.profitVnd >= 0 ? '#f0fdf4' : '#fef2f2', count: `${s.profitableDossierCount ?? 0} phiếu hoàn tất` },
+      { key: 'profit' as DetailModalKind, label: 'Lãi', short: 'Lãi theo buổi', value: s.profitVnd, color: s.profitVnd >= 0 ? '#16a34a' : '#ef4444', bg: s.profitVnd >= 0 ? '#f0fdf4' : '#fef2f2', count: `${s.treatmentSessionCount ?? 0} ngày điều trị` },
     ];
   }, [data]);
 
@@ -141,7 +141,7 @@ export default function FinanceStatisticsPage() {
     return service > 0 ? Math.min(100, Math.round((paid / service) * 100)) : 0;
   }, [data]);
   const profitMargin = useMemo(() => {
-    const actual = data?.actualReceivedVnd ?? 0;
+    const actual = (data?.profitEntries ?? []).reduce((total, entry) => total + entry.revenueVnd, 0);
     const profit = data?.profitVnd ?? 0;
     return actual > 0 ? Math.round((profit / actual) * 100) : 0;
   }, [data]);
@@ -171,14 +171,14 @@ export default function FinanceStatisticsPage() {
 
   return <div className="system-settings-page">
     <Typography.Title level={2}>Thống kê tài chính</Typography.Title>
-    <Typography.Paragraph type="secondary">Lọc phiếu điều trị theo ngày mở phiếu. Tiền dụng cụ vật liệu là tổng giá trị nhập hàng trong khoảng ngày được chọn của toàn phòng khám, vì dữ liệu nhập hàng chưa tách theo chi nhánh. Lãi chỉ ghi nhận khi phiếu đã phân bổ đủ tiền; tổng tiền nhập hàng được trừ một lần.</Typography.Paragraph>
+    <Typography.Paragraph type="secondary">Khoảng ngày lọc lãi theo ngày thực hiện điều trị, các chỉ số phiếu theo ngày mở phiếu và vật liệu theo ngày nhập. Lãi của từng buổi dùng số tiền khách đã thanh toán hoặc tiền cọc đã phân bổ cho việc làm trong buổi, trừ phí labo; tiền nhập vật liệu của toàn phòng khám được trừ một lần.</Typography.Paragraph>
     <Space wrap style={{ marginBottom: 20 }}>
-      <DatePicker aria-label="Từ ngày mở phiếu" placeholder="Từ ngày mở phiếu" format="DD/MM/YYYY" value={from ? dayjs(from) : null} onChange={value => {
+      <DatePicker aria-label="Từ ngày" placeholder="Từ ngày" format="DD/MM/YYYY" value={from ? dayjs(from) : null} onChange={value => {
         const next = value?.format('YYYY-MM-DD');
         setFrom(next);
         if (next && to && next > to) setTo(undefined);
       }} />
-      <DatePicker aria-label="Đến ngày mở phiếu" placeholder="Đến ngày mở phiếu" format="DD/MM/YYYY" value={to ? dayjs(to) : null} minDate={from ? dayjs(from) : undefined} onChange={value => setTo(value?.format('YYYY-MM-DD'))} />
+      <DatePicker aria-label="Đến ngày" placeholder="Đến ngày" format="DD/MM/YYYY" value={to ? dayjs(to) : null} minDate={from ? dayjs(from) : undefined} onChange={value => setTo(value?.format('YYYY-MM-DD'))} />
       {canPickBranch && branches.length > 1 && <Select allowClear aria-label="Chi nhánh" placeholder="Tất cả chi nhánh" style={{ minWidth: 200 }} value={branchId} onChange={setBranchId} options={branches.map(branch => ({ value: branch.id, label: branch.name }))} />}
       <Button onClick={() => setRevision(value => value + 1)}>Tải lại</Button>
     </Space>
@@ -327,7 +327,7 @@ export default function FinanceStatisticsPage() {
             </div>
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
-                <Typography.Text type="secondary">Tỷ suất lợi nhuận trên thực thu</Typography.Text>
+                <Typography.Text type="secondary">Tỷ suất lãi trên tiền đã thanh toán cho buổi điều trị</Typography.Text>
                 <Typography.Text strong style={{ color: profitMargin >= 0 ? '#16a34a' : '#ef4444' }}>{profitMargin}%</Typography.Text>
               </div>
               <Progress percent={Math.min(100, Math.max(0, Math.abs(profitMargin)))} showInfo={false} strokeColor={profitMargin >= 0 ? '#16a34a' : '#ef4444'} trailColor="#f2f4f7" size="small" />
@@ -406,15 +406,16 @@ export default function FinanceStatisticsPage() {
         ]} />
     </Modal>
 
-    <Modal title="Chi tiết các khoản tính lãi" open={activeModal === 'profit'} onCancel={() => setActiveModal(undefined)} footer={null} width={920}>
+    <Modal title="Lãi theo từng ngày điều trị" open={activeModal === 'profit'} onCancel={() => setActiveModal(undefined)} footer={null} width={920}>
+      <Typography.Paragraph type="secondary">Mỗi dòng gom việc điều trị của một phiếu trong một ngày vì dữ liệu hiện chưa lưu mã buổi trên từng việc đã làm. Lãi = tiền khách đã thanh toán cho việc điều trị và labo trừ phí labo. Tiền cọc chỉ được tính khi đã phân bổ; chi phí mua vật liệu được trừ một lần cho toàn phòng khám.</Typography.Paragraph>
       <Table rowKey="id" dataSource={data?.profitEntries ?? []} pagination={{ pageSize: 20 }} scroll={{ x: 760 }}
         columns={[
-          { title: 'Ngày', dataIndex: 'date', render: (value: string) => dayjs(value).format('DD/MM/YYYY') },
+          { title: 'Ngày điều trị', dataIndex: 'date', render: (value: string) => dayjs(value).format('DD/MM/YYYY') },
           { title: 'Phiếu / Khoản mục', dataIndex: 'dossierCode' },
           { title: 'Bệnh nhân / Phạm vi', key: 'patient', render: (_, row: ProfitEntry) => <>{row.patientName}{row.patientCode && <><br /><Typography.Text type="secondary">{row.patientCode}</Typography.Text></>}</> },
-          { title: 'Thu dịch vụ', dataIndex: 'revenueVnd', align: 'right' as const, render: money },
+          { title: 'Đã thanh toán', dataIndex: 'revenueVnd', align: 'right' as const, render: money },
           { title: 'Chi phí (Labo / Vật liệu)', dataIndex: 'costVnd', align: 'right' as const, render: money },
-          { title: 'Lãi ròng', dataIndex: 'profitVnd', align: 'right' as const, render: (value: number) => <Typography.Text type={value >= 0 ? 'success' : 'danger'}>{money(value)}</Typography.Text> },
+          { title: 'Chênh lệch', dataIndex: 'profitVnd', align: 'right' as const, render: (value: number) => <Typography.Text type={value >= 0 ? 'success' : 'danger'}>{money(value)}</Typography.Text> },
           { title: '', key: 'open', render: (_, row: ProfitEntry) => openLink(row.patientId, row.dossierId, row.canOpenDossier) },
         ]} />
     </Modal>

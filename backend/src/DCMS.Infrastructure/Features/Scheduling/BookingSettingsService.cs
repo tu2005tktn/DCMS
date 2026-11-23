@@ -25,7 +25,7 @@ public sealed class BookingSettingsService(DcmsDbContext db, UserManager<Applica
         return await (from member in db.SchedulingMembers.AsNoTracking()
             join employee in db.Employees on member.EmployeeId equals employee.Id
             join branch in db.Set<SchedulingBranch>() on member.BranchId equals branch.Id
-            where employee.AccountId == actorId && member.Active && branch.Active && (dentist || member.CanManageSchedules)
+            where employee.AccountId == actorId && member.Active && branch.Active && (dentist || member.CanManageSchedules || scope.GrantDriven)
                 && (!scope.Assigned || scope.Owner || scope.BranchIds.Contains(branch.Id))
             orderby branch.Name select new BranchOption(branch.Id, branch.Name)).ToArrayAsync(ct);
     }

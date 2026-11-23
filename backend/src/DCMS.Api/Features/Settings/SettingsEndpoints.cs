@@ -28,7 +28,7 @@ public static class SettingsEndpoints
             await access.RequireAsync(Actor(c), "access-groups.read", ct);
             string[] baseRoles = [Domain.Features.Accounts.AccountRoles.Admin, Domain.Features.Accounts.AccountRoles.Dentist, Domain.Features.Accounts.AccountRoles.ClinicAssistant];
             return Results.Ok(SettingsGrants.Definitions.Where(x => x.Key is not ("patients.manage" or "accounts.manage"))
-                .Select(x => new GrantOption(x.Key, x.Label, x.RequiredRole, x.Parent, baseRoles.Where(role => SettingsGrants.RoleAllows(x.Key, [role])).ToArray())));
+                .Select(x => new GrantOption(x.Key, x.Label, x.RequiredRole, x.Parent, baseRoles)));
         });
         groups.MapGet("/staff", async (HttpContext c, ISettingsService s, CancellationToken ct) => Results.Ok(await s.StaffAsync(Actor(c), ct)));
         groups.MapGet("/{id:guid}", async (HttpContext c, Guid id, ISettingsService s, CancellationToken ct) =>

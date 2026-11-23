@@ -184,6 +184,9 @@ public sealed partial class DcmsDbContext(DbContextOptions<DcmsDbContext> option
         AppointmentModel.Configure(model);
         VisitModel.Configure(model);
         ExaminationModel.Configure(model);
+        // Soft-deleted clinical documents (audit "Deleted") are hidden from every query; IgnoreQueryFilters reads them.
+        model.Entity<DCMS.Domain.Features.Examinations.ClinicalDocument>().HasQueryFilter(x => !Set<DCMS.Domain.Features.Examinations.DocumentAudit>()
+            .Any(a => a.DocumentId == x.Id && a.Action == DCMS.Domain.Features.Examinations.DocumentAudit.DeletedAction));
         SettingsModel.Configure(model);
         PrescriptionModel.Configure(model);
         TreatmentModel.Configure(model);

@@ -34,7 +34,7 @@ public static class ScreenEndpointPermissions
             var kind = p.Split('/')[5]; if (kind.StartsWith('{')) kind = values?.GetValueOrDefault("kind") ?? "{kind}";
             return Need($"catalog.{kind}.{(read ? p.EndsWith("/export") ? "export" : "read" : p.Contains("/state") ? "deactivate" : method == "POST" ? "create" : "update")}");
         }
-        if (p == "/api/finance/statistics") return Need("finance.read");
+        if (p == "/api/finance/statistics") return Need("finance.statistics.read");
         if (p == "/api/work-statistics") return Need("finance.work-statistics.read");
         if (p.StartsWith("/api/system-settings/material-purchases")) return Need($"materials.purchases.{(read ? "read" : method == "DELETE" ? "delete" : method == "POST" ? "create" : "update")}");
         if (p == "/api/system-settings/material-stock") return Need("materials.stock.read");
@@ -55,7 +55,7 @@ public static class ScreenEndpointPermissions
         if (p.StartsWith("/api/system-settings/branches") || p.StartsWith("/api/settings/branches"))
             return Need(p.Contains("/chairs") ? (read ? "chairs.read" : "chairs.manage") : read ? "branches.read" : "branches.manage");
         if (p.StartsWith("/api/prescriptions")) return Need(read && !p.EndsWith("/medicine-options") ? "prescriptions.read" : "prescriptions.manage");
-        if (p.StartsWith("/api/clinical-documents")) return Need(read ? "documents.read" : p.EndsWith("/review") || p.EndsWith("/ai-analyses") ? "documents.review" : "documents.upload");
+        if (p.StartsWith("/api/clinical-documents")) return Need(read ? "documents.read" : p.EndsWith("/delete") ? "documents.delete" : p.EndsWith("/review") || p.EndsWith("/ai-analyses") ? "documents.review" : "documents.upload");
         if (p.StartsWith("/api/visits")) {
             if (p == "/api/visits/{visitId}") return Need("reception.read");
             if (p.Contains("/investigations/") && p.EndsWith("/result")) return Need("investigations.results.receive");

@@ -47,7 +47,7 @@ public sealed partial class FamilyRecordService(DcmsDbContext db, TimeProvider c
     private async Task<int[]> StaffAsync(int actor, string permission, CancellationToken ct)
     {
         var state = await access.RequireAsync(actor, permission, ct);
-        if (!state.Roles.Contains(AccountRoles.ClinicAssistant)) throw Denied();
+        if (!state.GrantDriven && !state.Roles.Contains(AccountRoles.ClinicAssistant)) throw Denied();
         return state.BranchIds;
     }
     private async Task<FamilyRecordAccess> ReviewRowAsync(int actor, Guid id, string permission, CancellationToken ct)

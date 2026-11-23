@@ -32,7 +32,7 @@ Mô hình `recommended_caries_best.pt`: YOLO detect, 1 lớp `caries_lesion`, `i
 3. **Tile**: cắt ô 960×640 ở độ phân giải gốc, chồng lấn 25%, dự đoán từng ô với `imgsz` 960 (không phóng ô lên 1280; phóng to làm mất phần lớn tổn thương khi thử trên ảnh mẫu) rồi đổi tọa độ về ảnh gốc. Mục đích là bắt tổn thương nhỏ.
 4. **Gộp**: gom ứng viên theo IoU ≥ 0.35 (weighted box fusion). Khung là trung bình có trọng số theo độ tin cậy. Độ tin cậy cuối là max của cụm, cộng 0.03 cho mỗi nguồn xác nhận thêm (global/flip/tile), tối đa 0.99.
 5. **Lọc**: giữ cụm có độ tin cậy cuối ≥ `AI_CARIES_MIN_CONFIDENCE` (mặc định 0.25). Nếu chỉ một nguồn phát hiện thì cần ≥ `AI_CARIES_SINGLE_SOURCE_MIN_CONFIDENCE` (mặc định 0.35).
-6. **Vị trí gợi ý**: hàm trên/dưới theo nửa trên/dưới ảnh; bên phải/trái **của bệnh nhân** theo quy ước phim toàn cảnh (nửa trái ảnh = bên phải bệnh nhân). Đây là gợi ý thô, không phải số răng FDI.
+6. **Vị trí gợi ý**: hàm trên/dưới theo nửa trên/dưới ảnh; bên phải/trái **của bệnh nhân** theo quy ước phim toàn cảnh (nửa trái ảnh = bên phải bệnh nhân). Đây là gợi ý thô, không phải số răng FDI. Cập nhật 20/11/2026: giao diện **không hiển thị** vị trí gợi ý vì suy theo nửa ảnh thường sai (người dùng xác nhận); trường `jaw`/`side` vẫn được ai-service trả và lưu như cũ để giữ hợp đồng và các lần phân tích đã có.
 
 Ảnh tối đa 20 MiB (giới hạn S20), cạnh dài tối đa 8000 px. Ảnh xám/RGBA được chuyển sang RGB.
 
@@ -89,7 +89,7 @@ Trong drawer chi tiết tài liệu (S20, dùng ở S19 và trang tài liệu b�
 
 - Nút **Phân tích AI** (hiện khi có quyền `documents.review`). Lần sau đổi thành **Phân tích lại**. Đang chạy thì nút ở trạng thái loading (có thể vài giây đến vài chục giây trên CPU).
 - Cảnh báo cố định: "Kết quả AI chỉ mang tính gợi ý hỗ trợ, không thay thế chẩn đoán của bác sĩ. Mô hình được huấn luyện trên phim toàn cảnh."
-- Ảnh phim với khung đỏ đánh số (F01, F02…) theo kết quả mới nhất. Danh sách vùng nghi sâu: số, độ tin cậy %, hàm, bên; rê chuột vào dòng làm nổi khung. Ô chọn ngưỡng hiển thị độ tin cậy (mặc định 0%, chỉ lọc hiển thị, không đổi dữ liệu).
+- Ảnh phim với khung đỏ đánh số (F01, F02…) theo kết quả mới nhất. Danh sách vùng nghi sâu: số, độ tin cậy % (không hiển thị hàm/bên, xem mục 3.6); rê chuột vào dòng làm nổi khung. Ô chọn ngưỡng hiển thị độ tin cậy (mặc định 0%, chỉ lọc hiển thị, không đổi dữ liệu).
 - Thông tin lần chạy: người chạy, thời điểm, model, thời gian xử lý. Chọn được lần phân tích cũ để xem.
 - Không có vùng nào thì hiển thị "AI không phát hiện vùng nghi sâu răng", kèm nhắc bác sĩ vẫn tự đánh giá.
 
@@ -108,3 +108,12 @@ Biến của ai-service xem `ai-service/.env.example`.
 - ai-service: health, ảnh mẫu panorama trả finding hợp lệ trong biên ảnh, ảnh hỏng → 400, sai key → 401.
 - API: tài liệu không phải XRay/PDF → 400; PendingScan → 409; AI tắt → 503 + audit; thành công lưu và tăng Version; replay requestKey không gọi AI lần hai; trợ lý → 403.
 - UI: chạy phân tích trên X-quang thật, khung khớp vị trí ảnh khi co giãn, xem lần cũ.
+
+## 10. Chạy trên server production (20/11/2026)
+
+- `ai-service` được đóng gói thành image `dcms-ai` (`ai-service/Dockerfile`, Python 3.10 + torch bản CPU), build trên GitHub cùng API/web, server chỉ kéo về. Image không chứa weights.
+- Service `ai` trong `infrastructure/docker/compose.prod.yaml` thuộc profile `ai`, mặc định tắt. Chạy bằng CPU (`AI_DEVICE=cpu`), giới hạn RAM `AI_MEMORY_LIMIT` (mặc định 1500m) và số luồng `AI_CPU_THREADS` (mặc định 2) để không làm treo server 3,8 GB. Không publish cổng; API gọi qua mạng Docker `http://ai:8090`.
+- Weights đặt trên server tại `AI_MODELS_DIR` (mặc định `/opt/dcms/ai-models`), mount chỉ đọc vào `/models`; tên tệp `AI_CARIES_WEIGHTS_FILE` (mặc định `recommended_caries_best.pt`). Thiếu tệp thì `/health` của ai-service báo `unavailable` và DCMS trả 503 cho phân tích, các chức năng khác không ảnh hưởng.
+- API production nhận `DENTAL_AI_BASE_URL`, `DENTAL_AI_API_KEY`, `DENTAL_AI_TIMEOUT_SECONDS` từ `/opt/dcms/.env`; `DENTAL_AI_API_KEY` dùng chung làm `AI_SERVICE_API_KEY` của service `ai`.
+- Bật: chép weights vào `/opt/dcms/ai-models/`, trong `/opt/dcms/.env` thêm `ai` vào `COMPOSE_PROFILES`, đặt `DENTAL_AI_BASE_URL=http://ai:8090` và `DENTAL_AI_API_KEY` ngẫu nhiên, rồi chạy lại deploy. Tắt: bỏ `ai` khỏi `COMPOSE_PROFILES` và để trống `DENTAL_AI_BASE_URL`.
+- Trên CPU mỗi lần phân tích có thể mất vài chục giây; `DENTAL_AI_TIMEOUT_SECONDS` mặc định 120.

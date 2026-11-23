@@ -114,7 +114,8 @@ export default function AccessGroupsPanel() {
   }
   const failureView = failure && <Alert className="access-group-error" role="alert" type="error" showIcon message={failure.message} />;
   if (!data) return <>{loadError ? <Alert type="error" message={loadError} action={<Button onClick={() => void load()}>Thử lại phân quyền</Button>} /> : <Spin />}</>;
-  const canGrant = (option: GrantOption) => !!editor && option.allowedBaseRoles.includes(editor.values.baseRole) && (data.capabilities.owner || can(option.key));
+  // Base roles no longer limit grants: the owner may grant everything, other managers only what they hold.
+  const canGrant = (option: GrantOption) => !!editor && (data.capabilities.owner || can(option.key));
   const matches = (option: GrantOption) => `${option.label} ${option.key}`.toLocaleLowerCase('vi').includes(query.toLocaleLowerCase('vi'));
   const visible = (option: GrantOption): boolean => !query || matches(option) || data.options.some(child => child.parent === option.key && visible(child));
   function tree(parent: string | null, parentMatches = false): ReactNode {
@@ -123,9 +124,8 @@ export default function AccessGroupsPanel() {
     if (parent === null) entries.sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key));
     return entries.map(option => <div className={parent ? 'access-grant-child' : 'access-grant-section'} key={option.key}>
       <Checkbox checked={editor?.values.grants.includes(option.key)} disabled={busy || !mayEdit || !canGrant(option)}
-        onChange={event => change({ grants: toggleGrant(editor!.values.grants, option.key, event.target.checked, data!.options) })}>
+        onChange={event => change({ grants: toggleGrant(editor!.values.grants, option.key, event.target.checked, data!.options, key => data!.capabilities.owner || can(key)) })}>
         <span className={!parent ? 'access-grant-heading' : undefined}>{option.label}</span>
-        {!option.allowedBaseRoles.includes(editor?.values.baseRole ?? '') && <Typography.Text type="secondary"> · Theo vai trò chuyên môn khác</Typography.Text>}
       </Checkbox>
       {tree(option.key, parentMatches || !!query && matches(option))}
     </div>);
@@ -170,13 +170,13 @@ export default function AccessGroupsPanel() {
         <div className="access-group-fields"><Form.Item label="Tên phân quyền" required><Input aria-label="Tên phân quyền" value={editor.values.name} maxLength={160} onChange={e => change({ name: e.target.value })} /></Form.Item>
           <Form.Item label="Mã phân quyền" required><Input aria-label="Mã phân quyền" value={editor.values.code} maxLength={40} onChange={e => change({ code: e.target.value })} /></Form.Item></div>
         <Form.Item label="Vai trò nền" required><Select aria-label="Vai trò nền" value={editor.values.baseRole} disabled={!mayEdit || busy || !!editor.row?.assignedCount}
-          options={roles.map(value => ({ value, label: roleLabels[value] ?? value }))} onChange={baseRole => change({ baseRole, grants: editor.values.grants.filter(key => data.options.find(option => option.key === key)?.allowedBaseRoles.includes(baseRole)) })} /></Form.Item>
+          options={roles.map(value => ({ value, label: roleLabels[value] ?? value }))} onChange={baseRole => change({ baseRole })} /></Form.Item>
         <Form.Item label="Mô tả"><Input.TextArea aria-label="Mô tả phân quyền" value={editor.values.description} maxLength={1000} onChange={e => change({ description: e.target.value })} /></Form.Item>
       </Form>
       {!mayEdit && <Alert type="info" message={editor.row?.id === ownGroup ? 'Bạn đang thuộc nhóm này. Thay đổi cần được thực hiện bởi người quản lý khác.' : 'Bạn có quyền xem nhóm phân quyền.'} />}
       <Input.Search aria-label="Tìm quyền" placeholder="Tìm màn hình hoặc thao tác" allowClear value={query} onChange={e => setQuery(e.target.value)} />
       <div className="access-grant-list" aria-label="Danh sách quyền">{tree(null)}</div>
-      <Typography.Paragraph type="secondary">Quyền thao tác vẫn tuân theo vai trò chuyên môn và phạm vi chi nhánh được giao.</Typography.Paragraph>
+      <Typography.Paragraph type="secondary">Tích một màn hình sẽ tự chọn toàn bộ thao tác bên dưới; bỏ chọn thao tác không cần. Nhân viên được gán nhóm chỉ thao tác theo các quyền đã chọn và phạm vi chi nhánh được giao.</Typography.Paragraph>
       {editor.row && <Form.Item label="Lý do thay đổi phân quyền" required={mayEdit}><Input.TextArea aria-label="Lý do thay đổi phân quyền" value={editor.values.reason} maxLength={1000} disabled={busy || !mayEdit} onChange={e => change({ reason: e.target.value })} /></Form.Item>}
       {preview && <Alert type="info" showIcon message={`Ảnh hưởng ${preview.affected} nhân viên`} description={<>
         <div>Thêm: {preview.added.map(grantLabel).join('; ') || 'Không có'}</div><div>Thu hồi: {preview.removed.map(grantLabel).join('; ') || 'Không có'}</div>

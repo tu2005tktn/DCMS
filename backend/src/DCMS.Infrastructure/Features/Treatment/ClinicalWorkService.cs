@@ -28,11 +28,11 @@ public sealed class ClinicalWorkService(DcmsDbContext db, UserManager<Applicatio
         if (scope.Assigned && !scope.Owner && !scope.BranchIds.Contains(branchId)) throw Error("MSG06", 403);
         var user = await users.FindByIdAsync(actorId.ToString());
         if (user == null || !user.IsActive || user.AccountType != "Staff" ||
-            !AccountRoles.Effective(await users.GetRolesAsync(user)).Contains(AccountRoles.Dentist))
+            !scope.GrantDriven && !AccountRoles.Effective(await users.GetRolesAsync(user)).Contains(AccountRoles.Dentist))
             throw Error("MSG06", 403);
         var employee = await db.Employees.AsNoTracking().SingleOrDefaultAsync(x => x.AccountId == actorId, ct);
         if (employee == null || !await db.SchedulingMembers.AsNoTracking().AnyAsync(x =>
-            x.BranchId == branchId && x.EmployeeId == employee.Id && x.Active && x.CanDentist, ct))
+            x.BranchId == branchId && x.EmployeeId == employee.Id && x.Active && (x.CanDentist || scope.GrantDriven), ct))
             throw Error("MSG06", 403);
         return employee.Id;
     }

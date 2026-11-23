@@ -26,6 +26,8 @@ export default function TreatmentSheet({ patientId, dossierId, dossierVersion, o
 }) {
   const has = usePermissions();
   const { user } = useAuth();
+  // Owner, or staff in an access group granted treatment payments (ALL-SCREENS-DYNAMIC-PERMISSIONS 19/11/2026).
+  const canCollect = !!user?.effectiveRoles.includes('ClinicOwner') || !!user?.accessAssigned && has('finance.payments.create');
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [billableService, setBillableService] = useState<{ dossierId: string; available: boolean } | null>(null);
   const [dossier, setDossier] = useState<TreatmentDossier | null>(null), [context, setContext] = useState<SheetContext | null>(null);
@@ -61,14 +63,14 @@ export default function TreatmentSheet({ patientId, dossierId, dossierVersion, o
   useEffect(() => { let live = true; setError(undefined); void load().then(v => { if (live) accept(v); }).catch(e => { if (live) setError(e.message); }); return () => { live = false; }; }, [dossierId, dossierVersion, reload, patientId]);
   useEffect(() => { let live = true; void api<LabOrderSummary[]>(`/api/dossiers/${dossierId}/lab-orders`).then(v => { if (live) setLabOrders(v); }).catch(() => undefined); return () => { live = false; }; }, [dossierId, reload]);
   useEffect(() => {
-    if (!user?.effectiveRoles.includes('ClinicOwner') || dossier?.state === 'Cancelled') return;
+    if (!canCollect || dossier?.state === 'Cancelled') return;
     let live = true;
     setBillableService(null);
     void api<{ lines: { priceVnd: number }[] }>(`/api/dossiers/${dossierId}/payments/context`)
       .then(value => { if (live) setBillableService({ dossierId, available: value.lines.some(line => line.priceVnd > 0) }); })
       .catch(() => { if (live) setBillableService({ dossierId, available: false }); });
     return () => { live = false; };
-  }, [dossierId, dossier?.state, reload, user?.effectiveRoles]);
+  }, [dossierId, dossier?.state, reload, canCollect]);
   useEffect(() => {
     let live = true; setActivityError(undefined); setActivities(null);
     void api<ActivityPage>(`/api/dossiers/${dossierId}/activities?page=${page}&pageSize=20`).then(v => { if (live) setActivities(v); }).catch(e => { if (live) setActivityError(e.message); });
@@ -237,7 +239,7 @@ export default function TreatmentSheet({ patientId, dossierId, dossierVersion, o
     ...drafts.filter(d=>d.kind==='Plan').map(draft=>({id:draft.id,day:draft.row.date?.slice(0,10) ?? '',order:1000000,item:null as TreatmentItem|null,draft}))
   ].sort((a,b)=>a.day===b.day ? a.order-b.order || a.id.localeCompare(b.id) : !a.day ? 1 : !b.day ? -1 : a.day.localeCompare(b.day));  const gross = items.reduce((s,i) => s + Math.round(i.quantity * i.agreedUnitPriceVnd), 0);
   const discount = items.reduce((s,i) => s + (i.discount?.amountVnd ?? 0), 0);
-  const canPay = dossier.id === dossierId && dossier.state === 'Open' && items.length > 0 && (activities?.total ?? 0) > 0
+  const canPay = dossier.id === dossierId && dossier.state === 'Open' && (activities?.total ?? 0) > 0
     && billableService?.dossierId === dossierId && billableService.available;
   const member = (id?: number | null) => context.members.find(m => m.id === id)?.name ?? '—';
   const canWrite = context.allowedActions.includes('Draft');
@@ -286,11 +288,11 @@ export default function TreatmentSheet({ patientId, dossierId, dossierVersion, o
         {drafts.filter(d => d.kind === 'Actual' && d.id !== editor?.row?.id).map(d => <tr key={d.id}><td>{d.row.date || '—'}</td><td>{d.row.regions?.join(', ')}</td><td>{d.row.serviceName}<small>Nháp</small></td><td>{d.row.note}</td><td>{member(d.row.dentistId)}</td><td>{d.row.labWork}</td><td>{money(d.row.costVnd)}</td><td>—</td><td><Button size="small" disabled={!has('treatment.actuals.create')} onClick={() => setEditor({kind:'actual',row:d.row})}>Sửa nháp</Button></td></tr>)}
         {rowEditor('actual')}
       </tbody></table></div><Button className="treatment-sheet-create" aria-label="Thêm quá trình điều trị" disabled={!has('treatment.actuals.create') || !canWrite || !!editor || busy} onClick={() => setEditor({kind:'actual'})}>+ Thêm việc đã làm</Button>
-      {user?.effectiveRoles.includes('ClinicOwner') && <Button type="primary" style={{ marginLeft: 12 }}
+      {canCollect && <Button type="primary" style={{ marginLeft: 12 }}
         disabled={!canPay} title={!canPay ? 'Cần có dịch vụ có phí trong kế hoạch và quá trình điều trị trước khi thu tiền.' : undefined}
         onClick={() => { if (canPay) setPaymentOpen(true); }}>Trả tiền</Button>}
       {(activities?.total ?? 0) > 20 && <Pagination current={page} total={activities?.total} pageSize={20} onChange={setPage} />}</section>
-    <section className="treatment-sheet-images"><h3 className="treatment-sheet-section-title">HÌNH ẢNH</h3>{has('documents.read') && <PatientImageGallery patientId={patientId} dossierId={dossierId} canUpload={has('documents.upload')} />}</section>
+    <section className="treatment-sheet-images"><h3 className="treatment-sheet-section-title">HÌNH ẢNH</h3>{has('documents.read') && <PatientImageGallery patientId={patientId} dossierId={dossierId} canUpload={has('documents.upload')} canDelete={has('documents.delete')} />}</section>
     <section className="treatment-sheet-notes"><h3 className="treatment-sheet-minor-heading">GHI CHÚ</h3><Input.TextArea aria-label="Ghi chú hồ sơ" value={note} maxLength={4000} disabled={!has('treatment.dossiers.update') || !canWrite || noteBusy}
       onChange={e => { setNote(e.target.value); noteDirty.current = e.target.value !== noteSaved.current; }} /><Button size="small" loading={noteBusy} disabled={!has('treatment.dossiers.update') || !canWrite || note === noteSaved.current} onClick={() => void saveNote()}>Lưu ghi chú</Button>{noteError && <Alert type="error" message={noteError} />}</section>
     <Modal open={!!deleting} title="Bạn có muốn xóa dòng này không?" okText="Đồng ý" cancelText="Không đồng ý" confirmLoading={busy}

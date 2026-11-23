@@ -46,7 +46,7 @@ export default function DossierList({ patientId, visitId, initialDossierId, sour
   const createPayload = useRef('');
   const createKey = useRef(crypto.randomUUID());
 
-  const canUse = has('treatment.read') && ((auth.user?.effectiveRoles.includes('Dentist') || auth.user?.effectiveRoles.includes('ClinicOwner')) ?? false);
+  const canUse = has('treatment.read') && ((auth.user?.accessAssigned || auth.user?.effectiveRoles.includes('Dentist') || auth.user?.effectiveRoles.includes('ClinicOwner')) ?? false);
   const canCreate = has('treatment.dossiers.create');
 
   useEffect(() => {

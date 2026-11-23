@@ -15,13 +15,13 @@ using Xunit.Abstractions;
 
 namespace DCMS.IntegrationTests;
 
-// Real antivirus and a 60-second concurrent workload are explicit, optional NFR checks.
+// A 60-second concurrent workload is an explicit, optional NFR check.
 public sealed class SystemNfrFactAttribute : FactAttribute
 {
     public SystemNfrFactAttribute()
     {
         if (Environment.GetEnvironmentVariable("DCMS_RUN_SYSTEM_NFR") != "1")
-            Skip = "Set DCMS_RUN_SYSTEM_NFR=1 and start ClamAV to run local NFR checks.";
+            Skip = "Set DCMS_RUN_SYSTEM_NFR=1 to run local NFR checks.";
     }
 }
 
@@ -34,24 +34,13 @@ public sealed class SystemNfrFixture : ReceptionFixture
         base.ConfigureWebHost(builder);
         builder.ConfigureAppConfiguration((_, c) => c.AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["ClinicalDocuments:StoragePath"] = StoragePath,
-            ["ClinicalDocuments:ClamAvHost"] = "127.0.0.1",
-            ["ClinicalDocuments:ClamAvPort"] = "3310"
+            ["ClinicalDocuments:StoragePath"] = StoragePath
         }));
     }
 }
 
 public sealed class SystemNfrReportTests(SystemNfrFixture fixture, ITestOutputHelper output) : IClassFixture<SystemNfrFixture>
 {
-    [SystemNfrFact]
-    public async Task MissingOrUnavailableScannerKeepsFilesPending()
-    {
-        var missing = new DCMS.Infrastructure.Features.Examinations.ClamAvClinicalFileScanner(new ConfigurationBuilder().Build());
-        Assert.Equal("PendingScan", await missing.ScanAsync("%PDF-1.4"u8.ToArray(), default));
-        var unavailable = new DCMS.Infrastructure.Features.Examinations.ClamAvClinicalFileScanner(new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["ClinicalDocuments:ClamAvHost"] = "127.0.0.1", ["ClinicalDocuments:ClamAvPort"] = "1" }).Build());
-        Assert.Equal("PendingScan", await unavailable.ScanAsync("%PDF-1.4"u8.ToArray(), default));
-    }
-
     [SystemNfrFact]
     public async Task RealHttpFiveMbUploadAndDocumentAccessIsolation()
     {
@@ -168,7 +157,7 @@ public sealed class SystemNfrReportTests(SystemNfrFixture fixture, ITestOutputHe
         static double P95(IEnumerable<double> values) { var a = values.Order().ToArray(); return a[(int)Math.Ceiling(a.Length * .95) - 1]; }
         var load = new { users = 20, requestedDurationSeconds = 60, elapsedSeconds = loadTimer.Elapsed.TotalSeconds, thinkTimeMs = 250, requests = loadSamples.Count, errors = loadSamples.Count(x => x.Status != 200 || !x.Valid), p95Ms = P95(loadSamples.Select(x => x.Ms)), requestsPerSecond = loadSamples.Count / loadTimer.Elapsed.TotalSeconds, statuses = loadSamples.GroupBy(x => x.Status).ToDictionary(g => g.Key, g => g.Count()) };
         using var health = await anonymous.GetAsync("/health"); Assert.Equal(HttpStatusCode.OK, health.StatusCode);
-        var evidence = new { atUtc = DateTimeOffset.UtcNow, server = "Kestrel TCP loopback", scanner = "Real ClamAV INSTREAM", sizeBytes = bytes.Length, sha256 = Convert.ToHexString(SHA256.HashData(bytes)), measurements, probes, checks, singleUser = new { samples = single, p95Ms = P95(single) }, load, healthAfterLoad = (int)health.StatusCode };
+        var evidence = new { atUtc = DateTimeOffset.UtcNow, server = "Kestrel TCP loopback", scanner = "None (ClamAV removed)", sizeBytes = bytes.Length, sha256 = Convert.ToHexString(SHA256.HashData(bytes)), measurements, probes, checks, singleUser = new { samples = single, p95Ms = P95(single) }, load, healthAfterLoad = (int)health.StatusCode };
         var json = JsonSerializer.Serialize(evidence, new JsonSerializerOptions { WriteIndented = true });
         output.WriteLine(json);
         var evidencePath = Environment.GetEnvironmentVariable("DCMS_NFR_EVIDENCE_PATH");

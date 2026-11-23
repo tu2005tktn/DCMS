@@ -31,6 +31,8 @@ jobs:
             context: backend
           - name: dcms-web
             context: web
+          - name: dcms-ai
+            context: ai-service
     steps:
       - uses: actions/checkout@v4
 
@@ -73,12 +75,11 @@ jobs:
       - name: Log in to ghcr.io (read-only, this run only)
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
-      # ClamAV is optional (~1.5-2.5 GB RAM); remove it unless /opt/dcms/.env sets CLINICAL_ANTIVIRUS=ClamAv.
-      - name: Stop ClamAV when antivirus is disabled
-        run: grep -qx 'CLINICAL_ANTIVIRUS=ClamAv' /opt/dcms/.env || $COMPOSE --profile antivirus rm -sf clamav
-
       - name: Pull images
-        run: $COMPOSE pull api web
+        run: |
+          $COMPOSE pull api web
+          # The AI image (~1 GB) is pulled only when /opt/dcms/.env enables the "ai" profile.
+          if $COMPOSE config --services | grep -qx ai; then $COMPOSE pull ai; fi
 
       - name: Start database
         run: $COMPOSE up -d --wait postgres

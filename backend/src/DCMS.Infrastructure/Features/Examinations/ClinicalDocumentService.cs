@@ -71,7 +71,9 @@ public sealed class ClinicalDocumentService(DcmsDbContext db, ClinicalAccess acc
         var visits = await db.Visits.AsNoTracking().Where(x => x.PatientId == patientId && branches.Contains(x.BranchId)).OrderByDescending(x => x.ArrivalAt).ToArrayAsync(ct);
         var dossiers = await db.TreatmentDossiers.AsNoTracking().Where(x => x.PatientId == patientId && branches.Contains(x.BranchId)).ToArrayAsync(ct);
         if (visits.Length == 0 && dossiers.Length == 0) throw Error("MSG113", 404);
-        return new { patient, visits = visits.Select(x => new { x.Id, Label = $"Lượt {x.ArrivalAt.ToOffset(TimeSpan.FromHours(7)):dd/MM/yyyy HH:mm}", Date = x.ArrivalAt }),
+        // AcceptsUpload mirrors UploadAsync: only an open visit takes new documents (dossiers always do).
+        return new { patient, visits = visits.Select(x => new { x.Id, Label = $"Lượt {x.ArrivalAt.ToOffset(TimeSpan.FromHours(7)):dd/MM/yyyy HH:mm}", Date = x.ArrivalAt,
+                AcceptsUpload = x.Status is VisitStatuses.Queued or VisitStatuses.InProgress or VisitStatuses.ExaminationConfirmed }),
             dossiers = dossiers.Select(x => new { x.Id, Label = x.Code }) };
     }
     public async Task<DocumentPage> ListAsync(int actorId, DocumentQuery q, CancellationToken ct)
@@ -208,6 +210,25 @@ public sealed class ClinicalDocumentService(DcmsDbContext db, ClinicalAccess acc
             await db.SaveChangesAsync(ct);
         }
         await tx.CommitAsync(ct); return await DtoAsync(d, ct);
+    }
+    public async Task DeleteAsync(int actorId, Guid documentId, DeleteDocument r, CancellationToken ct)
+    {
+        var reason = r.Reason?.Trim();
+        if (r.RequestKey == Guid.Empty || r.ExpectedVersion <= 0 || string.IsNullOrEmpty(reason) || reason.Length > 500) throw Error("MSG04");
+        await using var tx = await db.Database.BeginTransactionAsync(ct); await LockAsync(ct);
+        // Permission and branch are checked before a replay is answered, so a revoked grant blocks the retry too.
+        var d = await db.Set<ClinicalDocument>().IgnoreQueryFilters().SingleOrDefaultAsync(x => x.Id == documentId, ct) ?? throw Error("MSG113", 404);
+        await access.BranchAsync(actorId, await SourceBranchAsync(d, ct), false, ct, "documents.delete");
+        var hash = ExaminationService.Hash(new { documentId, delete = r });
+        var receipt = await db.Set<DocumentReceipt>().SingleOrDefaultAsync(x => x.ActorId == actorId && x.RequestKey == r.RequestKey, ct);
+        if (receipt != null) { if (receipt.Fingerprint != hash) throw Error("MSG111", 409); await tx.CommitAsync(ct); return; }
+        if (await db.Set<DocumentAudit>().AnyAsync(x => x.DocumentId == d.Id && x.Action == DocumentAudit.DeletedAction, ct)) throw Error("MSG113", 404);
+        if (d.Metadata.InvestigationId.HasValue)
+            throw new DCMS.Application.Common.BusinessException(409, new("DOCUMENT_INVESTIGATION_RESULT", "Không xóa được hình ảnh/tài liệu là kết quả cận lâm sàng."));
+        if (d.Version != r.ExpectedVersion) throw Error("MSG111", 409);
+        d.Version++; Audit(d.Id, actorId, DocumentAudit.DeletedAction, reason);
+        db.Add(new DocumentReceipt { ActorId = actorId, RequestKey = r.RequestKey, Fingerprint = hash });
+        await db.SaveChangesAsync(ct); await tx.CommitAsync(ct);
     }
     // AI decision support (docs/specs/AI-CARIES-DETECTION.vi.md §5). The AI call runs outside the transaction.
     public const int MaxAiAnalyses = 20;

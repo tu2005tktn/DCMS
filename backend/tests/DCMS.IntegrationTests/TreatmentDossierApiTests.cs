@@ -306,8 +306,10 @@ public sealed class TreatmentDossierApiTests(ApiFixture fixture) : IClassFixture
         Assert.Equal(144000, partialStatistics.ActualReceivedVnd);
         Assert.Equal(56000, partialStatistics.RemainingReceivableVnd);
         Assert.Contains(partialStatistics.OutstandingDossiers, x => x.DossierId == dossierId && x.DueVnd == 56000);
-        Assert.Equal(-20000, partialStatistics.ProfitVnd);
-        Assert.Equal(0, partialStatistics.ProfitableDossierCount);
+        Assert.Equal(44000, partialStatistics.ProfitVnd);
+        Assert.Equal(1, partialStatistics.TreatmentSessionCount);
+        Assert.Contains(partialStatistics.ProfitEntries, x => x.DossierId == dossierId
+            && x.RevenueVnd == 144000 && x.CostVnd == 80000);
         Assert.Equal(HttpStatusCode.OK,
             (await owner.PostAsJsonAsync($"/api/dossiers/{dossierId}/payments", request)).StatusCode);
         Assert.Equal(HttpStatusCode.Conflict,
@@ -331,9 +333,10 @@ public sealed class TreatmentDossierApiTests(ApiFixture fixture) : IClassFixture
         Assert.Equal(219000, statistics.ActualReceivedVnd);
         Assert.Equal(56000, statistics.RemainingReceivableVnd);
         Assert.Equal(75000, statistics.AdvanceReceivedVnd);
-        Assert.Equal(-20000, statistics.ProfitVnd);
-        Assert.Equal(0, statistics.ProfitableDossierCount);
+        Assert.Equal(44000, statistics.ProfitVnd);
+        Assert.Equal(1, statistics.TreatmentSessionCount); // Unallocated deposit does not increase session profit.
         Guid additionalActivityId;
+        var nextTreatmentAt = DateTimeOffset.UtcNow.AddDays(2);
         using (var scope = fixture.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
@@ -342,7 +345,7 @@ public sealed class TreatmentDossierApiTests(ApiFixture fixture) : IClassFixture
                 DossierId = dossierId,
                 ServiceId = setup.ServiceId, ServiceNameSnapshot = "SYNTHETIC service paid from deposit",
                 Unit = "lần", Quantity = 1, PriceSnapshotVnd = 19000,
-                PerformerId = setup.DentistId, PerformedAt = DateTimeOffset.UtcNow,
+                PerformerId = setup.DentistId, PerformedAt = nextTreatmentAt,
                 CreatedAt = DateTimeOffset.UtcNow};
             db.ClinicalActivities.Add(additional);
             await db.SaveChangesAsync();
@@ -366,7 +369,14 @@ public sealed class TreatmentDossierApiTests(ApiFixture fixture) : IClassFixture
         Assert.DoesNotContain(afterAllocationStatistics.OutstandingDossiers, x => x.DossierId == dossierId);
         Assert.Equal(20000, afterAllocationStatistics.MaterialPurchaseVnd);
         Assert.Equal(119000, afterAllocationStatistics.ProfitVnd);
-        Assert.Equal(1, afterAllocationStatistics.ProfitableDossierCount);
+        Assert.Equal(2, afterAllocationStatistics.TreatmentSessionCount);
+        Assert.Equal(2, afterAllocationStatistics.ProfitEntries.Count(x => x.DossierId == dossierId));
+        var nextTreatmentDate = DateOnly.FromDateTime(nextTreatmentAt.ToOffset(TimeSpan.FromHours(7)).DateTime);
+        var nextSessionOnly = await owner.GetFromJsonAsync<DCMS.Api.Features.Finance.FinanceStatisticsResult>(
+            $"/api/finance/statistics?branchId={setup.BranchId}&from={nextTreatmentDate:yyyy-MM-dd}&to={nextTreatmentDate:yyyy-MM-dd}");
+        Assert.Equal(19000, nextSessionOnly!.ProfitVnd);
+        Assert.Equal(1, nextSessionOnly.TreatmentSessionCount);
+        Assert.Equal(19000, Assert.Single(nextSessionOnly.ProfitEntries).RevenueVnd);
         Assert.Equal(HttpStatusCode.OK,
             (await owner.PostAsJsonAsync($"/api/dossiers/{dossierId}/payments/advance-allocations", useDeposit)).StatusCode);
         Assert.Equal(HttpStatusCode.Conflict,

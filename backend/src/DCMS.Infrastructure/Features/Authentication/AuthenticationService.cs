@@ -217,13 +217,14 @@ public sealed class AuthenticationService(DcmsDbContext db, UserManager<Applicat
         }
         else if (user.AccountType != "Public" || roles.Any(x => x != AccountRoles.Guest && x != AccountRoles.Patient)) return null;
         var effective = AccountRoles.Effective(roles);
-        var permissions = user.AccountType == "Staff" ? (await settingsAccess.ResolveAsync(user.Id,ct)).Permissions : Array.Empty<string>();
+        var access = user.AccountType == "Staff" ? await settingsAccess.ResolveAsync(user.Id,ct) : null;
+        var permissions = access?.Permissions ?? Array.Empty<string>();
         if (user.AccountType == "Staff" && roles.Contains(AccountRoles.ClinicOwner))
             permissions = permissions.Append("settings.general.manage").Distinct().ToArray();
         // UC-36: only a current VERIFIED self link counts; never inferred from a role or contact. Re-read on every request.
         var verifiedLink = user.AccountType == "Public" && await db.PatientAccountLinks.AsNoTracking()
             .AnyAsync(x => x.AccountId == user.Id && x.Status == PatientLinkStatus.Verified, ct);
-        return new(user.Id, user.UserName!, user.FullName, user.AccountType, roles, effective, permissions, verifiedLink, user.PhoneNumber, user.Email);
+        return new(user.Id, user.UserName!, user.FullName, user.AccountType, roles, effective, permissions, verifiedLink, user.PhoneNumber, user.Email, access?.GrantDriven ?? false);
     }
 
     private string IssueAccessToken(int accountId, Guid sessionId, DateTimeOffset now, DateTimeOffset expires)

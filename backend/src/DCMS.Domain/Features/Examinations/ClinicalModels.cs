@@ -91,6 +91,8 @@ public sealed class DocumentReview
 
 public sealed class DocumentAudit : DCMS.Domain.Common.AuditRecord
 {
+    // A document with this audit action is soft-deleted and hidden from every read (global query filter).
+    public const string DeletedAction = "Deleted";
     public long Id { get; set; }
     public Guid DocumentId { get; set; }
     public int? ActorId { get; set; }

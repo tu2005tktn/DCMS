@@ -26,7 +26,8 @@ public sealed class AccountRecoveryService(
     IContactDeliveryAdapter delivery,
     IOptions<RecoverySettings> options,
     IMemoryCache cache,
-    ILogger<AccountRecoveryService> logger) : IAccountRecoveryService
+    ILogger<AccountRecoveryService> logger,
+    DCMS.Application.Features.Settings.ISettingsAccess access) : IAccountRecoveryService
 {
     private readonly RecoverySettings settings = options.Value;
 
@@ -587,7 +588,8 @@ public sealed class AccountRecoveryService(
     private async Task RequireAdminAsync(int actorId, CancellationToken ct)
     {
         var actor = await db.Users.AsNoTracking().SingleOrDefaultAsync(x => x.Id == actorId && x.IsActive, ct);
-        if (actor == null || !await users.IsInRoleAsync(actor, AccountRoles.Admin))
+        var state = actor?.AccountType == "Staff" ? await access.ResolveAsync(actorId, ct) : null;
+        if (actor == null || (state is { GrantDriven: true } ? !state.Permissions.Any(x => x.StartsWith("accounts.")) : !await users.IsInRoleAsync(actor, AccountRoles.Admin)))
             throw new BusinessException(403, SystemMessages.Get("MSG06"));
     }
 
