@@ -15,7 +15,7 @@ public sealed class FinanceStatisticsResult
     public long RemainingReceivableVnd { get; set; }
     public long MaterialPurchaseVnd { get; set; }
     public long ProfitVnd { get; set; }
-    public int ProfitableDossierCount { get; set; }
+    public int TreatmentSessionCount { get; set; }
     public List<FinanceOutstandingDossier> OutstandingDossiers { get; set; } = [];
     public List<FinanceServiceDossier> ServiceDossiers { get; set; } = [];
     public List<FinancePaymentEntry> ActualPayments { get; set; } = [];
@@ -111,7 +111,16 @@ public static class FinanceStatisticsEndpoints
                 .ToListAsync(ct);
             var purchaseTotal = purchaseRows.Sum(x => x.TotalVnd);
 
+            // ClinicalActivity currently has no VisitId. A session is therefore the work
+            // performed for one dossier on one Vietnam-local calendar date. This avoids
+            // waiting for whole-plan settlement, but same-day visits cannot be split.
+            var profitDossiers = await db.TreatmentDossiers.AsNoTracking()
+                .Where(x => x.State != "Deleted" && x.State != "Cancelled"
+                    && (!branchId.HasValue || x.BranchId == branchId)
+                    && db.ClinicalActivities.Any(a => a.DossierId == x.Id))
+                .Select(x => new { x.Id, x.Code, x.PatientId }).ToArrayAsync(ct);
             var allPatientIds = dossiers.Select(x => x.PatientId)
+                .Concat(profitDossiers.Select(x => x.PatientId))
                 .Concat(deletedDossiers.Select(x => x.PatientId)).Distinct().ToArray();
             var patients = allPatientIds.Length == 0
                 ? new Dictionary<int, (string FullName, string PatientCode)>()
@@ -125,6 +134,47 @@ public static class FinanceStatisticsEndpoints
                 ActualReceivedVnd = forfeited,
                 MaterialPurchases = purchaseRows
             };
+
+            var sessions = new Dictionary<(Guid DossierId, DateOnly Date), (long Revenue, long Cost)>();
+            foreach (var dossier in profitDossiers)
+            {
+                // This context reconciles archived receipts, confirmed cash/PayOS payments,
+                // and allocations from advances per activity and lab order. Unused deposits
+                // do not appear in PaidVnd.
+                var payment = await TreatmentPaymentEndpoints.ContextAsync(db, dossier.Id, ct);
+                if (payment is null) continue;
+                foreach (var line in payment.Lines)
+                {
+                    var date = DateOnly.FromDateTime(line.PerformedAt.ToOffset(TimeSpan.FromHours(7)).DateTime);
+                    if (from.HasValue && date < from.Value || to.HasValue && date > to.Value) continue;
+                    var key = (dossier.Id, date);
+                    var previous = sessions.GetValueOrDefault(key);
+                    sessions[key] = (checked(previous.Revenue + line.PaidVnd), previous.Cost);
+                }
+                foreach (var lab in payment.LabFees)
+                {
+                    var date = DateOnly.FromDateTime(lab.PerformedAt.ToOffset(TimeSpan.FromHours(7)).DateTime);
+                    if (from.HasValue && date < from.Value || to.HasValue && date > to.Value) continue;
+                    var key = (dossier.Id, date);
+                    var previous = sessions.GetValueOrDefault(key);
+                    sessions[key] = (checked(previous.Revenue + lab.PaidVnd),
+                        checked(previous.Cost + lab.TotalFeeVnd));
+                }
+            }
+            var profitByDossier = profitDossiers.ToDictionary(x => x.Id);
+            foreach (var (key, amount) in sessions.OrderByDescending(x => x.Key.Date))
+            {
+                var dossier = profitByDossier[key.DossierId];
+                patients.TryGetValue(dossier.PatientId, out var patient);
+                var profit = checked(amount.Revenue - amount.Cost);
+                result.ProfitVnd = checked(result.ProfitVnd + profit);
+                result.TreatmentSessionCount++;
+                result.ProfitEntries.Add(new FinanceProfitEntry($"{dossier.Id}:{key.Date:yyyy-MM-dd}",
+                    dossier.Id, dossier.Code, dossier.PatientId, patient.FullName ?? "",
+                    patient.PatientCode ?? "", key.Date, amount.Revenue, amount.Cost, profit, true));
+            }
+            // Purchases are a clinic-wide cost and are deducted once, outside session rows.
+            result.ProfitVnd = checked(result.ProfitVnd - purchaseTotal);
 
             if (deletedIds.Length > 0)
             {
@@ -159,7 +209,6 @@ public static class FinanceStatisticsEndpoints
                         0, "Toàn phòng khám", "", to ?? from ?? DateOnly.FromDateTime(DateTime.UtcNow),
                         0, purchaseTotal, -purchaseTotal, false));
                 }
-                result.ProfitVnd = checked(-purchaseTotal);
                 return Results.Ok(result);
             }
             var ids = dossiers.Select(x => x.Id).ToArray();
@@ -493,19 +542,7 @@ public static class FinanceStatisticsEndpoints
                         dossier.State == "Open" && posted == 0 && labCost == 0 && allocated == 0
                             && treatmentReceived == advanceReceived && advanceReceived > 0));
                 }
-                if (dossier.State == "Cancelled" || billed == 0 || allocated < billed) continue;
-
-                var dossierRevenue = Math.Min(allocated, billed);
-                var dossierProfit = checked(dossierRevenue - labCost);
-                result.ProfitVnd = checked(result.ProfitVnd + dossierProfit);
-                result.ProfitableDossierCount++;
-                result.ProfitEntries.Add(new FinanceProfitEntry(dossier.Id.ToString(), dossier.Id, dossier.Code,
-                    dossier.PatientId, patient.FullName ?? "", patient.PatientCode ?? "",
-                    dossier.StartedOn, dossierRevenue, labCost, dossierProfit, true));
             }
-            // The material-purchase total includes stock already used by dossiers, so deduct it
-            // once here rather than also deducting estimated usage cost from each dossier.
-            result.ProfitVnd = checked(result.ProfitVnd - result.MaterialPurchaseVnd);
             if (purchaseTotal > 0)
             {
                 result.ProfitEntries.Add(new FinanceProfitEntry("material-purchases", null, "Nhập dụng cụ vật liệu",
