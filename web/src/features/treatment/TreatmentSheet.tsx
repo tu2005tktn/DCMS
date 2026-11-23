@@ -239,7 +239,7 @@ export default function TreatmentSheet({ patientId, dossierId, dossierVersion, o
     ...drafts.filter(d=>d.kind==='Plan').map(draft=>({id:draft.id,day:draft.row.date?.slice(0,10) ?? '',order:1000000,item:null as TreatmentItem|null,draft}))
   ].sort((a,b)=>a.day===b.day ? a.order-b.order || a.id.localeCompare(b.id) : !a.day ? 1 : !b.day ? -1 : a.day.localeCompare(b.day));  const gross = items.reduce((s,i) => s + Math.round(i.quantity * i.agreedUnitPriceVnd), 0);
   const discount = items.reduce((s,i) => s + (i.discount?.amountVnd ?? 0), 0);
-  const canPay = dossier.id === dossierId && dossier.state === 'Open' && items.length > 0 && (activities?.total ?? 0) > 0
+  const canPay = dossier.id === dossierId && dossier.state === 'Open' && (activities?.total ?? 0) > 0
     && billableService?.dossierId === dossierId && billableService.available;
   const member = (id?: number | null) => context.members.find(m => m.id === id)?.name ?? '—';
   const canWrite = context.allowedActions.includes('Draft');

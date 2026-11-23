@@ -531,9 +531,32 @@ public sealed class TreatmentSheetV25Tests(ApiFixture fixture) : IClassFixture<A
     }
 
     [Fact]
+    public async Task PaymentContextUsesPriceAddedAfterZeroCostActivity()
+    {
+        using var dentist = await Login(); using var owner = await Login("owner.demo");
+        var setup = await Prepare(false); var dossier = await Create(dentist, setup);
+        var draft = await Draft(dentist, setup, dossier.Id, "Actual", unitPrice: 0);
+        var confirm = await dentist.PostAsJsonAsync($"/api/dossiers/{dossier.Id}/sheet-drafts/{draft.Id}/confirm-actual",
+            new ConfirmSheetActualRequest(dossier.Version, draft.Version, Guid.NewGuid()));
+        Assert.True(confirm.IsSuccessStatusCode, await confirm.Content.ReadAsStringAsync());
+        var actual = (await confirm.Content.ReadFromJsonAsync<ConfirmSheetActualResult>())!;
+        var before = await owner.GetFromJsonAsync<DCMS.Api.Features.Finance.TreatmentPaymentContext>($"/api/dossiers/{dossier.Id}/payments/context");
+        Assert.Empty(before!.Lines);
+
+        var row = JsonSerializer.SerializeToElement(new { serviceId = setup.Service, dentistId = setup.Dentist,
+            quantity = 1, unitPriceVnd = 14000000, costVnd = 14000000, note = "SYNTHETIC priced after posting" });
+        var edit = await dentist.PutAsJsonAsync($"/api/dossiers/{dossier.Id}/sheet-activities/{actual.Activity.Id}",
+            new EditSheetActivityRequest(actual.Dossier.Version, actual.Activity.Version, 0, row, Guid.NewGuid()));
+        Assert.True(edit.IsSuccessStatusCode, await edit.Content.ReadAsStringAsync());
+        var after = await owner.GetFromJsonAsync<DCMS.Api.Features.Finance.TreatmentPaymentContext>($"/api/dossiers/{dossier.Id}/payments/context");
+        Assert.Equal(14000000, Assert.Single(after!.Lines).DueVnd);
+    }
+
+    [Fact]
     public async Task SheetActivityEditDeleteIsVersionedAndPreservesPostedSourceAndPlan()
     {
         using var c = await Login(); var s = await Prepare(false); var dossier = await Create(c, s);
+        using var owner = await Login("owner.demo");
         var draft = await Draft(c, s, dossier.Id, "Plan", qty: 2);
         var plan = await c.PostAsJsonAsync($"/api/dossiers/{dossier.Id}/sheet-drafts/{draft.Id}/confirm-plan", new ConfirmSheetPlanRequest(dossier.Version, draft.Version, Guid.NewGuid()));
         dossier = (await plan.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
@@ -547,6 +570,8 @@ public sealed class TreatmentSheetV25Tests(ApiFixture fixture) : IClassFixture<A
         var edited = (await response.Content.ReadFromJsonAsync<ConfirmSheetActualResult>())!;
         Assert.Equal(1, edited.Activity.SheetVersion); Assert.Equal("NeedsAdjustment", edited.Activity.FeeStatus);
         Assert.Equal(350000, edited.Activity.PriceSnapshotVnd); Assert.Equal(300000, edited.Dossier.Items[0].AgreedUnitPriceVnd);
+        var paymentAfterEdit = await owner.GetFromJsonAsync<DCMS.Api.Features.Finance.TreatmentPaymentContext>($"/api/dossiers/{dossier.Id}/payments/context");
+        Assert.Equal(650000, Assert.Single(paymentAfterEdit!.Lines).PriceVnd);
         var replay = await c.PutAsJsonAsync(url, request);
         Assert.Equal(1, (await replay.Content.ReadFromJsonAsync<ConfirmSheetActualResult>())!.Activity.SheetVersion);
         var stale = await c.PutAsJsonAsync(url, request with { ExpectedVersion = edited.Dossier.Version, RequestKey = Guid.NewGuid() }); Assert.Equal(HttpStatusCode.Conflict, stale.StatusCode);
@@ -560,6 +585,8 @@ public sealed class TreatmentSheetV25Tests(ApiFixture fixture) : IClassFixture<A
         var deleted = await c.SendAsync(message); Assert.True(deleted.IsSuccessStatusCode, await deleted.Content.ReadAsStringAsync());
         Assert.True((await deleted.Content.ReadFromJsonAsync<ConfirmSheetActualResult>())!.Activity.SheetDeleted);
         Assert.Empty((await c.GetFromJsonAsync<TreatmentActivityPage>($"/api/dossiers/{dossier.Id}/activities"))!.Items);
+        var paymentAfterDelete = await owner.GetFromJsonAsync<DCMS.Api.Features.Finance.TreatmentPaymentContext>($"/api/dossiers/{dossier.Id}/payments/context");
+        Assert.Empty(paymentAfterDelete!.Lines);
         using var repeat = new HttpRequestMessage(HttpMethod.Delete, url) { Content = JsonContent.Create(delete) };
         Assert.Equal(HttpStatusCode.OK, (await c.SendAsync(repeat)).StatusCode);
         using var scope = fixture.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();

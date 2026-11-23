@@ -2,6 +2,7 @@ using System.Data;
 using System.Text.Json;
 using DCMS.Application.Features.Authentication;
 using DCMS.Domain.Features.Accounts;
+using DCMS.Infrastructure.Features.Treatment;
 using DCMS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,7 +12,7 @@ public sealed record TreatmentPaymentLine(Guid ActivityId, DateTimeOffset Perfor
     long PriceVnd, long PaidVnd, long DueVnd);
 public sealed record TreatmentLabFee(Guid LabOrderId, Guid ActivityId, string WorkName,
     long TotalFeeVnd, long PaidVnd, long DueVnd, long ProviderPaidVnd,
-    long Minimum30PercentVnd, long PriorityRemainingVnd);
+    long Minimum30PercentVnd, long PriorityRemainingVnd, DateTimeOffset PerformedAt);
 public sealed record TreatmentLabAllocation(Guid LabOrderId, long AmountVnd);
 public sealed record TreatmentPaymentContext(Guid DossierId, int PatientId, int BranchId,
     IReadOnlyList<TreatmentPaymentLine> Lines, long AdvanceReceivedVnd, IReadOnlyList<TreatmentLabFee> LabFees,
@@ -334,6 +335,9 @@ public static class TreatmentPaymentEndpoints
         var activities = await db.ClinicalActivities.AsNoTracking()
             .Where(x => x.DossierId == dossierId)
             .OrderBy(x => x.PerformedAt).ThenBy(x => x.Id).ToArrayAsync(ct);
+        var overrides = await TreatmentActivitySnapshotReader.ReadOverridesAsync(db, dossierId, ct);
+        var currentActivities = activities.Select(x => overrides.GetValueOrDefault(x.Id) ?? DCMS.Application.Features.Treatment.ActivityDto.From(x))
+            .Where(x => !x.SheetDeleted).ToArray();
         var paid = await db.Database.SqlQuery<TreatmentPaidRow>($"""
             WITH archive AS (
                 SELECT a."Target" AS source, item.row
@@ -381,7 +385,7 @@ public static class TreatmentPaymentEndpoints
             FROM sources WHERE activity_id IS NOT NULL GROUP BY activity_id
             """).ToArrayAsync(ct);
         var paidByActivity = paid.ToDictionary(x => x.ActivityId, x => x.PaidVnd);
-        var lines = activities.Select(activity =>
+        var lines = currentActivities.Select(activity =>
         {
             var gross = checked((long)Math.Round(activity.Quantity * activity.PriceSnapshotVnd, MidpointRounding.AwayFromZero));
             var price = Math.Max(0, gross - activity.DiscountSnapshotVnd);
@@ -389,7 +393,7 @@ public static class TreatmentPaymentEndpoints
             return new TreatmentPaymentLine(activity.Id, activity.PerformedAt,
                 activity.ServiceNameSnapshot ?? "Dịch vụ điều trị", price, paidVnd, price - paidVnd);
         }).Where(x => x.PriceVnd > 0).ToArray();
-        var activityIds = activities.Select(x => x.Id).ToArray();
+        var activityIds = currentActivities.Select(x => x.Id).ToArray();
         var labs = await (
             from x in db.LabOrders.AsNoTracking()
             join a in db.ClinicalActivities.AsNoTracking() on x.ActivityId equals a.Id
@@ -408,12 +412,14 @@ public static class TreatmentPaymentEndpoints
             WHERE ledger."AuditType" = 'FinanceLedger' AND ledger."Target" = {dossierId.ToString()}
             GROUP BY (item.row->>'labOrderId')::uuid
             """).ToDictionaryAsync(x => x.ActivityId, x => x.PaidVnd, ct);
+        var activityDates = currentActivities.ToDictionary(x => x.Id, x => x.PerformedAt);
         var labFees = labs.Select(x => {
             var target = checked((x.TotalFeeVnd * 3 + 9) / 10);
             var allocated = reserved.GetValueOrDefault(x.Id);
             var patientPaid = Math.Clamp(allocated, 0, x.TotalFeeVnd);
             return new TreatmentLabFee(x.Id, x.ActivityId, x.WorkName, x.TotalFeeVnd, patientPaid,
-                x.TotalFeeVnd - patientPaid, x.PaidVnd, target, Math.Max(0, target - patientPaid));
+                x.TotalFeeVnd - patientPaid, x.PaidVnd, target, Math.Max(0, target - patientPaid),
+                activityDates[x.ActivityId]);
         }).ToArray();
         var advance = await db.Database.SqlQuery<long>($"""
             SELECT COALESCE((SELECT sum((item.row->>'AmountVnd')::bigint)
