@@ -92,6 +92,18 @@ public sealed class AllScreensPermissionApiTests(ReceptionFixture fixture) : ICl
         await Ok<GroupDto>(await owner.PutAsJsonAsync($"/api/system-settings/access-groups/{group.Id}", new GroupCommand(Guid.NewGuid(), new(group.Code, group.Name, group.BaseRole, []), group.Version, "SYNTHETIC revoke")));
         Assert.Equal(HttpStatusCode.Forbidden, (await user.GetAsync(Path(read))).StatusCode);
     }
+    [Fact] public void DentistBaselineAllowsMedicineReadAndCreateButNotCatalogManagement() {
+        var roles = new[] { AccountRoles.Dentist };
+        var legacy = SettingsGrants.Legacy(roles);
+        Assert.True(SettingsGrants.RoleAllows("catalog.medicines.read", roles));
+        Assert.True(SettingsGrants.RoleAllows("catalog.medicines.create", roles));
+        Assert.False(SettingsGrants.RoleAllows("catalog.medicines.update", roles));
+        Assert.False(SettingsGrants.RoleAllows("catalog.medicines.deactivate", roles));
+        Assert.False(SettingsGrants.RoleAllows("catalog.medicines.export", roles));
+        Assert.Contains("catalog.medicines.read", legacy);
+        Assert.Contains("catalog.medicines.create", legacy);
+        Assert.DoesNotContain("catalog.medicines.update", legacy);
+    }
     [Fact] public async Task AssignedScheduleScopeFiltersOptionsAndDeniesAnotherBranch() {
         var first = await reception.Prepare(); var second = await reception.Prepare(); using var owner = await reception.Login("owner.demo");
         var (staff, name) = await Staff(first.BranchId, AccountRoles.Dentist);

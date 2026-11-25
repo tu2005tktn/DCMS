@@ -1,6 +1,7 @@
+import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import { Alert, Button, Card, DatePicker, Empty, Form, Input, InputNumber, Modal, Select, Space, Spin, Table, message } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../../services/api';
 import { useAuth } from '../authentication/AuthContext';
 import type { PatientDetail } from '../patients/types';
@@ -8,7 +9,9 @@ import { formatDate, PatientGrid, ReadOnlySheet, type Item, type Prescription } 
 import './patientPrescriptions.css';
 
 // Contract: docs/specs/S23-PATIENT-PRESCRIPTIONS.vi.md — form "Đơn thuốc" kê từ hồ sơ bệnh nhân.
-type Medicine = { id: string; code: string; name: string; strength?: string | null; dosageForm?: string | null; baseUnit: string; defaultInstructions?: string | null };
+type Medicine = { id: string; code: string; name: string; activeIngredient?: string | null; strength?: string | null; dosageForm?: string | null; baseUnit: string; defaultInstructions?: string | null };
+type NewMedicineValues = { name: string; code: string; activeIngredient?: string; baseUnit: string; referencePrice?: number; instructions?: string };
+type CreatedMedicine = Medicine & { instructions?: string | null };
 type Branch = { id: number; name: string; address?: string | null; phone?: string | null; email?: string | null };
 type Doctor = { employeeId: number; name: string; branchId: number };
 type Context = { branchIds: number[]; prescriberName: string; prescriberEmployeeId: number; branches: Branch[]; doctors: Doctor[] };
@@ -22,6 +25,7 @@ const splitDiagnoses = (value?: string | null) => (value ?? '').split(';').map(x
 export default function PatientPrescriptionsTab({ patient, active }: { patient: PatientDetail; active: boolean }) {
   const auth = useAuth();
   const canManage = auth.user?.permissions.includes('prescriptions.manage') ?? false;
+  const canAddMedicine = auth.user?.permissions.includes('catalog.medicines.create') ?? false;
   const [notice, holder] = message.useMessage();
   const [rows, setRows] = useState<Prescription[]>([]);
   const [context, setContext] = useState<Context>();
@@ -33,7 +37,12 @@ export default function PatientPrescriptionsTab({ patient, active }: { patient: 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>();
   const [sheetError, setSheetError] = useState<string>();
+  const [catalogAddIndex, setCatalogAddIndex] = useState<number | null>(null);
+  const [catalogSaving, setCatalogSaving] = useState(false);
+  const [catalogError, setCatalogError] = useState<string>();
   const branchId = Form.useWatch('branchId', form);
+  const [catalogForm] = Form.useForm<NewMedicineValues>();
+  const pendingMedicineCreate = useRef<{ fingerprint: string; key: string } | undefined>(undefined);
 
   async function refresh() {
     setLoading(true); setError(undefined);
@@ -105,6 +114,59 @@ export default function PatientPrescriptionsTab({ patient, active }: { patient: 
     finally { setBusy(false); }
   }
 
+  function openCatalogAdd(index: number) {
+    setCatalogError(undefined);
+    catalogForm.resetFields();
+    catalogForm.setFieldValue('referencePrice', 0);
+    setCatalogAddIndex(index);
+  }
+
+  async function createCatalogMedicine() {
+    if (!canAddMedicine || catalogSaving || catalogAddIndex === null) return;
+    let values: NewMedicineValues;
+    try { values = await catalogForm.validateFields(); } catch { return; }
+    const entry = {
+      code: values.code.trim(),
+      name: values.name.trim(),
+      activeIngredient: values.activeIngredient?.trim() || null,
+      strength: null,
+      dosageForm: null,
+      baseUnit: values.baseUnit.trim(),
+      packaging: null,
+      instructions: values.instructions?.trim() || null,
+      referencePrice: values.referencePrice ?? null,
+      prescriptionEligible: true,
+      internalStockTracked: false,
+    };
+    const fingerprint = JSON.stringify(entry);
+    if (pendingMedicineCreate.current?.fingerprint !== fingerprint) {
+      pendingMedicineCreate.current = { fingerprint, key: crypto.randomUUID() };
+    }
+
+    setCatalogSaving(true);
+    setCatalogError(undefined);
+    try {
+      const created = await api<CreatedMedicine>('/api/system-settings/settings/catalogs/medicines', {
+        method: 'POST',
+        body: JSON.stringify({ requestKey: pendingMedicineCreate.current.key, entry }),
+      });
+      pendingMedicineCreate.current = undefined;
+      const medicine: Medicine = { ...created, defaultInstructions: created.instructions ?? '' };
+      setMedicines(current => [medicine, ...current.filter(item => item.id !== medicine.id)]);
+      form.setFieldValue(['items', catalogAddIndex, 'medicineId'], medicine.id);
+      form.setFieldValue(['items', catalogAddIndex, 'unit'], medicine.baseUnit);
+      if (!form.getFieldValue(['items', catalogAddIndex, 'instructions'])) {
+        form.setFieldValue(['items', catalogAddIndex, 'instructions'], medicine.defaultInstructions ?? '');
+      }
+      setCatalogAddIndex(null);
+      catalogForm.resetFields();
+    } catch (e) {
+      setCatalogError((e as Error).message || 'Không thể lưu thuốc vào danh mục.');
+    } finally {
+      setCatalogSaving(false);
+    }
+  }
+
   const doc = sheet?.doc;
   const header = sheet?.mode === 'view' && doc
     ? { name: doc.branchName, phone: doc.branchPhone, email: doc.branchEmail }
@@ -171,29 +233,33 @@ export default function PatientPrescriptionsTab({ patient, active }: { patient: 
               <h3>CHỈ ĐỊNH</h3>
               <Form.List name="items">{(fields, { add, remove }) => <div className="rx-lines">
                 {fields.map((field, index) => <div key={field.key} className="rx-line">
-                  <span className="rx-index">{index + 1}</span>
                   <div className="rx-line-body">
                     <div className="rx-line-top">
                       <Form.Item name={[field.name, 'medicineId']} rules={[{ required: true, message: 'Chọn thuốc' }]} className="rx-medicine">
                         <Select showSearch optionFilterProp="label" placeholder="Tên thuốc" aria-label={`Tên thuốc dòng ${index + 1}`} options={medicineOptions}
                           onChange={id => {
                             const m = medicines.find(x => x.id === id);
-                            form.setFieldValue(['items', field.name, 'unit'], '');
+                            form.setFieldValue(['items', field.name, 'unit'], m?.baseUnit ?? '');
                             if (!form.getFieldValue(['items', field.name, 'instructions'])) form.setFieldValue(['items', field.name, 'instructions'], m?.defaultInstructions ?? '');
                           }} />
+                      </Form.Item>
+                      <Form.Item name={[field.name, 'unit']} rules={[{ required: true, whitespace: true, message: 'Nhập đơn vị thuốc' }, { max: 40 }]} className="rx-unit">
+                        <Input maxLength={40} placeholder="Đơn vị tính/đóng gói" aria-label={`Đơn vị tính/đóng gói dòng ${index + 1}`} />
                       </Form.Item>
                       <Form.Item name={[field.name, 'quantity']} rules={[{ required: true, message: 'Nhập số lượng' }, { type: 'integer', min: 1, max: 10000, message: '1–10.000' }]} className="rx-qty">
                         <InputNumber min={1} max={10000} precision={0} placeholder="SL" aria-label={`Số lượng dòng ${index + 1}`} style={{ width: '100%' }} />
                       </Form.Item>
+                      {canAddMedicine && <Button className="rx-catalog-add" aria-label="Thêm thuốc vào danh mục" title="Thêm thuốc vào danh mục"
+                        disabled={busy} onClick={() => openCatalogAdd(field.name)}><PlusOutlined /></Button>}
                     </div>
-                    <Form.Item name={[field.name, 'unit']} rules={[{ required: true, whitespace: true, message: 'Nhập đơn vị thuốc' }, { max: 40 }]} className="rx-usage">
-                      <Input maxLength={40} placeholder="Đơn vị thuốc (tự nhập), ví dụ: viên, tuýp" aria-label={`Đơn vị thuốc tùy chọn dòng ${index + 1}`} />
-                    </Form.Item>
-                    <Form.Item name={[field.name, 'instructions']} rules={[{ max: 1000 }]} className="rx-usage">
-                      <Input maxLength={1000} placeholder="Hướng dẫn sử dụng" aria-label={`Hướng dẫn sử dụng dòng ${index + 1}`} />
-                    </Form.Item>
+                    <div className="rx-line-bottom">
+                      <Form.Item name={[field.name, 'instructions']} rules={[{ max: 1000 }]} className="rx-instructions">
+                        <Input maxLength={1000} placeholder="Hướng dẫn sử dụng" aria-label={`Hướng dẫn sử dụng dòng ${index + 1}`} />
+                      </Form.Item>
+                      <Button type="text" danger icon={<DeleteOutlined />} aria-label={`Xóa dòng ${index + 1}`}
+                        disabled={fields.length <= 1} onClick={() => remove(field.name)} />
+                    </div>
                   </div>
-                  <Button type="text" danger aria-label={`Xóa dòng ${index + 1}`} disabled={fields.length <= 1} onClick={() => remove(field.name)}>✕</Button>
                 </div>)}
                 <div className="rx-add">
                   <Button className="rx-add-btn" disabled={fields.length >= 30} onClick={() => add(emptyItem())}>+ THÊM</Button>
@@ -224,6 +290,32 @@ export default function PatientPrescriptionsTab({ patient, active }: { patient: 
             </section>
         </Form>;
       })()}
+    </Modal>
+    <Modal open={catalogAddIndex !== null} title="Thuốc, dược phẩm, sản phẩm y tế" width={560} centered destroyOnClose
+      className="rx-medicine-modal" okText="LƯU LẠI" cancelText="QUAY LẠI" confirmLoading={catalogSaving}
+      okButtonProps={{ disabled: !canAddMedicine }} onCancel={() => { if (!catalogSaving) { setCatalogAddIndex(null); setCatalogError(undefined); } }}
+      onOk={() => void createCatalogMedicine()}>
+      {catalogError && <Alert type="error" showIcon message="Không lưu được thuốc" description={catalogError} style={{ marginBottom: 16 }} />}
+      <Form form={catalogForm} layout="horizontal" labelCol={{ span: 7 }} wrapperCol={{ span: 17 }} initialValues={{ referencePrice: 0 }} preserve={false}>
+        <Form.Item name="name" label="Tên" rules={[{ required: true, whitespace: true, message: 'Nhập tên thuốc.' }, { max: 200, message: 'Tối đa 200 ký tự.' }]}>
+          <Input autoFocus maxLength={200} placeholder="Ví dụ: Paracetamol (Panadol) 500mg" />
+        </Form.Item>
+        <Form.Item name="code" label="Mã thuốc/mã sản phẩm" rules={[{ required: true, whitespace: true, message: 'Nhập mã thuốc hoặc mã sản phẩm.' }, { max: 40, message: 'Tối đa 40 ký tự.' }, { pattern: /^[A-Za-z0-9][A-Za-z0-9._-]*$/, message: 'Mã chỉ gồm chữ, số, dấu chấm, gạch dưới hoặc gạch ngang.' }]}>
+          <Input maxLength={40} placeholder="Ví dụ: PARA-500" onBlur={event => catalogForm.setFieldValue('code', event.target.value.trim().toUpperCase())} />
+        </Form.Item>
+        <Form.Item name="activeIngredient" label="Hoạt chất/biệt dược" rules={[{ max: 200, message: 'Tối đa 200 ký tự.' }]}>
+          <Input maxLength={200} />
+        </Form.Item>
+        <Form.Item name="baseUnit" label="Đơn vị tính/đóng gói" rules={[{ required: true, whitespace: true, message: 'Nhập đơn vị tính.' }, { max: 40, message: 'Tối đa 40 ký tự.' }]}>
+          <Input maxLength={40} placeholder="Ví dụ: Hộp 20 viên" />
+        </Form.Item>
+        <Form.Item name="referencePrice" label="Đơn giá (₫)" rules={[{ type: 'integer', min: 0, max: 1_000_000_000_000, message: 'Nhập giá nguyên không âm.' }]}>
+          <InputNumber min={0} precision={0} step={1000} style={{ width: '100%' }} />
+        </Form.Item>
+        <Form.Item name="instructions" label="Hướng dẫn sử dụng" rules={[{ max: 1000, message: 'Tối đa 1.000 ký tự.' }]}>
+          <Input maxLength={1000} />
+        </Form.Item>
+      </Form>
     </Modal>
   </Card>;
 }
