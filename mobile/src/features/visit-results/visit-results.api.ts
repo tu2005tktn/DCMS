@@ -10,11 +10,11 @@ async function call<T>(path: string, token: string): Promise<T> {
   let response: Response;
   try {
     response = await fetch(env.apiUrl + path, { headers: { Accept: 'application/json', Authorization: `Bearer ${token}` }, cache: 'no-store' });
-  } catch { throw new RecordApiError(connectionMessage, 0, 'MSG144'); }
+  } catch { throw new RecordApiError(connectionMessage, 0, 'MSG49'); }
   const body = await response.json().catch(() => null) as unknown;
   if (!response.ok) {
     const error = body as Partial<SystemMessage> | null;
-    throw new RecordApiError(error?.message ?? connectionMessage, response.status, error?.code ?? 'MSG144');
+    throw new RecordApiError(error?.message ?? connectionMessage, response.status, error?.code ?? 'MSG49');
   }
   return body as T;
 }

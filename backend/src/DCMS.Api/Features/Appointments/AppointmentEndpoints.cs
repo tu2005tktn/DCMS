@@ -9,7 +9,7 @@ public static class AppointmentEndpoints
 {
     public static void MapAppointmentEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        // AllowAnonymous lets UC-06 distinguish an unauthenticated guest (MSG32) from an invalid bearer (MSG07).
+        // AllowAnonymous lets UC-06 distinguish an unauthenticated guest (MSG27) from an invalid bearer (MSG06).
         endpoints.MapGet("/api/appointments/{code}/availability", async (HttpContext context, string code, DateOnly date, int? dentistId,
             IAppointmentChangeService service, CancellationToken ct) =>
             Results.Ok(await service.AvailabilityAsync(ChangeActor(context), code, date, dentistId, ct)))
@@ -40,7 +40,7 @@ public static class AppointmentEndpoints
         {
             // A rejected bearer token must not be silently treated as an anonymous booking.
             if (context.Request.Headers.ContainsKey("Authorization") && context.User.Identity?.IsAuthenticated != true)
-                throw new BusinessException(401, SystemMessages.Get("MSG07"));
+                throw new BusinessException(401, SystemMessages.Get("MSG06"));
             var current = context.Items["CurrentUser"] as DCMS.Application.Features.Authentication.CurrentUser;
             var outcome = await service.CreateAsync(current?.Id, request, ct);
             return Results.Json(outcome.Result, statusCode: outcome.Replayed ? StatusCodes.Status200OK : StatusCodes.Status201Created);
@@ -50,7 +50,7 @@ public static class AppointmentEndpoints
     private static int ChangeActor(HttpContext context)
     {
         if (context.User.Identity?.IsAuthenticated != true)
-            throw new BusinessException(401, SystemMessages.Get(context.Request.Headers.ContainsKey("Authorization") ? "MSG07" : "MSG32"));
+            throw new BusinessException(401, SystemMessages.Get(context.Request.Headers.ContainsKey("Authorization") ? "MSG06" : "MSG27"));
         return AuthenticationEndpoints.AccountId(context.User);
     }
 }

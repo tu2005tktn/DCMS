@@ -14,7 +14,7 @@ Tài liệu này mô tả UI web và API TV5. Web gọi `supportInbox.api.ts`; m
   - Thông tin appointment liên quan (mã, chi nhánh, ghế, nha sĩ, thời gian).
   - Thông tin requester (booker/attendee, accountId/ẩn danh, SĐT).
   - Lịch sử thay đổi `history` của appointment.
-  - Cờ quyền `canResolve`, `canEdit`, `branchMatch`, `ownershipMatch` (do server tính, mock hiện trả `true` cho mọi staff).
+  - Cờ quyền `canResolve`, `canEdit`, `branchMatch`, `ownershipMatch` (do server tính theo quyền, chi nhánh và quyền sở hữu).
 - Command TV4/TV5 (theo hợp đồng mock DTO):
   - **Xác minh requester** (`verifyRequester`).
   - **Đổi lịch** với lý do (`staffChange`).
@@ -40,7 +40,7 @@ Tài liệu này mô tả UI web và API TV5. Web gọi `supportInbox.api.ts`; m
 | Withdrawn không được resolve (GBR-075) | Ẩn nút Resolve/Reject khi `status === 'Withdrawn'`. |
 | `expectedVersion` conflict (GBR-014) | Mọi command đều gửi `expectedVersion` lấy từ danh sách; server trả MSG111 → toast và tải lại. |
 | Quyền staff + branch + ownership (UC-34 booking) | Nút hành động disable khi `canResolve === false` hoặc `branchMatch === false`; tooltip giải thích. |
-| Không viết lại logic booking/change | UI web chỉ gọi `appointmentMockRepo.staffChange`; backend sẽ thay thế bằng HTTP thật. |
+| Không viết lại logic booking/change | UI web gọi `POST /api/support-requests/{id}/change-appointment`; đổi/hủy lịch do server thực hiện trong transaction. |
 | Notification không chứa chẩn đoán (GBR-081) | Web chỉ hiển thị `notificationCode` (MSG31-38) làm text, không render body lâm sàng. |
 
 ## Cấu trúc thư mục
@@ -94,31 +94,22 @@ reject được giữ khi retry lỗi mạng hoặc 5xx và chỉ thay khi comma
 - `ConfirmedToAttend` là cột riêng trên Appointment; command không tạo Visit và không
   thay đổi `Appointment.Status`.
 
-## Dữ liệu mock (chỉ Development)
+## Kiểm thử thủ công
 
-Mock tạo 6 yêu cầu mẫu thuộc branch 1 (mặc định staff phụ trách):
-- 2 `Change` Pending.
-- 1 `Cancel` InReview.
-- 1 `ConfirmToAttend` Pending.
-- 1 `Change` Resolved.
-- 1 `Cancel` Withdrawn (chỉ để staff thấy lịch sử; UI không cho phép resolve).
-
-Mỗi dòng gắn với `AppointmentDto` tối thiểu: `id`, `code`, `version`, `status`, `startAt`, `endAt`, `branchId`, `branchName`, `dentistName`, `attendeeName`, `booker`.
-
-## Kiểm thử thủ công (Playwright + tay)
-
-1. `cd web; npm run dev`, đăng nhập `assistant.demo` (tài khoản Staff) → thấy menu "Hộp thư hỗ trợ".
-2. Mở `/support-inbox` → thấy 6 yêu cầu mock, lọc "Chờ staff" → 3 dòng.
-3. Bấm vào `Change` Pending → drawer hiển thị lịch + lý do; bấm "Đổi sang khung mới" → điền `newStartAt` + lý do → command `staffChange` → trả `ok=true` → bật nút Resolve.
-4. Resolve với lý do → danh sách tải lại; dòng chuyển `Resolved`.
-5. Mở yêu cầu `Cancel` đang `Withdrawn` → không thấy nút Resolve/Reject; chỉ thấy lịch sử.
-6. Đăng nhập `patient.demo` (tài khoản Public) → menu Staff ẩn; gõ thẳng URL `/support-inbox` → trang "Không có quyền".
-7. Mô phỏng lỗi `STALE_VERSION`: trong mock, tăng `version` của request lên khi staff đang mở drawer → bấm Resolve → toast "Phiên làm việc đã thay đổi, vui lòng tải lại." + danh sách refresh.
+1. Chạy backend và `cd web; npm run dev`, đăng nhập tài khoản nhân viên có quyền hộp thư hỗ trợ → thấy menu "Hộp thư hỗ trợ".
+2. Từ web khách hàng hoặc mobile, gửi yêu cầu đổi/huỷ cho một lịch hẹn (dưới mốc tự phục vụ) → yêu cầu xuất hiện ở `/support-inbox`, lọc "Chờ staff".
+3. Mở yêu cầu `Change` → xác minh người yêu cầu → "Đổi sang khung mới" chọn `newStartAt` + lý do → server trả `ok=true` → bật nút xử lý.
+4. Xử lý → danh sách tải lại; dòng chuyển `Resolved`; người yêu cầu nhận thông báo S26.
+5. Người yêu cầu rút một yêu cầu khác → staff mở thấy `Withdrawn`, không có nút xử lý/từ chối.
+6. Đăng nhập tài khoản Public → menu nhân viên ẩn; mở thẳng `/support-inbox` → "Không có quyền".
+7. Mở cùng yêu cầu ở hai tab, xử lý ở tab 1 rồi thao tác ở tab 2 → server trả 409 (MSG111) → thông báo và tải lại.
 
 ## Phối hợp với mobile
 
-- `mobile/src/app/(home)/staff/requests/index.tsx` và `[id].tsx` đã hiện thực cùng DTO và command; web dùng chung `SupportRequestDto`/`StaffChangeCommand`/`StaffResolveResult` từ `appointment.types.ts` (khi chuyển sang chia sẻ package, copy sang `web/src/features/support-inbox/types.ts` giữ nguyên shape).
-- Khi backend TV5 triển khai, cả hai phía chỉ cần thay implementation bên trong repo (mock → HTTP) — UI không đổi.
+- `mobile/src/app/(home)/staff/requests/index.tsx` và `[id].tsx` gọi cùng API với web qua `mobile/src/features/support-inbox/support-requests.api.ts` (`GET /api/support-requests`, `GET /api/support-requests/{id}`, `POST .../verify-requester`, `.../change-appointment`, `.../resolve`, `.../reject`) bằng token phiên staff. Không còn dùng `appointmentMockRepo`, không gán cứng chi nhánh: server lọc theo chi nhánh của staff và trả cờ `permission`.
+- Mobile dùng cùng shape DTO với `web/src/features/support-inbox/types.ts` (`SupportRequestDetail`, `StaffChangeCommand`, `StaffResolveCommand`). `requestKey` là UUID giữ nguyên khi thử lại cùng nội dung sau lỗi mạng/5xx.
+- Đổi lịch trên mobile: chọn ngày (21 ngày tới) và khung giờ trống từ `GET /api/availability` theo chi nhánh/nha sĩ/dịch vụ/thời lượng của lịch hẹn; mặc định chọn giờ bệnh nhân đề xuất (`proposedChange.newStartAt`). Server vẫn kiểm tra lại khung giờ khi `change-appointment`. Từ chối bắt buộc nhập lý do (`decisionReason`) như web.
+- Màn "Lịch bị ảnh hưởng" trên mobile đã gỡ khỏi menu staff vì backend chưa có endpoint preview lịch bị ảnh hưởng theo tuần; staff dùng màn lịch làm việc trên web.
 
 ## Traceability
 

@@ -15,8 +15,8 @@ public static class StaffAccountConflicts
             "phone" => "Số điện thoại",
             _ => null
         };
-        return label == null ? SystemMessages.Get("MSG139")
-            : new SystemMessage("MSG139", $"{label} đã được sử dụng. Vui lòng nhập {label.ToLowerInvariant()} khác.") { Field = field };
+        return label == null ? SystemMessages.Get("MSG46")
+            : new SystemMessage("MSG46", $"{label} đã được sử dụng. Vui lòng nhập {label.ToLowerInvariant()} khác.") { Field = field };
     }
 
     public static SystemMessage ForConstraint(string? constraint) => ForField(constraint switch

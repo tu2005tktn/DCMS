@@ -21,7 +21,7 @@ public sealed class OwnClinicalRecordService(DcmsDbContext db, IClinicalDocument
     private async Task<int> PatientAsync(int accountId, CancellationToken ct) =>
         await db.PatientAccountLinks.AsNoTracking()
             .Where(x => x.AccountId == accountId && x.Status == PatientLinkStatus.Verified && x.PatientId != null)
-            .Select(x => x.PatientId).SingleOrDefaultAsync(ct) ?? throw Error("MSG06", 403);
+            .Select(x => x.PatientId).SingleOrDefaultAsync(ct) ?? throw Error("MSG05", 403);
 
     private static (int Page, int Size) Paging(int page, int pageSize)
     {
@@ -91,7 +91,7 @@ public sealed class OwnClinicalRecordService(DcmsDbContext db, IClinicalDocument
     public async Task<OwnVisitDetail> VisitAsync(int accountId, Guid visitId, CancellationToken ct)
     {
         var patientId = await PatientAsync(accountId, ct);
-        var row = await Visits(patientId).SingleOrDefaultAsync(x => x.Id == visitId, ct) ?? throw Error("MSG113", 404);
+        var row = await Visits(patientId).SingleOrDefaultAsync(x => x.Id == visitId, ct) ?? throw Error("MSG42", 404);
         var c = Content(row.ContentJson);
         var findings = c.Findings.Select(f => new OwnFinding(f.Tooth, f.Region, f.Condition, f.Surfaces ?? [], f.Diagnoses ?? [])).ToArray();
         var examination = new OwnExaminationResult(row.Version, c.Symptoms, findings, Diagnoses(c), c.Conclusion, c.Advice,
@@ -110,7 +110,7 @@ public sealed class OwnClinicalRecordService(DcmsDbContext db, IClinicalDocument
         var patientId = await PatientAsync(accountId, ct);
         var query = ReadyDocuments(patientId);
         if (visitId.HasValue) {
-            if (!await Visits(patientId).AnyAsync(x => x.Id == visitId, ct)) throw Error("MSG113", 404);
+            if (!await Visits(patientId).AnyAsync(x => x.Id == visitId, ct)) throw Error("MSG42", 404);
             var investigations = VisitInvestigations(visitId.Value);
             query = query.Where(d => d.VisitId == visitId || (d.Metadata.InvestigationId != null && investigations.Contains(d.Metadata.InvestigationId.Value)));
         }

@@ -123,7 +123,7 @@ export default function SystemSettingsPage() {
   ];
 
   if (!tabs.length) {
-    return <Result status="403" title="Bạn không có quyền thực hiện thao tác này (403 MSG06)." extra={<Link to="/">Về trang chủ</Link>} />;
+    return <Result status="403" title="Bạn không có quyền thực hiện thao tác này (403 MSG05)." extra={<Link to="/">Về trang chủ</Link>} />;
   }
 
   // Current active section resolution: from route param :section, or ?tab= query param, or first available tab

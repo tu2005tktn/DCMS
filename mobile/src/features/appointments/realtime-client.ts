@@ -3,8 +3,8 @@
  *
  * Mục đích:
  *  - Kết nối tới `/hubs/notifications` khi user đã authenticated.
- *  - Subscribe `notificationCreated` event, đẩy vào notificationRepoPersist
- *    để UI danh sách tự cập nhật + hiển thị toast.
+ *  - Subscribe `notificationCreated` event để hiển thị toast; danh sách thông báo luôn đọc lại
+ *    từ `GET /api/notifications` (không lưu bản sao trên thiết bị).
  *  - Auto-reconnect (exponential backoff), tự start khi có token, tự stop khi sign out.
  *
  * Vì sao viết wrapper (không xài trực tiếp SignalR ở UI):
@@ -22,7 +22,6 @@
 
 import * as signalR from '@microsoft/signalr';
 import { env } from '@/config/env';
-import { notificationRepoPersist } from './notification.repo.persist';
 import type { NotificationDto } from './notification.types';
 
 let connection: signalR.HubConnection | null = null;
@@ -71,21 +70,6 @@ export async function startRealtime(token: string): Promise<void> {
     .build();
 
   hub.on('notificationCreated', (payload: NotificationDto) => {
-    // 1. Persist + đẩy vào store để UI danh sách cập nhật.
-    void notificationRepoPersist
-      .create({
-        accountId: payload.accountId,
-        kind: payload.kind,
-        title: payload.title,
-        body: payload.body,
-        appointmentId: payload.appointmentId,
-        requestId: payload.requestId,
-        deepLink: payload.deepLink,
-        channels: payload.attempts?.map(a => a.channel) ?? ['InApp'],
-        dedupeKey: payload.dedupeKey,
-      })
-      .catch(() => undefined);
-    // 2. Toast.
     emitToast(payload);
   });
 

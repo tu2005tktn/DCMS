@@ -17,11 +17,11 @@ export type DocumentsApi = {
 };
 
 const base = (import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5080').replace(/\/$/, '');
-const connectionError = () => new ApiError(0, 'MSG144', 'Không thể hoàn tất thao tác. Vui lòng kiểm tra kết nối và thử lại.');
+const connectionError = () => new ApiError(0, 'MSG49', 'Không thể hoàn tất thao tác. Vui lòng kiểm tra kết nối và thử lại.');
 
 async function errorFrom(response: Response): Promise<ApiError> {
   const body = await response.json().catch(() => null) as Partial<SystemMessage> | null;
-  return new ApiError(response.status, body?.code ?? 'MSG144', body?.message ?? 'Không thể hoàn tất thao tác. Vui lòng thử lại.', body?.field);
+  return new ApiError(response.status, body?.code ?? 'MSG49', body?.message ?? 'Không thể hoàn tất thao tác. Vui lòng thử lại.', body?.field);
 }
 
 const httpDocumentsApi: DocumentsApi = {
@@ -51,7 +51,7 @@ const httpDocumentsApi: DocumentsApi = {
       try { body = JSON.parse(xhr.responseText); } catch { /* empty or non-JSON body */ }
       if (xhr.status >= 200 && xhr.status < 300 && (body as { document?: DocumentItem })?.document) { resolve((body as { document: DocumentItem }).document); return; }
       const error = body as Partial<SystemMessage> | null;
-      reject(new ApiError(xhr.status, error?.code ?? 'MSG144', error?.message ?? 'Không thể tải tệp lên. Vui lòng thử lại.', error?.field));
+      reject(new ApiError(xhr.status, error?.code ?? 'MSG49', error?.message ?? 'Không thể tải tệp lên. Vui lòng thử lại.', error?.field));
     };
     xhr.onerror = () => reject(connectionError());
     xhr.onabort = () => reject(new ApiError(0, 'ABORTED', 'Đã hủy tải lên.'));

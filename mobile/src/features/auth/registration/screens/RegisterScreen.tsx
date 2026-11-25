@@ -55,8 +55,8 @@ export default function RegisterScreen() {
       setSuccess(result.notification.message);
     } catch (error) {
       if (error instanceof ApiError) {
-        if (error.code === 'MSG139') setErrors(current => ({ ...current, phoneNumber: error.message }));
-        else if (error.code === 'MSG109') setErrors(current => ({ ...current, password: error.message }));
+        if (error.code === 'MSG46') setErrors(current => ({ ...current, phoneNumber: error.message }));
+        else if (error.code === 'MSG39') setErrors(current => ({ ...current, password: error.message }));
         else if (error.message.includes('Xác nhận mật khẩu')) {
           setErrors(current => ({ ...current, confirmPassword: error.message }));
         } else if (error.message.includes('Số điện thoại')) {

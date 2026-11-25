@@ -101,8 +101,8 @@ public sealed class TreatmentDossierApiTests(ApiFixture fixture) : IClassFixture
         Assert.Equal("Deleted", (await deletedResponse.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier.State);
         Assert.Equal(HttpStatusCode.OK, (await Delete(request)).StatusCode);
         await AssertMessage(await Delete(new DeleteDossierRequest(created.Version + 1, key)),
-            HttpStatusCode.Conflict, "MSG111");
-        await AssertMessage(await dentist.GetAsync(url), HttpStatusCode.NotFound, "MSG113");
+            HttpStatusCode.Conflict, "MSG41");
+        await AssertMessage(await dentist.GetAsync(url), HttpStatusCode.NotFound, "MSG42");
         var page = await dentist.GetFromJsonAsync<DossierPage>(
             $"/api/patients/{setup.PatientId}/dossiers?page=1&pageSize=20");
         Assert.DoesNotContain(page!.Items, x => x.Id == created.Id);
@@ -114,7 +114,7 @@ public sealed class TreatmentDossierApiTests(ApiFixture fixture) : IClassFixture
         var withItem = await AddPlanItem(dentist, second.Id, second.Version, setup.ServiceId, setup.DentistId, 100000);
         using var blocked = new HttpRequestMessage(HttpMethod.Delete, $"/api/dossiers/{second.Id}")
             { Content = JsonContent.Create(new DeleteDossierRequest(withItem.Version, Guid.NewGuid())) };
-        await AssertMessage(await dentist.SendAsync(blocked), HttpStatusCode.Conflict, "MSG233");
+        await AssertMessage(await dentist.SendAsync(blocked), HttpStatusCode.Conflict, "MSG55");
     }
 
     [Fact]
@@ -178,11 +178,11 @@ public sealed class TreatmentDossierApiTests(ApiFixture fixture) : IClassFixture
         Assert.Equal(HttpStatusCode.Created, retry.StatusCode);
         Assert.Equal(created.Id, (await retry.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier.Id);
         await AssertMessage(await dentist.PostAsJsonAsync(url, create with { Diagnosis = "Different" }),
-            HttpStatusCode.Conflict, "MSG111");
+            HttpStatusCode.Conflict, "MSG41");
 
         await AssertMessage(await dentist.PostAsJsonAsync($"/api/dossiers/{created.Id}/close",
             new CloseDossierRequest(created.Version, "CompletedAsAgreed", null, Guid.NewGuid())),
-            HttpStatusCode.Conflict, "MSG243");
+            HttpStatusCode.Conflict, "MSG58");
 
         var withItem = await AddPlanItem(dentist, created.Id, created.Version, setup.ServiceId, setup.DentistId);
         Assert.Equal(1, withItem.PlanVersion);

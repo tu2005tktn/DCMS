@@ -30,17 +30,17 @@ public sealed class SettingsService(DcmsDbContext db, ISettingsAccess access, Us
         var assignments=await db.Set<StaffAccessAssignment>().AsNoTracking().Where(x=>x.GroupId==row.Id).Select(x=>x.BranchIds).ToListAsync(ct);
         return new(row.Id,row.Code,row.Name,row.BaseRole,row.Description,row.Active,row.Version,row.Grants.Select(x=>x.Permission).Order().ToArray(),assignments.Count(x=>state.Owner||x.Length>0&&x.All(state.BranchIds.Contains)));
     }
-    async Task<AccessGroup> Group(Guid id,CancellationToken ct)=>await db.Set<AccessGroup>().SingleOrDefaultAsync(x=>x.Id==id,ct)??throw Error("MSG113",404);
+    async Task<AccessGroup> Group(Guid id,CancellationToken ct)=>await db.Set<AccessGroup>().SingleOrDefaultAsync(x=>x.Id==id,ct)??throw Error("MSG42",404);
     async Task ManageGroup(PermissionState actor,int actorId,Guid id,CancellationToken ct) {
         var assigned=await db.Set<StaffAccessAssignment>().AsNoTracking().Where(x=>x.GroupId==id).ToListAsync(ct);
-        if(assigned.Any(x=>x.AccountId==actorId)||!actor.Owner&&assigned.Any(x=>x.BranchIds.Length==0||x.BranchIds.Any(b=>!actor.BranchIds.Contains(b))))throw Error("MSG06",403);
+        if(assigned.Any(x=>x.AccountId==actorId)||!actor.Owner&&assigned.Any(x=>x.BranchIds.Length==0||x.BranchIds.Any(b=>!actor.BranchIds.Contains(b))))throw Error("MSG05",403);
     }
     static void ValidateGroup(AccessGroupValue input,PermissionState actor) {
         if(input==null||string.IsNullOrWhiteSpace(input.Code)||input.Code.Length>40||string.IsNullOrWhiteSpace(input.Name)||input.Name.Length>160||input.Description?.Length>1000
             ||!new[]{AccountRoles.Admin,AccountRoles.Dentist,AccountRoles.ClinicAssistant}.Contains(input.BaseRole)||input.Grants==null||input.Grants.Distinct().Count()!=input.Grants.Length)throw Error("MSG04");
         foreach(var grant in input.Grants){
             var definition=SettingsGrants.Definitions.SingleOrDefault(x=>x.Key==grant)??throw Error("MSG04");
-            if(!actor.Owner&&!actor.Permissions.Contains(grant))throw Error("MSG06",403);
+            if(!actor.Owner&&!actor.Permissions.Contains(grant))throw Error("MSG05",403);
             if(definition.Parent!=null&&!input.Grants.Contains(definition.Parent))throw Error("MSG04");
         }
     }
@@ -50,22 +50,22 @@ public sealed class SettingsService(DcmsDbContext db, ISettingsAccess access, Us
     }
     public async Task<object> GroupPreviewAsync(int actor,Guid id,GroupCommand command,CancellationToken ct) {
         var state=await access.RequireAsync(actor,"access-groups.manage",ct);await ManageGroup(state,actor,id,ct);ValidateGroup(command.Entry,state);
-        var row=await Group(id,ct);if(row.Version!=command.ExpectedVersion)throw Error("MSG111",409);var before=await GroupDto(row,state,ct);
+        var row=await Group(id,ct);if(row.Version!=command.ExpectedVersion)throw Error("MSG41",409);var before=await GroupDto(row,state,ct);
         return new {before,added=command.Entry.Grants.Except(before.Grants).ToArray(),removed=before.Grants.Except(command.Entry.Grants).ToArray(),affected=before.AssignedCount};
     }
     public Task<GroupDto> SaveGroupAsync(int actor,Guid? id,GroupCommand command,CancellationToken ct)=>Run(actor,"access-groups.manage",command.RequestKey,"group.save","access-groups:"+(id?.ToString()??"new"),command,id==null?"Tạo nhóm quyền":command.Reason,async state=>{
         ValidateGroup(command.Entry,state);var input=command.Entry;var name=Normalize(input.Name);var code=Normalize(input.Code);
-        if(await db.Set<AccessGroup>().AnyAsync(x=>x.Id!=id&&(x.Name.ToUpper()==name||x.Code.ToUpper()==code),ct))throw Error("MSG201",409,"code/name");
+        if(await db.Set<AccessGroup>().AnyAsync(x=>x.Id!=id&&(x.Name.ToUpper()==name||x.Code.ToUpper()==code),ct))throw Error("MSG50",409,"code/name");
         var row=id==null?new AccessGroup():await Group(id.Value,ct);var before=id==null?null:await GroupDto(row,state,ct);
-        if(id!=null){if(row.Version!=command.ExpectedVersion)throw Error("MSG111",409);if(input.BaseRole!=row.BaseRole&&await db.Set<StaffAccessAssignment>().AnyAsync(x=>x.GroupId==row.Id,ct))throw Error("MSG205",409);row.Version++;}else db.Add(row);
+        if(id!=null){if(row.Version!=command.ExpectedVersion)throw Error("MSG41",409);if(input.BaseRole!=row.BaseRole&&await db.Set<StaffAccessAssignment>().AnyAsync(x=>x.GroupId==row.Id,ct))throw Error("MSG52",409);row.Version++;}else db.Add(row);
         row.Code=input.Code.Trim();row.Name=input.Name.Trim();row.BaseRole=input.BaseRole;row.Description=input.Description?.Trim();
         var removed=row.Grants.Where(x=>!input.Grants.Contains(x.Permission)).ToArray();foreach(var item in removed)row.Grants.Remove(item);
         foreach(var grant in input.Grants.Where(x=>!row.Grants.Any(g=>g.Permission==x)))row.Grants.Add(new AccessGroupGrant {GroupId=row.Id,Permission=grant});var result=await GroupDto(row,state,ct);
         return(result,row.Version,(object?)before??new{},(object)result);
     },ct,id==null?null:state=>ManageGroup(state,actor,id.Value,ct));
     public Task<GroupDto> GroupStateAsync(int actor,Guid id,StateCommand command,CancellationToken ct)=>Run(actor,"access-groups.manage",command.RequestKey,"group.state","access-groups:"+id,command,command.Reason,async state=>{
-        var row=await Group(id,ct);if(row.Version!=command.ExpectedVersion)throw Error("MSG111",409);
-        if(!command.Active&&await db.Set<StaffAccessAssignment>().AnyAsync(x=>x.GroupId==id,ct))throw Error("MSG205",409,"nhóm còn nhân viên");
+        var row=await Group(id,ct);if(row.Version!=command.ExpectedVersion)throw Error("MSG41",409);
+        if(!command.Active&&await db.Set<StaffAccessAssignment>().AnyAsync(x=>x.GroupId==id,ct))throw Error("MSG52",409,"nhóm còn nhân viên");
         var before=await GroupDto(row,state,ct);row.Active=command.Active;row.Version++;var result=await GroupDto(row,state,ct);return(result,row.Version,(object)before,(object)result);
     },ct,state=>ManageGroup(state,actor,id,ct));
     public async Task<StaffAccessDto[]> StaffAsync(int actor,CancellationToken ct) {
@@ -80,11 +80,11 @@ public sealed class SettingsService(DcmsDbContext db, ISettingsAccess access, Us
     }
     public Task<StaffAccessDto> AssignAsync(int actor,int employeeId,AssignGroup command,CancellationToken ct)=>Run(actor,"staff.access.assign",command.RequestKey,"group.assign","staff:"+employeeId,command,command.Reason,async state=>{
         var employee=await db.Employees.SingleAsync(x=>x.Id==employeeId,ct);var user=await db.Users.SingleAsync(x=>x.Id==employee.AccountId,ct);var group=await Group(command.GroupId,ct);
-        if(!group.Active)throw Error("MSG202",409);if(user.Version!=command.ExpectedVersion||group.Version!=command.GroupVersion)throw Error("MSG111",409);
-        var roles=AccountRoles.Effective(await users.GetRolesAsync(user));if(!roles.Contains(group.BaseRole))throw Error("MSG06",403);
-        if(!state.Owner&&group.Grants.Any(x=>!state.Permissions.Contains(x.Permission)))throw Error("MSG06",403);
+        if(!group.Active)throw Error("MSG51",409);if(user.Version!=command.ExpectedVersion||group.Version!=command.GroupVersion)throw Error("MSG41",409);
+        var roles=AccountRoles.Effective(await users.GetRolesAsync(user));if(!roles.Contains(group.BaseRole))throw Error("MSG05",403);
+        if(!state.Owner&&group.Grants.Any(x=>!state.Permissions.Contains(x.Permission)))throw Error("MSG05",403);
         var membership=await db.SchedulingMembers.Where(x=>x.EmployeeId==employeeId&&x.Active).Select(x=>x.BranchId).ToArrayAsync(ct);
-        if(command.BranchIds==null||command.BranchIds.Length==0||command.BranchIds.Distinct().Count()!=command.BranchIds.Length||command.BranchIds.Any(x=>!membership.Contains(x)||!state.BranchIds.Contains(x)))throw Error("MSG06",403);
+        if(command.BranchIds==null||command.BranchIds.Length==0||command.BranchIds.Distinct().Count()!=command.BranchIds.Length||command.BranchIds.Any(x=>!membership.Contains(x)||!state.BranchIds.Contains(x)))throw Error("MSG05",403);
         var assignment=await db.Set<StaffAccessAssignment>().SingleOrDefaultAsync(x=>x.AccountId==user.Id,ct);object before=assignment==null?new{}:new{assignment.GroupId,user.Version,assignment.BranchIds};
         if(assignment==null){assignment=new(){AccountId=user.Id};db.Add(assignment);}else user.Version++;
         if(assignment.GroupId!=Guid.Empty&&assignment.GroupId!=group.Id){var previousGroup=await Group(assignment.GroupId,ct);previousGroup.Version++;}
@@ -93,12 +93,12 @@ public sealed class SettingsService(DcmsDbContext db, ISettingsAccess access, Us
         var result=new StaffAccessDto(employee.Id,user.Id,user.FullName,user.IsActive,user.Version,group.Id,user.Version,assignment.BranchIds);
         return(result,user.Version,before,(object)result);
     },ct,async state=>{
-        var employee=await db.Employees.AsNoTracking().SingleOrDefaultAsync(x=>x.Id==employeeId,ct)??throw Error("MSG113",404);
-        if(employee.AccountId==actor)throw Error("MSG06",403);
-        var target=await db.Users.AsNoTracking().SingleAsync(x=>x.Id==employee.AccountId,ct);if(target.AccountType!="Staff")throw Error("MSG06",403);
-        var roles=await users.GetRolesAsync(target);if(roles.Contains(AccountRoles.ClinicOwner))throw Error("MSG06",403);
+        var employee=await db.Employees.AsNoTracking().SingleOrDefaultAsync(x=>x.Id==employeeId,ct)??throw Error("MSG42",404);
+        if(employee.AccountId==actor)throw Error("MSG05",403);
+        var target=await db.Users.AsNoTracking().SingleAsync(x=>x.Id==employee.AccountId,ct);if(target.AccountType!="Staff")throw Error("MSG05",403);
+        var roles=await users.GetRolesAsync(target);if(roles.Contains(AccountRoles.ClinicOwner))throw Error("MSG05",403);
         var branches=await db.SchedulingMembers.Where(x=>x.EmployeeId==employeeId&&x.Active).Select(x=>x.BranchId).ToArrayAsync(ct);
-        if(!state.Owner&&(branches.Length==0||branches.Any(b=>!state.BranchIds.Contains(b))))throw Error("MSG06",403);
+        if(!state.Owner&&(branches.Length==0||branches.Any(b=>!state.BranchIds.Contains(b))))throw Error("MSG05",403);
     });
     async Task<T> Run<T>(int actor,string permission,Guid key,string action,string target,object payload,string? reason,Func<PermissionState,Task<(T Result,int Version,object Before,object After)>> change,CancellationToken ct,Func<PermissionState,Task>? guard=null) {
         await using var tx=await db.Database.BeginTransactionAsync(ct);
@@ -107,7 +107,7 @@ public sealed class SettingsService(DcmsDbContext db, ISettingsAccess access, Us
         if(key==Guid.Empty)throw Error("MSG04");Reason(reason);
         var fingerprint=Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new{action,target,payload},Json))));
         var old=await db.Set<SettingsReceipt>().AsNoTracking().SingleOrDefaultAsync(x=>x.ActorId==actor&&x.RequestKey==key,ct);
-        if(old!=null){if(old.Fingerprint!=fingerprint)throw Error("MSG111",409);await tx.CommitAsync(ct);return JsonSerializer.Deserialize<T>(old.ResultJson,Json)!;}
+        if(old!=null){if(old.Fingerprint!=fingerprint)throw Error("MSG41",409);await tx.CommitAsync(ct);return JsonSerializer.Deserialize<T>(old.ResultJson,Json)!;}
         var result=await change(state);
         var section=target.StartsWith("staff:")?"access-groups":target.Split(':')[0];
         var auditTarget=result.Result is ReferenceDto reference ? reference.Kind+":"+reference.Id : result.Result is GroupDto group ? "access-groups:"+group.Id : target;

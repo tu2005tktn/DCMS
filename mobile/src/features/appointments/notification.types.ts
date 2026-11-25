@@ -1,15 +1,11 @@
 /**
  * S26 — Notification DTOs (contract-first).
  *
- * Theo "Dùng mock DTO chung để làm song song, không đợi task khác hoàn thành mới bắt
- * đầu UI": file này định nghĩa DTO mà UI và backend (TV5) sẽ cùng dùng.
- *
- * Khi backend triển khai xong, UI chỉ cần bật `EXPO_PUBLIC_USE_REAL_NOTIFICATION_API=true`
- * để chuyển từ mock sang HTTP thật — shape response đã được chốt tại đây.
+ * Shape response của `/api/notifications` (backend `NotificationDto`, `ListNotificationsResult`).
  *
  * Traceability:
  *   - S26: notification list của account hiện tại, deep link có kiểm quyền lại.
- *   - UC-05/06; GBR-007/012-015/031/073/075/077/078/081/123; MSG31-38/94/111/144; AT16.
+ *   - UC-05/06; GBR-007/012-015/031/073/075/077/078/081/123; MSG26-38/94/111/144; AT16.
  */
 
 // ============================================================================
@@ -126,7 +122,7 @@ export type NotificationErrorCode =
   | 'UNAUTHORIZED'   // 401 — phiên hết hạn → sign out
   | 'FORBIDDEN'      // 403 — không thuộc account
   | 'NOT_FOUND'      // 404 — notification không tồn tại
-  | 'STALE_VERSION'  // 409 — expectedVersion không khớp (MSG111)
+  | 'STALE_VERSION'  // 409 — expectedVersion không khớp (MSG41)
   | 'BAD_REQUEST'    // 400 — payload sai
   | 'NETWORK'        // fetch fail / timeout
-  | 'SERVER';        // 5xx — MSG144
+  | 'SERVER';        // 5xx — MSG49

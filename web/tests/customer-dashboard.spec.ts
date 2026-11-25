@@ -17,8 +17,8 @@ async function setup(page: Page, mode: 'ok' | 'empty' | 'error' | 'expired' | 'f
     if (url.pathname === '/api/me/appointments') {
       requests.push(url.search);
       if (mode === 'expired') return route.fulfill({ status: 401, json: { code: 'MSG001', message: 'Hết phiên.' } });
-      if (mode === 'forbidden') return route.fulfill({ status: 403, json: { code: 'MSG144', message: 'Không có quyền xem lịch.' } });
-      if (failing) return route.fulfill({ status: 503, json: { code: 'MSG144', message: 'Không tải được lịch hẹn.' } });
+      if (mode === 'forbidden') return route.fulfill({ status: 403, json: { code: 'MSG49', message: 'Không có quyền xem lịch.' } });
+      if (failing) return route.fulfill({ status: 503, json: { code: 'MSG49', message: 'Không tải được lịch hẹn.' } });
       return route.fulfill({ json: { items: mode === 'empty' ? [] : [first, { ...first, code: 'LH-MAU-02' }], total: mode === 'empty' ? 0 : 2, page: 1, pageSize: 20 } });
     }
     return route.fulfill({ json: {} });

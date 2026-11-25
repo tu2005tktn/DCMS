@@ -193,8 +193,8 @@ export default function SupplyCatalogPanel({ onlyMedicines = false, initialKey, 
       const apiBase = (import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5080').replace(/\/$/, '');
       const response = await fetch(`${apiBase}${base}/${section.resource}/export?${new URLSearchParams({ q: query, status })}`,
         { headers: { Authorization: `Bearer ${readAccessToken() ?? ''}` }, cache: 'no-store' });
-      if (response.status === 403) throw new ApiError(403, 'MSG06', 'Bạn không có quyền xuất Excel danh mục này.');
-      if (!response.ok) throw new ApiError(response.status, 'MSG144', 'Không thể xuất Excel. Vui lòng thử lại.');
+      if (response.status === 403) throw new ApiError(403, 'MSG05', 'Bạn không có quyền xuất Excel danh mục này.');
+      if (!response.ok) throw new ApiError(response.status, 'MSG49', 'Không thể xuất Excel. Vui lòng thử lại.');
       const url = URL.createObjectURL(await response.blob());
       const link = Object.assign(document.createElement('a'), { href: url, download: `danh-muc-${section.resource}.xlsx` });
       link.click(); URL.revokeObjectURL(url);
@@ -240,7 +240,7 @@ export default function SupplyCatalogPanel({ onlyMedicines = false, initialKey, 
       onClose={() => { if (!busy) setEditing(null); }}
       extra={<Space><Button disabled={busy} onClick={() => setEditing(null)}>Hủy</Button><Button type="primary" loading={busy} onClick={() => void save()}>Lưu</Button></Space>}>
       {formError && <Alert type="error" showIcon message={formError.message}
-        action={formError.code === 'MSG111' && editing?.row ? <Button size="small" onClick={() => void reloadEditing()}>Tải lại bản mới</Button> : undefined} />}
+        action={formError.code === 'MSG41' && editing?.row ? <Button size="small" onClick={() => void reloadEditing()}>Tải lại bản mới</Button> : undefined} />}
       <Form form={form} layout="vertical" disabled={busy}>
         <Form.Item name="code" label="Mã" rules={[{ required: true, whitespace: true, message: 'Vui lòng nhập Mã.' }, { max: 40, message: 'Mã tối đa 40 ký tự.' },
           { pattern: /^\s*[A-Za-z0-9][A-Za-z0-9._-]*\s*$/, message: 'Mã gồm chữ không dấu, số, dấu chấm, gạch dưới hoặc gạch nối.' }]}><Input maxLength={40} autoComplete="off" /></Form.Item>

@@ -69,7 +69,8 @@ public sealed class StorageSimplificationTests(ApiFixture fixture) : IClassFixtu
         Assert.Equal(saved.Id, (await replay.Content.ReadFromJsonAsync<PatientProfilePrescriptionDto>())!.Id);
         medicine.Name = "SYNTHETIC renamed medicine";
         await db.SaveChangesAsync();
-        var detail = (await dentist.GetFromJsonAsync<PatientProfilePrescriptionDto>($"{path}/{saved.Id}"))!;
+        // The single-prescription GET was removed (docs/specs/UNUSED-API-REMOVAL.vi.md); the tab reads the patient list.
+        var detail = Assert.Single((await dentist.GetFromJsonAsync<PatientProfilePrescriptionDto[]>(path))!, x => x.Id == saved.Id);
         Assert.Equal("SYNTHETIC original medicine", Assert.Single(detail.Items).MedicineName);
         using var patientClient = await Login("guest.demo");
         var own = await patientClient.GetFromJsonAsync<PatientProfilePrescriptionDto>($"/api/patients/me/prescriptions/{saved.Id}");
@@ -80,7 +81,7 @@ public sealed class StorageSimplificationTests(ApiFixture fixture) : IClassFixtu
         Assert.Equal(HttpStatusCode.Conflict, (await dentist.PutAsJsonAsync($"{path}/{saved.Id}",
             edit with { RequestKey = Guid.NewGuid() })).StatusCode);
         using var anonymous = fixture.CreateClient();
-        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync($"{path}/{saved.Id}")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync(path)).StatusCode);
     }
 
     [Fact]

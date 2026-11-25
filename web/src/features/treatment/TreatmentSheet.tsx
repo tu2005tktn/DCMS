@@ -159,7 +159,7 @@ export default function TreatmentSheet({ patientId, dossierId, dossierVersion, o
           requestKey: attempt.confirmKey }) });
       accept({ value: result.dossier, ctx: context, rows: drafts.filter(d => d.id !== attempt.row.id) });
       copying.current = null; refresh();
-    } catch (e) { setCopyError({ message: (e as Error).message, stale: e instanceof ApiError && e.code === 'MSG111' }); }
+    } catch (e) { setCopyError({ message: (e as Error).message, stale: e instanceof ApiError && e.code === 'MSG41' }); }
     finally { actionGuard.current = false; setBusy(false); }
   }
   async function reloadCopy() {

@@ -18,10 +18,10 @@ namespace DCMS.Infrastructure.Features.FamilyMembers;
 public sealed partial class FamilyRecordService(DcmsDbContext db, TimeProvider clock, ISettingsAccess access,
     IConfiguration configuration) : IFamilyRecordService
 {
-    private static BusinessException Missing() => new(404, new("FAMILY_ACCESS_NOT_FOUND", "Không tìm thấy yêu cầu hoặc người thân."));
-    private static BusinessException Denied() => new(403, new("FAMILY_ACCESS_DENIED", "Bạn chưa có quyền xem nội dung hồ sơ này hoặc quyền đã hết hiệu lực."));
-    private static BusinessException Invalid(string field) => new(400, new("FAMILY_ACCESS_VALIDATION", $"Vui lòng kiểm tra {field}.") { Field = field });
-    private static BusinessException Stale() => new(409, SystemMessages.Get("MSG111"));
+    private static BusinessException Missing() => new(404, new("MSG71", "Không tìm thấy yêu cầu hoặc người thân."));
+    private static BusinessException Denied() => new(403, new("MSG72", "Bạn chưa có quyền xem nội dung hồ sơ này hoặc quyền đã hết hiệu lực."));
+    private static BusinessException Invalid(string field) => new(400, new("MSG70", $"Vui lòng kiểm tra {field}.") { Field = field });
+    private static BusinessException Stale() => new(409, SystemMessages.Get("MSG41"));
     private static string? Text(string? value, int max, string field, bool required = false)
     {
         var text = string.IsNullOrWhiteSpace(value) ? null : value.Trim();

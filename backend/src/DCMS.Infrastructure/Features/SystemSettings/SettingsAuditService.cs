@@ -23,7 +23,7 @@ public sealed partial class SettingsAuditService(DcmsDbContext db, ISettingsAcce
     public async Task<SettingsAuditPage> ListAsync(int actorId, string? section, DateOnly? from, DateOnly? to, int page, int pageSize, CancellationToken ct)
     {
         var state = await access.ResolveAsync(actorId, ct);
-        if (!state.Owner && !state.Permissions.Contains("settings.audit.read")) throw Error("MSG06", 403);
+        if (!state.Owner && !state.Permissions.Contains("settings.audit.read")) throw Error("MSG05", 403);
         if (page < 1 || !PageSizes.Contains(pageSize) || page > 100_000) throw Error("MSG04", label: "Phân trang");
         if (section != null && !AuditSections.All.Contains(section)) throw Error("MSG04", label: "Nhóm thiết lập", field: "section");
         if (from > to) throw Error("MSG04", label: "Khoảng ngày", field: "from");
@@ -38,7 +38,7 @@ public sealed partial class SettingsAuditService(DcmsDbContext db, ISettingsAcce
                 ? ScreenGrants.SupplyKinds.Any(k => state.Has($"catalog.{k}.read")) : dentist),
             _ => state.Permissions.Contains("access-groups.read")
         }).ToArray();
-        if (section != null && !allowed.Contains(section)) throw Error("MSG06", 403);
+        if (section != null && !allowed.Contains(section)) throw Error("MSG05", 403);
         bool Wants(string s) => allowed.Contains(s) && (section == null || section == s);
 
         // Clinic-day bounds converted to UTC: Npgsql only writes offset-0 values to timestamptz.

@@ -27,7 +27,7 @@ public sealed partial class ReferenceCatalogService(DcmsDbContext db, UserManage
     private async Task<string[]> RolesAsync(int actorId)
     {
         var user = await users.FindByIdAsync(actorId.ToString());
-        if (user is not { IsActive: true, AccountType: "Staff" }) throw Error("MSG06", 403);
+        if (user is not { IsActive: true, AccountType: "Staff" }) throw Error("MSG05", 403);
         return [.. await users.GetRolesAsync(user)];
     }
 
@@ -37,7 +37,7 @@ public sealed partial class ReferenceCatalogService(DcmsDbContext db, UserManage
     {
         Kind(kind);
         if (DCMS.Application.Features.Settings.SettingsGrants.CatalogKinds.Contains(kind)) await access.RequireAsync(actorId, $"catalog.{kind}.{action}", ct);
-        else if (!(await RolesAsync(actorId)).Contains(AccountRoles.ClinicOwner)) throw Error("MSG06", 403);
+        else if (!(await RolesAsync(actorId)).Contains(AccountRoles.ClinicOwner)) throw Error("MSG05", 403);
     }
 
     private static string Kind(string kind) => ReferenceKinds.All.Contains(kind) ? kind : throw Error("MSG04", label: "Loại danh mục", field: "kind");
@@ -81,7 +81,7 @@ public sealed partial class ReferenceCatalogService(DcmsDbContext db, UserManage
         {
             var reason = Reason(request.Reason);
             var row = await RowAsync(Kind(kind), id, tracked: true, ct);
-            if (row.Version != request.ExpectedVersion) throw Error("MSG111", 409);
+            if (row.Version != request.ExpectedVersion) throw Error("MSG41", 409);
             var (code, name, description) = Validate(kind, request.Entry);
             if (code == row.Code && name == row.Name && description == row.Description) throw new BusinessException(400, GeneralSettingsMessages.NoChange);
             await UniqueAsync(kind, code, name, id, ct);
@@ -108,7 +108,7 @@ public sealed partial class ReferenceCatalogService(DcmsDbContext db, UserManage
         {
             var reason = Reason(request.Reason);
             var row = await RowAsync(Kind(kind), id, tracked: true, ct);
-            if (row.Version != request.ExpectedVersion || row.IsActive == request.Active) throw Error("MSG111", 409);
+            if (row.Version != request.ExpectedVersion || row.IsActive == request.Active) throw Error("MSG41", 409);
             if (!request.Active && row.IsReserved) throw new BusinessException(409, ReferenceMessages.Reserved);
             var before = await DtoAsync(row, ct);
             row.IsActive = request.Active;
@@ -149,7 +149,7 @@ public sealed partial class ReferenceCatalogService(DcmsDbContext db, UserManage
             ReferenceKinds.ExpenseCategories => assigned.Contains(AccountRoles.ClinicOwner),
             _ => effective.Contains(AccountRoles.ClinicAssistant) || effective.Contains(AccountRoles.Dentist)
         };
-        if (!allowed) throw Error("MSG06", 403);
+        if (!allowed) throw Error("MSG05", 403);
         if (search?.Length > 100) throw Error("MSG03", label: "Từ khóa", max: 100);
         var term = search?.Trim().Normalize(NormalizationForm.FormC).ToUpperInvariant() ?? "";
         return await db.ReferenceEntries.AsNoTracking()
@@ -162,7 +162,7 @@ public sealed partial class ReferenceCatalogService(DcmsDbContext db, UserManage
     private async Task<IReadOnlyList<ReferenceOption>> SupplyOptionsAsync(string kind, string[] effective, string? search, CancellationToken ct)
     {
         var dentist = effective.Contains(AccountRoles.Dentist);
-        if (kind == "medicines" ? !dentist : !(dentist || effective.Contains(AccountRoles.ClinicAssistant))) throw Error("MSG06", 403);
+        if (kind == "medicines" ? !dentist : !(dentist || effective.Contains(AccountRoles.ClinicAssistant))) throw Error("MSG05", 403);
         var term = search?.Trim().Normalize(NormalizationForm.FormC).ToUpperInvariant() ?? "";
         if (kind == "medicines")
         {
@@ -202,8 +202,8 @@ public sealed partial class ReferenceCatalogService(DcmsDbContext db, UserManage
         var prior = await db.SystemCatalogChanges.AsNoTracking().SingleOrDefaultAsync(x => x.RequestKey == key, ct);
         if (prior != null)
         {
-            if (prior.ActorId != actorId || prior.Command != command || prior.Fingerprint != hash) throw Error("MSG111", 409);
-            return JsonSerializer.Deserialize<ReferenceEntryDto>(prior.ResultJson, ClinicSettingsStore.Json) ?? throw Error("MSG144", 503);
+            if (prior.ActorId != actorId || prior.Command != command || prior.Fingerprint != hash) throw Error("MSG41", 409);
+            return JsonSerializer.Deserialize<ReferenceEntryDto>(prior.ResultJson, ClinicSettingsStore.Json) ?? throw Error("MSG49", 503);
         }
         var now = clock.GetUtcNow();
         var (row, change) = await apply(now);
@@ -258,7 +258,7 @@ public sealed partial class ReferenceCatalogService(DcmsDbContext db, UserManage
 
     private async Task<ReferenceEntry> RowAsync(string kind, Guid id, bool tracked, CancellationToken ct) =>
         await (tracked ? db.ReferenceEntries : db.ReferenceEntries.AsNoTracking()).SingleOrDefaultAsync(x => x.Id == id && x.Kind == kind, ct)
-        ?? throw Error("MSG113", 404);
+        ?? throw Error("MSG42", 404);
 
     private async Task<ReferenceEntryDto> DtoAsync(ReferenceEntry row, CancellationToken ct) => (await DtosAsync([row], ct))[0];
 

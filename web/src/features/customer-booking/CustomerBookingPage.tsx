@@ -190,7 +190,7 @@ function BookingForm() {
       } else {
         const code = failure instanceof ApiError ? failure.code : '';
         setError(`${code ? `${code}: ` : ''}${(failure as Error).message}`);
-        if (['MSG24', 'MSG25', 'MSG26', 'MSG27', 'MSG28', 'MSG111'].includes(code)) {
+        if (['MSG19', 'MSG20', 'MSG21', 'MSG22', 'MSG23', 'MSG41'].includes(code)) {
           setSlot(null); setStep(1); retryRef.current = null;
           const query = new URLSearchParams({ branchId: String(branchId), dentistId: String(dentistId),
             serviceId: String(service.id), date, durationMinutes: String(service.publicDurationMinutes) });

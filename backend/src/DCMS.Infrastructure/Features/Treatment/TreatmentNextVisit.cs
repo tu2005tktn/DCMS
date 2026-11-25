@@ -14,12 +14,12 @@ public sealed partial class TreatmentDossierService
 
     public async Task<NextVisitCandidates> NextVisitCandidatesAsync(int actorId, int patientId, CancellationToken ct)
     {
-        if (!await db.Patients.AsNoTracking().AnyAsync(x => x.Id == patientId, ct)) throw Error("MSG113", 404);
+        if (!await db.Patients.AsNoTracking().AnyAsync(x => x.Id == patientId, ct)) throw Error("MSG42", 404);
         var account = await users.FindByIdAsync(actorId.ToString());
         var scope = await access.ResolveAsync(actorId, ct);
         if (account is not { IsActive: true, AccountType: "Staff" }
-            || !scope.GrantDriven && !AccountRoles.Effective(await users.GetRolesAsync(account)).Contains(AccountRoles.Dentist)) throw Error("MSG06", 403);
-        var employee = await db.Employees.AsNoTracking().SingleOrDefaultAsync(x => x.AccountId == actorId, ct) ?? throw Error("MSG06", 403);
+            || !scope.GrantDriven && !AccountRoles.Effective(await users.GetRolesAsync(account)).Contains(AccountRoles.Dentist)) throw Error("MSG05", 403);
+        var employee = await db.Employees.AsNoTracking().SingleOrDefaultAsync(x => x.AccountId == actorId, ct) ?? throw Error("MSG05", 403);
         var branches = await db.SchedulingMembers.AsNoTracking().Where(x => x.EmployeeId == employee.Id && x.Active && (x.CanDentist || scope.GrantDriven))
             .Select(x => x.BranchId).ToListAsync(ct);
         if (scope.Assigned && !scope.Owner) branches = branches.Where(scope.BranchIds.Contains).ToList();
@@ -69,7 +69,7 @@ public sealed partial class TreatmentDossierService
     public async Task<PlannedDatePreview> PlannedDatePreviewAsync(int actorId, Guid dossierId, Guid itemId, DateOnly plannedOn, CancellationToken ct)
     {
         var dossier = await DossierAsync(actorId, dossierId, ct);
-        var item = dossier.Items.SingleOrDefault(x => x.Id == itemId) ?? throw Error("MSG113", 404);
+        var item = dossier.Items.SingleOrDefault(x => x.Id == itemId) ?? throw Error("MSG42", 404);
         var changes = new List<PlannedDateChange>();
         var target = TreatmentItemRules.PlannedTarget(item);
         if (dossier.State != "Open" || target == plannedOn) return new(dossier.Version, changes);
@@ -90,7 +90,7 @@ public sealed partial class TreatmentDossierService
     public Task<TreatmentChange> ApplyPlannedDatesAsync(int actorId, Guid dossierId, ApplyPlannedDatesRequest request, CancellationToken ct) =>
         SheetCommandAsync(actorId, dossierId, request.RequestKey, "PlannedDatesApply", new { dossierId, request }, async dossier =>
         {
-            if (dossier.Version != request.ExpectedVersion) throw Error("MSG111", 409);
+            if (dossier.Version != request.ExpectedVersion) throw Error("MSG41", 409);
             if (dossier.State != "Open" || request.Changes is not { Count: > 0 and <= 50 }
                 || request.Changes.Select(x => x.ItemId).Distinct().Count() != request.Changes.Count
                 || request.Changes.Any(x => x.PlannedOn.Year < 2000)) throw Error("MSG04");
@@ -98,8 +98,8 @@ public sealed partial class TreatmentDossierService
             var applied = new List<object>();
             foreach (var change in request.Changes)
             {
-                var item = dossier.Items.SingleOrDefault(x => x.Id == change.ItemId) ?? throw Error("MSG113", 404);
-                if (item.DisplayCompleted || performed.Contains(item.Id)) throw Error("MSG111", 409);
+                var item = dossier.Items.SingleOrDefault(x => x.Id == change.ItemId) ?? throw Error("MSG42", 404);
+                if (item.DisplayCompleted || performed.Contains(item.Id)) throw Error("MSG41", 409);
                 var before = item.EstimatedStart;
                 item.EstimatedStart = change.PlannedOn;
                 applied.Add(new { itemId = item.Id, before, after = item.EstimatedStart });
@@ -107,6 +107,6 @@ public sealed partial class TreatmentDossierService
             dossier.Version++; dossier.UpdatedAt = clock.GetUtcNow();
             Event(dossier, actorId, "ItemPlannedDatesChanged", new { changes = applied });
             await db.SaveChangesAsync(ct);
-            return new TreatmentChange(await DetailAsync(dossier, ct), SystemMessages.Get("MSG222", "ngày dự kiến", value: dossier.Code));
+            return new TreatmentChange(await DetailAsync(dossier, ct), SystemMessages.Get("MSG53", "ngày dự kiến", value: dossier.Code));
         }, ct);
 }

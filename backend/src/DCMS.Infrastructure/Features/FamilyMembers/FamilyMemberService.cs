@@ -13,8 +13,8 @@ namespace DCMS.Infrastructure.Features.FamilyMembers;
 public sealed class FamilyMemberService(DcmsDbContext db, TimeProvider clock) : IFamilyMemberService
 {
     private static readonly string[] Relations = ["Father", "Mother", "Spouse", "Child", "Sibling", "Grandparent", "Other"];
-    private static BusinessException Missing() => new(404, new("FAMILY_MEMBER_NOT_FOUND", "Không tìm thấy người thân trong danh sách của bạn."));
-    private static BusinessException Invalid(string field) => new(400, new("FAMILY_MEMBER_VALIDATION", $"Thông tin {field} không hợp lệ.") { Field = field });
+    private static BusinessException Missing() => new(404, new("MSG67", "Không tìm thấy người thân trong danh sách của bạn."));
+    private static BusinessException Invalid(string field) => new(400, new("MSG68", $"Thông tin {field} không hợp lệ.") { Field = field });
     private static FamilyMemberDto Dto(FamilyMember member) => new(member.Id, member.FullName, member.Relationship, member.BirthDate, member.Version, member.Gender, member.ContactPhone);
     private static (string? Gender, string? Phone) Contact(string? gender, string? phone)
     {
@@ -32,7 +32,7 @@ public sealed class FamilyMemberService(DcmsDbContext db, TimeProvider clock) : 
     private async Task Authorize(int actor, CancellationToken ct)
     {
         if (!await db.Users.AsNoTracking().AnyAsync(x => x.Id == actor && x.IsActive && x.AccountType == "Public", ct))
-            throw new BusinessException(403, SystemMessages.Get("MSG06"));
+            throw new BusinessException(403, SystemMessages.Get("MSG05"));
     }
     private string Validate(string? name, string? relation, DateOnly? birth, Guid key)
     {
@@ -73,7 +73,7 @@ public sealed class FamilyMemberService(DcmsDbContext db, TimeProvider clock) : 
         var receipt = await db.Set<FamilyMemberReceipt>().AsNoTracking().SingleOrDefaultAsync(x => x.OwnerAccountId == actor && x.RequestKey == key, ct);
         if (receipt != null)
         {
-            if (receipt.Fingerprint != hash) throw new BusinessException(409, new("FAMILY_MEMBER_REQUEST_CONFLICT", "Mã yêu cầu đã được dùng cho nội dung khác."));
+            if (receipt.Fingerprint != hash) throw new BusinessException(409, new("MSG69", "Mã yêu cầu đã được dùng cho nội dung khác."));
             return (JsonSerializer.Deserialize<T>(receipt.ResultJson)!, true);
         }
         var result = await apply();
@@ -109,7 +109,7 @@ public sealed class FamilyMemberService(DcmsDbContext db, TimeProvider clock) : 
         {
             RequireContact(gender, phone);
             var member = await Owned(actor).SingleOrDefaultAsync(x => x.Id == id && x.DeletedAt == null, ct) ?? throw Missing();
-            if (member.Version != command.ExpectedVersion) throw new BusinessException(409, SystemMessages.Get("MSG111"));
+            if (member.Version != command.ExpectedVersion) throw new BusinessException(409, SystemMessages.Get("MSG41"));
             if (member.FullName != name || member.BirthDate != command.BirthDate)
                 await FamilyRecordService.EndAccessAsync(db, actor, id, "Thông tin định danh người thân đã thay đổi. Vui lòng gửi yêu cầu xác minh mới.", clock.GetUtcNow(), ct);
             member.FullName = name; member.Relationship = command.Relationship; member.BirthDate = command.BirthDate;
@@ -121,7 +121,7 @@ public sealed class FamilyMemberService(DcmsDbContext db, TimeProvider clock) : 
         (await Write(actor, command.RequestKey, new { action = "Delete", id, command.ExpectedVersion }, id, async () =>
         {
             var member = await Owned(actor).SingleOrDefaultAsync(x => x.Id == id && x.DeletedAt == null, ct) ?? throw Missing();
-            if (member.Version != command.ExpectedVersion) throw new BusinessException(409, SystemMessages.Get("MSG111"));
+            if (member.Version != command.ExpectedVersion) throw new BusinessException(409, SystemMessages.Get("MSG41"));
             await FamilyRecordService.EndAccessAsync(db, actor, id, "Người thân đã được xóa khỏi danh sách.", clock.GetUtcNow(), ct);
             member.DeletedAt = clock.GetUtcNow(); member.Version++; return new DeletedFamilyMember(id, member.Version, true);
         }, ct)).Result;

@@ -10,11 +10,11 @@ public sealed partial class WorkingScheduleService
     {
         await access.RequireAsync(actorId, "working-schedules.read", ct);
         if (dentistId <= 0 || from.Year is < 2000 or > 2100 || to.Year is < 2000 or > 2100 || from > to || to.DayNumber - from.DayNumber > 30)
-            throw Error("MSG110");
+            throw Error("MSG40");
         var options = await OptionsAsync(actorId, ct);
         var branches = options.Employees.Where(x => x.Id == dentistId && x.CanDentist && (x.CanView ?? x.CanEdit))
             .Select(x => x.BranchId).Distinct().ToArray();
-        if (branches.Length == 0) throw Error("MSG06", 403);
+        if (branches.Length == 0) throw Error("MSG05", 403);
         var lower = Local(from).ToUniversalTime();
         var upper = Local(to.AddDays(1)).ToUniversalTime();
         var rows = await (from appointment in db.Appointments.AsNoTracking()

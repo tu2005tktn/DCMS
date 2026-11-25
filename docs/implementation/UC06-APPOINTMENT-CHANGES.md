@@ -18,4 +18,4 @@ Mục tiêu: hai POST command dùng Appointment/ResourceReservation hiện hữu
 
 ## Giới hạn tích hợp
 
-Module follow-up và notification dispatcher chưa có: adapter hủy follow-up mặc định trả 503/MSG144 và rollback để không báo chuyển NeedsBooking sai; đổi lịch giữ liên kết follow-up. Outbox chứa event cho TV5, chưa chứng minh đã hủy reminder/gửi thông báo bên ngoài. API support-request và staff UI S12 chưa có. Source mobile giữ mặc định mock; cấu hình `.env` local (ngoài Git) đã đặt `EXPO_PUBLIC_APPOINTMENTS_MOCK=false` để thử phần HTTP đọc/đổi/hủy. Danh sách S14 trong chế độ này là dữ liệu tài khoản thật, không còn các mã LH-DEMO của mock.
+Module follow-up và notification dispatcher chưa có: adapter hủy follow-up mặc định trả 503/MSG144 và rollback để không báo chuyển NeedsBooking sai; đổi lịch giữ liên kết follow-up. Outbox chứa event cho TV5, chưa chứng minh đã hủy reminder/gửi thông báo bên ngoài. API support-request và staff UI S12 chưa có. Source mobile giữ mặc định mock; mobile luôn gọi HTTP đọc/đổi/hủy (mock đã gỡ 25/11/2026). Danh sách S14 trong chế độ này là dữ liệu tài khoản thật, không còn các mã LH-DEMO của mock.

@@ -74,7 +74,7 @@ export function useSignIn({ onSuccess }: UseSignInOptions): UseSignInResult {
             if (error.status >= 400 && error.status < 500) {
               const next: SignInFeedback = {
                 kind: 'error',
-                code: (signInApi.translateStatusToCode(error.status) as SignInFeedback extends { kind: 'error'; code: infer C } ? C : never) ?? 'MSG09',
+                code: (signInApi.translateStatusToCode(error.status) as SignInFeedback extends { kind: 'error'; code: infer C } ? C : never) ?? 'MSG07',
                 message: await extractServerMessage(error),
               };
               setFeedback(next);
@@ -91,11 +91,11 @@ export function useSignIn({ onSuccess }: UseSignInOptions): UseSignInResult {
 
       const fallback: SignInFeedback = {
         kind: 'error',
-        code: 'MSG144',
+        code: 'MSG49',
         message: 'Không thể kết nối máy chủ. Vui lòng kiểm tra mạng và thử lại.',
       };
       if (lastError instanceof ApiError && lastError.status >= 500) {
-        fallback.code = 'MSG144';
+        fallback.code = 'MSG49';
         fallback.message = 'Máy chủ đang bận. Vui lòng thử lại sau ít phút.';
       } else if (lastError instanceof ApiError && (lastError.status === 401 || lastError.status === 403)) {
         fallback.code = signInApi.translateStatusToCode(lastError.status) as typeof fallback.code;

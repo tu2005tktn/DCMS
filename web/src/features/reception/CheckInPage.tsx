@@ -87,7 +87,7 @@ export default function CheckInPage() {
     {modalContext}<div className="page-heading"><Typography.Title level={2} style={{ margin: 0 }}>Tiếp nhận bệnh nhân</Typography.Title><Button icon={<ArrowLeftOutlined />} onClick={back}>Về danh sách tiếp nhận</Button></div>
     <div ref={feedback} tabIndex={-1} role="region" aria-label="Kết quả tiếp nhận">{error && <Alert type="error" showIcon message={error.message}
       action={<Button onClick={() => void load()}>Tải lại lịch</Button>}
-      description={error instanceof ApiError && error.code === 'MSG111' ? 'Dữ liệu đã thay đổi. Tải lại, đối chiếu và xác nhận danh tính lại; thông tin đang nhập được giữ.' : undefined} />}</div>
+      description={error instanceof ApiError && error.code === 'MSG41' ? 'Dữ liệu đã thay đổi. Tải lại, đối chiếu và xác nhận danh tính lại; thông tin đang nhập được giữ.' : undefined} />}</div>
     {a && <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }} style={{ marginTop: 16 }} items={[
       { key: 'attendee', label: 'Người khám trên lịch', children: a.attendeeName },
       { key: 'birth', label: 'Ngày sinh trên lịch', children: a.attendeeBirthDate ? formatDate(a.attendeeBirthDate) : 'Chưa có thông tin' },

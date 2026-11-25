@@ -56,7 +56,7 @@ test('customer registers, signs in, and reaches the separate home', async ({ pag
   let registration: Record<string, unknown> | null = null;
   await page.route('**/api/auth/register', async route => {
     registration = route.request().postDataJSON() as Record<string, unknown>;
-    await route.fulfill(json({ accountId: 21, phoneNumber: '0912345678', notification: { code: 'MSG11', message: 'Đăng ký thành công.' } }, 201));
+    await route.fulfill(json({ accountId: 21, phoneNumber: '0912345678', notification: { code: 'MSG08', message: 'Đăng ký thành công.' } }, 201));
   });
   await page.route('**/api/auth/sign-in', route => route.fulfill(json({ accessToken: 'public-token', user: publicUser })));
   await page.goto('/customer/register');
@@ -143,9 +143,9 @@ test('signed-in customer booking retains form after a slot conflict and confirms
   await page.route('**/api/appointments', route => {
     calls += 1;
     requestKeys.push((route.request().postDataJSON() as { requestKey: string }).requestKey);
-    if (calls === 1) return route.fulfill(json({ code: 'MSG25', message: 'Khung giờ không còn khả dụng.' }, 409));
+    if (calls === 1) return route.fulfill(json({ code: 'MSG20', message: 'Khung giờ không còn khả dụng.' }, 409));
     return route.fulfill(json({ appointmentId: 'id-1', code: 'AP-123', version: 1, status: 'Confirmed',
-      startAt: second, endAt: second, notification: { code: 'MSG29', message: 'Đặt lịch thành công.' } }, 201));
+      startAt: second, endAt: second, notification: { code: 'MSG24', message: 'Đặt lịch thành công.' } }, 201));
   });
   await page.goto('/customer/book');
   await page.getByRole('button', { name: 'Tiếp tục' }).click();
@@ -172,7 +172,7 @@ test('signed-in customer booking retains form after a slot conflict and confirms
   await expect(errorSummary).toHaveCount(0);
   await page.getByRole('button', { name: 'Xem lại' }).click();
   await page.getByRole('button', { name: 'Xác nhận đặt lịch' }).click();
-  await expect(page.getByText('MSG25: Khung giờ không còn khả dụng.')).toBeVisible();
+  await expect(page.getByText('MSG20: Khung giờ không còn khả dụng.')).toBeVisible();
   await page.locator('.customer-slots button').last().click();
   await page.getByRole('button', { name: 'Tiếp tục' }).click();
   await expect(page.getByLabel('Họ tên người đặt')).toHaveValue('Khách A');
@@ -206,7 +206,7 @@ test('customer books any dentist with a free chair and sees the assigned dentist
   await page.route('**/api/appointments', route => {
     booking = route.request().postDataJSON() as Record<string, unknown>;
     return route.fulfill(json({ appointmentId: 'id-2', code: 'AP-456', version: 1, status: 'Confirmed',
-      startAt: second, endAt: second, notification: { code: 'MSG29', message: 'Đặt lịch thành công.' } }, 201));
+      startAt: second, endAt: second, notification: { code: 'MSG24', message: 'Đặt lịch thành công.' } }, 201));
   });
   await page.goto('/customer/book');
   await page.getByRole('button', { name: 'Tiếp tục' }).click();

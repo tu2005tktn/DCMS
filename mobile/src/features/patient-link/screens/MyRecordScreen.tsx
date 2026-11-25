@@ -76,7 +76,7 @@ export default function MyRecordScreen() {
   if (!token) return null;
   if (loading && !record) return <View style={styles.center}><ActivityIndicator size="large" color={palette.primary} /><Text style={styles.muted}>Đang tải…</Text></View>;
 
-  // MSG06 means the self link is missing or was revoked: nothing private is shown.
+  // MSG05 means the self link is missing or was revoked: nothing private is shown.
   if (!record) return <ScrollView contentContainerStyle={styles.container}>
     <Banner tone="error" message={loadError?.message ?? 'Không thể hoàn tất thao tác. Vui lòng kiểm tra kết nối và thử lại.'}
       action={loadError?.status === 403 ? undefined : { label: 'Thử lại', onPress: () => void load(token) }} />

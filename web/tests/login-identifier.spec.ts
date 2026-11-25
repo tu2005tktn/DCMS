@@ -7,7 +7,7 @@ async function mock(page: Page, fail = false) {
     const path = new URL(route.request().url()).pathname;
     if (path === '/api/auth/sign-in') {
       commands.push(route.request().postDataJSON());
-      if (fail) { fail = false; return route.fulfill({ status: 401, json: { code: 'MSG09', message: 'Thông tin đăng nhập không đúng.' } }); }
+      if (fail) { fail = false; return route.fulfill({ status: 401, json: { code: 'MSG07', message: 'Thông tin đăng nhập không đúng.' } }); }
       return route.fulfill({ json: { accessToken: 'synthetic-customer-token', user: customer } });
     }
     if (path === '/api/auth/me') return route.fulfill({ json: customer });

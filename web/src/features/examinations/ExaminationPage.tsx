@@ -122,7 +122,7 @@ export default function ExaminationPage() {
       }) }); if (token !== generation.current) return;
       setW(result); setContent(result.examination?.content ?? result.initialContent); setDirty(false); setValidationAttempt(0); setAmending(false); setAmendReason(''); pendingCommand.current = undefined;
       if (confirm) setTab('summary');
-    } catch (e) { if (token === generation.current) setError((e as ApiError).code === 'MSG111' ? 'Lượt đã thay đổi. Bản nhập vẫn còn; tải lại phiên bản trước khi lưu tiếp.' : (e as Error).message); }
+    } catch (e) { if (token === generation.current) setError((e as ApiError).code === 'MSG41' ? 'Lượt đã thay đổi. Bản nhập vẫn còn; tải lại phiên bản trước khi lưu tiếp.' : (e as Error).message); }
     finally { if (token === generation.current) setBusy(false); }
   }
   async function investigationsChanged(page: InvestigationPage, mutation: boolean) {

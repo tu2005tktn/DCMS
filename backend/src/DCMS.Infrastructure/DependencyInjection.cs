@@ -51,7 +51,6 @@ public static class DependencyInjection
         services.AddMemoryCache(options => options.SizeLimit = 8192);
         services.AddScoped<IRecoveryOutbox, RecoveryOutboxWriter>();
         services.AddScoped<IAccountRecoveryService, AccountRecoveryService>();
-        services.AddScoped<IEmailVerificationService, EmailVerificationService>();
         services.AddScoped<IAccountService, AccountService>();
         services.AddScoped<IAuthenticationService, AuthenticationService>();
         services.AddScoped<StaffIdleService>();
@@ -123,9 +122,7 @@ public static class DependencyInjection
             services.AddScoped<IMailSender, SmtpMailSender>();
             services.AddScoped<SmtpContactDeliveryAdapter>();
             services.AddScoped<IContactDeliveryAdapter>(sp => sp.GetRequiredService<SmtpContactDeliveryAdapter>());
-            services.AddScoped<IEmailVerificationDelivery>(sp => sp.GetRequiredService<SmtpContactDeliveryAdapter>());
         }
-        else services.AddScoped<IEmailVerificationDelivery, UnavailableEmailVerificationDelivery>();
         services.AddScoped<DCMS.Application.Features.SystemSettings.ISystemCatalogService, Features.SystemSettings.SystemCatalogService>();
         services.AddScoped<DCMS.Application.Features.SystemSettings.IMaterialPurchaseService, Features.SystemSettings.MaterialPurchaseService>();
         services.AddScoped<DCMS.Application.Features.SystemSettings.IMaterialStockService, Features.SystemSettings.MaterialStockService>();
@@ -133,7 +130,6 @@ public static class DependencyInjection
         services.AddScoped<DCMS.Application.Features.SystemSettings.IGeneralSettingsService, Features.SystemSettings.GeneralSettingsService>();
         services.AddScoped<DCMS.Application.Features.SystemSettings.IReferenceCatalogService, Features.SystemSettings.ReferenceCatalogService>();
         services.AddScoped<DCMS.Application.Features.SystemSettings.ISettingsAuditService, Features.SystemSettings.SettingsAuditService>();
-        services.AddScoped<DCMS.Application.Features.SystemSettings.IServiceCatalogExport, Features.SystemSettings.ServiceCatalogExport>();
         services.AddScoped<DCMS.Application.Features.SystemSettings.ISupplyCatalog<DCMS.Application.Features.SystemSettings.ProviderInput, DCMS.Application.Features.SystemSettings.ProviderDto>, Features.SystemSettings.ProviderCatalog>();
         services.AddScoped<DCMS.Application.Features.SystemSettings.ISupplyCatalog<DCMS.Application.Features.SystemSettings.LabWorkTypeInput, DCMS.Application.Features.SystemSettings.LabWorkTypeDto>, Features.SystemSettings.LabWorkTypeCatalog>();
         services.AddScoped<Features.SystemSettings.MedicineCatalog>();

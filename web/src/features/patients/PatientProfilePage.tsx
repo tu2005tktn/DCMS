@@ -83,7 +83,7 @@ export default function PatientProfilePage() {
     void toast.success(change.notification.message);
   }
 
-  // The message holder stays mounted while loading so the create notice (MSG222) is not lost.
+  // The message holder stays mounted while loading so the create notice (MSG53) is not lost.
   if (failure && !patient) return <>{toastContext}<Result status={failure.status === 403 ? '403' : failure.status === 404 ? '404' : 'error'} title={failure.message}
     extra={<Space><Button onClick={() => setRevision(value => value + 1)}>Thử lại</Button><Link to="/patients">Về danh sách bệnh nhân</Link></Space>} /></>;
   if (!patient) return <>{toastContext}<Card><Skeleton active /></Card></>;

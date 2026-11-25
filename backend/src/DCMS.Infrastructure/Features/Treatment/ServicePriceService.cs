@@ -20,33 +20,33 @@ public sealed class ServicePriceService(DcmsDbContext db, UserManager<Applicatio
     private async Task AuthorizeAsync(int actorId, int branchId, bool manage, CancellationToken ct)
     {
         var scope = await access.ResolveAsync(actorId, ct);
-        if (scope.Assigned && !scope.Owner && !scope.BranchIds.Contains(branchId)) throw Error("MSG06", 403);
+        if (scope.Assigned && !scope.Owner && !scope.BranchIds.Contains(branchId)) throw Error("MSG05", 403);
         var user = await users.FindByIdAsync(actorId.ToString());
-        if (user is not { IsActive: true, AccountType: "Staff" }) throw Error("MSG06", 403);
+        if (user is not { IsActive: true, AccountType: "Staff" }) throw Error("MSG05", 403);
         // Staff in an access group act through treatment.prices.* grants within their assignment branches.
         if (scope.GrantDriven) return;
         var roles = AccountRoles.Effective(await users.GetRolesAsync(user));
         if (manage && !roles.Contains(AccountRoles.Admin) && !roles.Contains(AccountRoles.ClinicOwner)
             && !roles.Contains(AccountRoles.Dentist))
-            throw Error("MSG06", 403);
+            throw Error("MSG05", 403);
         if (roles.Contains(AccountRoles.Admin)) return;
         var isOwner = roles.Contains(AccountRoles.ClinicOwner);
         var employee = await db.Employees.AsNoTracking().SingleOrDefaultAsync(x => x.AccountId == actorId, ct);
         if (employee == null || !await db.SchedulingMembers.AsNoTracking().AnyAsync(x =>
                 x.BranchId == branchId && x.EmployeeId == employee.Id && x.Active &&
                 (!manage || isOwner || x.CanDentist), ct))
-            throw Error("MSG06", 403);
+            throw Error("MSG05", 403);
     }
 
     public async Task<IReadOnlyList<ServicePriceDto>> ListAsync(int actorId, CancellationToken ct)
     {
         var account = await users.FindByIdAsync(actorId.ToString());
-        if (account is not { IsActive: true, AccountType: "Staff" }) throw Error("MSG06", 403);
+        if (account is not { IsActive: true, AccountType: "Staff" }) throw Error("MSG05", 403);
         var roles = AccountRoles.Effective(await users.GetRolesAsync(account));
         var scope = await access.ResolveAsync(actorId, ct);
         if (!scope.GrantDriven && !roles.Contains(AccountRoles.Admin) && !roles.Contains(AccountRoles.ClinicOwner)
             && !roles.Contains(AccountRoles.Dentist))
-            throw Error("MSG06", 403);
+            throw Error("MSG05", 403);
         var query = db.Set<SchedulingService>().AsNoTracking().Where(x => x.Active);
         if (scope.Assigned && !scope.Owner) query = query.Where(x => scope.BranchIds.Contains(x.BranchId));
         if (!scope.GrantDriven && !roles.Contains(AccountRoles.Admin))
@@ -54,7 +54,7 @@ public sealed class ServicePriceService(DcmsDbContext db, UserManager<Applicatio
             var isOwner = roles.Contains(AccountRoles.ClinicOwner);
             var employeeId = await db.Employees.AsNoTracking().Where(x => x.AccountId == actorId)
                 .Select(x => (int?)x.Id).SingleOrDefaultAsync(ct);
-            if (employeeId == null) throw Error("MSG06", 403);
+            if (employeeId == null) throw Error("MSG05", 403);
             var branches = db.SchedulingMembers.AsNoTracking().Where(x =>
                 x.EmployeeId == employeeId.Value && x.Active &&
                 (isOwner || x.CanDentist)).Select(x => x.BranchId);
@@ -68,7 +68,7 @@ public sealed class ServicePriceService(DcmsDbContext db, UserManager<Applicatio
     public async Task<ServicePriceDto> GetAsync(int actorId, int serviceId, CancellationToken ct)
     {
         var service = await db.Set<SchedulingService>().AsNoTracking().SingleOrDefaultAsync(x => x.Id == serviceId, ct)
-            ?? throw Error("MSG113", 404);
+            ?? throw Error("MSG42", 404);
         await AuthorizeAsync(actorId, service.BranchId, false, ct);
         return new(service.Id, service.BranchId, service.Name, service.ReferenceUnitPriceVnd, service.PriceVersion, service.Unit);
     }
@@ -81,17 +81,17 @@ public sealed class ServicePriceService(DcmsDbContext db, UserManager<Applicatio
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
         await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock({(long)serviceId + 905000L})", ct);
         var service = await db.Set<SchedulingService>().SingleOrDefaultAsync(x => x.Id == serviceId, ct)
-            ?? throw Error("MSG113", 404);
+            ?? throw Error("MSG42", 404);
         await AuthorizeAsync(actorId, service.BranchId, true, ct);
         var fingerprint = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
             JsonSerializer.Serialize(new { serviceId, request }))));
         var receipt = await db.Set<ScheduleReceipt>().AsNoTracking().SingleOrDefaultAsync(x => x.RequestKey == request.RequestKey, ct);
         if (receipt != null)
         {
-            if (receipt.ActorId != actorId || receipt.Fingerprint != fingerprint) throw Error("MSG111", 409);
+            if (receipt.ActorId != actorId || receipt.Fingerprint != fingerprint) throw Error("MSG41", 409);
             return JsonSerializer.Deserialize<ServicePriceDto>(receipt.ResultJson)!;
         }
-        if (service.PriceVersion != request.ExpectedVersion) throw Error("MSG111", 409);
+        if (service.PriceVersion != request.ExpectedVersion) throw Error("MSG41", 409);
         if (request.Unit != null && request.Unit is not ("lần" or "răng" or "hàm" or "gói" or "g" or "ml")) throw Error("MSG04", 400);
         service.ReferenceUnitPriceVnd = request.ReferenceUnitPriceVnd;
         if (request.Unit != null) service.Unit = request.Unit;

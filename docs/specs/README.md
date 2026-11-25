@@ -1,5 +1,11 @@
 # Bộ đặc tả DCMS v2.5
 
+Bổ sung 22/11/2026: [Mã thông báo hệ thống](SYSTEM-MESSAGE-CODES.md) đánh số lại toàn bộ thông báo thành MSG01–MSG116 theo [bảng System Messages](DCMS_System_Messages.docx); [bảng đối chiếu mã cũ](SYSTEM-MESSAGE-CODE-MAP.md). Quy tắc nghiệp vụ đang có trong code: [BUSINESS-RULES.md](BUSINESS-RULES.md).
+
+Bổ sung 21/11/2026: [Gỡ API không có giao diện sử dụng](UNUSED-API-REMOVAL.vi.md) liệt kê 34 route backend đã xóa vì web và mobile không gọi tới.
+
+Bổ sung 21/11/2026: [Danh mục use case theo hiện trạng hệ thống](USE-CASE-CATALOG.md) gồm 58 use case quét từ backend, web và mobile, kèm bảng đối chiếu với danh sách UC cũ. Cập nhật 22/11/2026: gộp còn 46 use case, thêm actor, quan hệ generalization/«extend» và điều kiện trước giữa các use case.
+
 Bổ sung 27/10/2026: [Thiết lập hệ thống S58/UC-51](S58-SYSTEM-SETTINGS.vi.md) cụ thể hóa 11 nhóm thiết lập theo khảo sát oDental, gồm trường dữ liệu, quyền, API, version/audit và ranh giới nghiệp vụ. Nội dung chi tiết đã ghi vào cả hai Word v2.5 chính tại phần S58/UC51 chi tiết; AT84/AT90 đã hiệu chỉnh theo GBR-180/184. Xem [bằng chứng khảo sát](../research/ODENTAL-SYSTEM-SETTINGS-20261027.vi.md), [kế hoạch triển khai/nghiệm thu](../implementation/S58-SYSTEM-SETTINGS-PLAN.vi.md) và [14 việc Jira đã phân công](../implementation/S58-JIRA-HANDOFF.vi.md). Đây là đặc tả và backlog, chưa phải chức năng đã triển khai.
 
 Bổ sung 17/11/2026: [AI hỗ trợ phát hiện sâu răng trên phim X-quang](AI-CARIES-DETECTION.vi.md) thêm phân tích AI cho tài liệu X-quang S20, dịch vụ `ai-service` và cột JSONB `AiAnalyses` trên `CLINICAL_DOCUMENT`.

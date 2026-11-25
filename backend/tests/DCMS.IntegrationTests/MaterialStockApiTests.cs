@@ -86,7 +86,7 @@ public sealed class MaterialStockApiTests(ApiFixture fixture) : IClassFixture<Ap
         await Use(a, new MaterialUseLine(m.Id, 20));                 // replaces 8 with 20 → exactly the stock
         Assert.Equal(0, (await Stock(c, m)).Stock);
         var ex = await Assert.ThrowsAsync<BusinessException>(() => Use(Guid.NewGuid(), new MaterialUseLine(m.Id, 0.001m)));
-        Assert.Equal(409, ex.Status); Assert.Equal("MATERIAL_STOCK_INSUFFICIENT", ex.Response.Code);
+        Assert.Equal(409, ex.Status); Assert.Equal("MSG79", ex.Response.Code);
         await Use(a, null);                                             // null keeps lines
         Assert.Equal(20, (await Stock(c, m)).Used);
         var history = (await c.GetFromJsonAsync<MaterialUsagePage>($"/api/system-settings/material-usage?materialId={m.Id}"))!;
@@ -104,7 +104,7 @@ public sealed class MaterialStockApiTests(ApiFixture fixture) : IClassFixture<Ap
         await Use(Guid.NewGuid(), new MaterialUseLine(m.Id, 2));
         using var delete = new HttpRequestMessage(HttpMethod.Delete, $"{Purchases}/{purchase.Id}") { Content = JsonContent.Create(new DeleteCatalogRequest(purchase.Version, Guid.NewGuid())) };
         var blocked = await c.SendAsync(delete);
-        Assert.Equal(HttpStatusCode.Conflict, blocked.StatusCode); Assert.Contains("MATERIAL_STOCK_NEGATIVE", await blocked.Content.ReadAsStringAsync());
+        Assert.Equal(HttpStatusCode.Conflict, blocked.StatusCode); Assert.Contains("MSG80", await blocked.Content.ReadAsStringAsync());
         var shrink = await c.PutAsJsonAsync($"{Purchases}/{purchase.Id}", new UpdateMaterialPurchaseRequest(Today, Today, null, m.Id, 1, "hộp", 1000, 0, purchase.Version, Guid.NewGuid(), 1));
         Assert.Equal(HttpStatusCode.Conflict, shrink.StatusCode);
         Assert.Equal(3, (await Stock(c, m)).Received);

@@ -15,19 +15,12 @@
 
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
 import { SessionProvider } from '@/features/auth/session/SessionProvider';
-import { appointmentRepo } from '@/features/appointments/appointment.repo';
-import { notificationRepoPersist } from '@/features/appointments/notification.repo.persist';
 import { RealtimeProvider } from '@/features/appointments/realtime-provider';
 import { RealtimeToast } from '@/features/appointments/realtime-toast';
 import { PushNotificationsProvider } from '@/features/appointments/push-notifications';
 
 export default function RootLayout() {
-  useEffect(() => {
-    void appointmentRepo.hydrate();
-    void notificationRepoPersist.hydrate();
-  }, []);
   return (
     <SessionProvider>
       <RealtimeProvider>

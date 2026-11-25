@@ -1,3 +1,4 @@
+using DCMS.Application.Common;
 using System.Data;
 using System.Text.Json;
 using DCMS.Application.Features.Authentication;
@@ -57,11 +58,11 @@ public static class TreatmentPaymentEndpoints
                 || (request.LabLines?.Any(x => x.AmountVnd <= 0) ?? false)
                 || (request.LabLines?.Select(x => x.LabOrderId).Distinct().Count() != request.LabLines?.Count) ||
                 request.Lines.Select(x => x.ActivityId).Distinct().Count() != request.Lines.Count)
-                return Results.BadRequest("Thông tin thu tiền không hợp lệ.");
+                return Results.BadRequest(SystemMessages.Get("MSG93"));
             long total;
             try { total = checked(request.Lines.Sum(x => x.AmountVnd) + (request.LabLines?.Sum(x => x.AmountVnd) ?? 0)); }
-            catch (OverflowException) { return Results.BadRequest("Số tiền không hợp lệ."); }
-            if (total > 1_000_000_000_000L) return Results.BadRequest("Số tiền vượt giới hạn.");
+            catch (OverflowException) { return Results.BadRequest(SystemMessages.Get("MSG94")); }
+            if (total > 1_000_000_000_000L) return Results.BadRequest(SystemMessages.Get("MSG95"));
             var actor = ((CurrentUser)context.Items["CurrentUser"]!).Id;
             var normalized = request.Lines.OrderBy(x => x.ActivityId).Select(x => new
             {
@@ -89,7 +90,7 @@ public static class TreatmentPaymentEndpoints
                     || (previous.RootElement.TryGetProperty("labLines", out var oldLabLines)
                         ? !JsonElement.DeepEquals(oldLabLines, proposedLabs.RootElement)
                         : labLines.Length > 0))
-                    return Results.Conflict("Mã yêu cầu đã được dùng cho một khoản thu khác.");
+                    return Results.Conflict(SystemMessages.Get("MSG114"));
                 await transaction.CommitAsync(ct);
                 return Results.Ok(current);
             }
@@ -97,10 +98,10 @@ public static class TreatmentPaymentEndpoints
             {
                 var service = current.Lines.SingleOrDefault(x => x.ActivityId == line.ActivityId);
                 if (service is null || line.AmountVnd > service.DueVnd)
-                    return Results.Conflict("Dịch vụ hoặc số còn phải thu đã thay đổi. Vui lòng tải lại.");
+                    return Results.Conflict(SystemMessages.Get("MSG102"));
             }
             var labPriority = ValidateLabPayment(current, request.Lines, labLines);
-            if (!labPriority) return Results.Conflict("Cần ưu tiên đủ 30% phí labo trước khi thu cho dịch vụ khác.");
+            if (!labPriority) return Results.Conflict(SystemMessages.Get("MSG104"));
             var payload = JsonSerializer.Serialize(new { kind = "TreatmentCashPayment", paidOn = request.PaidOn,
                 method = "Cash", lines = normalized, labLines },
                 new JsonSerializerOptions(JsonSerializerDefaults.Web));
@@ -111,7 +112,7 @@ public static class TreatmentPaymentEndpoints
                     {current.PatientId}, {current.BranchId}, {dossierId.ToString()}, {payload}::jsonb)
                 ON CONFLICT ("StorageId") DO NOTHING
                 """, ct);
-            if (inserted != 1) return Results.Conflict("Mã yêu cầu đã được dùng.");
+            if (inserted != 1) return Results.Conflict(SystemMessages.Get("MSG113"));
             var updated = await ContextAsync(db, dossierId, ct);
             await transaction.CommitAsync(ct);
             return Results.Ok(updated);
@@ -126,11 +127,11 @@ public static class TreatmentPaymentEndpoints
                 || lines.Any(x => x.AmountVnd <= 0) || labLines.Any(x => x.AmountVnd <= 0)
                 || lines.Select(x => x.ActivityId).Distinct().Count() != lines.Length
                 || labLines.Select(x => x.LabOrderId).Distinct().Count() != labLines.Length)
-                return Results.BadRequest("Khoản phân bổ cọc không hợp lệ.");
+                return Results.BadRequest(SystemMessages.Get("MSG97"));
             long total;
             try { total = checked(lines.Sum(x => x.AmountVnd) + labLines.Sum(x => x.AmountVnd)); }
-            catch (OverflowException) { return Results.BadRequest("Số tiền không hợp lệ."); }
-            if (total > 1_000_000_000_000L) return Results.BadRequest("Số tiền vượt giới hạn.");
+            catch (OverflowException) { return Results.BadRequest(SystemMessages.Get("MSG94")); }
+            if (total > 1_000_000_000_000L) return Results.BadRequest(SystemMessages.Get("MSG95"));
 
             await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
             await db.Database.ExecuteSqlInterpolatedAsync(
@@ -150,16 +151,16 @@ public static class TreatmentPaymentEndpoints
                     kind = "AdvanceApplied", lines, labLines
                 }, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
                 if (!JsonElement.DeepEquals(previous.RootElement, proposed.RootElement))
-                    return Results.Conflict("Mã yêu cầu đã được dùng cho một khoản phân bổ khác.");
+                    return Results.Conflict(SystemMessages.Get("MSG115"));
                 await transaction.CommitAsync(ct);
                 return Results.Ok(current);
             }
             if (total > current.AdvanceReceivedVnd)
-                return Results.Conflict("Số dư cọc không đủ. Vui lòng tải lại.");
+                return Results.Conflict(SystemMessages.Get("MSG106"));
             if (lines.Any(line => current.Lines.All(x => x.ActivityId != line.ActivityId || line.AmountVnd > x.DueVnd)))
-                return Results.Conflict("Dịch vụ hoặc số còn phải thu đã thay đổi. Vui lòng tải lại.");
+                return Results.Conflict(SystemMessages.Get("MSG102"));
             if (!ValidateLabPayment(current, lines, labLines))
-                return Results.Conflict("Cần ưu tiên đủ 30% phí labo trước khi phân bổ cọc cho dịch vụ khác.");
+                return Results.Conflict(SystemMessages.Get("MSG105"));
             var payload = JsonSerializer.Serialize(new { kind = "AdvanceApplied", lines, labLines },
                 new JsonSerializerOptions(JsonSerializerDefaults.Web));
             var inserted = await db.Database.ExecuteSqlInterpolatedAsync($"""
@@ -170,7 +171,7 @@ public static class TreatmentPaymentEndpoints
                     {current.PatientId}, {current.BranchId}, {dossierId.ToString()}, {payload}::jsonb)
                 ON CONFLICT ("StorageId") DO NOTHING
                 """, ct);
-            if (inserted != 1) return Results.Conflict("Mã yêu cầu đã được dùng.");
+            if (inserted != 1) return Results.Conflict(SystemMessages.Get("MSG113"));
             var updated = await ContextAsync(db, dossierId, ct);
             await transaction.CommitAsync(ct);
             return Results.Ok(updated);
@@ -182,7 +183,7 @@ public static class TreatmentPaymentEndpoints
             var reason = request.Reason?.Trim();
             if (request.RequestKey == Guid.Empty || request.ExpectedVersion < 1 ||
                 string.IsNullOrWhiteSpace(reason) || reason.Length > 500)
-                return Results.BadRequest("Cần nhập lý do khách không đến.");
+                return Results.BadRequest(SystemMessages.Get("MSG98"));
             await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
             await db.Database.ExecuteSqlInterpolatedAsync(
                 $"SELECT 1 FROM \"TREATMENT_DOSSIER\" WHERE \"Id\" = {dossierId} FOR UPDATE", ct);
@@ -196,26 +197,26 @@ public static class TreatmentPaymentEndpoints
                 using var document = JsonDocument.Parse(previous);
                 if (document.RootElement.GetProperty("reason").GetString() != reason ||
                     document.RootElement.GetProperty("expectedVersion").GetInt32() != request.ExpectedVersion)
-                    return Results.Conflict("Mã yêu cầu đã được dùng cho thao tác khác.");
+                    return Results.Conflict(SystemMessages.Get("MSG116"));
                 await transaction.CommitAsync(ct);
                 return Results.Ok(new { forfeitedVnd = document.RootElement.GetProperty("amountVnd").GetInt64() });
             }
             var dossier = await db.TreatmentDossiers.SingleOrDefaultAsync(x => x.Id == dossierId, ct);
             if (dossier is null) return Results.NotFound();
             if (dossier.State != "Open" || dossier.Version != request.ExpectedVersion)
-                return Results.Conflict("Phiếu đã thay đổi. Vui lòng tải lại.");
+                return Results.Conflict(SystemMessages.Get("MSG107"));
             if (await db.ClinicalActivities.AnyAsync(x => x.DossierId == dossierId, ct)
                 || await (from x in db.LabOrders join a in db.ClinicalActivities on x.ActivityId equals a.Id where a.DossierId == dossierId select x.Id).AnyAsync(ct))
-                return Results.Conflict("Phiếu đã có điều trị hoặc labo, không thể xóa do khách không đến.");
+                return Results.Conflict(SystemMessages.Get("MSG108"));
             var current = await ContextAsync(db, dossierId, ct);
             if (current is null || current.AdvanceReceivedVnd <= 0)
-                return Results.Conflict("Phiếu không có số dư cọc để ghi nhận bỏ cọc.");
+                return Results.Conflict(SystemMessages.Get("MSG109"));
             var hasOtherMoney = await db.Database.SqlQuery<int>($"""
                 SELECT 1 AS "Value" FROM "AUDIT_LOG" WHERE "AuditType" = 'FinanceLedger'
                     AND "Target" = {dossierId.ToString()}
                     AND "Action" NOT IN ('AdvanceCash', 'AdvanceTransfer') LIMIT 1
                 """).AnyAsync(ct);
-            if (hasOtherMoney) return Results.Conflict("Phiếu đã sử dụng cọc hoặc có giao dịch dịch vụ.");
+            if (hasOtherMoney) return Results.Conflict(SystemMessages.Get("MSG110"));
             var hasUnsettledOrder = await db.Database.SqlQuery<int>($"""
                 SELECT 1 AS "Value" FROM "AUDIT_LOG" order_log
                 WHERE order_log."AuditType" = 'FinancePayOsOrder'
@@ -226,7 +227,7 @@ public static class TreatmentPaymentEndpoints
                           AND payment."PayloadJson"->>'orderId' = order_log."StorageId"::text)
                 LIMIT 1
                 """).AnyAsync(ct);
-            if (hasUnsettledOrder) return Results.Conflict("Phiếu còn QR chuyển khoản chưa đối soát.");
+            if (hasUnsettledOrder) return Results.Conflict(SystemMessages.Get("MSG111"));
             var payload = JsonSerializer.Serialize(new { kind = "AdvanceForfeited", amountVnd = current.AdvanceReceivedVnd,
                 expectedVersion = request.ExpectedVersion, reason }, new JsonSerializerOptions(JsonSerializerDefaults.Web));
             var inserted = await db.Database.ExecuteSqlInterpolatedAsync($"""
@@ -237,7 +238,7 @@ public static class TreatmentPaymentEndpoints
                     {current.PatientId}, {current.BranchId}, {dossierId.ToString()}, {payload}::jsonb)
                 ON CONFLICT ("StorageId") DO NOTHING
                 """, ct);
-            if (inserted != 1) return Results.Conflict("Mã yêu cầu đã được dùng.");
+            if (inserted != 1) return Results.Conflict(SystemMessages.Get("MSG113"));
             dossier.State = "Deleted";
             dossier.Version++;
             dossier.UpdatedAt = DateTimeOffset.UtcNow;
@@ -265,7 +266,7 @@ public static class TreatmentPaymentEndpoints
             if (!scope.BranchIds.Contains(dossierBranchId.Value)) return Results.Forbid();
             var reason = string.IsNullOrWhiteSpace(request.Reason) ? "Hủy phiếu" : request.Reason.Trim();
             if (request.RequestKey == Guid.Empty || request.ExpectedVersion < 1 || reason.Length > 1000)
-                return Results.BadRequest("Cần nhập lý do hủy phiếu.");
+                return Results.BadRequest(SystemMessages.Get("MSG99"));
             await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
             await db.Database.ExecuteSqlInterpolatedAsync(
                 $"SELECT 1 FROM \"TREATMENT_DOSSIER\" WHERE \"Id\" = {dossierId} FOR UPDATE", ct);
@@ -279,14 +280,14 @@ public static class TreatmentPaymentEndpoints
                 using var document = JsonDocument.Parse(previous);
                 if (document.RootElement.GetProperty("reason").GetString() != reason ||
                     document.RootElement.GetProperty("expectedVersion").GetInt32() != request.ExpectedVersion)
-                    return Results.Conflict("Mã yêu cầu đã được dùng cho thao tác khác.");
+                    return Results.Conflict(SystemMessages.Get("MSG116"));
                 await transaction.CommitAsync(ct);
                 return Results.Ok(new { status = "Cancelled" });
             }
             var dossier = await db.TreatmentDossiers.SingleOrDefaultAsync(x => x.Id == dossierId, ct);
             if (dossier is null || dossier.State == "Deleted") return Results.NotFound();
             if (dossier.State == "Cancelled" || dossier.Version != request.ExpectedVersion)
-                return Results.Conflict("Phiếu đã thay đổi. Vui lòng tải lại.");
+                return Results.Conflict(SystemMessages.Get("MSG107"));
             var hasUnsettledOrder = await db.Database.SqlQuery<int>($"""
                 SELECT 1 AS "Value" FROM "AUDIT_LOG" order_log
                 WHERE order_log."AuditType" = 'FinancePayOsOrder'
@@ -297,7 +298,7 @@ public static class TreatmentPaymentEndpoints
                           AND payment."PayloadJson"->>'orderId' = order_log."StorageId"::text)
                 LIMIT 1
                 """).AnyAsync(ct);
-            if (hasUnsettledOrder) return Results.Conflict("Phiếu còn QR chuyển khoản chưa đối soát.");
+            if (hasUnsettledOrder) return Results.Conflict(SystemMessages.Get("MSG111"));
             var actor = ((CurrentUser)context.Items["CurrentUser"]!).Id;
             var now = DateTimeOffset.UtcNow;
             var payload = JsonSerializer.Serialize(new { kind = "DossierCancelled", reason,
@@ -309,7 +310,7 @@ public static class TreatmentPaymentEndpoints
                     {dossier.PatientId}, {dossier.BranchId}, {dossierId.ToString()}, {payload}::jsonb)
                 ON CONFLICT ("StorageId") DO NOTHING
                 """, ct);
-            if (inserted != 1) return Results.Conflict("Mã yêu cầu đã được dùng.");
+            if (inserted != 1) return Results.Conflict(SystemMessages.Get("MSG113"));
             dossier.State = "Cancelled";
             dossier.Version++;
             dossier.UpdatedAt = now;

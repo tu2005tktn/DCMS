@@ -14,7 +14,7 @@ async function prepare(page: Page, canReadAppointments = true) {
     if (path === '/api/working-schedules/recurring') return ok({ dentistId: 7, version: 0, template: null, exception: null, futureChanges: [], legacyWeek: [] });
     if (path === '/api/working-schedules/appointments') {
       state.calls.push(url);
-      if (state.fail) return route.fulfill({ status: 503, json: { code: 'MSG144', message: 'SYNTHETIC cannot load appointments' } });
+      if (state.fail) return route.fulfill({ status: 503, json: { code: 'MSG49', message: 'SYNTHETIC cannot load appointments' } });
       return ok({ items: [
         { id: 'plan-1', code: 'AP-PLAN-1', patientName: 'SYNTHETIC An', serviceName: 'Trám răng', branchId: 1, branchName: 'SYNTHETIC branch', startAt: '2032-01-05T17:30:00Z', endAt: '2032-01-05T18:00:00Z', status: state.cancelled ? 'Cancelled' : 'Confirmed', isTreatmentPlan: true },
         { id: 'plan-2', code: 'AP-PLAN-2', patientName: 'SYNTHETIC Bình', serviceName: 'Bọc sứ', branchId: 1, branchName: 'SYNTHETIC branch', startAt: '2032-01-06T02:00:00Z', endAt: '2032-01-06T02:30:00Z', status: 'Confirmed', isTreatmentPlan: false },

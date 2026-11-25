@@ -31,7 +31,7 @@ public sealed partial class WorkingScheduleService
     private async Task AuthorizeRecurring(int actor, int employee, CancellationToken ct)
     {
         var branches = (await ActiveMembers(ct)).Where(x => x.EmployeeId == employee).Select(x => x.BranchId).ToArray();
-        if (branches.Length == 0) throw Error("MSG06", 403);
+        if (branches.Length == 0) throw Error("MSG05", 403);
         foreach (var branch in branches) await Authorize(actor, branch, employee, ct);
         // An aggregate edit must not erase work at a branch outside the editor's rights.
         var publishedBranches = await db.Set<WorkingScheduleRevision>().Where(r => r.EmployeeId == employee)
@@ -42,7 +42,7 @@ public sealed partial class WorkingScheduleService
     public async Task<RecurringScheduleDto> GetRecurringAsync(int actorId, int dentistId, DateOnly date, CancellationToken ct)
     {
         await AuthorizeRecurring(actorId, dentistId, ct);
-        if (date.Year is < 2000 or > 2100) throw Error("MSG110");
+        if (date.Year is < 2000 or > 2100) throw Error("MSG40");
         return await RecurringDto(dentistId, date, ct);
     }
     private async Task<RecurringScheduleDto> RecurringDto(int employee, DateOnly date, CancellationToken ct)
@@ -64,14 +64,14 @@ public sealed partial class WorkingScheduleService
         await AuthorizeRecurring(actor, c.DentistId, ct);
         if (c.RequestKey == Guid.Empty || c.Date < ClinicToday || c.Date.Year > 2100 || c.Kind is not ("Template" or "Exception")
             || c.Intervals == null || c.Intervals.Any(p => p == null) || c.Reason == null || c.Reason.Length > 500
-            || (c.Kind == "Exception" && string.IsNullOrWhiteSpace(c.Reason))) throw Error("MSG110");
+            || (c.Kind == "Exception" && string.IsNullOrWhiteSpace(c.Reason))) throw Error("MSG40");
         var periods = c.Intervals.Select(p => new SchedulePeriod(p.Day, p.StartMinute, p.EndMinute, p.Kind, p.Reason)).ToArray();
         if (!ScheduleRules.ValidWeek(Monday(c.Date), periods)
             || c.Intervals.Any(p => p.StartMinute % 30 != 0 || p.EndMinute % 30 != 0)
             || c.Intervals.GroupBy(p => p.Day).Any(g => g.Select(p => p.BranchId).Distinct().Count() != 1)
-            || (c.Kind == "Exception" && c.Intervals.Any(p => p.Day != c.Date.DayNumber - Monday(c.Date).DayNumber))) throw Error("MSG110");
+            || (c.Kind == "Exception" && c.Intervals.Any(p => p.Day != c.Date.DayNumber - Monday(c.Date).DayNumber))) throw Error("MSG40");
         foreach (var branch in c.Intervals.Select(p => p.BranchId).Distinct()) await Authorize(actor, branch, c.DentistId, ct);
-        if (c.ExpectedVersion != await HeadVersion(c.DentistId, await Revisions(c.DentistId, ct), ct)) throw Error("MSG111", 409);
+        if (c.ExpectedVersion != await HeadVersion(c.DentistId, await Revisions(c.DentistId, ct), ct)) throw Error("MSG41", 409);
     }
     // The same resolver is used by public GET, draft preview and transaction resource checks.
     private async Task<WorkingWeek?> Resolve(int branch, int employee, DateOnly date, RecurringCommand? draft, CancellationToken ct)
@@ -107,7 +107,7 @@ public sealed partial class WorkingScheduleService
             try
             {
                 await ValidateQuery(q, false, ct);
-                if (Evaluate(q, false, local, r.ChairId, r.PatientId, r.Id, await Load(q, null, ct, c)) != null) continue;
+                if (Evaluate(q, false, local, r.ChairId, r.PatientId, r.Id, await Load(q, ct, c)) != null) continue;
             }
             catch (BusinessException) { }
             affected.Add(new(r.Id, r.Code, r.StartAt, r.EndAt, r.AttendeeName, r.Status));
@@ -128,16 +128,16 @@ public sealed partial class WorkingScheduleService
         var receipt = await db.Set<ScheduleReceipt>().AsNoTracking().SingleOrDefaultAsync(x => x.ActorId == actorId && x.RequestKey == command.RequestKey, ct);
         if (receipt != null)
         {
-            if (receipt.Fingerprint != fingerprint) throw Error("MSG111", 409);
+            if (receipt.Fingerprint != fingerprint) throw Error("MSG41", 409);
             return JsonSerializer.Deserialize<RecurringPublishResult>(receipt.ResultJson)!;
         }
         await ValidateRecurring(actorId, command, ct);
-        if ((await AffectedRecurring(command, ct)).Length > 0) throw Error("MSG38", 409);
+        if ((await AffectedRecurring(command, ct)).Length > 0) throw Error("MSG32", 409);
         var revision = Proposed(command, command.ExpectedVersion + 1);
         revision.PublishedBy = actorId; revision.PublishedAt = clock.GetUtcNow();
         db.Add(revision);
         await db.SaveChangesAsync(ct);
-        var result = new RecurringPublishResult(await RecurringDto(command.DentistId, command.Date, ct), SystemMessages.Get("MSG39"));
+        var result = new RecurringPublishResult(await RecurringDto(command.DentistId, command.Date, ct), SystemMessages.Get("MSG33"));
         db.Add(new ScheduleReceipt { ActorId = actorId, RequestKey = command.RequestKey, Fingerprint = fingerprint, ResultJson = JsonSerializer.Serialize(result) });
         await db.SaveChangesAsync(ct); await tx.CommitAsync(ct);
         return result;
@@ -146,10 +146,10 @@ public sealed partial class WorkingScheduleService
     {
         await ValidateRecurring(actorId, request.Schedule, ct);
         await Authorize(actorId, request.BranchId, request.Schedule.DentistId, ct);
-        if (request.From.Year < 2000 || request.To.Year > 2100 || request.To < request.From || request.To.DayNumber - request.From.DayNumber > 30) throw Error("MSG110");
+        if (request.From.Year < 2000 || request.To.Year > 2100 || request.To < request.From || request.To.DayNumber - request.From.DayNumber > 30) throw Error("MSG40");
         var result = new List<AvailabilityResult>();
         for (var date = request.From; date <= request.To; date = date.AddDays(1))
-            result.Add(await Query(new(request.BranchId, request.Schedule.DentistId, request.ServiceId, date, request.DurationMinutes, request.AssistantId), false, null, ct, request.Schedule));
+            result.Add(await Query(new(request.BranchId, request.Schedule.DentistId, request.ServiceId, date, request.DurationMinutes, request.AssistantId), false, ct, request.Schedule));
         return new(result.ToArray());
     }
 }

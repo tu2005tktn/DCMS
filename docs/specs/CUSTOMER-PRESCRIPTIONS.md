@@ -10,12 +10,12 @@
 
 ## API
 
-- `GET /api/me/prescriptions?page=1&pageSize=20` trả `{items,total,page,pageSize}` sắp xếp ngày kê giảm dần, chỉ đơn của `PatientId` trong liên kết VERIFIED của tài khoản Public hiện hành. Page size cố định 20; không nhận patientId/accountId từ client.
-- `GET /api/me/prescriptions/{id}` trả chi tiết cùng các dòng thuốc đã lưu snapshot. Đơn khác bệnh nhân hoặc không tồn tại trả 404; chưa có liên kết VERIFIED trả 403; chưa đăng nhập trả 401. Mọi request kiểm tra link trên database, không chỉ tin claim/token cũ.
+- `GET /api/patients/me/prescriptions` trả mảng đơn thuốc sắp xếp ngày kê giảm dần, chỉ đơn của `PatientId` trong liên kết VERIFIED của tài khoản Public hiện hành; không nhận patientId/accountId từ client. Hợp đồng chi tiết: [S23-PATIENT-PRESCRIPTIONS.vi.md](S23-PATIENT-PRESCRIPTIONS.vi.md). (Đường dẫn cũ `/api/me/prescriptions` có phân trang chưa từng được backend triển khai và không còn dùng.)
+- `GET /api/patients/me/prescriptions/{id}` trả chi tiết cùng các dòng thuốc đã lưu snapshot. Đơn khác bệnh nhân hoặc không tồn tại trả 404; chưa có liên kết VERIFIED trả 403; chưa đăng nhập trả 401. Mọi request kiểm tra link trên database, không chỉ tin claim/token cũ.
 - DTO danh sách không chứa dòng thuốc; DTO chi tiết có `requiresExternalPurchase`, `items[].isExternalPurchase`. Không trả mã nội bộ, giá, ID nhân viên hoặc thông tin bệnh nhân khác.
 
 ## Giao diện và nghiệm thu
 
-- Web: `/customer/prescriptions` trong menu và trang chủ; danh sách 20 đơn/trang, mở `/customer/prescriptions/:id`, loading/empty/error/retry rõ ràng, 401 hết phiên và 403 dẫn tới liên kết hồ sơ. Lịch hẹn hiện có vẫn ở `/customer/appointments` và có lối vào từ trang chủ/menu.
-- Mobile: từ trang tài khoản Public có nút Lịch hẹn của tôi và Đơn thuốc của tôi; trang đơn có danh sách và chi tiết, tải lại, tải thêm, trạng thái chưa xác minh và lỗi. Dùng token phiên Public hiện có. Lịch hẹn hiện có giữ quyền và thao tác đặt/đổi/hủy.
-- Kiểm thử API không liên kết/đã xác minh/đã thu hồi, cross-patient ID và phân trang; build .NET/web/mobile, UI desktop/mobile và hồi quy lịch hẹn.
+- Web: `/customer/prescriptions` trong menu và trang chủ; danh sách đơn mới nhất trước, mở `/customer/prescriptions/:id`, loading/empty/error/retry rõ ràng, 401 hết phiên và 403 dẫn tới liên kết hồ sơ. Lịch hẹn hiện có vẫn ở `/customer/appointments` và có lối vào từ trang chủ/menu.
+- Mobile: từ trang tài khoản Public có nút Lịch hẹn của tôi và Đơn thuốc của tôi; trang đơn có danh sách và chi tiết (`medicalRecordsApi.prescriptions/prescription`), tải lại, trạng thái chưa xác minh và lỗi. Dùng token phiên Public hiện có. Lịch hẹn hiện có giữ quyền và thao tác đặt/đổi/hủy.
+- Kiểm thử API không liên kết/đã xác minh/đã thu hồi, cross-patient ID; build .NET/web/mobile, UI desktop/mobile và hồi quy lịch hẹn.

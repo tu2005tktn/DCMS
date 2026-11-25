@@ -29,9 +29,9 @@ public sealed record ReferenceOption(Guid Id, string? Code, string Name, int Ver
 
 public static class ReferenceMessages
 {
-    public static SystemMessage DuplicateCode => new("MSG201", "Mã danh mục đã tồn tại. Vui lòng chọn mã khác.") { Field = "code" };
-    public static SystemMessage DuplicateName => new("MSG201", "Tên đã tồn tại trong danh mục. Vui lòng nhập tên khác.") { Field = "name" };
-    public static SystemMessage Reserved => new("SETTINGS_RESERVED_ENTRY", "Mục này được hệ thống dùng cho chứng từ liên kết nên không thể ngừng dùng.");
+    public static SystemMessage DuplicateCode => new("MSG50", "Mã danh mục đã tồn tại. Vui lòng chọn mã khác.") { Field = "code" };
+    public static SystemMessage DuplicateName => new("MSG50", "Tên đã tồn tại trong danh mục. Vui lòng nhập tên khác.") { Field = "name" };
+    public static SystemMessage Reserved => new("MSG87", "Mục này được hệ thống dùng cho chứng từ liên kết nên không thể ngừng dùng.");
 }
 
 public interface IReferenceCatalogService

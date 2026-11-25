@@ -32,7 +32,7 @@ public static class SettingsEndpoints
         });
         groups.MapGet("/staff", async (HttpContext c, ISettingsService s, CancellationToken ct) => Results.Ok(await s.StaffAsync(Actor(c), ct)));
         groups.MapGet("/{id:guid}", async (HttpContext c, Guid id, ISettingsService s, CancellationToken ct) =>
-            Results.Ok((await s.GroupsAsync(Actor(c), ct)).SingleOrDefault(x => x.Id == id) ?? throw Infrastructure.Features.Settings.SettingsAccess.Error("MSG113", 404)));
+            Results.Ok((await s.GroupsAsync(Actor(c), ct)).SingleOrDefault(x => x.Id == id) ?? throw Infrastructure.Features.Settings.SettingsAccess.Error("MSG42", 404)));
         groups.MapPost("/", async (HttpContext c, GroupCommand command, ISettingsService s, CancellationToken ct) => Results.Ok(await s.SaveGroupAsync(Actor(c), null, command, ct)));
         groups.MapPut("/{id:guid}", async (HttpContext c, Guid id, GroupCommand command, ISettingsService s, CancellationToken ct) => Results.Ok(await s.SaveGroupAsync(Actor(c), id, command, ct)));
         groups.MapPost("/{id:guid}/preview", async (HttpContext c, Guid id, GroupCommand command, ISettingsService s, CancellationToken ct) => Results.Ok(await s.GroupPreviewAsync(Actor(c), id, command, ct)));
@@ -78,7 +78,6 @@ public static class SettingsEndpoints
                 Results.Ok(await s.SetChairStateAsync(Actor(c), id, chairId, command, ct)));
         }
 
-        MapBranchRoutes(endpoints.MapGroup("/api/system-settings/branches").RequireAuthorization().WithTags("S58 Branches"));
         MapBranchRoutes(endpoints.MapGroup("/api/settings/branches").RequireAuthorization().WithTags("S58 Branches"));
     }
 }

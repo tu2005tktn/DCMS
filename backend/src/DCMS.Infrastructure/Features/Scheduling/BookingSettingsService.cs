@@ -19,7 +19,7 @@ public sealed class BookingSettingsService(DcmsDbContext db, UserManager<Applica
     {
         var scope = await access.ResolveAsync(actorId, ct);
         var user = await users.FindByIdAsync(actorId.ToString());
-        if (user == null || !user.IsActive || user.AccountType != "Staff") throw Error("MSG06", 403);
+        if (user == null || !user.IsActive || user.AccountType != "Staff") throw Error("MSG05", 403);
         var roles = AccountRoles.Effective(await users.GetRolesAsync(user));
         var dentist = roles.Contains(AccountRoles.Dentist);
         return await (from member in db.SchedulingMembers.AsNoTracking()
@@ -31,7 +31,7 @@ public sealed class BookingSettingsService(DcmsDbContext db, UserManager<Applica
     }
     private async Task Authorize(int actorId, int branchId, CancellationToken ct)
     {
-        if (!(await OptionsAsync(actorId, ct)).Any(x => x.Id == branchId)) throw Error("MSG06", 403);
+        if (!(await OptionsAsync(actorId, ct)).Any(x => x.Id == branchId)) throw Error("MSG05", 403);
     }
     private async Task<BookingSettings> Read(int branchId, CancellationToken ct)
     {
@@ -59,11 +59,11 @@ public sealed class BookingSettingsService(DcmsDbContext db, UserManager<Applica
         var receipt = await db.Set<ScheduleReceipt>().AsNoTracking().SingleOrDefaultAsync(x => x.ActorId == actorId && x.RequestKey == command.RequestKey, ct);
         if (receipt != null)
         {
-            if (receipt.Fingerprint != fingerprint) throw Error("MSG111", 409);
+            if (receipt.Fingerprint != fingerprint) throw Error("MSG41", 409);
             return JsonSerializer.Deserialize<BookingSettings>(receipt.ResultJson)!;
         }
         var branch = await db.Set<SchedulingBranch>().SingleAsync(x => x.Id == branchId, ct);
-        if (branch.Version != command.ExpectedVersion) throw Error("MSG111", 409);
+        if (branch.Version != command.ExpectedVersion) throw Error("MSG41", 409);
         var existing = await db.Set<SchedulingService>().Where(x => x.BranchId == branchId).ToListAsync(ct);
         if (!existing.Select(x => x.Id).Order().SequenceEqual(command.Services.Where(x => x.Id > 0).Select(x => x.Id).Order())) throw Error("MSG04", 400);
         foreach (var item in command.Services)

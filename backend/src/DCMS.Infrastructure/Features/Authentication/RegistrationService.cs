@@ -27,7 +27,7 @@ public sealed partial class RegistrationService(DcmsDbContext db, UserManager<Ap
         if (!MailAddress.TryCreate(email, out var address) || address.Address != email)
             throw new BusinessException(400, SystemMessages.Get("MSG04", "Email"));
         if (string.IsNullOrEmpty(request.Password)) throw new BusinessException(400, SystemMessages.Get("MSG02", "Mật khẩu"));
-        if (request.Password.Length > 256) throw new BusinessException(400, SystemMessages.Get("MSG109"));
+        if (request.Password.Length > 256) throw new BusinessException(400, SystemMessages.Get("MSG39"));
         if (string.IsNullOrEmpty(request.ConfirmPassword))
             throw new BusinessException(400, SystemMessages.Get("MSG02", "Xác nhận mật khẩu"));
         if (request.ConfirmPassword != request.Password)
@@ -35,11 +35,11 @@ public sealed partial class RegistrationService(DcmsDbContext db, UserManager<Ap
 
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         if (!await roles.RoleExistsAsync(AccountRoles.Guest))
-            throw new BusinessException(503, SystemMessages.Get("MSG144"));
+            throw new BusinessException(503, SystemMessages.Get("MSG49"));
         if (await users.FindByNameAsync(phone) != null)
-            throw new BusinessException(409, SystemMessages.Get("MSG139"));
+            throw new BusinessException(409, SystemMessages.Get("MSG46"));
         if (await users.FindByEmailAsync(email) != null)
-            throw new BusinessException(409, SystemMessages.Get("MSG139"));
+            throw new BusinessException(409, SystemMessages.Get("MSG46"));
 
         var now = DateTimeOffset.UtcNow;
         var user = new ApplicationUser
@@ -58,16 +58,16 @@ public sealed partial class RegistrationService(DcmsDbContext db, UserManager<Ap
         });
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
-        return new RegisterResponse(user.Id, phone, SystemMessages.Get("MSG11"));
+        return new RegisterResponse(user.Id, phone, SystemMessages.Get("MSG08"));
     }
 
     private static void Ensure(IdentityResult result)
     {
         if (result.Succeeded) return;
         if (result.Errors.Any(x => x.Code.StartsWith("Duplicate", StringComparison.Ordinal)))
-            throw new BusinessException(409, SystemMessages.Get("MSG139"));
+            throw new BusinessException(409, SystemMessages.Get("MSG46"));
         if (result.Errors.Any(x => x.Code.StartsWith("Password", StringComparison.Ordinal)))
-            throw new BusinessException(400, SystemMessages.Get("MSG109"));
+            throw new BusinessException(400, SystemMessages.Get("MSG39"));
         throw new BusinessException(400, SystemMessages.Get("MSG04", "Thông tin tài khoản"));
     }
 

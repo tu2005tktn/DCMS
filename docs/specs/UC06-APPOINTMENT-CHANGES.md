@@ -69,7 +69,7 @@ Tích hợp S24 theo [TREATMENT-PROGRESSION.vi.md](TREATMENT-PROGRESSION.vi.md) 
 
 ## Phạm vi tích hợp
 
-Đây là hai command đổi/hủy. API tạo/rút/xử lý yêu cầu hỗ trợ, cùng-visit extension, notification dispatcher và UI staff S12 là các phần riêng. S14/S16 hiện có thể gọi HTTP client bằng `EXPO_PUBLIC_APPOINTMENTS_MOCK=false`; không chuyển cấu hình mặc định khi support-request API chưa sẵn sàng.
+Đây là hai command đổi/hủy. API tạo/rút/xử lý yêu cầu hỗ trợ, cùng-visit extension, notification dispatcher và UI staff S12 là các phần riêng. S14/S16 trên mobile luôn gọi HTTP client (mock đã gỡ 25/11/2026).
 
 ## Kiểm thử bắt buộc
 

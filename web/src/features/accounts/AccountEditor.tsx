@@ -65,8 +65,8 @@ export default function AccountEditor({ account, roles, onClose, onSaved }: {
       onSaved(result.notification.message);
     } catch (failure) {
       if (failure instanceof Error) setError(failure.message);
-      if (failure instanceof ApiError && failure.code === 'MSG111') setConflict(true);
-      if (failure instanceof ApiError && failure.code === 'MSG139'
+      if (failure instanceof ApiError && failure.code === 'MSG41') setConflict(true);
+      if (failure instanceof ApiError && failure.code === 'MSG46'
         && failure.field && ['userName', 'employeeCode', 'email', 'phone'].includes(failure.field)) {
         form.setFields([{ name: failure.field, errors: [failure.message] }]);
       }

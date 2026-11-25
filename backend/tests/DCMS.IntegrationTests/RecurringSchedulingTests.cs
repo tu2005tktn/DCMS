@@ -97,7 +97,7 @@ public sealed class RecurringSchedulingTests(ApiFixture fixture) : IClassFixture
         await using var tx = await db.Database.BeginTransactionAsync();
         var start = new DateTimeOffset(Monday.AddDays(14).ToDateTime(new TimeOnly(8, 0)), TimeSpan.FromHours(7));
         var stale = await Assert.ThrowsAsync<BusinessException>(() => availability.CheckInTransactionAsync(new(s.Branch, s.Employee, s.Service, start, 30, s.Chair, null, null, 1), default));
-        Assert.Equal("MSG111", stale.Response.Code);
+        Assert.Equal("MSG41", stale.Response.Code);
     }
     [Fact]
     public async Task FutureBookingsBeyondPreviewRangeBlockBranchRemovalButLaterTemplatesStillApply()
@@ -117,7 +117,7 @@ public sealed class RecurringSchedulingTests(ApiFixture fixture) : IClassFixture
         var removal = Command(s, 1) with { Intervals = [new(s.OtherBranch, 0, 480, 1020, "Work")] };
         var preview = await s.Client.PostAsJsonAsync("/api/working-schedules/recurring/preview", removal);
         Assert.Single((await preview.Content.ReadFromJsonAsync<SchedulePreview>())!.AffectedAppointments);
-        await Message(await s.Client.PostAsJsonAsync("/api/working-schedules/recurring/publish", removal), HttpStatusCode.Conflict, "MSG38");
+        await Message(await s.Client.PostAsJsonAsync("/api/working-schedules/recurring/publish", removal), HttpStatusCode.Conflict, "MSG32");
         Assert.NotEmpty((await Slots(s, later)).Slots);
         await Publish(s, Command(s, 1) with { Date = later });
         await Publish(s, removal with { ExpectedVersion = 2 });
@@ -129,14 +129,14 @@ public sealed class RecurringSchedulingTests(ApiFixture fixture) : IClassFixture
     {
         var s = await Create(); using var client = s.Client; var c = Command(s);
         await Publish(s, c); Assert.Equal(1, (await Publish(s, c)).Schedule.Version);
-        await Message(await s.Client.PostAsJsonAsync("/api/working-schedules/recurring/publish", c with { Reason = "changed" }), HttpStatusCode.Conflict, "MSG111");
-        await Message(await s.Client.PostAsJsonAsync("/api/working-schedules/recurring/publish", c with { RequestKey = Guid.NewGuid() }), HttpStatusCode.Conflict, "MSG111");
-        await Message(await s.Client.PostAsJsonAsync("/api/working-schedules/recurring/publish", c with { ExpectedVersion = 1, RequestKey = Guid.NewGuid(), Intervals = [new(s.Branch, 0, 495, 720, "Work")] }), HttpStatusCode.BadRequest, "MSG110");
-        await Message(await s.Client.PostAsJsonAsync("/api/working-schedules/recurring/publish", c with { ExpectedVersion = 1, RequestKey = Guid.NewGuid(), Kind = "Exception", Intervals = [] }), HttpStatusCode.BadRequest, "MSG110");
+        await Message(await s.Client.PostAsJsonAsync("/api/working-schedules/recurring/publish", c with { Reason = "changed" }), HttpStatusCode.Conflict, "MSG41");
+        await Message(await s.Client.PostAsJsonAsync("/api/working-schedules/recurring/publish", c with { RequestKey = Guid.NewGuid() }), HttpStatusCode.Conflict, "MSG41");
+        await Message(await s.Client.PostAsJsonAsync("/api/working-schedules/recurring/publish", c with { ExpectedVersion = 1, RequestKey = Guid.NewGuid(), Intervals = [new(s.Branch, 0, 495, 720, "Work")] }), HttpStatusCode.BadRequest, "MSG40");
+        await Message(await s.Client.PostAsJsonAsync("/api/working-schedules/recurring/publish", c with { ExpectedVersion = 1, RequestKey = Guid.NewGuid(), Kind = "Exception", Intervals = [] }), HttpStatusCode.BadRequest, "MSG40");
         using var other = await Login("dentist.demo");
-        await Message(await other.PostAsJsonAsync("/api/working-schedules/recurring/publish", c), HttpStatusCode.Forbidden, "MSG06");
+        await Message(await other.PostAsJsonAsync("/api/working-schedules/recurring/publish", c), HttpStatusCode.Forbidden, "MSG05");
         using var admin = await Login("admin.demo");
-        await Message(await admin.GetAsync($"/api/working-schedules/recurring?dentistId={s.Employee}&date=2032-01-05"), HttpStatusCode.Forbidden, "MSG06");
+        await Message(await admin.GetAsync($"/api/working-schedules/recurring?dentistId={s.Employee}&date=2032-01-05"), HttpStatusCode.Forbidden, "MSG05");
         var race = await Task.WhenAll(s.Client.PostAsJsonAsync("/api/working-schedules/recurring/publish", Command(s, 1)),
             s.Client.PostAsJsonAsync("/api/working-schedules/recurring/publish", Command(s, 1)));
         Assert.Single(race, r => r.StatusCode == HttpStatusCode.OK); Assert.Single(race, r => r.StatusCode == HttpStatusCode.Conflict);
@@ -162,12 +162,17 @@ public sealed class RecurringSchedulingTests(ApiFixture fixture) : IClassFixture
     public async Task LegacyWeekIsPreservedAndNewTokensCannotCollideWithLegacyVersions()
     {
         var s = await Create(); using var client = s.Client;
-        var legacy = new ScheduleCommand(s.Branch, s.Employee, Monday, 0, [new(0, 480, 720, "Work")], Guid.NewGuid());
-        Assert.Equal(HttpStatusCode.OK, (await s.Client.PostAsJsonAsync("/api/working-schedules/publish", legacy)).StatusCode);
+        // The weekly publish API is gone (docs/specs/UNUSED-API-REMOVAL.vi.md); legacy weeks only exist as stored data.
+        using (var seed = fixture.Services.CreateScope())
+        {
+            var seedDb = seed.ServiceProvider.GetRequiredService<DcmsDbContext>();
+            var week = new WorkingWeek { BranchId = s.Branch, EmployeeId = s.Employee, WeekStart = Monday, PublishedBy = s.Actor, PublishedAt = DateTimeOffset.UtcNow };
+            week.Periods.Add(new WorkingPeriod { WeekId = week.Id, Day = 0, StartMinute = 480, EndMinute = 720, Kind = "Work" });
+            seedDb.Add(week); await seedDb.SaveChangesAsync();
+        }
         Assert.NotEmpty((await Slots(s, Monday)).Slots); Assert.Empty((await Slots(s, Monday.AddDays(7))).Slots);
         var result = await Publish(s, Command(s, 1)); Assert.Equal(2, result.Schedule.Version);
         Assert.Single(result.Schedule.LegacyWeek);
-        await Message(await s.Client.PostAsJsonAsync("/api/working-schedules/publish", legacy with { ExpectedVersion = 1, RequestKey = Guid.NewGuid() }), HttpStatusCode.Conflict, "MSG111");
         Assert.All((await Slots(s, Monday.AddDays(7))).Slots, slot => Assert.Equal(2, slot.ScheduleVersion));
         using var scope = fixture.Services.CreateScope();
         Assert.True(await scope.ServiceProvider.GetRequiredService<DcmsDbContext>().Set<WorkingWeek>().AnyAsync(x => x.EmployeeId == s.Employee));
@@ -182,6 +187,6 @@ public sealed class RecurringSchedulingTests(ApiFixture fixture) : IClassFixture
         var days = (await response.Content.ReadFromJsonAsync<RecurringAvailabilityResult>())!.Days;
         Assert.Equal(15, days.Length); Assert.NotEmpty(days[14].Slots); Assert.Empty(days[1].Slots);
         Assert.Empty((await Slots(s, Monday)).Slots);
-        await Message(await s.Client.PostAsJsonAsync("/api/working-schedules/recurring/preview-availability", request with { To = Monday.AddDays(31) }), HttpStatusCode.BadRequest, "MSG110");
+        await Message(await s.Client.PostAsJsonAsync("/api/working-schedules/recurring/preview-availability", request with { To = Monday.AddDays(31) }), HttpStatusCode.BadRequest, "MSG40");
     }
 }

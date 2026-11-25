@@ -20,7 +20,7 @@ async function mock(page: Page, config: { existing?: boolean; error?: boolean; s
     if (path.startsWith(root)) {
       if (method === 'GET') {
         if (path === root) {
-          if (config.listError) return route.fulfill({ status: 503, json: { code: 'MSG144', message: 'Chưa tải được kế hoạch.' } });
+          if (config.listError) return route.fulfill({ status: 503, json: { code: 'MSG49', message: 'Chưa tải được kế hoạch.' } });
           const value = dto(), keyword = url.searchParams.get('keyword')?.toLowerCase() ?? '';
           const items = value && value.name.toLowerCase().includes(keyword) && value.branchId === Number(url.searchParams.get('branchId')) ? [value] : [];
           return route.fulfill({ json: { items, total: items.length, page: 1, pageSize: 20 } });
@@ -28,8 +28,8 @@ async function mock(page: Page, config: { existing?: boolean; error?: boolean; s
         return route.fulfill({ json: staleTriggered ? { ...dto(), name: 'Tên mới trên máy chủ', version: 5 } : dto() });
       }
       const body = req.postDataJSON(); calls.push({ method, path, body });
-      if (config.error && !failed) { failed = true; return route.fulfill({ status: 503, json: { code: 'MSG144', message: 'Lưu chưa thành công.' } }); }
-      if (config.stale && body.expectedVersion !== 5) { staleTriggered = true; return route.fulfill({ status: 409, json: { code: 'MSG111', message: 'Dữ liệu đã thay đổi.' } }); }
+      if (config.error && !failed) { failed = true; return route.fulfill({ status: 503, json: { code: 'MSG49', message: 'Lưu chưa thành công.' } }); }
+      if (config.stale && body.expectedVersion !== 5) { staleTriggered = true; return route.fulfill({ status: 409, json: { code: 'MSG41', message: 'Dữ liệu đã thay đổi.' } }); }
       if (path === root) plan = { id: planId, branchId: body.branchId, name: body.name, version: 1, items: [] };
       else if (method === 'DELETE' && !path.includes('/items/')) { plan = null; return route.fulfill({ json: { id: planId, version: 2, deleted: true } }); }
       else {
@@ -107,10 +107,10 @@ test('lỗi mạng giữ bản nhập và retry cùng requestKey', async ({ page
   const calls = await mock(page, { existing: true, error: true }); await open(page);
   await page.locator('.item-plan-table').getByRole('button', { name: 'Sửa', exact: true }).click(); const row = page.getByRole('row', { name: 'Sửa hạng mục' });
   await row.getByLabel('Ghi chú', { exact: true }).fill('Giữ bản nhập'); await row.getByRole('button', { name: 'Đồng ý', exact: true }).click();
-  await expect(page.getByText('MSG144: Lưu chưa thành công.')).toBeVisible(); await expect(row.getByLabel('Ghi chú', { exact: true })).toHaveValue('Giữ bản nhập');
+  await expect(page.getByText('MSG49: Lưu chưa thành công.')).toBeVisible(); await expect(row.getByLabel('Ghi chú', { exact: true })).toHaveValue('Giữ bản nhập');
   await row.getByRole('button', { name: 'Đồng ý', exact: true }).click(); await expect(row).not.toBeVisible(); expect(calls[0].body.requestKey).toBe(calls[1].body.requestKey);
 });
-test('MSG111 đọc so sánh rồi giữ bản nhập với version mới', async ({ page }) => {
+test('MSG41 đọc so sánh rồi giữ bản nhập với version mới', async ({ page }) => {
   const calls = await mock(page, { existing: true, stale: true }); await open(page);
   await page.locator('.item-plan-table').getByRole('button', { name: 'Sửa', exact: true }).click(); const row = page.getByRole('row', { name: 'Sửa hạng mục' });
   await row.getByLabel('Ghi chú', { exact: true }).fill('Phiên bản đang nhập'); await row.getByRole('button', { name: 'Đồng ý', exact: true }).click();

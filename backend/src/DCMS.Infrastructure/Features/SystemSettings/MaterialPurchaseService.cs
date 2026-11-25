@@ -17,7 +17,7 @@ public sealed class MaterialPurchaseService(DcmsDbContext db, TimeProvider clock
     private static BusinessException Error(string code, int status = 400, string? field = null) => new(status, SystemMessages.Get(code) with { Field = field });
     private DateOnly Today => DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime.AddHours(7));
     private Task Require(int actorId, string permission) => access.RequireAsync(actorId, permission, CancellationToken.None);
-    private static void Version(int actual, int expected) { if (actual != expected) throw Error("MSG111", 409); }
+    private static void Version(int actual, int expected) { if (actual != expected) throw Error("MSG41", 409); }
     private sealed record Change(Guid Id, object? Before, MaterialPurchaseDto Result);
 
     // Names and usage unit are read from the catalogs (docs/specs/MATERIAL-PURCHASE-TABLE-SIMPLIFICATION.vi.md); load rows through WithNames.
@@ -26,7 +26,7 @@ public sealed class MaterialPurchaseService(DcmsDbContext db, TimeProvider clock
         x.ConversionFactor, x.Material.UsageUnit, x.UsageQuantity, decimal.Round(x.UnitPriceVnd / x.ConversionFactor, 2, MidpointRounding.AwayFromZero), x.SupplierId, x.Supplier?.Name, x.LotNumber);
     private static IQueryable<MaterialPurchase> WithNames(IQueryable<MaterialPurchase> query) => query.Include(x => x.Material).ThenInclude(x => x.Category).Include(x => x.Supplier);
     private async Task<MaterialPurchase> Row(Guid id, CancellationToken ct) =>
-        await WithNames(db.MaterialPurchases).SingleOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct) ?? throw Error("MSG113", 404);
+        await WithNames(db.MaterialPurchases).SingleOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct) ?? throw Error("MSG42", 404);
 
     private sealed record Fields(DateOnly EnteredOn, DateOnly? ReceivedOn, DateOnly? ExpiresOn, MaterialCatalogItem Material, decimal Quantity, string Unit, decimal Factor, decimal UsageQuantity, long UnitPrice, long Total, long Paid, CatalogProvider? Supplier, string? LotNumber);
     private async Task<Fields> Validate(DateOnly enteredOn, DateOnly? receivedOn, DateOnly? expiresOn, Guid materialId, decimal quantity, string? unit, decimal factor, long unitPrice, long paid, Guid? supplierId, string? lotNumber, CancellationToken ct)
@@ -77,8 +77,8 @@ public sealed class MaterialPurchaseService(DcmsDbContext db, TimeProvider clock
         var prior = await db.SystemCatalogChanges.AsNoTracking().SingleOrDefaultAsync(x => x.RequestKey == key, ct);
         if (prior != null)
         {
-            if (prior.ActorId != actorId || prior.Command != command || prior.Fingerprint != hash) throw Error("MSG111", 409);
-            return JsonSerializer.Deserialize<MaterialPurchaseDto>(prior.ResultJson, Json) ?? throw Error("MSG144", 503);
+            if (prior.ActorId != actorId || prior.Command != command || prior.Fingerprint != hash) throw Error("MSG41", 409);
+            return JsonSerializer.Deserialize<MaterialPurchaseDto>(prior.ResultJson, Json) ?? throw Error("MSG49", 503);
         }
         var change = await apply();
         db.SystemCatalogChanges.Add(new SystemCatalogChange { RequestKey = key, ActorId = actorId, Command = command, ResourceId = change.Id,
@@ -113,7 +113,7 @@ public sealed class MaterialPurchaseService(DcmsDbContext db, TimeProvider clock
         return new(rows.Select(ToDto).ToArray(), total, page, pageSize, totals);
     }
     public async Task<MaterialPurchaseDto> GetAsync(int actorId, Guid id, CancellationToken ct)
-    { await Require(actorId, "materials.purchases.read"); return ToDto(await WithNames(db.MaterialPurchases.AsNoTracking()).SingleOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct) ?? throw Error("MSG113", 404)); }
+    { await Require(actorId, "materials.purchases.read"); return ToDto(await WithNames(db.MaterialPurchases.AsNoTracking()).SingleOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct) ?? throw Error("MSG42", 404)); }
 
     public Task<MaterialPurchaseDto> CreateAsync(int actorId, CreateMaterialPurchaseRequest r, CancellationToken ct) =>
         Command(actorId, "materials.purchases.create", r.RequestKey, "PurchaseCreate", r, async () =>

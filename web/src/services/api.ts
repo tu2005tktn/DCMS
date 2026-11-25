@@ -8,7 +8,7 @@
  * `request(path, options)` — anonymous (cho /api/auth/sign-in, /api/auth/policy).
  * `authedRequest(path, token, options)` — gắn Authorization: Bearer.
  *
- * ApiError giữ status để các tầng trên dịch sang mã System Messages (MSG06/07/09/144).
+ * ApiError giữ status để các tầng trên dịch sang mã System Messages (MSG05/07/09/144).
  * KHÔNG log body request/response vì có thể chứa token.
  */
 
@@ -111,7 +111,7 @@ export async function api<T>(path: string, init: RequestInit = {}, authenticated
   if (authenticated) {
     await renewSession();
     // A sign-out/account switch while renewal was pending must cancel the old action.
-    if (generation !== sessionGeneration) throw new ApiError(401, 'MSG07', 'Phiên đăng nhập đã thay đổi. Vui lòng thử lại thao tác.');
+    if (generation !== sessionGeneration) throw new ApiError(401, 'MSG06', 'Phiên đăng nhập đã thay đổi. Vui lòng thử lại thao tác.');
   }
   const requestToken = accessToken;
   const headers = new Headers(init.headers);
@@ -119,9 +119,9 @@ export async function api<T>(path: string, init: RequestInit = {}, authenticated
   if (authenticated && accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
   let response: Response;
   try { response = await fetch(base + path, { ...init, headers, cache: 'no-store' }); }
-  catch { throw new ApiError(0, 'MSG144', 'Không thể hoàn tất thao tác. Vui lòng kiểm tra kết nối và thử lại.'); }
+  catch { throw new ApiError(0, 'MSG49', 'Không thể hoàn tất thao tác. Vui lòng kiểm tra kết nối và thử lại.'); }
   if (!response.ok) {
-    const fallback = { code: 'MSG144', message: 'Không thể hoàn tất thao tác. Vui lòng kiểm tra kết nối và thử lại.' };
+    const fallback = { code: 'MSG49', message: 'Không thể hoàn tất thao tác. Vui lòng kiểm tra kết nối và thử lại.' };
     const body = await response.json().catch(() => fallback) as SystemMessage;
     const error = new ApiError(response.status, body.code ?? fallback.code, body.message ?? fallback.message, body.field, body.currentVersion, body.blockers);
     if (response.status === 401 && authenticated && requestToken === accessToken) {
@@ -141,10 +141,10 @@ export async function apiBlob(path: string): Promise<Blob> {
   if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
   let response: Response;
   try { response = await fetch(base + path, { headers, cache: 'no-store' }); }
-  catch { throw new ApiError(0, 'MSG144', 'Không thể hoàn tất thao tác. Vui lòng kiểm tra kết nối và thử lại.'); }
+  catch { throw new ApiError(0, 'MSG49', 'Không thể hoàn tất thao tác. Vui lòng kiểm tra kết nối và thử lại.'); }
   if (!response.ok) {
     const body = await response.json().catch(() => ({})) as Partial<SystemMessage>;
-    throw new ApiError(response.status, body.code ?? 'MSG144', body.message ?? 'Không tải được tệp.', body.field);
+    throw new ApiError(response.status, body.code ?? 'MSG49', body.message ?? 'Không tải được tệp.', body.field);
   }
   return await response.blob();
 }

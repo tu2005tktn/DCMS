@@ -12,7 +12,6 @@ public static class AccountEndpoints
         group.MapGet("/", async (IAccountService service, string? search, int? page, int? pageSize,
             string? role, string? status, string? sortBy, string? sortDirection, CancellationToken ct) =>
             Results.Ok(await service.ListAsync(search, page ?? 1, pageSize ?? 20, role, status, sortBy, sortDirection, ct)));
-        group.MapGet("/roles", () => Results.Ok(AccountRoles.Staff));
         group.MapGet("/catalog", () => Results.Ok(new
         {
             Roles = AccountRoles.All, AssignableRoles = AccountRoles.Staff, Statuses = new[] { "Active", "Locked" }

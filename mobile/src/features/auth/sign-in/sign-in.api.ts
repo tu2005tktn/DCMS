@@ -45,11 +45,11 @@ async function parseJson<T>(response: Response): Promise<T> {
 }
 
 function translateUnauthorized(status: number): string {
-  // Chỉ hiển thị mã lỗi + status, không bao giờ kèm token/header. Backend dùng MSG07 cho 401.
-  if (status === 401) return 'MSG07';
-  if (status === 403) return 'MSG06';
-  if (status >= 500) return 'MSG144';
-  return 'MSG09';
+  // Chỉ hiển thị mã lỗi + status, không bao giờ kèm token/header. Backend dùng MSG06 cho 401.
+  if (status === 401) return 'MSG06';
+  if (status === 403) return 'MSG05';
+  if (status >= 500) return 'MSG49';
+  return 'MSG07';
 }
 
 export const signInApi = {

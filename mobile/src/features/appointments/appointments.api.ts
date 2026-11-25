@@ -1,6 +1,5 @@
 import { env } from '@/config/env';
 import { AppointmentApiError } from './appointments.errors';
-import { mockAppointmentsApi } from './appointments.mock';
 import type {
   AppointmentChangeResult, AppointmentDetail, AppointmentPage, AppointmentQuery, AvailabilitySlot, CancelCommand,
   RescheduleCommand, RescheduleDentist, SupportCommand, SupportRequest, SupportResult, SystemMessage,
@@ -27,11 +26,11 @@ async function call<T>(path: string, token: string | null, init: RequestInit = {
   if (token) headers.Authorization = `Bearer ${token}`;
   let response: Response;
   try { response = await fetch(env.apiUrl + path, { ...init, headers }); }
-  catch { throw new AppointmentApiError(connectionMessage, 0, 'MSG144'); }
+  catch { throw new AppointmentApiError(connectionMessage, 0, 'MSG49'); }
   const body = await response.json().catch(() => null) as unknown;
   if (!response.ok) {
     const error = body as Partial<SystemMessage> | null;
-    throw new AppointmentApiError(error?.message ?? connectionMessage, response.status, error?.code ?? 'MSG144');
+    throw new AppointmentApiError(error?.message ?? connectionMessage, response.status, error?.code ?? 'MSG49');
   }
   return body as T;
 }
@@ -64,6 +63,4 @@ const httpAppointmentsApi: AppointmentsApi = {
   withdrawSupport: (token, id, expectedVersion) => call(`/api/support-requests/${id}/withdraw`, token, post({ expectedVersion })),
 };
 
-// Mock DTOs until TV2/TV3 ship the Appointment API; set EXPO_PUBLIC_APPOINTMENTS_MOCK=false to use the server.
-export const usingMockAppointments = process.env.EXPO_PUBLIC_APPOINTMENTS_MOCK?.trim().toLowerCase() !== 'false';
-export const appointmentsApi: AppointmentsApi = usingMockAppointments ? mockAppointmentsApi : httpAppointmentsApi;
+export const appointmentsApi: AppointmentsApi = httpAppointmentsApi;

@@ -62,7 +62,7 @@ export default function InvestigationsPanel({ workspace, contexts, busy, onBusy,
       const page = await api<InvestigationPage>(`/api/visits/${visitId}/investigations${order ? `/${order.id}/${mode.action}` : ''}`, { method: 'POST', body: JSON.stringify({ ...body, requestKey: pending.current.key }) });
       if (!active.current) return;
       await onChanged(page, true); if(mode.action === 'create' && amendmentOrder) onAmendmentReason?.(values.amendmentReason!.trim()); pending.current = undefined; setMode(undefined);
-    } catch (failure) { if (active.current) setError((failure as ApiError).code === 'MSG111' ? 'Lượt hoặc chỉ định đã thay đổi. Bản nhập vẫn còn; dùng Tải lại phiên bản ở đầu trang trước khi thử lại.' : (failure as Error).message); }
+    } catch (failure) { if (active.current) setError((failure as ApiError).code === 'MSG41' ? 'Lượt hoặc chỉ định đã thay đổi. Bản nhập vẫn còn; dùng Tải lại phiên bản ở đầu trang trước khi thử lại.' : (failure as Error).message); }
     finally { if (active.current) { setWorking(false); onBusy(false); } }
   }
   const selectedKind = Form.useWatch('kind', form) ?? 'XRay';

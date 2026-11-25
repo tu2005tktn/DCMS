@@ -21,7 +21,7 @@ export function useFamilyApi() {
   const { state, expire } = useCustomerAuth();
   const token = state.status === 'authenticated' ? state.accessToken : undefined;
   return useCallback(async <T,>(path = '', init: RequestInit = {}) => {
-    if (!token) throw new ApiError(401, 'MSG07', 'Vui lòng đăng nhập lại.');
+    if (!token) throw new ApiError(401, 'MSG06', 'Vui lòng đăng nhập lại.');
     try { return await customerApi<T>(`/api/me/family-members${path}`, init, token); }
     catch (failure) { if (failure instanceof ApiError && failure.status === 401) expire(); throw failure; }
   }, [token, expire]);

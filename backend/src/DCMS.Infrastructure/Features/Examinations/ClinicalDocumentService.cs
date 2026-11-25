@@ -21,11 +21,11 @@ public sealed class ClinicalDocumentService(DcmsDbContext db, ClinicalAccess acc
     private string StorageRoot()
     {
         var path = config["ClinicalDocuments:StoragePath"];
-        if (string.IsNullOrWhiteSpace(path) || !Path.IsPathFullyQualified(path)) throw Error("MSG144", 503);
+        if (string.IsNullOrWhiteSpace(path) || !Path.IsPathFullyQualified(path)) throw Error("MSG49", 503);
         var root = Path.GetFullPath(path);
         for (var directory = new DirectoryInfo(Directory.GetCurrentDirectory()); directory != null; directory = directory.Parent) {
             if ((Directory.Exists(Path.Combine(directory.FullName, ".git")) || File.Exists(Path.Combine(directory.FullName, ".git")))
-                && (root.Equals(directory.FullName, StringComparison.OrdinalIgnoreCase) || root.StartsWith(directory.FullName + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))) throw Error("MSG144", 503);
+                && (root.Equals(directory.FullName, StringComparison.OrdinalIgnoreCase) || root.StartsWith(directory.FullName + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))) throw Error("MSG49", 503);
         }
         return root;
     }
@@ -36,20 +36,20 @@ public sealed class ClinicalDocumentService(DcmsDbContext db, ClinicalAccess acc
     {
         if (!visit.HasValue) {
             if (!dossier.HasValue) throw Error("MSG04");
-            var source = await db.TreatmentDossiers.AsNoTracking().SingleOrDefaultAsync(x => x.Id == dossier && x.PatientId == patient, ct) ?? throw Error("MSG113", 404);
+            var source = await db.TreatmentDossiers.AsNoTracking().SingleOrDefaultAsync(x => x.Id == dossier && x.PatientId == patient, ct) ?? throw Error("MSG42", 404);
             await access.BranchAsync(actor, source.BranchId, false, ct);
             return null;
         }
         var v = await access.VisitAsync(actor, visit.Value, false, ct);
-        if (v.PatientId != patient) throw Error("MSG113", 404);
+        if (v.PatientId != patient) throw Error("MSG42", 404);
         if (dossier.HasValue) {
-            if (!await db.TreatmentDossiers.AnyAsync(x => x.PatientId == patient && x.BranchId == v.BranchId && x.Id == dossier, ct)) throw Error("MSG113", 404);
+            if (!await db.TreatmentDossiers.AnyAsync(x => x.PatientId == patient && x.BranchId == v.BranchId && x.Id == dossier, ct)) throw Error("MSG42", 404);
         }
         return v;
     }
     private async Task<ClinicalDocument> RowAsync(int actor, Guid id, CancellationToken ct)
     {
-        var d = await db.Set<ClinicalDocument>().SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw Error("MSG113", 404);
+        var d = await db.Set<ClinicalDocument>().SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw Error("MSG42", 404);
         await ContextAsync(actor, d.PatientId, d.VisitId, d.DossierId, ct); return d;
     }
     private async Task<DocumentDto> DtoAsync(ClinicalDocument d, CancellationToken ct)
@@ -67,10 +67,10 @@ public sealed class ClinicalDocumentService(DcmsDbContext db, ClinicalAccess acc
     public async Task<object> ContextsAsync(int actorId, int patientId, CancellationToken ct)
     {
         var branches = await access.BranchesAsync(actorId, ct);
-        var patient = await db.Patients.AsNoTracking().Where(x => x.Id == patientId).Select(x => new { x.Id, x.PatientCode, x.FullName, x.BirthDate }).SingleOrDefaultAsync(ct) ?? throw Error("MSG113", 404);
+        var patient = await db.Patients.AsNoTracking().Where(x => x.Id == patientId).Select(x => new { x.Id, x.PatientCode, x.FullName, x.BirthDate }).SingleOrDefaultAsync(ct) ?? throw Error("MSG42", 404);
         var visits = await db.Visits.AsNoTracking().Where(x => x.PatientId == patientId && branches.Contains(x.BranchId)).OrderByDescending(x => x.ArrivalAt).ToArrayAsync(ct);
         var dossiers = await db.TreatmentDossiers.AsNoTracking().Where(x => x.PatientId == patientId && branches.Contains(x.BranchId)).ToArrayAsync(ct);
-        if (visits.Length == 0 && dossiers.Length == 0) throw Error("MSG113", 404);
+        if (visits.Length == 0 && dossiers.Length == 0) throw Error("MSG42", 404);
         // AcceptsUpload mirrors UploadAsync: only an open visit takes new documents (dossiers always do).
         return new { patient, visits = visits.Select(x => new { x.Id, Label = $"Lượt {x.ArrivalAt.ToOffset(TimeSpan.FromHours(7)):dd/MM/yyyy HH:mm}", Date = x.ArrivalAt,
                 AcceptsUpload = x.Status is VisitStatuses.Queued or VisitStatuses.InProgress or VisitStatuses.ExaminationConfirmed }),
@@ -82,9 +82,9 @@ public sealed class ClinicalDocumentService(DcmsDbContext db, ClinicalAccess acc
         var branches = await access.BranchesAsync(actorId, ct);
         if (q.VisitId.HasValue) await ContextAsync(actorId, q.PatientId, q.VisitId.Value, q.DossierId, ct);
         else if (!await db.Visits.AnyAsync(x => x.PatientId == q.PatientId && branches.Contains(x.BranchId), ct)
-            && !await db.TreatmentDossiers.AnyAsync(x => x.PatientId == q.PatientId && branches.Contains(x.BranchId), ct)) throw Error("MSG113", 404);
+            && !await db.TreatmentDossiers.AnyAsync(x => x.PatientId == q.PatientId && branches.Contains(x.BranchId), ct)) throw Error("MSG42", 404);
         if (q.DossierId.HasValue && !await db.TreatmentDossiers.AnyAsync(x => x.PatientId == q.PatientId && branches.Contains(x.BranchId)
-            && x.Id == q.DossierId, ct)) throw Error("MSG113", 404);
+            && x.Id == q.DossierId, ct)) throw Error("MSG42", 404);
         var query = db.Set<ClinicalDocument>().AsNoTracking().Where(x => x.PatientId == q.PatientId
             && (x.VisitId != null ? db.Visits.Any(v => v.Id == x.VisitId && branches.Contains(v.BranchId))
                 : db.TreatmentDossiers.Any(d => d.Id == x.DossierId && d.PatientId == q.PatientId && branches.Contains(d.BranchId)))
@@ -128,20 +128,20 @@ public sealed class ClinicalDocumentService(DcmsDbContext db, ClinicalAccess acc
         InvestigationOrder? investigation = null;
         if (m.InvestigationId.HasValue) {
             if (visit == null) throw Error("MSG04");
-            investigation = await db.Investigations.SingleOrDefaultAsync(x => x.Id == m.InvestigationId && x.VisitId == m.VisitId,ct) ?? throw Error("MSG113",404);
+            investigation = await db.Investigations.SingleOrDefaultAsync(x => x.Id == m.InvestigationId && x.VisitId == m.VisitId,ct) ?? throw Error("MSG42",404);
             var dentist = await access.BranchAsync(actorId,visit.BranchId,false,ct);
-            if (dentist && !await db.Employees.AnyAsync(x => x.Id == visit.DentistId && x.AccountId == actorId,ct)) throw Error("MSG06",403);
+            if (dentist && !await db.Employees.AnyAsync(x => x.Id == visit.DentistId && x.AccountId == actorId,ct)) throw Error("MSG05",403);
         }
         var hash = ExaminationService.Hash(new { m, files = files.Select(x => new { x.FileName, x.ContentType, Hash = Convert.ToHexString(SHA256.HashData(x.Content)) }) });
         var receipt = await db.Set<DocumentReceipt>().SingleOrDefaultAsync(x => x.ActorId == actorId && x.RequestKey == m.RequestKey, ct);
         if (receipt != null) {
-            if (receipt.Fingerprint != hash) throw Error("MSG111", 409);
+            if (receipt.Fingerprint != hash) throw Error("MSG41", 409);
             var entries = JsonSerializer.Deserialize<BatchEntry[]>(receipt.ResultJson)!; var replay = new List<DocumentUploadResult>();
             foreach (var entry in entries) replay.Add(new(entry.Id.HasValue ? await DetailAsync(actorId, entry.Id.Value, ct) : null, entry.Error));
             await tx.CommitAsync(ct); return new(replay.Count == 1 ? replay[0].Document : null, replay);
         }
-        if (visit != null && visit.Status is not (VisitStatuses.Queued or VisitStatuses.InProgress or VisitStatuses.ExaminationConfirmed)) throw Error("MSG42", 409);
-        if (investigation != null && investigation.State != "Ordered") throw Error("MSG42",409);
+        if (visit != null && visit.Status is not (VisitStatuses.Queued or VisitStatuses.InProgress or VisitStatuses.ExaminationConfirmed)) throw Error("MSG34", 409);
+        if (investigation != null && investigation.State != "Ordered") throw Error("MSG34",409);
         var results = new List<DocumentUploadResult>(); var ids = new List<BatchEntry>(); var written = new List<string>();
         try {
             foreach (var f in files) {
@@ -172,18 +172,18 @@ public sealed class ClinicalDocumentService(DcmsDbContext db, ClinicalAccess acc
     }
     public async Task<DocumentContent> ContentAsync(int actorId, Guid documentId, bool inline, CancellationToken ct)
     {
-        var d = await RowAsync(actorId, documentId, ct); if (d.FileState != "Ready") throw Error("MSG42", 409);
-        byte[] bytes; try { bytes = await File.ReadAllBytesAsync(PathFor(d.Id), ct); } catch (IOException) { throw Error("MSG144", 503); }
-        if (Convert.ToHexString(SHA256.HashData(bytes)) != d.Sha256) throw Error("MSG42", 409);
+        var d = await RowAsync(actorId, documentId, ct); if (d.FileState != "Ready") throw Error("MSG34", 409);
+        byte[] bytes; try { bytes = await File.ReadAllBytesAsync(PathFor(d.Id), ct); } catch (IOException) { throw Error("MSG49", 503); }
+        if (Convert.ToHexString(SHA256.HashData(bytes)) != d.Sha256) throw Error("MSG34", 409);
         Audit(d.Id, actorId, inline ? "Viewed" : "Downloaded"); await db.SaveChangesAsync(ct);
         return new(bytes, d.ContentType, d.FileName);
     }
     public async Task<DocumentContent> PatientContentAsync(int patientId, int accountId, Guid documentId, CancellationToken ct)
     {
-        var d = await db.Set<ClinicalDocument>().SingleOrDefaultAsync(x => x.Id == documentId && x.PatientId == patientId, ct) ?? throw Error("MSG113", 404);
-        if (d.FileState != "Ready") throw Error("MSG42", 409);
-        byte[] bytes; try { bytes = await File.ReadAllBytesAsync(PathFor(d.Id), ct); } catch (IOException) { throw Error("MSG144", 503); }
-        if (Convert.ToHexString(SHA256.HashData(bytes)) != d.Sha256) throw Error("MSG42", 409);
+        var d = await db.Set<ClinicalDocument>().SingleOrDefaultAsync(x => x.Id == documentId && x.PatientId == patientId, ct) ?? throw Error("MSG42", 404);
+        if (d.FileState != "Ready") throw Error("MSG34", 409);
+        byte[] bytes; try { bytes = await File.ReadAllBytesAsync(PathFor(d.Id), ct); } catch (IOException) { throw Error("MSG49", 503); }
+        if (Convert.ToHexString(SHA256.HashData(bytes)) != d.Sha256) throw Error("MSG34", 409);
         Audit(d.Id, accountId, "PatientViewed"); await db.SaveChangesAsync(ct);
         return new(bytes, d.ContentType, d.FileName);
     }
@@ -194,14 +194,14 @@ public sealed class ClinicalDocumentService(DcmsDbContext db, ClinicalAccess acc
         var d = await RowAsync(actorId, documentId, ct); var v = await access.VisitAsync(actorId, r.VisitId, true, ct, "documents.review");
         var sourceBranch = d.VisitId.HasValue ? (await db.Visits.SingleAsync(x => x.Id == d.VisitId, ct)).BranchId
             : (await db.TreatmentDossiers.SingleAsync(x => x.Id == d.DossierId, ct)).BranchId;
-        if (r.PatientId != d.PatientId || v.PatientId != d.PatientId || v.BranchId != sourceBranch) throw Error("MSG113", 404);
+        if (r.PatientId != d.PatientId || v.PatientId != d.PatientId || v.BranchId != sourceBranch) throw Error("MSG42", 404);
         var hash = ExaminationService.Hash(new { documentId, r });
         var receipt = await db.Set<DocumentReceipt>().SingleOrDefaultAsync(x => x.ActorId == actorId && x.RequestKey == r.RequestKey, ct);
-        if (receipt != null && receipt.Fingerprint != hash) throw Error("MSG111", 409);
-        if (d.FileState != "Ready") throw Error("MSG42", 409);
+        if (receipt != null && receipt.Fingerprint != hash) throw Error("MSG41", 409);
+        if (d.FileState != "Ready") throw Error("MSG34", 409);
         if (receipt == null) {
-            if (d.Version != r.ExpectedVersion) throw Error("MSG111", 409);
-            if (!VisitStatuses.Open.Contains(v.Status)) throw Error("MSG42", 409);
+            if (d.Version != r.ExpectedVersion) throw Error("MSG41", 409);
+            if (!VisitStatuses.Open.Contains(v.Status)) throw Error("MSG34", 409);
             if (!d.Reviews.Any(x => x.VisitId == v.Id)) {
                 d.Reviews.Add(new DocumentReview { DocumentId = d.Id, VisitId = v.Id, ReviewedBy = actorId, ReviewedAt = clock.GetUtcNow() });
                 d.Version++; Audit(d.Id, actorId, "ClinicallyReviewed");
@@ -217,15 +217,15 @@ public sealed class ClinicalDocumentService(DcmsDbContext db, ClinicalAccess acc
         if (r.RequestKey == Guid.Empty || r.ExpectedVersion <= 0 || string.IsNullOrEmpty(reason) || reason.Length > 500) throw Error("MSG04");
         await using var tx = await db.Database.BeginTransactionAsync(ct); await LockAsync(ct);
         // Permission and branch are checked before a replay is answered, so a revoked grant blocks the retry too.
-        var d = await db.Set<ClinicalDocument>().IgnoreQueryFilters().SingleOrDefaultAsync(x => x.Id == documentId, ct) ?? throw Error("MSG113", 404);
+        var d = await db.Set<ClinicalDocument>().IgnoreQueryFilters().SingleOrDefaultAsync(x => x.Id == documentId, ct) ?? throw Error("MSG42", 404);
         await access.BranchAsync(actorId, await SourceBranchAsync(d, ct), false, ct, "documents.delete");
         var hash = ExaminationService.Hash(new { documentId, delete = r });
         var receipt = await db.Set<DocumentReceipt>().SingleOrDefaultAsync(x => x.ActorId == actorId && x.RequestKey == r.RequestKey, ct);
-        if (receipt != null) { if (receipt.Fingerprint != hash) throw Error("MSG111", 409); await tx.CommitAsync(ct); return; }
-        if (await db.Set<DocumentAudit>().AnyAsync(x => x.DocumentId == d.Id && x.Action == DocumentAudit.DeletedAction, ct)) throw Error("MSG113", 404);
+        if (receipt != null) { if (receipt.Fingerprint != hash) throw Error("MSG41", 409); await tx.CommitAsync(ct); return; }
+        if (await db.Set<DocumentAudit>().AnyAsync(x => x.DocumentId == d.Id && x.Action == DocumentAudit.DeletedAction, ct)) throw Error("MSG42", 404);
         if (d.Metadata.InvestigationId.HasValue)
-            throw new DCMS.Application.Common.BusinessException(409, new("DOCUMENT_INVESTIGATION_RESULT", "Không xóa được hình ảnh/tài liệu là kết quả cận lâm sàng."));
-        if (d.Version != r.ExpectedVersion) throw Error("MSG111", 409);
+            throw new DCMS.Application.Common.BusinessException(409, new("MSG74", "Không xóa được hình ảnh/tài liệu là kết quả cận lâm sàng."));
+        if (d.Version != r.ExpectedVersion) throw Error("MSG41", 409);
         d.Version++; Audit(d.Id, actorId, DocumentAudit.DeletedAction, reason);
         db.Add(new DocumentReceipt { ActorId = actorId, RequestKey = r.RequestKey, Fingerprint = hash });
         await db.SaveChangesAsync(ct); await tx.CommitAsync(ct);
@@ -248,26 +248,26 @@ public sealed class ClinicalDocumentService(DcmsDbContext db, ClinicalAccess acc
     {
         if (r.RequestKey == Guid.Empty) throw Error("MSG04");
         var hash = ExaminationService.Hash(new { action = "AiAnalysis", documentId, r.RequestKey });
-        var d = await db.Set<ClinicalDocument>().AsNoTracking().SingleOrDefaultAsync(x => x.Id == documentId, ct) ?? throw Error("MSG113", 404);
+        var d = await db.Set<ClinicalDocument>().AsNoTracking().SingleOrDefaultAsync(x => x.Id == documentId, ct) ?? throw Error("MSG42", 404);
         await ContextAsync(actorId, d.PatientId, d.VisitId, d.DossierId, ct);
         await access.BranchAsync(actorId, await SourceBranchAsync(d, ct), true, ct, "documents.review");
         var receipt = await db.Set<DocumentReceipt>().AsNoTracking().SingleOrDefaultAsync(x => x.ActorId == actorId && x.RequestKey == r.RequestKey, ct);
         if (receipt != null) return await ReplayAiAsync(receipt, hash, documentId, ct);
         if (d.DocumentType != "XRay" || d.ContentType is not ("image/jpeg" or "image/png")) throw Error("MSG04");
-        if (d.FileState != "Ready" || d.AiAnalyses.Count >= MaxAiAnalyses) throw Error("MSG42", 409);
-        byte[] bytes; try { bytes = await File.ReadAllBytesAsync(PathFor(d.Id), ct); } catch (IOException) { throw Error("MSG144", 503); }
-        if (Convert.ToHexString(SHA256.HashData(bytes)) != d.Sha256) throw Error("MSG42", 409);
+        if (d.FileState != "Ready" || d.AiAnalyses.Count >= MaxAiAnalyses) throw Error("MSG34", 409);
+        byte[] bytes; try { bytes = await File.ReadAllBytesAsync(PathFor(d.Id), ct); } catch (IOException) { throw Error("MSG49", 503); }
+        if (Convert.ToHexString(SHA256.HashData(bytes)) != d.Sha256) throw Error("MSG34", 409);
         DentalAiResult result;
         try { result = await ai.AnalyzeXRayAsync(bytes, d.ContentType, d.FileName, ct); }
         catch (DentalAiUnavailableException e) {
             Audit(d.Id, actorId, "AiAnalysisFailed", e.Message); await db.SaveChangesAsync(ct);
-            throw new DCMS.Application.Common.BusinessException(503, new("MSG144", $"Không thể phân tích AI lúc này. {e.Message} Vui lòng thử lại sau."));
+            throw new DCMS.Application.Common.BusinessException(503, new("MSG49", $"Không thể phân tích AI lúc này. {e.Message} Vui lòng thử lại sau."));
         }
         await using var tx = await db.Database.BeginTransactionAsync(ct); await LockAsync(ct);
         receipt = await db.Set<DocumentReceipt>().AsNoTracking().SingleOrDefaultAsync(x => x.ActorId == actorId && x.RequestKey == r.RequestKey, ct);
         if (receipt != null) { await tx.CommitAsync(ct); return await ReplayAiAsync(receipt, hash, documentId, ct); }
         var row = await db.Set<ClinicalDocument>().SingleAsync(x => x.Id == documentId, ct);
-        if (row.FileState != "Ready" || row.Sha256 != d.Sha256 || row.AiAnalyses.Count >= MaxAiAnalyses) throw Error("MSG42", 409);
+        if (row.FileState != "Ready" || row.Sha256 != d.Sha256 || row.AiAnalyses.Count >= MaxAiAnalyses) throw Error("MSG34", 409);
         var analysis = new DocumentAiAnalysis {
             AnalysisId = Guid.NewGuid(), Kind = "Caries", SchemaVersion = result.SchemaVersion, ModelName = result.ModelName, ModelSha256 = result.ModelSha256,
             InputSha256 = row.Sha256, RequestedBy = actorId, RequestedAt = clock.GetUtcNow(), ElapsedMs = result.ElapsedMs, Device = result.Device,
@@ -282,12 +282,12 @@ public sealed class ClinicalDocumentService(DcmsDbContext db, ClinicalAccess acc
     }
     private async Task<AiAnalysisDto> ReplayAiAsync(DocumentReceipt receipt, string hash, Guid documentId, CancellationToken ct)
     {
-        if (receipt.Fingerprint != hash) throw Error("MSG111", 409);
+        if (receipt.Fingerprint != hash) throw Error("MSG41", 409);
         using var json = JsonDocument.Parse(receipt.ResultJson);
-        if (!json.RootElement.TryGetProperty("AnalysisId", out var idProperty)) throw Error("MSG111", 409);
+        if (!json.RootElement.TryGetProperty("AnalysisId", out var idProperty)) throw Error("MSG41", 409);
         var id = idProperty.GetGuid();
         var row = await db.Set<ClinicalDocument>().AsNoTracking().SingleAsync(x => x.Id == documentId, ct);
-        return (await AiDtosAsync(row, ct)).FirstOrDefault(x => x.AnalysisId == id) ?? throw Error("MSG113", 404);
+        return (await AiDtosAsync(row, ct)).FirstOrDefault(x => x.AnalysisId == id) ?? throw Error("MSG42", 404);
     }
     private string ReadyAudit => scanner.Enabled ? "ScanPassed" : "ScanSkipped";
     public async Task ScanPendingAsync(CancellationToken ct)

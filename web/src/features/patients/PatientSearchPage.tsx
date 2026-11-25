@@ -1,5 +1,5 @@
 import { PlusOutlined, SearchOutlined, ReloadOutlined, RightOutlined } from '@ant-design/icons';
-import { Alert, Button, Card, Checkbox, Empty, Input, Select, Space, Table, Tag, Tooltip, Typography } from 'antd';
+import { Alert, Button, Card, Checkbox, Empty, Input, Select, Space, Table, Tag, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -84,14 +84,14 @@ export default function PatientSearchPage() {
           { title: 'Giới tính', render: (_, item) => item.gender ? genderLabels[item.gender] : <Typography.Text type="secondary">Chưa rõ</Typography.Text> },
           { title: 'Số điện thoại', render: (_, item) => item.phone ?? '—' },
           { title: 'Lần khám gần nhất', render: (_, item) => item.lastVisitAt ? formatTime(item.lastVisitAt)
-            : <Tooltip title="Chức năng tiếp nhận/lượt khám (UC-07) chưa triển khai"><Typography.Text type="secondary">Chưa có dữ liệu</Typography.Text></Tooltip> },
+            : <Typography.Text type="secondary">Chưa có lượt khám</Typography.Text> },
           { title: 'Trạng thái', render: (_, item) => item.isArchived ? <Tag className="staff-patient-status">Ngừng sử dụng</Tag> : <Tag className="staff-patient-status" color="green">Đang sử dụng</Tag> },
           { title: '', render: (_, item) => <Button type="link" size="small" onClick={e => { e.stopPropagation(); open(item); }}>Mở hồ sơ <RightOutlined aria-hidden="true" /></Button> },
         ] as ColumnsType<PatientListItem>).map(c => ({ ...c, onCell: () => ({ 'data-label': typeof c.title === 'string' ? c.title : '' }) as React.HTMLAttributes<HTMLElement> }))} />
     </Card>
     <PatientFormDrawer open={creating} patient={null} onClose={() => setCreating(false)} onSaved={change => {
       setCreating(false);
-      // S06 shows the authoritative read-back and the MSG222 notice.
+      // S06 shows the authoritative read-back and the MSG53 notice.
       navigate(`/patients/${change.patient.id}`, { state: { notice: change.notification.message } });
     }} />
   </div>;

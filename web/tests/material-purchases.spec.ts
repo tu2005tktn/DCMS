@@ -29,7 +29,7 @@ async function prepare(page: Page) {
     const id = path.split('/')[4];
     if (!path.startsWith('/api/system-settings/material-purchases')) return route.fulfill({ status: 404, json: { code: 'NOT_MOCKED', message: path } });
     if (method === 'GET') {
-      if (id) { const row = live().find(x => x.id === id); return row ? ok(row) : route.fulfill({ status: 404, json: { code: 'MSG113', message: 'Không tìm thấy.' } }); }
+      if (id) { const row = live().find(x => x.id === id); return row ? ok(row) : route.fulfill({ status: 404, json: { code: 'MSG42', message: 'Không tìm thấy.' } }); }
       const q = (url.searchParams.get('q') ?? '').toLowerCase(), pay = url.searchParams.get('payment');
       const items = live().filter(p => p.materialName.toLowerCase().includes(q) && (!pay || (pay === 'paid' ? p.dueVnd <= 0 : pay === 'unpaid' ? p.paidVnd === 0 : p.paidVnd > 0 && p.dueVnd > 0)));
       return ok({ items, total: items.length, page: 1, pageSize: 20, totals: { totalVnd: items.reduce((s, p) => s + p.totalVnd, 0), paidVnd: items.reduce((s, p) => s + p.paidVnd, 0), dueVnd: items.reduce((s, p) => s + p.dueVnd, 0) } });
@@ -39,7 +39,7 @@ async function prepare(page: Page) {
     const row = live().find(x => x.id === id);
     if (method === 'DELETE') { row!.isDeleted = true; return ok({}); }
     const material = materials.find(m => m.id === body.materialId)!, total = Math.round(body.quantity * body.unitPriceVnd);
-    if (body.paidVnd > total) return route.fulfill({ status: 400, json: { code: 'PURCHASE_PAID_EXCEEDS_TOTAL', message: 'Số đã thanh toán không được lớn hơn Tổng.', field: 'paidVnd' } });
+    if (body.paidVnd > total) return route.fulfill({ status: 400, json: { code: 'MSG82', message: 'Số đã thanh toán không được lớn hơn Tổng.', field: 'paidVnd' } });
     const next = { enteredOn: body.enteredOn, receivedOn: body.receivedOn, expiresOn: body.expiresOn, materialId: material.id, materialName: material.name, categoryName: material.categoryName, quantity: body.quantity,
       unit: body.unit, unitPriceVnd: body.unitPriceVnd, totalVnd: total, paidVnd: body.paidVnd, dueVnd: total - body.paidVnd,
       lotNumber: body.lotNumber ?? null, supplierId: body.supplierId ?? null, supplierName: state.suppliers.find(s => s.id === body.supplierId)?.name ?? null, conversionFactor: body.conversionFactor ?? 1, usageUnit: material.usageUnit ?? null, usageQuantity: body.quantity * (body.conversionFactor ?? 1), usageUnitPriceVnd: body.unitPriceVnd / (body.conversionFactor ?? 1) };

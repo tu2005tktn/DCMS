@@ -4,7 +4,7 @@
  * `request(path, options)` — anonymous (cho /api/auth/sign-in, /api/auth/policy).
  * `authedRequest(path, token, options)` — gắn Authorization: Bearer.
  *
- * ApiError giữ status để các tầng trên dịch sang mã System Messages (MSG06/07/09/144).
+ * ApiError giữ status để các tầng trên dịch sang mã System Messages (MSG05/07/09/144).
  * KHÔNG log body request/response vì có thể chứa token.
  */
 
@@ -64,7 +64,7 @@ const fallbackMessage = 'Không thể hoàn tất thao tác. Vui lòng kiểm tr
  * Sends a request to the API and returns the parsed body.
  *
  * A failed answer carries the stable message code from the server so the screen can show the exact
- * wording (MSG108, MSG109, ...) instead of a generic string.
+ * wording (MSG38, MSG39, ...) instead of a generic string.
  */
 export async function requestJson<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (!path.startsWith('/') || path.startsWith('//')) throw new Error('Use an API-relative path starting with one slash.');
@@ -72,12 +72,12 @@ export async function requestJson<T>(path: string, options: RequestInit = {}): P
   try {
     response = await fetch(env.apiUrl + path, options);
   } catch {
-    throw new ApiError(fallbackMessage, 0, 'MSG144');
+    throw new ApiError(fallbackMessage, 0, 'MSG49');
   }
   const body = (await response.json().catch(() => null)) as ServerMessage | T | null;
   if (!response.ok) {
     const server = body && typeof body === 'object' && 'message' in body ? (body as ServerMessage) : null;
-    throw new ApiError(server?.message ?? fallbackMessage, response.status, server?.code ?? 'MSG144');
+    throw new ApiError(server?.message ?? fallbackMessage, response.status, server?.code ?? 'MSG49');
   }
   return body as T;
 }

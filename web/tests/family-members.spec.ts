@@ -20,7 +20,7 @@ async function mock(page: Page, options: { missing?: boolean; listError?: boolea
     if (path === '/api/availability') return route.fulfill({ json: { slots: [{ start: '2030-11-05T02:00:00Z', end: '2030-11-05T02:30:00Z', chairId: 1, dentistId: 2, scheduleVersion: 1, assistantScheduleVersion: null }] } });
     if (path === '/api/appointments' && method === 'POST') {
       const body = request.postDataJSON(); commands.push({ url: path, body }); bookings++;
-      if (bookings === 1) return route.fulfill({ status: 409, json: { code: 'MSG25', message: 'Khung giờ không còn khả dụng.' } });
+      if (bookings === 1) return route.fulfill({ status: 409, json: { code: 'MSG20', message: 'Khung giờ không còn khả dụng.' } });
       return route.fulfill({ status: 201, json: { appointmentId: 'saved', code: 'AP-FAMILY', version: 1, status: 'Confirmed', startAt: '2030-11-05T02:00:00Z', endAt: '2030-11-05T02:30:00Z', notification: {} } });
     }
     if (method === 'GET' && path.endsWith('/record-access')) return route.fulfill({ json: { current: null, history: [], canRequest: true } });
@@ -29,17 +29,17 @@ async function mock(page: Page, options: { missing?: boolean; listError?: boolea
       if (method === 'GET') {
         if (path === '/api/me/family-members') {
           listReads.push(url.search);
-          if (options.listError) return route.fulfill({ status: 503, json: { code: 'MSG144', message: 'Danh sách tạm thời không tải được.' } });
+          if (options.listError) return route.fulfill({ status: 503, json: { code: 'MSG49', message: 'Danh sách tạm thời không tải được.' } });
           const keyword = url.searchParams.get('keyword')?.toLowerCase() ?? '', p = Number(url.searchParams.get('page') ?? 1);
           const filtered = items.filter(m => m.fullName.toLowerCase().includes(keyword));
           return route.fulfill({ json: { items: filtered.slice((p - 1) * 20, p * 20), total: filtered.length, page: p, pageSize: 20 } });
         }
         const found = items.find(m => m.id === path.split('/').at(-1));
-        return options.missing || !found ? route.fulfill({ status: 404, json: { code: 'FAMILY_MEMBER_NOT_FOUND', message: 'Không tìm thấy người thân.' } }) : route.fulfill({ json: stale ? { ...found, fullName: 'Tên mới trên server', version: 2 } : found });
+        return options.missing || !found ? route.fulfill({ status: 404, json: { code: 'MSG67', message: 'Không tìm thấy người thân.' } }) : route.fulfill({ json: stale ? { ...found, fullName: 'Tên mới trên server', version: 2 } : found });
       }
       const body = request.postDataJSON(); commands.push({ url: path, body }); saves++;
-      if (options.saveError && saves === 1) return route.fulfill({ status: 503, json: { code: 'MSG144', message: 'Lưu chưa thành công.' } });
-      if (stale && method === 'PUT' && body.expectedVersion === 1) return route.fulfill({ status: 409, json: { code: 'MSG111', message: 'Dữ liệu đã thay đổi.' } });
+      if (options.saveError && saves === 1) return route.fulfill({ status: 503, json: { code: 'MSG49', message: 'Lưu chưa thành công.' } });
+      if (stale && method === 'PUT' && body.expectedVersion === 1) return route.fulfill({ status: 409, json: { code: 'MSG41', message: 'Dữ liệu đã thay đổi.' } });
       if (method === 'POST') { const saved = { id: '33333333-3333-4333-8333-333333333333', ...body, version: 1 }; items.push(saved); return route.fulfill({ status: 201, json: saved }); }
       const index = items.findIndex(m => m.id === path.split('/').at(-1));
       if (method === 'DELETE') { items.splice(index, 1); return route.fulfill({ json: { id: path.split('/').at(-1), deleted: true, version: 2 } }); }
@@ -157,7 +157,7 @@ test('deep link chọn người thân, giữ định danh chỉ đọc và retry
   await expect(page.getByLabel('Họ tên người khám')).toHaveJSProperty('readOnly', true); await expect(page.getByLabel('Ngày sinh người khám (không bắt buộc)')).toHaveJSProperty('readOnly', true);
   await page.getByRole('button', { name: 'Xem lại', exact: true }).click(); await expect(page.getByText('12/03/2015', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Sửa thông tin' }).click(); await expect(page.getByLabel('Họ tên người khám')).toHaveValue(member.fullName); await page.getByRole('button', { name: 'Xem lại', exact: true }).click();
-  await page.getByRole('button', { name: 'Xác nhận đặt lịch', exact: true }).click(); await expect(page.getByText(/MSG25:/)).toBeVisible();
+  await page.getByRole('button', { name: 'Xác nhận đặt lịch', exact: true }).click(); await expect(page.getByText(/MSG20:/)).toBeVisible();
   await page.locator('.customer-slots button').first().click(); await page.getByRole('button', { name: 'Tiếp tục', exact: true }).click(); await expect(page.getByLabel('Họ tên người khám')).toHaveValue(member.fullName);
   await page.getByRole('button', { name: 'Xem lại', exact: true }).click(); await page.getByRole('button', { name: 'Xác nhận đặt lịch', exact: true }).click(); await expect(page.getByText('AP-FAMILY', { exact: true })).toBeVisible();
   expect(calls).toHaveLength(2); expect(calls[1].body.attendee).toEqual({ patientId: null, name: member.fullName, birthDate: '2015-03-12' }); expect(calls[1].body.attendeeRelation).toBe('Relative'); expect(calls[1].body.familyMemberId).toBe(member.id);

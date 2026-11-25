@@ -41,7 +41,7 @@ async function signIn(page: Page) {
 }
 
 test('S10 lưới 15 phút: card có mã/nguồn/trạng thái, không lộ lý do; ô trống mở S11 và lịch mở S12', async ({ page }) => {
-  await page.route('**/api/**', route => route.fulfill({ status: 404, json: { code: 'MSG144', message: 'not mocked' } }));
+  await page.route('**/api/**', route => route.fulfill({ status: 404, json: { code: 'MSG49', message: 'not mocked' } }));
   await page.route('**/api/auth/me', route => route.fulfill({ json: user }));
   await page.route('**/api/auth/sign-in', route => route.fulfill({ json: { accessToken: 'synthetic-token', user } }));
   await page.route('**/api/appointments/options', route => route.fulfill({ json: {
@@ -94,7 +94,7 @@ test('S11 đặt lịch Bất kỳ nha sĩ: slot gộp theo ghế trống, gửi
   const date = new Date(Date.parse(at(0)) + 7 * 3_600_000).toISOString().slice(0, 10);
   const queries: URLSearchParams[] = [];
   let posted: Record<string, unknown> | null = null;
-  await page.route('**/api/**', route => route.fulfill({ status: 404, json: { code: 'MSG144', message: 'not mocked' } }));
+  await page.route('**/api/**', route => route.fulfill({ status: 404, json: { code: 'MSG49', message: 'not mocked' } }));
   await page.route('**/api/auth/me', route => route.fulfill({ json: user }));
   await page.route('**/api/auth/sign-in', route => route.fulfill({ json: { accessToken: 'synthetic-token', user } }));
   await page.route('**/api/appointments/options', route => route.fulfill({ json: {
@@ -115,7 +115,7 @@ test('S11 đặt lịch Bất kỳ nha sĩ: slot gộp theo ghế trống, gửi
   await page.route('**/api/appointments', route => {
     posted = route.request().postDataJSON() as Record<string, unknown>;
     return route.fulfill({ status: 201, json: { appointmentId: 'id-9', code: 'AP-ANY-1', version: 1, status: 'Confirmed',
-      startAt: at(10), endAt: at(10.5), notification: { code: 'MSG29', message: 'Đặt lịch thành công.' } } });
+      startAt: at(10), endAt: at(10.5), notification: { code: 'MSG24', message: 'Đặt lịch thành công.' } } });
   });
 
   await signIn(page);

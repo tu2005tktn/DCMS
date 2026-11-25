@@ -4,7 +4,7 @@ import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, T
 import { spacing } from '@/theme/spacing';
 import { useSession } from '@/features/auth/session/useSession';
 import { Banner, Button, Card, Field, palette } from '@/features/patient-link/components/LinkUi';
-import { AppointmentApiError, appointmentsApi, usingMockAppointments } from '../appointments.api';
+import { AppointmentApiError, appointmentsApi } from '../appointments.api';
 import { formatClock, formatDate, formatDateInput, formatWeekday, parseInputDate, statusColors, statusLabels } from '../appointments.rules';
 import type { AccessSource, AppointmentCard, AppointmentScope, AppointmentStatus } from '../appointments.types';
 
@@ -92,7 +92,6 @@ export default function MyAppointmentsScreen() {
     refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void load(1, 'refresh')} />}>
     <Text style={styles.title}>Lịch hẹn của tôi</Text>
     <Text style={styles.muted}>Theo dõi lịch sắp tới và các lần khám trước của bạn.</Text>
-    {usingMockAppointments && <Banner tone="info" message="Đang dùng dữ liệu minh họa; thao tác chỉ lưu trên thiết bị này." />}
     {notice && <Banner tone="info" message={notice} />}
     <View style={styles.tabs}>
       {(['UPCOMING', 'HISTORY'] as AppointmentScope[]).map(value =>

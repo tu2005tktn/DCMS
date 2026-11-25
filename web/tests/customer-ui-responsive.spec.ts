@@ -83,8 +83,8 @@ test('customer recovery completes through its own four-step UI without a real em
     if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
     const path = new URL(route.request().url()).pathname;
     const response = path.endsWith('/verify') ? { resetGrant: 'synthetic-grant' }
-      : path.endsWith('/reset') ? { code: 'MSG13', message: 'Đặt lại mật khẩu thành công. Vui lòng đăng nhập bằng mật khẩu mới.' }
-        : { code: 'MSG12', message: 'Nếu thông tin tài khoản hợp lệ, hướng dẫn đặt lại mật khẩu sẽ được gửi qua kênh liên hệ đã đăng ký.' };
+      : path.endsWith('/reset') ? { code: 'MSG10', message: 'Đặt lại mật khẩu thành công. Vui lòng đăng nhập bằng mật khẩu mới.' }
+        : { code: 'MSG09', message: 'Nếu thông tin tài khoản hợp lệ, hướng dẫn đặt lại mật khẩu sẽ được gửi qua kênh liên hệ đã đăng ký.' };
     return route.fulfill({ ...json(response), headers: cors });
   });
   await page.goto('/customer/recover');

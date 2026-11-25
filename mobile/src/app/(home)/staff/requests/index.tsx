@@ -12,17 +12,17 @@
  *  - Withdrawn KHÔNG được resolve lại.
  *  - Không báo xử lý thành công nếu mutation thất bại.
  *
- * Mock staff user: mọi staff role (branch/chair/staff) đều có quyền trong demo.
- * Production: sẽ kiểm qua `state.user.effectiveRoles` + `state.user.branchId`.
+ * Dữ liệu từ `GET /api/support-requests`: server lọc theo chi nhánh/quyền của staff đang đăng nhập.
  */
 
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSession } from '@/features/auth/session/useSession';
-import { appointmentMockRepo } from '@/features/appointments/appointment.mock';
-import type { SupportRequestDto, SupportRequestStatus } from '@/features/appointments/appointment.types';
+import { supportRequestsApi } from '@/features/support-inbox/support-requests.api';
+import { kindLabels, statusLabels, type SupportRequestDto, type SupportRequestStatus } from '@/features/support-inbox/support-requests.types';
+import { ApiError } from '@/services/api/api-error';
 import { colors } from '@/theme/colors';
 import { spacing } from '@/theme/spacing';
 import { typography } from '@/theme/typography';
@@ -43,37 +43,34 @@ const STATUS_FILTERS: { value: SupportRequestStatus[]; label: string }[] = [
 
 export default function StaffSupportInboxScreen() {
   const router = useRouter();
-  const { state } = useSession();
+  const { state, signOut } = useSession();
   const [filter, setFilter] = useState(0);
   const [load, setLoad] = useState<LoadState>({ kind: 'loading' });
   const [refreshing, setRefreshing] = useState(false);
 
-  // Mock: lấy branchId từ user (public account thì = 1).
-  const staffBranchId = 1;
+  const token = state.status === 'authenticated' ? state.accessToken : null;
   const isStaff = state.status === 'authenticated' && state.user.accountType === 'Public'
     ? false
     : state.status === 'authenticated' && (state.user.roles?.length ?? 0) > 0;
 
   const reload = useCallback(async () => {
-    if (!isStaff) {
+    if (!isStaff || !token) {
       setLoad({ kind: 'denied' });
       return;
     }
     try {
-      const items = await appointmentMockRepo.listRequestsForStaff({
-        statuses: STATUS_FILTERS[filter].value,
-        branchId: staffBranchId,
-      });
-      setLoad(items.length === 0 ? { kind: 'empty' } : { kind: 'ready', items });
-    } catch {
-      setLoad({ kind: 'error', message: 'Không thể kết nối máy chủ.' });
+      const page = await supportRequestsApi.list({ statuses: STATUS_FILTERS[filter].value, page: 1, pageSize: 50 }, token);
+      setLoad(page.items.length === 0 ? { kind: 'empty' } : { kind: 'ready', items: page.items });
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) { void signOut('expired'); return; }
+      if (error instanceof ApiError && error.status === 403) { setLoad({ kind: 'denied' }); return; }
+      setLoad({ kind: 'error', message: error instanceof ApiError ? error.message : 'Không thể kết nối máy chủ.' });
     }
-  }, [isStaff, filter]);
+  }, [isStaff, token, filter, signOut]);
 
-  useEffect(() => { void reload(); }, [reload]);
   useFocusEffect(useCallback(() => { void reload(); }, [reload]));
 
-  if (!isStaff) {
+  if (!isStaff || load.kind === 'denied') {
     return (
       <SafeAreaView style={styles.center} edges={['top']}>
         <Text style={styles.title}>Không có quyền</Text>
@@ -120,7 +117,7 @@ export default function StaffSupportInboxScreen() {
               <Text style={styles.errorBody}>{load.message}</Text>
               <Pressable onPress={() => void reload()} style={styles.retryBtn}><Text style={styles.retryText}>Thử lại</Text></Pressable>
             </View>
-          ) : load.kind === 'denied' ? null : (
+          ) : (
             <View style={styles.emptyBox}>
               <Text style={styles.emptyTitle}>Không có yêu cầu nào</Text>
               <Text style={styles.emptyBody}>
@@ -137,10 +134,10 @@ export default function StaffSupportInboxScreen() {
             <View style={styles.cardTop}>
               <Text style={styles.cardCode}>{item.appointmentCode}</Text>
               <View style={[styles.statusPill, statusPillStyle(item.status)]}>
-                <Text style={styles.statusPillText}>{statusLabel(item.status)}</Text>
+                <Text style={styles.statusPillText}>{statusLabels[item.status] ?? item.status}</Text>
               </View>
             </View>
-            <Text style={styles.cardTitle}>{kindLabel(item.kind)}</Text>
+            <Text style={styles.cardTitle}>{kindLabels[item.kind] ?? item.kind}</Text>
             <Text style={styles.cardReason}>{item.reason || '—'}</Text>
             <View style={styles.cardFooter}>
               <Text style={styles.cardMeta}>
@@ -164,25 +161,7 @@ function statusPillStyle(s: SupportRequestStatus) {
   }
 }
 
-function statusLabel(s: SupportRequestStatus): string {
-  switch (s) {
-    case 'Pending': return 'Chờ staff';
-    case 'InReview': return 'Đang xem xét';
-    case 'Resolved': return 'Đã xử lý';
-    case 'Rejected': return 'Bị từ chối';
-    case 'Withdrawn': return 'Đã rút';
-  }
-}
 
-function kindLabel(k: string): string {
-  switch (k) {
-    case 'Change': return 'Yêu cầu đổi lịch';
-    case 'Cancel': return 'Yêu cầu huỷ lịch';
-    case 'ConfirmToAttend': return 'Xác nhận tham dự';
-    case 'WithdrawAttend': return 'Rút xác nhận tham dự';
-    default: return 'Hỏi chung';
-  }
-}
 
 function formatTime(iso: string): string {
   try { return new Date(iso).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }); }

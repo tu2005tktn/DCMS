@@ -27,7 +27,7 @@ test('protected route, invalid login and sign-out invalidate the session', async
   await expect(page).toHaveURL(/sign-in/);
   const oldSession = await request.get('http://localhost:5080/api/auth/me', { headers: { Authorization: `Bearer ${session.accessToken}` } });
   expect(oldSession.status()).toBe(401);
-  expect((await oldSession.json()).code).toBe('MSG07');
+  expect((await oldSession.json()).code).toBe('MSG06');
 });
 
 test('admin creates, edits roles, locks, unlocks, searches and reads audit through real APIs', async ({ page }) => {
@@ -93,7 +93,7 @@ test('account list shows loading and service error, then retries the real API', 
   await page.route('**/api/accounts?*', async route => {
     await pending;
     await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({
-      code: 'MSG144', message: 'Không thể hoàn tất thao tác. Vui lòng kiểm tra kết nối và thử lại.',
+      code: 'MSG49', message: 'Không thể hoàn tất thao tác. Vui lòng kiểm tra kết nối và thử lại.',
     }) });
   });
   await page.getByRole('link', { name: 'Quản lý tài khoản', exact: true }).click();
@@ -234,7 +234,7 @@ test('S04 detail retries connection errors and displays permission failure witho
   await drawer.getByRole('button', { name: 'Thử lại' }).click();
   await expect(drawer).toContainText(account.email);
   await page.getByRole('button', { name: 'Close', exact: true }).click();
-  await page.route(target, route => route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ code: 'MSG06', message: 'Bạn không có quyền thực hiện thao tác này.' }) }));
+  await page.route(target, route => route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ code: 'MSG05', message: 'Bạn không có quyền thực hiện thao tác này.' }) }));
   await page.getByRole('row').filter({ hasText: account.userName }).getByRole('button', { name: 'Chi tiết', exact: true }).click();
   await expect(drawer).toContainText('Bạn không có quyền thực hiện thao tác này.');
   await expect(drawer).not.toContainText(account.email);

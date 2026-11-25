@@ -35,14 +35,14 @@ async function prepare(page: Page, withItem = true, withFinance = false) {
     if (path === '/api/system-settings/material-stock/available') {
       const q = url.searchParams.get('q') ?? '', number = Number(url.searchParams.get('page') ?? 1);
       state.materialReads.push({q,page:number});
-      if (state.failMaterialOnce) { state.failMaterialOnce = false; return route.fulfill({status:503,json:{code:'MSG144',message:'Không thể tải danh mục thử nghiệm.'}}); }
+      if (state.failMaterialOnce) { state.failMaterialOnce = false; return route.fulfill({status:503,json:{code:'MSG49',message:'Không thể tải danh mục thử nghiệm.'}}); }
       const items = state.materials.filter(m=>m.name.toLowerCase().includes(q.toLowerCase())).map(m=>({materialId:m.id,name:m.name,categoryName:m.categoryName,usageUnit:null,stock:(m as {stock?:number}).stock}));
       return ok({items:items.slice((number-1)*20,number*20),total:items.length,page:number,pageSize:20});
     }
     if (path === '/api/system-settings/materials') {
       const q = url.searchParams.get('q') ?? '', number = Number(url.searchParams.get('page') ?? 1);
       state.materialReads.push({q,page:number});
-      if (state.failMaterialOnce) { state.failMaterialOnce = false; return route.fulfill({status:503,json:{code:'MSG144',message:'Không thể tải danh mục thử nghiệm.'}}); }
+      if (state.failMaterialOnce) { state.failMaterialOnce = false; return route.fulfill({status:503,json:{code:'MSG49',message:'Không thể tải danh mục thử nghiệm.'}}); }
       const items = state.materials.filter(m=>m.name.toLowerCase().includes(q.toLowerCase()));
       return ok({items:items.slice((number-1)*20,number*20),total:items.length,page:number,pageSize:20});
     }
@@ -63,7 +63,7 @@ async function prepare(page: Page, withItem = true, withFinance = false) {
       const v = { id, ...data, version: (state.drafts.get(id)?.version ?? 0) + 1 }; state.drafts.set(id, v); return ok(v);
     }
     if (path.endsWith('/confirm-plan')) {
-      if (state.conflict) return route.fulfill({ status: 409, json: { code: 'MSG111', message: 'MSG111 — phiên bản đã thay đổi' } });
+      if (state.conflict) return route.fulfill({ status: 409, json: { code: 'MSG41', message: 'MSG41 — phiên bản đã thay đổi' } });
       const id = path.split('/').at(-2)!, draft = state.drafts.get(id); const body = r.postDataJSON(); state.requests.push(body);
       state.items.push({ ...item, id, serviceId: draft.row.serviceId, serviceName: draft.row.serviceName,
         region: draft.row.regions.join(', '), quantity: draft.row.quantity,
@@ -116,7 +116,7 @@ async function prepare(page: Page, withItem = true, withFinance = false) {
       else Object.assign(i, { note: body.row.note, region: body.row.regions.join(', '), estimatedMinutes: body.row.estimatedMinutes, agreedUnitPriceVnd: body.row.unitPriceVnd });
       state.version++; return ok({ dossier: detail(), activity: state.activities.at(-1) });
     }
-    if (path.endsWith('/close')) return route.fulfill({ status: 409, json: { code: 'MSG243', message: 'MSG243 — Còn hạng mục chưa được xử lý' } });
+    if (path.endsWith('/close')) return route.fulfill({ status: 409, json: { code: 'MSG58', message: 'MSG58 — Còn hạng mục chưa được xử lý' } });
     if (path.endsWith('/note')) { state.notes = r.postDataJSON().note; state.version++; return ok({ dossier: detail() }); }
     if (path.endsWith('/payments/context')) {
       const lines = state.activities.map(a => { const cost = Math.round(a.quantity * a.priceSnapshotVnd), discount = a.discountSnapshotVnd ?? 0,
@@ -169,7 +169,7 @@ test('ngày giảm dần, thiếu ngày cuối, sửa giữ vị trí và không
 test('tạo phiếu nhanh không Modal hoặc chuyển trang, retry cùng key và mở đúng ID', async ({page})=>{
   await prepare(page);const id='99999999-9999-4999-8999-999999999999';const calls:any[]=[];let fail=true;
   const dossier={id,code:'DT-NEW',patientId:123,branchId:1,dentistId:7,state:'Open',version:1,planVersion:0,items:[],timeline:[],note:null,createdAt:'2026-11-02T00:00:00Z'};
-  await page.route('**/api/patients/123/dossiers/quick',async r=>{calls.push(r.request().postDataJSON());if(fail){fail=false;return r.fulfill({status:503,json:{code:'MSG144',message:'Lỗi tạo thử nghiệm'}});}return r.fulfill({json:{dossier}});});
+  await page.route('**/api/patients/123/dossiers/quick',async r=>{calls.push(r.request().postDataJSON());if(fail){fail=false;return r.fulfill({status:503,json:{code:'MSG49',message:'Lỗi tạo thử nghiệm'}});}return r.fulfill({json:{dossier}});});
   await page.route(`**/api/dossiers/${id}`,r=>r.fulfill({json:dossier}));
   await page.getByRole('button',{name:'Tạo phiếu mới',exact:true}).click();await expect(page.getByText('Lỗi tạo thử nghiệm',{exact:true})).toBeVisible();
   await page.getByRole('button',{name:'Tạo phiếu mới',exact:true}).click();
@@ -185,7 +185,7 @@ test('áp kế hoạch thêm cuối bảng, giữ ghi chú và retry cùng key',
   await page.route(`**/api/treatment-templates/item-plans/${source.id}`, r => r.fulfill({ json: source }));
   await page.route('**/sheet-items/from-item-plan', async r => {
     requests.push(r.request().postDataJSON());
-    if (fail) { fail = false; return r.fulfill({ status: 503, json: { code: 'MSG144', message: 'Lỗi thử nghiệm nhập kế hoạch' } }); }
+    if (fail) { fail = false; return r.fulfill({ status: 503, json: { code: 'MSG49', message: 'Lỗi thử nghiệm nhập kế hoạch' } }); }
     state.items.push({ ...item, id: source.id, serviceName: source.items[0].serviceName, quantity: 1, agreedUnitPriceVnd: 1000000 }); state.version++;
     return r.fulfill({ json: { createdItemIds: [source.id] } });
   });
@@ -225,7 +225,7 @@ test('hàng chỉ có răng, thời gian và text; lưu một lần bấm, lỗi
   await page.screenshot({ path: 'test-results/treatment-direct-entry-form.png', fullPage: true });
   await page.waitForTimeout(1000); expect(state.requests).toHaveLength(0);
   state.conflict = true; await page.getByRole('button', { name: 'Đồng ý', exact: true }).click();
-  await expect(page.getByText('MSG111 — phiên bản đã thay đổi')).toBeVisible();
+  await expect(page.getByText('MSG41 — phiên bản đã thay đổi')).toBeVisible();
   await expect(page.getByLabel('Răng', { exact: true })).toHaveValue('25, 26, 46');
   expect([...state.drafts.values()][0].row.regions).toEqual(['25','26','46']);
   state.conflict = false; await page.getByRole('button', { name: 'Đồng ý', exact: true }).click();
@@ -344,7 +344,7 @@ test('đọc quá trình nhiều buổi, tổng toàn bộ phiếu và đóng c�
   await expect(page.getByText('Buổi đầu', { exact: true })).toBeVisible(); await expect(page.getByText('Buổi sau', { exact: true })).toBeVisible();
   await expect(page.locator('.treatment-sheet-payment')).toContainText(/Còn nợ:\s*600\.000\s*₫/);
   await page.getByRole('button', { name: 'Trạng thái phiếu: Chưa xong' }).click(); await page.getByRole('menuitem', { name: 'Hoàn tất', exact: true }).click();
-  await expect(page.getByText('MSG243 — Còn hạng mục chưa được xử lý', { exact: true })).toBeVisible();
+  await expect(page.getByText('MSG58 — Còn hạng mục chưa được xử lý', { exact: true })).toBeVisible();
 });
 
 test('Đã trả mặc định 0, Còn nợ bằng Thành tiền trừ Đã trả và form chưa có việc đã làm không cho lưu', async ({ page }) => {
@@ -617,7 +617,7 @@ test('Sao chép lưu ngay đủ dữ liệu, không editor/xác nhận và giữ
 
 test('Sao chép lỗi mạng thử lại cùng ID/key, không mở hàng và không ghi hai bản',async({page})=>{
   const state=await prepare(page);const confirms:any[]=[];let failed=false;
-  await page.route('**/sheet-drafts/*/confirm-plan',async route=>{confirms.push({url:route.request().url(),body:route.request().postDataJSON()});if(!failed){failed=true;return route.fulfill({status:503,json:{code:'MSG144',message:'Lỗi sao chép thử nghiệm'}});}return route.fallback();});
+  await page.route('**/sheet-drafts/*/confirm-plan',async route=>{confirms.push({url:route.request().url(),body:route.request().postDataJSON()});if(!failed){failed=true;return route.fulfill({status:503,json:{code:'MSG49',message:'Lỗi sao chép thử nghiệm'}});}return route.fallback();});
   await page.getByRole('button',{name:'Chức năng Trám răng',exact:true}).click();await page.getByRole('menuitem',{name:'Sao chép',exact:true}).click();
   await expect(page.getByText('Lỗi sao chép thử nghiệm')).toBeVisible();expect(state.items).toHaveLength(1);expect(state.drafts.size).toBe(1);
   await expect(page.getByRole('row',{name:'Nhập hạng mục kế hoạch',exact:true})).toHaveCount(0);
@@ -625,10 +625,10 @@ test('Sao chép lỗi mạng thử lại cùng ID/key, không mở hàng và kh�
   expect(confirms).toHaveLength(2);expect(confirms[1]).toEqual(confirms[0]);expect(state.items).toHaveLength(2);expect(state.drafts.size).toBe(0);expect(state.activities).toHaveLength(0);
 });
 
-test('Sao chép MSG111 đọc version mới rồi thử lại, khóa thao tác khi đang nhập',async({page})=>{
+test('Sao chép MSG41 đọc version mới rồi thử lại, khóa thao tác khi đang nhập',async({page})=>{
   const state=await prepare(page);state.conflict=true;
   await page.getByRole('button',{name:'Chức năng Trám răng',exact:true}).click();await page.getByRole('menuitem',{name:'Sao chép',exact:true}).click();
-  await expect(page.getByText('MSG111 — phiên bản đã thay đổi',{exact:true})).toBeVisible();state.conflict=false;state.version++;
+  await expect(page.getByText('MSG41 — phiên bản đã thay đổi',{exact:true})).toBeVisible();state.conflict=false;state.version++;
   await page.getByRole('button',{name:'Đọc lại phiên bản sao chép',exact:true}).click();await page.getByRole('button',{name:'Thử lại sao chép',exact:true}).click();
   await expect(page.locator('.treatment-sheet-plan-table tbody > tr')).toHaveCount(2);expect(state.items).toHaveLength(2);
   await page.getByRole('button',{name:'Thêm hạng mục kế hoạch',exact:true}).click();await page.getByRole('button',{name:'Chức năng Trám răng',exact:true}).first().click();

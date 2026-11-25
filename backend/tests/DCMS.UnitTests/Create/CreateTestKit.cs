@@ -35,6 +35,8 @@ internal static class CreateTestKit
             s == null ? null : System.Text.RegularExpressions.Regex.Replace(s, p ?? "", r ?? ""), true);
         connection.CreateFunction<object?, string?, string?, string?, string?, string?>("regexp_replace", null, (_, s, p, r, f) =>
             s == null ? null : System.Text.RegularExpressions.Regex.Replace(s, p ?? "", r ?? ""), true);
+        // SQLite's built-in upper() only folds ASCII; PostgreSQL folds Vietnamese letters too (case-insensitive duplicate checks).
+        connection.CreateFunction<string?, string?>("upper", s => s?.ToUpperInvariant(), true);
         long counter = 0;
         connection.CreateFunction("nextval", (string? _) => ++counter);
         var db = new DcmsDbContext(new DbContextOptionsBuilder<DcmsDbContext>().UseSqlite(connection)

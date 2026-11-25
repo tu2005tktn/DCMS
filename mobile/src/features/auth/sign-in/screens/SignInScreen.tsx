@@ -6,7 +6,7 @@
  *    nhận username; xem ghi chú trong sign-in.api.ts).
  *  - Hiện/ẩn mật khẩu: PasswordField.
  *  - Liên kết S02 (đăng ký) + S03 (khôi phục) — chỉ là link navigation, S02/S03 ngoài scope.
- *  - Lỗi sai hiển thị thông báo chung (MSG09), không phân biệt username hay password.
+ *  - Lỗi sai hiển thị thông báo chung (MSG07), không phân biệt username hay password.
  *  - Loading: chặn submit, hiển thị FormError khi lỗi mạng.
  *  - Thành công -> về menu trung tâm (/(home)); "Trang chủ tài khoản" tự xuất hiện.
  *

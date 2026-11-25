@@ -8,7 +8,7 @@ namespace DCMS.IntegrationTests;
 [Collection(ApiCollection.Name)]
 public sealed class PatientTests(ApiHost host)
 {
-    private const string Assistant = "Trợ lý (ClinicAssistant) đã đăng nhập.";
+    private const string Assistant = "A clinic assistant (ClinicAssistant) is signed in.";
 
     private static CreatePatientRequest Body(string? name = null, DateOnly? birth = null, string? gender = "FEMALE", string? phone = null, Guid? key = null) =>
         new(null, name ?? "Trần Thị Mai " + Guid.NewGuid().ToString("N")[..6], birth ?? new DateOnly(1990, 5, 20), gender,

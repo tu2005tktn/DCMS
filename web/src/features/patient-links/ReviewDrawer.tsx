@@ -101,7 +101,7 @@ export default function ReviewDrawer({ id, onClose, onChanged }: Props) {
       : { version: detail.version, decisionReason: values.decisionReason, publicNote: values.publicNote || null });
   }
 
-  const stale = error?.code === 'MSG111';
+  const stale = error?.code === 'MSG41';
   const selectedPatient = candidates?.find(item => item.patient.id === patientId)?.patient;
   const selectedMismatches = detail && selectedPatient ? identityMismatches(detail, selectedPatient) : [];
   return <Drawer open={id != null} onClose={onClose} width={960} destroyOnClose

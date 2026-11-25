@@ -34,7 +34,7 @@ internal static class PatientLinkSupport
 
     public static void Invalid(string field) => throw new BusinessException(400, SystemMessages.Get("MSG04", field));
     public static BusinessException NotFound() => new(404, SystemMessages.Get("MSG01"));
-    public static BusinessException Stale() => new(409, SystemMessages.Get("MSG111"));
+    public static BusinessException Stale() => new(409, SystemMessages.Get("MSG41"));
 
     public static string NewRequestCode(DateTimeOffset now) =>
         $"LK-{now.ToOffset(ClinicOffset):yyMMdd}-{RandomNumberGenerator.GetString("ABCDEFGHJKLMNPQRSTUVWXYZ23456789", 6)}";
@@ -51,8 +51,8 @@ internal static class PatientLinkSupport
 
     public static SystemMessage? PublicResult(string status) => status switch
     {
-        PatientLinkStatus.Verified => SystemMessages.Get("MSG19"),
-        PatientLinkStatus.Rejected or PatientLinkStatus.Revoked => SystemMessages.Get("MSG20"),
+        PatientLinkStatus.Verified => SystemMessages.Get("MSG16"),
+        PatientLinkStatus.Rejected or PatientLinkStatus.Revoked => SystemMessages.Get("MSG17"),
         _ => null
     };
 
@@ -82,7 +82,7 @@ internal static class PatientLinkSupport
         catch (Exception ex) when (Postgres(ex) is { } error)
         {
             if (error.SqlState == PostgresErrorCodes.UniqueViolation)
-                throw new BusinessException(409, SystemMessages.Get(error.ConstraintName?.EndsWith("_Verified", StringComparison.Ordinal) == true ? "MSG142" : "MSG111"));
+                throw new BusinessException(409, SystemMessages.Get(error.ConstraintName?.EndsWith("_Verified", StringComparison.Ordinal) == true ? "MSG47" : "MSG41"));
             if (error.SqlState is PostgresErrorCodes.SerializationFailure or PostgresErrorCodes.DeadlockDetected) throw Stale();
             throw;
         }

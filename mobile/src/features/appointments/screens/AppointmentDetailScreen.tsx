@@ -4,13 +4,12 @@ import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, T
 import { spacing } from '@/theme/spacing';
 import { useSession } from '@/features/auth/session/useSession';
 import { Banner, Button, Card, Field, palette } from '@/features/patient-link/components/LinkUi';
-import { AppointmentApiError, appointmentsApi, usingMockAppointments } from '../appointments.api';
+import { AppointmentApiError, appointmentsApi } from '../appointments.api';
 import {
   addDays, clinicDate, formatClock, formatDate, formatDateTime, formatWeekday, ineligibleLabels, newRequestKey, reasonError,
   REASON_MAX, remainingLabel, statusLabels, supportKindLabels, supportStatusLabels,
 } from '../appointments.rules';
 import type { AppointmentDetail, AvailabilitySlot, RescheduleDentist, SupportRequest, SupportRequestKind } from '../appointments.types';
-import { notificationRepoPersist } from '../notification.repo.persist';
 import { StatusPill } from './MyAppointmentsScreen';
 
 type Mode = 'view' | 'reschedule' | 'cancel' | 'support';
@@ -117,7 +116,7 @@ export default function AppointmentDetailScreen() {
       setActionError(error);
       // A rejected command will not be replayed; a new attempt gets a new key. Connection failures keep the key.
       if (error.status !== 0) pending.current = null;
-      if (error.code === 'MSG34') { setSlot(null); setReviewing(false); void loadSlots(date); }
+      if (error.code === 'MSG29') { setSlot(null); setReviewing(false); void loadSlots(date); }
     } finally { setBusy(false); }
   }
 
@@ -131,18 +130,6 @@ export default function AppointmentDetailScreen() {
       result => {
         close();
         setNotice(result.notification.message);
-        const accountId = session.state.status === 'authenticated' ? session.state.user.id : null;
-        void notificationRepoPersist.create({
-          accountId,
-          kind: 'SupportRequestCreated',
-          title: 'Đã gửi yêu cầu đổi lịch',
-          body: `Yêu cầu đổi lịch ${detail.code} sang ${formatDateTime(slot.start)} đã được gửi cho nhân viên phòng khám xử lý.`,
-          appointmentId: detail.code,
-          requestId: String(result.request.id),
-          deepLink: `/appointments/${detail.code}`,
-          channels: ['InApp'],
-          dedupeKey: `req:${result.request.id}:created`,
-        }).catch(err => console.warn('[AppointmentDetailScreen] notification.create failed', err));
         void load(true);
       });
       return;
@@ -153,18 +140,6 @@ export default function AppointmentDetailScreen() {
       setDetail(result.appointment);
       close();
       setNotice(result.notification.message);
-      const accountId = session.state.status === 'authenticated' ? session.state.user.id : null;
-      void notificationRepoPersist.create({
-        accountId,
-        kind: 'AppointmentRescheduled',
-        title: 'Đổi lịch hẹn thành công',
-        body: `Lịch hẹn ${detail.code} đã được đổi sang ${formatDateTime(result.appointment.start)}.`,
-        appointmentId: detail.code,
-        requestId: null,
-        deepLink: `/appointments/${detail.code}`,
-        channels: ['InApp'],
-        dedupeKey: `appt:${detail.code}:rescheduled:${result.appointment.version}`,
-      }).catch(err => console.warn('[AppointmentDetailScreen] notification.create failed', err));
     });
   }
   function confirmCancel() {
@@ -176,18 +151,6 @@ export default function AppointmentDetailScreen() {
       result => {
         close();
         setNotice(result.notification.message);
-        const accountId = session.state.status === 'authenticated' ? session.state.user.id : null;
-        void notificationRepoPersist.create({
-          accountId,
-          kind: 'SupportRequestCreated',
-          title: 'Đã gửi yêu cầu hủy lịch',
-          body: `Yêu cầu hủy lịch ${detail.code} đã được gửi cho nhân viên phòng khám xử lý.`,
-          appointmentId: detail.code,
-          requestId: String(result.request.id),
-          deepLink: `/appointments/${detail.code}`,
-          channels: ['InApp'],
-          dedupeKey: `req:${result.request.id}:created`,
-        }).catch(err => console.warn('[AppointmentDetailScreen] notification.create failed', err));
         void load(true);
       });
       return;
@@ -197,18 +160,6 @@ export default function AppointmentDetailScreen() {
         setDetail(result.appointment);
         close();
         setNotice(result.notification.message);
-        const accountId = session.state.status === 'authenticated' ? session.state.user.id : null;
-        void notificationRepoPersist.create({
-          accountId,
-          kind: 'AppointmentCancelled',
-          title: 'Đã hủy lịch hẹn',
-          body: `Lịch hẹn ${detail.code} đã được hủy thành công.`,
-          appointmentId: detail.code,
-          requestId: null,
-          deepLink: `/appointments/${detail.code}`,
-          channels: ['InApp'],
-          dedupeKey: `appt:${detail.code}:cancelled:${result.appointment.version}`,
-        }).catch(err => console.warn('[AppointmentDetailScreen] notification.create failed', err));
       });
   }
   function submitSupport() {
@@ -217,38 +168,13 @@ export default function AppointmentDetailScreen() {
       result => {
         close();
         setNotice(result.notification.message);
-        const accountId = session.state.status === 'authenticated' ? session.state.user.id : null;
-        void notificationRepoPersist.create({
-          accountId,
-          kind: 'SupportRequestCreated',
-          title: 'Đã gửi yêu cầu hỗ trợ',
-          body: `Yêu cầu hỗ trợ cho lịch hẹn ${detail.code} đã được gửi.`,
-          appointmentId: detail.code,
-          requestId: String(result.request.id),
-          deepLink: `/appointments/${detail.code}`,
-          channels: ['InApp'],
-          dedupeKey: `req:${result.request.id}:created`,
-        }).catch(err => console.warn('[AppointmentDetailScreen] notification.create failed', err));
         void load(true);
       });
   }
   function withdraw(request: SupportRequest) {
     if (!detail) return;
-    const apptCode = detail.code;
     void run(() => appointmentsApi.withdrawSupport(token!, request.id, request.version), () => {
       setNotice('Đã rút yêu cầu hỗ trợ. Lịch hẹn không thay đổi.');
-      const accountId = session.state.status === 'authenticated' ? session.state.user.id : null;
-      void notificationRepoPersist.create({
-        accountId,
-        kind: 'SupportRequestUpdate',
-        title: 'Đã rút yêu cầu hỗ trợ',
-        body: `Bạn đã rút yêu cầu hỗ trợ cho lịch hẹn ${apptCode}. Lịch hẹn không thay đổi.`,
-        appointmentId: apptCode,
-        requestId: String(request.id),
-        deepLink: `/appointments/${apptCode}`,
-        channels: ['InApp'],
-        dedupeKey: `req:${request.id}:withdrawn:${request.version + 1}`,
-      }).catch(err => console.warn('[AppointmentDetailScreen] notification.create failed', err));
       void load(true);
     });
   }
@@ -264,7 +190,7 @@ export default function AppointmentDetailScreen() {
   const e = detail.eligibility;
   const pendingSupport = detail.supportRequests.find(r => r.status === 'Pending');
   const selectedDentist = dentists?.find(value => value.id === dentistId);
-  const stale = actionError?.code === 'MSG111';
+  const stale = actionError?.code === 'MSG41';
   const errorBanner = actionError && <Banner tone="error" message={actionError.message}
     action={stale ? { label: 'Tải lại lịch hẹn', onPress: () => { close(); void load(true); } } : undefined} />;
   const reasonField = <Field label={`Lý do * (tối đa ${REASON_MAX} ký tự)`} value={reason} multiline maxLength={REASON_MAX}
@@ -273,7 +199,6 @@ export default function AppointmentDetailScreen() {
 
   return <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled"
     refreshControl={mode === 'view' ? <RefreshControl refreshing={refreshing} onRefresh={() => void load(true)} /> : undefined}>
-    {usingMockAppointments && <Banner tone="info" message="Dữ liệu minh họa (mock) — API lịch hẹn chưa sẵn sàng." />}
     {notice && <Banner tone="success" message={notice} />}
 
     <View style={styles.head}>

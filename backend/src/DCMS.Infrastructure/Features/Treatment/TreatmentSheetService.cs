@@ -47,8 +47,8 @@ public sealed partial class TreatmentDossierService
         if (previous != null)
         {
             if (previous.ActorId != actorId || previous.Command != command || previous.Fingerprint != fingerprint)
-                throw Error("MSG111", 409);
-            return JsonSerializer.Deserialize<T>(previous.ResultJson, Json) ?? throw Error("MSG144", 503);
+                throw Error("MSG41", 409);
+            return JsonSerializer.Deserialize<T>(previous.ResultJson, Json) ?? throw Error("MSG49", 503);
         }
         var result = await mutate(dossier);
         await db.SaveChangesAsync(ct);
@@ -62,13 +62,13 @@ public sealed partial class TreatmentDossierService
     private async Task<TreatmentSheetDraft> SheetDraftAsync(int actorId, Guid dossierId, Guid id,
         string kind, int draftVersion, int version, TreatmentDossier dossier, CancellationToken ct)
     {
-        if (dossier.Version != version) throw Error("MSG111", 409);
+        if (dossier.Version != version) throw Error("MSG41", 409);
         var draft = await db.LoadSheetDraftAsync(db.TreatmentSheetDrafts.Where(x => x.Id == id && x.DossierId == dossierId), ct)
-            ?? throw Error("MSG113", 404);
-        if (draft.ActorId != actorId) throw Error("MSG06", 403);
+            ?? throw Error("MSG42", 404);
+        if (draft.ActorId != actorId) throw Error("MSG05", 403);
         if (draft.Version != draftVersion || draft.Kind != kind)
-            throw Error("MSG111", 409);
-        if (dossier.State != "Open") throw Error("MSG230", 409);
+            throw Error("MSG41", 409);
+        if (dossier.State != "Open") throw Error("MSG54", 409);
         return draft;
     }
 
@@ -79,7 +79,7 @@ public sealed partial class TreatmentDossierService
             x.Id == row.ServiceId && x.BranchId == dossier.BranchId && x.Active, ct) ?? throw Error("MSG04");
         var actorEmployee = await DentistAsync(actorId, dossier.BranchId, ct);
         if (row.DentistId != actorEmployee || dossier.DentistId != actorEmployee)
-            throw Error("MSG06", 403);
+            throw Error("MSG05", 403);
         if (!TreatmentSheetRules.ValidQuantity(row.Quantity, service.Unit)) throw Error("MSG04");
         if (row.AssistantId.HasValue && !await db.SchedulingMembers.AnyAsync(x => x.BranchId == dossier.BranchId
             && x.EmployeeId == row.AssistantId && x.Active && !x.CanDentist, ct)) throw Error("MSG04");
@@ -88,12 +88,12 @@ public sealed partial class TreatmentDossierService
         if (gross != row.CostVnd) throw Error("MSG04");
         var discountType = row.DiscountType == "VND" ? "Fixed" : row.DiscountType;
         if (row.DiscountValue > 0 && (discountType is not ("Fixed" or "Percent") || Clean(row.DiscountNote) == null))
-            throw Error("MSG252");
-        if (row.DiscountValue < 0) throw Error("MSG252");
+            throw Error("MSG59");
+        if (row.DiscountValue < 0) throw Error("MSG59");
         if (row.DiscountValue > 0)
         {
             try { _ = TreatmentPlanRules.Discount(gross, discountType!, row.DiscountValue); }
-            catch (ArgumentOutOfRangeException) { throw Error("MSG252"); }
+            catch (ArgumentOutOfRangeException) { throw Error("MSG59"); }
         }
         var item = new TreatmentItem { Id = itemId, DossierId = dossier.Id, ServiceId = service.Id,
             ServiceName = service.Name, Unit = service.Unit, Region = Clean(row.Region) ?? Clean(string.Join(", ", row.Regions ?? [])),
@@ -125,11 +125,11 @@ public sealed partial class TreatmentDossierService
     public Task<ImportItemPlanResult> ImportItemPlanAsync(int actorId, Guid dossierId, ImportItemPlanRequest request, CancellationToken ct) =>
         SheetCommandAsync(actorId, dossierId, request.RequestKey, "SheetImportItemPlan", new { dossierId, request }, async dossier =>
         {
-            if (dossier.Version != request.ExpectedVersion) throw Error("MSG111", 409);
-            if (dossier.State != "Open") throw Error("MSG240", 409);
-            var source = await db.TreatmentTemplates.AsNoTracking().SingleOrDefaultAsync(x => x.Id == request.ItemPlanId && x.DeletedAt == null, ct) ?? throw Error("MSG113", 404);
-            if (source.BranchId != dossier.BranchId) throw Error("MSG06", 403);
-            if (source.Version != request.ExpectedItemPlanVersion) throw Error("MSG111", 409);
+            if (dossier.Version != request.ExpectedVersion) throw Error("MSG41", 409);
+            if (dossier.State != "Open") throw Error("MSG57", 409);
+            var source = await db.TreatmentTemplates.AsNoTracking().SingleOrDefaultAsync(x => x.Id == request.ItemPlanId && x.DeletedAt == null, ct) ?? throw Error("MSG42", 404);
+            if (source.BranchId != dossier.BranchId) throw Error("MSG05", 403);
+            if (source.Version != request.ExpectedItemPlanVersion) throw Error("MSG41", 409);
             var rows = await db.TreatmentTemplateItems.AsNoTracking().Where(x => x.TemplateId == source.Id && x.DeletedAt == null).OrderBy(x => x.Position).ThenBy(x => x.Id).ToListAsync(ct);
             if (rows.Count == 0) throw Error("MSG04");
             var created = new List<Guid>();
@@ -145,7 +145,7 @@ public sealed partial class TreatmentDossierService
                     item.ServiceName = row.ServiceName;
                     created.Add(item.Id);
                 } catch (BusinessException e) when (e.Status == 400) {
-                    throw new BusinessException(400, new("ITEM_PLAN_IMPORT_INVALID", $"Hạng mục {row.Position} ({row.ServiceName}) không còn hợp lệ. Vui lòng sửa kế hoạch nguồn.") { Field = $"items.{row.Id}" });
+                    throw new BusinessException(400, new("MSG77", $"Hạng mục {row.Position} ({row.ServiceName}) không còn hợp lệ. Vui lòng sửa kế hoạch nguồn.") { Field = $"items.{row.Id}" });
                 }
             }
             FinalizeSheetItems(actorId, dossier, planVersion);
@@ -162,7 +162,7 @@ public sealed partial class TreatmentDossierService
             await AddSheetItemAsync(actorId, dossier, ReadRow(JsonDocument.Parse(draft.PayloadJson).RootElement), rowId, ct);
             await db.RemoveTreatmentDataAsync(draft);
             await db.SaveChangesAsync(ct);
-            return new TreatmentChange(await DetailAsync(dossier, ct), SystemMessages.Get("MSG222", "kế hoạch điều trị", value: dossier.Code));
+            return new TreatmentChange(await DetailAsync(dossier, ct), SystemMessages.Get("MSG53", "kế hoạch điều trị", value: dossier.Code));
         }, ct);
 
     public Task<ConfirmSheetActualResult> ConfirmSheetActualAsync(int actorId, Guid dossierId, Guid rowId,
@@ -174,7 +174,7 @@ public sealed partial class TreatmentDossierService
             TreatmentItem? directItem = null;
             if (row.SourceItemId.HasValue)
             {
-                directItem = dossier.Items.SingleOrDefault(x => x.Id == row.SourceItemId) ?? throw Error("MSG113", 404);
+                directItem = dossier.Items.SingleOrDefault(x => x.Id == row.SourceItemId) ?? throw Error("MSG42", 404);
                 if (row.ServiceId != directItem.ServiceId || row.Quantity != directItem.Quantity
                     || row.CostVnd != Gross(directItem) || !TreatmentSheetRules.RegionWithinScope(directItem.Region, Clean(string.Join(", ", row.Regions ?? []))))
                     throw Error("MSG04");
@@ -263,42 +263,4 @@ public sealed partial class TreatmentDossierService
         return names;
     }
 
-    public Task<TreatmentChange> ScheduleNoteAsync(int actorId, Guid dossierId, Guid itemId,
-        ScheduleNoteRequest request, CancellationToken ct) => SheetCommandAsync(actorId, dossierId, request.RequestKey,
-        "SheetScheduleNote", new { dossierId, itemId, request }, async dossier =>
-        {
-            if (dossier.Version != request.ExpectedVersion) throw Error("MSG111", 409);
-            if (dossier.State != "Open" || request.Note?.Length > 1000) throw Error("MSG04");
-            var item = dossier.Items.SingleOrDefault(x => x.Id == itemId) ?? throw Error("MSG113", 404);
-            var before = new { item.EstimatedStart, item.Note };
-            item.EstimatedStart = request.PlannedOn; item.Note = Clean(request.Note); dossier.Version++; dossier.UpdatedAt = clock.GetUtcNow();
-            Event(dossier, actorId, "ItemScheduleNoteChanged", new { itemId, before, request.PlannedOn, request.Note });
-            await db.SaveChangesAsync(ct);
-            return new TreatmentChange(await DetailAsync(dossier, ct), SystemMessages.Get("MSG222", "ghi chú kế hoạch", value: dossier.Code));
-        }, ct);
-
-    public async Task<DossierTotals> SummaryAsync(int actorId, int patientId, int? branchId, CancellationToken ct)
-    {
-        // Reuse list authorization, then aggregate the entire authorized filter, not its first page.
-        await ListAsync(actorId, patientId, branchId, 1, 20, ct);
-        var employee = await db.Employees.AsNoTracking().SingleAsync(x => x.AccountId == actorId, ct);
-        var branches = db.SchedulingMembers.Where(x => x.EmployeeId == employee.Id && x.Active && x.CanDentist).Select(x => x.BranchId);
-        var dossiers = await db.TreatmentDossiers.AsNoTracking().Include(x => x.Items).Where(x => x.PatientId == patientId
-            && x.State != "Deleted" && branches.Contains(x.BranchId) && (!branchId.HasValue || x.BranchId == branchId)).ToListAsync(ct);
-        var gross = 0L; var reduction = 0L; var summaries = new List<TreatmentFinancialSummary>();
-        foreach (var dossier in dossiers)
-        {
-            var preview = PricePreview(dossier, 0); gross = checked(gross + preview.GrossVnd); reduction = checked(reduction + preview.ApprovedDiscountVnd);
-            var finance = await financialPort.ReadAsync(patientId, dossier.BranchId, dossier.Id, ct);
-            if (finance?.Available == true) summaries.Add(finance);
-        }
-        var available = dossiers.Count > 0 && summaries.Count == dossiers.Count;
-        var ids = dossiers.Select(x => x.Id).ToArray();
-        var pending = await db.ClinicalActivities.CountAsync(x => ids.Contains(x.DossierId) && x.FeeStatus == "Pending", ct);
-        return new(dossiers.Count, gross, reduction, gross - reduction, available,
-            available && summaries.All(x => x.PostedChargeVnd.HasValue) ? summaries.Sum(x => x.PostedChargeVnd!.Value) : null,
-            available && summaries.All(x => x.AllocatedVnd.HasValue) ? summaries.Sum(x => x.AllocatedVnd!.Value) : null,
-            available && summaries.All(x => x.OutstandingVnd.HasValue) ? summaries.Sum(x => x.OutstandingVnd!.Value) : null,
-            available && summaries.All(x => x.UnusedAdvanceVnd.HasValue) ? summaries.Sum(x => x.UnusedAdvanceVnd!.Value) : null, pending);
-    }
 }

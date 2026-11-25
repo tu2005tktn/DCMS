@@ -20,7 +20,7 @@ const json = (options: RequestOptions = {}): RequestInit => ({
   body: options.body,
 });
 
-/** Always answers with the same neutral MSG12 body, matching an account or not. */
+/** Always answers with the same neutral MSG09 body, matching an account or not. */
 export async function requestRecovery(identifier: string): Promise<ServerMessage> {
   return request<ServerMessage>('/api/customer/recovery/request', json({ body: JSON.stringify({ identifier }) }));
 }
@@ -29,7 +29,7 @@ export async function resendRecovery(identifier: string): Promise<ServerMessage>
   return request<ServerMessage>('/api/customer/recovery/resend', json({ body: JSON.stringify({ identifier }) }));
 }
 
-/** Returns the reset grant, or throws an ApiError carrying MSG108. */
+/** Returns the reset grant, or throws an ApiError carrying MSG38. */
 export async function verifyRecovery(identifier: string, proof: string): Promise<string> {
   const response = await request<{ resetGrant: string }>(
     '/api/customer/recovery/verify',
@@ -38,7 +38,7 @@ export async function verifyRecovery(identifier: string, proof: string): Promise
   return response.resetGrant;
 }
 
-/** Throws an ApiError carrying MSG108 (proof) or MSG109 (password policy). */
+/** Throws an ApiError carrying MSG38 (proof) or MSG39 (password policy). */
 export async function resetPassword(
   identifier: string,
   resetGrant: string,

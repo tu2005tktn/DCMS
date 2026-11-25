@@ -82,10 +82,10 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
   }, [state.status === 'authenticated' ? state.accessToken : null, expire]);
 
   async function acceptSession(response: SignInResponse) {
-    if (!response.accessToken || !response.user) throw new ApiError(502, 'MSG144', 'Phản hồi đăng nhập không hợp lệ.');
+    if (!response.accessToken || !response.user) throw new ApiError(502, 'MSG49', 'Phản hồi đăng nhập không hợp lệ.');
     if (response.user.accountType !== 'Public') {
       await customerApi<void>('/api/auth/sign-out', { method: 'POST' }, response.accessToken).catch(() => undefined);
-      throw new ApiError(403, 'MSG06', 'Đây là tài khoản nhân viên. Vui lòng chọn đăng nhập Nhân viên.');
+      throw new ApiError(403, 'MSG05', 'Đây là tài khoản nhân viên. Vui lòng chọn đăng nhập Nhân viên.');
     }
     activeToken.current = response.accessToken;
     storeToken(response.accessToken);

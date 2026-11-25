@@ -1,0 +1,23 @@
+import { test } from '@playwright/test';
+import { staffLogin } from '../helpers';
+const NL = String.fromCharCode(10);
+const dump = async (label: string, loc: any, n = 40) => console.log('=== ' + label + NL + (await loc.ariaSnapshot()).split(NL).filter((l: string) => !l.includes('/url') && !l.includes('- img')).slice(0, n).join(NL));
+test('explore ad2', async ({ page }) => {
+  test.setTimeout(200000); page.setDefaultTimeout(8000);
+  await staffLogin(page, 'owner.demo');
+  await page.goto('/settings/treatment-services'); await page.waitForTimeout(2500);
+  await page.getByRole('button', { name: 'Cập nhật giá' }).nth(1).click().catch(e => console.log('E1', String(e).slice(0, 200))); await page.waitForTimeout(1200);
+  await dump('PRICE', page.locator('.ant-modal-wrap:visible .ant-modal, .ant-drawer-open .ant-drawer-content, .ant-popover:visible').last()).catch(e => console.log('E2', String(e).slice(0, 200)));
+  await page.keyboard.press('Escape');
+  await page.goto('/settings/customer-groups'); await page.waitForTimeout(2000);
+  console.log('ROW1', JSON.stringify(await page.locator('tbody tr').first().locator('td').allInnerTexts()));
+  await page.goto('/settings/diagnoses'); await page.waitForTimeout(2000);
+  const row = page.locator('tbody tr').first(); console.log('DROW', JSON.stringify(await row.locator('td').allInnerTexts()));
+  await row.getByRole('button', { name: 'Ngừng dùng' }).click().catch(e => console.log('E3', String(e).slice(0, 200))); await page.waitForTimeout(1200);
+  await dump('DEACT', page.locator('.ant-modal-wrap:visible .ant-modal, .ant-popover:visible').last()).catch(e => console.log('E4', String(e).slice(0, 200)));
+  await page.keyboard.press('Escape');
+  await page.getByRole('menuitem', { name: 'Loại chi' }).click(); await page.waitForTimeout(1500); console.log('LOAICHI', JSON.stringify(await page.locator('tbody tr').allInnerTexts()));
+  await page.goto('/settings/general'); await page.waitForTimeout(2500);
+  await page.getByRole('combobox', { name: 'Tự đăng xuất khi không thao tác sau' }).click({ force: true }); await page.waitForTimeout(800);
+  console.log('IDLE', JSON.stringify(await page.locator('.ant-select-dropdown:visible').last().locator('.ant-select-item-option').allInnerTexts()));
+});

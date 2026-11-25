@@ -41,15 +41,15 @@ export type SignInFeedback =
   | { kind: 'idle' }
   | { kind: 'submitting' }
   | { kind: 'success' }
-  | { kind: 'error'; code: 'MSG02' | 'MSG03' | 'MSG04' | 'MSG06' | 'MSG07' | 'MSG09' | 'MSG144' | 'NETWORK'; message: string };
+  | { kind: 'error'; code: 'MSG02' | 'MSG03' | 'MSG04' | 'MSG05' | 'MSG06' | 'MSG07' | 'MSG49' | 'NETWORK'; message: string };
 
 /** Mã System Messages dùng chung từ đặc tả v1.2. Tham chiếu docs/specs/... */
 export const SYSTEM_MESSAGE_CODES = {
   MSG02: 'MSG02',
   MSG03: 'MSG03',
   MSG04: 'MSG04',
+  MSG05: 'MSG05',
   MSG06: 'MSG06',
   MSG07: 'MSG07',
-  MSG09: 'MSG09',
-  MSG144: 'MSG144',
+  MSG49: 'MSG49',
 } as const;

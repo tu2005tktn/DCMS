@@ -54,7 +54,7 @@ export default function WorkingSchedulesPage() {
   const durationError = validateAvailabilityDuration(duration, mode === 'Public', options?.services.find(s => s.id === service)?.publicDurationMinutes);
   const showBranchPicker = canPickBranch && (options?.branches.length ?? 0) > 1;
   const eligible = options?.branches.filter(b => options.employees.some(e => e.id === employee && e.branchId === b.id && (e.canView ?? e.canEdit))) ?? [];
-  const fail = (e: unknown) => setError(e instanceof ApiError ? e : new ApiError(0, 'MSG144', 'Không thể kết nối. Vui lòng thử lại.'));
+  const fail = (e: unknown) => setError(e instanceof ApiError ? e : new ApiError(0, 'MSG49', 'Không thể kết nối. Vui lòng thử lại.'));
   const discardOkay = () => !dirty || window.confirm('Hủy các thay đổi chưa lưu?');
   const clearResults = () => { setAffected(undefined); setDays(undefined); setSuccess(''); };
   const edit = (next: BranchPeriod[]) => { setPeriods(next); clearResults(); };
@@ -98,7 +98,7 @@ export default function WorkingSchedulesPage() {
     if (periods.some(p => p.startMinute % 30 || p.endMinute % 30)) issues.push('Giờ làm và nghỉ phải theo bước 30 phút.');
     if (kind === 'Exception' && !reason.trim()) issues.push('Nhập lý do ngoại lệ, kể cả ngày không làm việc.');
     if (!date || date < today()) issues.push('Ngày áp dụng phải từ hôm nay theo giờ phòng khám.');
-    if (issues.length) throw new ApiError(400, 'MSG110', issues.join('\n'));
+    if (issues.length) throw new ApiError(400, 'MSG40', issues.join('\n'));
     const body = { dentistId: employee!, date, kind, expectedVersion: saved!.version, intervals: periods, reason };
     const text = JSON.stringify(body);
     if (request.current?.text !== text) request.current = { text, body: { ...body, requestKey: crypto.randomUUID() } };
@@ -119,7 +119,7 @@ export default function WorkingSchedulesPage() {
       useSaved(result.schedule); setSuccess(result.notification.message);
     } catch (e) {
       fail(e);
-      if (e instanceof ApiError && e.code === 'MSG38') {
+      if (e instanceof ApiError && e.code === 'MSG32') {
         try { setAffected((await api<{ affectedAppointments: Affected[] }>('/api/working-schedules/recurring/preview', { method: 'POST', body: JSON.stringify(command()) })).affectedAppointments); }
         catch (impactError) { fail(impactError); }
       }
@@ -128,8 +128,8 @@ export default function WorkingSchedulesPage() {
   async function previewSlots() {
     setBusy(true); setError(undefined); setDays(undefined);
     try {
-      if (durationError) throw new ApiError(400, 'MSG110', durationError);
-      if (!from || !to || to < from || to > addDays(from, 30)) throw new ApiError(400, 'MSG110', 'Chọn khoảng preview từ 1 đến 31 ngày.');
+      if (durationError) throw new ApiError(400, 'MSG40', durationError);
+      if (!from || !to || to < from || to > addDays(from, 30)) throw new ApiError(400, 'MSG40', 'Chọn khoảng preview từ 1 đến 31 ngày.');
       if (mode === 'Staff') {
         const result = await api<{ days: Availability[] }>('/api/working-schedules/recurring/preview-availability', { method: 'POST', body: JSON.stringify({ schedule: command(), branchId: branch, serviceId: service, from, to, durationMinutes: duration, assistantId: assistant }) });
         setDays(result.days);
@@ -202,7 +202,7 @@ export default function WorkingSchedulesPage() {
         </div>
       </section>
       <Space wrap><Button disabled={!has('working-schedules.manage') || busy} onClick={() => void check(false)}>Kiểm tra ảnh hưởng</Button><Button type="primary" disabled={!has('working-schedules.manage') || busy} onClick={() => void check(true)}>Lưu và công bố</Button><Button disabled={!has('working-schedules.manage') || busy || !dirty} onClick={() => { if (discardOkay()) { useSaved(saved); setError(undefined); clearResults(); } }}>Hủy thay đổi chưa lưu</Button></Space>
-      {affected && (affected.length ? <><Alert type="warning" message={`MSG38 · Có ${affected.length} lịch Confirmed bị ảnh hưởng. Giải quyết tại S12 trước khi công bố.`} /><Table rowKey="id" dataSource={affected} columns={[{ title: 'Mã lịch', dataIndex: 'code', render: (value: string, row: Affected) => <Link to={`/appointments/${row.id}`}>{value} · S12</Link> }, { title: 'Bắt đầu', dataIndex: 'start', render: clinicTime }, { title: 'Kết thúc', dataIndex: 'end', render: clinicTime }, { title: 'Người đến', dataIndex: 'attendee' }, { title: 'Trạng thái', dataIndex: 'status' }]} /></> : <Alert type="info" message="Không có lịch Confirmed bị ảnh hưởng tại thời điểm kiểm tra." />)}
+      {affected && (affected.length ? <><Alert type="warning" message={`MSG32 · Có ${affected.length} lịch Confirmed bị ảnh hưởng. Giải quyết tại S12 trước khi công bố.`} /><Table rowKey="id" dataSource={affected} columns={[{ title: 'Mã lịch', dataIndex: 'code', render: (value: string, row: Affected) => <Link to={`/appointments/${row.id}`}>{value} · S12</Link> }, { title: 'Bắt đầu', dataIndex: 'start', render: clinicTime }, { title: 'Kết thúc', dataIndex: 'end', render: clinicTime }, { title: 'Người đến', dataIndex: 'attendee' }, { title: 'Trạng thái', dataIndex: 'status' }]} /></> : <Alert type="info" message="Không có lịch Confirmed bị ảnh hưởng tại thời điểm kiểm tra." />)}
       <Card title="Preview availability">
         <Space wrap>
           <Select aria-label="Chế độ preview" value={mode} disabled={busy} style={{ width: 240 }} options={[{ value: 'Staff', label: 'Nhân viên · bản đang sửa' }, { value: 'Public', label: 'Công khai · bản đã công bố' }]} onChange={value => { setMode(value); setDays(undefined); if (value === 'Public') setDuration(options?.services.find(s => s.id === service)?.publicDurationMinutes ?? 30); }} />
