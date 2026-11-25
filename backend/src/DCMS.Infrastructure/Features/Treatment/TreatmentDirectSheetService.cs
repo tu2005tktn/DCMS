@@ -12,9 +12,9 @@ public sealed partial class TreatmentDossierService
     private async Task<TreatmentItem> EditableSheetItemAsync(int actorId, TreatmentDossier dossier, Guid itemId, int version, CancellationToken ct)
     {
         var employee = await DentistAsync(actorId, dossier.BranchId, ct);
-        if (employee != dossier.DentistId) throw Error("MSG06", 403);
-        if (dossier.Version != version) throw Error("MSG111", 409);
-        return dossier.Items.SingleOrDefault(x => x.Id == itemId) ?? throw Error("MSG113", 404);
+        if (employee != dossier.DentistId) throw Error("MSG05", 403);
+        if (dossier.Version != version) throw Error("MSG41", 409);
+        return dossier.Items.SingleOrDefault(x => x.Id == itemId) ?? throw Error("MSG42", 404);
     }
 
     public Task<TreatmentChange> MarkSheetItemAsync(int actorId, Guid dossierId, Guid itemId, MarkSheetItemRequest request, CancellationToken ct)
@@ -25,7 +25,7 @@ public sealed partial class TreatmentDossierService
             dossier.Version++; dossier.UpdatedAt = clock.GetUtcNow();
             Event(dossier, actorId, "SheetItemMarked", new { itemId, request.Completed });
             await db.SaveChangesAsync(ct);
-            return new TreatmentChange(await DetailAsync(dossier, ct), SystemMessages.Get("MSG222", "hạng mục", value: dossier.Code));
+            return new TreatmentChange(await DetailAsync(dossier, ct), SystemMessages.Get("MSG53", "hạng mục", value: dossier.Code));
         }, ct);
 
     public Task<TreatmentChange> DeleteSheetItemAsync(int actorId, Guid dossierId, Guid itemId, SheetItemActionRequest request, CancellationToken ct)
@@ -50,14 +50,14 @@ public sealed partial class TreatmentDossierService
             Event(dossier, actorId, "SheetItemDeleted", new { itemId, before, planVersion });
             RecordDirectPlanSnapshot(dossier, planVersion, actorId);
             await db.SaveChangesAsync(ct);
-            return new TreatmentChange(await DetailAsync(dossier, ct), SystemMessages.Get("MSG222", "hạng mục", value: dossier.Code));
+            return new TreatmentChange(await DetailAsync(dossier, ct), SystemMessages.Get("MSG53", "hạng mục", value: dossier.Code));
         }, ct);
 
     public Task<TreatmentChange> EditSheetItemAsync(int actorId, Guid dossierId, Guid itemId, EditSheetItemRequest request, CancellationToken ct)
         => SheetCommandAsync(actorId, dossierId, request.RequestKey, "SheetItemEdit", new { dossierId, itemId, request }, async dossier =>
         {
             var item = await EditableSheetItemAsync(actorId, dossier, itemId, request.ExpectedVersion, ct);
-            if (dossier.State != "Open") throw Error("MSG230", 409);
+            if (dossier.State != "Open") throw Error("MSG54", 409);
             var row = ReadRow(request.Row);
             if (row.Quantity != item.Quantity || row.DentistId != dossier.DentistId) throw Error("MSG04");
             var service = await db.Set<SchedulingService>().AsNoTracking().SingleOrDefaultAsync(x => x.Id == row.ServiceId && x.BranchId == dossier.BranchId && x.Active, ct)
@@ -69,9 +69,9 @@ public sealed partial class TreatmentDossierService
                 await access.RequireAsync(actorId, "treatment.items.price", ct);
             if (TreatmentPlanRules.Gross(row.Quantity, unitPrice) != row.CostVnd) throw Error("MSG04");
             var type = row.DiscountType == "VND" ? "Fixed" : row.DiscountType;
-            if (row.DiscountValue < 0 || row.DiscountValue > 0 && (type is not ("Fixed" or "Percent") || Clean(row.DiscountNote) == null)) throw Error("MSG252");
+            if (row.DiscountValue < 0 || row.DiscountValue > 0 && (type is not ("Fixed" or "Percent") || Clean(row.DiscountNote) == null)) throw Error("MSG59");
             try { if (row.DiscountValue > 0) _ = TreatmentPlanRules.Discount(row.CostVnd, type!, row.DiscountValue); }
-            catch (ArgumentOutOfRangeException) { throw Error("MSG252"); }
+            catch (ArgumentOutOfRangeException) { throw Error("MSG59"); }
             var before = ItemDto(item);
             item.ServiceId = service.Id; item.ServiceName = service.Name; item.Unit = service.Unit;
             item.Region = Clean(string.Join(", ", row.Regions ?? [])); item.Note = Clean(row.Note);
@@ -85,14 +85,14 @@ public sealed partial class TreatmentDossierService
             Event(dossier, actorId, "SheetItemEdited", new { before, after = ItemDto(item), planVersion });
             RecordDirectPlanSnapshot(dossier, planVersion, actorId);
             await db.SaveChangesAsync(ct);
-            return new TreatmentChange(await DetailAsync(dossier, ct), SystemMessages.Get("MSG222", "hạng mục", value: dossier.Code));
+            return new TreatmentChange(await DetailAsync(dossier, ct), SystemMessages.Get("MSG53", "hạng mục", value: dossier.Code));
         }, ct);
 
     public Task<ConfirmSheetActualResult> PerformSheetItemAsync(int actorId, Guid dossierId, Guid itemId, PerformSheetItemRequest request, CancellationToken ct)
         => SheetCommandAsync(actorId, dossierId, request.RequestKey, "SheetItemPerform", new { dossierId, itemId, request }, async dossier =>
         {
             var item = await EditableSheetItemAsync(actorId, dossier, itemId, request.ExpectedVersion, ct);
-            if (dossier.State != "Open") throw Error("MSG230", 409);
+            if (dossier.State != "Open") throw Error("MSG54", 409);
             var old = await db.ClinicalActivities.SingleOrDefaultAsync(x => x.ItemId == itemId && x.IsPlanTransfer, ct);
             ActivityDto activity;
             var input = request.Row.HasValue ? ReadRow(request.Row.Value) : null;
@@ -122,7 +122,7 @@ public sealed partial class TreatmentDossierService
         Guid activityId, DateOnly? date, string? note, bool transfer, Guid key, CancellationToken ct, string? labWork = null, SheetRow? input = null)
     {
         var employee = await DentistAsync(actorId, dossier.BranchId, ct);
-        if (employee != dossier.DentistId || item?.ResponsibleDentistId.HasValue == true && item.ResponsibleDentistId != employee) throw Error("MSG06", 403);
+        if (employee != dossier.DentistId || item?.ResponsibleDentistId.HasValue == true && item.ResponsibleDentistId != employee) throw Error("MSG05", 403);
         if (note?.Length > 1000) throw Error("MSG04");
         if (item == null && input == null) throw Error("MSG04");
         var service = input == null ? null : await db.Set<SchedulingService>().AsNoTracking()
@@ -136,10 +136,10 @@ public sealed partial class TreatmentDossierService
         var discountType = input == null ? item!.DiscountType : input.DiscountType == "VND" ? "Fixed" : input.DiscountType;
         var discountValue = input?.DiscountValue ?? item?.DiscountValue ?? 0;
         var discountReason = input?.DiscountNote ?? item?.DiscountReason;
-        if (discountValue < 0 || discountValue > 0 && (discountType is not ("Fixed" or "Percent") || Clean(discountReason) == null)) throw Error("MSG252");
+        if (discountValue < 0 || discountValue > 0 && (discountType is not ("Fixed" or "Percent") || Clean(discountReason) == null)) throw Error("MSG59");
         long reduction;
         try { reduction = discountValue > 0 ? TreatmentPlanRules.Discount(GrossInput(qty, price), discountType!, discountValue) : 0; }
-        catch (ArgumentOutOfRangeException) { throw Error("MSG252"); }
+        catch (ArgumentOutOfRangeException) { throw Error("MSG59"); }
         var assistant = input == null ? item!.AssistantId : input.AssistantId;
         if (assistant.HasValue && !await db.SchedulingMembers.AnyAsync(x => x.BranchId == dossier.BranchId && x.EmployeeId == assistant && x.Active && !x.CanDentist, ct)) throw Error("MSG04");
         var planVersion = item == null ? (int?)null : await CurrentPlanVersionAsync(dossier.Id, true, ct);

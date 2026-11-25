@@ -8,7 +8,7 @@ namespace DCMS.IntegrationTests;
 [Collection(ApiCollection.Name)]
 public sealed class CustomerRegisterTests(ApiHost host)
 {
-    private const string Guest = "Khách chưa đăng nhập.";
+    private const string Guest = "Anonymous visitor, not signed in.";
 
     private static string NewPhone() => "09" + Random.Shared.Next(10000000, 99999999);
     private static RegisterRequest Body(string? name = "Lê Văn Nam", string? phone = null, string? email = null, string? password = "Abcdef1!x", string? confirm = null) =>

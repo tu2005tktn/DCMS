@@ -41,10 +41,10 @@ public sealed class ScreenPermissionScope(DcmsDbContext db, ISettingsAccess acce
         }
         if (int.TryParse(http.Request.RouteValues["serviceId"]?.ToString(), out var service))
             await AddBranch(db.Set<SchedulingService>().Where(x => x.Id == service).Select(x => (int?)x.BranchId).SingleOrDefaultAsync(ct));
-        if (branches.Any(branch => !state.BranchIds.Contains(branch))) throw new BusinessException(403, SystemMessages.Get("MSG06"));
+        if (branches.Any(branch => !state.BranchIds.Contains(branch))) throw new BusinessException(403, SystemMessages.Get("MSG05"));
         if (http.Request.Method == "DELETE" && Guid.TryParse(http.Request.RouteValues["rowId"]?.ToString(), out var rowId)) {
             var draft = await db.TreatmentSheetDrafts.AsNoTracking().SingleOrDefaultAsync(x => x.Id == rowId, ct);
-            if (draft != null && !state.Permissions.Contains(draft.Kind.Equals("actual", StringComparison.OrdinalIgnoreCase) ? "treatment.actuals.delete" : "treatment.items.delete")) throw new BusinessException(403, SystemMessages.Get("MSG06"));
+            if (draft != null && !state.Permissions.Contains(draft.Kind.Equals("actual", StringComparison.OrdinalIgnoreCase) ? "treatment.actuals.delete" : "treatment.items.delete")) throw new BusinessException(403, SystemMessages.Get("MSG05"));
         }
     }
 }

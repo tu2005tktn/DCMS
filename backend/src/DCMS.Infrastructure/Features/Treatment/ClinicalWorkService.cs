@@ -25,15 +25,15 @@ public sealed class ClinicalWorkService(DcmsDbContext db, UserManager<Applicatio
     private async Task<int> DentistAsync(int actorId, int branchId, CancellationToken ct)
     {
         var scope = await settingsAccess.ResolveAsync(actorId, ct);
-        if (scope.Assigned && !scope.Owner && !scope.BranchIds.Contains(branchId)) throw Error("MSG06", 403);
+        if (scope.Assigned && !scope.Owner && !scope.BranchIds.Contains(branchId)) throw Error("MSG05", 403);
         var user = await users.FindByIdAsync(actorId.ToString());
         if (user == null || !user.IsActive || user.AccountType != "Staff" ||
             !scope.GrantDriven && !AccountRoles.Effective(await users.GetRolesAsync(user)).Contains(AccountRoles.Dentist))
-            throw Error("MSG06", 403);
+            throw Error("MSG05", 403);
         var employee = await db.Employees.AsNoTracking().SingleOrDefaultAsync(x => x.AccountId == actorId, ct);
         if (employee == null || !await db.SchedulingMembers.AsNoTracking().AnyAsync(x =>
             x.BranchId == branchId && x.EmployeeId == employee.Id && x.Active && (x.CanDentist || scope.GrantDriven), ct))
-            throw Error("MSG06", 403);
+            throw Error("MSG05", 403);
         return employee.Id;
     }
 
@@ -46,19 +46,19 @@ public sealed class ClinicalWorkService(DcmsDbContext db, UserManager<Applicatio
         if (receipt != null)
         {
             if (receipt.ActorId != actorId || receipt.Command != "ActivityPost" || receipt.Fingerprint != Hash(new { id, request }))
-                throw Error("MSG111", 409);
+                throw Error("MSG41", 409);
             return ActivityDto.From(await db.ClinicalActivities.AsNoTracking().SingleAsync(x => x.Id == receipt.ResultId, ct));
         }
         await db.Database.ExecuteSqlRawAsync($"SELECT pg_advisory_xact_lock({DCMS.Infrastructure.Features.Scheduling.WorkingScheduleService.TransactionLock})", ct);
-        var row = await db.ClinicalActivities.SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw Error("MSG113", 404);
+        var row = await db.ClinicalActivities.SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw Error("MSG42", 404);
         var dossier = await db.TreatmentDossiers.Include(x => x.Items).SingleOrDefaultAsync(x => x.Id == row.DossierId, ct)
-            ?? throw Error("MSG113", 404);
+            ?? throw Error("MSG42", 404);
         var employee = await DentistAsync(actorId, dossier.BranchId, ct);
         TreatmentItem? item = null;
         if (row.ItemId.HasValue)
-            item = dossier.Items.SingleOrDefault(x => x.Id == row.ItemId.Value) ?? throw Error("MSG113", 404);
+            item = dossier.Items.SingleOrDefault(x => x.Id == row.ItemId.Value) ?? throw Error("MSG42", 404);
         if (employee != dossier.DentistId || row.PerformerId != employee || dossier.State != "Open" || row.Version != request.ExpectedVersion)
-            throw Error("MSG111", 409);
+            throw Error("MSG41", 409);
         if (row.PriceSnapshotVnd == 0) row.FeeStatus = "NotRequested";
         else if (row.Unit == "gói") row.FeeStatus = "NeedsRule";
         else
@@ -83,7 +83,7 @@ public sealed class ClinicalWorkService(DcmsDbContext db, UserManager<Applicatio
                 row.Quantity, row.Unit, checked((long)row.PriceSnapshotVnd), gross, row.DiscountSnapshotVnd,
                 item?.DiscountType, item?.DiscountValue, item?.DiscountReason, null,
                 row.DiscountSnapshotVnd > 0 ? actorId : null, row.DiscountSnapshotVnd > 0 ? clock.GetUtcNow() : null, actorId), ct);
-            if (fee.Status is not ("Pending" or "Posted")) throw Error("MSG144", 503);
+            if (fee.Status is not ("Pending" or "Posted")) throw Error("MSG49", 503);
             row.FeeStatus = fee.Status;
         }
         row.Version++;

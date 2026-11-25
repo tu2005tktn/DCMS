@@ -10,12 +10,12 @@ test.beforeAll(() => {
   if (!password) throw new Error('Set E2E_DEMO_PASSWORD from ignored .env before running browser tests.');
 });
 
-const MSG12 =
+const MSG09 =
   'Nếu thông tin tài khoản hợp lệ, hướng dẫn đặt lại mật khẩu sẽ được gửi qua kênh liên hệ đã đăng ký.';
-const MSG13 = 'Đặt lại mật khẩu thành công. Vui lòng đăng nhập bằng mật khẩu mới.';
-const MSG108 =
+const MSG10 = 'Đặt lại mật khẩu thành công. Vui lòng đăng nhập bằng mật khẩu mới.';
+const MSG38 =
   'Mã hoặc liên kết xác minh không hợp lệ hoặc đã hết hạn. Vui lòng yêu cầu xác minh lại.';
-const MSG144 = 'Không thể hoàn tất thao tác. Vui lòng kiểm tra kết nối và thử lại.';
+const MSG49 = 'Không thể hoàn tất thao tác. Vui lòng kiểm tra kết nối và thử lại.';
 
 const newPassword = () => 'Zx9!q' + Math.random().toString(36).slice(2, 20);
 
@@ -57,7 +57,7 @@ test('request, verify, reset and landing on sign-in for an existing account', as
   const request = page.waitForResponse(r => r.url().endsWith('/api/auth/recovery/request') && r.request().method() === 'POST');
   await page.getByRole('button', { name: 'Gửi yêu cầu', exact: true }).click();
   expect((await request).status()).toBe(200);
-  await expect(page.getByRole('status').filter({ hasText: MSG12 })).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: MSG09 })).toBeVisible();
 
   // Step 2 - the delivered proof is supplied by the development adapter's outbox.
   const proof = await readOutboxProof(page.request, 'dentist.demo');
@@ -76,7 +76,7 @@ test('request, verify, reset and landing on sign-in for an existing account', as
   expect((await reset).status()).toBe(200);
 
   // Step 4 - success message, then navigation to S01.
-  await expect(page.getByText(MSG13).first()).toBeVisible();
+  await expect(page.getByText(MSG10).first()).toBeVisible();
   await page.getByRole('button', { name: 'Về trang đăng nhập', exact: true }).click();
   await expect(page).toHaveURL(/sign-in/);
   // The old credential no longer works and the new one does.
@@ -96,15 +96,15 @@ test('unknown account produces the same neutral request answer', async ({ page }
   await page.getByRole('button', { name: 'Gửi yêu cầu', exact: true }).click();
   const response = await request;
   expect(response.status()).toBe(200);
-  expect((await response.json())).toEqual({ code: 'MSG12', message: MSG12 });
+  expect((await response.json())).toEqual({ code: 'MSG09', message: MSG09 });
 
   // The follow-up steps behave identically and reveal nothing about the account.
-  await expect(page.getByRole('status').filter({ hasText: MSG12 })).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: MSG09 })).toBeVisible();
   await page.getByLabel('Mã xác minh', { exact: true }).fill('000000');
   const verify = page.waitForResponse(r => r.url().endsWith('/api/auth/recovery/verify') && r.request().method() === 'POST');
   await page.getByRole('button', { name: 'Xác minh', exact: true }).click();
   expect((await verify).status()).toBe(400);
-  await expect(page.getByText(MSG108, { exact: true })).toBeVisible();
+  await expect(page.getByText(MSG38, { exact: true })).toBeVisible();
 });
 
 test('wrong proof, weak password and mismatch show inline errors', async ({ page }) => {
@@ -113,14 +113,14 @@ test('wrong proof, weak password and mismatch show inline errors', async ({ page
   await page.getByRole('button', { name: 'Gửi yêu cầu', exact: true }).click();
   await page.getByLabel('Mã xác minh', { exact: true }).fill('000000');
   await page.getByRole('button', { name: 'Xác minh', exact: true }).click();
-  await expect(page.getByText(MSG108, { exact: true })).toBeVisible();
+  await expect(page.getByText(MSG38, { exact: true })).toBeVisible();
 
   const proof = await readOutboxProof(page.request, 'guest.demo');
   await page.getByLabel('Mã xác minh', { exact: true }).fill(proof);
   await page.getByRole('button', { name: 'Xác minh', exact: true }).click();
   await expect(page.getByLabel('Mật khẩu mới', { exact: true })).toBeVisible();
 
-  // Weak password is refused by the shared policy (MSG109) with the rule hints visible.
+  // Weak password is refused by the shared policy (MSG39) with the rule hints visible.
   await page.getByLabel('Mật khẩu mới', { exact: true }).fill('short');
   await page.getByLabel('Xác nhận mật khẩu', { exact: true }).fill('short');
   const rejected = page.waitForResponse(r => r.url().endsWith('/api/auth/recovery/reset') && r.request().method() === 'POST');
@@ -147,7 +147,7 @@ test('wrong proof, weak password and mismatch show inline errors', async ({ page
   const completed = page.waitForResponse(r => r.url().endsWith('/api/auth/recovery/reset') && r.request().method() === 'POST');
   await page.getByRole('button', { name: 'Đặt lại mật khẩu', exact: true }).click();
   expect((await completed).status()).toBe(200);
-  await expect(page.getByText(MSG13).first()).toBeVisible();
+  await expect(page.getByText(MSG10).first()).toBeVisible();
 });
 
 test('validation, resend cooldown and service failure are handled', async ({ page }) => {
@@ -166,15 +166,15 @@ test('validation, resend cooldown and service failure are handled', async ({ pag
   await expect(resend).toBeDisabled();
   await expect(resend).toContainText('Gửi lại sau');
 
-  // A service failure on the verify step surfaces MSG144.
+  // A service failure on the verify step surfaces MSG49.
   await page.route('**/api/auth/recovery/verify', async route => {
-    await fulfillWithCors(route, 503, { code: 'MSG144', message: MSG144 });
+    await fulfillWithCors(route, 503, { code: 'MSG49', message: MSG49 });
   });
   await page.getByLabel('Mã xác minh', { exact: true }).fill('123456');
   const failed = page.waitForResponse(r => r.url().endsWith('/api/auth/recovery/verify') && r.request().method() === 'POST');
   await page.getByRole('button', { name: 'Xác minh', exact: true }).click();
   expect((await failed).status()).toBe(503);
-  await expect(page.getByText(MSG144, { exact: true })).toBeVisible();
+  await expect(page.getByText(MSG49, { exact: true })).toBeVisible();
   // The error can render one tick before the in-flight guard clears; wait for the button to settle.
   await expect(page.locator('button:has-text("Xác minh")')).toBeEnabled();
 
@@ -185,13 +185,13 @@ test('validation, resend cooldown and service failure are handled', async ({ pag
   await page.unroute('**/api/auth/recovery/verify');
   await page.route('**/api/auth/recovery/verify', async route => {
     await pending;
-    await fulfillWithCors(route, 400, { code: 'MSG108', message: MSG108 });
+    await fulfillWithCors(route, 400, { code: 'MSG38', message: MSG38 });
   });
   await page.getByLabel('Mã xác minh', { exact: true }).fill('123456');
   await page.getByRole('button', { name: 'Xác minh', exact: true }).click();
   await expect(page.locator('button:has-text("Xác minh")')).toBeDisabled();
   release();
-  await expect(page.getByText(MSG108, { exact: true })).toBeVisible();
+  await expect(page.getByText(MSG38, { exact: true })).toBeVisible();
 });
 
 test('no proof, grant or password is written into the URL', async ({ page }) => {

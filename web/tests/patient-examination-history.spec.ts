@@ -17,9 +17,9 @@ async function prepare(page: Page, fail = false) {
     if (path === '/api/patients/1') return route.fulfill({ json: { id: 1, fullName: 'SYNTHETIC bệnh nhân', patientCode: 'BN-SYN', birthDate: null, gender: null, link: {}, intakeHistory: [] } });
     if (path === '/api/patients/1/examinations') {
       state.requests++;
-      return state.fail ? route.fulfill({ status: 503, json: { code: 'MSG144', message: 'SYNTHETIC không tải được lịch sử khám' } }) : route.fulfill({ json: state.rows });
+      return state.fail ? route.fulfill({ status: 503, json: { code: 'MSG49', message: 'SYNTHETIC không tải được lịch sử khám' } }) : route.fulfill({ json: state.rows });
     }
-    return route.fulfill({ status: 404, json: { code: 'MSG113', message: 'Không tìm thấy.' } });
+    return route.fulfill({ status: 404, json: { code: 'MSG42', message: 'Không tìm thấy.' } });
   });
   await page.goto('/patients/1?tab=examinations');
   return state;

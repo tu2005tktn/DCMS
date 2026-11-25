@@ -8,7 +8,7 @@ async function mock(page: Page, permissions = ['patients.read','patients.manage'
     const url=new URL(route.request().url());
     if(url.pathname==='/api/auth/me') return route.fulfill({json:user});
     if(url.pathname==='/api/auth/session/idle') return route.fulfill({json:{deadlineAt:new Date(Date.now()+600000).toISOString(),serverNow:new Date().toISOString(),activityVersion:1}});
-    if(url.pathname==='/api/auth/sign-out') return route.fulfill({status:503,json:{code:'MSG144',message:'Không thể đăng xuất lúc này.'}});
+    if(url.pathname==='/api/auth/sign-out') return route.fulfill({status:503,json:{code:'MSG49',message:'Không thể đăng xuất lúc này.'}});
     if(url.pathname==='/api/patients') {
       queries.push(url.search);
       return route.fulfill({json:{total:6,page:Number(url.searchParams.get('page')??1),pageSize:20,items:Array.from({length:6},(_,i)=>({id:i+1,patientCode:`BN-M00${i+1}`,fullName:`Hồ sơ mẫu 0${i+1}`,birthDate:i===4?null:'1995-03-12',gender:'FEMALE',phone:null,lastVisitAt:null,isArchived:i===5,version:1}))}});

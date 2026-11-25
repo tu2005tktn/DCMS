@@ -43,7 +43,7 @@ export const auditLabels: Record<string, string> = {
 const normalizeName = (value: string) => value.trim().replace(/đ/g, 'd').replace(/Đ/g, 'D')
   .normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().split(/\s+/).filter(Boolean).join(' ');
 
-// Fields where the declared identity differs from a Patient; the server refuses verification (MSG143) if any differ.
+// Fields where the declared identity differs from a Patient; the server refuses verification (MSG48) if any differ.
 export function identityMismatches(detail: LinkReviewDetail, patient: PatientSummary): string[] {
   const result: string[] = [];
   if (normalizeName(detail.declaredFullName) !== normalizeName(patient.fullName)) result.push('Họ tên');

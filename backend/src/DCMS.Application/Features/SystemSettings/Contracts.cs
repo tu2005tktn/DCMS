@@ -11,8 +11,8 @@ public sealed record UpdateMaterialRequest(string Name, Guid CategoryId, int Exp
 public sealed record DeleteCatalogRequest(int ExpectedVersion, Guid RequestKey);
 public static class CatalogMessages
 {
-    public static SystemMessage Duplicate => new("CATALOG_NAME_DUPLICATE", "Tên đã tồn tại. Vui lòng nhập tên khác.") { Field = "name" };
-    public static SystemMessage InUse => new("CATALOG_CATEGORY_IN_USE", "Danh mục đang có dụng cụ/vật liệu. Vui lòng chuyển hoặc xóa các mục trước.");
+    public static SystemMessage Duplicate => new("MSG85", "Tên đã tồn tại. Vui lòng nhập tên khác.") { Field = "name" };
+    public static SystemMessage InUse => new("MSG86", "Danh mục đang có dụng cụ/vật liệu. Vui lòng chuyển hoặc xóa các mục trước.");
 }
 public interface ISystemCatalogService
 {

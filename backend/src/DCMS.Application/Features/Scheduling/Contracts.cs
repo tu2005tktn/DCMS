@@ -3,11 +3,8 @@ using DCMS.Domain.Features.Scheduling;
 
 namespace DCMS.Application.Features.Scheduling;
 
-public sealed record ScheduleCommand(int BranchId, int DentistId, DateOnly WeekStart, int ExpectedVersion,
-    SchedulePeriod[] Intervals, Guid RequestKey);
 public sealed record ScheduleDto(Guid? Id, int BranchId, int DentistId, DateOnly WeekStart, int Version,
     string Status, SchedulePeriod[] Intervals, int? PublishedBy, DateTimeOffset? PublishedAt);
-public sealed record PublishResult(ScheduleDto Schedule, SystemMessage Notification);
 public sealed record AffectedAppointment(Guid Id, string Code, DateTimeOffset Start, DateTimeOffset End, string Attendee, string Status);
 public sealed record SchedulePreview(AffectedAppointment[] AffectedAppointments);
 public sealed record ScheduleAppointment(Guid Id, string Code, int BranchId, string BranchName,
@@ -23,7 +20,6 @@ public sealed record AvailabilityQuery(int BranchId, int DentistId, int? Service
 public sealed record AvailabilitySlot(DateTimeOffset Start, DateTimeOffset End, int ChairId, int DentistId, int? AssistantId,
     int ScheduleVersion, int? AssistantScheduleVersion, int BookingSettingsVersion = 1);
 public sealed record AvailabilityResult(string TimeZone, DateOnly Date, AvailabilitySlot[] Slots);
-public sealed record PreviewAvailabilityRequest(ScheduleCommand Schedule, AvailabilityQuery Query);
 public sealed record ResourceCheck(int BranchId, int DentistId, int? ServiceId, DateTimeOffset Start, int DurationMinutes,
     int? ChairId, int? AssistantId, int? PatientId, int ExpectedScheduleVersion,
     int? ExpectedAssistantScheduleVersion = null, Guid? ExcludeAppointmentId = null, bool Public = false, int? BookingSettingsVersion = null);
@@ -47,10 +43,6 @@ public interface IWorkingScheduleService
     Task<RecurringAvailabilityResult> PreviewRecurringAvailabilityAsync(int actorId, RecurringPreviewRequest request, CancellationToken ct);
     Task<ScheduleOptions> OptionsAsync(int actorId, CancellationToken ct);
     Task<ScheduleOptions> PublicOptionsAsync(int branchId, CancellationToken ct);
-    Task<ScheduleDto> GetAsync(int actorId, int branchId, int dentistId, DateOnly weekStart, CancellationToken ct);
-    Task<SchedulePreview> PreviewAsync(int actorId, ScheduleCommand command, CancellationToken ct);
-    Task<PublishResult> PublishAsync(int actorId, ScheduleCommand command, CancellationToken ct);
-    Task<AvailabilityResult> PreviewAvailabilityAsync(int actorId, PreviewAvailabilityRequest request, CancellationToken ct);
 }
 public interface IAvailabilityService
 {

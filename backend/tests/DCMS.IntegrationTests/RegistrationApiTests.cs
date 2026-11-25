@@ -57,7 +57,7 @@ public sealed class RegistrationApiTests(ApiFixture fixture) : IClassFixture<Api
         var response = await client.PostAsJsonAsync("/api/auth/register",
             new RegisterRequest("Password length test", phone, NewEmail(phone), password, password));
         if (accepted) Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        else await AssertMessage(response, HttpStatusCode.BadRequest, "MSG109");
+        else await AssertMessage(response, HttpStatusCode.BadRequest, "MSG39");
     }
 
     private static async Task AssertMessage(HttpResponseMessage response, HttpStatusCode status, string code)
@@ -77,7 +77,7 @@ public sealed class RegistrationApiTests(ApiFixture fixture) : IClassFixture<Api
             new RegisterRequest("  Nguyễn Văn A  ", phone, $"  {email}  ", fixture.Password, fixture.Password));
         Assert.Equal(HttpStatusCode.Created, registration.StatusCode);
         var result = (await registration.Content.ReadFromJsonAsync<RegisterResponse>())!;
-        Assert.Equal("MSG11", result.Notification.Code);
+        Assert.Equal("MSG08", result.Notification.Code);
         Assert.Equal(phone, result.PhoneNumber);
 
         var signIn = await client.PostAsJsonAsync("/api/auth/sign-in", new SignInRequest(phone, fixture.Password));
@@ -110,11 +110,11 @@ public sealed class RegistrationApiTests(ApiFixture fixture) : IClassFixture<Api
         var request = new RegisterRequest("Khách kiểm thử", phone, NewEmail(phone), fixture.Password, fixture.Password);
         var first = await client.PostAsJsonAsync("/api/auth/register", request);
         Assert.Equal(HttpStatusCode.Created, first.StatusCode);
-        await AssertMessage(await client.PostAsJsonAsync("/api/auth/register", request), HttpStatusCode.Conflict, "MSG139");
+        await AssertMessage(await client.PostAsJsonAsync("/api/auth/register", request), HttpStatusCode.Conflict, "MSG46");
 
         var duplicateEmail = request with { PhoneNumber = NewPhone(), Email = request.Email!.ToUpperInvariant() };
         await AssertMessage(await client.PostAsJsonAsync("/api/auth/register", duplicateEmail),
-            HttpStatusCode.Conflict, "MSG139");
+            HttpStatusCode.Conflict, "MSG46");
 
         var concurrentPhone = NewPhone();
         var concurrentRequest = request with { PhoneNumber = concurrentPhone, Email = NewEmail(concurrentPhone) };
@@ -154,7 +154,7 @@ public sealed class RegistrationApiTests(ApiFixture fixture) : IClassFixture<Api
         await AssertMessage(await client.PostAsJsonAsync("/api/auth/register", valid with { ConfirmPassword = "different" }),
             HttpStatusCode.BadRequest, "MSG04");
         await AssertMessage(await client.PostAsJsonAsync("/api/auth/register", valid with { Password = "weak", ConfirmPassword = "weak" }),
-            HttpStatusCode.BadRequest, "MSG109");
+            HttpStatusCode.BadRequest, "MSG39");
     }
 
     [Fact]

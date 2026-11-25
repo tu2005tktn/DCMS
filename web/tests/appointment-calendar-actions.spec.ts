@@ -26,7 +26,7 @@ async function setup(page: Page, settings: { due?: boolean; permissions?: string
         days: [{ dentistId: 3, date, periods: [{ startMinute: 480, endMinute: 1020, kind: 'Work', reason: null }] }] });
     }
     if (path === `/api/appointments/${id}`) {
-      if (detailError) return json({ code: 'MSG144', message: 'Không tải được chi tiết thử nghiệm.' }, 503);
+      if (detailError) return json({ code: 'MSG49', message: 'Không tải được chi tiết thử nghiệm.' }, 503);
       return json({ appointment: current, bookerName: 'Người đặt cũ', bookerPhoneMasked: '***', reason: 'Lý do chỉ xuất hiện trong chi tiết' });
     }
     if (path.endsWith('/availability')) {

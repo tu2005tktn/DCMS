@@ -15,12 +15,12 @@ public sealed class SettingsAccess(DcmsDbContext db, UserManager<ApplicationUser
     public async Task<PermissionState> ResolveAsync(int actorId, CancellationToken ct)
     {
         var user = await db.Users.AsNoTracking().SingleOrDefaultAsync(x => x.Id == actorId, ct);
-        if (user == null || !user.IsActive || user.LockoutEnabled && user.LockoutEnd > clock.GetUtcNow()) throw Error("MSG07",401);
+        if (user == null || !user.IsActive || user.LockoutEnabled && user.LockoutEnd > clock.GetUtcNow()) throw Error("MSG06",401);
         var roles = AccountRoles.Effective(await users.GetRolesAsync(user));
         if (user.AccountType != "Staff" || !roles.Any(x => AccountRoles.Staff.Contains(x))) return new(false,false,roles,[],[]);
         var owner = roles.Contains(AccountRoles.ClinicOwner);
         var employee = await db.Employees.AsNoTracking().SingleOrDefaultAsync(x => x.AccountId == actorId, ct);
-        if (employee == null) throw Error("MSG06",403);
+        if (employee == null) throw Error("MSG05",403);
         var branches = owner ? await db.Set<SchedulingBranch>().Where(x => x.Active).Select(x => x.Id).ToArrayAsync(ct)
             : await (from m in db.SchedulingMembers join b in db.Set<SchedulingBranch>() on m.BranchId equals b.Id
                      where m.EmployeeId == employee.Id && m.Active && b.Active select b.Id).ToArrayAsync(ct);
@@ -39,13 +39,13 @@ public sealed class SettingsAccess(DcmsDbContext db, UserManager<ApplicationUser
     public async Task<PermissionState> RequireAsync(int actorId, string permission, CancellationToken ct)
     {
         var state = await ResolveAsync(actorId,ct);
-        if (!state.Permissions.Contains(permission)) throw Error("MSG06",403);
+        if (!state.Permissions.Contains(permission)) throw Error("MSG05",403);
         return state;
     }
     public async Task OperationalAsync(int actorId, string permission, int branchId, CancellationToken ct)
     {
         var state = await ResolveAsync(actorId,ct);
-        if (!state.Permissions.Contains(permission) || !state.BranchIds.Contains(branchId)) throw Error("MSG06",403);
+        if (!state.Permissions.Contains(permission) || !state.BranchIds.Contains(branchId)) throw Error("MSG05",403);
     }
     public static BusinessException Error(string code, int status = 400, string? field = null) => new(status,SystemMessages.Get(code,field:field ?? "Thông tin"));
 }

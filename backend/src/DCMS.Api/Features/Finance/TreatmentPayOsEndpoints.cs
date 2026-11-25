@@ -1,3 +1,4 @@
+using DCMS.Application.Common;
 using System.Data;
 using System.Security.Cryptography;
 using System.Text.Json;
@@ -58,7 +59,7 @@ public static class TreatmentPayOsEndpoints
         {
             if (!Owner(http)) return Results.Forbid();
             if (request.RequestKey == Guid.Empty || request.AmountVnd is null or <= 0 or > 1_000_000_000_000L)
-                return Results.BadRequest("Số tiền cọc không hợp lệ.");
+                return Results.BadRequest(SystemMessages.Get("MSG96"));
             await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
             await LockDossier(db, dossierId, ct);
             var context = await TreatmentPaymentEndpoints.ContextAsync(db, dossierId, ct);
@@ -72,7 +73,7 @@ public static class TreatmentPayOsEndpoints
                 using var previous = JsonDocument.Parse(old);
                 if (previous.RootElement.GetProperty("kind").GetString() != "AdvanceCash"
                     || previous.RootElement.GetProperty("amountVnd").GetInt64() != request.AmountVnd)
-                    return Results.Conflict("Mã yêu cầu đã được dùng.");
+                    return Results.Conflict(SystemMessages.Get("MSG113"));
                 await transaction.CommitAsync(ct);
                 return Results.Ok(context);
             }
@@ -88,9 +89,9 @@ public static class TreatmentPayOsEndpoints
         string purpose, DcmsDbContext db, TreatmentPayOsGateway gateway, CancellationToken ct)
     {
         if (!Owner(http)) return Results.Forbid();
-        if (!gateway.Configured) return Results.Json(new { code = "PAYOS_NOT_CONFIGURED",
+        if (!gateway.Configured) return Results.Json(new { code = "MSG90",
             message = "Chưa cấu hình khóa chuyển khoản trên máy chủ." }, statusCode: 503);
-        if (request.RequestKey == Guid.Empty) return Results.BadRequest("Mã yêu cầu không hợp lệ.");
+        if (request.RequestKey == Guid.Empty) return Results.BadRequest(SystemMessages.Get("MSG100"));
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
         await LockDossier(db, dossierId, ct);
         var context = await TreatmentPaymentEndpoints.ContextAsync(db, dossierId, ct);
@@ -100,33 +101,33 @@ public static class TreatmentPayOsEndpoints
         {
             if (old.Purpose != purpose || old.AmountVnd != (purpose == "Advance" ? request.AmountVnd : (request.Lines?.Sum(x => x.AmountVnd) ?? 0) + (request.LabLines?.Sum(x => x.AmountVnd) ?? 0))
                 || !SameLines(old.Lines, request.Lines ?? [])
-                || (purpose == "Treatment" && !SameLabLines(old.LabLines ?? [], request.LabLines ?? []))) return Results.Conflict("Mã yêu cầu đã được dùng.");
+                || (purpose == "Treatment" && !SameLabLines(old.LabLines ?? [], request.LabLines ?? []))) return Results.Conflict(SystemMessages.Get("MSG113"));
             await transaction.CommitAsync(ct);
             return Results.Ok(new TreatmentPayOsOrderState(old, "PENDING", context));
         }
         var active = await LatestOrder(db, dossierId, purpose, ct);
         if (active is not null && active.ExpiresAt > DateTimeOffset.UtcNow
             && !await Settled(db, active.Id, ct))
-            return Results.Conflict("Đã có mã QR chưa hết hạn. Hãy mở lại mã QR hiện tại.");
+            return Results.Conflict(SystemMessages.Get("MSG112"));
         var lines = purpose == "Treatment" ? request.Lines?.ToArray() ?? [] : [];
         var labLines = purpose == "Treatment" ? request.LabLines?.ToArray() ?? [] :
             TreatmentPaymentEndpoints.AllocateAdvanceToLab(context, request.AmountVnd ?? 0);
         if (purpose == "Treatment" && (lines.Length == 0 && labLines.Length == 0 || lines.Any(x => x.AmountVnd <= 0)
             || lines.Select(x => x.ActivityId).Distinct().Count() != lines.Length
             || lines.Any(x => context.Lines.All(y => y.ActivityId != x.ActivityId || y.DueVnd < x.AmountVnd))))
-            return Results.Conflict("Dịch vụ hoặc số tiền cần thu đã thay đổi.");
+            return Results.Conflict(SystemMessages.Get("MSG103"));
         if (purpose == "Treatment" && !TreatmentPaymentEndpoints.ValidateLabPayment(context, lines, labLines))
-            return Results.Conflict("Cần ưu tiên đủ 30% phí labo trước khi thu cho dịch vụ khác.");
+            return Results.Conflict(SystemMessages.Get("MSG104"));
         long amount;
         try { amount = purpose == "Advance" ? request.AmountVnd ?? 0 : checked(lines.Sum(x => x.AmountVnd) + labLines.Sum(x => x.AmountVnd)); }
-        catch (OverflowException) { return Results.BadRequest("Số tiền không hợp lệ."); }
-        if (amount <= 0 || amount > 1_000_000_000_000L) return Results.BadRequest("Số tiền không hợp lệ.");
+        catch (OverflowException) { return Results.BadRequest(SystemMessages.Get("MSG94")); }
+        if (amount <= 0 || amount > 1_000_000_000_000L) return Results.BadRequest(SystemMessages.Get("MSG94"));
         // Keep orderCode below JavaScript's safe integer limit used by payOS clients.
         var orderCode = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() * 1_000L + RandomNumberGenerator.GetInt32(1_000);
         TreatmentPayOsLink link;
         try { link = await gateway.CreateAsync(orderCode, amount, ct); }
         catch (Exception e) when (e is HttpRequestException or JsonException or TaskCanceledException)
-        { return Results.Json(new { code = "PAYOS_UNAVAILABLE",
+        { return Results.Json(new { code = "MSG91",
             message = "Không tạo được mã QR chuyển khoản. Kiểm tra kết nối PayOS của máy chủ rồi thử lại." }, statusCode: 503); }
         var order = new TreatmentPayOsOrder(request.RequestKey, purpose, ((CurrentUser)http.Items["CurrentUser"]!).Id,
             orderCode, amount, link.PaymentLinkId,
@@ -139,7 +140,7 @@ public static class TreatmentPayOsEndpoints
                 {DateTimeOffset.UtcNow}, {context.PatientId}, {context.BranchId}, {dossierId.ToString()}, {payload}::jsonb)
             ON CONFLICT ("StorageId") DO NOTHING
             """, ct);
-        if (count != 1) return Results.Conflict("Mã yêu cầu đã được dùng.");
+        if (count != 1) return Results.Conflict(SystemMessages.Get("MSG113"));
         await transaction.CommitAsync(ct);
         return Results.Ok(new TreatmentPayOsOrderState(order, "PENDING", context));
     }
@@ -174,7 +175,7 @@ public static class TreatmentPayOsEndpoints
         TreatmentPayOsStatus remote;
         try { remote = await gateway.GetAsync(order.OrderCode, ct); }
         catch (Exception e) when (e is HttpRequestException or JsonException or TaskCanceledException or InvalidOperationException)
-        { return Results.Json(new { code = "PAYOS_STATUS_UNAVAILABLE",
+        { return Results.Json(new { code = "MSG92",
             message = "Không tra cứu được chuyển khoản. Vui lòng thử lại." }, statusCode: 503); }
         if (remote.OrderCode != order.OrderCode || remote.PaymentLinkId != order.PaymentLinkId
             || remote.Amount != order.AmountVnd) return Results.Ok(new TreatmentPayOsOrderState(order, "REVIEW", context));

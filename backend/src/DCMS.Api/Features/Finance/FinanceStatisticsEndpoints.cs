@@ -1,3 +1,4 @@
+using DCMS.Application.Common;
 using System.Text.Json;
 using DCMS.Application.Features.Authentication;
 using DCMS.Domain.Features.Accounts;
@@ -82,7 +83,7 @@ public static class FinanceStatisticsEndpoints
             // finance.statistics.read defaults to the owner only; an access group may grant it to anyone.
             if (context.Items["CurrentUser"] is not CurrentUser user ||
                 !user.Permissions.Contains("finance.statistics.read")) return Results.Forbid();
-            if (from > to || branchId is < 1) return Results.BadRequest("Khoảng ngày hoặc chi nhánh không hợp lệ.");
+            if (from > to || branchId is < 1) return Results.BadRequest(SystemMessages.Get("MSG101"));
 
             // Select a cohort by dossier opening date, then use lifetime figures for each dossier.
             // This keeps billed, received and remaining amounts on the same basis.

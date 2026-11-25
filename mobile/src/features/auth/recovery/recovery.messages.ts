@@ -3,11 +3,11 @@
  * The wording is fixed by the v1.2 specification and matches what the API returns.
  */
 export const recoveryMessages = {
-  MSG12:
+  MSG09:
     'Nếu thông tin tài khoản hợp lệ, hướng dẫn đặt lại mật khẩu sẽ được gửi qua kênh liên hệ đã đăng ký.',
-  MSG13: 'Đặt lại mật khẩu thành công. Vui lòng đăng nhập bằng mật khẩu mới.',
-  MSG108: 'Mã hoặc liên kết xác minh không hợp lệ hoặc đã hết hạn. Vui lòng yêu cầu xác minh lại.',
-  MSG144: 'Không thể hoàn tất thao tác. Vui lòng kiểm tra kết nối và thử lại.',
+  MSG10: 'Đặt lại mật khẩu thành công. Vui lòng đăng nhập bằng mật khẩu mới.',
+  MSG38: 'Mã hoặc liên kết xác minh không hợp lệ hoặc đã hết hạn. Vui lòng yêu cầu xác minh lại.',
+  MSG49: 'Không thể hoàn tất thao tác. Vui lòng kiểm tra kết nối và thử lại.',
 } as const;
 
 export const recoveryFields = {

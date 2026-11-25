@@ -89,14 +89,14 @@ public sealed class PatientLinkReviewService(DcmsDbContext db, UserManager<Appli
         if (!account.IsActive || account.AccountType != "Public") throw Insufficient();
         // A Patient exists only after first check-in (GBR-016); no record means no link may be approved.
         var patient = await db.Patients.AsNoTracking().SingleOrDefaultAsync(x => x.Id == request.PatientId, ct)
-            ?? throw new BusinessException(400, SystemMessages.Get("MSG17"));
+            ?? throw new BusinessException(400, SystemMessages.Get("MSG14"));
         if (NormalizeName(patient.FullName) != NormalizeName(link.DeclaredFullName)
             || (link.DeclaredBirthDate != null && patient.BirthDate != null && link.DeclaredBirthDate != patient.BirthDate)
             || (link.DeclaredPatientCode != null && !string.Equals(link.DeclaredPatientCode, patient.PatientCode, StringComparison.OrdinalIgnoreCase)))
             throw Insufficient();
         if (await db.PatientAccountLinks.AnyAsync(x => x.Status == PatientLinkStatus.Verified
                 && (x.AccountId == link.AccountId || x.PatientId == patient.Id), ct))
-            throw new BusinessException(409, SystemMessages.Get("MSG142"));
+            throw new BusinessException(409, SystemMessages.Get("MSG47"));
 
         var before = Snapshot(link);
         var now = DateTimeOffset.UtcNow;
@@ -107,9 +107,9 @@ public sealed class PatientLinkReviewService(DcmsDbContext db, UserManager<Appli
         link.ReviewedAt = now;
         link.Version++;
         AddAudit(db, link, actorId, "Verify", note, before, now);
-        // Deferred (UC-34): enqueue MSG19 as an in-app notification to the account in this transaction.
+        // Deferred (UC-34): enqueue MSG16 as an in-app notification to the account in this transaction.
         await CommitAsync(db, transaction, ct);
-        return new LinkDecisionResult(await DetailAsync(link, ct), SystemMessages.Get("MSG19"));
+        return new LinkDecisionResult(await DetailAsync(link, ct), SystemMessages.Get("MSG16"));
     });
 
     public Task<LinkDecisionResult> RejectAsync(int actorId, int id, RejectLinkRequest request, CancellationToken ct) => GuardAsync(async () =>
@@ -130,9 +130,9 @@ public sealed class PatientLinkReviewService(DcmsDbContext db, UserManager<Appli
         link.ReviewedAt = now;
         link.Version++;
         AddAudit(db, link, actorId, "Reject", reason, before, now);
-        // Deferred (UC-34): enqueue MSG20 as an in-app notification to the account in this transaction.
+        // Deferred (UC-34): enqueue MSG17 as an in-app notification to the account in this transaction.
         await CommitAsync(db, transaction, ct);
-        return new LinkDecisionResult(await DetailAsync(link, ct), SystemMessages.Get("MSG20"));
+        return new LinkDecisionResult(await DetailAsync(link, ct), SystemMessages.Get("MSG17"));
     });
 
     public Task<LinkDecisionResult> RevokeAsync(int actorId, int id, RevokeLinkRequest request, CancellationToken ct) => GuardAsync(async () =>
@@ -153,9 +153,9 @@ public sealed class PatientLinkReviewService(DcmsDbContext db, UserManager<Appli
         link.Version++;
         AddAudit(db, link, actorId, "Revoke", reason, before, now);
         // Deferred (UC-34): cancel NOTIFICATION rows with recipient_link_id = link.Id and status PENDING here,
-        // then enqueue MSG20. Own-record reads already re-check the link on every request.
+        // then enqueue MSG17. Own-record reads already re-check the link on every request.
         await CommitAsync(db, transaction, ct);
-        return new LinkDecisionResult(await DetailAsync(link, ct), SystemMessages.Get("MSG20"));
+        return new LinkDecisionResult(await DetailAsync(link, ct), SystemMessages.Get("MSG17"));
     });
 
     public async Task<IReadOnlyList<LinkAuditDto>> AuditAsync(int id, CancellationToken ct)
@@ -204,6 +204,6 @@ public sealed class PatientLinkReviewService(DcmsDbContext db, UserManager<Appli
             link.WithdrawnAt, new(active != null, active), link.Version);
     }
 
-    private static BusinessException Forbidden() => new(403, SystemMessages.Get("MSG06"));
-    private static BusinessException Insufficient() => new(400, SystemMessages.Get("MSG143"));
+    private static BusinessException Forbidden() => new(403, SystemMessages.Get("MSG05"));
+    private static BusinessException Insufficient() => new(400, SystemMessages.Get("MSG48"));
 }

@@ -34,8 +34,6 @@ jobs:
       CI: '1'
       EXPO_NO_TELEMETRY: '1'
       EXPO_PUBLIC_API_URL: ${{ inputs.api_url || vars.MOBILE_API_URL || 'http://192.168.0.102:5080' }}
-      EXPO_PUBLIC_APPOINTMENTS_MOCK: 'false'
-      EXPO_PUBLIC_USE_REAL_NOTIFICATION_API: 'true'
       APK_OUTPUT_DIR: ${{ github.workspace }}/.artifacts/mobile-apk
       GRADLE_OPTS: '-Dorg.gradle.daemon=false -Dorg.gradle.workers.max=2'
 

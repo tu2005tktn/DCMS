@@ -29,6 +29,8 @@
 - [Đặc tả UC-23 / UC-24 / UC-25](specs/UC23-24-25-SPEC.md): sửa ghi nhận thu tiền, theo dõi tái khám, liên hệ bệnh nhân — actor, tiền/hậu điều kiện, luồng chính/thay thế/ngoại lệ, `GBR-*`/`MSG*`; traceability theo phiên bản tài liệu.
 - [Đặc tả màn S38 / S39 / S40](specs/S38-40-SCREEN-SPEC.md): hóa đơn bệnh nhân, thu tiền & biên nhận, báo cáo — trường, thao tác, validation, trạng thái và quyền; ranh giới quy mô (đặc tả, chưa triển khai billing).
 
+- [External API Inventory](architecture/EXTERNAL-API-INVENTORY.md), [Background Job Inventory](architecture/BACKGROUND-JOB-INVENTORY.md) và [Non-Functional Requirements](architecture/NON-FUNCTIONAL-REQUIREMENTS.md): dịch vụ bên ngoài DCMS gọi tới, các job nền đang chạy và yêu cầu phi chức năng, theo mục 5.2, 5.3 và IV của SRS (Report 3).
+
 Architecture: `Domain` contains business rules, `Application` defines use cases and contracts, `Infrastructure` supplies PostgreSQL/EF Core implementations, and `Api` configures HTTP endpoints and dependency injection. Add feature folders within each layer when implementing business features.
 
 The supplied [37-table logical ERD](architecture/DCMS_Logical_ERD_37_Tables.mmd) is the database design reference. Only account, employee, session, account-audit, patient master with administrative audit (UC-08/09/38) and patient account link (UC-36) entities are implemented and migrated; the other business features remain pending.

@@ -55,8 +55,7 @@ npm.cmd run dev
 ```powershell
 cd D:\SEP\SE\DCMS\DCMS-clone\mobile
 npm.cmd install
-# Bật mock S26 (mặc định — backend TV5 chưa sẵn sàng)
-$env:EXPO_PUBLIC_USE_REAL_NOTIFICATION_API = "false"
+# Ứng dụng gọi API thật; đặt EXPO_PUBLIC_API_URL tới backend đang chạy.
 npm.cmd start
 # Mở Expo Go trên điện thoại, quét QR.
 # Hoặc nhấn 'w' để mở web preview tại http://localhost:8081

@@ -82,7 +82,7 @@ public sealed class MaterialPurchaseApiTests(ApiFixture fixture) : IClassFixture
         foreach (var bad in new[] { lab.Id, Guid.NewGuid() })
         {
             var r = await c.PostAsJsonAsync(Purchases, Create(material.Id) with { SupplierId = bad });
-            Assert.Equal(HttpStatusCode.BadRequest, r.StatusCode); Assert.Contains("PURCHASE_SUPPLIER_INVALID", await Body(r));
+            Assert.Equal(HttpStatusCode.BadRequest, r.StatusCode); Assert.Contains("MSG84", await Body(r));
         }
     }
 
@@ -106,11 +106,11 @@ public sealed class MaterialPurchaseApiTests(ApiFixture fixture) : IClassFixture
             var r = await c.PostAsJsonAsync(Purchases, request); var text = await Body(r);
             Assert.Equal(HttpStatusCode.BadRequest, r.StatusCode); Assert.Contains(field, text); if (code != "") Assert.Contains(code, text);
         }
-        await Expect(Create(material.Id, paid: 300_001), "PURCHASE_PAID_EXCEEDS_TOTAL", "paidVnd");
-        await Expect(Create(material.Id, entered: Today.AddDays(1)), "PURCHASE_DATE_INVALID", "enteredOn");
-        await Expect(Create(material.Id, entered: Today, received: Today.AddDays(-1)), "PURCHASE_DATE_INVALID", "receivedOn");
-        await Expect(Create(material.Id, received: Today.AddDays(1)), "PURCHASE_DATE_INVALID", "receivedOn");
-        await Expect(Create(material.Id, entered: Today, expires: Today.AddDays(-1)), "PURCHASE_DATE_INVALID", "expiresOn");
+        await Expect(Create(material.Id, paid: 300_001), "MSG82", "paidVnd");
+        await Expect(Create(material.Id, entered: Today.AddDays(1)), "MSG81", "enteredOn");
+        await Expect(Create(material.Id, entered: Today, received: Today.AddDays(-1)), "MSG81", "receivedOn");
+        await Expect(Create(material.Id, received: Today.AddDays(1)), "MSG81", "receivedOn");
+        await Expect(Create(material.Id, entered: Today, expires: Today.AddDays(-1)), "MSG81", "expiresOn");
         Assert.Equal(HttpStatusCode.Created, (await c.PostAsJsonAsync(Purchases, Create(material.Id, expires: Today.AddYears(3)))).StatusCode);
         Assert.Equal(HttpStatusCode.Created, (await c.PostAsJsonAsync(Purchases, Create(material.Id, expires: Today))).StatusCode);
         await Expect(Create(material.Id, quantity: 0), "", "quantity");
@@ -118,7 +118,7 @@ public sealed class MaterialPurchaseApiTests(ApiFixture fixture) : IClassFixture
         await Expect(Create(material.Id, quantity: 1.2345m), "", "quantity");
         await Expect(Create(material.Id, unit: "  "), "", "unit");
         await Expect(Create(material.Id, price: -1), "", "unitPriceVnd");
-        await Expect(Create(Guid.NewGuid()), "PURCHASE_MATERIAL_INACTIVE", "materialId");
+        await Expect(Create(Guid.NewGuid()), "MSG83", "materialId");
         Assert.Equal(HttpStatusCode.BadRequest, (await c.PostAsJsonAsync(Purchases, Create(material.Id, key: Guid.Empty))).StatusCode);
     }
 

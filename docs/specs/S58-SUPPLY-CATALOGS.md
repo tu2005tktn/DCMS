@@ -43,7 +43,7 @@ Development starter catalog (gọi tường minh qua `--seed-clinic-medicines`) 
 
 ## Quyền
 
-`providers.*`, `lab-work-types.*`, `medicines.*` (read/manage/export) chỉ thuộc Staff active có role gán ClinicOwner, như các đợt trước. `capabilities` trả thêm `supplies`.
+Quản lý danh mục thuốc dùng chung cần Staff active. Bác sĩ có quyền kê đơn nhận `catalog.medicines.read` và `catalog.medicines.create` theo role baseline nếu chưa bị giới hạn bởi access group; với access group, hai grant này phải được cấp rõ ràng. Bác sĩ chỉ được đọc/thêm thuốc, không được sửa, ngừng dùng, khôi phục hay xuất Excel. ClinicOwner có quyền quản lý đầy đủ; Admin chỉ có quyền theo grant được cấp. Các danh mục nhà cung cấp và loại công việc labo giữ quyền theo ma trận hiện hành. `capabilities` trả thêm `supplies`.
 
 Projection lựa chọn qua `GET /api/reference-options?kind=`: `suppliers` (Supplier/Both) và `lab-providers` (Lab/Both), `lab-work-types` — ClinicAssistant hoặc Dentist hiệu lực; `medicines` — Dentist hiệu lực, chỉ thuốc `prescriptionEligible`. Trả `{ id, code, name }` của mục đang dùng; không trả giá.
 
@@ -63,15 +63,15 @@ DTO trả kèm `version`, `active` (lịch sử `created/updated` đọc từ `G
 
 ## UI web
 
-Tab **Vật tư, labo & thuốc** trong `/system-settings` (Owner) với 4 mục: Công ty cung cấp vật liệu, Công ty labo, Loại công việc labo, Thuốc. Mỗi mục: tìm kiếm, lọc trạng thái, bảng, phân trang 20/50/100, Thêm/Sửa (Drawer form, Lý do khi sửa), Ngừng dùng/Khôi phục có preview + lý do, Lịch sử. Thuốc có nút "Xuất Excel". Giá nhập số nguyên, hiển thị định dạng VND; để trống = chưa xác định.
+Tab **Vật tư, labo & thuốc** trong `/system-settings` với 4 mục: Công ty cung cấp vật liệu, Công ty labo, Loại công việc labo, Thuốc. Mỗi mục: tìm kiếm, lọc trạng thái, bảng, phân trang 20/50/100, thao tác được hiển thị theo quyền. Thuốc có nút "Xuất Excel" theo quyền. Giá nhập số nguyên, hiển thị định dạng VND; để trống = chưa xác định.
 
-Trong form kê đơn, người có quyền `catalog.medicines.manage` có thể mở popup **Thêm thuốc vào danh mục** cạnh ô chọn thuốc. Popup dùng cùng contract và ràng buộc tạo mới của danh mục này; sau khi tạo thành công, thuốc đủ điều kiện kê được chọn ngay trong dòng đơn hiện tại. Không tạo tồn kho hoặc khoản thu từ thao tác này.
+Trong form kê đơn, người có quyền `catalog.medicines.create` có thể mở popup **Thêm thuốc vào danh mục** cạnh đơn vị tính/đóng gói. Popup dùng cùng contract và ràng buộc tạo mới của danh mục này; khi bấm **LƯU LẠI**, thuốc được ghi ngay vào danh mục dùng chung và được chọn vào dòng đơn hiện tại. Đơn thuốc chỉ được lưu khi bấm **Lưu đơn thuốc**. Không tạo bảng mới, tồn kho hoặc khoản thu từ thao tác này.
 
 ## Nghiệm thu
 
 Bổ sung 07/11/2026: bảng Thuốc có bộ lọc `Tất cả / Thuốc phòng khám / Thuốc mua ngoài` dựa trên `internalStockTracked`, mặc định 20 dòng/trang. API danh sách medicines chấp nhận `type=Clinic|External`; lựa chọn mới trong đơn bệnh nhân theo đúng nhóm, trong khi thuốc cũ giữ snapshot.
 
-Bổ sung điều hướng: Chủ phòng khám thấy mục **Quản lý thuốc** trực tiếp trong nhóm Quản trị của menu nhân viên. Đường dẫn `/medicines` mở thẳng bảng thuốc, mặc định lọc Thuốc phòng khám và 20 mục/trang; vẫn giữ mục Thuốc trong Thiết lập hệ thống cho người dùng quen luồng cũ. Quyền truy cập route là `catalog.medicines.read`, các quyền sửa/đổi trạng thái vẫn theo quyền danh mục hiện hữu.
+Bổ sung điều hướng: người có `catalog.medicines.read` thấy mục **Quản lý thuốc** trong nhóm Quản trị của menu nhân viên. Đường dẫn `/medicines` mở thẳng bảng thuốc, mặc định lọc Thuốc phòng khám và 20 mục/trang; vẫn giữ mục Thuốc trong Thiết lập hệ thống cho người dùng quen luồng cũ. Bác sĩ chỉ xem/thêm; quyền sửa/đổi trạng thái và xuất Excel giữ theo grant danh mục hiện hữu.
 
 SET-AT-15 (công ty Both một ID ở hai tab; đổi về Supplier khi còn loại công việc labo bị chặn), 17 (loại công việc không có công ty mặc định vẫn lưu), 18 (thuốc kê mua ngoài không cần theo dõi tồn), 30 (export đúng lọc, ô công thức an toàn), 12 phần giá âm/NULL/0, quyền Owner. Integration test trên schema tạm; web build.
 

@@ -82,7 +82,7 @@ public sealed record ImpactPreviewResult(
 
 public sealed record BranchObligationResult(bool Available, int Count);
 
-// Lab orders are not modelled yet; the default adapter reports Available = false so branch deactivation stops with 503 MSG144.
+// Lab orders are not modelled yet; the default adapter reports Available = false so branch deactivation stops with 503 MSG49.
 public interface IBranchLabObligationPort
 {
     Task<BranchObligationResult> OpenLabOrdersAsync(int branchId, CancellationToken ct);

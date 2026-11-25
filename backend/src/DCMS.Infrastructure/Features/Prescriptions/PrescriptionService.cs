@@ -84,8 +84,8 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
     private async Task<PatientProfile> ReadablePatientAsync(int patientId, CancellationToken ct)
     {
         var patient = await db.Set<PatientProfile>().AsNoTracking().SingleOrDefaultAsync(x => x.Id == patientId, ct)
-            ?? throw Fail("MSG113", 404);
-        if (patient.IsArchived) throw Fail("MSG113", 404);
+            ?? throw Fail("MSG42", 404);
+        if (patient.IsArchived) throw Fail("MSG42", 404);
         return patient;
     }
 
@@ -93,7 +93,7 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
     {
         await ReadablePatientAsync(patientId, ct);
         var state = await access.RequireAsync(actor, "prescriptions.manage", ct);
-        if (!state.GrantDriven && !state.Roles.Contains(AccountRoles.Dentist)) throw Fail("MSG06", 403);
+        if (!state.GrantDriven && !state.Roles.Contains(AccountRoles.Dentist)) throw Fail("MSG05", 403);
         var employee = await db.Employees.AsNoTracking().SingleAsync(x => x.AccountId == actor, ct);
         var branchIds = state.BranchIds;
         var schedulingBranches = await db.Set<SchedulingBranch>().AsNoTracking().Where(x => branchIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, ct);
@@ -121,21 +121,12 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
         return result;
     }
 
-    public async Task<PatientProfilePrescriptionDto> PatientProfilePrescriptionAsync(int actor, int patientId, Guid id, CancellationToken ct)
-    {
-        await ReadablePatientAsync(patientId, ct);
-        var state = await access.RequireAsync(actor, "prescriptions.read", ct);
-        var rx = await db.PatientPrescriptions.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id && x.PatientId == patientId && state.BranchIds.Contains(x.BranchId), ct)
-            ?? throw Fail("MSG113", 404);
-        return await PatientProfileDtoAsync(rx, ct);
-    }
-
     public async Task<PatientProfilePrescriptionDto> SavePatientProfilePrescriptionAsync(int actor, int patientId, Guid? id, SavePatientPrescription c, CancellationToken ct)
     {
         var patient = await ReadablePatientAsync(patientId, ct);
         var state = await access.RequireAsync(actor, "prescriptions.manage", ct);
         var employee = await db.Employees.AsNoTracking().SingleAsync(x => x.AccountId == actor, ct);
-        if (!state.GrantDriven && !state.Roles.Contains(AccountRoles.Dentist) || !state.BranchIds.Contains(c.BranchId)) throw Fail("MSG06", 403);
+        if (!state.GrantDriven && !state.Roles.Contains(AccountRoles.Dentist) || !state.BranchIds.Contains(c.BranchId)) throw Fail("MSG05", 403);
         if (c.RequestKey == Guid.Empty || c.Items is not { Length: > 0 and <= 30 }) throw Fail("MSG04", field: "items", label: "Danh sách thuốc");
         if (c.Diagnosis?.Length > 1000 || c.OtherDiagnosis?.Length > 1000 || c.Advice?.Length > 4000)
             throw Fail("MSG04", field: "diagnosis");
@@ -149,7 +140,7 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
         var receipt = await db.Set<PatientPrescriptionReceipt>().AsNoTracking().SingleOrDefaultAsync(x => x.ActorId == actor && x.RequestKey == c.RequestKey, ct);
         if (receipt != null)
         {
-            if (receipt.Fingerprint != hash) throw Fail("MSG111", 409);
+            if (receipt.Fingerprint != hash) throw Fail("MSG41", 409);
             var replayed = await db.PatientPrescriptions.AsNoTracking().SingleAsync(x => x.Id == receipt.PrescriptionId, ct);
             await tx.CommitAsync(ct); return await PatientProfileDtoAsync(replayed, ct);
         }
@@ -157,20 +148,20 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
         var beforeJson = "{}";
         if (id.HasValue)
         {
-            rx = await db.PatientPrescriptions.SingleOrDefaultAsync(x => x.Id == id && x.PatientId == patientId, ct) ?? throw Fail("MSG113", 404);
-            if (!state.BranchIds.Contains(rx.BranchId)) throw Fail("MSG06", 403);
-            if (rx.Version != c.ExpectedVersion) throw Fail("MSG111", 409, currentVersion: rx.Version);
+            rx = await db.PatientPrescriptions.SingleOrDefaultAsync(x => x.Id == id && x.PatientId == patientId, ct) ?? throw Fail("MSG42", 404);
+            if (!state.BranchIds.Contains(rx.BranchId)) throw Fail("MSG05", 403);
+            if (rx.Version != c.ExpectedVersion) throw Fail("MSG41", 409, currentVersion: rx.Version);
             beforeJson = JsonSerializer.Serialize(rx, Json);
             rx.Items.Clear(); rx.Version++;
         }
         else
         {
-            if (c.ExpectedVersion != 0) throw Fail("MSG111", 409);
+            if (c.ExpectedVersion != 0) throw Fail("MSG41", 409);
             rx = new PatientPrescription { PatientId = patient.Id, PrescriberEmployeeId = prescriberId, CreatedAt = clock.GetUtcNow() };
             db.Add(rx);
         }
         var meds = await db.CatalogMedicines.AsNoTracking().Where(x => c.Items.Select(i => i.MedicineId).Contains(x.Id) && x.IsActive && x.PrescriptionEligible).ToDictionaryAsync(x => x.Id, ct);
-        if (meds.Count != c.Items.Select(x => x.MedicineId).Distinct().Count()) throw Fail("MSG113", 404, "items");
+        if (meds.Count != c.Items.Select(x => x.MedicineId).Distinct().Count()) throw Fail("MSG42", 404, "items");
         rx.BranchId = c.BranchId; rx.PrescriberEmployeeId = prescriberId; rx.PrescribedOn = c.PrescribedOn; rx.Diagnosis = c.Diagnosis?.Trim() ?? "";
         rx.OtherDiagnosis = c.OtherDiagnosis?.Trim(); rx.Advice = c.Advice?.Trim();
         for (var index = 0; index < c.Items.Length; index++)
@@ -210,7 +201,7 @@ public sealed class PrescriptionService(DcmsDbContext db, ISettingsAccess access
     {
         var patients = VerifiedLinkedPatients(actor);
         var rx = await db.PatientPrescriptions.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id && patients.Contains(x.PatientId), ct)
-            ?? throw Fail("MSG113", 404);
+            ?? throw Fail("MSG42", 404);
         return await PatientProfileDtoAsync(rx, ct);
     }
 }

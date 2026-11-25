@@ -19,7 +19,7 @@ async function setup(page: Page) {
       isArchived: false, createdAt: '2026-10-19T00:00:00Z', updatedAt: '2026-10-19T00:00:00Z', version: 1, link: {}, intakeHistory: [] };
     else if (url.pathname === '/api/patients/7/appointments') {
       queries.push(url);
-      if (fail) return route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ code: 'MSG144', message: 'Synthetic connection failure' }) });
+      if (fail) return route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ code: 'MSG49', message: 'Synthetic connection failure' }) });
       const items = url.searchParams.get('scope') === 'HISTORY' ? [] : [appointment];
       body = { items, total: items.length, page: 1, pageSize: 20 };
     } else if (url.pathname === `/api/appointments/${appointmentId}`) body = { appointment, bookerName: 'Booker', bookerPhoneMasked: '***' };
@@ -68,7 +68,7 @@ async function setupNextVisit(page: Page, candidatesStatus = 200, extra: { candi
       isArchived: false, createdAt: '2026-10-19T00:00:00Z', updatedAt: '2026-10-19T00:00:00Z', version: 1, link: {}, intakeHistory: [] });
     if (url.pathname === '/api/patients/7/appointments') return json({ items: [], total: 0, page: 1, pageSize: 20 });
     if (url.pathname === '/api/patients/7/next-visit-candidates') {
-      if (candidatesStatus !== 200) return json({ code: 'MSG06', message: 'Không có quyền.' }, candidatesStatus);
+      if (candidatesStatus !== 200) return json({ code: 'MSG05', message: 'Không có quyền.' }, candidatesStatus);
       return json({ items: [booked ? { ...candidate, status: 'Booked',
         appointment: { id: 'ap-1', code: 'AP-NEXT', startAt: '2099-01-12T02:00:00Z' } } : candidate] });
     }
@@ -85,7 +85,7 @@ async function setupNextVisit(page: Page, candidatesStatus = 200, extra: { candi
     if (url.pathname === '/api/appointments' && method === 'POST') {
       sent.push({ command: 'appointment', ...route.request().postDataJSON() }); booked = true;
       return json({ appointmentId: 'ap-1', code: 'AP-NEXT', version: 1, status: 'Confirmed', startAt: '2099-01-12T02:00:00Z', endAt: '2099-01-12T02:30:00Z',
-        notification: { code: 'MSG29', message: 'Đã đặt lịch.' } });
+        notification: { code: 'MSG24', message: 'Đã đặt lịch.' } });
     }
     return json({});
   });

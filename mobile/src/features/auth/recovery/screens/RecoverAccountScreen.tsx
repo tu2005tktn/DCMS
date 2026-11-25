@@ -68,7 +68,7 @@ export default function RecoverAccountScreen() {
 
   useEffect(() => {
     // The shared S02 policy is fetched once; its hints appear at the password step. Failing to load
-    // them is not an error: the API answer (MSG109) stays the authority.
+    // them is not an error: the API answer (MSG39) stays the authority.
     void fetchRecoveryPolicy()
       .then(setPolicy)
       .catch(() => undefined);
@@ -180,7 +180,7 @@ export default function RecoverAccountScreen() {
       try {
         // The answer is the same neutral message; the cooldown restarts either way so a user cannot
         // hammer the endpoint when the account does not exist.
-        setNotice(recoveryMessages.MSG12);
+        setNotice(recoveryMessages.MSG09);
         await resendRecovery(identifier.current);
         setCooldown(RESEND_COOLDOWN_SECONDS);
       } catch (failure) {
@@ -359,7 +359,7 @@ export default function RecoverAccountScreen() {
         {step === 'done' ? (
           <View style={styles.form}>
             <View style={[styles.callout, styles.neutral]} accessibilityLiveRegion="polite">
-              <Text style={styles.neutralText}>{success ?? recoveryMessages.MSG13}</Text>
+              <Text style={styles.neutralText}>{success ?? recoveryMessages.MSG10}</Text>
             </View>
             <Text style={styles.hint}>
               Các phiên đăng nhập trước đã bị thu hồi. Hãy đăng nhập lại bằng mật khẩu mới.
@@ -385,10 +385,10 @@ export default function RecoverAccountScreen() {
 }
 
 function messageOf(failure: unknown): string {
-  // ApiError already carries the server text (MSG108 / MSG109 / MSG144). Anything else is a
+  // ApiError already carries the server text (MSG38 / MSG39 / MSG49). Anything else is a
   // transport failure and is reported with the connection message.
   if (failure instanceof ApiError) return failure.message;
-  return recoveryMessages.MSG144;
+  return recoveryMessages.MSG49;
 }
 
 function LabelledField({

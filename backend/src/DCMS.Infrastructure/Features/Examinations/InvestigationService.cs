@@ -61,20 +61,20 @@ public sealed class InvestigationService(DcmsDbContext db, ClinicalAccess access
         await db.Database.ExecuteSqlRawAsync($"SELECT pg_advisory_xact_lock({WorkingScheduleService.TransactionLock})", ct);
         var visit = await access.VisitAsync(actorId, visitId, action != "ReceiveInvestigationResult", ct,
             action == "ReceiveInvestigationResult" ? "investigations.results.receive" : "examinations.manage");
-        if (visit.PatientId != patientId) throw Error("MSG113", 404);
+        if (visit.PatientId != patientId) throw Error("MSG42", 404);
         if (action == "ReceiveInvestigationResult") {
             var dentist = await access.BranchAsync(actorId, visit.BranchId, false, ct);
-            if (dentist && !await db.Employees.AnyAsync(x => x.Id == visit.DentistId && x.AccountId == actorId, ct)) throw Error("MSG06", 403);
+            if (dentist && !await db.Employees.AnyAsync(x => x.Id == visit.DentistId && x.AccountId == actorId, ct)) throw Error("MSG05", 403);
         }
-        var row = id.HasValue ? visit.Investigations.SingleOrDefault(x => x.Id == id) ?? throw Error("MSG113",404) : null;
+        var row = id.HasValue ? visit.Investigations.SingleOrDefault(x => x.Id == id) ?? throw Error("MSG42",404) : null;
         var fingerprint = ExaminationService.Hash(new { visitId, id, action, payload });
         var receipt = await db.Set<ExaminationReceipt>().SingleOrDefaultAsync(x => x.ActorId == actorId && x.RequestKey == key, ct);
         if (receipt != null) {
-            if (receipt.VisitId != visitId || receipt.Fingerprint != fingerprint) throw Error("MSG111",409);
+            if (receipt.VisitId != visitId || receipt.Fingerprint != fingerprint) throw Error("MSG41",409);
             await tx.CommitAsync(ct); return await ListAsync(actorId, visitId, ct);
         }
-        if (visit.Version != expectedVisit || row != null && row.Version != expectedOrder) throw Error("MSG111",409);
-        if (!VisitStatuses.Open.Contains(visit.Status)) throw Error("MSG42",409);
+        if (visit.Version != expectedVisit || row != null && row.Version != expectedOrder) throw Error("MSG41",409);
+        if (!VisitStatuses.Open.Contains(visit.Status)) throw Error("MSG34",409);
         int? sourceExaminationVersion = null; string? amendmentReason = null;
         var before = row == null ? "{}" : JsonSerializer.Serialize(row, ExaminationService.Json);
         if (payload is CreateInvestigation create) {
@@ -82,7 +82,7 @@ public sealed class InvestigationService(DcmsDbContext db, ClinicalAccess access
                 if (string.IsNullOrWhiteSpace(create.AmendmentReason) || create.AmendmentReason.Length > 1000)
                     throw new BusinessException(400,SystemMessages.Get("MSG02",field:"lý do bổ sung chỉ định sau xác nhận khám") with {Field="amendmentReason"});
                 sourceExaminationVersion = await db.Set<VisitAudit>().CountAsync(x => x.VisitId == visitId && new[]{"SaveExamination","ConfirmExamination","AmendExamination"}.Contains(x.Action),ct);
-                if (create.ExpectedExaminationVersion != sourceExaminationVersion) throw Error("MSG111",409);
+                if (create.ExpectedExaminationVersion != sourceExaminationVersion) throw Error("MSG41",409);
                 amendmentReason = create.AmendmentReason.Trim();
             }
             if (!new[] {"XRay","Imaging","Lab","Pathology","Other"}.Contains(create.Kind) || string.IsNullOrWhiteSpace(create.Name) || create.Name.Length > 160
@@ -93,7 +93,7 @@ public sealed class InvestigationService(DcmsDbContext db, ClinicalAccess access
                 CreatedAt = clock.GetUtcNow(), CreateRequestKey = key };
             visit.Investigations.Add(row);
         } else if (payload is ReceiveInvestigationResult result) {
-            if (row!.State != "Ordered") throw Error("MSG42",409);
+            if (row!.State != "Ordered") throw Error("MSG34",409);
             if (result.ResultText?.Length > 4000) throw Error("MSG04");
             var ready = await db.Set<ClinicalDocument>().Where(x => x.Metadata.InvestigationId == row.Id && x.FileState == "Ready").Select(x => x.Id).ToArrayAsync(ct);
             if (string.IsNullOrWhiteSpace(result.ResultText) && ready.Length == 0)
@@ -102,11 +102,11 @@ public sealed class InvestigationService(DcmsDbContext db, ClinicalAccess access
             row.ResultDocumentIdsJson = JsonSerializer.Serialize(ready); row.State = "ResultAvailable";
             row.ResultBy = actorId; row.ResultAt = clock.GetUtcNow(); row.Version++;
         } else if (payload is ReviewInvestigation review) {
-            if (row!.State != "ResultAvailable") throw Error("MSG42",409);
+            if (row!.State != "ResultAvailable") throw Error("MSG34",409);
             if (review.Interpretation?.Length > 4000) throw Error("MSG04");
             var fileIds = JsonSerializer.Deserialize<Guid[]>(row.ResultDocumentIdsJson)!;
             if (await db.Set<ClinicalDocument>().CountAsync(x => fileIds.Contains(x.Id) && x.Metadata.InvestigationId == row.Id && x.FileState == "Ready",ct) != fileIds.Length
-                || fileIds.Length == 0 && string.IsNullOrWhiteSpace(row.ResultText)) throw Error("MSG42",409);
+                || fileIds.Length == 0 && string.IsNullOrWhiteSpace(row.ResultText)) throw Error("MSG34",409);
             foreach (var file in await db.Set<ClinicalDocument>().Where(x => fileIds.Contains(x.Id)).ToArrayAsync(ct)) {
                 if (!file.Reviews.Any(x => x.VisitId == visitId)) {
                     file.Reviews.Add(new DocumentReview { DocumentId = file.Id, VisitId = visitId, ReviewedBy = actorId, ReviewedAt = clock.GetUtcNow() });
@@ -115,7 +115,7 @@ public sealed class InvestigationService(DcmsDbContext db, ClinicalAccess access
             }
             row.Interpretation = review.Interpretation?.Trim(); row.ReviewedBy = actorId; row.ReviewedAt = clock.GetUtcNow(); row.State = "Reviewed"; row.Version++;
         } else if (payload is CancelInvestigation cancel) {
-            if (row!.State is not ("Ordered" or "ResultAvailable")) throw Error("MSG42",409);
+            if (row!.State is not ("Ordered" or "ResultAvailable")) throw Error("MSG34",409);
             if (string.IsNullOrWhiteSpace(cancel.Reason) || cancel.Reason.Length > 1000) throw Error("MSG04");
             row.CancellationReason = cancel.Reason.Trim(); row.CancelledBy = actorId; row.CancelledAt = clock.GetUtcNow(); row.State = "Cancelled"; row.Version++;
         }

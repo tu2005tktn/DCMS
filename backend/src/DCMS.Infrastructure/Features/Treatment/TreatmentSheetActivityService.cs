@@ -14,14 +14,14 @@ public sealed partial class TreatmentDossierService
     private async Task<(ClinicalActivity Source, ActivityDto Current)> EditableSheetActivityAsync(int actorId,
         TreatmentDossier dossier, Guid id, int expectedVersion, int expectedActivityVersion, int expectedSheetVersion, CancellationToken ct)
     {
-        if (await DentistAsync(actorId, dossier.BranchId, ct) != dossier.DentistId) throw Error("MSG06", 403);
-        if (dossier.Version != expectedVersion) throw Error("MSG111", 409);
-        var source = await db.ClinicalActivities.AsNoTracking().SingleOrDefaultAsync(a => a.Id == id && a.DossierId == dossier.Id, ct) ?? throw Error("MSG113", 404);
+        if (await DentistAsync(actorId, dossier.BranchId, ct) != dossier.DentistId) throw Error("MSG05", 403);
+        if (dossier.Version != expectedVersion) throw Error("MSG41", 409);
+        var source = await db.ClinicalActivities.AsNoTracking().SingleOrDefaultAsync(a => a.Id == id && a.DossierId == dossier.Id, ct) ?? throw Error("MSG42", 404);
         var overrides = await SheetActivityOverridesAsync(dossier.Id, ct);
         var current = overrides.GetValueOrDefault(id) ?? DirectActivityDto(source);
         if (current.ServiceNameSnapshot == null)
             current = current with { ServiceNameSnapshot = (await ActivitySourceNamesAsync([source], dossier, ct)).GetValueOrDefault(id) };
-        if (source.Version != expectedActivityVersion || current.SheetVersion != expectedSheetVersion) throw Error("MSG111", 409);
+        if (source.Version != expectedActivityVersion || current.SheetVersion != expectedSheetVersion) throw Error("MSG41", 409);
         return (source, current);
     }
 
@@ -45,11 +45,11 @@ public sealed partial class TreatmentDossierService
             if (TreatmentPlanRules.Gross(row.Quantity, price) != row.CostVnd) throw Error("MSG04");
             var type = row.DiscountType == "VND" ? "Fixed" : row.DiscountType;
             long discount;
-            if (row.DiscountValue < 0 || row.DiscountValue > 0 && type is not ("Fixed" or "Percent")) throw Error("MSG252");
+            if (row.DiscountValue < 0 || row.DiscountValue > 0 && type is not ("Fixed" or "Percent")) throw Error("MSG59");
             try { discount = row.DiscountValue > 0 ? TreatmentPlanRules.Discount(row.CostVnd, type!, row.DiscountValue) : 0; }
-            catch (ArgumentOutOfRangeException) { throw Error("MSG252"); }
+            catch (ArgumentOutOfRangeException) { throw Error("MSG59"); }
             var moneyChanged = before.SheetDeleted || before.ServiceId != row.ServiceId || before.PriceSnapshotVnd != price || before.DiscountSnapshotVnd != discount;
-            if (moneyChanged && discount > 0 && Clean(row.DiscountNote) == null) throw Error("MSG252");
+            if (moneyChanged && discount > 0 && Clean(row.DiscountNote) == null) throw Error("MSG59");
             var after = before with { ServiceId = service.Id, ServiceNameSnapshot = service.Id == before.ServiceId ? before.ServiceNameSnapshot ?? service.Name : service.Name, Unit = service.Unit,
                 Region = Clean(string.Join(", ", row.Regions ?? [])), Outcome = Clean(row.Note) ?? "", PerformerId = row.DentistId,
                 AssistantId = row.AssistantId, LabWorkSnapshot = Clean(row.LabWork), PriceSnapshotVnd = price,

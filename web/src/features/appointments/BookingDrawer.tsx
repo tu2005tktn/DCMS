@@ -18,7 +18,7 @@ type Values = {
 type PatientOption = { id: number; patientCode: string; fullName: string; birthDate: string | null; phone: string | null };
 // docs/specs/CHAIR-CAPACITY-ANY-DENTIST-BOOKING.vi.md: 0 = any on-shift dentist with a free chair.
 const ANY_DENTIST = 0;
-const slotChangedCodes = ['MSG25', 'MSG27', 'MSG28', 'MSG34'];
+const slotChangedCodes = ['MSG20', 'MSG22', 'MSG23', 'MSG29'];
 
 // S11 counter booking (UC-04). Slots come from Tư's availability for the exact staff duration; the booking itself is
 // Vinh's shared POST /api/appointments with the staff session. Contract: docs/implementation/UC04-05-S10-S11.md §5.
@@ -159,7 +159,7 @@ export default function BookingDrawer({ open, prefill, options, replacement, onC
     {replacement && <Alert className="form-alert" type="info" showIcon message={`Lịch ${replacement.code}: khách không tới. Nhập thông tin khách mới; thời gian phải kết thúc trước ${formatClock(replacement.endAt)}.`} />}
     {error && <Alert className="form-alert" type="error" showIcon message={error.message}
       description={slotChangedCodes.includes(error.code) ? 'Khung giờ đã thay đổi. Danh sách khung giờ đã được tải lại; thông tin đã nhập được giữ nguyên.'
-        : error.code === 'MSG06' ? 'Phiên không còn quyền với bệnh nhân này — dữ liệu được giữ nguyên.'
+        : error.code === 'MSG05' ? 'Phiên không còn quyền với bệnh nhân này — dữ liệu được giữ nguyên.'
         : undefined} />}
     <Form<Values> className="booking-form" form={form} layout="vertical"disabled={reviewing || busy} style={{ display: reviewing ? 'none' : undefined }}>      <div className="patient-form-grid">
         <Form.Item name="kind" label="Loại lịch"><Radio.Group disabled={!!replacement} optionType="button" options={[

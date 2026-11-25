@@ -15,8 +15,10 @@ public sealed class AppointmentCreateTests
         string? attendeeName = "Lê Văn Nam", DateOnly? attendeeBirth = null, string? relation = "Self", string? kind = "Standard") =>
         new(branchId, new BookerContact(bookerName, bookerPhone, bookerEmail),
             new AppointmentAttendee(null, attendeeName, attendeeBirth ?? new DateOnly(1990, 1, 1)),
-            relation, kind, "App", null, "Đau răng", dentistId, null, startAt ?? new DateTimeOffset(2030, 1, 15, 9, 0, 0, TimeSpan.FromHours(7)), 30,
-            null, null, requestKey ?? SampleKey, scheduleVersion, null);
+            relation, kind, "App", ServiceId: null, Reason: "Đau răng", DentistId: dentistId, ChairId: null,
+            StartAt: startAt ?? new DateTimeOffset(2030, 1, 15, 9, 0, 0, TimeSpan.FromHours(7)), DurationMinutes: 30,
+            DossierId: null, ExceptionReason: null, RequestKey: requestKey ?? SampleKey, ScheduleVersion: scheduleVersion,
+            AssistantScheduleVersion: null);
 
     public static TheoryData<string, CreateAppointmentRequest, string> Rejected => new()
     {

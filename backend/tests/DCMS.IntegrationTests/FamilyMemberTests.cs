@@ -7,7 +7,7 @@ namespace DCMS.IntegrationTests;
 [Collection(ApiCollection.Name)]
 public sealed class FamilyMemberTests(ApiHost host)
 {
-    private const string Customer = "Khách hàng (guest.demo) đã đăng nhập.";
+    private const string Customer = "Customer guest.demo is signed in.";
 
     private static CreateFamilyMember Body(string name = "Nguyễn Thị Lan", string relationship = "Mother", Guid? key = null, DateOnly? birth = null,
         string? gender = "FEMALE", string? phone = "0912345678") =>

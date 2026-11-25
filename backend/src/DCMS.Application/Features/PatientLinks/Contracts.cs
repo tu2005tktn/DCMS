@@ -19,7 +19,6 @@ public interface IPatientLinkService
 {
     Task<SelfLinkOverview> OverviewAsync(int accountId, CancellationToken ct);
     Task<SelfLinkChange> SubmitAsync(int accountId, SubmitLinkRequest request, CancellationToken ct);
-    Task<SelfLinkRequestDto> GetAsync(int accountId, int id, CancellationToken ct);
     Task<SelfLinkRequestDto> WithdrawAsync(int accountId, int id, WithdrawLinkRequest request, CancellationToken ct);
     Task<OwnRecordSummary> OwnRecordAsync(int accountId, CancellationToken ct);
 }

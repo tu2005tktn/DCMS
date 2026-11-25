@@ -7,7 +7,7 @@ namespace DCMS.IntegrationTests;
 [Collection(ApiCollection.Name)]
 public sealed class AppointmentTests(ApiHost host)
 {
-    private const string Guest = "Khách chưa đăng nhập (đặt lịch công khai).";
+    private const string Guest = "Anonymous visitor, not signed in (public booking).";
 
     private CreateAppointmentRequest Body(int? branchId = null, int? dentistId = null, string? bookerName = "Lê Văn Nam", string? bookerPhone = "0987654321",
         string? bookerEmail = "nam@gmail.com", string? attendeeName = "Lê Văn Nam", DateOnly? birth = null, string? relation = "Self", DateTimeOffset? startAt = null) =>

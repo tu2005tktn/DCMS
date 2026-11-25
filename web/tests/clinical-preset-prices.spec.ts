@@ -25,7 +25,7 @@ async function prepare(page:Page,price:number|null=200000){
     if(path.endsWith(`/investigations/${orderId}/billing/quote`)){
       const body=r.postDataJSON();state.writes.push({path,body});return ok({...billing,mode:'Clinic',serviceId:2,serviceName:'SYNTHETIC CBC',unit:'Mẫu',unitPriceVnd:body.agreedUnitPriceVnd,amountVnd:body.agreedUnitPriceVnd,allowedActions:['quote','perform']});
     }
-    return route.fulfill({status:404,json:{code:'MSG113',message:'Không tìm thấy.'}});
+    return route.fulfill({status:404,json:{code:'MSG42',message:'Không tìm thấy.'}});
   });
   return state;
 }

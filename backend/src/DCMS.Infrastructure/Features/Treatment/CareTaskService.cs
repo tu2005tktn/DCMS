@@ -28,24 +28,24 @@ public sealed class CareTaskService(DcmsDbContext db, UserManager<ApplicationUse
     private async Task<bool> AuthorizedAsync(int actorId, int branchId, CancellationToken ct)
     {
         var user = await users.FindByIdAsync(actorId.ToString());
-        if (user == null || !user.IsActive || user.AccountType != "Staff") throw Error("MSG06", 403);
+        if (user == null || !user.IsActive || user.AccountType != "Staff") throw Error("MSG05", 403);
         var scope = await access.ResolveAsync(actorId, ct);
-        if (scope.Assigned && !scope.Owner && !scope.BranchIds.Contains(branchId)) throw Error("MSG06", 403);
+        if (scope.Assigned && !scope.Owner && !scope.BranchIds.Contains(branchId)) throw Error("MSG05", 403);
         var roles = AccountRoles.Effective(await users.GetRolesAsync(user));
         if (!scope.GrantDriven && !roles.Contains(AccountRoles.Dentist) && !roles.Contains(AccountRoles.ClinicAssistant))
-            throw Error("MSG06", 403);
+            throw Error("MSG05", 403);
         var employeeId = await db.Employees.AsNoTracking().Where(x => x.AccountId == actorId)
             .Select(x => (int?)x.Id).SingleOrDefaultAsync(ct);
         if (!employeeId.HasValue || !await db.SchedulingMembers.AsNoTracking().AnyAsync(x =>
             x.BranchId == branchId && x.EmployeeId == employeeId && x.Active, ct))
-            throw Error("MSG06", 403);
+            throw Error("MSG05", 403);
         return roles.Contains(AccountRoles.Dentist);
     }
 
     private async Task<CareTask> TaskAsync(int actorId, Guid id, CancellationToken ct)
     {
         var row = await db.CareTasks.SingleOrDefaultAsync(x => x.Id == id, ct)
-            ?? throw Error("MSG113", 404);
+            ?? throw Error("MSG42", 404);
         await AuthorizedAsync(actorId, row.BranchId, ct);
         return row;
     }
@@ -70,7 +70,7 @@ public sealed class CareTaskService(DcmsDbContext db, UserManager<ApplicationUse
             .SingleOrDefaultAsync(x => x.RequestKey == key, ct);
         if (receipt == null) return null;
         if (receipt.ActorId != actorId || receipt.Command != command || receipt.Fingerprint != Hash(payload))
-            throw Error("MSG111", 409);
+            throw Error("MSG41", 409);
         return receipt.ResultId;
     }
     private void Receipt(int actorId, Guid key, string command, object payload, Guid resultId) =>
@@ -97,7 +97,7 @@ public sealed class CareTaskService(DcmsDbContext db, UserManager<ApplicationUse
     public async Task<CareTaskDetail> GetAsync(int actorId, Guid id, CancellationToken ct)
     {
         var row = await db.CareTasks.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, ct)
-            ?? throw Error("MSG113", 404);
+            ?? throw Error("MSG42", 404);
         await ReadableAsync(actorId, row.BranchId, ct);
         var contacts = row.ContactAttempts.OrderBy(x => x.OccurredAt).ToList();
         return new(Map(row), contacts.Select(Map).ToArray());
@@ -118,7 +118,7 @@ public sealed class CareTaskService(DcmsDbContext db, UserManager<ApplicationUse
             throw Error("MSG04");
         if (request.AppointmentId.HasValue && !await db.Appointments.AsNoTracking()
             .AnyAsync(x => x.Id == request.AppointmentId && x.BranchId == request.BranchId &&
-                x.PatientId == request.PatientId, ct)) throw Error("MSG113", 404);
+                x.PatientId == request.PatientId, ct)) throw Error("MSG42", 404);
         var row = new CareTask
         {
             PatientId = request.PatientId, BranchId = request.BranchId,
@@ -144,7 +144,7 @@ public sealed class CareTaskService(DcmsDbContext db, UserManager<ApplicationUse
         var row = await TaskAsync(actorId, id, ct);
         await RequireOwnerAsync(request.OwnerAccountId, row.BranchId, ct);
         if (row.Version != request.ExpectedVersion || row.Status is "Done" or "Cancelled")
-            throw Error("MSG111", 409);
+            throw Error("MSG41", 409);
         if (request.Status is not ("Open" or "InProgress" or "Done" or "Cancelled") ||
             Clean(request.Content) is not { Length: <= 4000 } || request.DueAt == default)
             throw Error("MSG04");
@@ -166,14 +166,14 @@ public sealed class CareTaskService(DcmsDbContext db, UserManager<ApplicationUse
             .SingleAsync(x => x.Id == replay, ct));
         var task = await TaskAsync(actorId, id, ct);
         if (task.Version != request.ExpectedTaskVersion || task.Status is "Done" or "Cancelled")
-            throw Error("MSG111", 409);
+            throw Error("MSG41", 409);
         if (request.Channel is not ("Phone" or "InPerson" or "Other") ||
             request.Result is not ("Reached" or "NoAnswer" or "Rebooked" or "Declined" or "Other") ||
             Clean(request.NextAction)?.Length > 1000) throw Error("MSG04");
         if (request.Result == "Rebooked" && (!request.RebookedAppointmentId.HasValue ||
             !await db.Appointments.AsNoTracking().AnyAsync(x => x.Id == request.RebookedAppointmentId &&
                 x.BranchId == task.BranchId && x.PatientId == task.PatientId &&
-                x.Status == "Confirmed", ct))) throw Error("MSG230", 409);
+                x.Status == "Confirmed", ct))) throw Error("MSG54", 409);
         var row = new CareContactAttempt
         {
             TaskId = id, Channel = request.Channel, Result = request.Result,
@@ -222,7 +222,7 @@ public sealed class CareTaskService(DcmsDbContext db, UserManager<ApplicationUse
     private async Task<(bool Owner, Dictionary<int, string> Branches)> ReadScopeAsync(int actorId, CancellationToken ct)
     {
         var user = await users.FindByIdAsync(actorId.ToString());
-        if (user == null || !user.IsActive || user.AccountType != "Staff") throw Error("MSG06", 403);
+        if (user == null || !user.IsActive || user.AccountType != "Staff") throw Error("MSG05", 403);
         var owner = (await access.ResolveAsync(actorId, ct)).Owner;
         var branches = new Dictionary<int, string>();
         foreach (var branch in await db.Set<SchedulingBranch>().AsNoTracking().Where(x => x.Active).OrderBy(x => x.Id).ToListAsync(ct))
@@ -232,7 +232,7 @@ public sealed class CareTaskService(DcmsDbContext db, UserManager<ApplicationUse
 
     private async Task ReadableAsync(int actorId, int branchId, CancellationToken ct)
     {
-        if (!(await ReadScopeAsync(actorId, ct)).Branches.ContainsKey(branchId)) throw Error("MSG06", 403);
+        if (!(await ReadScopeAsync(actorId, ct)).Branches.ContainsKey(branchId)) throw Error("MSG05", 403);
     }
 
     private async Task<Dictionary<string, string>> TypeNamesAsync(CancellationToken ct)
@@ -296,7 +296,7 @@ public sealed class CareTaskService(DcmsDbContext db, UserManager<ApplicationUse
         CareWorklistQuery q, CancellationToken ct)
     {
         var scope = await ReadScopeAsync(actorId, ct);
-        if (q.BranchId.HasValue && !scope.Branches.ContainsKey(q.BranchId.Value)) throw Error("MSG06", 403);
+        if (q.BranchId.HasValue && !scope.Branches.ContainsKey(q.BranchId.Value)) throw Error("MSG05", 403);
         var branchIds = q.BranchId.HasValue ? new[] { q.BranchId.Value } : scope.Branches.Keys.ToArray();
         if (q.From.HasValue && q.To.HasValue && (q.From > q.To || q.To.Value.DayNumber - q.From.Value.DayNumber > 366) ||
             q.Status is not (null or "Open" or "InProgress" or "Done" or "Cancelled" or "Pending") ||

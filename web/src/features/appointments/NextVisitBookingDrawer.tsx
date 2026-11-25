@@ -15,7 +15,7 @@ type DaySlots = { date: string; slots: AvailabilitySlot[] };
 type PlannedDateChange = { itemId: string; serviceName: string; region: string | null; currentPlannedOn: string | null; proposedPlannedOn: string; isBookedItem: boolean };
 type PlannedDatePreview = { dossierVersion: number; items: PlannedDateChange[] };
 
-const slotChangedCodes = ['MSG25', 'MSG27', 'MSG28', 'MSG34'];
+const slotChangedCodes = ['MSG20', 'MSG22', 'MSG23', 'MSG29'];
 const scanDays = 30, maxSuggestedDays = 5;
 const cleanPhone = (value: string) => /^0\d{9}$/.test(value.trim());
 const cleanEmail = (value: string) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(value.trim());

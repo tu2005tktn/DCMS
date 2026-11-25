@@ -92,6 +92,18 @@ public sealed class AllScreensPermissionApiTests(ReceptionFixture fixture) : ICl
         await Ok<GroupDto>(await owner.PutAsJsonAsync($"/api/system-settings/access-groups/{group.Id}", new GroupCommand(Guid.NewGuid(), new(group.Code, group.Name, group.BaseRole, []), group.Version, "SYNTHETIC revoke")));
         Assert.Equal(HttpStatusCode.Forbidden, (await user.GetAsync(Path(read))).StatusCode);
     }
+    [Fact] public void DentistBaselineAllowsMedicineReadAndCreateButNotCatalogManagement() {
+        var roles = new[] { AccountRoles.Dentist };
+        var legacy = SettingsGrants.Legacy(roles);
+        Assert.True(SettingsGrants.RoleAllows("catalog.medicines.read", roles));
+        Assert.True(SettingsGrants.RoleAllows("catalog.medicines.create", roles));
+        Assert.False(SettingsGrants.RoleAllows("catalog.medicines.update", roles));
+        Assert.False(SettingsGrants.RoleAllows("catalog.medicines.deactivate", roles));
+        Assert.False(SettingsGrants.RoleAllows("catalog.medicines.export", roles));
+        Assert.Contains("catalog.medicines.read", legacy);
+        Assert.Contains("catalog.medicines.create", legacy);
+        Assert.DoesNotContain("catalog.medicines.update", legacy);
+    }
     [Fact] public async Task AssignedScheduleScopeFiltersOptionsAndDeniesAnotherBranch() {
         var first = await reception.Prepare(); var second = await reception.Prepare(); using var owner = await reception.Login("owner.demo");
         var (staff, name) = await Staff(first.BranchId, AccountRoles.Dentist);
@@ -188,13 +200,6 @@ public sealed class AllScreensPermissionApiTests(ReceptionFixture fixture) : ICl
         await Ok<GroupDto>(await owner.PutAsJsonAsync($"/api/system-settings/access-groups/{group.Id}", new GroupCommand(Guid.NewGuid(), new(group.Code, group.Name, group.BaseRole, ["treatment.read"]), group.Version, "SYNTHETIC read only")));
         var context = await Ok<DCMS.Application.Features.Treatment.TreatmentSheetContext>(await user.GetAsync($"/api/dossiers/{dossier.Id}/sheet-context"));
         Assert.Empty(context.AllowedActions);
-    }
-    [Fact] public async Task ReceptionVisitHeaderDoesNotRequireClinicalRead() {
-        var setup = await reception.Prepare(); using var assistant = await reception.Login(); var visit = await reception.Check(assistant, setup);
-        using var owner = await reception.Login("owner.demo"); var (staff, name) = await Staff(setup.BranchId, AccountRoles.ClinicAssistant);
-        await Assign(owner, staff, AccountRoles.ClinicAssistant, "reception.read"); using var user = await reception.Login(name);
-        Assert.Equal(HttpStatusCode.OK, (await user.GetAsync($"/api/visits/{visit.VisitId}")).StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, (await user.GetAsync($"/api/visits/{visit.VisitId}/examination")).StatusCode);
     }
     [Fact] public async Task PrescriptionReadDoesNotRequireExaminationWriteOrReceptionAccess() {
         var setup = await reception.Prepare(); using var assistant = await reception.Login(); var visit = await reception.Check(assistant, setup);

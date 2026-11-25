@@ -19,8 +19,6 @@ public static class PatientLinkEndpoints
             var result = await service.SubmitAsync(AuthenticationEndpoints.AccountId(context.User), request, ct);
             return result.Created ? Results.Created($"/api/patient-links/me/requests/{result.Request.Id}", result) : Results.Ok(result);
         });
-        self.MapGet("/requests/{id:int}", async (HttpContext context, int id, IPatientLinkService service, CancellationToken ct) =>
-            Results.Ok(await service.GetAsync(AuthenticationEndpoints.AccountId(context.User), id, ct)));
         self.MapPost("/requests/{id:int}/withdraw", async (HttpContext context, int id, WithdrawLinkRequest request, IPatientLinkService service, CancellationToken ct) =>
             Results.Ok(await service.WithdrawAsync(AuthenticationEndpoints.AccountId(context.User), id, request, ct)));
         self.MapGet("/record", async (HttpContext context, IPatientLinkService service, CancellationToken ct) =>

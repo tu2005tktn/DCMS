@@ -17,8 +17,8 @@ namespace DCMS.Infrastructure.Features.Treatment;
 public sealed class ItemPlanService(DcmsDbContext db, UserManager<ApplicationUser> users, TimeProvider clock, DCMS.Application.Features.Settings.ISettingsAccess access) : IItemPlanService
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
-    private static BusinessException Missing() => new(404, SystemMessages.Get("MSG113"));
-    private static BusinessException Invalid(string field) => new(400, new("ITEM_PLAN_VALIDATION", "Thông tin kế hoạch không hợp lệ.") { Field = field });
+    private static BusinessException Missing() => new(404, SystemMessages.Get("MSG42"));
+    private static BusinessException Invalid(string field) => new(400, new("MSG75", "Thông tin kế hoạch không hợp lệ.") { Field = field });
     private static string Name(string? value) => value?.Trim() is { Length: >= 1 and <= 160 } clean ? clean : throw Invalid("name");
     private async Task Authorize(int actor, int branch, CancellationToken ct)
     {
@@ -32,7 +32,7 @@ public sealed class ItemPlanService(DcmsDbContext db, UserManager<ApplicationUse
             || !await (from m in db.SchedulingMembers join e in db.Employees on m.EmployeeId equals e.Id
                 join b in db.Set<SchedulingBranch>() on m.BranchId equals b.Id
                 where e.AccountId == actor && b.Id == branch && b.Active && m.Active && (m.CanDentist || grantDriven) select m).AnyAsync(ct))
-            throw new BusinessException(403, SystemMessages.Get("MSG06"));
+            throw new BusinessException(403, SystemMessages.Get("MSG05"));
     }
     private async Task<TreatmentTemplate> Find(Guid id, CancellationToken ct, bool includeDeleted = false) =>
         await db.TreatmentTemplates.SingleOrDefaultAsync(x => x.Id == id && (includeDeleted || x.DeletedAt == null), ct) ?? throw Missing();
@@ -86,11 +86,11 @@ public sealed class ItemPlanService(DcmsDbContext db, UserManager<ApplicationUse
         if (receipt != null)
         {
             if (receipt.ActorId != actor || receipt.Command != command || receipt.Fingerprint != hash)
-                throw new BusinessException(409, new("ITEM_PLAN_REQUEST_CONFLICT", "Mã yêu cầu đã được dùng cho nội dung khác."));
+                throw new BusinessException(409, new("MSG76", "Mã yêu cầu đã được dùng cho nội dung khác."));
             return JsonSerializer.Deserialize<T>(receipt.ResultJson, Json)!;
         }
         if (plan?.DeletedAt != null) throw Missing();
-        if (plan != null && plan.Version != version) throw new BusinessException(409, SystemMessages.Get("MSG111"));
+        if (plan != null && plan.Version != version) throw new BusinessException(409, SystemMessages.Get("MSG41"));
         var before = plan == null ? null : await Dto(plan, ct);
         if (plan != null) plan.Version++;
         var result = await apply(plan);

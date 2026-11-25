@@ -1,6 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
-using System.Text.Json;
 using DCMS.Application.Common;
 using DCMS.Application.Features.Scheduling;
 using DCMS.Domain.Features.Appointments;
@@ -53,18 +50,18 @@ public sealed partial class WorkingScheduleService(DcmsDbContext db, TimeProvide
     private async Task Authorize(int actorId, int branchId, int? employeeId, CancellationToken ct)
     {
         var scope = await access.ResolveAsync(actorId, ct);
-        if (scope.Assigned && !scope.Owner && !scope.BranchIds.Contains(branchId)) throw Error("MSG06", 403);
+        if (scope.Assigned && !scope.Owner && !scope.BranchIds.Contains(branchId)) throw Error("MSG05", 403);
         if (scope.Owner)
         {
             // Chủ phòng khám làm việc trên mọi chi nhánh đang hoạt động; nhân sự được chọn vẫn phải thuộc chi nhánh đó.
             var active = await ActiveMembers(ct);
-            if (!active.Any(x => x.BranchId == branchId) || employeeId.HasValue && !active.Any(x => x.BranchId == branchId && x.EmployeeId == employeeId)) throw Error("MSG06", 403);
+            if (!active.Any(x => x.BranchId == branchId) || employeeId.HasValue && !active.Any(x => x.BranchId == branchId && x.EmployeeId == employeeId)) throw Error("MSG05", 403);
             return;
         }
         var own = await db.Employees.AsNoTracking().SingleOrDefaultAsync(x => x.AccountId == actorId, ct);
         var membership = (await ActiveMembers(ct)).SingleOrDefault(x => x.BranchId == branchId && x.EmployeeId == own?.Id);
-        if (membership == null || (employeeId.HasValue && !membership.CanManageSchedules && (employeeId != own!.Id || !membership.CanDentist))) throw Error("MSG06", 403);
-        if (employeeId.HasValue && !(await ActiveMembers(ct)).Any(x => x.BranchId == branchId && x.EmployeeId == employeeId)) throw Error("MSG06", 403);
+        if (membership == null || (employeeId.HasValue && !membership.CanManageSchedules && (employeeId != own!.Id || !membership.CanDentist))) throw Error("MSG05", 403);
+        if (employeeId.HasValue && !(await ActiveMembers(ct)).Any(x => x.BranchId == branchId && x.EmployeeId == employeeId)) throw Error("MSG05", 403);
     }
     public async Task<ScheduleOptions> OptionsAsync(int actorId, CancellationToken ct)
     {
@@ -74,7 +71,7 @@ public sealed partial class WorkingScheduleService(DcmsDbContext db, TimeProvide
         var mine = members.Where(x => x.EmployeeId == own?.Id && (x.CanDentist || x.CanManageSchedules) && (!scope.Assigned || scope.Owner || scope.BranchIds.Contains(x.BranchId))).ToArray();
         // Chủ phòng khám quản lý lịch mọi chi nhánh đang hoạt động, không cần là thành viên.
         if (scope.Owner) mine = members.Select(x => x.BranchId).Distinct().Select(b => new SchedulingMember { BranchId = b, EmployeeId = own?.Id ?? 0, Active = true, CanManageSchedules = true, CanDentist = true }).ToArray();
-        if (mine.Length == 0) throw Error("MSG06", 403);
+        if (mine.Length == 0) throw Error("MSG05", 403);
         var branches = mine.Select(x => x.BranchId).ToArray();
         var employees = await db.Employees.AsNoTracking().ToDictionaryAsync(x => x.Id, ct);
         return new(await db.Set<SchedulingBranch>().Where(x => branches.Contains(x.Id)).Select(x => new BranchOption(x.Id, x.Name)).ToArrayAsync(ct),
@@ -93,82 +90,20 @@ public sealed partial class WorkingScheduleService(DcmsDbContext db, TimeProvide
             members.Select(x => new EmployeeOption(x.EmployeeId, x.BranchId, employees[x.EmployeeId].FullName, true, false, false)).ToArray(), [],
             await db.Set<SchedulingService>().Where(x => branches.Contains(x.BranchId) && x.Active && x.PublicBookable && x.IsInitialExamination).Select(x => new ServiceOption(x.Id, x.BranchId, "Khám", x.PublicDurationMinutes)).ToArrayAsync(ct));
     }
-    public async Task<ScheduleDto> GetAsync(int actorId, int branchId, int dentistId, DateOnly weekStart, CancellationToken ct)
-    {
-        await Authorize(actorId, branchId, dentistId, ct);
-        if (weekStart.DayOfWeek != DayOfWeek.Monday) throw Error("MSG110");
-        return Dto(await Week(branchId, dentistId, weekStart, ct), branchId, dentistId, weekStart);
-    }
-    private async Task<WorkingWeek?> Validate(int actorId, ScheduleCommand command, CancellationToken ct)
-    {
-        await Authorize(actorId, command.BranchId, command.DentistId, ct);
-        if (await db.Set<WorkingScheduleRevision>().AnyAsync(x => x.EmployeeId == command.DentistId, ct)) throw Error("MSG111", 409);
-        if (command.RequestKey == Guid.Empty || command.Intervals == null || !ScheduleRules.ValidWeek(command.WeekStart, command.Intervals)) throw Error("MSG110");
-        var previous = await Week(command.BranchId, command.DentistId, command.WeekStart, ct);
-        if (command.ExpectedVersion != (previous?.Version ?? 0)) throw Error("MSG111", 409);
-        return previous;
-    }
-    private async Task<AffectedAppointment[]> Affected(ScheduleCommand command, CancellationToken ct)
-    {
-        var start = Local(command.WeekStart).ToUniversalTime(); var end = start.AddDays(7);
-        var appointments = await db.Appointments.AsNoTracking().Where(x => x.BranchId == command.BranchId
-            && x.DentistId == command.DentistId && x.Status == "Confirmed" && x.StartAt < end && x.EndAt > start).ToArrayAsync(ct);
-        var affected = new List<AffectedAppointment>();
-        foreach (var r in appointments)
-        {
-            var local = r.StartAt.ToOffset(TimeSpan.FromHours(7)); var date = DateOnly.FromDateTime(local.DateTime);
-            var q = new AvailabilityQuery(r.BranchId, r.DentistId, r.ServiceId, date, (int)(r.EndAt - r.StartAt).TotalMinutes);
-            var slot = await Find(q, false, local, r.ChairId, r.PatientId, r.Id, command, ct);
-            if (slot == null) affected.Add(new(r.Id, r.Code, r.StartAt, r.EndAt, r.AttendeeName, r.Status));
-        }
-        return affected.ToArray();
-    }
-    public async Task<SchedulePreview> PreviewAsync(int actorId, ScheduleCommand command, CancellationToken ct)
-    {
-        await Validate(actorId, command, ct); return new(await Affected(command, ct));
-    }
-    public async Task<PublishResult> PublishAsync(int actorId, ScheduleCommand command, CancellationToken ct)
-    {
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        await Lock(ct);
-        await Authorize(actorId, command.BranchId, command.DentistId, ct);
-        var fingerprint = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(command))));
-        var receipt = await db.Set<ScheduleReceipt>().AsNoTracking().SingleOrDefaultAsync(x => x.ActorId == actorId && x.RequestKey == command.RequestKey, ct);
-        if (receipt != null)
-        {
-            if (receipt.Fingerprint != fingerprint) throw Error("MSG111", 409);
-            return JsonSerializer.Deserialize<PublishResult>(receipt.ResultJson)!;
-        }
-        var previous = await Validate(actorId, command, ct);
-        var affected = await Affected(command, ct);
-        if (affected.Length > 0) throw new BusinessException(409, new("MSG38", $"Thay đổi này ảnh hưởng đến {affected.Length} lịch hẹn đã xác nhận. Vui lòng xử lý các lịch liên quan trước khi cập nhật."));
-        var week = previous ?? new WorkingWeek { BranchId = command.BranchId, EmployeeId = command.DentistId, WeekStart = command.WeekStart };
-        if (previous != null)
-        {
-            db.Attach(week); week.Periods = []; week.Version++;
-        }
-        else db.Add(week);
-        week.PublishedBy = actorId; week.PublishedAt = clock.GetUtcNow();
-        var newPeriods = command.Intervals.Select(p => new WorkingPeriod { WeekId = week.Id, Day = p.Day, StartMinute = p.StartMinute, EndMinute = p.EndMinute, Kind = p.Kind, Reason = p.Reason.Trim() }).ToArray();
-        week.Periods.AddRange(newPeriods);
-        var result = new PublishResult(Dto(week, command.BranchId, command.DentistId, command.WeekStart), SystemMessages.Get("MSG39"));
-        db.Add(new ScheduleReceipt { ActorId = actorId, RequestKey = command.RequestKey, Fingerprint = fingerprint, ResultJson = JsonSerializer.Serialize(result) });
-        await db.SaveChangesAsync(ct); await transaction.CommitAsync(ct); return result;
-    }
     private async Task Lock(CancellationToken ct) => await db.Database.ExecuteSqlRawAsync("SELECT pg_advisory_xact_lock(90403)", ct);
 
     public async Task<AvailabilityResult> QueryAsync(AvailabilityQuery query, int? staffActorId, CancellationToken ct)
     {
         if (staffActorId.HasValue) await Authorize(staffActorId.Value, query.BranchId, null, ct);
         return query.DentistId > 0
-            ? await Query(query, !staffActorId.HasValue, null, ct)
+            ? await Query(query, !staffActorId.HasValue, ct)
             : await QueryAnyDentist(query, !staffActorId.HasValue, ct);
     }
     // docs/specs/CHAIR-CAPACITY-ANY-DENTIST-BOOKING.vi.md: chairs are branch capacity, not tied to a dentist. Each start time gets
     // at most one slot, assigned to the free on-shift dentist with the fewest active bookings that day (ties: lower Id).
     private async Task<AvailabilityResult> QueryAnyDentist(AvailabilityQuery q, bool isPublic, CancellationToken ct)
     {
-        if (q.AssistantId.HasValue) throw Error("MSG110");
+        if (q.AssistantId.HasValue) throw Error("MSG40");
         var dentists = (await ActiveMembers(ct)).Where(x => x.BranchId == q.BranchId && x.CanDentist)
             .Select(x => x.EmployeeId).Distinct().ToArray();
         if (dentists.Length == 0) return new("Asia/Ho_Chi_Minh", q.Date, []);
@@ -182,7 +117,7 @@ public sealed partial class WorkingScheduleService(DcmsDbContext db, TimeProvide
         foreach (var dentistId in dentists.OrderBy(id => load.GetValueOrDefault(id)).ThenBy(id => id))
         {
             AvailabilityResult result;
-            try { result = await Query(q with { DentistId = dentistId }, isPublic, null, ct); }
+            try { result = await Query(q with { DentistId = dentistId }, isPublic, ct); }
             catch (BusinessException) { continue; }
             foreach (var slot in result.Slots) chosen.TryAdd(slot.Start, slot);
         }
@@ -191,7 +126,7 @@ public sealed partial class WorkingScheduleService(DcmsDbContext db, TimeProvide
     public async Task<AvailabilityResult> QueryForAppointmentAsync(AvailabilityQuery query, Guid appointmentId, int? patientId, CancellationToken ct)
     {
         await ValidateQuery(query, false, ct);
-        var data = await Load(query, null, ct);
+        var data = await Load(query, ct);
         var slots = new List<AvailabilitySlot>();
         foreach (var minute in CandidateMinutes(query, data))
         {
@@ -200,35 +135,28 @@ public sealed partial class WorkingScheduleService(DcmsDbContext db, TimeProvide
         }
         return new("Asia/Ho_Chi_Minh", query.Date, slots.ToArray());
     }
-    public async Task<AvailabilityResult> PreviewAvailabilityAsync(int actorId, PreviewAvailabilityRequest request, CancellationToken ct)
-    {
-        await Validate(actorId, request.Schedule, ct);
-        if (request.Query.BranchId != request.Schedule.BranchId || request.Query.DentistId != request.Schedule.DentistId
-            || Monday(request.Query.Date) != request.Schedule.WeekStart) throw Error("MSG110");
-        return await Query(request.Query, false, request.Schedule, ct);
-    }
     private async Task ValidateQuery(AvailabilityQuery q, bool isPublic, CancellationToken ct)
     {
-        if (!ScheduleRules.ValidDuration(q.DurationMinutes, isPublic) || q.Date.Year is < 2000 or > 2100 || q.AssistantId == q.DentistId) throw Error("MSG110");
+        if (!ScheduleRules.ValidDuration(q.DurationMinutes, isPublic) || q.Date.Year is < 2000 or > 2100 || q.AssistantId == q.DentistId) throw Error("MSG40");
         var members = await ActiveMembers(ct);
         if (!members.Any(x => x.BranchId == q.BranchId && x.EmployeeId == q.DentistId && x.CanDentist)
-            || (q.AssistantId.HasValue && !members.Any(x => x.BranchId == q.BranchId && x.EmployeeId == q.AssistantId))) throw Error("MSG110");
+            || (q.AssistantId.HasValue && !members.Any(x => x.BranchId == q.BranchId && x.EmployeeId == q.AssistantId))) throw Error("MSG40");
         var service = q.ServiceId.HasValue
             ? await db.Set<SchedulingService>().AsNoTracking().SingleOrDefaultAsync(x => x.Id == q.ServiceId && x.BranchId == q.BranchId && x.Active, ct)
             : null;
-        if ((q.ServiceId.HasValue && service == null) || (isPublic && (service == null || !service.IsInitialExamination || !service.PublicBookable || service.PublicDurationMinutes != q.DurationMinutes))) throw Error("MSG110");
+        if ((q.ServiceId.HasValue && service == null) || (isPublic && (service == null || !service.IsInitialExamination || !service.PublicBookable || service.PublicDurationMinutes != q.DurationMinutes))) throw Error("MSG40");
     }
-    private async Task<AvailabilityResult> Query(AvailabilityQuery q, bool isPublic, ScheduleCommand? draft, CancellationToken ct, RecurringCommand? recurringDraft = null)
+    private async Task<AvailabilityResult> Query(AvailabilityQuery q, bool isPublic, CancellationToken ct, RecurringCommand? recurringDraft = null)
     {
         await ValidateQuery(q, isPublic, ct);
         var slots = new List<AvailabilitySlot>();
         // Load resources once per query; candidate starts all share the same resource snapshot.
-        var data = await Load(q, draft, ct, recurringDraft);
+        var data = await Load(q, ct, recurringDraft);
         var now = clock.GetUtcNow();
         foreach (var minute in CandidateMinutes(q, data))
         {
             var start = Local(q.Date, minute);
-            if (draft == null && recurringDraft == null && start <= now) continue; // never offer slots that already passed
+            if (recurringDraft == null && start <= now) continue; // never offer slots that already passed
             var slot = Evaluate(q, isPublic, start, null, null, null, data);
             if (slot != null) slots.Add(slot);
         }
@@ -244,16 +172,16 @@ public sealed partial class WorkingScheduleService(DcmsDbContext db, TimeProvide
     }
     private sealed record Resources(SchedulingBranch Branch, WorkingWeek? Main, WorkingWeek? Assistant, SchedulePeriod[] MainPeriods,
         SchedulePeriod[] AssistantPeriods, SchedulingChair[] Chairs, Appointment[] Occupied);
-    private async Task<Resources> Load(AvailabilityQuery q, ScheduleCommand? draft, CancellationToken ct, RecurringCommand? recurringDraft = null)
+    private async Task<Resources> Load(AvailabilityQuery q, CancellationToken ct, RecurringCommand? recurringDraft = null)
     {
         var main = await Resolve(q.BranchId, q.DentistId, q.Date, recurringDraft, ct);
         var assistant = q.AssistantId.HasValue ? await Resolve(q.BranchId, q.AssistantId.Value, q.Date, recurringDraft, ct) : null;
         var from = Local(q.Date).ToUniversalTime(); var to = from.AddDays(1);
         var branch = await db.Set<SchedulingBranch>().AsNoTracking().SingleOrDefaultAsync(x => x.Id == q.BranchId && x.Active, ct)
-            ?? throw Error("MSG110");
+            ?? throw Error("MSG40");
         return new(branch, main, assistant,
-            draft != null && draft.DentistId == q.DentistId ? draft.Intervals : Periods(main),
-            draft != null && draft.DentistId == q.AssistantId ? draft.Intervals : Periods(assistant),
+            Periods(main),
+            Periods(assistant),
             await db.SchedulingChairs.AsNoTracking().Where(x => x.BranchId == q.BranchId && x.Active).OrderBy(x => x.Id).ToArrayAsync(ct),
             await db.Appointments.AsNoTracking().Where(x => OccupiedStatuses.Contains(x.Status) && x.StartAt < to && x.EndAt > from).ToArrayAsync(ct));
     }
@@ -262,41 +190,35 @@ public sealed partial class WorkingScheduleService(DcmsDbContext db, TimeProvide
         AvailabilitySlot? Fail(string code)
         {
             if (!throwOnConflict) return null;
-            if (code == "MSG26") throw new BusinessException(409, new("MSG26", $"Không còn khoảng thời gian liên tiếp đủ {q.DurationMinutes} phút. Vui lòng chọn giờ khác."));
+            if (code == "MSG21") throw new BusinessException(409, new("MSG21", $"Không còn khoảng thời gian liên tiếp đủ {q.DurationMinutes} phút. Vui lòng chọn giờ khác."));
             throw Error(code, 409);
         }
         var end = start.AddMinutes(q.DurationMinutes); var minute = start.Hour * 60 + start.Minute; var day = q.Date.DayNumber - Monday(q.Date).DayNumber;
         if (start.Second != 0 || start.Ticks % TimeSpan.TicksPerSecond != 0 || minute + q.DurationMinutes > 1440
             || !data.MainPeriods.Any(p => p.Day == day && p.Kind == "Work" && p.StartMinute <= minute && minute < p.EndMinute
                 && (minute - p.StartMinute) % data.Branch.SlotIntervalMinutes == 0)
-            ) return Fail("MSG110");
-        if (isPublic && start < clock.GetUtcNow().AddMinutes(60)) return Fail("MSG24");
+            ) return Fail("MSG40");
+        if (isPublic && start < clock.GetUtcNow().AddMinutes(60)) return Fail("MSG19");
         if (!ScheduleRules.Covers(data.MainPeriods, day, minute, minute + q.DurationMinutes)
-            || (q.AssistantId.HasValue && !ScheduleRules.Covers(data.AssistantPeriods, day, minute, minute + q.DurationMinutes))) return Fail("MSG26");
+            || (q.AssistantId.HasValue && !ScheduleRules.Covers(data.AssistantPeriods, day, minute, minute + q.DurationMinutes))) return Fail("MSG21");
         var overlaps = data.Occupied.Where(r => r.Id != exclude && r.StartAt < end && start < r.EndAt).ToArray();
         var staff = new[] { q.DentistId, q.AssistantId ?? q.DentistId };
-        if (overlaps.Any(r => staff.Contains(r.DentistId) || (patientId.HasValue && r.PatientId == patientId.Value))) return Fail("MSG27");
+        if (overlaps.Any(r => staff.Contains(r.DentistId) || (patientId.HasValue && r.PatientId == patientId.Value))) return Fail("MSG22");
         var chair = data.Chairs.FirstOrDefault(c => (!chairId.HasValue || c.Id == chairId) && !overlaps.Any(r => r.ChairId == c.Id));
-        return chair == null ? Fail("MSG28") : new(start, end, chair.Id, q.DentistId, q.AssistantId, data.Main?.Version ?? 0, data.Assistant?.Version, data.Branch.Version);
-    }
-    private async Task<AvailabilitySlot?> Find(AvailabilityQuery q, bool isPublic, DateTimeOffset start, int? chairId, int? patientId, Guid? exclude, ScheduleCommand? draft, CancellationToken ct)
-    {
-        try { await ValidateQuery(q, isPublic, ct); }
-        catch (BusinessException) { return null; }
-        return Evaluate(q, isPublic, start, chairId, patientId, exclude, await Load(q, draft, ct));
+        return chair == null ? Fail("MSG23") : new(start, end, chair.Id, q.DentistId, q.AssistantId, data.Main?.Version ?? 0, data.Assistant?.Version, data.Branch.Version);
     }
     public async Task ValidateReceptionAsync(Guid appointmentId, int patientId, CancellationToken ct)
     {
         if (db.Database.CurrentTransaction == null) throw new InvalidOperationException("Reception requires the reservation transaction.");
         await Lock(ct);
         var a = await db.Appointments.AsNoTracking().SingleOrDefaultAsync(x => x.Id == appointmentId, ct)
-            ?? throw Error("MSG47", 409);
-        if (a.Status != "Confirmed") throw Error("MSG47", 409);
+            ?? throw Error("MSG36", 409);
+        if (a.Status != "Confirmed") throw Error("MSG36", 409);
         var start = a.StartAt.ToOffset(TimeSpan.FromHours(7));
         var q = new AvailabilityQuery(a.BranchId, a.DentistId, a.ServiceId, DateOnly.FromDateTime(start.DateTime),
             (int)(a.EndAt - a.StartAt).TotalMinutes);
         await ValidateQuery(q, false, ct);
-        var data = await Load(q, null, ct);
+        var data = await Load(q, ct);
         _ = Evaluate(q, false, start, a.ChairId, patientId, a.Id, data, true);
     }
 
@@ -309,11 +231,11 @@ public sealed partial class WorkingScheduleService(DcmsDbContext db, TimeProvide
         var start = request.Start.ToOffset(TimeSpan.FromHours(7));
         var q = new AvailabilityQuery(request.BranchId, request.DentistId, request.ServiceId, DateOnly.FromDateTime(start.DateTime), request.DurationMinutes, request.AssistantId);
         if (request.BookingSettingsVersion.HasValue && request.BookingSettingsVersion != await db.Set<SchedulingBranch>()
-            .Where(x => x.Id == q.BranchId).Select(x => x.Version).SingleOrDefaultAsync(ct)) throw Error("MSG111", 409);
+            .Where(x => x.Id == q.BranchId).Select(x => x.Version).SingleOrDefaultAsync(ct)) throw Error("MSG41", 409);
         await ValidateQuery(q, request.Public, ct);
-        var data = await Load(q, null, ct);
-        if (request.BookingSettingsVersion.HasValue && request.BookingSettingsVersion != data.Branch.Version) throw Error("MSG111", 409);
-        if ((data.Main?.Version ?? 0) != request.ExpectedScheduleVersion || (q.AssistantId.HasValue && data.Assistant?.Version != request.ExpectedAssistantScheduleVersion)) throw Error("MSG111", 409);
+        var data = await Load(q, ct);
+        if (request.BookingSettingsVersion.HasValue && request.BookingSettingsVersion != data.Branch.Version) throw Error("MSG41", 409);
+        if ((data.Main?.Version ?? 0) != request.ExpectedScheduleVersion || (q.AssistantId.HasValue && data.Assistant?.Version != request.ExpectedAssistantScheduleVersion)) throw Error("MSG41", 409);
         return Evaluate(q, request.Public, start, request.ChairId, request.PatientId, request.ExcludeAppointmentId, data, true)!;
     }
 }

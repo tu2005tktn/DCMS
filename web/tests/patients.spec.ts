@@ -110,7 +110,7 @@ test('admin cannot enter patient routes', async ({ page }) => {
 
 test('load failure is distinct from empty results and retry recovers', async ({ page }) => {
   await login(page);
-  await page.route('**/api/patients?*', route => route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ code: 'MSG144', message: 'SYNTHETIC unavailable' }) }));
+  await page.route('**/api/patients?*', route => route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ code: 'MSG49', message: 'SYNTHETIC unavailable' }) }));
   await page.getByRole('link', { name: 'Bệnh nhân', exact: true }).click();
   await expect(page.getByText('SYNTHETIC unavailable', { exact: true })).toBeVisible();
   await expect(page.getByText('Không tìm thấy hồ sơ bệnh nhân phù hợp.', { exact: true })).toHaveCount(0);

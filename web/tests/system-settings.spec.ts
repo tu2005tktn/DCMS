@@ -17,7 +17,7 @@ async function prepare(page: Page, initial = true, role = 'Dentist', count = 1) 
     const dto=(row:Row)=>({...row,...(kind==='materials'?{categoryName:state.categories.find(c=>c.id===row.categoryId)?.name}:{itemCount:state.materials.filter(i=>!i.isDeleted&&i.categoryId===row.id).length})});
     if(method==='GET'){
       state.reads++;
-      if(id){const row=rows.find(x=>x.id===id&&!x.isDeleted);return row?ok(dto(row)):route.fulfill({status:404,json:{code:'MSG113',message:'Không tìm thấy.'}});}
+      if(id){const row=rows.find(x=>x.id===id&&!x.isDeleted);return row?ok(dto(row)):route.fulfill({status:404,json:{code:'MSG42',message:'Không tìm thấy.'}});}
       const q=(url.searchParams.get('q')??'').toLowerCase(), group=url.searchParams.get('categoryId'),p=Number(url.searchParams.get('page')??1),size=Number(url.searchParams.get('pageSize')??20);
       const filtered=rows.filter(x=>!x.isDeleted&&x.name.toLowerCase().includes(q)&&(!group||x.categoryId===group));
       return ok({items:filtered.slice((p-1)*size,p*size).map(dto),total:filtered.length,page:p,pageSize:size});
@@ -25,12 +25,12 @@ async function prepare(page: Page, initial = true, role = 'Dentist', count = 1) 
     const body=r.postDataJSON(); state.requests.push({kind,id,method,...body});
     if(state.failNetwork){state.failNetwork=false;return route.abort('failed');}
     const row=rows.find(x=>x.id===id&&!x.isDeleted);
-    if(method!=='POST'&&row?.version!==body.expectedVersion)return route.fulfill({status:409,json:{code:'MSG111',message:'MSG111 — Dữ liệu đã thay đổi.'}});
+    if(method!=='POST'&&row?.version!==body.expectedVersion)return route.fulfill({status:409,json:{code:'MSG41',message:'MSG41 — Dữ liệu đã thay đổi.'}});
     if(method==='DELETE'){
-      if(kind==='material-categories'&&state.materials.some(i=>!i.isDeleted&&i.categoryId===id))return route.fulfill({status:409,json:{code:'CATALOG_CATEGORY_IN_USE',message:'Danh mục đang có dụng cụ/vật liệu. Vui lòng chuyển hoặc xóa các mục trước.'}});
+      if(kind==='material-categories'&&state.materials.some(i=>!i.isDeleted&&i.categoryId===id))return route.fulfill({status:409,json:{code:'MSG86',message:'Danh mục đang có dụng cụ/vật liệu. Vui lòng chuyển hoặc xóa các mục trước.'}});
       row!.isDeleted=true;row!.version++;return ok(dto(row!));
     }
-    if(rows.some(x=>!x.isDeleted&&x.id!==id&&x.name.trim().toUpperCase()===body.name.trim().toUpperCase()&&(kind!=='materials'||x.categoryId===body.categoryId)))return route.fulfill({status:409,json:{code:'CATALOG_NAME_DUPLICATE',message:'Tên đã tồn tại. Vui lòng nhập tên khác.',field:'name'}});
+    if(rows.some(x=>!x.isDeleted&&x.id!==id&&x.name.trim().toUpperCase()===body.name.trim().toUpperCase()&&(kind!=='materials'||x.categoryId===body.categoryId)))return route.fulfill({status:409,json:{code:'MSG85',message:'Tên đã tồn tại. Vui lòng nhập tên khác.',field:'name'}});
     if(method==='POST'){
       const created={id:crypto.randomUUID(),name:body.name,categoryId:body.categoryId,version:1};rows.push(created);return ok(dto(created));
     }
@@ -66,7 +66,7 @@ test('tên trùng và conflict giữ form; đọc phiên bản mới không xóa
   await page.getByLabel('Tên danh mục',{exact:true}).fill('Nhóm 001');await page.getByRole('button',{name:'Lưu',exact:true}).click();await expect(page.getByRole('alert').filter({hasText:'Tên đã tồn tại.'})).toBeVisible();
   await expect(page.getByLabel('Tên danh mục',{exact:true})).toHaveValue('Nhóm 001');await page.getByRole('button',{name:'Hủy',exact:true}).click();
   await page.getByRole('button',{name:'Sửa Nhóm 001'}).click();await page.getByLabel('Tên danh mục',{exact:true}).fill('Nhóm đã sửa');state.categories[0].version++;
-  await page.getByRole('button',{name:'Lưu',exact:true}).click();await expect(page.getByText('MSG111 — Dữ liệu đã thay đổi.')).toBeVisible();
+  await page.getByRole('button',{name:'Lưu',exact:true}).click();await expect(page.getByText('MSG41 — Dữ liệu đã thay đổi.')).toBeVisible();
   await page.getByRole('button',{name:'Đọc lại phiên bản, giữ nội dung',exact:true}).click();await expect(page.getByLabel('Tên danh mục',{exact:true})).toHaveValue('Nhóm đã sửa');
   await page.getByRole('button',{name:'Lưu',exact:true}).click();await expect(page.getByRole('button',{name:'Sửa Nhóm đã sửa'})).toBeVisible();
   const puts=state.requests.filter(r=>r.method==='PUT');expect(puts[0].requestKey).not.toBe(puts[1].requestKey);

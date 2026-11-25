@@ -1,5 +1,7 @@
 # S03 · Account Recovery (UC-02) — Acceptance Evidence
 
+> Cập nhật 21/11/2026: Nhóm route `/api/admin/recovery/*` đã gỡ vì không có giao diện sử dụng, xem [UNUSED-API-REMOVAL.vi.md](specs/UNUSED-API-REMOVAL.vi.md).
+
 Screen: **S03 Account Recovery**, owner **Tong Nguyen Tuan**
 Use case: **UC-02 Recover Account Access**
 Date: 12/10/2026

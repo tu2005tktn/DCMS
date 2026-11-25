@@ -70,12 +70,12 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
             context.HandleResponse();
             context.Response.StatusCode = 401;
             context.Response.Headers.WWWAuthenticate = "Bearer";
-            await context.Response.WriteAsJsonAsync(SystemMessages.Get("MSG07"));
+            await context.Response.WriteAsJsonAsync(SystemMessages.Get("MSG06"));
         },
         OnForbidden = context =>
         {
             context.Response.StatusCode = 403;
-            return context.Response.WriteAsJsonAsync(SystemMessages.Get("MSG06"));
+            return context.Response.WriteAsJsonAsync(SystemMessages.Get("MSG05"));
         },
         // S26+ — SignalR browser client không gửi Authorization header tuỳ ý được; cho phép
         // negotiate kèm ?access_token=... (chỉ khi path là /hubs/*).
@@ -185,7 +185,6 @@ app.UseMiddleware<DCMS.Api.Features.Settings.ScreenPermissionMiddleware>();
 app.MapHealthEndpoints();
 app.MapAuthenticationEndpoints();
 app.MapRecoveryEndpoints();
-app.MapEmailVerificationEndpoints();
 app.MapAccountEndpoints();
 DCMS.Api.Features.Settings.SettingsEndpoints.MapSettingsEndpoints(app);
 DCMS.Api.Features.Prescriptions.PrescriptionEndpoints.MapPrescriptionEndpoints(app);

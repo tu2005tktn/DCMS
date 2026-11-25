@@ -72,38 +72,38 @@ public sealed class ExaminationService(DcmsDbContext db, ClinicalAccess access, 
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         await db.Database.ExecuteSqlRawAsync($"SELECT pg_advisory_xact_lock({WorkingScheduleService.TransactionLock})", ct);
         var v = await access.VisitAsync(actorId, visitId, true, ct);
-        if (v.PatientId != patientId) throw Error("MSG113", 404);
+        if (v.PatientId != patientId) throw Error("MSG42", 404);
         if(v.Purpose==AttendancePurposes.TreatmentContinuation && action!="Amend")
-            throw new BusinessException(409,new SystemMessage("TREATMENT_VISIT_REQUIRED","Lượt này dành cho điều trị. Dùng các buổi trong hồ sơ điều trị để bắt đầu hoặc kết thúc, không tạo phiếu khám mới."));
+            throw new BusinessException(409,new SystemMessage("MSG73","Lượt này dành cho điều trị. Dùng các buổi trong hồ sơ điều trị để bắt đầu hoặc kết thúc, không tạo phiếu khám mới."));
         var hash = Hash(new { visitId, action, payload });
         var receipt = await db.Set<ExaminationReceipt>().SingleOrDefaultAsync(x => x.ActorId == actorId && x.RequestKey == key, ct);
         if (receipt != null) {
-            if (receipt.VisitId != visitId || receipt.Fingerprint != hash) throw Error("MSG111", 409);
+            if (receipt.VisitId != visitId || receipt.Fingerprint != hash) throw Error("MSG41", 409);
             await tx.CommitAsync(ct); return (await GetAsync(actorId, visitId, ct)) with { Replayed = true };
         }
-        if (v.Version != version) throw Error("MSG111", 409);
+        if (v.Version != version) throw Error("MSG41", 409);
         var a = await db.Appointments.SingleAsync(x => x.Id == v.AppointmentId, ct);
         var old = JsonSerializer.Serialize(new { v.Status, v.Version }, Json);
         var e = await db.Set<VisitExamination>().SingleOrDefaultAsync(x => x.VisitId == visitId, ct);
         if (action == "Complete") {
             var request = (CompleteExaminationVisit)payload;
-            if (!request.WorkReviewed || e == null || v.Status != VisitStatuses.ExaminationConfirmed || a.Status != "InProgress") throw new BusinessException(409, SystemMessages.Get("MSG239", field: "hoàn tất phiếu khám và kiểm tra công việc trước khi kết thúc lượt"));
+            if (!request.WorkReviewed || e == null || v.Status != VisitStatuses.ExaminationConfirmed || a.Status != "InProgress") throw new BusinessException(409, SystemMessages.Get("MSG56", field: "hoàn tất phiếu khám và kiểm tra công việc trước khi kết thúc lượt"));
             if (await db.Investigations.AnyAsync(x => x.VisitId == visitId && x.State != "Reviewed" && x.State != "Cancelled", ct))
-                throw new BusinessException(409, SystemMessages.Get("MSG239",field:"còn chỉ định cận lâm sàng chưa được bác sĩ đọc hoặc hủy") with { Field = "investigations" });
+                throw new BusinessException(409, SystemMessages.Get("MSG56",field:"còn chỉ định cận lâm sàng chưa được bác sĩ đọc hoặc hủy") with { Field = "investigations" });
             var content = Dto(e, v.Status).Content;
-            if (!HasDiagnosis(content) || string.IsNullOrWhiteSpace(content.Disposition)) throw new BusinessException(409, SystemMessages.Get("MSG239", field: "phiếu khám còn thiếu chẩn đoán hoặc hướng xử trí"));
+            if (!HasDiagnosis(content) || string.IsNullOrWhiteSpace(content.Disposition)) throw new BusinessException(409, SystemMessages.Get("MSG56", field: "phiếu khám còn thiếu chẩn đoán hoặc hướng xử trí"));
             v.Status = VisitStatuses.Completed; a.Status = "Completed"; a.Version++;
         } else if (save == null) {
-            if (v.Status != VisitStatuses.Queued || a.Status != "CheckedIn") throw Error("MSG42", 409);
+            if (v.Status != VisitStatuses.Queued || a.Status != "CheckedIn") throw Error("MSG34", 409);
             v.Status = VisitStatuses.InProgress; a.Status = "InProgress"; a.Version++;
         } else {
             if (action == "Amend") {
                 var amendment = (AmendExamination)payload;
-                if (e == null || !VisitStatuses.HasConfirmedExamination.Contains(v.Status)) throw Error("MSG42", 409);
+                if (e == null || !VisitStatuses.HasConfirmedExamination.Contains(v.Status)) throw Error("MSG34", 409);
                 if (string.IsNullOrWhiteSpace(amendment.Reason) || amendment.Reason.Length > 1000) throw new BusinessException(400, SystemMessages.Get("MSG04", field: "Lý do đính chính (tối đa 1000 ký tự)"));
-            } else if (v.Status != VisitStatuses.InProgress || a.Status != "InProgress") throw Error("MSG42", 409);
+            } else if (v.Status != VisitStatuses.InProgress || a.Status != "InProgress") throw Error("MSG34", 409);
             if (save.Confirm && await db.Investigations.AnyAsync(x => x.VisitId == visitId && x.RequiredForDiagnosis && x.State != "Reviewed" && x.State != "Cancelled", ct))
-                throw new BusinessException(409, SystemMessages.Get("MSG239",field:"cần nhận và đọc kết quả cận lâm sàng trước khi hoàn tất khám") with { Field = "investigations" });
+                throw new BusinessException(409, SystemMessages.Get("MSG56",field:"cần nhận và đọc kết quả cận lâm sàng trước khi hoàn tất khám") with { Field = "investigations" });
             Validate(save.Content, save.Confirm);
             await ValidateDiagnosisReferences(save.Content,e == null ? null : JsonSerializer.Deserialize<ExaminationContent>(e.ContentJson,Json),ct);
             save = save with { Content = NormalizeDiagnoses(save.Content) };
@@ -134,9 +134,9 @@ public sealed class ExaminationService(DcmsDbContext db, ClinicalAccess access, 
         foreach(var reference in references){
             if(!names.Contains(reference.Name,StringComparer.OrdinalIgnoreCase))throw Error("MSG04");
             if(previous?.DiagnosisReferences?.Contains(reference)==true)continue;
-            var entry=await db.ReferenceEntries.AsNoTracking().SingleOrDefaultAsync(x=>x.Id==reference.Id&&x.Kind=="diagnoses",ct)??throw Error("MSG113",404);
-            if(!entry.IsActive)throw Error("MSG202",409);
-            if(entry.Version!=reference.Version||entry.Name!=reference.Name||entry.Code!=reference.Code)throw Error("MSG111",409);
+            var entry=await db.ReferenceEntries.AsNoTracking().SingleOrDefaultAsync(x=>x.Id==reference.Id&&x.Kind=="diagnoses",ct)??throw Error("MSG42",404);
+            if(!entry.IsActive)throw Error("MSG51",409);
+            if(entry.Version!=reference.Version||entry.Name!=reference.Name||entry.Code!=reference.Code)throw Error("MSG41",409);
         }
     }
     private static string[] EffectiveDiagnoses(ExaminationContent c) =>
@@ -237,8 +237,8 @@ public sealed class ExaminationService(DcmsDbContext db, ClinicalAccess access, 
     {
         await access.VisitAsync(actorId, visitId, true, ct);
         var w = await GetAsync(actorId, visitId, ct);
-        if (w.Examination?.Confirmed != true || (w.Visit.Status != VisitStatuses.ExaminationConfirmed && !(w.Visit.Status == VisitStatuses.Completed && w.Examination.Content.Disposition == "ProceedToTreatment"))) throw Error("MSG42", 409);
-        if(w.Investigations?.Any(x=>x.RequiredForDiagnosis && x.State is not ("Reviewed" or "Cancelled"))==true) throw new BusinessException(409,SystemMessages.Get("MSG239",field:"cần nhận và đọc kết quả cận lâm sàng bổ sung") with {Field="investigations"});
+        if (w.Examination?.Confirmed != true || (w.Visit.Status != VisitStatuses.ExaminationConfirmed && !(w.Visit.Status == VisitStatuses.Completed && w.Examination.Content.Disposition == "ProceedToTreatment"))) throw Error("MSG34", 409);
+        if(w.Investigations?.Any(x=>x.RequiredForDiagnosis && x.State is not ("Reviewed" or "Cancelled"))==true) throw new BusinessException(409,SystemMessages.Get("MSG56",field:"cần nhận và đọc kết quả cận lâm sàng bổ sung") with {Field="investigations"});
         var files = new List<DocumentDto>();
         for (var pageNumber = 1; ; pageNumber++) {
             var page = await documents.ListAsync(actorId, new(w.Visit.PatientId, VisitId: visitId, Page: pageNumber, PageSize: 100), ct);
@@ -251,7 +251,7 @@ public sealed class ExaminationService(DcmsDbContext db, ClinicalAccess access, 
     public async Task<IReadOnlyList<PatientExamination>> ListAsync(int actorId, int patientId, CancellationToken ct)
     {
         var branches = await access.BranchesAsync(actorId, ct);
-        if (!await db.Patients.AnyAsync(p => p.Id == patientId, ct)) throw Error("MSG113", 404);
+        if (!await db.Patients.AnyAsync(p => p.Id == patientId, ct)) throw Error("MSG42", 404);
         var rows = await (from v in db.Visits.AsNoTracking()
             join a in db.Appointments on v.AppointmentId equals a.Id
             join b in db.Set<DCMS.Domain.Features.Scheduling.SchedulingBranch>() on v.BranchId equals b.Id

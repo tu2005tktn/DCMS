@@ -30,11 +30,11 @@ public sealed class GoogleAuthenticationService(
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
         // A new Google identity must not claim or duplicate an email already used by another account.
         if (await users.FindByEmailAsync(identity.Email) != null)
-            throw new BusinessException(409, new SystemMessage("GOOGLE_EMAIL_EXISTS",
+            throw new BusinessException(409, new SystemMessage("MSG63",
                 "Email này đã có tài khoản. Vui lòng đăng nhập bằng phương thức đã đăng ký hoặc chọn tài khoản Google khác."));
 
         if (!await roles.RoleExistsAsync(AccountRoles.Guest))
-            throw new BusinessException(503, SystemMessages.Get("MSG144"));
+            throw new BusinessException(503, SystemMessages.Get("MSG49"));
 
         var now = DateTimeOffset.UtcNow;
         var user = new ApplicationUser
@@ -60,8 +60,8 @@ public sealed class GoogleAuthenticationService(
     private static void Ensure(IdentityResult result)
     {
         if (!result.Succeeded) throw new BusinessException(409,
-            new SystemMessage("GOOGLE_CONFLICT", "Không thể tạo tài khoản Google. Vui lòng thử lại."));
+            new SystemMessage("MSG64", "Không thể tạo tài khoản Google. Vui lòng thử lại."));
     }
 
-    private static BusinessException Unavailable() => new(403, SystemMessages.Get("MSG06"));
+    private static BusinessException Unavailable() => new(403, SystemMessages.Get("MSG05"));
 }

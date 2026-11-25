@@ -22,11 +22,11 @@ public sealed class ScreenPermissionMiddleware(RequestDelegate next)
             var values = context.Request.RouteValues.ToDictionary(x => x.Key, x => x.Value?.ToString());
             var kind = body?.RootElement.ValueKind == JsonValueKind.Object && body.RootElement.TryGetProperty("kind", out var draftKind) && draftKind.ValueKind == JsonValueKind.String ? draftKind.GetString() : null;
             var rule = ScreenEndpointPermissions.Resolve(endpoint.RoutePattern.RawText ?? "", context.Request.Method, values, kind);
-            if (rule == null) throw new BusinessException(403, SystemMessages.Get("MSG06"));
-            if (rule.Baseline == null && !rule.AnyOf.Any(actor.Permissions.Contains)) throw new BusinessException(403, SystemMessages.Get("MSG06"));
+            if (rule == null) throw new BusinessException(403, SystemMessages.Get("MSG05"));
+            if (rule.Baseline == null && !rule.AnyOf.Any(actor.Permissions.Contains)) throw new BusinessException(403, SystemMessages.Get("MSG05"));
             if ((endpoint.RoutePattern.RawText ?? "").EndsWith("/change-appointment") && body?.RootElement.ValueKind == JsonValueKind.Object) {
                 var permission = body.RootElement.TryGetProperty("newStartAt", out var newStart) && newStart.ValueKind != JsonValueKind.Null ? "appointments.reschedule" : "appointments.cancel";
-                if (!actor.Permissions.Contains(permission)) throw new BusinessException(403, SystemMessages.Get("MSG06"));
+                if (!actor.Permissions.Contains(permission)) throw new BusinessException(403, SystemMessages.Get("MSG05"));
             }
             if (rule.Baseline == null) await scope.EnforceAsync(actor.Id, context, body?.RootElement, context.RequestAborted);
             await next(context);

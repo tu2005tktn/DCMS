@@ -50,7 +50,6 @@ public sealed record DossierListItem(Guid Id, string Code, int PatientId, int Br
     string Diagnosis, string State, int Version, DateTimeOffset UpdatedAt);
 public sealed record DossierPage(IReadOnlyList<DossierListItem> Items, int Total, int Page, int PageSize);
 public sealed record TreatmentChange(TreatmentDossierDto Dossier, SystemMessage Notification);
-public sealed record TreatmentHistoryItem(int Version, DateTimeOffset CommittedAt, int ActorId, string SnapshotJson);
 public sealed record PerformedTreatmentItem(Guid Id, DateTimeOffset PerformedAt, string ServiceName,
     string? Region, decimal Quantity, string Unit, string? Outcome);
 public sealed record OwnTreatmentPaymentItem(Guid Id, DateOnly PaidOn, string Method, long TotalVnd, string Source);
@@ -84,12 +83,9 @@ public interface ITreatmentDossierService
     Task<TreatmentChange> ConfirmSheetPlanAsync(int actorId, Guid dossierId, Guid rowId, ConfirmSheetPlanRequest request, CancellationToken ct);
     Task<ImportItemPlanResult> ImportItemPlanAsync(int actorId, Guid dossierId, ImportItemPlanRequest request, CancellationToken ct);
     Task<ConfirmSheetActualResult> ConfirmSheetActualAsync(int actorId, Guid dossierId, Guid rowId, ConfirmSheetActualRequest request, CancellationToken ct);
-    Task<TreatmentChange> ScheduleNoteAsync(int actorId, Guid dossierId, Guid itemId, ScheduleNoteRequest request, CancellationToken ct);
-    Task<DossierTotals> SummaryAsync(int actorId, int patientId, int? branchId, CancellationToken ct);
     Task<DossierPage> ListAsync(int actorId, int patientId, int? branchId, int page, int pageSize, CancellationToken ct);
     Task<TreatmentDossierDto> GetAsync(int actorId, Guid dossierId, CancellationToken ct);
     Task<TreatmentChange> CreateAsync(int actorId, int patientId, CreateDossierRequest request, CancellationToken ct);
-    Task<IReadOnlyList<TreatmentHistoryItem>> HistoryAsync(int actorId, Guid dossierId, CancellationToken ct);
     Task<TreatmentChange> CloseAsync(int actorId, Guid dossierId, CloseDossierRequest request, CancellationToken ct);
     Task<TreatmentChange> ReopenAsync(int actorId, Guid dossierId, ReopenDossierRequest request, CancellationToken ct);
     Task<TreatmentChange> DeleteAsync(int actorId, Guid dossierId, DeleteDossierRequest request, CancellationToken ct);
@@ -99,6 +95,5 @@ public interface ITreatmentDossierService
     Task<SheetDraftDto> SaveSheetDraftAsync(int actorId, Guid dossierId, Guid rowId,
         SaveSheetDraftRequest request, CancellationToken ct);
     Task DeleteSheetDraftAsync(int actorId, Guid dossierId, Guid rowId, int expectedVersion, CancellationToken ct);
-    Task<PlanPricePreviewDto> PricePreviewAsync(int actorId, Guid dossierId, CancellationToken ct);
     Task<IReadOnlyList<OwnTreatmentSummaryItem>> OwnSummaryAsync(int accountId, CancellationToken ct);
 }

@@ -1,5 +1,7 @@
 # S21/S43 — Hồ sơ và kế hoạch điều trị (UC-13/39)
 
+> Cập nhật 21/11/2026: `GET /api/dossiers/{id}/plan/preview`, `GET /api/dossiers/{id}/plan/history`, `GET /api/patients/{id}/dossiers/summary` và `PATCH .../schedule-note` đã gỡ vì không có giao diện sử dụng, xem [UNUSED-API-REMOVAL.vi.md](UNUSED-API-REMOVAL.vi.md).
+
 Baseline hiện hành cho màn tích hợp: [Điều trị & Thanh toán v2.5](TREATMENT-PAYMENT-V25.md). Phần này mở rộng DCMS-96 bằng hàng nhập S21/S22 ngay trong S43, trạng thái đóng hồ sơ thật và contract S38/S39; các mô tả cũ về S43 chỉ tóm tắt, cờ hoàn tất tự do hoặc chưa có actual không áp dụng cho luồng v2.5.
 
 Nguồn hồ sơ gốc: DCMS_Screen_Specifications_v2.2.docx và DCMS_Use_Cases_Business_Rules_Messages_v2.2.docx, 19/10/2026. Phần bước/mẫu/chỉ định áp dụng v2.3 ngày 24/10/2026 và bổ sung ngày 25/10/2026 theo [TREATMENT-PROGRESSION.vi.md](TREATMENT-PROGRESSION.vi.md). Điều chỉnh plan đã chốt dùng [S62](S62-TREATMENT-PLAN-REVISION.md), không mở editor thứ hai ở S21/S43. Phạm vi S21/S43 không bao gồm UI patient app, actual S22, file S20 hoặc ledger S38/S39.

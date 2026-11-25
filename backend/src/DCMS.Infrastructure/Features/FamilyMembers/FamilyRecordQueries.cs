@@ -112,16 +112,16 @@ public sealed partial class FamilyRecordService
         var row = await GrantedAsync(actor, memberId, "Documents", ct);
         var document = await Documents(row).SingleOrDefaultAsync(x => x.Id == documentId, ct) ?? throw Missing();
         var root = configuration["ClinicalDocuments:StoragePath"];
-        if (string.IsNullOrWhiteSpace(root) || !Path.IsPathFullyQualified(root)) throw new BusinessException(503, SystemMessages.Get("MSG144"));
+        if (string.IsNullOrWhiteSpace(root) || !Path.IsPathFullyQualified(root)) throw new BusinessException(503, SystemMessages.Get("MSG49"));
         root = Path.GetFullPath(root);
         for (var directory = new DirectoryInfo(Directory.GetCurrentDirectory()); directory != null; directory = directory.Parent)
             if ((Directory.Exists(Path.Combine(directory.FullName, ".git")) || File.Exists(Path.Combine(directory.FullName, ".git")))
                 && (root.Equals(directory.FullName, StringComparison.OrdinalIgnoreCase) || root.StartsWith(directory.FullName + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)))
-                throw new BusinessException(503, SystemMessages.Get("MSG144"));
+                throw new BusinessException(503, SystemMessages.Get("MSG49"));
         byte[] bytes;
         try { bytes = await File.ReadAllBytesAsync(Path.Combine(root, document.Id.ToString("N")), ct); }
-        catch (IOException) { throw new BusinessException(503, SystemMessages.Get("MSG144")); }
-        if (Convert.ToHexString(SHA256.HashData(bytes)) != document.Sha256) throw new BusinessException(409, SystemMessages.Get("MSG42"));
+        catch (IOException) { throw new BusinessException(503, SystemMessages.Get("MSG49")); }
+        if (Convert.ToHexString(SHA256.HashData(bytes)) != document.Sha256) throw new BusinessException(409, SystemMessages.Get("MSG34"));
         await GrantedAsync(actor, memberId, "Documents", ct);
         await RecordReadAsync(row, actor, "DocumentRead", ct);
         return new(bytes, document.ContentType, document.FileName);

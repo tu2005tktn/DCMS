@@ -30,7 +30,7 @@ async function setup(page: Page, permitted = true) {
     else if (url.pathname === `/api/appointments/${id}`) body = { appointment, bookerName: 'Booker', bookerPhoneMasked: '***' };
     else if (url.pathname === '/api/support-requests') {
       queries.push(url);
-      if (fail) return route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ code: 'MSG144', message: 'Synthetic read error' }) });
+      if (fail) return route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ code: 'MSG49', message: 'Synthetic read error' }) });
       body = { items: empty ? [] : [request], total: empty ? 0 : 1, page: 1, pageSize: 10 };
     } else if (url.pathname === '/api/support-requests/SR-DIRECT/verify-requester') {
       writes.push(url.pathname);

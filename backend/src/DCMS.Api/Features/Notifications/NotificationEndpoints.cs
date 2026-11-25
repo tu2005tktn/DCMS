@@ -29,7 +29,7 @@ public static class NotificationEndpoints
         {
             if (body is null || body.Platform != "android" || string.IsNullOrWhiteSpace(body.Token)
                 || body.Token.Length > 512 || body.Token.Any(char.IsWhiteSpace))
-                throw new BusinessException(400, SystemMessages.Get("MSG09"));
+                throw new BusinessException(400, SystemMessages.Get("MSG07"));
             var accountId = AuthenticationEndpoints.AccountId(ctx.User);
             var device = await db.PushDevices.SingleOrDefaultAsync(x => x.Token == body.Token, ct);
             if (device is null)
@@ -47,7 +47,7 @@ public static class NotificationEndpoints
         group.MapDelete("/devices", async (HttpContext ctx, [FromBody] PushDeviceDeleteRequest body, DcmsDbContext db, CancellationToken ct) =>
         {
             if (body is null || string.IsNullOrWhiteSpace(body.Token))
-                throw new BusinessException(400, SystemMessages.Get("MSG09"));
+                throw new BusinessException(400, SystemMessages.Get("MSG07"));
             var accountId = AuthenticationEndpoints.AccountId(ctx.User);
             await db.PushDevices.Where(x => x.AccountId == accountId && x.Token == body.Token).ExecuteDeleteAsync(ct);
             return Results.Ok(new { ok = true });
@@ -66,10 +66,10 @@ public static class NotificationEndpoints
         {
             if (request is null || request.NotificationIds is null || request.NotificationIds.Count == 0
                 || request.NotificationIds.Count > 100)
-                throw new BusinessException(400, SystemMessages.Get("MSG09"));
+                throw new BusinessException(400, SystemMessages.Get("MSG07"));
             var accountId = AuthenticationEndpoints.AccountId(ctx.User);
             if (request.ExpectedAccountId != accountId)
-                throw new BusinessException(409, SystemMessages.Get("MSG111"));
+                throw new BusinessException(409, SystemMessages.Get("MSG41"));
             // Đảm bảo chỉ mark của account hiện tại.
             var result = await service.MarkReadAsync(accountId, request with { ExpectedAccountId = accountId }, ct);
             return Results.Ok(result);
@@ -78,12 +78,12 @@ public static class NotificationEndpoints
         group.MapPost("/{id}/mark-read", async (HttpContext ctx, string id, MarkReadOneBody body,
             INotificationService service, CancellationToken ct) =>
         {
-            if (string.IsNullOrWhiteSpace(id)) throw new BusinessException(400, SystemMessages.Get("MSG09"));
+            if (string.IsNullOrWhiteSpace(id)) throw new BusinessException(400, SystemMessages.Get("MSG07"));
             var accountId = AuthenticationEndpoints.AccountId(ctx.User);
             if (body is null || body.ExpectedAccountId != accountId)
-                throw new BusinessException(409, SystemMessages.Get("MSG111"));
+                throw new BusinessException(409, SystemMessages.Get("MSG41"));
             var r = await service.MarkReadOneAsync(id, accountId, ct);
-            if (r.Skipped.Count > 0) throw new BusinessException(409, SystemMessages.Get("MSG111"));
+            if (r.Skipped.Count > 0) throw new BusinessException(409, SystemMessages.Get("MSG41"));
             return Results.Ok(new { ok = true });
         });
 
@@ -98,7 +98,7 @@ public static class NotificationEndpoints
             INotificationService service, CancellationToken ct) =>
         {
             if (body is null || string.IsNullOrWhiteSpace(body.DeepLink))
-                throw new BusinessException(400, SystemMessages.Get("MSG09"));
+                throw new BusinessException(400, SystemMessages.Get("MSG07"));
             var accountId = AuthenticationEndpoints.AccountId(ctx.User);
             var r = await service.CheckDeepLinkAsync(accountId, body.DeepLink, ct);
             return Results.Ok(r);

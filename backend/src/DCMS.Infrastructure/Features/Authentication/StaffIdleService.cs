@@ -13,30 +13,13 @@ namespace DCMS.Infrastructure.Features.Authentication;
 
 public sealed class StaffIdleService(DcmsDbContext db, TimeProvider clock) : IStaffIdleService
 {
-    public static readonly int[] AllowedMinutes = [5, 10, 20, 30, 60, 90, 120];
     private static BusinessException Error(int status, string code) => new(status, SystemMessages.Get(code));
-    public static bool Allowed(int minutes) => AllowedMinutes.Contains(minutes);
     public async Task<int> MinutesAsync(CancellationToken ct)
     {
         var json = await db.Set<ClinicSettingsVersion>().AsNoTracking().OrderByDescending(x => x.Version)
             .Select(x => x.ContentJson).FirstOrDefaultAsync(ct);
         return json == null ? GeneralSettings.Default.StaffIdleTimeoutMinutes
             : JsonSerializer.Deserialize<GeneralSettings>(json, ClinicSettingsStore.Json)!.StaffIdleTimeoutMinutes;
-    }
-
-    public async Task<StaffIdlePreviewDto> PreviewAsync(StaffIdlePreviewRequest request, CancellationToken ct)
-    {
-        if (!Allowed(request.StaffIdleTimeoutMinutes)) throw Error(400, "MSG04");
-        var now = clock.GetUtcNow();
-        var current = await MinutesAsync(ct);
-        var staffAuth = await db.Users.AsNoTracking()
-            .Where(x => x.AccountType == "Staff")
-            .Select(x => x.AuthData)
-            .ToListAsync(ct);
-        var affected = staffAuth.SelectMany(x => x.Sessions).Count(x => x.ClientKind == "StaffWeb"
-            && x.RevokedAt == null && x.LastInteractiveActivityAt.AddMinutes(current) > now
-            && x.LastInteractiveActivityAt.AddMinutes(request.StaffIdleTimeoutMinutes) <= now);
-        return new(request.StaffIdleTimeoutMinutes, affected, now);
     }
 
     public async Task<StaffIdleStatusDto> StatusAsync(int actorId, Guid sessionId, CancellationToken ct) =>
@@ -55,13 +38,13 @@ public sealed class StaffIdleService(DcmsDbContext db, TimeProvider clock) : ISt
         var owner = await db.LockAccountAsync(actorId, ct);
         var session = owner?.Sessions.SingleOrDefault(x => x.Id == sessionId);
         if (session == null || session.AccountId != actorId || session.ClientKind != "StaffWeb"
-            || session.RevokedAt != null) throw Error(403, "MSG06");
+            || session.RevokedAt != null) throw Error(403, "MSG05");
         var now = clock.GetUtcNow(); var minutes = await MinutesAsync(ct);
         var deadline = session.LastInteractiveActivityAt.AddMinutes(minutes);
         if (deadline <= now)
         {
             await ExpireAsync(session, now, ct); await tx.CommitAsync(ct);
-            throw Error(401, "MSG07");
+            throw Error(401, "MSG06");
         }
         if (request != null)
         {
@@ -69,10 +52,10 @@ public sealed class StaffIdleService(DcmsDbContext db, TimeProvider clock) : ISt
                 x.SessionId == sessionId && x.RequestKey == request.RequestKey, ct);
             if (old != null)
             {
-                if (old.ExpectedVersion != request.ExpectedVersion) throw Error(409, "MSG111");
+                if (old.ExpectedVersion != request.ExpectedVersion) throw Error(409, "MSG41");
                 return JsonSerializer.Deserialize<StaffIdleStatusDto>(old.ResultJson)!;
             }
-            if (session.ActivityVersion != request.ExpectedVersion) throw Error(409, "MSG111");
+            if (session.ActivityVersion != request.ExpectedVersion) throw Error(409, "MSG41");
             if (now - session.LastInteractiveActivityAt >= TimeSpan.FromSeconds(30))
             {
                 session.LastInteractiveActivityAt = now;

@@ -24,7 +24,7 @@ public sealed class TreatmentPlanBookingApiTests(ApiFixture fixture) : IClassFix
     private int outboxBefore;
 
     private async Task AssertRejectedWithoutWrites(Setup s, HttpResponseMessage response,
-        HttpStatusCode expectedStatus = HttpStatusCode.Conflict, string expectedCode = "MSG230")
+        HttpStatusCode expectedStatus = HttpStatusCode.Conflict, string expectedCode = "MSG54")
     {
         Assert.Equal(expectedStatus, response.StatusCode);
         Assert.Equal(expectedCode, (await response.Content.ReadFromJsonAsync<DCMS.Application.Common.SystemMessage>())!.Code);
@@ -89,7 +89,7 @@ public sealed class TreatmentPlanBookingApiTests(ApiFixture fixture) : IClassFix
     {
         var s = await Prepare(); using var client = await Login();
         await AssertRejectedWithoutWrites(s, await Book(client, s, s.Dossier, false),
-            HttpStatusCode.BadRequest, "APPOINTMENT_PATIENT_CONSENT_REQUIRED");
+            HttpStatusCode.BadRequest, "MSG65");
         Assert.Equal(HttpStatusCode.Created, (await Book(client, s, s.Dossier)).StatusCode);
     }
 
@@ -259,7 +259,7 @@ public sealed class TreatmentPlanBookingApiTests(ApiFixture fixture) : IClassFix
     public async Task AnotherPatientsDossierCannotBeBooked()
     {
         var s = await Prepare(); var other = await Prepare(); using var client = await Login();
-        await AssertRejectedWithoutWrites(s, await Book(client, s, other.Dossier), HttpStatusCode.Forbidden, "MSG06");
+        await AssertRejectedWithoutWrites(s, await Book(client, s, other.Dossier), HttpStatusCode.Forbidden, "MSG05");
     }
 
     [Fact]
@@ -322,7 +322,7 @@ public sealed class TreatmentPlanBookingApiTests(ApiFixture fixture) : IClassFix
         Assert.Equal(original.AppointmentId, (await replay.Content.ReadFromJsonAsync<AppointmentResult>())!.AppointmentId);
         var changedConsent = await client.PostAsJsonAsync("/api/appointments", lastCommand! with { PatientConsentConfirmed = false });
         Assert.Equal(HttpStatusCode.Conflict, changedConsent.StatusCode);
-        Assert.Equal("MSG111", (await changedConsent.Content.ReadFromJsonAsync<DCMS.Application.Common.SystemMessage>())!.Code);
+        Assert.Equal("MSG41", (await changedConsent.Content.ReadFromJsonAsync<DCMS.Application.Common.SystemMessage>())!.Code);
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
         var saved = Assert.Single(await db.Appointments.AsNoTracking().Where(x => x.PatientId == s.Patient).ToListAsync());

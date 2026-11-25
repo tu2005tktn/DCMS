@@ -20,7 +20,7 @@ public sealed class WorkStatisticsService(DcmsDbContext db, TimeProvider clock, 
     {
         var scope = await access.RequireAsync(actorId, "finance.work-statistics.read", ct);
         if (branchId.HasValue && !scope.BranchIds.Contains(branchId.Value))
-            throw new BusinessException(403, SystemMessages.Get("MSG06"));
+            throw new BusinessException(403, SystemMessages.Get("MSG05"));
         if (pageSize is not (20 or 50 or 100) || page < 1 || page > int.MaxValue / pageSize || q?.Length > 160 || from > to) throw Bad();
         var dossierQuery = db.TreatmentDossiers.AsNoTracking().Where(d => d.State != "Deleted" && scope.BranchIds.Contains(d.BranchId));
         if (branchId.HasValue) dossierQuery = dossierQuery.Where(d => d.BranchId == branchId);

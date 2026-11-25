@@ -29,7 +29,7 @@ async function setup(page: Page, settings: { permissions?: string[]; status?: st
         failed = true;
         if (settings.network) return route.abort('failed');
         if (settings.stale) current = { ...current, version: 2 };
-        return json({ code: settings.stale ? 'MSG111' : 'MSG34', message: settings.stale ? 'Phiên bản đã thay đổi.' : 'Khung giờ không còn trống.' }, 409);
+        return json({ code: settings.stale ? 'MSG41' : 'MSG29', message: settings.stale ? 'Phiên bản đã thay đổi.' : 'Khung giờ không còn trống.' }, 409);
       }
       if (path.endsWith('/cancel')) current = { ...current, status: 'Cancelled', version: current.version + 1 };
       else current = { ...current, startAt: body.newStart, endAt: new Date(Date.parse(body.newStart) + 30 * 60000).toISOString(), version: current.version + 1 };

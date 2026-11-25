@@ -1,6 +1,6 @@
 # S26 — Notifications & Appointment Reminders (mobile patient app)
 
-Bằng chứng tích hợp S26 theo spec [S26-Notifications-Reminders.md](../specs/S26-Notifications-Reminders.md). Backend TV5 và mobile HTTP adapter đã được nối thật; mock chỉ còn là lựa chọn offline khi đặt `EXPO_PUBLIC_USE_REAL_NOTIFICATION_API=false`.
+Bằng chứng tích hợp S26 theo spec [S26-Notifications-Reminders.md](../specs/S26-Notifications-Reminders.md). Backend TV5 và mobile HTTP adapter đã được nối thật; mock đã gỡ (25/11/2026).
 
 ## Backend đã triển khai
 
@@ -23,11 +23,9 @@ Bằng chứng tích hợp S26 theo spec [S26-Notifications-Reminders.md](../spe
 | --- | --- | 
 | `mobile/src/features/appointments/notification.types.ts` | DTO + enum + envelope chuẩn hoá giữa UI ↔ backend. |
 | `mobile/src/features/appointments/notification.api.ts` | HTTP client gọi endpoint TV5 (`/api/notifications`, `/mark-read`, `/unread-count`, `/check-deep-link`). |
-| `mobile/src/features/appointments/notification.repo.ts` | Adapter: chuyển đổi mock ↔ real theo `EXPO_PUBLIC_USE_REAL_NOTIFICATION_API`. |
-| `mobile/src/features/appointments/notification.mock.ts` | Mock repo hiện có — giữ nguyên để chạy UI khi backend chưa sẵn sàng. |
+| `mobile/src/features/appointments/notification.repo.ts` | Gọi `notification.api.ts`, đổi lỗi HTTP sang mã System Message. |
 | `mobile/src/app/(home)/notifications.tsx` | S26 list screen — đã chuyển sang dùng `notificationRepo`, truyền token từ SessionProvider. |
 | `mobile/src/config/env.ts` | Thêm `useRealNotificationApi` cờ. |
-| `mobile/.env.example` | Document flag `EXPO_PUBLIC_USE_REAL_NOTIFICATION_API`. |
 
 ## Endpoint contract chốt với backend TV5
 
@@ -69,9 +67,6 @@ cd mobile
 # Mock (mặc định, không cần backend):
 npm.cmd start
 
-# Real API (khi backend TV5 sẵn sàng):
-$env:EXPO_PUBLIC_USE_REAL_NOTIFICATION_API = "true"
-npm.cmd start
 ```
 
 ## Kiểm thử tay
@@ -81,7 +76,7 @@ npm.cmd start
 3. Tap một notification unread → marker chấm xanh biến mất, body vẫn còn.
 4. Tap notification có `deepLink` → navigate sang detail appointment (mock chấp nhận vì accountId khớp).
 5. Sửa `dedupeKey` trong seed để có notification của account 2 → đăng nhập account khác (mock chưa hỗ trợ đổi user, dùng test API giả lập).
-6. Bật `EXPO_PUBLIC_USE_REAL_NOTIFICATION_API=true` + chạy backend → đảm bảo mọi case (list/markRead/deepLink) đều dùng API thật.
+6. Chạy backend → mọi case (list/markRead/deepLink) dùng API thật.
 
 ## Ghi chú vận hành
 

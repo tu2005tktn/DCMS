@@ -31,7 +31,7 @@ public sealed class SupportRequestService(DcmsDbContext db, UserManager<Applicat
     {
         page = Math.Max(page, 1); pageSize = Math.Clamp(pageSize, 1, 100);
         var branches = await StaffBranchesAsync(actorId, ct);
-        if (branchId.HasValue && !branches.Contains(branchId.Value)) throw Error("MSG06", 403);
+        if (branchId.HasValue && !branches.Contains(branchId.Value)) throw Error("MSG05", 403);
         var selected = branchId.HasValue ? [branchId.Value] : branches;
         var allowed = new HashSet<string>((statuses ?? "Pending").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
             StringComparer.OrdinalIgnoreCase);
@@ -107,7 +107,7 @@ public sealed class SupportRequestService(DcmsDbContext db, UserManager<Applicat
             var availability = await changes.AvailabilityAsync(actorId, appointment.Code,
                 DateOnly.FromDateTime(start.ToOffset(TimeSpan.FromHours(7)).DateTime), appointment.DentistId, ct);
             var slot = availability.Slots.FirstOrDefault(x => x.Start == start.ToUniversalTime())
-                ?? throw Error("MSG34", 409);
+                ?? throw Error("MSG29", 409);
             changed = await changes.RescheduleAsync(actorId, appointment.Code,
                 new RescheduleAppointmentRequest(appointment.Version, command.RequestKey, slot.Start,
                     slot.ChairId, slot.ScheduleVersion, slot.AssistantScheduleVersion,
@@ -158,7 +158,7 @@ public sealed class SupportRequestService(DcmsDbContext db, UserManager<Applicat
             if (!request.AppointmentActionRequestKey.HasValue || !await db.AppointmentChanges.AsNoTracking().AnyAsync(x =>
                     x.AppointmentId == appointment.Id && x.RequestKey == request.AppointmentActionRequestKey
                     && x.Action == (request.Kind == "Cancel" ? "CANCEL" : "RESCHEDULE"), ct))
-                throw Error("MSG111");
+                throw Error("MSG41");
         }
         request.Status = command.Decision == "Reject" ? "Rejected" : "Resolved";
         request.DecisionReason = reason ?? Clean(command.Notes) ?? "Đã xử lý yêu cầu.";
@@ -173,7 +173,7 @@ public sealed class SupportRequestService(DcmsDbContext db, UserManager<Applicat
         });
         await db.SaveChangesAsync(ct);
         var detail = await ToDetailAsync(request, appointment, ct);
-        var result = new ResolveSupportResult(true, detail, command.Decision == "Reject" ? "MSG38" : "MSG37");
+        var result = new ResolveSupportResult(true, detail, command.Decision == "Reject" ? "MSG32" : "MSG31");
         db.SupportRequestReceipts.Add(new SupportRequestReceipt { ActorAccountId = actorId,
             RequestKey = command.RequestKey, Fingerprint = fingerprint, SupportRequestId = request.Id,
             ResultJson = JsonSerializer.Serialize(result) });
@@ -202,17 +202,17 @@ public sealed class SupportRequestService(DcmsDbContext db, UserManager<Applicat
         await db.Database.ExecuteSqlRawAsync("SELECT pg_advisory_xact_lock(90403)", ct);
         replay = await ReplayAsync<SupportCustomerResult>(actorId, command.RequestKey, fingerprint, ct);
         if (replay != null) return replay;
-        if (await db.AppointmentSupportRequests.AnyAsync(x => x.RequestKey == command.RequestKey, ct)) throw Error("MSG111", 409);
+        if (await db.AppointmentSupportRequests.AnyAsync(x => x.RequestKey == command.RequestKey, ct)) throw Error("MSG41", 409);
         string requestCode;
         do { requestCode = "SR-" + Guid.NewGuid().ToString("N")[..8].ToUpperInvariant(); }
         while (await db.AppointmentSupportRequests.AnyAsync(x => x.Code == requestCode, ct));
 
         var appointment = await AuthorizeCustomerAppointmentAsync(actorId, code, ct);
         if (appointment.Status != "Confirmed" || appointment.StartAt <= clock.GetUtcNow())
-            throw Error("MSG31", 409);
+            throw Error("MSG26", 409);
 
         if (await db.AppointmentSupportRequests.AnyAsync(x => x.AppointmentId == appointment.Id && x.Status == "Pending", ct))
-            throw Error("MSG111", 409);
+            throw Error("MSG41", 409);
 
         var request = new AppointmentSupportRequest
         {
@@ -257,7 +257,7 @@ public sealed class SupportRequestService(DcmsDbContext db, UserManager<Applicat
             request.Kind == "Change" ? "RESCHEDULE" : request.Kind == "Cancel" ? "CANCEL" : request.Kind,
             request.Reason ?? "", request.Status, request.CreatedAt, request.DecidedAt, request.PublicNote,
             request.Version, request.ProposedStartAt);
-        var result = new SupportCustomerResult(dto, SystemMessages.Get("MSG33"));
+        var result = new SupportCustomerResult(dto, SystemMessages.Get("MSG28"));
         await SaveReceiptAsync(actorId, command.RequestKey, fingerprint, request.Id, result, ct);
         await tx.CommitAsync(ct);
         await PublishSupportUpdatedAsync(request, appointment, "Created");
@@ -269,19 +269,19 @@ public sealed class SupportRequestService(DcmsDbContext db, UserManager<Applicat
     {
         if (command.ExpectedVersion <= 0) throw Error("MSG04", 400);
         var request = await db.LoadSupportRequestAsync(id, ct)
-            ?? throw Error("MSG102", 404);
+            ?? throw Error("MSG37", 404);
         var appointment = await db.Appointments.SingleAsync(x => x.Id == request.AppointmentId, ct);
         var user = await users.FindByIdAsync(actorId.ToString());
-        if (user == null || !user.IsActive) throw Error("MSG07", 401);
+        if (user == null || !user.IsActive) throw Error("MSG06", 401);
         if (request.RequesterAccountId != actorId && appointment.BookerAccountId != actorId)
         {
             var linked = await db.Set<PatientAccountLink>().AsNoTracking()
                 .AnyAsync(x => x.AccountId == actorId && x.PatientId == appointment.PatientId && x.Status == PatientLinkStatus.Verified, ct);
-            if (!linked) throw Error("MSG102", 404);
+            if (!linked) throw Error("MSG37", 404);
         }
 
         if (request.Status != "Pending" || request.Version != command.ExpectedVersion)
-            throw Error("MSG111", 409);
+            throw Error("MSG41", 409);
 
         request.Status = "Withdrawn";
         request.DecidedAt = clock.GetUtcNow();
@@ -319,15 +319,15 @@ public sealed class SupportRequestService(DcmsDbContext db, UserManager<Applicat
     {
         var user = await users.FindByIdAsync(actorId.ToString());
         if (user == null || !user.IsActive || (user.LockoutEnabled && user.LockoutEnd > clock.GetUtcNow()))
-            throw Error("MSG07", 401);
-        if (user.AccountType != "Public" && user.AccountType != "Staff") throw Error("MSG06", 403);
+            throw Error("MSG06", 401);
+        if (user.AccountType != "Public" && user.AccountType != "Staff") throw Error("MSG05", 403);
         var appointment = await db.Appointments.SingleOrDefaultAsync(x => x.Code == code, ct)
-            ?? throw Error("MSG102", 404);
+            ?? throw Error("MSG37", 404);
         var linkedPatientId = await db.Set<PatientAccountLink>().AsNoTracking()
             .Where(x => x.AccountId == actorId && x.Status == PatientLinkStatus.Verified)
             .Select(x => (int?)x.PatientId).SingleOrDefaultAsync(ct);
         if (appointment.BookerAccountId != actorId && (linkedPatientId == null || appointment.PatientId != linkedPatientId))
-            throw Error("MSG102", 404);
+            throw Error("MSG37", 404);
         return appointment;
     }
 
@@ -335,7 +335,7 @@ public sealed class SupportRequestService(DcmsDbContext db, UserManager<Applicat
         string id, CancellationToken ct)
     {
         var request = await db.LoadSupportRequestAsync(id, ct)
-            ?? throw Error("MSG102", 404);
+            ?? throw Error("MSG37", 404);
         var appointment = await db.Appointments.SingleAsync(x => x.Id == request.AppointmentId, ct);
         await RequireBranchAsync(actorId, appointment.BranchId, ct);
         return (request, appointment);
@@ -346,7 +346,7 @@ public sealed class SupportRequestService(DcmsDbContext db, UserManager<Applicat
         var permissions=await settingsAccess.RequireAsync(actorId,"appointments.support.handle",ct);
         var user = await users.FindByIdAsync(actorId.ToString());
         if (user == null || !user.IsActive || user.AccountType != "Staff"
-            || !permissions.GrantDriven && !await users.IsInRoleAsync(user, AccountRoles.ClinicAssistant)) throw Error("MSG06", 403);
+            || !permissions.GrantDriven && !await users.IsInRoleAsync(user, AccountRoles.ClinicAssistant)) throw Error("MSG05", 403);
         var result = await (from member in db.SchedulingMembers.AsNoTracking()
             join employee in db.Employees.AsNoTracking() on member.EmployeeId equals employee.Id
             join branch in db.Set<SchedulingBranch>().AsNoTracking() on member.BranchId equals branch.Id
@@ -357,12 +357,12 @@ public sealed class SupportRequestService(DcmsDbContext db, UserManager<Applicat
 
     private async Task RequireBranchAsync(int actorId, int branchId, CancellationToken ct)
     {
-        if (!(await StaffBranchesAsync(actorId, ct)).Contains(branchId)) throw Error("MSG06", 403);
+        if (!(await StaffBranchesAsync(actorId, ct)).Contains(branchId)) throw Error("MSG05", 403);
     }
 
     private static void RequirePending(AppointmentSupportRequest request, int expectedVersion)
     {
-        if (request.Status != "Pending" || request.Version != expectedVersion) throw Error("MSG111");
+        if (request.Status != "Pending" || request.Version != expectedVersion) throw Error("MSG41");
     }
 
     private AppointmentSupportHistory History(AppointmentSupportRequest request, Appointment appointment,
@@ -445,7 +445,7 @@ public sealed class SupportRequestService(DcmsDbContext db, UserManager<Applicat
         var receipt = await db.SupportRequestReceipts.AsNoTracking()
             .SingleOrDefaultAsync(x => x.ActorAccountId == actorId && x.RequestKey == key, ct);
         if (receipt == null) return null;
-        if (receipt.Fingerprint != fingerprint) throw Error("MSG111");
+        if (receipt.Fingerprint != fingerprint) throw Error("MSG41");
         return JsonSerializer.Deserialize<T>(receipt.ResultJson)!;
     }
 

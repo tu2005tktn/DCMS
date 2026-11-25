@@ -218,7 +218,7 @@ public sealed class AppointmentQueryApiTests(ApiFixture fixture) : IClassFixture
             Assert.Contains(view.Appointments, x => x.Id == mine.AppointmentId);
             Assert.DoesNotContain(view.Appointments, x => x.Id == other.AppointmentId);
         }
-        await AssertMessage(await dentist.GetAsync($"/api/appointments/{other.AppointmentId}"), HttpStatusCode.Forbidden, "MSG06");
+        await AssertMessage(await dentist.GetAsync($"/api/appointments/{other.AppointmentId}"), HttpStatusCode.Forbidden, "MSG05");
         var options = (await dentist.GetFromJsonAsync<AppointmentOptions>("/api/appointments/options"))!;
         Assert.Equal(s.DentistId, options.CurrentDentistId);
         Assert.DoesNotContain(options.Dentists, x => x.BranchId == s.BranchId && x.Id == s.OtherDentistId);
@@ -227,11 +227,11 @@ public sealed class AppointmentQueryApiTests(ApiFixture fixture) : IClassFixture
         var ownerOptions = (await (await Login("owner.demo")).GetFromJsonAsync<AppointmentOptions>("/api/appointments/options"))!;
         Assert.Equal(s.OtherDentistId, ownerOptions.CurrentDentistId);
 
-        await AssertMessage(await (await Login("admin.demo")).GetAsync($"/api/appointments/calendar?{Range(s)}"), HttpStatusCode.Forbidden, "MSG06");
+        await AssertMessage(await (await Login("admin.demo")).GetAsync($"/api/appointments/calendar?{Range(s)}"), HttpStatusCode.Forbidden, "MSG05");
         var outsider = await PrepareAsync(assistantMember: false);
-        await AssertMessage(await assistant.GetAsync($"/api/appointments/calendar?{Range(outsider)}"), HttpStatusCode.Forbidden, "MSG06");
+        await AssertMessage(await assistant.GetAsync($"/api/appointments/calendar?{Range(outsider)}"), HttpStatusCode.Forbidden, "MSG05");
         var (publicClient, _) = await NewPublic();
-        await AssertMessage(await publicClient.GetAsync($"/api/appointments/{mine.AppointmentId}"), HttpStatusCode.Forbidden, "MSG06");
+        await AssertMessage(await publicClient.GetAsync($"/api/appointments/{mine.AppointmentId}"), HttpStatusCode.Forbidden, "MSG05");
     }
 
     [Fact]
@@ -248,7 +248,7 @@ public sealed class AppointmentQueryApiTests(ApiFixture fixture) : IClassFixture
         Assert.True(detail.Eligibility.CanSelfService);
 
         var (stranger, _) = await NewPublic();
-        await AssertMessage(await stranger.GetAsync($"/api/me/appointments/{relative.Code}"), HttpStatusCode.NotFound, "MSG102");
+        await AssertMessage(await stranger.GetAsync($"/api/me/appointments/{relative.Code}"), HttpStatusCode.NotFound, "MSG37");
 
         // A clinic booking for a Patient becomes visible to that Patient's verified account, and disappears on revocation.
         var (linked, linkedId) = await NewPublic();
@@ -278,8 +278,8 @@ public sealed class AppointmentQueryApiTests(ApiFixture fixture) : IClassFixture
         }
         Assert.DoesNotContain((await linked.GetFromJsonAsync<MyAppointmentPage>("/api/me/appointments?scope=UPCOMING&pageSize=10"))!.Items,
             x => x.Code == clinic.Code);
-        await AssertMessage(await linked.GetAsync($"/api/me/appointments/{clinic.Code}"), HttpStatusCode.NotFound, "MSG102");
-        await AssertMessage(await assistant.GetAsync("/api/me/appointments"), HttpStatusCode.Forbidden, "MSG06");
+        await AssertMessage(await linked.GetAsync($"/api/me/appointments/{clinic.Code}"), HttpStatusCode.NotFound, "MSG37");
+        await AssertMessage(await assistant.GetAsync("/api/me/appointments"), HttpStatusCode.Forbidden, "MSG05");
     }
 
     [Fact]
@@ -291,7 +291,7 @@ public sealed class AppointmentQueryApiTests(ApiFixture fixture) : IClassFixture
             HttpStatusCode.BadRequest, "MSG04");
         await AssertMessage(await assistant.GetAsync($"/api/appointments?{Range(s)}&pageSize=7"), HttpStatusCode.BadRequest, "MSG04");
         await AssertMessage(await assistant.GetAsync($"/api/appointments?{Range(s)}&status=Unknown"), HttpStatusCode.BadRequest, "MSG04");
-        await AssertMessage(await assistant.GetAsync($"/api/appointments/{Guid.NewGuid()}"), HttpStatusCode.NotFound, "MSG113");
+        await AssertMessage(await assistant.GetAsync($"/api/appointments/{Guid.NewGuid()}"), HttpStatusCode.NotFound, "MSG42");
         var (app, _) = await NewPublic();
         await AssertMessage(await app.GetAsync("/api/me/appointments?scope=LATER"), HttpStatusCode.BadRequest, "MSG04");
     }

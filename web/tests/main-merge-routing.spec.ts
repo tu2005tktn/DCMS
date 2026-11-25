@@ -25,7 +25,7 @@ async function session(page: Page, accountType: 'Public' | 'Staff') {
     } });
     if (path === '/api/patients/me/prescriptions') return route.fulfill({ json: [prescription] });
     if (path === `/api/patients/me/prescriptions/${prescription.id}`) return route.fulfill({ json: prescription });
-    return route.fulfill({ status: 404, json: { code: 'MSG113', message: 'Synthetic endpoint not configured' } });
+    return route.fulfill({ status: 404, json: { code: 'MSG42', message: 'Synthetic endpoint not configured' } });
   });
 }
 

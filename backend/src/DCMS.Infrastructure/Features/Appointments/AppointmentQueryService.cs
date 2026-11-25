@@ -36,8 +36,8 @@ public sealed class AppointmentQueryService(DcmsDbContext db, UserManager<Applic
     private async Task<(int EmployeeId, bool Broad)> ActorAsync(int actorId, CancellationToken ct)
     {
         var user = await users.FindByIdAsync(actorId.ToString());
-        if (user == null || !user.IsActive || user.AccountType != "Staff") throw Error("MSG06", 403);
-        var employee = await db.Employees.AsNoTracking().SingleOrDefaultAsync(x => x.AccountId == actorId, ct) ?? throw Error("MSG06", 403);
+        if (user == null || !user.IsActive || user.AccountType != "Staff") throw Error("MSG05", 403);
+        var employee = await db.Employees.AsNoTracking().SingleOrDefaultAsync(x => x.AccountId == actorId, ct) ?? throw Error("MSG05", 403);
         var roles = AccountRoles.Effective(await users.GetRolesAsync(user));
         // Staff in an access group see the whole branch unless they are a dentist, who keeps the own-appointments rule.
         var grantDriven = (await access.ResolveAsync(actorId, ct)).GrantDriven;
@@ -48,17 +48,17 @@ public sealed class AppointmentQueryService(DcmsDbContext db, UserManager<Applic
     private async Task<Scope> ScopeAsync(int actorId, int branchId, CancellationToken ct)
     {
         var dynamicScope = await access.ResolveAsync(actorId, ct);
-        if (dynamicScope.Assigned && !dynamicScope.Owner && !dynamicScope.BranchIds.Contains(branchId)) throw Error("MSG06", 403);
+        if (dynamicScope.Assigned && !dynamicScope.Owner && !dynamicScope.BranchIds.Contains(branchId)) throw Error("MSG05", 403);
         var (employeeId, broad) = await ActorAsync(actorId, ct);
         if (dynamicScope.Owner)
         {
-            if (!await db.Set<SchedulingBranch>().AsNoTracking().AnyAsync(x => x.Id == branchId && x.Active, ct)) throw Error("MSG06", 403);
+            if (!await db.Set<SchedulingBranch>().AsNoTracking().AnyAsync(x => x.Id == branchId && x.Active, ct)) throw Error("MSG05", 403);
             return new(branchId, employeeId, null);
         }
         var membership = await db.SchedulingMembers.AsNoTracking()
-            .SingleOrDefaultAsync(x => x.BranchId == branchId && x.EmployeeId == employeeId && x.Active, ct) ?? throw Error("MSG06", 403);
+            .SingleOrDefaultAsync(x => x.BranchId == branchId && x.EmployeeId == employeeId && x.Active, ct) ?? throw Error("MSG05", 403);
         if (broad || membership.CanManageSchedules) return new(branchId, employeeId, null);
-        if (!membership.CanDentist && !dynamicScope.GrantDriven) throw Error("MSG06", 403);
+        if (!membership.CanDentist && !dynamicScope.GrantDriven) throw Error("MSG05", 403);
         return new(branchId, employeeId, employeeId);
     }
 
@@ -74,10 +74,10 @@ public sealed class AppointmentQueryService(DcmsDbContext db, UserManager<Applic
             branchIds = await db.Set<SchedulingBranch>().AsNoTracking().Where(x => x.Active).Select(x => x.Id).ToArrayAsync(ct);
         else
         {
-            if (mine.Count == 0) throw Error("MSG06", 403);
+            if (mine.Count == 0) throw Error("MSG05", 403);
             branchIds = mine.Select(x => x.BranchId).ToArray();
         }
-        if (branchIds.Length == 0) throw Error("MSG06", 403);
+        if (branchIds.Length == 0) throw Error("MSG05", 403);
         var ownOnly = mine.Where(x => !broad && !x.CanManageSchedules).Select(x => x.BranchId).ToHashSet();
         var branches = await db.Set<SchedulingBranch>().AsNoTracking().Where(x => branchIds.Contains(x.Id) && x.Active)
             .OrderBy(x => x.Name).Select(x => new CalendarOption(x.Id, x.Name)).ToArrayAsync(ct);
@@ -136,7 +136,7 @@ public sealed class AppointmentQueryService(DcmsDbContext db, UserManager<Applic
         if (scope is not ("ALL" or "UPCOMING" or "HISTORY") || page < 1 || !PageSizes.Contains(pageSize))
             throw Error("MSG04");
         var (employeeId, broad) = await ActorAsync(actorId, ct);
-        if (!await db.Patients.AsNoTracking().AnyAsync(x => x.Id == patientId, ct)) throw Error("MSG113", 404);
+        if (!await db.Patients.AsNoTracking().AnyAsync(x => x.Id == patientId, ct)) throw Error("MSG42", 404);
         var memberships = db.SchedulingMembers.AsNoTracking().Where(x => x.EmployeeId == employeeId && x.Active);
         var activeBranches = db.Set<SchedulingBranch>().AsNoTracking().Where(x => x.Active);
         var source = db.Appointments.AsNoTracking().Where(a => a.PatientId == patientId
@@ -155,9 +155,9 @@ public sealed class AppointmentQueryService(DcmsDbContext db, UserManager<Applic
 
     public async Task<StaffAppointmentDetail> DetailAsync(int actorId, Guid id, CancellationToken ct)
     {
-        var row = await db.Appointments.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw Error("MSG113", 404);
+        var row = await db.Appointments.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw Error("MSG42", 404);
         var scope = await ScopeAsync(actorId, row.BranchId, ct);
-        if (scope.OwnDentistId.HasValue && row.DentistId != scope.OwnDentistId) throw Error("MSG06", 403);
+        if (scope.OwnDentistId.HasValue && row.DentistId != scope.OwnDentistId) throw Error("MSG05", 403);
         var item = (await ItemsAsync([row], ct))[0];
         return new(item, row.BookingInfo.BookerName, MaskPhone(row.BookingInfo.Phone()), MaskEmail(row.BookingInfo.Email()), row.BookerAccountId.HasValue,
             row.Reason, row.BookingInfo.ExceptionReason, row.CreatedAt);
@@ -167,7 +167,7 @@ public sealed class AppointmentQueryService(DcmsDbContext db, UserManager<Applic
     private async Task<(IQueryable<Appointment> Query, int? PatientId)> MineQueryAsync(int accountId, CancellationToken ct)
     {
         var user = await users.FindByIdAsync(accountId.ToString());
-        if (user == null || !user.IsActive || user.AccountType != "Public") throw Error("MSG06", 403);
+        if (user == null || !user.IsActive || user.AccountType != "Public") throw Error("MSG05", 403);
         var patientId = await db.PatientAccountLinks.AsNoTracking()
             .Where(x => x.AccountId == accountId && x.Status == PatientLinkStatus.Verified).Select(x => x.PatientId).SingleOrDefaultAsync(ct);
         var query = db.Appointments.AsNoTracking()
@@ -199,7 +199,7 @@ public sealed class AppointmentQueryService(DcmsDbContext db, UserManager<Applic
     {
         var (source, patientId) = await MineQueryAsync(accountId, ct);
         // Out of scope and missing are indistinguishable so a code cannot be used to probe other bookings.
-        var row = await source.SingleOrDefaultAsync(x => x.Code == code, ct) ?? throw Error("MSG102", 404);
+        var row = await source.SingleOrDefaultAsync(x => x.Code == code, ct) ?? throw Error("MSG37", 404);
         return await DetailOfAsync(row, accountId, patientId, false, ct);
     }
 
@@ -207,9 +207,9 @@ public sealed class AppointmentQueryService(DcmsDbContext db, UserManager<Applic
     {
         var user = await users.FindByIdAsync(accountId.ToString());
         if (user?.AccountType != "Staff") return await MineDetailAsync(accountId, code, ct);
-        var row = await db.Appointments.AsNoTracking().SingleOrDefaultAsync(x => x.Code == code, ct) ?? throw Error("MSG102", 404);
+        var row = await db.Appointments.AsNoTracking().SingleOrDefaultAsync(x => x.Code == code, ct) ?? throw Error("MSG37", 404);
         var scope = await ScopeAsync(accountId, row.BranchId, ct);
-        if (scope.OwnDentistId.HasValue && row.DentistId != scope.OwnDentistId) throw Error("MSG102", 404);
+        if (scope.OwnDentistId.HasValue && row.DentistId != scope.OwnDentistId) throw Error("MSG37", 404);
         return await DetailOfAsync(row, accountId, null, true, ct);
     }
 

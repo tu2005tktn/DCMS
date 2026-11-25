@@ -70,7 +70,7 @@ public sealed partial class GeneralSettingsService(DcmsDbContext db, UserManager
     private async Task<ApplicationUser> StaffAsync(int actorId)
     {
         var user = await users.FindByIdAsync(actorId.ToString());
-        if (user is not { IsActive: true, AccountType: "Staff" }) throw Error("MSG06", 403);
+        if (user is not { IsActive: true, AccountType: "Staff" }) throw Error("MSG05", 403);
         return user;
     }
 
@@ -141,7 +141,7 @@ public sealed partial class GeneralSettingsService(DcmsDbContext db, UserManager
     private async Task<GeneralSettings> SourceAsync(int version, CancellationToken ct)
     {
         var row = await db.ClinicSettingsVersions.AsNoTracking().SingleOrDefaultAsync(x => x.Version == version, ct)
-            ?? throw Error("MSG113", 404);
+            ?? throw Error("MSG42", 404);
         return Normalize(ClinicSettingsStore.Read(row.ContentJson));
     }
 
@@ -159,11 +159,11 @@ public sealed partial class GeneralSettingsService(DcmsDbContext db, UserManager
         var prior = await db.SystemCatalogChanges.AsNoTracking().SingleOrDefaultAsync(x => x.RequestKey == key, ct);
         if (prior != null)
         {
-            if (prior.ActorId != actorId || prior.Command != command || prior.Fingerprint != hash) throw Error("MSG111", 409);
-            return JsonSerializer.Deserialize<GeneralSettingsDto>(prior.ResultJson, ClinicSettingsStore.Json) ?? throw Error("MSG144", 503);
+            if (prior.ActorId != actorId || prior.Command != command || prior.Fingerprint != hash) throw Error("MSG41", 409);
+            return JsonSerializer.Deserialize<GeneralSettingsDto>(prior.ResultJson, ClinicSettingsStore.Json) ?? throw Error("MSG49", 503);
         }
         var (version, current, _) = await ClinicSettingsStore.CurrentAsync(db, ct);
-        if (version != expectedVersion) throw Error("MSG111", 409);
+        if (version != expectedVersion) throw Error("MSG41", 409);
         var (settings, restoredFrom) = await resolve();
         if (settings == current) throw new BusinessException(400, GeneralSettingsMessages.NoChange);
         var now = clock.GetUtcNow();
@@ -260,11 +260,11 @@ public sealed partial class GeneralSettingsService(DcmsDbContext db, UserManager
         var prior = await db.SystemCatalogChanges.AsNoTracking().SingleOrDefaultAsync(x => x.RequestKey == request.RequestKey, ct);
         if (prior != null)
         {
-            if (prior.ActorId != actorId || prior.Command != command || prior.Fingerprint != hash) throw Error("MSG111", 409);
-            return JsonSerializer.Deserialize<PatientCodeSequenceDto>(prior.ResultJson, ClinicSettingsStore.Json) ?? throw Error("MSG144", 503);
+            if (prior.ActorId != actorId || prior.Command != command || prior.Fingerprint != hash) throw Error("MSG41", 409);
+            return JsonSerializer.Deserialize<PatientCodeSequenceDto>(prior.ResultJson, ClinicSettingsStore.Json) ?? throw Error("MSG49", 503);
         }
         var before = await SequenceDtoAsync(ct);
-        if (before.NextNumber != request.ExpectedNextNumber) throw Error("MSG111", 409);
+        if (before.NextNumber != request.ExpectedNextNumber) throw Error("MSG41", 409);
         if (request.NextNumber == before.NextNumber) throw new BusinessException(400, GeneralSettingsMessages.NoChange);
         if (SequenceIssues(before.Prefix, before.NextNumber, request.NextNumber).Count > 0)
             throw Error("MSG04", label: "Số tiếp theo", field: "nextNumber");

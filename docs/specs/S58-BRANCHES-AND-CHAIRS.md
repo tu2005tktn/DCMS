@@ -1,5 +1,7 @@
 # DCMS-124 / DCMS-120: Quản lý Chi nhánh, Ghế vật lý & Điều hướng Thiết lập 11 nhóm
 
+> Cập nhật 21/11/2026: Bí danh `/api/system-settings/branches/*` (giữ `/api/settings/branches/*`) đã gỡ vì không có giao diện sử dụng, xem [UNUSED-API-REMOVAL.vi.md](UNUSED-API-REMOVAL.vi.md).
+
 > Cập nhật 18/11/2026 theo Phương án A ([rút gọn bảng SCHEDULING_BRANCH](SCHEDULING-BRANCH-TABLE-SIMPLIFICATION.vi.md)): hợp nhất `BranchProfile` vào `SchedulingBranch` với **11 cột** (`Id`, `Code`, `Name`, `Address`, `Phone`, `Email`, `Active`, `SlotIntervalMinutes`, `Version`, `Members`, `Chairs`). Đã bỏ `BranchAsset`, `BranchAssetStore`, route `/logo`, các trường logo/ngân hàng/`Website`/`TimeZoneId`, `BookingSettingsVersion` và `StorageStamp`. Các mô tả logo/ngân hàng/2-entity bên dưới là cấu trúc lịch sử trước 18/11/2026.
 
 Cập nhật lưu trữ 12/11/2026 theo [hợp đồng gộp lịch](SCHEDULING-STORAGE-REVIEW.vi.md): thông tin chi nhánh, nhân sự, ghế và metadata logo nằm trong `SCHEDULING_BRANCH`. Danh sách ghế, nhân sự và logo là collection JSONB; các bảng `SCHEDULING_CHAIR`, `SCHEDULING_MEMBER`, `BRANCH_ASSET` đã được gộp. ID, trạng thái, phiên bản hiệu lực, route và DTO hiện có tiếp tục được giữ. Các tên bảng cũ bên dưới là cấu trúc lịch sử.

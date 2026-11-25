@@ -32,7 +32,7 @@ export default function FamilyMemberDrawer({ open, member, onClose, onSaved }: {
     try {
       const saved = await request<FamilyMember>(member ? `/${member.id}` : '', { method: member ? 'PUT' : 'POST', body: JSON.stringify({ ...body, requestKey: key }) });
       dirty.current = false; onSaved(saved);
-    } catch (failure) { setError((failure as Error).message); setConflict(failure instanceof ApiError && failure.code === 'MSG111'); }
+    } catch (failure) { setError((failure as Error).message); setConflict(failure instanceof ApiError && failure.code === 'MSG41'); }
     finally { sending.current = false; setBusy(false); }
   }
   async function readLatest() {

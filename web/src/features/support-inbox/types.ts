@@ -1,18 +1,14 @@
 /**
  * S26 — Staff Support Inbox (Web).
  *
- * DTO bám sát `mobile/src/features/appointments/appointment.types.ts` để cả hai phía
- * (mobile staff + web staff) dùng chung hợp đồng khi backend TV5 sẵn sàng. Khi chuyển
- * sang chia sẻ package, các type này sẽ được thay bằng re-export từ shared.
- *
- * Mock DTO chung theo chuẩn bàn giao "Dùng mock DTO chung để làm song song, không đợi
- * task khác hoàn tất mới bắt đầu UI".
+ * Hợp đồng API thật `/api/support-requests`; mobile dùng cùng shape tại
+ * `mobile/src/features/support-inbox/support-requests.types.ts`.
  *
  * Traceability:
  *   - S26: hộp thư staff, command TV4/TV5, lịch sử, conflict version.
  *   - UC-05, UC-06, UC-34 (booking portion).
  *   - GBR-007/012-015/031/073/075/077/078/081/123.
- *   - MSG31-38/94/111/144, AT16.
+ *   - MSG26-38/94/111/144, AT16.
  */
 
 // ============================================================================
@@ -97,7 +93,7 @@ export const appointmentStatusLabels: Record<AppointmentStatus, string> = {
 // DTOs
 // ============================================================================
 
-/** Quyền của staff với request (server trả; mock trả `true`). */
+/** Quyền của staff với request (server tính theo quyền, chi nhánh, quyền sở hữu). */
 export interface StaffPermission {
   canResolve: boolean;
   canEdit: boolean;
@@ -218,7 +214,7 @@ export interface StaffChangeResult {
   ok: boolean;
   appointment?: AppointmentSummary;
   request?: SupportRequestDetail;
-  notificationCode?: string;   // MSG37/94/144
+  notificationCode?: string;   // MSG31/94/144
   errorCode?: 'CONFLICT' | 'FORBIDDEN' | 'NOT_FOUND' | 'BAD_REQUEST' | 'STALE_VERSION' | 'NETWORK' | 'SERVER';
   errorMessage?: string;
 }

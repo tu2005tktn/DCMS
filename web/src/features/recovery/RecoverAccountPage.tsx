@@ -56,7 +56,7 @@ export default function RecoverAccountPage({ customer = false }: { customer?: bo
 
   useEffect(() => {
     // The shared S02 policy is fetched once; its hints are shown from step 3 onward. Failing to
-    // load the hints is not an error: the API answer (MSG109) stays the authority.
+    // load the hints is not an error: the API answer (MSG39) stays the authority.
     void fetchRecoveryPolicy()
       .then(setPolicy)
       .catch(() => undefined);
@@ -158,7 +158,7 @@ export default function RecoverAccountPage({ customer = false }: { customer?: bo
       try {
         // The answer is the same neutral message; the cooldown restarts either way so a user
         // cannot hammer the endpoint when the account does not exist.
-        setNotice(recoveryMessages.MSG12);
+        setNotice(recoveryMessages.MSG09);
         await resendRecovery(identifier.current, customer);
         setCooldown(RESEND_COOLDOWN_SECONDS);
       } catch (failure) {
@@ -318,7 +318,7 @@ export default function RecoverAccountPage({ customer = false }: { customer?: bo
 
             {step === 'done' && (
               <div className="recovery-fade-in" style={{ textAlign: 'center' }}>
-                <Typography.Title level={4}>{recoveryMessages.MSG13}</Typography.Title>
+                <Typography.Title level={4}>{recoveryMessages.MSG10}</Typography.Title>
                 <Typography.Paragraph className="recovery-hint">
                   Các phiên đăng nhập trước đã bị thu hồi. Hãy đăng nhập lại bằng mật khẩu mới.
                 </Typography.Paragraph>
@@ -343,8 +343,8 @@ export default function RecoverAccountPage({ customer = false }: { customer?: bo
 }
 
 function connectionError(failure: unknown): string {
-  // ApiError already carries the server text (MSG108 / MSG109 / MSG144). Anything else is a
+  // ApiError already carries the server text (MSG38 / MSG39 / MSG49). Anything else is a
   // transport failure and is reported with the connection message.
   if (failure instanceof ApiError) return failure.message;
-  return recoveryMessages.MSG144;
+  return recoveryMessages.MSG49;
 }

@@ -83,7 +83,11 @@ public static class ScreenGrants
         if (permission == "finance.work-statistics.read") return Has(AccountRoles.ClinicOwner, AccountRoles.Admin, AccountRoles.Dentist, AccountRoles.ClinicAssistant);
         if (permission is "settings.general.read" or "settings.general.manage") return Has(AccountRoles.ClinicOwner, AccountRoles.Admin);
         if (permission.StartsWith("catalog.") && SupplyKinds.Any(kind => permission.StartsWith($"catalog.{kind}.")))
+        {
+            if (permission is "catalog.medicines.read" or "catalog.medicines.create")
+                return Has(AccountRoles.ClinicOwner, AccountRoles.Admin, AccountRoles.Dentist);
             return Has(AccountRoles.ClinicOwner, AccountRoles.Admin) || !permission.StartsWith("catalog.medicines.") && Has(AccountRoles.Dentist);
+        }
         if (permission.StartsWith("working-schedules.") || permission.StartsWith("booking-settings.") || permission.StartsWith("notifications.")) return roles.Any(AccountRoles.Staff.Contains);
         if (permission.StartsWith("appointments.") && permission != "appointments.support.handle" || permission.StartsWith("care-tasks.") || permission.StartsWith("documents."))
             return permission == "documents.review" ? Has(AccountRoles.Dentist) : Has(AccountRoles.Dentist, AccountRoles.ClinicAssistant);
@@ -94,7 +98,9 @@ public static class ScreenGrants
     }
 
     public static bool LegacySettings(string permission, string[] roles) => roles.Contains(AccountRoles.Dentist)
-        && (permission == "settings.read" || SupplyKinds.Where(kind => kind != "medicines").Any(kind => permission.StartsWith($"catalog.{kind}.")));
+        && (permission == "settings.read"
+            || SupplyKinds.Where(kind => kind != "medicines").Any(kind => permission.StartsWith($"catalog.{kind}."))
+            || (permission is "catalog.medicines.read" or "catalog.medicines.create"));
 
     public static string[] Expand(IEnumerable<string> grants)
     {

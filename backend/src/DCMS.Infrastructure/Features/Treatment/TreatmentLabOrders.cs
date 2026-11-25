@@ -34,14 +34,14 @@ public sealed partial class TreatmentDossierService
 
     private async Task<ClinicalActivity> LabActivityAsync(Guid dossierId, Guid activityId, CancellationToken ct) =>
         await db.ClinicalActivities.AsNoTracking().SingleOrDefaultAsync(a => a.Id == activityId && a.DossierId == dossierId, ct)
-            ?? throw Error("MSG113", 404);
+            ?? throw Error("MSG42", 404);
 
     public async Task<LabOrderContext> LabOrderContextAsync(int actorId, Guid dossierId, Guid activityId, CancellationToken ct)
     {
         var dossier = await DossierAsync(actorId, dossierId, ct);
         var activity = await LabActivityAsync(dossierId, activityId, ct);
         var order = await db.LabOrders.AsNoTracking().SingleOrDefaultAsync(x => x.ActivityId == activityId, ct);
-        var patient = await db.Patients.AsNoTracking().SingleOrDefaultAsync(x => x.Id == dossier.PatientId, ct) ?? throw Error("MSG113", 404);
+        var patient = await db.Patients.AsNoTracking().SingleOrDefaultAsync(x => x.Id == dossier.PatientId, ct) ?? throw Error("MSG42", 404);
         var today = DateOnly.FromDateTime(clock.GetUtcNow().ToOffset(TimeSpan.FromHours(7)).DateTime);
         int? age = patient.BirthDate is { } b ? Math.Max(0, today.Year - b.Year - (today < b.AddYears(today.Year - b.Year) ? 1 : 0)) : null;
         var labs = await db.Set<CatalogProvider>().AsNoTracking().Where(x => x.IsActive && (x.Type == "Lab" || x.Type == "Both"))
@@ -84,7 +84,7 @@ public sealed partial class TreatmentDossierService
             join a in db.ClinicalActivities on x.ActivityId equals a.Id
             join d in db.TreatmentDossiers on a.DossierId equals d.Id
             where d.BranchId == dossier.BranchId && x.Code == code && x.ActivityId != activityId
-            select x.Id).AnyAsync(ct)) throw Error("MSG111", 409);
+            select x.Id).AnyAsync(ct)) throw Error("MSG41", 409);
 
         var order = await db.LabOrders.SingleOrDefaultAsync(x => x.ActivityId == activityId, ct);
         var now = clock.GetUtcNow();
@@ -94,10 +94,10 @@ public sealed partial class TreatmentDossierService
             db.Add(order);
             order.StatusLogs.Add(new LabOrderStatusLog { LabOrderId = order.Id, ToStatus = LabOrderStatus.NotSent, ChangedAt = now, ChangedBy = actorId });
         }
-        else if (r.ExpectedVersion != order.Version) throw Error("MSG111", 409);
+        else if (r.ExpectedVersion != order.Version) throw Error("MSG41", 409);
         else
         {
-            if (r.TotalFeeVnd < await PatientPaidLabAsync(order.Id, ct)) throw Error("MSG111", 409);
+            if (r.TotalFeeVnd < await PatientPaidLabAsync(order.Id, ct)) throw Error("MSG41", 409);
             order.Version++;
         }
         order.Code = code; order.OrderedOn = r.OrderedOn; order.DueOn = r.DueOn; order.DeliveredOn = r.DeliveredOn; order.DentistId = r.DentistId;
@@ -110,7 +110,7 @@ public sealed partial class TreatmentDossierService
             Material = material, Warranty = warranty, SentOn = order.Spec.SentOn, ReceivedOn = order.Spec.ReceivedOn
         };
         try { await db.SaveChangesAsync(ct); }
-        catch (DbUpdateException) { throw Error("MSG111", 409); }
+        catch (DbUpdateException) { throw Error("MSG41", 409); }
         return ToDto(order);
     }
 
@@ -123,11 +123,11 @@ public sealed partial class TreatmentDossierService
             join a in db.ClinicalActivities.AsNoTracking() on x.ActivityId equals a.Id
             where x.ActivityId == activityId && a.DossierId == dossierId
             select new { x.Id, x.Version }
-        ).SingleOrDefaultAsync(ct) ?? throw Error("MSG113", 404);
-        if (await PatientPaidLabAsync(order.Id, ct) > 0) throw Error("MSG111", 409);
+        ).SingleOrDefaultAsync(ct) ?? throw Error("MSG42", 404);
+        if (await PatientPaidLabAsync(order.Id, ct) > 0) throw Error("MSG41", 409);
         // EF cannot delete a tracked row whose JSONB status history has entries, so delete directly and keep the Version concurrency check.
         if (await db.LabOrders.Where(x => x.Id == order.Id && x.Version == order.Version).ExecuteDeleteAsync(ct) == 0)
-            throw Error("MSG111", 409);
+            throw Error("MSG41", 409);
     }
 
     private async Task<long> PatientPaidLabAsync(Guid labOrderId, CancellationToken ct) =>

@@ -34,7 +34,7 @@ internal sealed class StubGoogleVerifier : IGoogleTokenVerifier
         var fields = idToken.Split('|');
         if (fields.Length != 3 || fields.Any(string.IsNullOrWhiteSpace))
             throw new DCMS.Application.Common.BusinessException(401,
-                new DCMS.Application.Common.SystemMessage("GOOGLE_INVALID_TOKEN", "Invalid Google token"));
+                new DCMS.Application.Common.SystemMessage("MSG62", "Invalid Google token"));
         return Task.FromResult(new GoogleIdentity(fields[0], fields[1], fields[2]));
     }
 }
@@ -99,7 +99,7 @@ public sealed class GoogleApiTests(GoogleApiFixture fixture) : IClassFixture<Goo
 
         var googleSignIn = await client.PostAsJsonAsync("/api/auth/google/sign-in", new GoogleSignInRequest(token));
         Assert.Equal(HttpStatusCode.Conflict, googleSignIn.StatusCode);
-        Assert.Equal("GOOGLE_EMAIL_EXISTS", (await googleSignIn.Content.ReadFromJsonAsync<SystemMessage>())!.Code);
+        Assert.Equal("MSG63", (await googleSignIn.Content.ReadFromJsonAsync<SystemMessage>())!.Code);
 
         var repeat = await client.PostAsJsonAsync("/api/auth/google/sign-in", new GoogleSignInRequest(token));
         Assert.Equal(HttpStatusCode.Conflict, repeat.StatusCode);
@@ -128,7 +128,7 @@ public sealed class GoogleApiTests(GoogleApiFixture fixture) : IClassFixture<Goo
         var otherToken = Token(Guid.NewGuid().ToString("N"), email.ToUpperInvariant());
         var duplicate = await client.PostAsJsonAsync("/api/auth/google/sign-in", new GoogleSignInRequest(otherToken));
         Assert.Equal(HttpStatusCode.Conflict, duplicate.StatusCode);
-        Assert.Equal("GOOGLE_EMAIL_EXISTS", (await duplicate.Content.ReadFromJsonAsync<SystemMessage>())!.Code);
+        Assert.Equal("MSG63", (await duplicate.Content.ReadFromJsonAsync<SystemMessage>())!.Code);
 
         var again = await client.PostAsJsonAsync("/api/auth/google/sign-in", new GoogleSignInRequest(firstToken));
         Assert.Equal(HttpStatusCode.OK, again.StatusCode);

@@ -98,7 +98,7 @@ public sealed partial class AccountService(DcmsDbContext db, UserManager<Applica
         AddAudit(actorId, user.Id, "CreateStaff", "Tạo tài khoản nhân viên", null, account);
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
-        return new(account, SystemMessages.Get("MSG14"));
+        return new(account, SystemMessages.Get("MSG11"));
     }
 
     public async Task<AccountChange> UpdateAsync(int actorId, int id, UpdateStaffRequest request, CancellationToken ct)
@@ -133,7 +133,7 @@ public sealed partial class AccountService(DcmsDbContext db, UserManager<Applica
         AddAudit(actorId, id, "UpdateStaff", request.Reason.Trim(), before, account);
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
-        return new(account, SystemMessages.Get("MSG14"));
+        return new(account, SystemMessages.Get("MSG11"));
     }
 
     public async Task<AccountChange> SetStateAsync(int actorId, int id, AccountStateRequest request, CancellationToken ct)
@@ -159,7 +159,7 @@ public sealed partial class AccountService(DcmsDbContext db, UserManager<Applica
         AddAudit(actorId, id, request.Locked ? "Lock" : "Unlock", request.Reason.Trim(), before, account);
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
-        return new(account, SystemMessages.Get(request.Locked ? "MSG15" : "MSG16"));
+        return new(account, SystemMessages.Get(request.Locked ? "MSG12" : "MSG13"));
     }
 
     public async Task<IReadOnlyList<AccountAuditDto>> AuditAsync(int id, CancellationToken ct)
@@ -213,7 +213,7 @@ public sealed partial class AccountService(DcmsDbContext db, UserManager<Applica
 
     private static void CheckVersion(ApplicationUser user, int version)
     {
-        if (user.Version != version) throw new BusinessException(409, SystemMessages.Get("MSG111"));
+        if (user.Version != version) throw new BusinessException(409, SystemMessages.Get("MSG41"));
     }
 
     private static void ValidateDetails(string? name, string? fullName, string? email, string? phone)
@@ -240,11 +240,11 @@ public sealed partial class AccountService(DcmsDbContext db, UserManager<Applica
     private static void Check(IdentityResult result)
     {
         if (result.Succeeded) return;
-        if (result.Errors.Any(x => x.Code == "ConcurrencyFailure")) throw new BusinessException(409, SystemMessages.Get("MSG111"));
+        if (result.Errors.Any(x => x.Code == "ConcurrencyFailure")) throw new BusinessException(409, SystemMessages.Get("MSG41"));
         if (result.Errors.Any(x => x.Code == "DuplicateUserName")) throw new BusinessException(409, StaffAccountConflicts.ForField("userName"));
         if (result.Errors.Any(x => x.Code == "DuplicateEmail")) throw new BusinessException(409, StaffAccountConflicts.ForField("email"));
-        if (result.Errors.Any(x => x.Code.StartsWith("Duplicate", StringComparison.Ordinal))) throw new BusinessException(409, SystemMessages.Get("MSG139"));
-        if (result.Errors.Any(x => x.Code.StartsWith("Password", StringComparison.Ordinal))) throw new BusinessException(400, SystemMessages.Get("MSG109"));
+        if (result.Errors.Any(x => x.Code.StartsWith("Duplicate", StringComparison.Ordinal))) throw new BusinessException(409, SystemMessages.Get("MSG46"));
+        if (result.Errors.Any(x => x.Code.StartsWith("Password", StringComparison.Ordinal))) throw new BusinessException(400, SystemMessages.Get("MSG39"));
         Invalid("Thông tin tài khoản");
     }
 
@@ -260,7 +260,7 @@ public sealed partial class AccountService(DcmsDbContext db, UserManager<Applica
             user.Version, roles.Order(StringComparer.Ordinal).ToArray(), code, user.CreatedAt, user.UpdatedAt);
     private static string? Clean(string? value) => ContactRules.Clean(value);
     private static void Invalid(string field) => throw new BusinessException(400, SystemMessages.Get("MSG04", field));
-    private static void Forbidden() => throw new BusinessException(403, SystemMessages.Get("MSG06"));
+    private static void Forbidden() => throw new BusinessException(403, SystemMessages.Get("MSG05"));
     [GeneratedRegex(@"^[A-Za-z0-9._-]{3,64}$")] private static partial Regex UserNamePattern();
     [GeneratedRegex(@"^[A-Za-z0-9_-]{1,40}$")] private static partial Regex EmployeeCodePattern();
 }

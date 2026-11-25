@@ -46,8 +46,8 @@ public sealed record UpdatePatientCodeSequenceRequest(long ExpectedNextNumber, G
 public static class GeneralSettingsMessages
 {
     public static SystemMessage FieldUnavailable(string field) =>
-        new("SETTINGS_FIELD_UNAVAILABLE", "Hồ sơ bệnh nhân chưa có trường này nên chưa thể đặt bắt buộc.") { Field = field };
-    public static SystemMessage NoChange => new("SETTINGS_NO_CHANGE", "Thiết lập không có thay đổi để lưu.");
+        new("MSG89", "Hồ sơ bệnh nhân chưa có trường này nên chưa thể đặt bắt buộc.") { Field = field };
+    public static SystemMessage NoChange => new("MSG88", "Thiết lập không có thay đổi để lưu.");
 }
 
 public interface IGeneralSettingsService

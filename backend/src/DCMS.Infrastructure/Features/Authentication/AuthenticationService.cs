@@ -111,7 +111,7 @@ public sealed class AuthenticationService(DcmsDbContext db, UserManager<Applicat
 
     public async Task<RefreshResponse> RefreshAsync(RefreshRequest request, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(request.RefreshToken)) throw new BusinessException(401, SystemMessages.Get("MSG07"));
+        if (string.IsNullOrWhiteSpace(request.RefreshToken)) throw new BusinessException(401, SystemMessages.Get("MSG06"));
         var incomingHash = HashRefreshToken(request.RefreshToken);
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         var now = DateTimeOffset.UtcNow;
@@ -126,33 +126,33 @@ public sealed class AuthenticationService(DcmsDbContext db, UserManager<Applicat
         if (!accountId.HasValue)
         {
             // Không tìm thấy — token sai hoặc đã bị xóa. Trả 401, KHÔNG thu hồi chain.
-            throw new BusinessException(401, SystemMessages.Get("MSG07"));
+            throw new BusinessException(401, SystemMessages.Get("MSG06"));
         }
         // Tài khoản và session còn hiệu lực?
         var user = await db.LockAccountAsync(accountId.Value, ct);
         var session = user?.Sessions.SingleOrDefault(x => x.RefreshTokens.Any(r => r.TokenHash == incomingHash));
         var existing = session?.RefreshTokens.SingleOrDefault(x => x.TokenHash == incomingHash);
-        if (existing == null) throw new BusinessException(401, SystemMessages.Get("MSG07"));
+        if (existing == null) throw new BusinessException(401, SystemMessages.Get("MSG06"));
         if (session?.ClientKind == "StaffWeb" && session.RevokedAt == null
             && session.LastInteractiveActivityAt.AddMinutes(await staffIdle.MinutesAsync(ct)) <= now)
         {
             await staffIdle.ExpireAsync(session, now, ct); await transaction.CommitAsync(ct);
-            throw new BusinessException(401, SystemMessages.Get("MSG07"));
+            throw new BusinessException(401, SystemMessages.Get("MSG06"));
         }
-        if (session?.RevokedAt != null) throw new BusinessException(401, SystemMessages.Get("MSG07"));
+        if (session?.RevokedAt != null) throw new BusinessException(401, SystemMessages.Get("MSG06"));
         if (session == null || session.RevokedAt != null || session.ExpiresAt <= now
             || user == null || !user.IsActive || await users.IsLockedOutAsync(user))
         {
             await RevokeChainAsync(existing, "ServerInvalidated", now, ct);
             await transaction.CommitAsync(ct);
-            throw new BusinessException(401, SystemMessages.Get("MSG07"));
+            throw new BusinessException(401, SystemMessages.Get("MSG06"));
         }
         // Reuse detection: token ACTIVE → xử lý bình thường. REPLACED/REVOKED → thu hồi chain.
         if (existing.Status == "REPLACED" || existing.Status == "REVOKED")
         {
             await RevokeChainAsync(existing, "ReuseDetected", now, ct);
             await transaction.CommitAsync(ct);
-            throw new BusinessException(401, SystemMessages.Get("MSG07"));
+            throw new BusinessException(401, SystemMessages.Get("MSG06"));
         }
         // Rotation: cấp access mới, cấp refresh mới, đánh dấu token cũ REPLACED.
         var accessExpires = now.AddMinutes(settings.Value.AccessTokenMinutes);
@@ -173,37 +173,6 @@ public sealed class AuthenticationService(DcmsDbContext db, UserManager<Applicat
         await transaction.CommitAsync(ct);
         var access = IssueAccessToken(existing.AccountId, existing.SessionId, now, accessExpires);
         return new(access, accessExpires, newRefreshPlaintext, existing.SessionId);
-    }
-
-    public async Task SignOutAllAsync(int accountId, Guid currentSessionId, string? reason, CancellationToken ct)
-    {
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        var now = DateTimeOffset.UtcNow;
-        var owner = await db.Users.SingleAsync(x => x.Id == accountId, ct);
-        AccountSessions.Revoke(owner, now);
-        db.AccountAudits.Add(new AccountAudit
-        {
-            ActorId = accountId, TargetId = accountId, Action = "SignOutAll",
-            Reason = string.IsNullOrWhiteSpace(reason) ? "Đăng xuất khỏi mọi thiết bị" : reason.Trim(),
-            OccurredAt = now, AfterJson = "{\"allSessionsRevoked\":true}"
-        });
-        await db.SaveChangesAsync(ct);
-        await transaction.CommitAsync(ct);
-    }
-
-    public async Task<IReadOnlyList<SessionInfo>> ListSessionsAsync(int accountId, Guid currentSessionId, CancellationToken ct)
-    {
-        var now = DateTimeOffset.UtcNow;
-        var authData = await db.Users.AsNoTracking()
-            .Where(x => x.Id == accountId)
-            .Select(x => x.AuthData)
-            .SingleOrDefaultAsync(ct);
-        return (authData?.Sessions ?? [])
-            .Where(x => x.AccountId == accountId && x.RevokedAt == null && x.ExpiresAt > now)
-            .OrderByDescending(x => x.LastSeenAt)
-            .Select(x => new SessionInfo(x.Id, x.DeviceLabel, x.CreatedAt, x.LastSeenAt, x.ExpiresAt,
-                x.Id == currentSessionId))
-            .ToList();
     }
 
     private async Task<CurrentUser?> CurrentAsync(ApplicationUser user, CancellationToken ct)
@@ -285,5 +254,5 @@ public sealed class AuthenticationService(DcmsDbContext db, UserManager<Applicat
         return trimmed.Length <= 120 ? trimmed : trimmed[..120];
     }
 
-    private static void DenySignIn() => throw new BusinessException(401, SystemMessages.Get("MSG09"));
+    private static void DenySignIn() => throw new BusinessException(401, SystemMessages.Get("MSG07"));
 }

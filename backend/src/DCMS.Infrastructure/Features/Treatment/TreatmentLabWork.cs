@@ -76,7 +76,7 @@ public sealed partial class TreatmentDossierService
         q = Clean(q);
         if (page < 1 || pageSize is not (20 or 50 or 100) || page > int.MaxValue / pageSize || q?.Length > 160 || from > to
             || (status != null && status != "Overdue" && !LabOrderStatus.All.Contains(status))) throw Error("MSG04");
-        if (branchId is { } b && !scope.BranchIds.Contains(b)) throw Error("MSG06", 403);
+        if (branchId is { } b && !scope.BranchIds.Contains(b)) throw Error("MSG05", 403);
         var today = VnToday();
         var baseQuery = LabScope(scope, branchId);
         var labRows = await (from x in baseQuery join p in db.Set<CatalogProvider>() on x.LabProviderId equals p.Id select new { p.Id, p.Name }).Distinct().ToListAsync(ct);
@@ -125,7 +125,7 @@ public sealed partial class TreatmentDossierService
                 from a in db.ClinicalActivities
                 join d in db.TreatmentDossiers on a.DossierId equals d.Id
                 where a.Id == x.ActivityId && scope.BranchIds.Contains(d.BranchId)
-                select d.Id).Any(), ct) ?? throw Error("MSG113", 404);
+                select d.Id).Any(), ct) ?? throw Error("MSG42", 404);
 
     public async Task<IReadOnlyList<LabStatusLogItem>> LabWorkHistoryAsync(int actorId, Guid id, CancellationToken ct)
     {
@@ -145,7 +145,7 @@ public sealed partial class TreatmentDossierService
         var note = Clean(r.Note);
         if (!LabOrderStatus.All.Contains(r.Status) || note?.Length > 300) throw Error("MSG04");
         var order = await ScopedLabOrderAsync(scope, id, true, ct);
-        if (order.Version != r.ExpectedVersion) throw Error("MSG111", 409);
+        if (order.Version != r.ExpectedVersion) throw Error("MSG41", 409);
         if (!LabOrderStatus.CanMove(order.Status, r.Status)) throw Error("MSG04");
         var today = VnToday(); var now = clock.GetUtcNow();
         order.StatusLogs.Add(new LabOrderStatusLog { LabOrderId = id, FromStatus = order.Status, ToStatus = r.Status, ChangedAt = now, ChangedBy = actorId, Note = note });
@@ -168,7 +168,7 @@ public sealed partial class TreatmentDossierService
             };
         order.Status = r.Status; order.Version++;
         try { await db.SaveChangesAsync(ct); }
-        catch (DbUpdateConcurrencyException) { throw Error("MSG111", 409); }
+        catch (DbUpdateConcurrencyException) { throw Error("MSG41", 409); }
         return await SingleLabItemAsync(id, ct);
     }
 

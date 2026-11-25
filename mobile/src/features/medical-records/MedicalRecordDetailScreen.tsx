@@ -3,7 +3,8 @@
  *
  * Nguồn: GET /api/patients/me/treatment-summary (projection máy chủ) — tải lại mỗi lần mở,
  * không nhận PatientId từ client. Tách bạch kế hoạch đã chốt với tiến độ thực tế;
- * phần findings/prescription/files/sync chưa có API thì hiển thị trạng thái nguồn trung thực.
+ * Đơn thuốc mở qua `/(account)/prescriptions` (`GET /api/patients/me/prescriptions`); kết quả khám và tệp
+ * xem tại `/(account)/visit-results` (`GET /api/patients/me/visits`, `/api/patients/me/documents`).
  * 401 → signOut('expired'); 403 → xóa dữ liệu nhạy cảm và quay về gate.
  */
 
