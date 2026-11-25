@@ -155,6 +155,22 @@ public sealed class AppointmentService(DcmsDbContext db, IAvailabilityService av
         if (start <= now) throw Error("MSG20", 409);
         if (!staff && !AppointmentRules.PublicLeadTimeValid(now, start)) throw Error("MSG19");
         if (staff && start < now.AddMinutes(60) && exceptionReason == null) throw Error("MSG19");
+        if (!staff && kind == "Standard")
+        {
+            // One open self-booked examination per person until it is checked in or cancelled. A person is the linked patient,
+            // the saved family member, or otherwise the same attendee name under the same booker (account, or guest contact).
+            var open = db.Appointments.AsNoTracking().Where(a => a.Status == "Confirmed" && a.EndAt > now && a.Kind == "Standard");
+            var contact = phone ?? email;
+            if (patientId.HasValue) open = open.Where(a => a.PatientId == patientId);
+            else if (request.FamilyMemberId.HasValue) open = open.Where(a => a.FamilyMemberId == request.FamilyMemberId);
+            else
+            {
+                var name = attendeeName.ToLower();
+                open = open.Where(a => a.PatientId == null && a.FamilyMemberId == null && a.AttendeeName.ToLower() == name
+                    && (accountId.HasValue ? a.BookerAccountId == accountId : a.BookerAccountId == null && a.BookingInfo.BookerContact == contact));
+            }
+            if (await open.AnyAsync(ct)) throw Error("MSG118", 409);
+        }
 
         if (request.DossierId.HasValue)
         {

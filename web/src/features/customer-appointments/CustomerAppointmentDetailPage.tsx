@@ -39,7 +39,7 @@ export default function CustomerAppointmentDetailPage() {
     <div className="calendar-toolbar customer-page-heading"><div><span className="customer-kicker">Lịch khám</span>
       <Typography.Title level={2}>Chi tiết lịch hẹn</Typography.Title></div>
       <Button loading={busy} onClick={() => setRevision(value => value + 1)}>Tải lại lịch hẹn</Button></div>
-    {notice && <Alert className="form-alert" type="success" showIcon message={notice} />}
+    <Modal open={!!notice} title="Thông báo" onCancel={() => setNotice(null)} footer={<Button type="primary" onClick={() => setNotice(null)}>Đã hiểu</Button>}>{notice}</Modal>
     {busy ? <Spin tip="Đang tải lịch hẹn…"><div className="customer-loading" /></Spin> : error ?
       <Alert type="error" showIcon message={error.message}
         action={error.status !== 403 && error.status !== 404 ? <Button onClick={() => setRevision(value => value + 1)}>Thử lại</Button> : undefined} /> :

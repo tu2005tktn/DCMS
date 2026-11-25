@@ -110,7 +110,7 @@ public sealed class AppointmentChangeApiTests(AppointmentChangeFixture fixture) 
     private async Task<AppointmentResult> Book(HttpClient client, Setup s, AvailabilitySlot slot, string relation = "Self")
     {
         var request = new CreateAppointmentRequest(s.BranchId, new("Synthetic booker", "0912345678", null),
-            new(null, "Synthetic attendee", null), relation, "Standard", "App", s.ServiceId, null, s.DentistId,
+            new(null, "Synthetic attendee " + Guid.NewGuid().ToString("N")[..6], null), relation, "Standard", "App", s.ServiceId, null, s.DentistId,
             null, slot.Start, 30, null, null, Guid.NewGuid(), slot.ScheduleVersion, null);
         var response = await client.PostAsJsonAsync("/api/appointments", request);
         Assert.True(response.StatusCode == HttpStatusCode.Created, await response.Content.ReadAsStringAsync());

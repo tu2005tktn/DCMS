@@ -87,6 +87,32 @@ public sealed class AppointmentApiTests(ApiFixture fixture) : IClassFixture<ApiF
         Assert.Equal(0, await db.Patients.CountAsync(x => x.FullName == "Nguyễn A"));
     }
 
+    // One open self-booked examination per person until it is checked in or cancelled; other people are unaffected.
+    [Fact]
+    public async Task PersonHasOneOpenBookingUntilItIsCancelled()
+    {
+        var setup = await PrepareAsync(); using var client = fixture.CreateClient();
+        var response = await client.GetAsync($"/api/availability?branchId={setup.BranchId}&dentistId={setup.DentistId}&serviceId={setup.ServiceId}&date={setup.Date:yyyy-MM-dd}&durationMinutes=30");
+        var slots = (await response.Content.ReadFromJsonAsync<AvailabilityResult>())!.Slots
+            .Where(x => x.Start.ToOffset(TimeSpan.FromHours(7)).TimeOfDay >= TimeSpan.FromHours(9)).Aggregate(new List<AvailabilitySlot>(), (list, x) => { if (list.Count == 0 || x.Start >= list[^1].End) list.Add(x); return list; }).Take(5).ToArray();
+        Assert.True(slots.Length >= 4);
+        var phone = "09" + Random.Shared.Next(10_000_000, 99_999_999);
+        CreateAppointmentRequest As(AvailabilitySlot slot, string attendee) => Request(setup, slot, attendee: attendee) with { Booker = new BookerContact("Người đặt", phone, null) };
+        var first = await client.PostAsJsonAsync("/api/appointments", As(slots[0], "Khách A"));
+        Assert.Equal(HttpStatusCode.Created, first.StatusCode);
+        var blocked = await client.PostAsJsonAsync("/api/appointments", As(slots[1], "khách a"));
+        Assert.Equal(HttpStatusCode.Conflict, blocked.StatusCode);
+        Assert.Equal("MSG118", (await blocked.Content.ReadFromJsonAsync<SystemMessage>())!.Code);
+        Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync("/api/appointments", As(slots[1], "Khách B"))).StatusCode);
+        using (var scope = fixture.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
+            var id = (await first.Content.ReadFromJsonAsync<AppointmentResult>())!.AppointmentId;
+            var stored = await db.Appointments.SingleAsync(x => x.Id == id); stored.Status = "Cancelled"; await db.SaveChangesAsync();
+        }
+        Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync("/api/appointments", As(slots[2], "Khách A"))).StatusCode);
+    }
+
     [Fact]
     public async Task CompetingRequestsCannotReserveSameDentistOrChair()
     {

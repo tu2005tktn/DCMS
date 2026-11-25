@@ -99,6 +99,7 @@ public static class SystemMessages
         "MSG112" => "Đã có mã QR chưa hết hạn. Hãy mở lại mã QR hiện tại.",
         "MSG113" => "Mã yêu cầu đã được dùng.",
         "MSG114" => "Mã yêu cầu đã được dùng cho một khoản thu khác.",
+        "MSG118" => "Người này đã có một lịch hẹn chưa được tiếp nhận. Vui lòng hủy lịch cũ hoặc đợi đến khi lịch đó được tiếp nhận trước khi đặt lịch mới.",
         "MSG117" => "Không đủ ghế để đăng ký khung giờ này. Vui lòng chọn khung giờ khác hoặc liên hệ quản lý phòng khám.",
         "MSG115" => "Mã yêu cầu đã được dùng cho một khoản phân bổ khác.",
         "MSG116" => "Mã yêu cầu đã được dùng cho thao tác khác.",
