@@ -79,6 +79,34 @@ public sealed class RecurringSchedulingTests(ApiFixture fixture) : IClassFixture
         Assert.Empty((await Slots(s, later.AddDays(2), true)).Slots);
         Assert.Empty((await Slots(s, Monday.AddDays(-7))).Slots);
     }
+    // The branch has one active chair: a second dentist cannot be on shift at the same time, but may work another time.
+    [Fact]
+    public async Task SecondDentistCannotOverlapWhenBranchHasNoSpareChair()
+    {
+        var first = await Create(); using var firstClient = first.Client;
+        await Publish(first, Command(first));
+        using var admin = await Login("admin.demo");
+        var suffix = Guid.NewGuid().ToString("N")[..12]; var name = "recurring2." + suffix;
+        var created = await admin.PostAsJsonAsync("/api/accounts", new CreateStaffRequest(name, fixture.Password, "Second dentist", "RE2-" + suffix, suffix + "@example.invalid", null, ["Dentist"]));
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var account = (await created.Content.ReadFromJsonAsync<AccountChange>())!.Account;
+        using (var scope = fixture.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
+            var employee = await db.Employees.SingleAsync(e => e.AccountId == account.Id);
+            await db.AddSchedulingDataAsync(new SchedulingMember { BranchId = first.Branch, EmployeeId = employee.Id, CanDentist = true }); await db.SaveChangesAsync();
+            using var second = await Login(name);
+            var secondSetup = first with { Client = second, Employee = employee.Id, Actor = account.Id };
+            var overlap = new RecurringCommand(employee.Id, Monday, "Template", 0, [new(first.Branch, 0, 540, 660, "Work")], Guid.NewGuid());
+            var preview = await second.PostAsJsonAsync("/api/working-schedules/recurring/preview", overlap);
+            Assert.Equal(HttpStatusCode.OK, preview.StatusCode);
+            var warnings = (await preview.Content.ReadFromJsonAsync<SchedulePreview>())!.CapacityConflicts!;
+            var conflict = Assert.Single(warnings); Assert.Equal((0, 540, 660, 2, 1), (conflict.Day, conflict.StartMinute, conflict.EndMinute, conflict.Doctors, conflict.Chairs));
+            await Message(await second.PostAsJsonAsync("/api/working-schedules/recurring/publish", overlap), HttpStatusCode.Conflict, "MSG117");
+            // First dentist has a lunch break 12:00-13:00, so the second may cover exactly that hour, and a time after closing.
+            await Publish(secondSetup, new RecurringCommand(employee.Id, Monday, "Template", 0, [new(first.Branch, 0, 720, 780, "Work")], Guid.NewGuid()));
+        }
+    }
     [Fact]
     public async Task DatedAbsenceAndExtraSessionOverrideOnlyOneDateAndChangeBookingVersion()
     {

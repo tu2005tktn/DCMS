@@ -55,7 +55,6 @@ export default function BookingSettingsPage() {
   }
   return <>
     <Typography.Title level={2}>Cài đặt đặt lịch</Typography.Title>
-    <Typography.Paragraph>Khám lần đầu / đợt mới chỉ có dịch vụ Khám. Nhập bước chia giờ và thời lượng Khám tại đây. Các dịch vụ điều trị giữ riêng để dùng theo phác đồ của bệnh nhân.</Typography.Paragraph>
     {error && <Alert className="form-alert" type="error" showIcon message={error}
       action={<Button disabled={!has('booking-settings.manage') || saving} onClick={() => setRevision(value => value + 1)}>{dirty ? 'Bỏ thay đổi và tải lại' : 'Thử lại'}</Button>} />}
     {notice && <Alert className="form-alert" type="success" showIcon message={notice} />}

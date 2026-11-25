@@ -89,7 +89,7 @@ public static class ScheduleRules
         foreach (var p in periods)
         {
             if (p.Day is < 0 or > 6 || p.StartMinute < 0 || p.EndMinute > 1440 || p.StartMinute >= p.EndMinute
-                || p.StartMinute % 15 != 0 || p.EndMinute % 15 != 0 || p.Kind is not ("Work" or "Break" or "Block")
+                || p.StartMinute % 15 != 0 || p.EndMinute % 15 != 0 || p.Kind is not ("Work" or "Break")
                 || p.Reason == null || p.Reason.Length > 500 || (p.Kind != "Work" && string.IsNullOrWhiteSpace(p.Reason))) return false;
             if (p.Kind != "Work" && !periods.Any(w => w.Day == p.Day && w.Kind == "Work" && w.StartMinute <= p.StartMinute && w.EndMinute >= p.EndMinute)) return false;
         }

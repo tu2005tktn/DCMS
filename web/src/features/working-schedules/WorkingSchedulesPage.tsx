@@ -1,21 +1,21 @@
 import { usePermissions } from '../authentication/usePermissions';
 import { useCanPickBranch } from '../authentication/useCanPickBranch';
-import { Alert, Button, Card, Empty, Input, InputNumber, Select, Space, Spin, Table, Tag, Tooltip, Typography } from 'antd';
+import { Alert, Button, Card, Empty, Input, Modal, Select, Space, Spin, Table, Tag, Tooltip, Typography, message } from 'antd';
 import { CalendarOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { api, ApiError } from '../../services/api';
-import type { Affected, Availability, Options, Period } from './contracts';
+import type { Affected, CapacityConflict, Options, Period } from './contracts';
 import './workingSchedules.css';
-import { validateAvailabilityDuration, validateSchedulePeriods } from './validation';
-import DoctorAppointmentsPanel from './DoctorAppointmentsPanel';
+import { validateSchedulePeriods } from './validation';
 
 type BranchPeriod = Period & { branchId: number };
 type Revision = { id: string; date: string; kind: string; version: number; intervals: BranchPeriod[]; reason: string; publishedBy: number; publishedAt: string };
 type Saved = { dentistId: number; version: number; template: Revision | null; exception: Revision | null; futureChanges: Revision[]; legacyWeek: { weekStart: string; branchId: number }[] };
 type Command = { dentistId: number; date: string; kind: string; expectedVersion: number; intervals: BranchPeriod[]; requestKey: string; reason: string };
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
-const addDays = (value: string, days: number) => { const date = new Date(value + 'T00:00:00Z'); date.setUTCDate(date.getUTCDate() + days); return date.toISOString().slice(0, 10); };
+const clock = (minute: number) => `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`;
+const addDays = (value: string, days: number) => { const d = new Date(value + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + days); return d.toISOString().slice(0, 10); };
 const weekday = (date: string) => (new Date(date + 'T00:00:00Z').getUTCDay() + 6) % 7;
 const dayName = (day: number) => day === 6 ? 'Chủ nhật' : `Thứ ${day + 2}`;
 const time = (minute: number) => `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`;
@@ -28,6 +28,7 @@ export default function WorkingSchedulesPage() {
   const [options, setOptions] = useState<Options>();
   const [employee, setEmployee] = useState<number>();
   const [date, setDate] = useState(today);
+  const [endDate, setEndDate] = useState('');
   const [kind, setKind] = useState('Template');
   const [saved, setSaved] = useState<Saved>();
   const [periods, setPeriods] = useState<BranchPeriod[]>([]);
@@ -37,26 +38,25 @@ export default function WorkingSchedulesPage() {
   const [error, setError] = useState<ApiError>();
   const [success, setSuccess] = useState('');
   const [affected, setAffected] = useState<Affected[]>();
-  const [days, setDays] = useState<Availability[]>();
-  const [branch, setBranch] = useState<number>();
+  const [capacity, setCapacity] = useState<CapacityConflict[]>();
+  const [toast, toastContext] = message.useMessage();
+  // Results of "Kiểm tra ảnh hưởng" / "Lưu và công bố" appear as pop-ups, not as banners at the top of the page.
+  useEffect(() => { if (success) { void toast.success(success); setSuccess(''); } }, [success, toast]);
+  useEffect(() => {
+    if (affected && affected.length === 0) { void toast.info('Không có lịch Confirmed bị ảnh hưởng tại thời điểm kiểm tra.'); setAffected(undefined); }
+  }, [affected, toast]);
   const canPickBranch = useCanPickBranch();
   const [viewBranch, setViewBranch] = useState<number>();
-  const [service, setService] = useState<number>();
-  const [assistant, setAssistant] = useState<number>();
-  const [duration, setDuration] = useState<number | null>(30);
-  const [from, setFrom] = useState(today);
-  const [to, setTo] = useState(() => addDays(today(), 6));
-  const [mode, setMode] = useState(has('working-schedules.manage') ? 'Staff' : 'Public');
   const request = useRef<{ text: string; body: Command } | undefined>(undefined);
   const reviewed = useRef<string | undefined>(undefined);
   const generation = useRef(0);
+  const rangeKeys = useRef(new Map<string, string>());
   const dirty = !!saved && baseline !== JSON.stringify({ periods, reason });
-  const durationError = validateAvailabilityDuration(duration, mode === 'Public', options?.services.find(s => s.id === service)?.publicDurationMinutes);
-  const showBranchPicker = canPickBranch && (options?.branches.length ?? 0) > 1;
   const eligible = options?.branches.filter(b => options.employees.some(e => e.id === employee && e.branchId === b.id && (e.canView ?? e.canEdit))) ?? [];
+  const showBranchPicker = canPickBranch && (options?.branches.length ?? 0) > 1;
   const fail = (e: unknown) => setError(e instanceof ApiError ? e : new ApiError(0, 'MSG49', 'Không thể kết nối. Vui lòng thử lại.'));
   const discardOkay = () => !dirty || window.confirm('Hủy các thay đổi chưa lưu?');
-  const clearResults = () => { setAffected(undefined); setDays(undefined); setSuccess(''); };
+  const clearResults = () => { setAffected(undefined); setCapacity(undefined); setSuccess(''); };
   const edit = (next: BranchPeriod[]) => { setPeriods(next); clearResults(); };
   const useSaved = (result: Saved) => {
     const revision = kind === 'Template' ? result.template : result.exception;
@@ -70,7 +70,7 @@ export default function WorkingSchedulesPage() {
       const result = await api<Options>('/api/working-schedules/options'); setOptions(result);
       const requested = Number(params.get('dentistId'));
       const own = result.employees.find(e => e.id === requested && (e.canView ?? e.canEdit)) ?? result.employees.find(e => e.self && (e.canView ?? e.canEdit)) ?? result.employees.find(e => (e.canView ?? e.canEdit));
-      setEmployee(own?.id); setBranch(own?.branchId); setViewBranch(own?.branchId); setService(result.services.find(s => s.branchId === own?.branchId)?.id);
+      setEmployee(own?.id); setViewBranch(own?.branchId);
     } catch (e) { fail(e); } finally { setBusy(false); }
   }
   useEffect(() => { void loadOptions(); }, []);
@@ -104,65 +104,85 @@ export default function WorkingSchedulesPage() {
     if (request.current?.text !== text) request.current = { text, body: { ...body, requestKey: crypto.randomUUID() } };
     return request.current!.body;
   };
+  // Leave over several days: one single-date exception per day, checked first, then published from the last day back to the first.
+  async function checkRange(publish: boolean) {
+    setBusy(true); setError(undefined); clearResults();
+    let version = saved!.version;
+    try {
+      command();
+      if (endDate > addDays(date, 30)) throw new ApiError(400, 'MSG40', 'Chọn tối đa 31 ngày liên tiếp.');
+      const dates: string[] = [];
+      for (let d = date; d <= endDate; d = addDays(d, 1)) dates.push(d);
+      const body = (d: string, expectedVersion: number) => {
+        const content = { dentistId: employee!, date: d, kind: 'Exception', expectedVersion, intervals: periods.map(p => ({ ...p, day: weekday(d) })), reason };
+        const text = JSON.stringify(content);
+        if (!rangeKeys.current.has(text)) rangeKeys.current.set(text, crypto.randomUUID());
+        return { ...content, requestKey: rangeKeys.current.get(text)! };
+      };
+      const impact: Affected[] = []; const full: CapacityConflict[] = [];
+      for (const d of dates) {
+        const preview = await api<{ affectedAppointments: Affected[]; capacityConflicts?: CapacityConflict[] }>('/api/working-schedules/recurring/preview', { method: 'POST', body: JSON.stringify(body(d, version)) });
+        impact.push(...preview.affectedAppointments); full.push(...(preview.capacityConflicts ?? []));
+      }
+      if (impact.length) { setAffected(impact); return; }
+      if (full.length) { setCapacity(full); return; }
+      if (!publish) { setAffected([]); return; }
+      for (const d of [...dates].reverse()) {
+        const result = await api<{ schedule: Saved }>('/api/working-schedules/recurring/publish', { method: 'POST', body: JSON.stringify(body(d, version)) });
+        version = result.schedule.version;
+      }
+      setEndDate(''); await load();
+      setSuccess(`Đã công bố lịch nghỉ/ngoại lệ cho ${dates.length} ngày.`);
+    } catch (e) {
+      setSaved(current => current ? { ...current, version } : current);
+      fail(e);
+    } finally { setBusy(false); }
+  }
   async function check(publish: boolean) {
+    if (kind === 'Exception' && endDate > date) return checkRange(publish);
     setBusy(true); setError(undefined); clearResults();
     try {
       const body = command();
       if (!publish || reviewed.current !== body.requestKey) {
-        const preview = await api<{ affectedAppointments: Affected[] }>('/api/working-schedules/recurring/preview', { method: 'POST', body: JSON.stringify(body) });
+        const preview = await api<{ affectedAppointments: Affected[]; capacityConflicts?: CapacityConflict[] }>('/api/working-schedules/recurring/preview', { method: 'POST', body: JSON.stringify(body) });
         setAffected(preview.affectedAppointments);
         if (preview.affectedAppointments.length) return;
+        if (preview.capacityConflicts?.length) { setCapacity(preview.capacityConflicts); return; }
         reviewed.current = body.requestKey;
         if (!publish) return;
       }
       const result = await api<{ schedule: Saved; notification: { message: string } }>('/api/working-schedules/recurring/publish', { method: 'POST', body: JSON.stringify(body) });
       useSaved(result.schedule); setSuccess(result.notification.message);
     } catch (e) {
-      fail(e);
+      if (e instanceof ApiError && e.code === 'MSG117') {
+        try { const again = await api<{ capacityConflicts?: CapacityConflict[] }>('/api/working-schedules/recurring/preview', { method: 'POST', body: JSON.stringify(command()) }); setCapacity(again.capacityConflicts); }
+        catch (capacityError) { fail(capacityError); }
+      } else fail(e);
       if (e instanceof ApiError && e.code === 'MSG32') {
         try { setAffected((await api<{ affectedAppointments: Affected[] }>('/api/working-schedules/recurring/preview', { method: 'POST', body: JSON.stringify(command()) })).affectedAppointments); }
         catch (impactError) { fail(impactError); }
       }
     } finally { setBusy(false); }
   }
-  async function previewSlots() {
-    setBusy(true); setError(undefined); setDays(undefined);
-    try {
-      if (durationError) throw new ApiError(400, 'MSG40', durationError);
-      if (!from || !to || to < from || to > addDays(from, 30)) throw new ApiError(400, 'MSG40', 'Chọn khoảng preview từ 1 đến 31 ngày.');
-      if (mode === 'Staff') {
-        const result = await api<{ days: Availability[] }>('/api/working-schedules/recurring/preview-availability', { method: 'POST', body: JSON.stringify({ schedule: command(), branchId: branch, serviceId: service, from, to, durationMinutes: duration, assistantId: assistant }) });
-        setDays(result.days);
-      } else {
-        const result: Availability[] = [];
-        for (let day = from; day <= to; day = addDays(day, 1)) {
-          const query = new URLSearchParams({ branchId: String(branch), dentistId: String(employee), serviceId: String(service), date: day, durationMinutes: String(duration) });
-          if (assistant) query.set('assistantId', String(assistant));
-          result.push(await api<Availability>(`/api/availability?${query}`, {}, false));
-        }
-        setDays(result);
-      }
-    } catch (e) { fail(e); } finally { setBusy(false); }
-  }
   const changePeriod = (index: number, patch: Partial<BranchPeriod>) => edit(periods.map((p, i) => i === index ? { ...p, ...patch } : p));
   const revision = kind === 'Template' ? saved?.template : saved?.exception;
   return <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-    <Typography.Title level={2}>S09 · Lịch làm việc tuần</Typography.Title>
-    {error && <Alert type="error" showIcon message={`${error.status === 403 ? 'Không có quyền truy cập' : error.status === 409 ? 'Xung đột · Cần kiểm tra lại' : error.status === 400 ? 'Dữ liệu chưa hợp lệ' : 'Lỗi kết nối hoặc dịch vụ'} · ${error.code}`} description={<div style={{ whiteSpace: 'pre-line' }}>{error.message}</div>} action={<Button disabled={busy} onClick={() => { if (discardOkay()) void (options ? load() : loadOptions()); }}>Tải lại</Button>} />}
-    {success && <Alert type="success" message={success} showIcon />}
+    <Typography.Title level={2}>Lịch làm việc</Typography.Title>
+    <Modal open={!!error} title={`${error?.status === 403 ? 'Không có quyền truy cập' : error?.status === 409 ? 'Xung đột · Cần kiểm tra lại' : error?.status === 400 ? 'Dữ liệu chưa hợp lệ' : 'Lỗi kết nối hoặc dịch vụ'} · ${error?.code}`} onCancel={() => setError(undefined)}
+      footer={<Space><Button disabled={busy} onClick={() => { if (discardOkay()) void (options ? load() : loadOptions()); }}>Tải lại</Button><Button type="primary" onClick={() => setError(undefined)}>Đóng</Button></Space>}>{<div style={{ whiteSpace: 'pre-line' }}>{error?.message}</div>}</Modal>
+    {toastContext}
     <Space wrap align="end" className="ws-filters">
       {showBranchPicker && <label className="ws-field">Chi nhánh <Select aria-label="Chi nhánh" value={viewBranch} disabled={busy} style={{ width: 230 }} options={options?.branches.map(b => ({ value: b.id, label: b.name }))}
-        onChange={value => { if (!discardOkay()) return; setViewBranch(value); const first = options?.employees.find(e => e.branchId === value && (e.canView ?? e.canEdit)); setEmployee(first?.id); setBranch(value); setService(options?.services.find(sv => sv.branchId === value)?.id); setAssistant(undefined); }} /></label>}
-      <label className="ws-field">Nhân viên / bác sĩ <Select aria-label="Nhân viên / bác sĩ" value={employee} disabled={busy} style={{ width: 230 }} options={options?.employees.filter((e, i, all) => (e.canView ?? e.canEdit) && (!showBranchPicker || e.branchId === viewBranch) && all.findIndex(x => x.id === e.id && (x.canView ?? x.canEdit) && (!showBranchPicker || x.branchId === viewBranch)) === i).map(e => ({ value: e.id, label: e.name }))} onChange={value => { if (discardOkay()) { setEmployee(value); const b = options?.employees.find(e => e.id === value && (e.canView ?? e.canEdit))?.branchId; setBranch(b); setService(options?.services.find(s => s.branchId === b)?.id); setAssistant(undefined); } }} /></label>
+        onChange={value => { if (!discardOkay()) return; setViewBranch(value); const first = options?.employees.find(e => e.branchId === value && (e.canView ?? e.canEdit)); setEmployee(first?.id); }} /></label>}
+      <label className="ws-field">Nhân viên / bác sĩ <Select aria-label="Nhân viên / bác sĩ" value={employee} disabled={busy} style={{ width: 230 }} options={options?.employees.filter((e, i, all) => (e.canView ?? e.canEdit) && (!showBranchPicker || e.branchId === viewBranch) && all.findIndex(x => x.id === e.id && (x.canView ?? x.canEdit) && (!showBranchPicker || x.branchId === viewBranch)) === i).map(e => ({ value: e.id, label: e.name }))} onChange={value => { if (discardOkay()) { setEmployee(value); } }} /></label>
       <Select aria-label="Loại lịch" value={kind} disabled={busy} style={{ width: 230 }} options={[{ value: 'Template', label: 'Mẫu lặp hằng tuần' }, { value: 'Exception', label: 'Ngoại lệ ngày cụ thể' }]} onChange={value => { if (discardOkay()) setKind(value); }} />
-      <label className="ws-field">{kind === 'Template' ? 'Áp dụng từ ngày' : 'Ngày ngoại lệ'} <Input aria-label="Ngày áp dụng" type="date" value={date} disabled={busy} onChange={e => { if (e.target.value && discardOkay()) setDate(e.target.value); }} /></label>
+      <label className="ws-field">{kind === 'Template' ? 'Áp dụng từ ngày' : 'Ngày ngoại lệ'} <Input aria-label="Ngày áp dụng" type="date" value={date} disabled={busy} onChange={e => { if (e.target.value && discardOkay()) { setDate(e.target.value); if (endDate && endDate <= e.target.value) setEndDate(''); } }} /></label>
+      {kind === 'Exception' && <label className="ws-field">Đến ngày (nghỉ nhiều ngày) <Input aria-label="Đến ngày" type="date" value={endDate} min={addDays(date, 1)} disabled={busy} onChange={e => { setEndDate(e.target.value); clearResults(); }} /></label>}
     </Space>
     {busy && <Spin tip="Đang tải / kiểm tra lịch"><div style={{ height: 30 }} /></Spin>}
     {options && !options.employees.some(e => (e.canView ?? e.canEdit)) && <Empty description="Chưa có nhân viên được phân quyền" />}
-    {employee && options?.employees.some(person => person.id === employee && person.canDentist && (person.canView ?? person.canEdit))
-      && <DoctorAppointmentsPanel dentistId={employee} date={date} />}
     {saved && <>
-      <Space wrap><Tag color={revision ? 'green' : 'default'}>{revision ? 'Đã công bố' : 'Chưa công bố'}</Tag><Typography.Text>Version {saved.version}{dirty ? ' · Có thay đổi chưa lưu' : ''}</Typography.Text>{revision && <Typography.Text>Hiệu lực: {revision.date} · Người công bố: {revision.publishedBy} · {clinicTime(revision.publishedAt)}</Typography.Text>}</Space>
+      <Space wrap><Tag color={revision ? 'green' : 'default'}>{revision ? 'Đã công bố' : 'Chưa công bố'}</Tag>{dirty && <Typography.Text>Có thay đổi chưa lưu</Typography.Text>}</Space>
       {!!saved.futureChanges.length && <Card size="small" title="Thay đổi đã công bố trong tương lai">{saved.futureChanges.map(r => <div key={r.id}>{r.date} · {r.kind === 'Template' ? 'Mẫu lặp' : 'Ngoại lệ'} · Version {r.version}{r.reason ? ` · ${r.reason}` : ''}</div>)}</Card>}
       {kind === 'Exception' && <label>Lý do ngoại lệ <Input aria-label="Lý do ngoại lệ" value={reason} maxLength={500} disabled={!has('working-schedules.manage') || busy} onChange={e => { setReason(e.target.value); clearResults(); }} /></label>}
       <section className="working-week-editor" aria-label="Chỉnh lịch làm việc">
@@ -186,13 +206,13 @@ export default function WorkingSchedulesPage() {
               {!dayBranch && <span className="working-day-empty">Không có ca làm việc</span>}
               {periods.map((p, i) => p.day === day && <div key={i} role="group" aria-label={`Khoảng ${i + 1} · ${time(p.startMinute)} → ${time(p.endMinute)}`} className={`working-period working-period-${p.kind.toLowerCase()}`}>
                 <span className="working-period-number" title={`Khoảng ${i + 1}`}>{String(i + 1).padStart(2, '0')}</span>
-                <Select className="working-period-kind" aria-label={`Loại khoảng ${i + 1}`} value={p.kind} disabled={!has('working-schedules.manage') || busy} options={[{ value: 'Work', label: 'Làm việc' }, { value: 'Break', label: 'Nghỉ' }, { value: 'Block', label: 'Block' }]} onChange={value => changePeriod(i, { kind: value })} />
+                <Select className="working-period-kind" aria-label={`Loại khoảng ${i + 1}`} value={p.kind} disabled={!has('working-schedules.manage') || busy} options={[{ value: 'Work', label: 'Làm việc' }, { value: 'Break', label: 'Nghỉ' }]} onChange={value => changePeriod(i, { kind: value })} />
                 <div className="working-period-times">
                   <Select aria-label={`Bắt đầu ${i + 1}`} showSearch optionFilterProp="label" value={p.startMinute} disabled={!has('working-schedules.manage') || busy} options={timeOptions.slice(0, -1)} onChange={value => changePeriod(i, { startMinute: value })} />
                   <span className="working-time-separator" aria-hidden="true">–</span>
                   <Select aria-label={`Kết thúc ${i + 1}`} showSearch optionFilterProp="label" value={p.endMinute} disabled={!has('working-schedules.manage') || busy} options={timeOptions.slice(1)} onChange={value => changePeriod(i, { endMinute: value })} />
                 </div>
-                <Input className="working-period-reason" aria-label={`Lý do ${i + 1}`} placeholder={p.kind === 'Work' ? 'Ghi chú (không bắt buộc)' : 'Lý do nghỉ / block'} value={p.reason} maxLength={500} disabled={!has('working-schedules.manage') || busy} onChange={e => changePeriod(i, { reason: e.target.value })} />
+                <Input className="working-period-reason" aria-label={`Lý do ${i + 1}`} placeholder={p.kind === 'Work' ? 'Ghi chú (không bắt buộc)' : 'Lý do nghỉ'} value={p.reason} maxLength={500} disabled={!has('working-schedules.manage') || busy} onChange={e => changePeriod(i, { reason: e.target.value })} />
                 <Tooltip title={`Xóa khoảng ${i + 1}`}><Button className="working-period-remove" type="text" danger icon={<DeleteOutlined />} aria-label={`Xóa khoảng ${i + 1}`} disabled={!has('working-schedules.manage') || busy} onClick={() => edit(periods.filter((_, index) => index !== i))} /></Tooltip>
               </div>)}
               {dayBranch && <Button className="working-period-add" type="text" aria-label="Thêm khoảng" icon={<PlusOutlined aria-hidden="true" />} disabled={!has('working-schedules.manage') || busy} onClick={() => edit([...periods, { branchId: dayBranch, day, startMinute: 480, endMinute: 720, kind: 'Work', reason: '' }])}>Thêm khoảng</Button>}
@@ -202,24 +222,14 @@ export default function WorkingSchedulesPage() {
         </div>
       </section>
       <Space wrap><Button disabled={!has('working-schedules.manage') || busy} onClick={() => void check(false)}>Kiểm tra ảnh hưởng</Button><Button type="primary" disabled={!has('working-schedules.manage') || busy} onClick={() => void check(true)}>Lưu và công bố</Button><Button disabled={!has('working-schedules.manage') || busy || !dirty} onClick={() => { if (discardOkay()) { useSaved(saved); setError(undefined); clearResults(); } }}>Hủy thay đổi chưa lưu</Button></Space>
-      {affected && (affected.length ? <><Alert type="warning" message={`MSG32 · Có ${affected.length} lịch Confirmed bị ảnh hưởng. Giải quyết tại S12 trước khi công bố.`} /><Table rowKey="id" dataSource={affected} columns={[{ title: 'Mã lịch', dataIndex: 'code', render: (value: string, row: Affected) => <Link to={`/appointments/${row.id}`}>{value} · S12</Link> }, { title: 'Bắt đầu', dataIndex: 'start', render: clinicTime }, { title: 'Kết thúc', dataIndex: 'end', render: clinicTime }, { title: 'Người đến', dataIndex: 'attendee' }, { title: 'Trạng thái', dataIndex: 'status' }]} /></> : <Alert type="info" message="Không có lịch Confirmed bị ảnh hưởng tại thời điểm kiểm tra." />)}
-      <Card title="Preview availability">
-        <Space wrap>
-          <Select aria-label="Chế độ preview" value={mode} disabled={busy} style={{ width: 240 }} options={[{ value: 'Staff', label: 'Nhân viên · bản đang sửa' }, { value: 'Public', label: 'Công khai · bản đã công bố' }]} onChange={value => { setMode(value); setDays(undefined); if (value === 'Public') setDuration(options?.services.find(s => s.id === service)?.publicDurationMinutes ?? 30); }} />
-          <label>Từ ngày <Input aria-label="Preview từ ngày" type="date" value={from} disabled={busy} onChange={e => { setFrom(e.target.value); setDays(undefined); }} /></label>
-          <label>Đến ngày <Input aria-label="Preview đến ngày" type="date" value={to} disabled={busy} onChange={e => { setTo(e.target.value); setDays(undefined); }} /></label>
-          <Select aria-label="Chi nhánh preview" value={branch} style={{ width: 200 }} disabled={busy} options={eligible.map(b => ({ value: b.id, label: b.name }))} onChange={value => { const next = options?.services.find(s => s.branchId === value); setBranch(value); setService(next?.id); if (mode === 'Public') setDuration(next?.publicDurationMinutes ?? 30); setAssistant(undefined); setDays(undefined); }} />
-          <Select aria-label="Dịch vụ" value={service} style={{ width: 200 }} disabled={busy} options={options?.services.filter(s => s.branchId === branch).map(s => ({ value: s.id, label: s.name }))} onChange={value => { setService(value); setDays(undefined); if (mode === 'Public') setDuration(options?.services.find(s => s.id === value)?.publicDurationMinutes ?? 30); }} />
-          <InputNumber aria-label="Thời lượng phút" aria-invalid={!!durationError} status={durationError ? 'error' : undefined} min={1} max={480} step={1} changeOnBlur={false} value={duration} disabled={busy || mode === 'Public'}
-            onInput={text => { setDuration(text.trim() === '' ? null : Number(text)); setDays(undefined); }}
-            onChange={value => { setDuration(value); setDays(undefined); }} />
-          <Select aria-label="Trợ lý" allowClear placeholder="Trợ lý (nếu có)" style={{ width: 200 }} value={assistant} disabled={busy} options={options?.employees.filter(e => e.branchId === branch && e.id !== employee).map(e => ({ value: e.id, label: e.name }))} onChange={value => { setAssistant(value); setDays(undefined); }} />
-          <Button disabled={busy || !service || !options?.employees.find(e => e.id === employee && e.branchId === branch)?.canDentist} onClick={() => void previewSlots()}>Preview slot</Button>
-        </Space>
-        <Typography.Paragraph type={durationError ? 'danger' : 'secondary'} role={durationError ? 'alert' : undefined}>{durationError ?? (mode === 'Public' ? 'Thời lượng theo dịch vụ đã chọn.' : 'Thời lượng: số nguyên từ 1 đến 480 phút.')}</Typography.Paragraph>
-        <Typography.Paragraph>Preview tối đa 31 ngày, không giữ chỗ. Mỗi slot dùng một ghế và cùng nhân sự trong toàn bộ khoảng.</Typography.Paragraph>
-        {days && (days.every(d => !d.slots.length) ? <Empty description="Không có khung giờ đáp ứng tài nguyên" /> : <Table size="small" rowKey="start" dataSource={days.flatMap(d => d.slots)} columns={[{ title: 'Bắt đầu', dataIndex: 'start', render: clinicTime }, { title: 'Kết thúc', dataIndex: 'end', render: clinicTime }, { title: 'Ghế', dataIndex: 'chairId' }, { title: 'Version lịch', dataIndex: 'scheduleVersion' }]} />)}
-      </Card>
+      <Modal open={!!capacity?.length} title="Không đủ ghế để đăng ký" onCancel={() => setCapacity(undefined)}
+        footer={<Button type="primary" onClick={() => setCapacity(undefined)}>Đóng</Button>}>
+        <Alert type="warning" showIcon message="Khung giờ này đã có nhiều bác sĩ trực hơn số ghế của chi nhánh, nên chưa thể công bố." />
+        <ul style={{ marginTop: 12 }}>{capacity?.map(c => <li key={`${c.branchId}-${c.day}-${c.startMinute}`}>{['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ nhật'][c.day]} {clock(c.startMinute)}–{clock(c.endMinute)}: {c.doctors} bác sĩ cùng ca, chi nhánh chỉ có {c.chairs} ghế</li>)}</ul>
+        <Typography.Text type="secondary">Hãy chọn khung giờ khác, hoặc nhờ quản lý tăng số ghế / đổi ca của bác sĩ khác.</Typography.Text>
+      </Modal>
+      <Modal open={!!affected?.length} title="Có lịch hẹn bị ảnh hưởng" width={720} onCancel={() => setAffected(undefined)}
+        footer={<Button type="primary" onClick={() => setAffected(undefined)}>Đóng</Button>}><Alert type="warning" message={`MSG32 · Có ${affected?.length} lịch Confirmed bị ảnh hưởng. Giải quyết tại S12 trước khi công bố.`} /><Table rowKey="id" dataSource={affected} columns={[{ title: 'Mã lịch', dataIndex: 'code', render: (value: string, row: Affected) => <Link to={`/appointments/${row.id}`}>{value} · S12</Link> }, { title: 'Bắt đầu', dataIndex: 'start', render: clinicTime }, { title: 'Kết thúc', dataIndex: 'end', render: clinicTime }, { title: 'Người đến', dataIndex: 'attendee' }, { title: 'Trạng thái', dataIndex: 'status' }]} /></Modal>
     </>}
   </Space>;
 }

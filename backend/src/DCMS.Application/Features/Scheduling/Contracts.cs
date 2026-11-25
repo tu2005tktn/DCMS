@@ -6,7 +6,8 @@ namespace DCMS.Application.Features.Scheduling;
 public sealed record ScheduleDto(Guid? Id, int BranchId, int DentistId, DateOnly WeekStart, int Version,
     string Status, SchedulePeriod[] Intervals, int? PublishedBy, DateTimeOffset? PublishedAt);
 public sealed record AffectedAppointment(Guid Id, string Code, DateTimeOffset Start, DateTimeOffset End, string Attendee, string Status);
-public sealed record SchedulePreview(AffectedAppointment[] AffectedAppointments);
+public sealed record CapacityConflict(int BranchId, int Day, int StartMinute, int EndMinute, int Doctors, int Chairs);
+public sealed record SchedulePreview(AffectedAppointment[] AffectedAppointments, CapacityConflict[]? CapacityConflicts = null);
 public sealed record ScheduleAppointment(Guid Id, string Code, int BranchId, string BranchName,
     DateTimeOffset StartAt, DateTimeOffset EndAt, string PatientName, string ServiceName, string Status,
     bool IsTreatmentPlan);
