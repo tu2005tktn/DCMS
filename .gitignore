@@ -58,3 +58,6 @@ web/package-lock.json
 # Local agent instructions.
 /AGENTS.md
 /agent.md
+
+# Local test reports and evidence (not versioned)
+outputs/
