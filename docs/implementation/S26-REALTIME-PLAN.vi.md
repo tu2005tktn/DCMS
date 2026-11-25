@@ -1,5 +1,7 @@
 # S26+ · Realtime Notification & Booking Data Fix — PLAN
 
+> Cập nhật 25/11/2026: mobile đã gỡ toàn bộ mock (`appointment.mock.ts`, `appointments.mock.ts`, `notification.mock.ts`, các repo lưu AsyncStorage) và các biến `EXPO_PUBLIC_APPOINTMENTS_MOCK`, `EXPO_PUBLIC_USE_REAL_NOTIFICATION_API`; mọi màn hình gọi API thật. Phần dưới đây là ghi chép lịch sử.
+
 > Tác giả: assistant · Ngày: 2026-10-17 · Branch: `Trien`
 > Phạm vi: 3 vấn đề người dùng báo + SignalR realtime.
 > Phong cách: phased — dừng sau mỗi giai đoạn để bạn verify.

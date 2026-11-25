@@ -15,6 +15,5 @@ public static class ReceptionEndpoints
             int? page, int? pageSize, IReceptionService s, CancellationToken ct) => Results.Ok(await s.QueueAsync(AuthenticationEndpoints.AccountId(c.User), new(branchId, date, dentistId, status, keyword, page ?? 1, pageSize ?? 20), ct)));
         group.MapGet("/appointments/{appointmentId:guid}", async (HttpContext c, Guid appointmentId, IReceptionService s, CancellationToken ct) => Results.Ok(await s.DetailAsync(AuthenticationEndpoints.AccountId(c.User), appointmentId, ct)));
         group.MapPost("/appointments/{appointmentId:guid}/check-in", async (HttpContext c, Guid appointmentId, CheckInRequest request, IReceptionService s, CancellationToken ct) => Results.Ok(await s.CheckInAsync(AuthenticationEndpoints.AccountId(c.User), appointmentId, request, ct)));
-        endpoints.MapGet("/api/visits/{visitId:guid}", async (HttpContext c, Guid visitId, IReceptionService s, CancellationToken ct) => Results.Ok(await s.VisitAsync(AuthenticationEndpoints.AccountId(c.User), visitId, ct))).RequireAuthorization().WithTags("Visits");
     }
 }

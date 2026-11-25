@@ -12,7 +12,7 @@ namespace DCMS.IntegrationTests;
 public sealed class ItemPlanTests(ApiHost host)
 {
     private const string Root = "/api/treatment-templates/item-plans";
-    private const string Dentist = "Nha sĩ (dentist.demo) đã đăng nhập, làm việc tại chi nhánh A.";
+    private const string Dentist = "Dentist dentist.demo is signed in and works in branch A.";
 
     private async Task<ItemPlanDto> NewPlanAsync(ApiClient client) =>
         (await client.PostAsync(Root, new ItemPlanCreate(host.BranchA, "Kế hoạch " + Guid.NewGuid().ToString("N")[..8], Guid.NewGuid()))).Json<ItemPlanDto>();
@@ -38,7 +38,6 @@ public sealed class ItemPlanTests(ApiHost host)
 
         Assert.Equal(200, response.Status);
         var stored = await host.QueryAsync(db => db.TreatmentTemplates.AsNoTracking().SingleAsync(x => x.Name == name));
-        Assert.Equal("ItemPlan", stored.DefinitionKind);
         Assert.Equal(host.BranchA, stored.BranchId);
     }
 
@@ -66,7 +65,7 @@ public sealed class ItemPlanTests(ApiHost host)
         var response = await client.PostAsync(Root, new ItemPlanCreate(host.BranchA, "", Guid.NewGuid()));
 
         Assert.Equal(400, response.Status);
-        Assert.Equal("ITEM_PLAN_VALIDATION", response.Code);
+        Assert.Equal("MSG75", response.Code);
     }
 
     [Fact, Case("PLN-04", "A plan name of 161 characters is rejected", Dentist,
@@ -78,10 +77,10 @@ public sealed class ItemPlanTests(ApiHost host)
         var response = await client.PostAsync(Root, new ItemPlanCreate(host.BranchA, new string('A', 161), Guid.NewGuid()));
 
         Assert.Equal(400, response.Status);
-        Assert.Equal("ITEM_PLAN_VALIDATION", response.Code);
+        Assert.Equal("MSG75", response.Code);
     }
 
-    [Fact, Case("PLN-05", "A dentist cannot create a plan in a branch they do not work in", "Nha sĩ (dentist.demo) đã đăng nhập, chỉ làm việc tại chi nhánh A.",
+    [Fact, Case("PLN-05", "A dentist cannot create a plan in a branch they do not work in", "Dentist dentist.demo is signed in and works only in branch A.",
         "Step 1: Call POST /api/treatment-templates/item-plans with the id of branch B.")]
     public async Task Other_branch_is_rejected()
     {
@@ -90,10 +89,10 @@ public sealed class ItemPlanTests(ApiHost host)
         var response = await client.PostAsync(Root, new ItemPlanCreate(host.BranchB, "Kế hoạch chi nhánh B", Guid.NewGuid()));
 
         Assert.Equal(403, response.Status);
-        Assert.Equal("MSG06", response.Code);
+        Assert.Equal("MSG05", response.Code);
     }
 
-    [Fact, Case("PLN-06", "A clinic assistant cannot create a plan", "Trợ lý (assistant.demo) đã đăng nhập.",
+    [Fact, Case("PLN-06", "A clinic assistant cannot create a plan", "Clinic assistant assistant.demo is signed in.",
         "Step 1: Sign in as assistant.demo.",
         "Step 2: Call POST /api/treatment-templates/item-plans.")]
     public async Task Assistant_is_rejected()
@@ -162,7 +161,7 @@ public sealed class ItemPlanTests(ApiHost host)
         var response = await client.PostAsync($"{Root}/{plan.Id}/items", Row(plan.Version, await ServiceIdAsync(client), teeth: ["99"]));
 
         Assert.Equal(400, response.Status);
-        Assert.Equal("ITEM_PLAN_VALIDATION", response.Code);
+        Assert.Equal("MSG75", response.Code);
     }
 
     [Fact, Case("ROW-04", "An estimated time of 481 minutes is rejected", Dentist + " The plan exists.",
@@ -175,7 +174,7 @@ public sealed class ItemPlanTests(ApiHost host)
         var response = await client.PostAsync($"{Root}/{plan.Id}/items", Row(plan.Version, await ServiceIdAsync(client), minutes: 481));
 
         Assert.Equal(400, response.Status);
-        Assert.Equal("ITEM_PLAN_VALIDATION", response.Code);
+        Assert.Equal("MSG75", response.Code);
     }
 
     [Fact, Case("ROW-05", "A negative cost is rejected", Dentist + " The plan exists.",
@@ -188,7 +187,7 @@ public sealed class ItemPlanTests(ApiHost host)
         var response = await client.PostAsync($"{Root}/{plan.Id}/items", Row(plan.Version, await ServiceIdAsync(client), cost: -1));
 
         Assert.Equal(400, response.Status);
-        Assert.Equal("ITEM_PLAN_VALIDATION", response.Code);
+        Assert.Equal("MSG75", response.Code);
     }
 
     [Fact, Case("ROW-06", "A note of 1001 characters is rejected", Dentist + " The plan exists.",
@@ -201,7 +200,7 @@ public sealed class ItemPlanTests(ApiHost host)
         var response = await client.PostAsync($"{Root}/{plan.Id}/items", Row(plan.Version, await ServiceIdAsync(client), note: new string('a', 1001)));
 
         Assert.Equal(400, response.Status);
-        Assert.Equal("ITEM_PLAN_VALIDATION", response.Code);
+        Assert.Equal("MSG75", response.Code);
     }
 
     [Fact, Case("ROW-07", "A service that was not selected is rejected", Dentist + " The plan exists.",
@@ -214,7 +213,7 @@ public sealed class ItemPlanTests(ApiHost host)
         var response = await client.PostAsync($"{Root}/{plan.Id}/items", Row(plan.Version, 0));
 
         Assert.Equal(400, response.Status);
-        Assert.Equal("ITEM_PLAN_VALIDATION", response.Code);
+        Assert.Equal("MSG75", response.Code);
     }
 
     [Fact, Case("ROW-08", "An item sent with an old plan version is rejected", Dentist + " The plan exists and was changed after it was loaded.",
@@ -230,7 +229,7 @@ public sealed class ItemPlanTests(ApiHost host)
         var response = await client.PostAsync($"{Root}/{plan.Id}/items", Row(plan.Version, service));
 
         Assert.Equal(409, response.Status);
-        Assert.Equal("MSG111", response.Code);
+        Assert.Equal("MSG41", response.Code);
     }
 
     [Fact, Case("ROW-09", "A plan that does not exist is rejected", Dentist,
@@ -242,10 +241,10 @@ public sealed class ItemPlanTests(ApiHost host)
         var response = await client.PostAsync($"{Root}/{Guid.NewGuid()}/items", Row(1, 1));
 
         Assert.Equal(404, response.Status);
-        Assert.Equal("MSG113", response.Code);
+        Assert.Equal("MSG42", response.Code);
     }
 
-    [Fact, Case("ROW-10", "A clinic assistant cannot add an item", "Trợ lý (assistant.demo) đã đăng nhập; plan exists.",
+    [Fact, Case("ROW-10", "A clinic assistant cannot add an item", "Clinic assistant assistant.demo is signed in; the plan exists.",
         "Step 1: Create a plan as the dentist.",
         "Step 2: Sign in as assistant.demo and call POST .../{id}/items.")]
     public async Task Assistant_is_rejected_for_items()

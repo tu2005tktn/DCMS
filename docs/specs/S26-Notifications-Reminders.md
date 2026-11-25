@@ -4,6 +4,10 @@
 
 Với mỗi mốc nhắc lịch hợp lệ, hệ thống duyệt từng tài khoản nhận đã tính từ người đặt và liên kết bệnh nhân VERIFIED. Một tài khoản chỉ có một nhắc lịch cho cùng lịch hẹn, phiên bản và mốc; thay đổi này khôi phục đúng vòng lặp nhận nhắc và cho phép backend build trước migration, không thay đổi API.
 
+## Thông báo trên web bệnh nhân (bổ sung 25/11/2026)
+
+Cổng `/customer` hiển thị cùng thông báo trong ứng dụng qua chuông ở header; hợp đồng giao diện và ánh xạ deep link: [S26-CUSTOMER-NOTIFICATIONS-WEB.vi.md](S26-CUSTOMER-NOTIFICATIONS-WEB.vi.md). Web nhân viên không có chuông vì thông báo S26 chỉ gửi tới tài khoản Public.
+
 ## Thông báo theo sự kiện của bệnh nhân (bổ sung 10/11/2026)
 
 | Sự kiện đã lưu thành công | Người nhận | Nội dung và đích mở |

@@ -72,12 +72,12 @@ public sealed class AppointmentApiTests(ApiFixture fixture) : IClassFixture<ApiF
         Assert.Equal(HttpStatusCode.Created, first.StatusCode);
         var created = (await first.Content.ReadFromJsonAsync<AppointmentResult>())!;
         Assert.Equal("Confirmed", created.Status);
-        Assert.Equal("MSG29", created.Notification.Code);
+        Assert.Equal("MSG24", created.Notification.Code);
         var retry = await client.PostAsJsonAsync("/api/appointments", command);
         Assert.Equal(HttpStatusCode.OK, retry.StatusCode);
         var repeated = (await retry.Content.ReadFromJsonAsync<AppointmentResult>())!;
         Assert.Equal(created.AppointmentId, repeated.AppointmentId);
-        Assert.Equal("MSG30", repeated.Notification.Code);
+        Assert.Equal("MSG25", repeated.Notification.Code);
         var changed = await client.PostAsJsonAsync("/api/appointments", command with
         { Attendee = new AppointmentAttendee(null, "Người khác", null) });
         Assert.Equal(HttpStatusCode.Conflict, changed.StatusCode);
@@ -168,7 +168,7 @@ public sealed class AppointmentApiTests(ApiFixture fixture) : IClassFixture<ApiF
         var command = Request(setup, slot) with { StartAt = DateTimeOffset.UtcNow.AddMinutes(30) };
         var response = await client.PostAsJsonAsync("/api/appointments", command);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.Equal("MSG24", (await response.Content.ReadFromJsonAsync<SystemMessage>())!.Code);
+        Assert.Equal("MSG19", (await response.Content.ReadFromJsonAsync<SystemMessage>())!.Code);
     }
 
     [Fact]
@@ -188,7 +188,7 @@ public sealed class AppointmentApiTests(ApiFixture fixture) : IClassFixture<ApiF
             "Khám khẩn", setup.DentistId, null, candidate, 15, null, null, Guid.NewGuid(), 1, null);
         var denied = await client.PostAsJsonAsync("/api/appointments", command);
         Assert.Equal(HttpStatusCode.BadRequest, denied.StatusCode);
-        Assert.Equal("MSG24", (await denied.Content.ReadFromJsonAsync<SystemMessage>())!.Code);
+        Assert.Equal("MSG19", (await denied.Content.ReadFromJsonAsync<SystemMessage>())!.Code);
         var accepted = await client.PostAsJsonAsync("/api/appointments", command with { ExceptionReason = "Ca gấp đã được tiếp nhận" });
         Assert.Equal(HttpStatusCode.Created, accepted.StatusCode);
         var conflict = await client.PostAsJsonAsync("/api/appointments", command with

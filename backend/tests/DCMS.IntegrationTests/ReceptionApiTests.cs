@@ -108,7 +108,7 @@ public sealed class ReceptionApiTests(ReceptionFixture fixture) : IClassFixture<
         var patientsBefore = await db.Patients.CountAsync(); var linksBefore = await db.PatientAccountLinks.CountAsync();
         var v = await Check(client, s); Assert.Equal("Queued", v.Status); Assert.Equal("CheckedIn", v.AppointmentStatus); Assert.Equal(s.PatientId, v.PatientId);
         Assert.Equal(fixture.Clock.Now, v.ArrivalAt);
-        using var dentist = await Login("dentist.demo"); var read = await dentist.GetFromJsonAsync<VisitResult>($"/api/visits/{v.VisitId}");
+        using var dentist = await Login("dentist.demo"); var read = (await dentist.GetFromJsonAsync<ReceptionDetail>($"/api/reception/appointments/{v.AppointmentId}"))!.Visit;
         Assert.Equal(v.VisitId, read!.VisitId); Assert.Equal(s.AppointmentId, read.AppointmentId);
         var queue = await dentist.GetFromJsonAsync<ReceptionPage<VisitResult>>($"/api/reception/queue?branchId={s.BranchId}&date={Today:yyyy-MM-dd}");
         Assert.Single(queue!.Items); Assert.Equal(v.VisitId, queue.Items[0].VisitId);
@@ -132,36 +132,36 @@ public sealed class ReceptionApiTests(ReceptionFixture fixture) : IClassFixture<
         var s = await Prepare(); using var client = await Login(); var command = Command(s); var first = await Check(client, s, command);
         using (var scope = fixture.Services.CreateScope()) { var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>(); var v = await db.Visits.SingleAsync(x => x.Id == first.VisitId); v.Status = status; v.Version++; await db.SaveChangesAsync(); }
         var replay = await Check(client, s, command); Assert.Equal(first.VisitId, replay.VisitId); Assert.Equal(status, replay.Status); Assert.Equal(2, replay.VisitVersion); Assert.True(replay.Replayed);
-        await Error(await client.PostAsJsonAsync(Path(s), command with { Note = "changed" }), HttpStatusCode.Conflict, "MSG111");
+        await Error(await client.PostAsJsonAsync(Path(s), command with { Note = "changed" }), HttpStatusCode.Conflict, "MSG41");
     }
     [Theory] [InlineData("Cancelled")] [InlineData("NoShow")] [InlineData("Completed")]
     public async Task IneligibleAppointmentNeverCreatesVisit(string status)
     {
         var s = await Prepare(); using var client = await Login();
         using (var scope = fixture.Services.CreateScope()) { var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>(); (await db.Appointments.SingleAsync(x => x.Id == s.AppointmentId)).Status = status; await db.SaveChangesAsync(); }
-        await Error(await client.PostAsJsonAsync(Path(s), Command(s)), HttpStatusCode.Conflict, status == "NoShow" ? "MSG47" : "MSG42");
+        await Error(await client.PostAsJsonAsync(Path(s), Command(s)), HttpStatusCode.Conflict, status == "NoShow" ? "MSG36" : "MSG34");
     }
     [Theory] [InlineData(-1)] [InlineData(1)]
     public async Task AppointmentOnAnotherClinicDayIsExplainedBeforeSubmitAndRejected(int day)
     {
         var s = await Prepare(dayOffset: day); using var client = await Login(); var detail = await client.GetFromJsonAsync<ReceptionDetail>($"/api/reception/appointments/{s.AppointmentId}");
         Assert.False(detail!.Appointment.CanCheckIn); Assert.NotNull(detail.Appointment.IneligibleReason);
-        await Error(await client.PostAsJsonAsync(Path(s), Command(s)), HttpStatusCode.Conflict, "MSG42");
+        await Error(await client.PostAsJsonAsync(Path(s), Command(s)), HttpStatusCode.Conflict, "MSG34");
     }
     [Fact] public async Task SamePhoneDoesNotMatchAnotherPatientAndIdentityConfirmationIsRequired()
     {
         var s = await Prepare(false); using var client = await Login(); int other;
         using (var scope = fixture.Services.CreateScope()) { var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>(); var p = new PatientProfile { PatientCode = Guid.NewGuid().ToString("N"), FullName = "SYNTHETIC khác người", Phone = "0912345678", CreatedAt = fixture.Clock.Now, UpdatedAt = fixture.Clock.Now }; db.Add(p); await db.SaveChangesAsync(); other = p.Id; }
-        await Error(await client.PostAsJsonAsync(Path(s), Command(s) with { PatientId = other }), HttpStatusCode.Conflict, "MSG43");
+        await Error(await client.PostAsJsonAsync(Path(s), Command(s) with { PatientId = other }), HttpStatusCode.Conflict, "MSG35");
         await Error(await client.PostAsJsonAsync(Path(s), Command(s) with { IdentityConfirmed = false }), HttpStatusCode.BadRequest);
         await Check(client, s);
     }
     [Fact] public async Task ArchivedPatientAndStaleVersionAreRejectedWithoutPartialWrite()
     {
-        var s = await Prepare(); using var client = await Login(); await Error(await client.PostAsJsonAsync(Path(s), Command(s) with { ExpectedVersion = 2 }), HttpStatusCode.Conflict, "MSG111");
+        var s = await Prepare(); using var client = await Login(); await Error(await client.PostAsJsonAsync(Path(s), Command(s) with { ExpectedVersion = 2 }), HttpStatusCode.Conflict, "MSG41");
         using var scope = fixture.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
         (await db.Patients.SingleAsync(x => x.Id == s.PatientId)).IsArchived = true; await db.SaveChangesAsync();
-        await Error(await client.PostAsJsonAsync(Path(s), Command(s)), HttpStatusCode.Conflict, "MSG202"); Assert.Equal(0, await db.Visits.CountAsync(x => x.AppointmentId == s.AppointmentId));
+        await Error(await client.PostAsJsonAsync(Path(s), Command(s)), HttpStatusCode.Conflict, "MSG51"); Assert.Equal(0, await db.Visits.CountAsync(x => x.AppointmentId == s.AppointmentId));
     }
     [Fact] public async Task AppointmentFollowUpSourceIsCarriedByServer()
     {
@@ -190,11 +190,11 @@ public sealed class ReceptionApiTests(ReceptionFixture fixture) : IClassFixture<
     [Fact] public async Task DentistOwnScopeAndRevokedBranchApplyToReadAndReplay()
     {
         var s = await Prepare(); using var client = await Login(); var command = Command(s); var v = await Check(client, s, command);
-        using var owner = await Login("owner.demo"); Assert.Equal(HttpStatusCode.OK, (await owner.GetAsync($"/api/visits/{v.VisitId}")).StatusCode); // chủ phòng khám xem mọi chi nhánh (S58-BRANCHES-AND-CHAIRS §4)
+        using var owner = await Login("owner.demo"); Assert.Equal(HttpStatusCode.OK, (await owner.GetAsync($"/api/reception/appointments/{v.AppointmentId}")).StatusCode); // chủ phòng khám xem mọi chi nhánh (S58-BRANCHES-AND-CHAIRS §4)
         using var dual = await Login("dual.demo"); using var dentist = await Login("dentist.demo");
         var queue = await dentist.GetFromJsonAsync<ReceptionPage<VisitResult>>($"/api/reception/queue?branchId={s.BranchId}&date={Today:yyyy-MM-dd}&dentistId={s.AssistantId}"); Assert.Single(queue!.Items);
         using (var scope = fixture.Services.CreateScope()) { var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>(); (await db.LoadMemberAsync(s.BranchId, s.AssistantId)).Active = false; await db.SaveChangesAsync(); }
-        await Error(await client.GetAsync($"/api/visits/{v.VisitId}"), HttpStatusCode.Forbidden); await Error(await client.PostAsJsonAsync(Path(s), command), HttpStatusCode.Forbidden);
+        await Error(await client.GetAsync($"/api/reception/appointments/{v.AppointmentId}"), HttpStatusCode.Forbidden); await Error(await client.PostAsJsonAsync(Path(s), command), HttpStatusCode.Forbidden);
     }
     [Theory] [InlineData("chair")] [InlineData("dentist")] [InlineData("patient")]
     public async Task RecheckBlocksOverlappingResourcesAndLeavesNoPartialReception(string kind)
@@ -207,7 +207,7 @@ public sealed class ReceptionApiTests(ReceptionFixture fixture) : IClassFixture<
             ChairId = kind == "chair" ? s.ChairId : otherChair, ServiceId = s.ServiceId, StartAt = a.StartAt, EndAt = a.EndAt,
             PatientId = kind == "patient" ? s.PatientId : null, AttendeeName = "SYNTHETIC blocker", CreatedAt = fixture.Clock.Now,
             BookingInfo = new() { BookerName = "SYNTHETIC" } }); await db.SaveChangesAsync();
-        await Error(await client.PostAsJsonAsync(Path(s), Command(s)), HttpStatusCode.Conflict, kind == "chair" ? "MSG28" : "MSG27");
+        await Error(await client.PostAsJsonAsync(Path(s), Command(s)), HttpStatusCode.Conflict, kind == "chair" ? "MSG23" : "MSG22");
         Assert.Equal(0, await db.Visits.CountAsync(x => x.AppointmentId == s.AppointmentId)); Assert.Equal("Confirmed", (await db.Appointments.AsNoTracking().SingleAsync(x => x.Id == s.AppointmentId)).Status);
     }
     [Fact] public async Task QuickBookingUsesExistingCommandThenCheckInAndResourceConflictsAreRejected()
@@ -218,7 +218,7 @@ public sealed class ReceptionApiTests(ReceptionFixture fixture) : IClassFixture<
         var booking = new CreateAppointmentRequest(s.BranchId, new BookerContact("SYNTHETIC người đặt", "0912345678", null), new AppointmentAttendee(s.PatientId, "SYNTHETIC người đến", null),
             "Relative", "WalkIn", "InPerson", s.ServiceId, null, s.DentistId, slot.ChairId, slot.Start, 15, null, "Vãng lai còn nguồn lực", Guid.NewGuid(), slot.ScheduleVersion, null, slot.BookingSettingsVersion);
         var response = await client.PostAsJsonAsync("/api/appointments", booking); Assert.Equal(HttpStatusCode.Created, response.StatusCode); var created = (await response.Content.ReadFromJsonAsync<AppointmentResult>())!;
-        await Error(await client.PostAsJsonAsync("/api/appointments", booking with { RequestKey = Guid.NewGuid() }), HttpStatusCode.Conflict, "MSG27");
+        await Error(await client.PostAsJsonAsync("/api/appointments", booking with { RequestKey = Guid.NewGuid() }), HttpStatusCode.Conflict, "MSG22");
         var v = await Check(client, s with { AppointmentId = created.AppointmentId }); Assert.Equal(created.AppointmentId, v.AppointmentId);
     }
     [Fact] public async Task CancelRaceNeverLeavesCancelledAppointmentWithAQueuedVisit()
@@ -251,7 +251,7 @@ public sealed class ReceptionApiTests(ReceptionFixture fixture) : IClassFixture<
             """);
         try
         {
-            await Error(await client.PostAsJsonAsync(Path(s), Command(s)), HttpStatusCode.ServiceUnavailable, "MSG144");
+            await Error(await client.PostAsJsonAsync(Path(s), Command(s)), HttpStatusCode.ServiceUnavailable, "MSG49");
             Assert.Equal(0, await db.Visits.CountAsync(x => x.AppointmentId == s.AppointmentId));
             Assert.Equal("Confirmed", (await db.Appointments.AsNoTracking().SingleAsync(x => x.Id == s.AppointmentId)).Status);
             Assert.Equal(0, await db.AppointmentChanges.CountAsync(x => x.AppointmentId == s.AppointmentId));
@@ -297,7 +297,7 @@ public sealed class ReceptionApiTests(ReceptionFixture fixture) : IClassFixture<
         await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE \"VISIT\" SET \"Purpose\"='TreatmentContinuation', \"DossierId\"={source}, \"AdditionalConcern\"='Legacy concern' WHERE \"Id\"={original.VisitId}");
         await db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO \"CLINICAL_SOURCE_REFERENCE\" VALUES ({source},{s.PatientId},{s.BranchId},'Legacy course','Needs clinical review')");
         await db.Database.MigrateAsync();
-        var adopted = await client.GetFromJsonAsync<VisitResult>($"/api/visits/{original.VisitId}");
+        var adopted = (await client.GetFromJsonAsync<ReceptionDetail>($"/api/reception/appointments/{original.AppointmentId}"))!.Visit;
         Assert.Equal(original.VisitId, adopted!.VisitId); Assert.Equal(original.ArrivalAt, adopted.ArrivalAt);
         Assert.Equal("Legacy concern", adopted.Note);
         Assert.Equal(original.VisitId, (await Check(client, s, command)).VisitId);
@@ -311,6 +311,6 @@ public sealed class ReceptionApiTests(ReceptionFixture fixture) : IClassFixture<
         await db.GetService<IMigrator>().MigrateAsync(previous);
         await db.Database.MigrateAsync(); // Restore the current model after a data-preserving legacy rollback.
         Assert.Equal(2, await db.Visits.CountAsync());
-        Assert.Equal(original.VisitId, (await client.GetFromJsonAsync<VisitResult>($"/api/visits/{original.VisitId}"))!.VisitId);
+        Assert.Equal(original.VisitId, (await client.GetFromJsonAsync<ReceptionDetail>($"/api/reception/appointments/{original.AppointmentId}"))!.Visit!.VisitId);
     }
 }

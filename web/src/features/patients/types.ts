@@ -31,5 +31,5 @@ export const auditActionLabels: Record<string, string> = {
   CREATE: 'Tạo hồ sơ', UPDATE: 'Cập nhật hành chính', ARCHIVE: 'Ngừng sử dụng', RESTORE: 'Khôi phục',
 };
 
-// MSG115: search succeeded with no match (a failed load is never shown as "no results").
+// MSG43: search succeeded with no match (a failed load is never shown as "no results").
 export const noPatientsMessage = 'Không tìm thấy hồ sơ bệnh nhân phù hợp.';

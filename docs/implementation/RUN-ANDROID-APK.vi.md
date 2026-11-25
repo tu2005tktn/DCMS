@@ -19,7 +19,7 @@
 ## Cấu hình demo
 
 - `EXPO_PUBLIC_API_URL` là URL công khai được nhúng vào APK. Với demo LAN, dùng IPv4 hiện tại của máy chạy API, không dùng `localhost`.
-- `EXPO_PUBLIC_APPOINTMENTS_MOCK=false` và `EXPO_PUBLIC_USE_REAL_NOTIFICATION_API=true` để dùng API thật.
+- Ứng dụng luôn gọi API thật; chỉ cần `EXPO_PUBLIC_API_URL`.
 - Cấu hình Expo hiện có cho phép HTTP Android khi URL API bắt đầu bằng `http://`.
 - Máy chạy API và điện thoại phải cùng mạng; API chạy bằng `infrastructure/scripts/start-api.ps1 -Lan` tại cổng 5080. Không tự thay đổi firewall.
 - IP máy thay đổi thì cần build lại APK hoặc dùng một URL API ổn định đã được cấu hình riêng.

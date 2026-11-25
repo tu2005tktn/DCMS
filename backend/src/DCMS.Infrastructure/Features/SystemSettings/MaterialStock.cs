@@ -70,7 +70,7 @@ public static class MaterialStock
 
 public static class MaterialStockMessages
 {
-    public static SystemMessage InvalidLines => new("MATERIAL_USAGE_INVALID", "Danh sách vật liệu dùng không hợp lệ. Vui lòng kiểm tra vật liệu và số lượng.") { Field = "materials" };
-    public static SystemMessage Insufficient(string detail) => new("MATERIAL_STOCK_INSUFFICIENT", $"Tồn kho không đủ. {detail}.") { Field = "materials" };
-    public static SystemMessage Negative => new("MATERIAL_STOCK_NEGATIVE", "Thay đổi này làm tồn kho vật liệu bị âm vì đã xuất dùng. Vui lòng kiểm tra lại.");
+    public static SystemMessage InvalidLines => new("MSG78", "Danh sách vật liệu dùng không hợp lệ. Vui lòng kiểm tra vật liệu và số lượng.") { Field = "materials" };
+    public static SystemMessage Insufficient(string detail) => new("MSG79", $"Tồn kho không đủ. {detail}.") { Field = "materials" };
+    public static SystemMessage Negative => new("MSG80", "Thay đổi này làm tồn kho vật liệu bị âm vì đã xuất dùng. Vui lòng kiểm tra lại.");
 }

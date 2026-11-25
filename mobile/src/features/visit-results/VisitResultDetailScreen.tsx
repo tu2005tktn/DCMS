@@ -143,7 +143,7 @@ export default function VisitResultDetailScreen() {
         {!documentsError && documentTotal === 0 && <Text style={styles.muted}>Lượt khám này chưa có ảnh hoặc tài liệu được phép xem.</Text>}
         {images.length > 0 && <View style={styles.grid}>
           {images.map((doc, i) => <Thumbnail key={doc.documentId} doc={doc} token={token} onOpen={() => setViewer(i)}
-            onDenied={status => authFailure(new RecordApiError('Phiên hoặc liên kết không còn hiệu lực.', status, 'MSG06'))} />)}
+            onDenied={status => authFailure(new RecordApiError('Phiên hoặc liên kết không còn hiệu lực.', status, 'MSG05'))} />)}
         </View>}
         {files.map(doc => <View key={doc.documentId} style={styles.file}>
           <Text style={styles.findingTitle}>{documentTypeLabels[doc.documentType] ?? doc.documentType} · {formatDate(`${doc.sourceDate}T12:00:00+07:00`)}</Text>
@@ -154,7 +154,7 @@ export default function VisitResultDetailScreen() {
       </Card>
     </ScrollView>
     <ImageViewer images={images} index={viewer} token={token} onIndex={setViewer} onClose={() => setViewer(null)}
-      onDenied={status => authFailure(new RecordApiError('Phiên hoặc liên kết không còn hiệu lực.', status, 'MSG06'))} />
+      onDenied={status => authFailure(new RecordApiError('Phiên hoặc liên kết không còn hiệu lực.', status, 'MSG05'))} />
   </>;
 }
 

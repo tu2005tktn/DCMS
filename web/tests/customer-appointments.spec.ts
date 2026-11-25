@@ -72,7 +72,7 @@ test('under twelve hours allows requesting reschedule with staff confirmation', 
     requestedSupport = route.request().postDataJSON() as Record<string, unknown>;
     submitted = true;
     return route.fulfill(json({ request: { id: 'SR-TEST', appointmentCode: original.code, kind: 'RESCHEDULE', status: 'Pending', version: 1 },
-      notification: { code: 'MSG33', message: 'Yêu cầu đổi lịch của bạn đã được gửi tới phòng khám.' } }, 201));
+      notification: { code: 'MSG28', message: 'Yêu cầu đổi lịch của bạn đã được gửi tới phòng khám.' } }, 201));
   });
   await page.goto('/customer/appointments/AP-WEB-TEST');
   await expect(page.getByText(/còn dưới 12 giờ/i)).toBeVisible();
@@ -100,11 +100,11 @@ test('under twelve hours allows requesting reschedule with staff confirmation', 
 
 test('slot race keeps original booking and entered reason, reloads slots for review', async ({ page }) => {
   await mockSession(page);
-  await page.route('**/api/appointments/*/reschedule', route => route.fulfill(json({ code: 'MSG34', message: 'MSG34: Lịch hẹn cũ vẫn được giữ nguyên.' }, 409)));
+  await page.route('**/api/appointments/*/reschedule', route => route.fulfill(json({ code: 'MSG29', message: 'MSG29: Lịch hẹn cũ vẫn được giữ nguyên.' }, 409)));
   await page.goto('/customer/appointments/AP-WEB-TEST');
   const dialog = await reviewMove(page);
   await dialog.getByRole('button', { name: 'Xác nhận đổi lịch', exact: true }).click();
-  await expect(dialog.getByText('MSG34: Lịch hẹn cũ vẫn được giữ nguyên.')).toBeVisible();
+  await expect(dialog.getByText('MSG29: Lịch hẹn cũ vẫn được giữ nguyên.')).toBeVisible();
   await expect(dialog.getByLabel('Lý do', { exact: true })).toHaveValue('SYNTHETIC change');
   await expect(dialog.getByRole('button', { name: 'Xem lại', exact: true })).toBeDisabled();
   await expect(page.getByText(formatTime(original.start), { exact: true }).first()).toBeVisible();
@@ -117,7 +117,7 @@ test('reschedule shows branch dentists and sends the selected dentist with that 
     payload = route.request().postDataJSON() as Record<string, unknown>;
     return route.fulfill(json({ appointment: { ...original, dentistId: 3, dentistName: 'SYNTHETIC alternate dentist',
       start: alternateSlot.start, end: alternateSlot.end, version: 2 },
-      notification: { code: 'MSG35', message: 'Đã đổi lịch thử nghiệm.' } }));
+      notification: { code: 'MSG30', message: 'Đã đổi lịch thử nghiệm.' } }));
   });
   await page.goto('/customer/appointments/AP-WEB-TEST');
   await page.getByRole('button', { name: 'Đổi lịch', exact: true }).click();
@@ -135,11 +135,11 @@ test('reschedule shows branch dentists and sends the selected dentist with that 
 
 test('stale version requires reload instead of allowing another confirmation', async ({ page }) => {
   await mockSession(page);
-  await page.route('**/api/appointments/*/reschedule', route => route.fulfill(json({ code: 'MSG111', message: 'MSG111: Dữ liệu đã thay đổi.' }, 409)));
+  await page.route('**/api/appointments/*/reschedule', route => route.fulfill(json({ code: 'MSG41', message: 'MSG41: Dữ liệu đã thay đổi.' }, 409)));
   await page.goto('/customer/appointments/AP-WEB-TEST');
   const dialog = await reviewMove(page);
   await dialog.getByRole('button', { name: 'Xác nhận đổi lịch', exact: true }).click();
-  await expect(dialog.getByText('MSG111: Dữ liệu đã thay đổi.')).toBeVisible();
+  await expect(dialog.getByText('MSG41: Dữ liệu đã thay đổi.')).toBeVisible();
   await expect(dialog.getByRole('button', { name: /Xác nhận đổi lịch$/ })).toBeDisabled();
   await dialog.getByRole('button', { name: 'Tải lại lịch hẹn', exact: true }).click();
   await expect(dialog).not.toBeVisible();
@@ -153,7 +153,7 @@ test('network retry reuses requestKey and never updates the displayed appointmen
     keys.push(route.request().postDataJSON().requestKey);
     if (keys.length === 1) await route.abort('failed');
     else await route.fulfill(json({ appointment: { ...original, start: slot.start, end: slot.end, version: 2 },
-      notification: { code: 'MSG35', message: 'Đã đổi lịch thử nghiệm.' } }));
+      notification: { code: 'MSG30', message: 'Đã đổi lịch thử nghiệm.' } }));
   });
   await page.goto('/customer/appointments/AP-WEB-TEST');
   const dialog = await reviewMove(page);
@@ -170,7 +170,7 @@ test('network retry reuses requestKey and never updates the displayed appointmen
 
 for (const status of [401, 403, 404]) test(`HTTP ${status} after opening detail removes cached appointment`, async ({ page }) => {
   await mockSession(page);
-  await page.route('**/api/appointments/*/cancel', route => route.fulfill(json({ code: status === 401 ? 'MSG07' : 'MSG102', message: 'Quyền truy cập đã thay đổi.' }, status)));
+  await page.route('**/api/appointments/*/cancel', route => route.fulfill(json({ code: status === 401 ? 'MSG06' : 'MSG37', message: 'Quyền truy cập đã thay đổi.' }, status)));
   await page.goto('/customer/appointments/AP-WEB-TEST');
   await page.getByRole('button', { name: 'Hủy lịch', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Hủy lịch hẹn' });

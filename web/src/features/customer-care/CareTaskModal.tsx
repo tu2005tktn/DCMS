@@ -83,7 +83,7 @@ export default function CareTaskModal({ open, options, branches, initialBranchId
       <Button key="save" type="primary" loading={busy} onClick={() => void save()}>Lưu</Button>]}>
     {confirmContext}
     {error && <Alert type="error" showIcon style={{ marginBottom: 16 }} message={error.message}
-      description={error.code === 'MSG111' ? 'Phiếu vừa được người khác cập nhật. Đóng hộp thoại, tải lại danh sách rồi sửa lại.' : undefined} />}
+      description={error.code === 'MSG41' ? 'Phiếu vừa được người khác cập nhật. Đóng hộp thoại, tải lại danh sách rồi sửa lại.' : undefined} />}
     <Form form={form} layout="horizontal" labelCol={{ span: 6 }} wrapperCol={{ span: 18 }} disabled={busy}>
       <Form.Item label="Chi nhánh" name="branchId" hidden={editing != null || branches.length < 2} rules={[{ required: true, message: 'Chọn chi nhánh.' }]}>
         <Select aria-label="Chi nhánh tạo phiếu" options={branches.map(b => ({ value: b.id, label: b.name }))}

@@ -20,9 +20,3 @@ public interface ISettingsAuditService
 {
     Task<SettingsAuditPage> ListAsync(int actorId, string? section, DateOnly? from, DateOnly? to, int page, int pageSize, CancellationToken ct);
 }
-
-// DCMS-132 services export (docs/specs/S58-DCMS-132-EXPORT-AUDIT.vi.md §4).
-public interface IServiceCatalogExport
-{
-    Task<byte[]> ExportAsync(int actorId, string? q, string? status, CancellationToken ct);
-}

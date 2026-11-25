@@ -1,0 +1,608 @@
+Table ACCESS_GROUP {
+  Id "uuid" [pk]
+  RecordKind "varchar(24)" [not null]
+  IdentityRoleId "integer" [unique]
+  Code "varchar(40)" [not null]
+  Name "varchar(160)" [not null]
+  Description "varchar(1000)"
+  BaseRole "varchar(40)" [not null]
+  Active "boolean" [not null]
+  Version "integer" [not null]
+  Grants "jsonb" [not null]
+}
+
+Table CARE_TASK {
+  Id "uuid" [pk]
+  PatientId "integer" [not null]
+  BranchId "integer" [not null]
+  AppointmentId "uuid"
+  Type "varchar(40)" [not null]
+  Content "varchar(4000)" [not null]
+  OwnerAccountId "integer"
+  DueAt "timestamptz" [not null]
+  Status "varchar(16)" [not null]
+  Version "integer" [not null]
+  ContactAttempts "jsonb" [not null]
+}
+
+Table CATALOG_MEDICINE {
+  Id "uuid" [pk]
+  Code "varchar(40)" [not null, unique]
+  Name "varchar(200)" [not null]
+  BaseUnit "varchar(40)" [not null]
+  ReferencePrice "bigint"
+  PrescriptionEligible "boolean" [not null]
+  InternalStockTracked "boolean" [not null]
+  IsActive "boolean" [not null]
+  Version "integer" [not null]
+  Spec "jsonb" [not null]
+}
+
+Table CATALOG_PROVIDER {
+  Id "uuid" [pk]
+  Type "varchar(16)" [not null]
+  Address "varchar(1000)"
+  Phone "varchar(20)"
+  Email "varchar(254)"
+  Code "varchar(40)" [not null, unique]
+  Name "varchar(160)" [not null]
+  IsActive "boolean" [not null]
+  Version "integer" [not null]
+}
+
+Table CLINIC_SETTINGS_VERSION {
+  Version "integer" [pk]
+  EffectiveAt "timestamptz" [not null]
+  ActorId "integer" [not null]
+  Reason "varchar(500)" [not null]
+  RestoredFromVersion "integer"
+  ContentJson "jsonb" [not null]
+}
+
+Table MATERIAL_CATEGORY {
+  Id "uuid" [pk]
+  Name "varchar(160)" [not null]
+  Version "integer" [not null]
+  IsDeleted "boolean" [not null]
+}
+
+Table REFERENCE_ENTRY {
+  Id "uuid" [pk]
+  Kind "varchar(32)" [not null]
+  Code "varchar(40)"
+  Name "varchar(160)" [not null]
+  Description "varchar(1000)"
+  IsReserved "boolean" [not null]
+  IsActive "boolean" [not null]
+  Version "integer" [not null]
+}
+
+Table SCHEDULING_BRANCH {
+  Id "integer" [pk]
+  Code "varchar(40)" [unique]
+  Name "varchar(160)" [not null]
+  Address "varchar(1000)"
+  Phone "varchar(20)"
+  Email "varchar(254)"
+  Active "boolean" [not null]
+  SlotIntervalMinutes "integer" [not null]
+  Version "integer" [not null]
+  Chairs "jsonb" [not null]
+  Members "jsonb" [not null]
+}
+
+Table USER_ACCOUNT {
+  Id "integer" [pk]
+  EmployeeId "integer" [not null]
+  FullName "varchar(160)" [not null]
+  AccountType "varchar(16)" [not null]
+  IsActive "boolean" [not null]
+  Version "integer" [not null]
+  CreatedAt "timestamptz" [not null]
+  UpdatedAt "timestamptz" [not null]
+  AssignedRoles "text[]" [not null]
+  AuthData "jsonb" [not null]
+  EmployeeCode "varchar(40)" [unique]
+  GroupId "uuid"
+  BranchIds "integer[]"
+  UserName "varchar(256)"
+  Email "varchar(256)"
+  EmailConfirmed "boolean" [not null]
+  PasswordHash "text"
+  PhoneNumber "text"
+}
+
+Table LAB_WORK_TYPE {
+  Id "uuid" [pk]
+  ProviderId "uuid"
+  Unit "varchar(16)" [not null]
+  ReferencePrice "bigint"
+  Warranty "varchar(1000)"
+  Code "varchar(40)" [not null, unique]
+  Name "varchar(160)" [not null]
+  IsActive "boolean" [not null]
+  Version "integer" [not null]
+}
+
+Table MATERIAL_CATALOG_ITEM {
+  Id "uuid" [pk]
+  Name "varchar(160)" [not null]
+  CategoryId "uuid" [not null]
+  UsageUnit "varchar(40)"
+  Version "integer" [not null]
+  IsDeleted "boolean" [not null]
+}
+
+Table PATIENT_PROFILE {
+  Id "integer" [pk]
+  PatientCode "varchar(40)" [not null, unique]
+  FullName "varchar(160)" [not null]
+  NormalizedName "varchar(160)" [not null]
+  BirthDate "date"
+  Gender "varchar(16)"
+  Phone "varchar(24)"
+  Address "varchar(255)"
+  SourceId "uuid"
+  CustomerGroupId "uuid"
+  OccupationId "uuid"
+  IsArchived "boolean" [not null]
+  CreatedAt "timestamptz" [not null]
+  UpdatedAt "timestamptz" [not null]
+  Version "integer" [not null]
+  Details "jsonb" [not null]
+}
+
+Table SCHEDULING_SERVICE {
+  Id "integer" [pk]
+  Unit "varchar(40)" [not null]
+  IsInitialExamination "boolean" [not null]
+  PublicBookable "boolean" [not null]
+  BranchId "integer" [not null, unique]
+  Name "varchar(160)" [not null]
+  PublicDurationMinutes "integer" [not null]
+  Active "boolean" [not null]
+  ReferenceUnitPriceVnd "bigint"
+  PriceVersion "integer" [not null]
+}
+
+Table TREATMENT_TEMPLATE {
+  Id "uuid" [pk]
+  DeletedAt "timestamptz"
+  BranchId "integer" [not null]
+  Name "varchar(160)" [not null]
+  Version "integer" [not null]
+  CreatedBy "integer" [not null]
+  CreatedAt "timestamptz" [not null]
+  Items "jsonb" [not null]
+}
+
+Table CUSTOMER_FAMILY_MEMBER {
+  Id "uuid" [pk]
+  OwnerAccountId "integer" [not null]
+  FullName "varchar(100)" [not null]
+  Relationship "varchar(20)" [not null]
+  BirthDate "date"
+  Gender "varchar(16)"
+  ContactPhone "varchar(10)"
+  Version "integer" [not null]
+  DeletedAt "timestamptz"
+}
+
+Table PUSH_DEVICE {
+  Id "uuid" [pk]
+  AccountId "integer" [not null]
+  Token "varchar(512)" [not null, unique]
+  Platform "varchar(16)" [not null]
+  UpdatedAt "timestamptz" [not null]
+}
+
+Table WORKING_SCHEDULE {
+  Id "uuid" [pk]
+  EmployeeId "integer" [not null]
+  Version "integer" [not null]
+  PublishedBy "integer" [not null]
+  PublishedAt "timestamptz" [not null]
+  ScheduleKind "varchar(34)" [not null]
+  Date "date"
+  Kind "varchar(16)"
+  Reason "varchar(500)"
+  BranchId "integer"
+  WeekStart "date"
+  Periods "jsonb" [not null]
+}
+
+Table MATERIAL_PURCHASE {
+  Id "uuid" [pk]
+  MaterialId "uuid" [not null]
+  SupplierId "uuid"
+  LotNumber "varchar(60)"
+  EnteredOn "date" [not null]
+  ReceivedOn "date"
+  ExpiresOn "date"
+  Quantity "numeric(12,3)" [not null]
+  Unit "varchar(40)" [not null]
+  ConversionFactor "numeric(12,3)" [not null]
+  UsageQuantity "numeric(18,3)" [not null]
+  UnitPriceVnd "bigint" [not null]
+  TotalVnd "bigint" [not null]
+  PaidVnd "bigint" [not null]
+  Version "integer" [not null]
+  IsDeleted "boolean" [not null]
+  CreatedAt "timestamptz" [not null]
+}
+
+Table PATIENT_ACCOUNT_LINK {
+  Id "integer" [pk]
+  RequestCode "varchar(32)" [not null, unique]
+  AccountId "integer" [not null, unique]
+  PatientId "integer" [unique]
+  DeclaredFullName "varchar(160)" [not null]
+  Status "varchar(16)" [not null]
+  RequestedAt "timestamptz" [not null]
+  ReviewingEmployeeId "integer"
+  RevokingEmployeeId "integer"
+  Version "integer" [not null]
+  Details "jsonb" [not null]
+}
+
+Table PRESCRIPTION {
+  Id "uuid" [pk]
+  PatientId "integer" [not null]
+  BranchId "integer" [not null]
+  PrescriberEmployeeId "integer" [not null]
+  PrescribedOn "date" [not null]
+  Diagnosis "varchar(1000)" [not null]
+  OtherDiagnosis "varchar(1000)"
+  Advice "varchar(4000)"
+  Version "integer" [not null]
+  CreatedAt "timestamptz" [not null]
+  Items "jsonb" [not null]
+}
+
+Table FAMILY_RECORD_ACCESS {
+  Id "uuid" [pk]
+  FamilyMemberId "uuid" [not null, unique]
+  OwnerAccountId "integer" [not null]
+  Code "varchar(40)" [not null, unique]
+  Status "varchar(16)" [not null]
+  PatientId "integer"
+  BranchId "integer"
+  Scopes "text[]" [not null]
+  RequestedAt "timestamptz" [not null]
+  ExpiresAt "timestamptz"
+  DecidedBy "integer"
+  Version "integer" [not null]
+  Details "jsonb" [not null]
+}
+
+Table APPOINTMENT {
+  Id "uuid" [pk]
+  Code "varchar(40)" [not null, unique]
+  BranchId "integer" [not null]
+  BookerAccountId "integer"
+  FamilyMemberId "uuid"
+  PatientId "integer"
+  AttendeeName "varchar(100)" [not null]
+  Kind "varchar(16)" [not null]
+  Source "varchar(24)" [not null]
+  ServiceId "integer"
+  Reason "varchar(1000)"
+  DentistId "integer" [not null]
+  ChairId "integer" [not null]
+  StartAt "timestamptz" [not null]
+  EndAt "timestamptz" [not null]
+  DossierId "uuid"
+  Status "varchar(24)" [not null]
+  Version "integer" [not null]
+  CreatedAt "timestamptz" [not null]
+  BookingInfo "jsonb" [not null]
+  Reminders "jsonb" [not null]
+  SupportRequests "jsonb" [not null]
+}
+
+Table IN_APP_NOTIFICATION {
+  Id "uuid" [pk]
+  Data "jsonb" [not null]
+  NotificationRecordKind "varchar(34)" [not null]
+  AppointmentId "uuid"
+  Kind "varchar(80)"
+  Status "varchar(16)"
+  CreatedAt "timestamptz"
+  PublicId "varchar(40)" [unique]
+  AccountId "integer"
+  BranchId "integer"
+  Title "varchar(160)"
+  Body "varchar(1000)"
+  ReadAt "timestamptz"
+  DedupeKey "varchar(160)" [unique]
+  NotificationId "uuid"
+  Channel "varchar(16)"
+  AttemptCount "integer"
+  NextRetryAt "timestamptz"
+  Error "varchar(1000)"
+}
+
+Table VISIT {
+  Id "uuid" [pk]
+  AppointmentId "uuid" [not null, unique]
+  PatientId "integer" [not null]
+  BranchId "integer" [not null]
+  DentistId "integer" [not null]
+  Status "varchar(24)" [not null]
+  Version "integer" [not null]
+  ArrivalAt "timestamptz" [not null]
+  RecordedBy "integer" [not null]
+  ArrivalReason "varchar(500)"
+  Purpose "varchar(40)" [not null]
+  Note "varchar(1000)"
+  ExaminationContentJson "jsonb"
+  UpdatedBy "integer"
+  UpdatedAt "timestamptz"
+  Investigations "jsonb" [not null]
+}
+
+Table TREATMENT_DOSSIER {
+  Id "uuid" [pk]
+  SourceExaminationVisitId "uuid"
+  Code "varchar(40)" [not null, unique]
+  PatientId "integer" [not null]
+  BranchId "integer" [not null]
+  DentistId "integer" [not null]
+  StartedOn "date" [not null]
+  Diagnosis "varchar(4000)" [not null]
+  Note "varchar(4000)"
+  State "varchar(16)" [not null]
+  Version "integer" [not null]
+  CreatedAt "timestamptz" [not null]
+  UpdatedAt "timestamptz" [not null]
+  SheetDrafts "jsonb" [not null]
+}
+
+Table CLINICAL_DOCUMENT {
+  Id "uuid" [pk]
+  PatientId "integer" [not null]
+  VisitId "uuid"
+  DossierId "uuid"
+  FileName "varchar(255)" [not null]
+  ContentType "varchar(64)" [not null]
+  DocumentType "varchar(24)" [not null]
+  SourceDate "date" [not null]
+  FileState "varchar(16)" [not null]
+  UploaderId "integer" [not null]
+  UploadedAt "timestamptz" [not null]
+  Version "integer" [not null]
+  AiAnalyses "jsonb" [not null]
+  Metadata "jsonb" [not null]
+  Reviews "jsonb" [not null]
+}
+
+Table COMMAND_RECEIPT {
+  StorageId "uuid" [pk]
+  RequestKey "uuid" [not null]
+  Fingerprint "varchar(64)" [not null]
+  ResultJson "jsonb" [not null]
+  ReceiptType "varchar(34)" [not null]
+  ActorAccountId "integer"
+  AppointmentId "uuid"
+  ActorScope "varchar(96)"
+  SupportRequestId "uuid"
+  Id "uuid"
+  SessionId "uuid"
+  ExpectedVersion "integer"
+  ActorId "integer"
+  VisitId "uuid"
+  OwnerAccountId "integer"
+  CreatedAt "timestamptz"
+  AccessId "uuid"
+  PatientId "integer"
+  PrescriptionId "uuid"
+  Command "varchar(48)"
+  ResourceId "uuid"
+  BeforeJson "jsonb"
+  OccurredAt "timestamptz"
+  ResultId "uuid"
+  DossierId "uuid"
+}
+
+Table TREATMENT_PLAN_ITEM {
+  Id "uuid" [pk]
+  DossierId "uuid" [not null]
+  PlannedOrder "integer" [not null]
+  ServiceId "integer" [not null]
+  ServiceName "varchar(160)" [not null]
+  Region "varchar(80)"
+  Unit "varchar(40)" [not null]
+  Quantity "numeric(12,3)" [not null]
+  EstimatedStart "date"
+  EstimatedMinutes "integer"
+  Note "varchar(1000)"
+  ResponsibleDentistId "integer"
+  AssistantId "integer"
+  AgreedUnitPriceVnd "bigint" [not null]
+  DiscountType "varchar(16)"
+  DiscountValue "numeric(18,3)"
+  DiscountReason "varchar(1000)"
+  DisplayCompleted "boolean" [not null]
+}
+
+Table AUDIT_LOG {
+  StorageId "uuid" [pk]
+  AuditType "varchar(34)" [not null]
+  LegacyNumber "bigint"
+  ActorId "integer"
+  TargetId "integer"
+  OccurredAt "timestamptz"
+  Action "varchar(64)"
+  Reason "varchar(1000)"
+  BeforeJson "jsonb"
+  AfterJson "jsonb"
+  LegacyId "uuid"
+  AppointmentId "uuid"
+  ActorAccountId "integer"
+  ActorKind "varchar(16)"
+  OldStart "timestamptz"
+  OldEnd "timestamptz"
+  OldDentistId "integer"
+  OldChairId "integer"
+  NewStart "timestamptz"
+  NewEnd "timestamptz"
+  NewDentistId "integer"
+  NewChairId "integer"
+  RequesterVerification "varchar(500)"
+  RequestKey "uuid"
+  RequestId "uuid"
+  Notes "varchar(500)"
+  ChannelType "varchar(16)"
+  Result "varchar(20)"
+  DocumentId "uuid"
+  Note "varchar(500)"
+  AccessId "uuid"
+  LinkId "integer"
+  PatientId "integer"
+  ChangesJson "jsonb"
+  BranchId "integer"
+  VisitId "uuid"
+  TemplateId "uuid"
+  At "timestamptz"
+  BranchIds "integer[]"
+  Section "varchar(40)"
+  Target "varchar(100)"
+  Version "integer"
+  DossierId "uuid"
+  Kind "varchar(80)"
+  PayloadJson "jsonb"
+  EventActorId "integer"
+  DossierVersion "integer"
+  AggregateId "uuid"
+  StableKey "varchar(160)" [unique]
+  DecidingDentistId "integer"
+}
+
+Table CLINICAL_ACTIVITY {
+  Id "uuid" [pk]
+  DossierId "uuid" [not null]
+  ItemId "uuid"
+  PlanVersion "integer"
+  IsPlanTransfer "boolean" [not null]
+  ServiceId "integer" [not null]
+  ServiceNameSnapshot "varchar(160)"
+  Region "varchar(80)"
+  Unit "varchar(40)" [not null]
+  Quantity "numeric(12,3)" [not null]
+  LabWorkSnapshot "varchar(1000)"
+  PerformedAt "timestamptz" [not null]
+  PerformerId "integer" [not null]
+  AssistantId "integer"
+  Outcome "varchar(4000)" [not null]
+  PriceSnapshotVnd "numeric(18,0)" [not null]
+  DiscountSnapshotVnd "bigint" [not null]
+  FeeStatus "varchar(24)" [not null]
+  Version "integer" [not null]
+  CreatedAt "timestamptz" [not null]
+}
+
+Table LAB_ORDER {
+  Id "uuid" [pk]
+  ActivityId "uuid" [not null, unique]
+  Code "varchar(40)"
+  DentistId "integer" [not null]
+  LabProviderId "uuid"
+  LabWorkTypeId "uuid"
+  WorkName "varchar(160)" [not null]
+  OrderedOn "date" [not null]
+  DueOn "date"
+  DeliveredOn "date"
+  Quantity "integer" [not null]
+  TotalFeeVnd "bigint" [not null]
+  PaidVnd "bigint" [not null]
+  Note "varchar(1000)"
+  Status "varchar(20)" [not null]
+  Version "integer" [not null]
+  Spec "jsonb" [not null]
+  StatusLogs "jsonb" [not null]
+}
+
+Table MATERIAL_USAGE {
+  Id "uuid" [pk]
+  ActivityId "uuid" [not null]
+  MaterialId "uuid" [not null]
+  Quantity "numeric(18,3)" [not null]
+  UsedAt "timestamptz" [not null]
+  RecordedBy "integer"
+}
+
+Ref: USER_ACCOUNT.GroupId > ACCESS_GROUP.Id
+Ref: LAB_WORK_TYPE.ProviderId > CATALOG_PROVIDER.Id
+Ref: MATERIAL_CATALOG_ITEM.CategoryId > MATERIAL_CATEGORY.Id
+Ref: PATIENT_PROFILE.CustomerGroupId > REFERENCE_ENTRY.Id
+Ref: PATIENT_PROFILE.OccupationId > REFERENCE_ENTRY.Id
+Ref: PATIENT_PROFILE.SourceId > REFERENCE_ENTRY.Id
+Ref: SCHEDULING_SERVICE.BranchId - SCHEDULING_BRANCH.Id
+Ref: TREATMENT_TEMPLATE.BranchId > SCHEDULING_BRANCH.Id
+Ref: CUSTOMER_FAMILY_MEMBER.OwnerAccountId > USER_ACCOUNT.Id
+Ref: PUSH_DEVICE.AccountId > USER_ACCOUNT.Id
+Ref: WORKING_SCHEDULE.BranchId > SCHEDULING_BRANCH.Id
+Ref: WORKING_SCHEDULE.EmployeeId > USER_ACCOUNT.EmployeeId
+Ref: WORKING_SCHEDULE.PublishedBy > USER_ACCOUNT.Id
+Ref: MATERIAL_PURCHASE.SupplierId > CATALOG_PROVIDER.Id
+Ref: MATERIAL_PURCHASE.MaterialId > MATERIAL_CATALOG_ITEM.Id
+Ref: PATIENT_ACCOUNT_LINK.PatientId - PATIENT_PROFILE.Id
+Ref: PATIENT_ACCOUNT_LINK.AccountId - USER_ACCOUNT.Id
+Ref: PATIENT_ACCOUNT_LINK.ReviewingEmployeeId > USER_ACCOUNT.EmployeeId
+Ref: PATIENT_ACCOUNT_LINK.RevokingEmployeeId > USER_ACCOUNT.EmployeeId
+Ref: PRESCRIPTION.PatientId > PATIENT_PROFILE.Id
+Ref: PRESCRIPTION.BranchId > SCHEDULING_BRANCH.Id
+Ref: PRESCRIPTION.PrescriberEmployeeId > USER_ACCOUNT.EmployeeId
+Ref: FAMILY_RECORD_ACCESS.FamilyMemberId - CUSTOMER_FAMILY_MEMBER.Id
+Ref: FAMILY_RECORD_ACCESS.PatientId > PATIENT_PROFILE.Id
+Ref: FAMILY_RECORD_ACCESS.BranchId > SCHEDULING_BRANCH.Id
+Ref: FAMILY_RECORD_ACCESS.DecidedBy > USER_ACCOUNT.Id
+Ref: FAMILY_RECORD_ACCESS.OwnerAccountId > USER_ACCOUNT.Id
+Ref: APPOINTMENT.FamilyMemberId > CUSTOMER_FAMILY_MEMBER.Id
+Ref: APPOINTMENT.PatientId > PATIENT_PROFILE.Id
+Ref: APPOINTMENT.BranchId > SCHEDULING_BRANCH.Id
+Ref: APPOINTMENT.(ServiceId, BranchId) > SCHEDULING_SERVICE.(Id, BranchId)
+Ref: APPOINTMENT.BookerAccountId > USER_ACCOUNT.Id
+Ref: APPOINTMENT.DentistId > USER_ACCOUNT.EmployeeId
+Ref: IN_APP_NOTIFICATION.AppointmentId > APPOINTMENT.Id
+Ref: IN_APP_NOTIFICATION.NotificationId > IN_APP_NOTIFICATION.Id
+Ref: IN_APP_NOTIFICATION.AccountId > USER_ACCOUNT.Id
+Ref: VISIT.AppointmentId - APPOINTMENT.Id
+Ref: VISIT.PatientId > PATIENT_PROFILE.Id
+Ref: VISIT.BranchId > SCHEDULING_BRANCH.Id
+Ref: VISIT.DentistId > USER_ACCOUNT.EmployeeId
+Ref: VISIT.RecordedBy > USER_ACCOUNT.Id
+Ref: VISIT.UpdatedBy > USER_ACCOUNT.Id
+Ref: TREATMENT_DOSSIER.PatientId > PATIENT_PROFILE.Id
+Ref: TREATMENT_DOSSIER.BranchId > SCHEDULING_BRANCH.Id
+Ref: TREATMENT_DOSSIER.SourceExaminationVisitId > VISIT.Id
+Ref: CLINICAL_DOCUMENT.DossierId > TREATMENT_DOSSIER.Id
+Ref: CLINICAL_DOCUMENT.UploaderId > USER_ACCOUNT.Id
+Ref: CLINICAL_DOCUMENT.VisitId > VISIT.Id
+Ref: COMMAND_RECEIPT.AppointmentId > APPOINTMENT.Id
+Ref: COMMAND_RECEIPT.AccessId > FAMILY_RECORD_ACCESS.Id
+Ref: COMMAND_RECEIPT.PatientId > PATIENT_PROFILE.Id
+Ref: COMMAND_RECEIPT.PrescriptionId > PRESCRIPTION.Id
+Ref: COMMAND_RECEIPT.DossierId > TREATMENT_DOSSIER.Id
+Ref: COMMAND_RECEIPT.ActorAccountId > USER_ACCOUNT.Id
+Ref: COMMAND_RECEIPT.ActorId > USER_ACCOUNT.Id
+Ref: COMMAND_RECEIPT.OwnerAccountId > USER_ACCOUNT.Id
+Ref: COMMAND_RECEIPT.VisitId > VISIT.Id
+Ref: TREATMENT_PLAN_ITEM.DossierId > TREATMENT_DOSSIER.Id
+Ref: AUDIT_LOG.AppointmentId > APPOINTMENT.Id
+Ref: AUDIT_LOG.DocumentId > CLINICAL_DOCUMENT.Id
+Ref: AUDIT_LOG.AccessId > FAMILY_RECORD_ACCESS.Id
+Ref: AUDIT_LOG.LinkId > PATIENT_ACCOUNT_LINK.Id
+Ref: AUDIT_LOG.PatientId > PATIENT_PROFILE.Id
+Ref: AUDIT_LOG.DossierId > TREATMENT_DOSSIER.Id
+Ref: AUDIT_LOG.ActorAccountId > USER_ACCOUNT.Id
+Ref: AUDIT_LOG.ActorId > USER_ACCOUNT.Id
+Ref: AUDIT_LOG.DecidingDentistId > USER_ACCOUNT.EmployeeId
+Ref: AUDIT_LOG.TargetId > USER_ACCOUNT.Id
+Ref: AUDIT_LOG.VisitId > VISIT.Id
+Ref: CLINICAL_ACTIVITY.DossierId > TREATMENT_DOSSIER.Id
+Ref: CLINICAL_ACTIVITY.ItemId > TREATMENT_PLAN_ITEM.Id
+Ref: LAB_ORDER.ActivityId - CLINICAL_ACTIVITY.Id
+Ref: MATERIAL_USAGE.ActivityId > CLINICAL_ACTIVITY.Id
+Ref: MATERIAL_USAGE.MaterialId > MATERIAL_CATALOG_ITEM.Id
+Ref: APPOINTMENT.DossierId > TREATMENT_DOSSIER.Id

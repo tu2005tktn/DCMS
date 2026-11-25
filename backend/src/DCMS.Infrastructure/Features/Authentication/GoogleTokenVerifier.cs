@@ -18,7 +18,7 @@ public sealed class GoogleTokenVerifier(IHttpClientFactory clients, IConfigurati
     {
         var clientId = configuration["Google:WebClientId"]?.Trim();
         if (string.IsNullOrWhiteSpace(clientId))
-            throw new BusinessException(503, new SystemMessage("GOOGLE_NOT_CONFIGURED", "Đăng nhập Google chưa được cấu hình."));
+            throw new BusinessException(503, new SystemMessage("MSG61", "Đăng nhập Google chưa được cấu hình."));
         if (string.IsNullOrWhiteSpace(idToken) || idToken.Length > 8192)
             throw InvalidToken();
 
@@ -77,5 +77,5 @@ public sealed class GoogleTokenVerifier(IHttpClientFactory clients, IConfigurati
     }
 
     private static BusinessException InvalidToken() => new(401,
-        new SystemMessage("GOOGLE_INVALID_TOKEN", "Không thể xác thực tài khoản Google. Vui lòng thử lại."));
+        new SystemMessage("MSG62", "Không thể xác thực tài khoản Google. Vui lòng thử lại."));
 }

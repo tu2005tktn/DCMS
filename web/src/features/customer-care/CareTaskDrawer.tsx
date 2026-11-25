@@ -34,7 +34,7 @@ export default function CareTaskDrawer({ item, staff, canManage, onClose, onEdit
   async function run(action: () => Promise<unknown>, after?: () => void) {
     setBusy(true); setError(undefined);
     try { await action(); after?.(); setRevision(x => x + 1); onChanged(); }
-    catch (e) { setError(e as ApiError); if ((e as ApiError).code === 'MSG111') { setRevision(x => x + 1); onChanged(); } }
+    catch (e) { setError(e as ApiError); if ((e as ApiError).code === 'MSG41') { setRevision(x => x + 1); onChanged(); } }
     finally { setBusy(false); }
   }
   async function contact() {
@@ -63,7 +63,7 @@ export default function CareTaskDrawer({ item, staff, canManage, onClose, onEdit
     {!task && !loadError && <Spin />}
     {task && item && <>
       {error && <Alert type="error" showIcon style={{ marginBottom: 16 }} message={error.message}
-        description={error.code === 'MSG111' ? 'Phiếu vừa thay đổi ở nơi khác. Dữ liệu mới đã được tải lại, hãy kiểm tra rồi làm lại.' : undefined}
+        description={error.code === 'MSG41' ? 'Phiếu vừa thay đổi ở nơi khác. Dữ liệu mới đã được tải lại, hãy kiểm tra rồi làm lại.' : undefined}
         afterClose={() => setError(undefined)} closable />}
       <Descriptions column={1} size="small" bordered>
         <Descriptions.Item label="Chi nhánh">{item.branchName}</Descriptions.Item>

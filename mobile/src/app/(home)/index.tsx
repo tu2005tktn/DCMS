@@ -63,7 +63,6 @@ export default function HomeScreen() {
     <Text style={styles.eyebrow}>DCMS · NHÂN VIÊN</Text><Text style={styles.title}>Xin chào, {user.fullName}</Text>
     <Section title="Công việc của bạn" />
     <Action label="Hộp thư hỗ trợ" onPress={() => go('/(home)/staff/requests')} />
-    <Action label="Lịch bị ảnh hưởng" onPress={() => go('/(home)/staff/schedule-impact')} />
     <Action label="Tài khoản" onPress={() => go('/(account)/home')} />
   </ScrollView></SafeAreaView>;
 

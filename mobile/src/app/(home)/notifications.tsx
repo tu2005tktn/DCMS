@@ -2,7 +2,7 @@
  * S26 — NotificationListScreen.
  *
  * Theo đặc tả S26: chỉ phần thông báo lịch hẹn của account hiện tại. Mở deep link sẽ kiểm
- * quyền lại (xem notification.mock.ts.checkDeepLinkPermission).
+ * quyền lại qua `POST /api/notifications/check-deep-link`.
  *
  * Theo GBR-081: notification KHÔNG chứa chẩn đoán. Theo AT16: nếu external push/email fail
  * sau 3 lần retry, staff sẽ có handling item — UI hiển thị badge "Gửi thất bại" để user biết

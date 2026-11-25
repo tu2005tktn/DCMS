@@ -121,7 +121,10 @@ public sealed class TreatmentSheetV25Tests(ApiFixture fixture) : IClassFixture<A
             var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
             var row = await db.LoadTemplateItemAsync(plan.Items[1].Id); row!.TeethJson = "[\"99\"]"; await db.SaveChangesAsync();
         }
-        Assert.Equal(HttpStatusCode.BadRequest, (await c.PostAsJsonAsync(url, command with { ExpectedVersion = imported.Dossier.Version, RequestKey = Guid.NewGuid() })).StatusCode);
+        // Rows are stored inside the template, so the edit above bumps its version; send the current one so only the row is invalid.
+        var edited = (await c.GetFromJsonAsync<ItemPlanDto>($"{root}/{plan.Id}"))!;
+        Assert.Equal(HttpStatusCode.BadRequest, (await c.PostAsJsonAsync(url, command with { ExpectedItemPlanVersion = edited.Version,
+            ExpectedVersion = imported.Dossier.Version, RequestKey = Guid.NewGuid() })).StatusCode);
         var after = (await c.GetFromJsonAsync<TreatmentDossierDto>($"/api/dossiers/{dossier.Id}"))!; Assert.Equal(2, after.Items.Count); Assert.Equal(imported.Dossier.Version, after.Version);
         using var check = fixture.Services.CreateScope(); var context = check.ServiceProvider.GetRequiredService<DcmsDbContext>();
         Assert.False(await context.ClinicalActivities.AnyAsync(x => x.DossierId == dossier.Id));
@@ -190,8 +193,6 @@ public sealed class TreatmentSheetV25Tests(ApiFixture fixture) : IClassFixture<A
         dossier = (await confirmed.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
         var item = Assert.Single(dossier.Items);
         Assert.Equal(25, item.EstimatedMinutes);
-        var preview = await c.GetFromJsonAsync<PlanPricePreviewDto>($"/api/dossiers/{dossier.Id}/plan/preview");
-        Assert.Equal(500000, preview!.NetBeforeTaxVnd);
         var url = $"/api/dossiers/{dossier.Id}/sheet-items/{item.Id}/perform";
         var request = new SheetItemActionRequest(dossier.Version, Guid.NewGuid());
         var responses = await Task.WhenAll(c.PostAsJsonAsync(url, request), c.PostAsJsonAsync(url, request));
@@ -218,8 +219,6 @@ public sealed class TreatmentSheetV25Tests(ApiFixture fixture) : IClassFixture<A
         Assert.True(edited.IsSuccessStatusCode, await edited.Content.ReadAsStringAsync());
         dossier = (await edited.Content.ReadFromJsonAsync<TreatmentChange>())!.Dossier;
         Assert.Equal(2, dossier.Items[0].Quantity); Assert.Equal(45, dossier.Items[0].EstimatedMinutes);
-        var history = await c.GetFromJsonAsync<IReadOnlyList<TreatmentHistoryItem>>($"/api/dossiers/{dossier.Id}/plan/history");
-        Assert.Contains(history!, h => h.Version == dossier.PlanVersion && h.SnapshotJson.Contains("400000"));
         var read = await c.GetFromJsonAsync<TreatmentActivityPage>($"/api/dossiers/{dossier.Id}/activities");
         var actual = Assert.Single(read!.Items); Assert.Equal(item.ServiceName, actual.ServiceNameSnapshot); Assert.Equal(300000, actual.PriceSnapshotVnd); Assert.Equal(100000, actual.DiscountSnapshotVnd);
         using var deletion = new HttpRequestMessage(HttpMethod.Delete, $"/api/dossiers/{dossier.Id}/sheet-items/{item.Id}") { Content = JsonContent.Create(new SheetItemActionRequest(dossier.Version, Guid.NewGuid())) };
@@ -436,7 +435,6 @@ public sealed class TreatmentSheetV25Tests(ApiFixture fixture) : IClassFixture<A
         Assert.Equal("NotRequested", result.Activity.FeeStatus);
         Assert.Empty(result.Dossier.Items);
         Assert.Null(result.Activity.ItemId);
-        var preview = await c.GetFromJsonAsync<PlanPricePreviewDto>($"/api/dossiers/{dossier.Id}/plan/preview"); Assert.Equal(0, preview!.NetBeforeTaxVnd);
         var planDraft = await Draft(c, s, dossier.Id, "Plan");
         var planned = await c.PostAsJsonAsync($"/api/dossiers/{dossier.Id}/sheet-drafts/{planDraft.Id}/confirm-plan",
             new ConfirmSheetPlanRequest(result.Dossier.Version, planDraft.Version, Guid.NewGuid()));
@@ -596,7 +594,6 @@ public sealed class TreatmentSheetV25Tests(ApiFixture fixture) : IClassFixture<A
     }
 
 }
-
 
 public sealed class RejectedSheetChargePort : IClinicalChargePort
 {

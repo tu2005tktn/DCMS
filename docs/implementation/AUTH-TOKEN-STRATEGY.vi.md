@@ -1,5 +1,7 @@
 # Chiến lược quản lý token & phiên — UC-01 mở rộng
 
+> Cập nhật 21/11/2026: `POST /api/auth/sign-out-all` và `GET /api/auth/sessions` đã gỡ vì không có giao diện sử dụng, xem [UNUSED-API-REMOVAL.vi.md](../specs/UNUSED-API-REMOVAL.vi.md).
+
 > Phạn vi: tài liệu này là phần bổ sung cho [UC01-UC31.md](UC01-UC31.md) sau khi thống nhất
 > mở rộng UC-01 với **refresh token rotation có thể thu hồi**, **đăng xuất mọi thiết bị**
 > và **chính sách lưu trữ token trên Web / Mobile**. Áp dụng cho tất cả client

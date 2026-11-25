@@ -1,5 +1,7 @@
 # DCMS-132 — Excel theo quyền, lịch sử cấu hình, restore và kiểm thử tích hợp S58
 
+> Cập nhật 21/11/2026: `GET /api/system-settings/settings/catalogs/services/export` đã gỡ vì không có giao diện sử dụng, xem [UNUSED-API-REMOVAL.vi.md](UNUSED-API-REMOVAL.vi.md).
+
 Owner: Ngô Minh Trí. Ngày chốt: 01/11/2026. Nền: `main` dd50777, sau khi [gộp settings](S58-SETTINGS-MERGE.vi.md). Nguồn: ticket DCMS-132, [S58-SYSTEM-SETTINGS.vi.md](S58-SYSTEM-SETTINGS.vi.md) §2, §4, §9.
 
 ## 1. Đã có, tái dùng

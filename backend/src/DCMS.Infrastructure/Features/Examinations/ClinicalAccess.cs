@@ -16,24 +16,24 @@ public sealed class ClinicalAccess(DcmsDbContext db, UserManager<ApplicationUser
     {
         await settingsAccess.OperationalAsync(actorId,permission ?? (dentistOnly ? "examinations.manage" : "examinations.read"),branchId,ct);
         var u = await users.FindByIdAsync(actorId.ToString());
-        if (u == null || !u.IsActive || u.LockoutEnabled && u.LockoutEnd > clock.GetUtcNow()) throw Error("MSG07", 401);
+        if (u == null || !u.IsActive || u.LockoutEnabled && u.LockoutEnd > clock.GetUtcNow()) throw Error("MSG06", 401);
         var roles = AccountRoles.Effective(await users.GetRolesAsync(u));
         var dentist = roles.Contains(AccountRoles.Dentist);
         var assistant = roles.Contains(AccountRoles.ClinicAssistant);
         // Staff in an access group act through the grant and assignment branch checked above, not their role or membership flags.
         var grantDriven = (await settingsAccess.ResolveAsync(actorId, ct)).GrantDriven;
-        if (u.AccountType != "Staff" || !grantDriven && (!dentist && !assistant || dentistOnly && !dentist)) throw Error("MSG06", 403);
+        if (u.AccountType != "Staff" || !grantDriven && (!dentist && !assistant || dentistOnly && !dentist)) throw Error("MSG05", 403);
         var e = await db.Employees.AsNoTracking().SingleOrDefaultAsync(x => x.AccountId == actorId, ct);
         if (e == null || !grantDriven && !await (from m in db.SchedulingMembers join b in db.Set<SchedulingBranch>() on m.BranchId equals b.Id
             where m.EmployeeId == e.Id && m.BranchId == branchId && m.Active && b.Active && (dentistOnly ? m.CanDentist : assistant || m.CanDentist)
-            select m).AnyAsync(ct)) throw Error("MSG06", 403);
+            select m).AnyAsync(ct)) throw Error("MSG05", 403);
         return dentist && await db.SchedulingMembers.AnyAsync(x => x.EmployeeId == e.Id && x.BranchId == branchId && x.Active && x.CanDentist, ct);
     }
     public async Task<Visit> VisitAsync(int actorId, Guid id, bool dentistOnly, CancellationToken ct, string? permission = null)
     {
-        var v = await db.Visits.SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw Error("MSG113", 404);
+        var v = await db.Visits.SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw Error("MSG42", 404);
         await BranchAsync(actorId, v.BranchId, dentistOnly, ct, permission);
-        if (dentistOnly && !await ActsForAsync(actorId, v, ct)) throw Error("MSG06", 403);
+        if (dentistOnly && !await ActsForAsync(actorId, v, ct)) throw Error("MSG05", 403);
         return v;
     }
     // The visit's own dentist, or a non-dentist in an access group who was granted the clinical action for the branch.
@@ -49,7 +49,7 @@ public sealed class ClinicalAccess(DcmsDbContext db, UserManager<ApplicationUser
             where e.AccountId == actorId && m.Active select m.BranchId).ToArrayAsync(ct);
         var allowed = new List<int>();
         foreach (var id in ids) { try { await BranchAsync(actorId, id, false, ct); allowed.Add(id); } catch (BusinessException ex) when (ex.Status == 403) { } }
-        if (allowed.Count == 0) throw Error("MSG06", 403);
+        if (allowed.Count == 0) throw Error("MSG05", 403);
         return allowed.ToArray();
     }
 }

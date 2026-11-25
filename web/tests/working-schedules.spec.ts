@@ -48,13 +48,13 @@ test('recurring weekday rows choose branch or Not working with half-hour time en
 test('stale and network failures preserve draft; discard requires confirmation', async ({ page }) => {
   await workspace(page); await select(page, 'Chi nhánh Thứ 2', 'Chi nhánh A');
   await select(page, 'Bắt đầu 1', '09:00');
-  await page.route('**/api/working-schedules/recurring/publish', route => route.fulfill({ status: 409, json: { code: 'MSG111', message: 'Dữ liệu đã thay đổi.' } }));
+  await page.route('**/api/working-schedules/recurring/publish', route => route.fulfill({ status: 409, json: { code: 'MSG41', message: 'Dữ liệu đã thay đổi.' } }));
   await page.getByRole('button', { name: 'Lưu và công bố' }).click();
-  await expect(page.getByText('Xung đột · Cần kiểm tra lại · MSG111')).toBeVisible();
+  await expect(page.getByText('Xung đột · Cần kiểm tra lại · MSG41')).toBeVisible();
   await expect(page.getByRole('group', { name: 'Khoảng 1 · 09:00 → 17:00', exact: true })).toBeVisible();
   await page.route('**/api/working-schedules/recurring/publish', route => route.abort());
   await page.getByRole('button', { name: 'Lưu và công bố' }).click();
-  await expect(page.getByText('Lỗi kết nối hoặc dịch vụ · MSG144')).toBeVisible();
+  await expect(page.getByText('Lỗi kết nối hoặc dịch vụ · MSG49')).toBeVisible();
   page.once('dialog', dialog => dialog.dismiss());
   await page.getByRole('button', { name: 'Hủy thay đổi chưa lưu' }).click();
   await expect(page.getByRole('group', { name: 'Khoảng 1 · 09:00 → 17:00', exact: true })).toBeVisible();
@@ -120,7 +120,7 @@ test('retry after a lost publish response reuses receipt key without stale prefl
     return route.fulfill({ json: { schedule: { ...empty(), version: 1, template: { ...c, id: 'r', version: 1, publishedBy: 10, publishedAt: '2032-01-05T00:00:00Z' } }, notification: { message: 'Đã cập nhật lịch làm việc.' } } });
   });
   await page.getByRole('button', { name: 'Lưu và công bố' }).click();
-  await expect(page.getByText('Lỗi kết nối hoặc dịch vụ · MSG144')).toBeVisible();
+  await expect(page.getByText('Lỗi kết nối hoặc dịch vụ · MSG49')).toBeVisible();
   await page.getByRole('button', { name: 'Lưu và công bố' }).click();
   await expect(page.getByText('Đã công bố', { exact: true })).toBeVisible(); expect(previews).toBe(1);
 });
@@ -142,9 +142,9 @@ test('public preview uses published GET and catalog duration while keeping an in
 
 test('denied load is distinct from an empty schedule and retry reloads current data', async ({ page }) => {
   await workspace(page);
-  await page.route('**/api/working-schedules/recurring?*', route => route.fulfill({ status: 403, json: { code: 'MSG06', message: 'Bạn không có quyền.' } }));
+  await page.route('**/api/working-schedules/recurring?*', route => route.fulfill({ status: 403, json: { code: 'MSG05', message: 'Bạn không có quyền.' } }));
   await page.getByLabel('Ngày áp dụng', { exact: true }).fill('2032-01-06');
-  await expect(page.getByText('Không có quyền truy cập · MSG06')).toBeVisible();
+  await expect(page.getByText('Không có quyền truy cập · MSG05')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Lưu và công bố' })).toHaveCount(0);
   await page.route('**/api/working-schedules/recurring?*', route => route.fulfill({ json: empty() }));
   await page.getByRole('button', { name: 'Tải lại', exact: true }).click();

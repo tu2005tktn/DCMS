@@ -97,14 +97,14 @@ function ChangeForm({ appointment, mode, onClose, onChanged }: {
     } catch (failure) {
       const apiError = failure as ApiError; setError(apiError);
       if (apiError.status !== 0) pending.current = null;
-      if (apiError.code === 'MSG34') { setSlot(null); setRevision(value => value + 1); }
+      if (apiError.code === 'MSG29') { setSlot(null); setRevision(value => value + 1); }
     } finally { sending.current = false; setBusy(false); }
   }
   const valid = allowed && reason.trim().length > 0 && reason.trim().length <= 500 && !reloading
     && (mode !== 'edit' || !!slot && !loading && !optionsError);
   const feedback = <>
     {error && <Alert className="form-alert" type="error" showIcon message={error.message}
-      action={error instanceof ApiError && error.code === 'MSG111' ? <Button aria-label="Tải lại phiên bản" loading={reloading} onClick={() => void reloadCurrent()}>Tải lại phiên bản</Button> : undefined} />}
+      action={error instanceof ApiError && error.code === 'MSG41' ? <Button aria-label="Tải lại phiên bản" loading={reloading} onClick={() => void reloadCurrent()}>Tải lại phiên bản</Button> : undefined} />}
     {!currentEligible && <Alert className="form-alert" type="warning" message="Lịch hẹn không còn ở trạng thái có thể thực hiện thao tác này." />}
   </>;
   const summary = <Descriptions bordered size="small" column={1} items={[

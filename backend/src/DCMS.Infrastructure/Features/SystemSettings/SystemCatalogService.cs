@@ -39,14 +39,14 @@ public sealed class SystemCatalogService(DcmsDbContext db, TimeProvider clock, D
         if (unit.Length > 40) throw Error("MSG04", field: "usageUnit");
         return unit;
     }
-    private static void Version(int actual, int expected) { if (actual != expected) throw Error("MSG111", 409); }
+    private static void Version(int actual, int expected) { if (actual != expected) throw Error("MSG41", 409); }
     private async Task<MaterialCategory> CategoryRow(Guid id, CancellationToken ct) =>
-        await db.MaterialCategories.SingleOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct) ?? throw Error("MSG113", 404);
+        await db.MaterialCategories.SingleOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct) ?? throw Error("MSG42", 404);
     private async Task<MaterialCategoryDto> CategoryResult(Guid id, CancellationToken ct) => await db.MaterialCategories.AsNoTracking().Where(x => x.Id == id)
         .Select(x => new MaterialCategoryDto(x.Id, x.Name, db.MaterialCatalogItems.Count(i => i.CategoryId == x.Id && !i.IsDeleted), x.Version)).SingleAsync(ct);
     private async Task<MaterialDto> MaterialResult(Guid id, CancellationToken ct) => await db.MaterialCatalogItems.AsNoTracking().Where(x => x.Id == id)
         .Select(x => new MaterialDto(x.Id, x.Name, x.CategoryId, x.Category.Name, x.Version, x.UsageUnit)).SingleAsync(ct);
-    private async Task<MaterialCatalogItem> MaterialRow(Guid id, CancellationToken ct) => await db.MaterialCatalogItems.SingleOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct) ?? throw Error("MSG113", 404);
+    private async Task<MaterialCatalogItem> MaterialRow(Guid id, CancellationToken ct) => await db.MaterialCatalogItems.SingleOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct) ?? throw Error("MSG42", 404);
     private async Task UniqueCategory(string name, Guid? except, CancellationToken ct)
     {
         if (await db.MaterialCategories.AnyAsync(x => !x.IsDeleted && x.Id != except && x.Name.ToUpper() == name.ToUpperInvariant(), ct)) throw new BusinessException(409, CatalogMessages.Duplicate);
@@ -67,8 +67,8 @@ public sealed class SystemCatalogService(DcmsDbContext db, TimeProvider clock, D
         var prior = await db.SystemCatalogChanges.AsNoTracking().SingleOrDefaultAsync(x => x.RequestKey == key, ct);
         if (prior != null)
         {
-            if (prior.ActorId != actorId || prior.Command != command || prior.Fingerprint != hash) throw Error("MSG111", 409);
-            return JsonSerializer.Deserialize<T>(prior.ResultJson, Json) ?? throw Error("MSG144", 503);
+            if (prior.ActorId != actorId || prior.Command != command || prior.Fingerprint != hash) throw Error("MSG41", 409);
+            return JsonSerializer.Deserialize<T>(prior.ResultJson, Json) ?? throw Error("MSG49", 503);
         }
         Change<T> change;
         try { change = await apply(); }

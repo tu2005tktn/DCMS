@@ -144,7 +144,7 @@ export default function BranchesPanel() {
       const err = e as ApiError;
       setBranchError(err);
       // Keep what the user typed; only refresh the server copy (version) for comparison.
-      if (err.code === 'MSG111' && selected) void refreshDetail(selected.id, true).catch(() => undefined);
+      if (err.code === 'MSG41' && selected) void refreshDetail(selected.id, true).catch(() => undefined);
     } finally {
       setSavingBranch(false);
     }
@@ -231,8 +231,8 @@ export default function BranchesPanel() {
   const stateActive = stateTarget ? (stateTarget.kind === 'branch' ? !stateTarget.branch.isActive : !stateTarget.chair.isActive) : false;
   const stateName = stateTarget ? (stateTarget.kind === 'branch' ? `chi nhánh "${stateTarget.branch.name}"` : `ghế "${stateTarget.chair.name}"`) : '';
   const errorText = (e: ApiError) =>
-    e.code === 'MSG111' ? 'Dữ liệu đã được thay đổi ở nơi khác. Phần bạn nhập vẫn được giữ; kiểm tra lại rồi lưu tiếp.'
-      : e.code === 'MSG144' && e.status === 503 ? 'Chưa thể kiểm tra nghĩa vụ phiếu Labo vì module Labo chưa sẵn sàng. Thao tác ngừng chi nhánh bị chặn để bảo đảm an toàn.'
+    e.code === 'MSG41' ? 'Dữ liệu đã được thay đổi ở nơi khác. Phần bạn nhập vẫn được giữ; kiểm tra lại rồi lưu tiếp.'
+      : e.code === 'MSG49' && e.status === 503 ? 'Chưa thể kiểm tra nghĩa vụ phiếu Labo vì module Labo chưa sẵn sàng. Thao tác ngừng chi nhánh bị chặn để bảo đảm an toàn.'
       : e.message;
 
   return (

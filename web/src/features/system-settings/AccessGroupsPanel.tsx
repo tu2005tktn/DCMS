@@ -181,7 +181,7 @@ export default function AccessGroupsPanel() {
       {preview && <Alert type="info" showIcon message={`Ảnh hưởng ${preview.affected} nhân viên`} description={<>
         <div>Thêm: {preview.added.map(grantLabel).join('; ') || 'Không có'}</div><div>Thu hồi: {preview.removed.map(grantLabel).join('; ') || 'Không có'}</div>
       </>} />}
-      {failureView}{failure?.code === 'MSG111' && <Button disabled={busy} onClick={() => void reloadEditor()}>Đọc lại phiên bản nhóm, giữ bản nhập</Button>}
+      {failureView}{failure?.code === 'MSG41' && <Button disabled={busy} onClick={() => void reloadEditor()}>Đọc lại phiên bản nhóm, giữ bản nhập</Button>}
       </>}
     </Modal>
     <Modal open={!!assignment} title={`Gán nhóm quyền · ${assignment?.staff.name ?? ''}`} okText="Lưu nhóm cho nhân viên" okButtonProps={{ 'aria-label': 'Lưu nhóm cho nhân viên', disabled: busy || !can('staff.access.assign') }} cancelText="Hủy" confirmLoading={busy}
@@ -194,7 +194,7 @@ export default function AccessGroupsPanel() {
           onChange={branches => { setAssignment({ ...assignment, branches }); setFailure(undefined); }} /></Form.Item>
         <Typography.Paragraph type="secondary">Chọn trong các chi nhánh nhân viên đã tham gia và bạn được quản lý.</Typography.Paragraph>
         <Form.Item label="Lý do gán nhóm" required><Input.TextArea aria-label="Lý do gán nhóm" value={assignment.reason} maxLength={1000} onChange={e => { setAssignment({ ...assignment, reason: e.target.value }); setFailure(undefined); }} /></Form.Item>
-        {failureView}{failure?.code === 'MSG111' && <Button disabled={busy} onClick={() => void reloadAssignment()}>Đọc lại phiên bản nhân viên và nhóm</Button>}
+        {failureView}{failure?.code === 'MSG41' && <Button disabled={busy} onClick={() => void reloadAssignment()}>Đọc lại phiên bản nhân viên và nhóm</Button>}
       </Form>}
     </Modal>
     <Modal open={!!stateChange} title={`${stateChange?.group.active ? 'Ngừng dùng' : 'Khôi phục'} nhóm quyền`} okText="Xác nhận trạng thái" okButtonProps={{ 'aria-label': 'Xác nhận trạng thái', disabled: busy || !can('access-groups.manage') }} cancelText="Hủy" confirmLoading={busy}
@@ -202,7 +202,7 @@ export default function AccessGroupsPanel() {
       <Typography.Paragraph>{stateChange?.group.name}. Nhóm còn nhân viên phải được chuyển hết nhân viên trước khi ngừng.</Typography.Paragraph>
       <Form.Item label="Lý do đổi trạng thái" required><Input.TextArea aria-label="Lý do đổi trạng thái" disabled={busy || !can('access-groups.manage')} maxLength={1000} value={stateChange?.reason}
         onChange={e => { setStateChange(value => value ? { ...value, reason: e.target.value } : value); setFailure(undefined); }} /></Form.Item>
-      {failureView}{failure?.code === 'MSG111' && <Button disabled={busy} onClick={() => void run(async () => { const group = await api<AccessGroup>(`${base}/${stateChange!.group.id}`); setStateChange(value => value ? { ...value, group } : value); pending.current = undefined; })}>Đọc lại trạng thái nhóm</Button>}
+      {failureView}{failure?.code === 'MSG41' && <Button disabled={busy} onClick={() => void run(async () => { const group = await api<AccessGroup>(`${base}/${stateChange!.group.id}`); setStateChange(value => value ? { ...value, group } : value); pending.current = undefined; })}>Đọc lại trạng thái nhóm</Button>}
     </Modal>
     <Drawer open={!!audit} title="Lịch sử phân quyền" aria-label="Lịch sử phân quyền" width="min(900px, 100vw)" onClose={() => setAudit(undefined)}>
       {audit?.error ? <Alert type="error" message={audit.error} action={<Button onClick={() => void openAudit()}>Tải lại lịch sử</Button>} /> : <Table<Audit> rowKey="id" loading={!audit?.rows} dataSource={audit?.rows} locale={{ emptyText: <Empty description="Chưa có thay đổi phân quyền." /> }} columns={[

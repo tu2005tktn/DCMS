@@ -17,7 +17,7 @@ public static class ScreenEndpointPermissions
         var p = Regex.Replace(template.TrimEnd('/'), @"\{([^}:]+):[^}]+\}", "{$1}");
         var read = method is "GET" or "HEAD";
         ScreenEndpointRule Need(string grant) => ScreenEndpointRule.Need(grant);
-        if (p.StartsWith("/api/admin/recovery/") || p.StartsWith("/api/dev/recovery/proof/")) return Need(read && !p.StartsWith("/api/dev/") ? "accounts.read" : "accounts.update");
+        if (p.StartsWith("/api/dev/recovery/proof/")) return Need("accounts.update");
         if (p is "/api/test/realtime/ping" or "/api/test/realtime/state") return ScreenEndpointRule.Open("Integration fixture realtime probes; not registered by the application");
         if (p == "/health" || p.StartsWith("/openapi/") || p.StartsWith("/api/auth") || p.StartsWith("/api/recovery") || p.StartsWith("/api/email-verification") || p.StartsWith("/api/development") || p.StartsWith("/api/dev/")
             || p == "/api/payments/payos/webhook"
@@ -52,12 +52,11 @@ public static class ScreenEndpointPermissions
         if (p.StartsWith("/api/appointments")) return Need(read ? "appointments.read" : p.EndsWith("/reschedule") ? "appointments.reschedule" : p.EndsWith("/cancel") ? "appointments.cancel"
             : p.EndsWith("/no-show") ? "appointments.no-show" : p.Contains("/support-requests") ? "appointments.support.handle" : "appointments.create");
         if (p.StartsWith("/api/reception")) return Need(read ? "reception.read" : "reception.check-in");
-        if (p.StartsWith("/api/system-settings/branches") || p.StartsWith("/api/settings/branches"))
+        if (p.StartsWith("/api/settings/branches"))
             return Need(p.Contains("/chairs") ? (read ? "chairs.read" : "chairs.manage") : read ? "branches.read" : "branches.manage");
         if (p.StartsWith("/api/prescriptions")) return Need(read && !p.EndsWith("/medicine-options") ? "prescriptions.read" : "prescriptions.manage");
         if (p.StartsWith("/api/clinical-documents")) return Need(read ? "documents.read" : p.EndsWith("/delete") ? "documents.delete" : p.EndsWith("/review") || p.EndsWith("/ai-analyses") ? "documents.review" : "documents.upload");
         if (p.StartsWith("/api/visits")) {
-            if (p == "/api/visits/{visitId}") return Need("reception.read");
             if (p.Contains("/investigations/") && p.EndsWith("/result")) return Need("investigations.results.receive");
             return Need(read ? "examinations.read" : "examinations.manage");
         }

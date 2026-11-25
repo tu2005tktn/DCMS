@@ -7,6 +7,7 @@ import { ApiError } from '../../services/api';
 import { customerApi } from '../../services/customerApi';
 import { CustomerGoogleButton } from './CustomerGoogleButton';
 import { useCustomerAuth } from './CustomerAuthContext';
+import NotificationBell from '../customer-notifications/NotificationBell';
 
 type Registration = { fullName: string; phoneNumber: string; email: string; password: string; confirmPassword: string };
 type CredentialPolicy = { requiredLength: number; maximumLength: number; requireDigit: boolean;
@@ -107,7 +108,7 @@ export function CustomerShell() {
     <a className="customer-skip-link" href="#customer-main">Bỏ qua điều hướng</a>
     <header className="customer-header"><div className="customer-header-inner">
       <Link to="/customer/home" className="customer-brand"><span className="customer-brand-mark" aria-hidden="true">D</span>DCMS <span>Cổng bệnh nhân</span></Link>
-      <div className="customer-header-account"><span className="customer-avatar" aria-hidden="true">{initials}</span><span className="customer-header-name">{fullName}</span>
+      <div className="customer-header-account"><NotificationBell /><span className="customer-avatar" aria-hidden="true">{initials}</span><span className="customer-header-name">{fullName}</span>
         <Button type="text" className="customer-signout" loading={busy} icon={<LogoutOutlined aria-hidden="true" />} onClick={() => void leave()}>Đăng xuất</Button></div>
     </div><nav aria-label="Điều hướng khách hàng" className="customer-navigation"><div className="customer-nav-inner">
           <NavLink to="/customer/home" end className={({ isActive }) => `customer-nav-link${isActive ? ' active' : ''}`}><HomeOutlined className="customer-nav-icon" aria-hidden="true" /><span className="customer-nav-long">Trang chủ</span><span className="customer-nav-short" aria-hidden="true">Trang chủ</span></NavLink>
@@ -194,7 +195,7 @@ export function CustomerRegisterPage() {
       window.setTimeout(() => navigate('/customer/sign-in', { replace: true }), 1200);
     } catch (failure) {
       const message = (failure as Error).message;
-      if (failure instanceof ApiError && failure.code === 'MSG139') {
+      if (failure instanceof ApiError && failure.code === 'MSG46') {
         setDuplicateContact(true);
         setError(message);
       }

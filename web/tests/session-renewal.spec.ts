@@ -27,7 +27,7 @@ test('concurrent requests renew once, use rotated token and persist the pair acr
 });
 
 for(const status of [503,401])test(`refresh ${status} ${status===401?'ends':'preserves'} the session`,async({page})=>{
-  await page.route('**/api/auth/refresh',route=>route.fulfill({status,json:{code:status===401?'MSG07':'MSG144',message:'Renewal unavailable'}}));
+  await page.route('**/api/auth/refresh',route=>route.fulfill({status,json:{code:status===401?'MSG06':'MSG49',message:'Renewal unavailable'}}));
   await prepare(page);
   await requests(page,nearToken()).catch(()=>undefined);
   expect(await page.evaluate(()=>sessionStorage.getItem('dcms.web.refresh-token'))).toBe(status===401?null:'refresh-old');
@@ -35,7 +35,7 @@ for(const status of [503,401])test(`refresh ${status} ${status===401?'ends':'pre
 
 for(const status of [200,401])test(`late refresh ${status} cannot replace or clear a newer login or send the old command`,async({page})=>{
   let release!:()=>void;let started!:()=>void;const ready=new Promise<void>(r=>started=r),gate=new Promise<void>(r=>release=r);let writes=0;
-  await page.route('**/api/auth/refresh',async route=>{started();await gate;await route.fulfill({status,json:status===200?{accessToken:freshToken(),refreshToken:'late-old-refresh'}:{code:'MSG07',message:'Expired'}});});
+  await page.route('**/api/auth/refresh',async route=>{started();await gate;await route.fulfill({status,json:status===200?{accessToken:freshToken(),refreshToken:'late-old-refresh'}:{code:'MSG06',message:'Expired'}});});
   await page.route('**/api/test-write',route=>{writes++;return route.fulfill({json:{}});});
   await prepare(page);
   const old=page.evaluate(async token=>{const modulePath='/src/services/api.ts';const c=await import(modulePath);c.setSessionTokens({accessToken:token,refreshToken:'refresh-old'});await c.api('/api/test-write',{method:'POST',body:'{}'}).catch(()=>undefined);},nearToken());

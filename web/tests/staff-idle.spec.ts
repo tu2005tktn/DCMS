@@ -67,9 +67,9 @@ test('S58 expired mock session drops an unsubmitted receipt draft before another
   await dialog.getByRole('spinbutton', {name:'Số tiền thực nhận'}).fill('1000');
   await page.clock.install();
   await page.route('**/api/auth/session/activity', route => route.fulfill({status:401,contentType:'application/json',
-    body:JSON.stringify({code:'MSG07',message:'Phiên hết hạn, vui lòng đăng nhập lại.'})}));
+    body:JSON.stringify({code:'MSG06',message:'Phiên hết hạn, vui lòng đăng nhập lại.'})}));
   await page.route('**/api/auth/refresh', route => route.fulfill({status:401,contentType:'application/json',
-    body:JSON.stringify({code:'MSG07',message:'Phiên hết hạn, vui lòng đăng nhập lại.'})}));
+    body:JSON.stringify({code:'MSG06',message:'Phiên hết hạn, vui lòng đăng nhập lại.'})}));
   await page.clock.fastForward(31_000);
   await dialog.getByRole('spinbutton', {name:'Số tiền thực nhận'}).press('Tab');
   await expect(page.getByRole('heading', {name:'Đăng nhập'})).toBeVisible();

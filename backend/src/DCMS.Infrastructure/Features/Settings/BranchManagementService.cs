@@ -44,7 +44,7 @@ public sealed partial class BranchManagementService(DcmsDbContext db, ISettingsA
     {
         var prior = await db.Set<SettingsReceipt>().AsNoTracking().SingleOrDefaultAsync(x => x.ActorId == actor && x.RequestKey == key, ct);
         if (prior == null) return (false, default);
-        if (prior.Fingerprint != hash) throw Fail("MSG111", 409);
+        if (prior.Fingerprint != hash) throw Fail("MSG41", 409);
         return (true, JsonSerializer.Deserialize<T>(prior.ResultJson, Json));
     }
 
@@ -90,7 +90,7 @@ public sealed partial class BranchManagementService(DcmsDbContext db, ISettingsA
 
     private async Task<BranchDetailDto> DetailAsync(int id, CancellationToken ct)
     {
-        var s = await db.Set<SchedulingBranch>().AsNoTracking().SingleOrDefaultAsync(b => b.Id == id, ct) ?? throw Fail("MSG113", 404);
+        var s = await db.Set<SchedulingBranch>().AsNoTracking().SingleOrDefaultAsync(b => b.Id == id, ct) ?? throw Fail("MSG42", 404);
         return new BranchDetailDto(s.Id, BranchCode(s), s.Name, s.Address, s.Phone, s.Email,
             s.SlotIntervalMinutes, s.Active, s.Version, await ChairRowsAsync(id, ct));
     }
@@ -98,7 +98,7 @@ public sealed partial class BranchManagementService(DcmsDbContext db, ISettingsA
     public async Task<ChairDto[]> ChairsAsync(int actor, int branchId, CancellationToken ct)
     {
         await access.RequireAsync(actor, "chairs.read", ct);
-        if (!await db.Set<SchedulingBranch>().AnyAsync(x => x.Id == branchId, ct)) throw Fail("MSG113", 404);
+        if (!await db.Set<SchedulingBranch>().AnyAsync(x => x.Id == branchId, ct)) throw Fail("MSG42", 404);
         return await ChairRowsAsync(branchId, ct);
     }
 
@@ -139,10 +139,10 @@ public sealed partial class BranchManagementService(DcmsDbContext db, ISettingsA
     {
         var upper = code.ToUpperInvariant();
         if (await db.Set<SchedulingBranch>().AnyAsync(x => (!selfId.HasValue || x.Id != selfId.Value) && x.Code != null && x.Code.ToUpper() == upper, ct))
-            throw Fail("MSG201", 409, "code", "chi nhánh");
+            throw Fail("MSG50", 409, "code", "chi nhánh");
         // Branches without a custom code still display their generated BR-xx code.
         var uncoded = await db.Set<SchedulingBranch>().Where(s => (!selfId.HasValue || s.Id != selfId.Value) && s.Code == null).Select(s => s.Id).ToListAsync(ct);
-        if (uncoded.Any(id => $"BR-{id:D2}".Equals(code, StringComparison.OrdinalIgnoreCase))) throw Fail("MSG201", 409, "code", "chi nhánh");
+        if (uncoded.Any(id => $"BR-{id:D2}".Equals(code, StringComparison.OrdinalIgnoreCase))) throw Fail("MSG50", 409, "code", "chi nhánh");
     }
 
     public async Task<BranchDetailDto> SaveBranchAsync(int actor, int? id, SaveBranchCommand c, CancellationToken ct)
@@ -160,15 +160,15 @@ public sealed partial class BranchManagementService(DcmsDbContext db, ISettingsA
         var before = "{}";
         if (id is { } branchId)
         {
-            sched = await db.Set<SchedulingBranch>().SingleOrDefaultAsync(b => b.Id == branchId, ct) ?? throw Fail("MSG113", 404);
-            if (sched.Version != c.ExpectedVersion) throw Fail("MSG111", 409, currentVersion: sched.Version);
+            sched = await db.Set<SchedulingBranch>().SingleOrDefaultAsync(b => b.Id == branchId, ct) ?? throw Fail("MSG42", 404);
+            if (sched.Version != c.ExpectedVersion) throw Fail("MSG41", 409, currentVersion: sched.Version);
             before = JsonSerializer.Serialize(await DetailAsync(branchId, ct), Json);
             await EnsureUniqueBranchCodeAsync(v.Code, branchId, ct);
             sched.Version++;
         }
         else
         {
-            if (c.ExpectedVersion != 0) throw Fail("MSG111", 409, currentVersion: 0);
+            if (c.ExpectedVersion != 0) throw Fail("MSG41", 409, currentVersion: 0);
             await EnsureUniqueBranchCodeAsync(v.Code, null, ct);
             sched = new SchedulingBranch { Active = true, Version = 1 };
             db.Add(sched);
@@ -191,7 +191,7 @@ public sealed partial class BranchManagementService(DcmsDbContext db, ISettingsA
     private async Task<BlockerItem[]> BranchBlockersAsync(int id, CancellationToken ct)
     {
         var labOrders = await lab.OpenLabOrdersAsync(id, ct);
-        if (!labOrders.Available) throw Fail("MSG144", 503);
+        if (!labOrders.Available) throw Fail("MSG49", 503);
 
         var now = clock.GetUtcNow();
         var blockers = new List<BlockerItem>();
@@ -220,7 +220,7 @@ public sealed partial class BranchManagementService(DcmsDbContext db, ISettingsA
     public async Task<ImpactPreviewResult> BranchStatePreviewAsync(int actor, int id, bool targetActive, CancellationToken ct)
     {
         await access.RequireAsync(actor, "branches.manage", ct);
-        if (!await db.Set<SchedulingBranch>().AnyAsync(x => x.Id == id, ct)) throw Fail("MSG113", 404);
+        if (!await db.Set<SchedulingBranch>().AnyAsync(x => x.Id == id, ct)) throw Fail("MSG42", 404);
         if (targetActive) return new(true, [], "Kích hoạt lại chi nhánh để tiếp nhận lịch hẹn và bệnh nhân.");
         return Preview(await BranchBlockersAsync(id, ct), "Chi nhánh không còn nghĩa vụ ràng buộc. Có thể ngừng hoạt động.", "chi nhánh");
     }
@@ -244,12 +244,12 @@ public sealed partial class BranchManagementService(DcmsDbContext db, ISettingsA
         var replay = await ReplayAsync<BranchDetailDto>(actor, c.RequestKey, hash, ct);
         if (replay.Found) return replay.Result!;
 
-        var sched = await db.Set<SchedulingBranch>().SingleOrDefaultAsync(b => b.Id == id, ct) ?? throw Fail("MSG113", 404);
-        if (sched.Version != c.ExpectedVersion) throw Fail("MSG111", 409, currentVersion: sched.Version);
+        var sched = await db.Set<SchedulingBranch>().SingleOrDefaultAsync(b => b.Id == id, ct) ?? throw Fail("MSG42", 404);
+        if (sched.Version != c.ExpectedVersion) throw Fail("MSG41", 409, currentVersion: sched.Version);
         if (!c.Active)
         {
             var blockers = await BranchBlockersAsync(id, ct);
-            if (blockers.Length > 0) throw Fail("MSG205", 409, label: "Chi nhánh", blockers: blockers);
+            if (blockers.Length > 0) throw Fail("MSG52", 409, label: "Chi nhánh", blockers: blockers);
         }
 
         var before = JsonSerializer.Serialize(await DetailAsync(id, ct), Json);
@@ -283,10 +283,10 @@ public sealed partial class BranchManagementService(DcmsDbContext db, ISettingsA
     {
         var upper = code.ToUpperInvariant();
         if (await db.BranchChairs.AnyAsync(x => x.BranchId == branchId && x.Code.ToUpper() == upper && x.Id != selfId, ct))
-            throw Fail("MSG201", 409, "code", "ghế");
+            throw Fail("MSG50", 409, "code", "ghế");
         var withoutProfile = await db.SchedulingChairs
             .Where(s => s.BranchId == branchId && s.Id != selfId && !db.BranchChairs.Any(p => p.Id == s.Id)).Select(s => s.Id).ToListAsync(ct);
-        if (withoutProfile.Any(id => ChairCode(id, null).Equals(code, StringComparison.OrdinalIgnoreCase))) throw Fail("MSG201", 409, "code", "ghế");
+        if (withoutProfile.Any(id => ChairCode(id, null).Equals(code, StringComparison.OrdinalIgnoreCase))) throw Fail("MSG50", 409, "code", "ghế");
     }
 
     public async Task<ChairDto> SaveChairAsync(int actor, int branchId, int? chairId, SaveChairCommand c, CancellationToken ct)
@@ -300,22 +300,22 @@ public sealed partial class BranchManagementService(DcmsDbContext db, ISettingsA
         var replay = await ReplayAsync<ChairDto>(actor, c.RequestKey, hash, ct);
         if (replay.Found) return replay.Result!;
 
-        var branch = await db.Set<SchedulingBranch>().SingleOrDefaultAsync(x => x.Id == branchId, ct) ?? throw Fail("MSG113", 404);
+        var branch = await db.Set<SchedulingBranch>().SingleOrDefaultAsync(x => x.Id == branchId, ct) ?? throw Fail("MSG42", 404);
         SchedulingChair chair;
         var before = "{}";
         if (chairId is { } id)
         {
-            chair = branch.Chairs.SingleOrDefault(x => x.Id == id) ?? throw Fail("MSG113", 404);
+            chair = branch.Chairs.SingleOrDefault(x => x.Id == id) ?? throw Fail("MSG42", 404);
             var current = ChairVersion(chair);
-            if (current != c.ExpectedVersion) throw Fail("MSG111", 409, currentVersion: current);
+            if (current != c.ExpectedVersion) throw Fail("MSG41", 409, currentVersion: current);
             before = JsonSerializer.Serialize(ChairDto(chair), Json);
             await EnsureUniqueChairCodeAsync(branchId, v.Code, id, ct);
             chair.Version = current + 1;
         }
         else
         {
-            if (c.ExpectedVersion != 0) throw Fail("MSG111", 409, currentVersion: 0);
-            if (!branch.Active) throw Fail("MSG205", 409, "branchId");
+            if (c.ExpectedVersion != 0) throw Fail("MSG41", 409, currentVersion: 0);
+            if (!branch.Active) throw Fail("MSG52", 409, "branchId");
             await EnsureUniqueChairCodeAsync(branchId, v.Code, null, ct);
             chair = new SchedulingChair { Id = await db.NextChairIdAsync(ct), BranchId = branchId };
             branch.Chairs.Add(chair);
@@ -349,7 +349,7 @@ public sealed partial class BranchManagementService(DcmsDbContext db, ISettingsA
     public async Task<ImpactPreviewResult> ChairStatePreviewAsync(int actor, int branchId, int chairId, bool targetActive, CancellationToken ct)
     {
         await access.RequireAsync(actor, "chairs.manage", ct);
-        if (!await db.SchedulingChairs.AnyAsync(x => x.Id == chairId && x.BranchId == branchId, ct)) throw Fail("MSG113", 404);
+        if (!await db.SchedulingChairs.AnyAsync(x => x.Id == chairId && x.BranchId == branchId, ct)) throw Fail("MSG42", 404);
         if (targetActive)
         {
             var branchActive = await db.Set<SchedulingBranch>().Where(x => x.Id == branchId).Select(x => x.Active).SingleAsync(ct);
@@ -371,19 +371,19 @@ public sealed partial class BranchManagementService(DcmsDbContext db, ISettingsA
         var replay = await ReplayAsync<ChairDto>(actor, c.RequestKey, hash, ct);
         if (replay.Found) return replay.Result!;
 
-        var chair = await db.LoadChairAsync(branchId, chairId, ct) ?? throw Fail("MSG113", 404);
+        var chair = await db.LoadChairAsync(branchId, chairId, ct) ?? throw Fail("MSG42", 404);
         var current = ChairVersion(chair);
-        if (current != c.ExpectedVersion) throw Fail("MSG111", 409, currentVersion: current);
+        if (current != c.ExpectedVersion) throw Fail("MSG41", 409, currentVersion: current);
         if (c.Active)
         {
             if (!await db.Set<SchedulingBranch>().Where(x => x.Id == branchId).Select(x => x.Active).SingleAsync(ct))
-                throw Fail("MSG205", 409, "branchId", "Chi nhánh",
+                throw Fail("MSG52", 409, "branchId", "Chi nhánh",
                     blockers: [new("Branch", "Chi nhánh đang ngừng hoạt động; khôi phục chi nhánh trước.", 1, "/settings/branches")]);
         }
         else
         {
             var blockers = await ChairBlockersAsync(branchId, chairId, ct);
-            if (blockers.Length > 0) throw Fail("MSG205", 409, label: "Ghế", blockers: blockers);
+            if (blockers.Length > 0) throw Fail("MSG52", 409, label: "Ghế", blockers: blockers);
         }
 
         var before = JsonSerializer.Serialize(ChairDto(chair), Json);

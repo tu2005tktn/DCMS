@@ -11,7 +11,7 @@ public sealed class CatalogTests(ApiHost host)
     private const string LabRoot = "/api/system-settings/settings/catalogs/lab-work-types";
     private const string Groups = "/api/system-settings/material-categories";
     private const string Materials = "/api/system-settings/materials";
-    private const string Admin = "Chủ phòng khám (owner.demo) đã đăng nhập.";
+    private const string Admin = "Clinic owner owner.demo is signed in.";
 
     private static string Suffix() => Guid.NewGuid().ToString("N")[..6].ToUpperInvariant();
 
@@ -90,7 +90,7 @@ public sealed class CatalogTests(ApiHost host)
         Assert.Equal(409, response.Status);
     }
 
-    [Fact, Case("LWT-08", "A clinic assistant cannot create a lab work type", "Trợ lý (assistant.demo) đã đăng nhập.",
+    [Fact, Case("LWT-08", "A clinic assistant cannot create a lab work type", "Clinic assistant assistant.demo is signed in.",
         "Step 1: Sign in as assistant.demo.",
         "Step 2: Call POST .../lab-work-types with valid data.")]
     public async Task Assistant_is_rejected_for_lab_work_types()
@@ -147,7 +147,7 @@ public sealed class CatalogTests(ApiHost host)
         Assert.Equal(409, response.Status);
     }
 
-    [Fact, Case("CAT-05", "A clinic assistant cannot create a material group", "Trợ lý (assistant.demo) đã đăng nhập.",
+    [Fact, Case("CAT-05", "A clinic assistant cannot create a material group", "Clinic assistant assistant.demo is signed in.",
         "Step 1: Sign in as assistant.demo.",
         "Step 2: Call POST .../material-categories with a valid name.")]
     public async Task Assistant_is_rejected_for_groups()
@@ -218,7 +218,7 @@ public sealed class CatalogTests(ApiHost host)
         Assert.Equal(409, response.Status);
     }
 
-    [Fact, Case("MAT-06", "A clinic assistant cannot create a material", "Trợ lý (assistant.demo) đã đăng nhập.",
+    [Fact, Case("MAT-06", "A clinic assistant cannot create a material", "Clinic assistant assistant.demo is signed in.",
         "Step 1: Sign in as assistant.demo.",
         "Step 2: Call POST .../materials with valid data.")]
     public async Task Assistant_is_rejected_for_materials()

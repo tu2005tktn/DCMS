@@ -158,7 +158,7 @@ function ChangeDialog({ detail, token, mode, onClose, onChanged, onAccessError, 
   const [error, setError] = useState<ApiError | null>(null);
   const submitting = useRef(false);
   const retry = useRef<{ fingerprint: string; key: string } | null>(null);
-  const conflict = error?.code === 'MSG111' || error?.code === 'MSG31';
+  const conflict = error?.code === 'MSG41' || error?.code === 'MSG26';
   const selectedDentistName = dentists.find(value => value.id === dentistId)?.name ?? detail.dentistName;
   const slotGroups = [
     { label: 'Buổi sáng', slots: slots.filter(value => Number(formatClock(value.start).slice(0, 2)) < 12) },
@@ -194,7 +194,7 @@ function ChangeDialog({ detail, token, mode, onClose, onChanged, onAccessError, 
       .catch((failure: ApiError) => {
         if (!active) return;
         if ([401, 403, 404].includes(failure.status)) onAccessError(failure);
-        else { setSlotsError(failure.message); if (failure.code === 'MSG31') setError(failure); }
+        else { setSlotsError(failure.message); if (failure.code === 'MSG26') setError(failure); }
       }).finally(() => { if (active) setSlotsBusy(false); });
     return () => { active = false; controller.abort(); };
   }, [date, dentistId, detail.code, moving, token, revision, onAccessError]);
@@ -230,7 +230,7 @@ function ChangeDialog({ detail, token, mode, onClose, onChanged, onAccessError, 
       if ([401, 403, 404].includes(error.status)) { onAccessError(error); return; }
       setError(error);
       if (error.status >= 400 && error.status < 500) retry.current = null;
-      if (error.code === 'MSG34') { setReviewing(false); setRevision(value => value + 1); }
+      if (error.code === 'MSG29') { setReviewing(false); setRevision(value => value + 1); }
     } finally { submitting.current = false; setBusy(false); }
   }
 

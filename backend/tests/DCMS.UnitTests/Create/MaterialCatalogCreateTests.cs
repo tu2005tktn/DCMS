@@ -20,7 +20,7 @@ public sealed class MaterialCatalogCreateTests
     }
 
     private static MaterialCategory Category(string name) =>
-        new() { Name = name, NormalizedName = name.ToUpperInvariant(), CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow };
+        new() { Name = name };
 
     public static TheoryData<string, string, string, int> CategoryRejected => new()
     {
@@ -59,8 +59,7 @@ public sealed class MaterialCatalogCreateTests
         using var _ = db;
         var category = Category("Vật liệu trám");
         db.MaterialCategories.Add(category);
-        db.MaterialCatalogItems.Add(new() { Name = "COMPOSITE A2", NormalizedName = "COMPOSITE A2", CategoryId = category.Id,
-            CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow });
+        db.MaterialCatalogItems.Add(new() { Name = "COMPOSITE A2", CategoryId = category.Id });
         await db.SaveChangesAsync();
         var categoryId = categoryExists ? category.Id : Guid.NewGuid();
 

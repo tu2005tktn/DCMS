@@ -35,7 +35,7 @@ public sealed class AccountRecoveryService(
         bool publicOnly = false)
     {
         // One neutral answer for every valid-format request, matching an account or not (UC-02 step 3).
-        var neutral = new RecoveryRequestOutcome(true, "MSG12");
+        var neutral = new RecoveryRequestOutcome(true, "MSG09");
         var invalid = ValidateIdentifier(identifier, publicOnly ? 254 : 64);
         if (invalid != null) throw invalid;
         ValidateCustomerEmail(identifier, publicOnly);
@@ -78,20 +78,20 @@ public sealed class AccountRecoveryService(
         if (invalid != null) throw invalid;
         ValidateCustomerEmail(identifier, publicOnly);
         if (publicOnly && settings.Channel != RecoveryChannel.Email)
-            return new RecoveryResendOutcome(false, "MSG12", null);
-        if (!AllowRequest(identifier, ipAddress)) return new RecoveryResendOutcome(false, "MSG12", null);
+            return new RecoveryResendOutcome(false, "MSG09", null);
+        if (!AllowRequest(identifier, ipAddress)) return new RecoveryResendOutcome(false, "MSG09", null);
 
         var user = await FindAsync(identifier, ct, publicOnly);
         if (user == null)
         {
             await EqualizeTimingAsync(ct);
-            return new RecoveryResendOutcome(false, "MSG12", null);
+            return new RecoveryResendOutcome(false, "MSG09", null);
         }
 
         // Unknown account and throttled account get the same answer below, so neither can be told
         // apart without knowing an identifier that actually exists.
         var current = await LatestTokenAsync(user.Id, ct);
-        if (current != null && ThrottleFor(current) != null) return new RecoveryResendOutcome(false, "MSG12", null);
+        if (current != null && ThrottleFor(current) != null) return new RecoveryResendOutcome(false, "MSG09", null);
 
         try
         {
@@ -105,7 +105,7 @@ public sealed class AccountRecoveryService(
                 settings.Channel.ToString(), blocked.Result, ct);
         }
 
-        return new RecoveryResendOutcome(true, "MSG12", null);
+        return new RecoveryResendOutcome(true, "MSG09", null);
     }
 
     public async Task<RecoveryVerifyOutcome> VerifyAsync(string identifier, string proof, string? ipAddress,
@@ -135,7 +135,7 @@ public sealed class AccountRecoveryService(
         if (invalid != null) throw invalid;
         ValidateCustomerEmail(identifier, publicOnly);
         if (publicOnly && settings.Channel != RecoveryChannel.Email)
-            return new RecoveryResetOutcome(false, "MSG108");
+            return new RecoveryResetOutcome(false, "MSG38");
 
         var user = await FindAsync(identifier, ct, publicOnly);
         return await ApplyResetAsync(user, resetGrant, newPassword, adminActor: null, ct);
@@ -181,94 +181,10 @@ public sealed class AccountRecoveryService(
         return new RecoveryVerifyOutcome(true, grant);
     }
 
-    public async Task<AdminRecoveryRequestOutcome> RequestForAccountAsync(int actorId, int targetAccountId,
-        CancellationToken ct)
-    {
-        await RequireAdminAsync(actorId, ct);
-        var user = await db.Users.SingleOrDefaultAsync(x => x.Id == targetAccountId, ct)
-            ?? throw new BusinessException(404, SystemMessages.Get("MSG01"));
-
-        var current = await LatestTokenAsync(targetAccountId, ct);
-        var throttle = current == null ? null : ThrottleFor(current);
-        if (throttle != null)
-        {
-            // Admin-assisted recovery keeps the shared cooldown: it is not a way around the cap.
-            await AuditAsync(actorId, targetAccountId, "RecoveryBlocked", "Gửi lại quá sớm",
-                ChannelName(current), "OverResendLimit", ct);
-            return new AdminRecoveryRequestOutcome(false, "MSG12", targetAccountId, ChannelName(current),
-                current!.NormalizedDestination, throttle.RetryAfterSeconds);
-        }
-
-        try
-        {
-            var token = await IssueAsync(user, current, ct);
-            await AuditAsync(actorId, targetAccountId, "RecoveryRequested", "Hỗ trợ khôi phục bởi quản trị viên",
-                ChannelName(token), "Succeeded", ct);
-            return new AdminRecoveryRequestOutcome(true, "MSG12", targetAccountId, ChannelName(token),
-                token.NormalizedDestination, null);
-        }
-        catch (RecoveryBlockedException blocked)
-        {
-            await AuditAsync(actorId, targetAccountId, "RecoveryBlocked", blocked.Reason,
-                ChannelName(current), blocked.Result, ct);
-            return new AdminRecoveryRequestOutcome(false, "MSG12", targetAccountId, ChannelName(current), "", null);
-        }
-    }
-
-    public async Task<RecoveryVerifyOutcome> VerifyForAccountAsync(int actorId, int targetAccountId, string proof,
-        CancellationToken ct)
-    {
-        await RequireAdminAsync(actorId, ct);
-        var user = await db.Users.SingleOrDefaultAsync(x => x.Id == targetAccountId, ct)
-            ?? throw new BusinessException(404, SystemMessages.Get("MSG01"));
-        // The Admin actor is carried into the audit trail so GBR-028 stays satisfied.
-        return await VerifyCoreAsync(user, proof, actorId, ct);
-    }
-
-    public async Task<RecoveryResetOutcome> ResetForAccountAsync(int actorId, int targetAccountId, string newPassword,
-        string confirmPassword, CancellationToken ct)
-    {
-        await RequireAdminAsync(actorId, ct);
-        var invalid = ValidatePassword(newPassword, confirmPassword);
-        if (invalid != null) throw invalid;
-
-        var user = await db.Users.SingleOrDefaultAsync(x => x.Id == targetAccountId, ct)
-            ?? throw new BusinessException(404, SystemMessages.Get("MSG01"));
-
-        // The Admin path reuses the same process: the account owner must already have completed
-        // verification. An Admin may then set the new credential, and the action is audited.
-        var current = await LatestTokenAsync(targetAccountId, ct);
-        if (current == null || string.IsNullOrEmpty(current.ResetGrantHash) || current.UsedAt != null)
-            throw new BusinessException(400, SystemMessages.Get("MSG108"));
-
-        return await ApplyResetAsync(user, grant: null, newPassword, actorId, ct);
-    }
-
-    public async Task<RecoveryStatusSnapshot> GetStatusAsync(int actorId, int targetAccountId, CancellationToken ct)
-    {
-        // Status is deliberately admin-only: for an anonymous caller it would confirm that an
-        // account exists as soon as one recovery request had been made for it.
-        await RequireAdminAsync(actorId, ct);
-        var user = await db.Users.AsNoTracking().SingleOrDefaultAsync(x => x.Id == targetAccountId, ct)
-            ?? throw new BusinessException(404, SystemMessages.Get("MSG01"));
-
-        var current = await LatestTokenAsync(targetAccountId, ct);
-        if (current == null) return EmptyStatus();
-        return EmptyStatus() with
-        {
-            HasActiveRequest = true,
-            ChannelType = ChannelName(current),
-            AttemptsUsed = current.VerifyAttempts,
-            ResendsUsed = current.ResendCount,
-            SecondsUntilExpiry = SecondsLeft(current),
-            RetryAfterSeconds = ThrottleSeconds(current)
-        };
-    }
-
     private async Task<RecoveryResetOutcome> ApplyResetAsync(ApplicationUser? user, string? grant, string newPassword,
         int? adminActor, CancellationToken ct)
     {
-        var invalid = new RecoveryResetOutcome(false, "MSG108");
+        var invalid = new RecoveryResetOutcome(false, "MSG38");
         if (user == null)
         {
             await EqualizeTimingAsync(ct);
@@ -309,7 +225,7 @@ public sealed class AccountRecoveryService(
             if (!applied.Succeeded)
             {
                 await transaction.RollbackAsync(ct);
-                throw new BusinessException(400, SystemMessages.Get("MSG109"));
+                throw new BusinessException(400, SystemMessages.Get("MSG39"));
             }
 
             var now = DateTimeOffset.UtcNow;
@@ -330,7 +246,7 @@ public sealed class AccountRecoveryService(
             logger.LogInformation("Password reset completed for account {AccountId} by actor {ActorId}; " +
                 "previous sessions revoked (no secrets logged).",
                 user.Id, adminActor?.ToString() ?? "self");
-            return new RecoveryResetOutcome(true, "MSG13");
+            return new RecoveryResetOutcome(true, "MSG10");
         }
         // The loser of a concurrent reset never reaches the password change. The conflict can
         // surface as a DbUpdateException, a DbUpdateConcurrencyException, directly from the driver,
@@ -431,7 +347,7 @@ public sealed class AccountRecoveryService(
     private RecoveryResendOutcome? ThrottleFor(RecoveryToken token)
     {
         var seconds = ThrottleSeconds(token);
-        return seconds == null ? null : new RecoveryResendOutcome(false, "MSG12", seconds);
+        return seconds == null ? null : new RecoveryResendOutcome(false, "MSG09", seconds);
     }
 
     private int? ThrottleSeconds(RecoveryToken token)
@@ -442,15 +358,6 @@ public sealed class AccountRecoveryService(
         var remaining = TimeSpan.FromMinutes(settings.ResendCooldownMinutes) - elapsed;
         return remaining > TimeSpan.Zero ? (int)Math.Ceiling(remaining.TotalSeconds) : null;
     }
-
-    private static int? SecondsLeft(RecoveryToken token)
-    {
-        var remaining = token.ExpiresAt - DateTimeOffset.UtcNow;
-        return remaining > TimeSpan.Zero ? (int)Math.Ceiling(remaining.TotalSeconds) : 0;
-    }
-
-    private RecoveryStatusSnapshot EmptyStatus() => new(false, "", 0, 0, null,
-        settings.MaxVerifyAttempts, settings.MaxResends, null);
 
     private async Task<RecoveryToken?> LatestTokenAsync(int accountId, CancellationToken ct)
     {
@@ -583,14 +490,6 @@ public sealed class AccountRecoveryService(
             });
         }
         await db.SaveChangesAsync(ct);
-    }
-
-    private async Task RequireAdminAsync(int actorId, CancellationToken ct)
-    {
-        var actor = await db.Users.AsNoTracking().SingleOrDefaultAsync(x => x.Id == actorId && x.IsActive, ct);
-        var state = actor?.AccountType == "Staff" ? await access.ResolveAsync(actorId, ct) : null;
-        if (actor == null || (state is { GrantDriven: true } ? !state.Permissions.Any(x => x.StartsWith("accounts.")) : !await users.IsInRoleAsync(actor, AccountRoles.Admin)))
-            throw new BusinessException(403, SystemMessages.Get("MSG06"));
     }
 
     private string ChannelName(RecoveryToken? token = null)

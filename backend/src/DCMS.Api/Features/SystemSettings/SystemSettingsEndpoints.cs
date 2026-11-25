@@ -83,9 +83,6 @@ public static class SystemSettingsEndpoints
             Results.File(await s.ExportAsync(await ExportGrant(c, access, "medicines", ct), q, status, ct),
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"danh-muc-thuoc-{DateTime.UtcNow:yyyyMMdd}.xlsx"));
         MapSupply<MedicineInput, MedicineDto>(settings, "medicines");
-        settings.MapGet("/catalogs/services/export", async (HttpContext c, string? q, string? status, IServiceCatalogExport s, CancellationToken ct) =>
-            Results.File(await s.ExportAsync(AuthenticationEndpoints.AccountId(c.User), q, status, ct),
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"danh-muc-dich-vu-{DateTime.UtcNow:yyyyMMdd}.xlsx"));
         // S58 danh mục tham chiếu (docs/specs/S58-REFERENCE-CATALOGS.md).
         var catalogs = settings.MapGroup("/catalogs/{kind}");
         catalogs.MapGet("/", async (HttpContext c, string kind, string? q, string? status, int? page, int? pageSize, IReferenceCatalogService s, CancellationToken ct) =>

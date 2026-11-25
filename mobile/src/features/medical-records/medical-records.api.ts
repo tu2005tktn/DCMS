@@ -16,16 +16,16 @@ async function call<T>(path: string, token: string, init: RequestInit = {}): Pro
   if (token) headers.Authorization = `Bearer ${token}`;
   let response: Response;
   try { response = await fetch(env.apiUrl + path, { ...init, headers, cache: 'no-store' }); }
-  catch { throw new RecordApiError(connectionMessage, 0, 'MSG144'); }
+  catch { throw new RecordApiError(connectionMessage, 0, 'MSG49'); }
   const body = await response.json().catch(() => null) as unknown;
   if (!response.ok) {
     const error = body as Partial<SystemMessage> | null;
-    throw new RecordApiError(error?.message ?? connectionMessage, response.status, error?.code ?? 'MSG144');
+    throw new RecordApiError(error?.message ?? connectionMessage, response.status, error?.code ?? 'MSG49');
   }
   return body as T;
 }
 
-// S41 luôn gọi API thật (không đi qua công tắc mock của màn lịch hẹn) để không bao giờ hiển thị dữ liệu giả đã lưu.
+// S41 luôn gọi API thật và không lưu bản sao trên thiết bị.
 export const medicalRecordsApi = {
   treatmentSummary: (token: string) => call<OwnTreatmentSummaryItem[]>('/api/patients/me/treatment-summary', token),
   visits: (token: string, scope: VisitScope) =>

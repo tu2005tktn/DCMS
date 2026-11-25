@@ -34,14 +34,14 @@ public sealed class ReceptionService(DcmsDbContext db, UserManager<ApplicationUs
     private async Task<Actor> ActorAsync(int actorId, CancellationToken ct)
     {
         var user = await users.FindByIdAsync(actorId.ToString());
-        if (user == null || !user.IsActive || user.LockoutEnabled && user.LockoutEnd > clock.GetUtcNow()) throw Error("MSG07", 401);
-        if (user.AccountType != "Staff") throw Error("MSG06", 403);
+        if (user == null || !user.IsActive || user.LockoutEnabled && user.LockoutEnd > clock.GetUtcNow()) throw Error("MSG06", 401);
+        if (user.AccountType != "Staff") throw Error("MSG05", 403);
         var roles = AccountRoles.Effective(await users.GetRolesAsync(user));
         // Staff in an access group act through reception.* grants and assignment branches, never their role.
         var assistant = roles.Contains(AccountRoles.ClinicAssistant) || roles.Contains(AccountRoles.ClinicOwner)
             || (await settingsAccess.ResolveAsync(actorId, ct)).GrantDriven;
-        if (!assistant && !roles.Contains(AccountRoles.Dentist)) throw Error("MSG06", 403);
-        var employee = await db.Employees.AsNoTracking().SingleOrDefaultAsync(x => x.AccountId == actorId, ct) ?? throw Error("MSG06", 403);
+        if (!assistant && !roles.Contains(AccountRoles.Dentist)) throw Error("MSG05", 403);
+        var employee = await db.Employees.AsNoTracking().SingleOrDefaultAsync(x => x.AccountId == actorId, ct) ?? throw Error("MSG05", 403);
         var backdate = assistant && (await users.GetClaimsAsync(user)).Any(x => x.Type == "permission" && x.Value == "reception.backdate");
         return new(employee.Id, assistant, backdate);
     }
@@ -50,20 +50,20 @@ public sealed class ReceptionService(DcmsDbContext db, UserManager<ApplicationUs
     {
         await settingsAccess.OperationalAsync(actorId,permission ?? (write ? "reception.check-in" : "reception.read"),branchId,ct);
         var actor = await ActorAsync(actorId, ct);
-        if (write && !actor.Assistant) throw Error("MSG06", 403);
+        if (write && !actor.Assistant) throw Error("MSG05", 403);
         if ((await settingsAccess.ResolveAsync(actorId, ct)).Owner)
         {
-            if (!await db.Set<SchedulingBranch>().AnyAsync(x => x.Id == branchId && x.Active, ct)) throw Error("MSG06", 403);
+            if (!await db.Set<SchedulingBranch>().AnyAsync(x => x.Id == branchId && x.Active, ct)) throw Error("MSG05", 403);
             return actor;
         }
         if (!await (from m in db.SchedulingMembers join b in db.Set<SchedulingBranch>() on m.BranchId equals b.Id
             where m.EmployeeId == actor.EmployeeId && m.BranchId == branchId && m.Active && b.Active && (actor.Assistant || m.CanDentist)
-            select m).AnyAsync(ct)) throw Error("MSG06", 403);
+            select m).AnyAsync(ct)) throw Error("MSG05", 403);
         return actor;
     }
     private static void Own(Actor actor, int dentistId)
     {
-        if (!actor.Assistant && actor.EmployeeId != dentistId) throw Error("MSG06", 403);
+        if (!actor.Assistant && actor.EmployeeId != dentistId) throw Error("MSG05", 403);
     }
 
     public async Task<ReceptionOptions> OptionsAsync(int actorId, CancellationToken ct)
@@ -137,7 +137,7 @@ public sealed class ReceptionService(DcmsDbContext db, UserManager<ApplicationUs
 
     public async Task<ReceptionDetail> DetailAsync(int actorId, Guid appointmentId, CancellationToken ct)
     {
-        var a = await db.Appointments.AsNoTracking().SingleOrDefaultAsync(x => x.Id == appointmentId, ct) ?? throw Error("MSG113", 404);
+        var a = await db.Appointments.AsNoTracking().SingleOrDefaultAsync(x => x.Id == appointmentId, ct) ?? throw Error("MSG42", 404);
         var actor = await ScopeAsync(actorId, a.BranchId, false, ct); Own(actor, a.DentistId);
         var dto = (await AppointmentDtosAsync([a], actor.Assistant, ct))[0];
         return new(dto, dto.VisitId.HasValue ? await VisitAsync(actorId, dto.VisitId.Value, ct) : null,
@@ -156,7 +156,7 @@ public sealed class ReceptionService(DcmsDbContext db, UserManager<ApplicationUs
     }
     public async Task<VisitResult> VisitAsync(int actorId, Guid visitId, CancellationToken ct, bool clinical = false)
     {
-        var v = await db.Visits.AsNoTracking().SingleOrDefaultAsync(x => x.Id == visitId, ct) ?? throw Error("MSG113", 404);
+        var v = await db.Visits.AsNoTracking().SingleOrDefaultAsync(x => x.Id == visitId, ct) ?? throw Error("MSG42", 404);
         var state = await settingsAccess.ResolveAsync(actorId, ct);
         var permission = clinical ? state.Permissions.Contains("examinations.read") ? "examinations.read" : "treatment.read" : "reception.read";
         var actor = await ScopeAsync(actorId, v.BranchId, false, ct, permission);
@@ -191,33 +191,33 @@ public sealed class ReceptionService(DcmsDbContext db, UserManager<ApplicationUs
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
         // Same lock and ordering as booking/change; this also serializes newly identified Patient reservations.
         await db.Database.ExecuteSqlRawAsync($"SELECT pg_advisory_xact_lock({WorkingScheduleService.TransactionLock})", ct);
-        var a = await db.Appointments.SingleOrDefaultAsync(x => x.Id == appointmentId, ct) ?? throw Error("MSG113", 404);
+        var a = await db.Appointments.SingleOrDefaultAsync(x => x.Id == appointmentId, ct) ?? throw Error("MSG42", 404);
         var actor = await ScopeAsync(actorId, a.BranchId, true, ct);
         var patient = await db.Patients.FromSqlInterpolated($"SELECT * FROM \"PATIENT_PROFILE\" WHERE \"Id\" = {request.PatientId} FOR UPDATE")
-            .SingleOrDefaultAsync(ct) ?? throw Error("MSG113", 404);
-        if (patient.IsArchived) throw Error("MSG202", 409);
+            .SingleOrDefaultAsync(ct) ?? throw Error("MSG42", 404);
+        if (patient.IsArchived) throw Error("MSG51", 409);
         if (a.PatientId.HasValue ? a.PatientId != patient.Id
             : PatientLinkSupport.NormalizeName(a.AttendeeName) != PatientLinkSupport.NormalizeName(patient.FullName)
-                || a.BookingInfo.AttendeeBirthDate.HasValue && a.BookingInfo.AttendeeBirthDate != patient.BirthDate) throw Error("MSG43", 409);
+                || a.BookingInfo.AttendeeBirthDate.HasValue && a.BookingInfo.AttendeeBirthDate != patient.BirthDate) throw Error("MSG35", 409);
         var receipt = await db.Set<ReceptionReceipt>().AsNoTracking().SingleOrDefaultAsync(x => x.ActorAccountId == actorId && x.RequestKey == request.RequestKey, ct);
-        if (receipt != null && receipt.Fingerprint != fingerprint) throw Error("MSG111", 409);
+        if (receipt != null && receipt.Fingerprint != fingerprint) throw Error("MSG41", 409);
         var existing = await db.Visits.AsNoTracking().SingleOrDefaultAsync(x => x.AppointmentId == a.Id, ct);
-        if (receipt != null && (existing == null || receipt.VisitId != existing.Id)) throw Error("MSG111", 409);
+        if (receipt != null && (existing == null || receipt.VisitId != existing.Id)) throw Error("MSG41", 409);
         if (existing != null)
         {
-            if (existing.PatientId != patient.Id) throw Error("MSG43", 409);
+            if (existing.PatientId != patient.Id) throw Error("MSG35", 409);
             if (receipt == null) db.Add(new ReceptionReceipt { ActorAccountId = actorId, RequestKey = request.RequestKey, VisitId = existing.Id, Fingerprint = fingerprint });
             await db.SaveChangesAsync(ct); await tx.CommitAsync(ct);
             return await ResultAsync(existing, true, ct);
         }
         var now = clock.GetUtcNow();
-        if (a.Version != request.ExpectedVersion) throw Error("MSG111", 409);
-        if (Ineligible(a, now) != null) throw Error(a.Status == "NoShow" ? "MSG47" : "MSG42", 409);
+        if (a.Version != request.ExpectedVersion) throw Error("MSG41", 409);
+        if (Ineligible(a, now) != null) throw Error(a.Status == "NoShow" ? "MSG36" : "MSG34", 409);
         var arrival = request.ArrivalAt?.ToUniversalTime() ?? now;
         if (arrival > now || ClinicDate(arrival) != ClinicDate(now)) throw Error("MSG04");
         if (request.ArrivalAt.HasValue)
         {
-            if (!actor.CanBackdate) throw Error("MSG06", 403);
+            if (!actor.CanBackdate) throw Error("MSG05", 403);
             if (arrivalReason == null) throw Error("MSG02");
         }
         await availability.ValidateReceptionAsync(a.Id, patient.Id, ct);

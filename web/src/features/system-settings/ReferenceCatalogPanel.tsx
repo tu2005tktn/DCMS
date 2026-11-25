@@ -156,7 +156,7 @@ export default function ReferenceCatalogPanel({ initialKind }: { initialKind?: K
     <Modal forceRender open={!!editing} title={`${editing?.entry ? 'Sửa' : 'Thêm'} · ${meta.label}`} okText="Lưu" cancelText="Hủy" confirmLoading={busy}
       closable={!busy} cancelButtonProps={{ disabled: busy }} onCancel={() => { if (!busy) setEditing(null); }} onOk={() => form.submit()}>
       {formError && <Alert type="error" showIcon message={formError.message}
-        action={formError.code === 'MSG111' && editing?.entry ? <Button size="small" onClick={() => void reloadEditing()}>Tải lại bản mới</Button> : undefined} />}
+        action={formError.code === 'MSG41' && editing?.entry ? <Button size="small" onClick={() => void reloadEditing()}>Tải lại bản mới</Button> : undefined} />}
       <Form form={form} layout="vertical" disabled={busy} onFinish={v => void save(v)}>
         <Form.Item name="code" label={meta.codeLabel} rules={[{ required: kind !== 'diagnoses', whitespace: true, message: `Vui lòng nhập ${meta.codeLabel}.` },
           { max: 40, message: `${meta.codeLabel} tối đa 40 ký tự.` }, { pattern: /^\s*([A-Za-z0-9][A-Za-z0-9._-]*)?\s*$/, message: 'Mã gồm chữ không dấu, số, dấu chấm, gạch dưới hoặc gạch nối.' }]}>

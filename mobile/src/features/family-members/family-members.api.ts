@@ -14,9 +14,9 @@ async function call<T>(path: string, token: string, init: RequestInit = {}): Pro
   if (init.body) headers['Content-Type'] = 'application/json';
   let response: Response;
   try { response = await fetch(`${env.apiUrl}/api/me/family-members${path}`, { ...init, headers, cache: 'no-store' }); }
-  catch { throw new FamilyApiError(connectionMessage, 0, 'MSG144'); }
+  catch { throw new FamilyApiError(connectionMessage, 0, 'MSG49'); }
   const body = await response.json().catch(() => null) as { code?: string; message?: string; field?: string } | null;
-  if (!response.ok) throw new FamilyApiError(body?.message ?? connectionMessage, response.status, body?.code ?? 'MSG144', body?.field);
+  if (!response.ok) throw new FamilyApiError(body?.message ?? connectionMessage, response.status, body?.code ?? 'MSG49', body?.field);
   return body as T;
 }
 const post = (body: unknown): RequestInit => ({ method: 'POST', body: JSON.stringify(body) });

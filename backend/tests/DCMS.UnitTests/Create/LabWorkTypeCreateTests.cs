@@ -37,8 +37,7 @@ public sealed class LabWorkTypeCreateTests
     {
         using var db = CreateTestKit.NewSqliteDb();
         var admin = await CreateTestKit.SeedStaffAsync(db, "admin.test", "Admin", 1, member: false);
-        db.Add(new LabWorkType { Code = "EXIST-01", Name = "Mão răng toàn sứ", NormalizedName = "MÃO RĂNG TOÀN SỨ", Unit = "Tooth",
-            CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow, CreatedBy = admin.Id, UpdatedBy = admin.Id });
+        db.Add(new LabWorkType { Code = "EXIST-01", Name = "Mão răng toàn sứ", Unit = "Tooth" });
         await db.SaveChangesAsync();
         var catalog = new LabWorkTypeCatalog(db, TimeProvider.System, new CreateTestKit.AllowAll());
 

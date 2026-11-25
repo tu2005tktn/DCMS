@@ -15,11 +15,11 @@ async function call<T>(path: string, token: string, init: RequestInit = {}): Pro
   if (token) headers.Authorization = `Bearer ${token}`;
   let response: Response;
   try { response = await fetch(env.apiUrl + path, { ...init, headers }); }
-  catch { throw new LinkApiError(connectionMessage, 0, 'MSG144'); }
+  catch { throw new LinkApiError(connectionMessage, 0, 'MSG49'); }
   const body = await response.json().catch(() => null) as unknown;
   if (!response.ok) {
     const error = body as Partial<SystemMessage> | null;
-    throw new LinkApiError(error?.message ?? connectionMessage, response.status, error?.code ?? 'MSG144');
+    throw new LinkApiError(error?.message ?? connectionMessage, response.status, error?.code ?? 'MSG49');
   }
   return body as T;
 }

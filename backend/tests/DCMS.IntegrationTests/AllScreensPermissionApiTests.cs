@@ -189,13 +189,6 @@ public sealed class AllScreensPermissionApiTests(ReceptionFixture fixture) : ICl
         var context = await Ok<DCMS.Application.Features.Treatment.TreatmentSheetContext>(await user.GetAsync($"/api/dossiers/{dossier.Id}/sheet-context"));
         Assert.Empty(context.AllowedActions);
     }
-    [Fact] public async Task ReceptionVisitHeaderDoesNotRequireClinicalRead() {
-        var setup = await reception.Prepare(); using var assistant = await reception.Login(); var visit = await reception.Check(assistant, setup);
-        using var owner = await reception.Login("owner.demo"); var (staff, name) = await Staff(setup.BranchId, AccountRoles.ClinicAssistant);
-        await Assign(owner, staff, AccountRoles.ClinicAssistant, "reception.read"); using var user = await reception.Login(name);
-        Assert.Equal(HttpStatusCode.OK, (await user.GetAsync($"/api/visits/{visit.VisitId}")).StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, (await user.GetAsync($"/api/visits/{visit.VisitId}/examination")).StatusCode);
-    }
     [Fact] public async Task PrescriptionReadDoesNotRequireExaminationWriteOrReceptionAccess() {
         var setup = await reception.Prepare(); using var assistant = await reception.Login(); var visit = await reception.Check(assistant, setup);
         using var owner = await reception.Login("owner.demo"); var (staff, name) = await Staff(setup.BranchId, AccountRoles.Dentist);

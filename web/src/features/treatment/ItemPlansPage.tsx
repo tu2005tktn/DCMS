@@ -79,8 +79,8 @@ function ItemPlansWorkspace() {
       <Space wrap>{canPickBranch && branches.length > 1 && <Select aria-label="Chi nhánh" value={branch} disabled={busy}
         options={branches.map(x => ({ value: x.id, label: x.name }))} onChange={id => { if (canLeave()) { setBranch(id); setPlan(null); setEditing(null); setDirty(false); setPage(1); setData(null); setOptions(null); setError(null); } }} />}</Space></div>
     {listError && <Alert showIcon type="error" message={listError} action={<Button onClick={() => branch ? setRevision(r => r + 1) : window.location.reload()}>Thử lại</Button>} />}
-    {!plan && error && <Alert showIcon type="error" message={`${error.code ?? ''}: ${error.message}`} description={error.code === 'MSG111' ? 'Bản nhập vẫn được giữ. Đọc phiên bản mới để đối chiếu trước khi lưu lại.' : undefined}
-      action={error.code === 'MSG111' && plan ? <Button disabled={busy} onClick={readLatest}>Xem phiên bản mới</Button> : undefined} />}
+    {!plan && error && <Alert showIcon type="error" message={`${error.code ?? ''}: ${error.message}`} description={error.code === 'MSG41' ? 'Bản nhập vẫn được giữ. Đọc phiên bản mới để đối chiếu trước khi lưu lại.' : undefined}
+      action={error.code === 'MSG41' && plan ? <Button disabled={busy} onClick={readLatest}>Xem phiên bản mới</Button> : undefined} />}
     {!plan && !nameDialog && comparison}
     <Card title="Danh sách kế hoạch" extra={<Button type="primary" disabled={!canManage || !branch || busy} onClick={() => { if (canLeave()) { setEditing(null); setName(''); setNameDialog('create'); setDirty(false); setError(null); } }}>Tạo kế hoạch</Button>}>
       <Space.Compact className="item-plan-search"><Input aria-label="Tìm tên kế hoạch" value={search} maxLength={160} allowClear onChange={e => setSearch(e.target.value)} onPressEnter={() => { setKeyword(search.trim()); setPage(1); }} /><Button onClick={() => { setKeyword(search.trim()); setPage(1); }}>Tìm kiếm</Button></Space.Compact>
@@ -94,8 +94,8 @@ function ItemPlansWorkspace() {
     <Modal open={!!plan} centered width={1180} destroyOnClose title={plan?.name} footer={null} styles={{ body: { maxHeight: '75vh', overflowY: 'auto' } }}
       onCancel={() => { if (!busy && canLeave()) { setPlan(null); setEditing(null); setDirty(false); setError(null); setLatest(null); } }}>
       {plan && <>
-      {error && !nameDialog && <Alert showIcon type="error" message={`${error.code ?? ''}: ${error.message}`} description={error.code === 'MSG111' ? 'Bản nhập vẫn được giữ. Đọc phiên bản mới để đối chiếu trước khi lưu lại.' : undefined}
-        action={error.code === 'MSG111' ? <Button disabled={busy} onClick={readLatest}>Xem phiên bản mới</Button> : undefined} style={{ marginBottom: 12 }} />}
+      {error && !nameDialog && <Alert showIcon type="error" message={`${error.code ?? ''}: ${error.message}`} description={error.code === 'MSG41' ? 'Bản nhập vẫn được giữ. Đọc phiên bản mới để đối chiếu trước khi lưu lại.' : undefined}
+        action={error.code === 'MSG41' ? <Button disabled={busy} onClick={readLatest}>Xem phiên bản mới</Button> : undefined} style={{ marginBottom: 12 }} />}
       {!nameDialog && comparison}
       <Space wrap style={{ marginBottom: 12, justifyContent: 'space-between', width: '100%' }}>
         <span>{plan.itemCount} hạng mục · Tổng chi phí: <strong>{planMoney(plan.totalCostVnd)}</strong></span>
@@ -124,7 +124,7 @@ function ItemPlansWorkspace() {
         else if (plan) void write(`${itemPlanApi}/${plan.id}`, 'PUT', { name: name.trim(), expectedVersion: plan.version });
       }}>Lưu</Button></Space>}>
       <label htmlFor="item-plan-name">Tên kế hoạch</label><Input id="item-plan-name" value={name} maxLength={160} disabled={busy} onChange={e => { setName(e.target.value); setDirty(true); }} />
-      {error && <Alert type="error" message={error.message} action={error.code === 'MSG111' && plan ? <Button onClick={readLatest}>Xem phiên bản mới</Button> : undefined} />}
+      {error && <Alert type="error" message={error.message} action={error.code === 'MSG41' && plan ? <Button onClick={readLatest}>Xem phiên bản mới</Button> : undefined} />}
       {nameDialog && comparison}
     </Modal>
   </main>;

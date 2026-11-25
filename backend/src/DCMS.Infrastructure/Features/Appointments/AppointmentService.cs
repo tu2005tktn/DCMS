@@ -36,9 +36,9 @@ public sealed class AppointmentService(DcmsDbContext db, IAvailabilityService av
             || request.ScheduleVersion <= 0 || request.StartAt == default || request.ReplacesAppointmentId == Guid.Empty) throw Error("MSG04");
 
         var account = accountId.HasValue ? await users.FindByIdAsync(accountId.Value.ToString()) : null;
-        if (accountId.HasValue && (account == null || !account.IsActive)) throw Error("MSG07", 401);
+        if (accountId.HasValue && (account == null || !account.IsActive)) throw Error("MSG06", 401);
         var staff = account?.AccountType == "Staff";
-        if (request.ReplacesAppointmentId.HasValue && !staff) throw Error("MSG06", 403);
+        if (request.ReplacesAppointmentId.HasValue && !staff) throw Error("MSG05", 403);
         if (staff)
         {
             // Counter booking is for assistants; a dentist may only book a treatment follow-up of their own plan.
@@ -47,17 +47,17 @@ public sealed class AppointmentService(DcmsDbContext db, IAvailabilityService av
             if (request.ReplacesAppointmentId.HasValue) await access.RequireAsync(accountId!.Value, "appointments.create", ct);
             // Staff in an access group book through appointments.create (enforced per endpoint), not their role.
             var grantDriven = (await access.ResolveAsync(accountId!.Value, ct)).GrantDriven;
-            if (!request.ReplacesAppointmentId.HasValue && !treatmentFollowUp && !grantDriven && !await users.IsInRoleAsync(account!, AccountRoles.ClinicAssistant)) throw Error("MSG06", 403);
+            if (!request.ReplacesAppointmentId.HasValue && !treatmentFollowUp && !grantDriven && !await users.IsInRoleAsync(account!, AccountRoles.ClinicAssistant)) throw Error("MSG05", 403);
             var employee = await db.Employees.AsNoTracking().SingleOrDefaultAsync(x => x.AccountId == accountId, ct);
             if (employee == null || !await db.SchedulingMembers.AsNoTracking().AnyAsync(x =>
-                    x.BranchId == request.BranchId && x.EmployeeId == employee.Id && x.Active, ct)) throw Error("MSG06", 403);
+                    x.BranchId == request.BranchId && x.EmployeeId == employee.Id && x.Active, ct)) throw Error("MSG05", 403);
         }
 
         var relation = Clean(request.AttendeeRelation) ?? "Self";
         var kind = Clean(request.Kind) ?? "Standard";
         var source = staff ? Clean(request.Source) ?? "Phone" : "App";
         if (request.ReplacesAppointmentId.HasValue && (kind != "WalkIn" || source != "InPerson" || request.DossierId.HasValue)) throw Error("MSG04");
-        if (request.FamilyMemberId.HasValue && (account?.AccountType != "Public" || relation != "Relative")) throw Error("MSG06", 403);
+        if (request.FamilyMemberId.HasValue && (account?.AccountType != "Public" || relation != "Relative")) throw Error("MSG05", 403);
         if (relation is not ("Self" or "Relative") || kind is not ("Standard" or "WalkIn" or "FollowUp")
             || (staff && source is not ("Phone" or "Zalo" or "Facebook" or "InPerson" or "App"))
             || (!staff && kind == "WalkIn") || (request.DossierId.HasValue != (kind == "FollowUp"))) throw Error("MSG04");
@@ -71,7 +71,7 @@ public sealed class AppointmentService(DcmsDbContext db, IAvailabilityService av
 
         var attendeeName = Clean(request.Attendee?.Name);
         var attendeeBirthDate = request.Attendee?.BirthDate;
-        if (attendeeName == null || attendeeName.Length > 100) throw Error("MSG23");
+        if (attendeeName == null || attendeeName.Length > 100) throw Error("MSG18");
         if (request.Attendee?.BirthDate is { } birthDate
             && birthDate > DateOnly.FromDateTime(clock.GetUtcNow().ToOffset(TimeSpan.FromHours(7)).DateTime)) throw Error("MSG04");
         var patientId = request.Attendee?.PatientId;
@@ -83,13 +83,13 @@ public sealed class AppointmentService(DcmsDbContext db, IAvailabilityService av
         if (patientId.HasValue)
         {
             if (!staff && (relation != "Self" || !accountId.HasValue || !await db.PatientAccountLinks.AsNoTracking().AnyAsync(x =>
-                    x.AccountId == accountId && x.PatientId == patientId && x.Status == PatientLinkStatus.Verified, ct))) throw Error("MSG06", 403);
+                    x.AccountId == accountId && x.PatientId == patientId && x.Status == PatientLinkStatus.Verified, ct))) throw Error("MSG05", 403);
             var patient = await db.Patients.AsNoTracking().SingleOrDefaultAsync(x => x.Id == patientId.Value, ct);
-            if (patient == null) throw Error("MSG06", 404);
+            if (patient == null) throw Error("MSG05", 404);
             attendeeName = patient.FullName;
             attendeeBirthDate = patient.BirthDate;
         }
-        if (request.DossierId.HasValue && (!patientId.HasValue || (!staff && relation != "Self"))) throw Error("MSG06", 403);
+        if (request.DossierId.HasValue && (!patientId.HasValue || (!staff && relation != "Self"))) throw Error("MSG05", 403);
 
         var reason = Clean(request.Reason);
         var exceptionReason = Clean(request.ExceptionReason);
@@ -122,24 +122,24 @@ public sealed class AppointmentService(DcmsDbContext db, IAvailabilityService av
         if (request.ReplacesAppointmentId.HasValue) {
             var permissions = await access.RequireAsync(accountId!.Value, "appointments.create", ct);
             replacementSource = (await queries.DetailAsync(accountId.Value, request.ReplacesAppointmentId.Value, ct)).Appointment;
-            if (!permissions.BranchIds.Contains(replacementSource.BranchId)) throw Error("MSG06", 403);
+            if (!permissions.BranchIds.Contains(replacementSource.BranchId)) throw Error("MSG05", 403);
         }
         DCMS.Domain.Features.FamilyMembers.FamilyMember? familyMember = null;
         if (request.FamilyMemberId.HasValue) {
             await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(90121, {accountId!.Value})", ct);
             familyMember = await db.Set<DCMS.Domain.Features.FamilyMembers.FamilyMember>().AsNoTracking()
                 .SingleOrDefaultAsync(x => x.Id == request.FamilyMemberId && x.OwnerAccountId == accountId, ct)
-                ?? throw new BusinessException(404, new("FAMILY_MEMBER_NOT_FOUND", "Không tìm thấy người thân trong danh sách của bạn."));
+                ?? throw new BusinessException(404, new("MSG67", "Không tìm thấy người thân trong danh sách của bạn."));
         }
         var receipt = await db.AppointmentReceipts.AsNoTracking().SingleOrDefaultAsync(x => x.RequestKey == request.RequestKey, ct);
         if (receipt != null)
         {
-            if (receipt.ActorScope != scope || receipt.Fingerprint != fingerprint) throw Error("MSG111", 409);
+            if (receipt.ActorScope != scope || receipt.Fingerprint != fingerprint) throw Error("MSG41", 409);
             var previous = JsonSerializer.Deserialize<AppointmentResult>(receipt.ResultJson)!;
-            return new(previous with { Notification = SystemMessages.Get("MSG30") }, true);
+            return new(previous with { Notification = SystemMessages.Get("MSG25") }, true);
         }
         if (familyMember != null) {
-            if (familyMember.DeletedAt.HasValue) throw new BusinessException(404, new("FAMILY_MEMBER_NOT_FOUND", "Người thân không còn khả dụng."));
+            if (familyMember.DeletedAt.HasValue) throw new BusinessException(404, new("MSG67", "Người thân không còn khả dụng."));
             attendeeName = familyMember.FullName; attendeeBirthDate = familyMember.BirthDate;
         }
 
@@ -148,23 +148,23 @@ public sealed class AppointmentService(DcmsDbContext db, IAvailabilityService av
             || replacementSource.BranchId != request.BranchId || replacementSource.DentistId != request.DentistId
             || start.AddMinutes(request.DurationMinutes) > replacementSource.EndAt
             || await db.Visits.AnyAsync(x => x.AppointmentId == replacementSource.Id, ct)))
-            throw new BusinessException(409, new SystemMessage("APPOINTMENT_REPLACEMENT_UNAVAILABLE", "Khung giờ của lịch khách không tới không còn phù hợp. Vui lòng tải lại hoặc đặt một lịch khác."));
+            throw new BusinessException(409, new SystemMessage("MSG66", "Khung giờ của lịch khách không tới không còn phù hợp. Vui lòng tải lại hoặc đặt một lịch khác."));
 
         if (kind != "FollowUp" && !await db.Set<SchedulingService>().AsNoTracking().AnyAsync(s =>
-            s.Id == request.ServiceId && s.BranchId == request.BranchId && s.Active && s.IsInitialExamination, ct)) throw Error("MSG110");
-        if (start <= now) throw Error("MSG25", 409);
-        if (!staff && !AppointmentRules.PublicLeadTimeValid(now, start)) throw Error("MSG24");
-        if (staff && start < now.AddMinutes(60) && exceptionReason == null) throw Error("MSG24");
+            s.Id == request.ServiceId && s.BranchId == request.BranchId && s.Active && s.IsInitialExamination, ct)) throw Error("MSG40");
+        if (start <= now) throw Error("MSG20", 409);
+        if (!staff && !AppointmentRules.PublicLeadTimeValid(now, start)) throw Error("MSG19");
+        if (staff && start < now.AddMinutes(60) && exceptionReason == null) throw Error("MSG19");
 
         if (request.DossierId.HasValue)
         {
             // A follow-up is booked against the patient's open treatment dossier; the item is chosen when treatment is recorded.
             var dossier = await db.TreatmentDossiers.AsNoTracking().SingleOrDefaultAsync(x => x.Id == request.DossierId.Value, ct)
-                ?? throw Error("MSG113", 404);
-            if (dossier.PatientId != patientId || dossier.BranchId != request.BranchId) throw Error("MSG06", 403);
-            if (dossier.State != "Open") throw Error("MSG230", 409);
+                ?? throw Error("MSG42", 404);
+            if (dossier.PatientId != patientId || dossier.BranchId != request.BranchId) throw Error("MSG05", 403);
+            if (dossier.State != "Open") throw Error("MSG54", 409);
             if (!request.PatientConsentConfirmed)
-                throw new BusinessException(400, new SystemMessage("APPOINTMENT_PATIENT_CONSENT_REQUIRED",
+                throw new BusinessException(400, new SystemMessage("MSG65",
                     "Vui lòng xác nhận đã có sự đồng ý của bệnh nhân trước khi đặt lịch.") { Field = "patientConsentConfirmed" });
         }
 
@@ -197,7 +197,7 @@ public sealed class AppointmentService(DcmsDbContext db, IAvailabilityService av
         db.Add(appointment);
         db.Add(new AppointmentReceipt { ActorScope = scope, RequestKey = request.RequestKey,
             Fingerprint = fingerprint, AppointmentId = id,
-            ResultJson = JsonSerializer.Serialize(Result(appointment, "MSG29")) });
+            ResultJson = JsonSerializer.Serialize(Result(appointment, "MSG24")) });
         var eventPayload = JsonSerializer.SerializeToNode(new { appointmentId = id, code, version = 1,
             status = "Confirmed", branchId = request.BranchId, startAt = startUtc, endAt = endUtc })!;
         if (request.ReplacesAppointmentId.HasValue) eventPayload["replacesAppointmentId"] = JsonSerializer.SerializeToNode(request.ReplacesAppointmentId.Value);
@@ -209,7 +209,7 @@ public sealed class AppointmentService(DcmsDbContext db, IAvailabilityService av
         await db.SaveChangesAsync(ct);
         var saved = await db.Appointments.AsNoTracking().SingleAsync(x => x.Id == id, ct);
         await tx.CommitAsync(ct);
-        return new(Result(saved, "MSG29"), false);
+        return new(Result(saved, "MSG24"), false);
     }
 
     private static AppointmentResult Result(Appointment appointment, string message) => new(

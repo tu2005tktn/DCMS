@@ -11,10 +11,10 @@ public sealed record CreateMaterialPurchaseRequest(DateOnly EnteredOn, DateOnly?
 public sealed record UpdateMaterialPurchaseRequest(DateOnly EnteredOn, DateOnly? ReceivedOn, DateOnly? ExpiresOn, Guid MaterialId, decimal Quantity, string Unit, long UnitPriceVnd, long PaidVnd, int ExpectedVersion, Guid RequestKey, decimal ConversionFactor = 1, Guid? SupplierId = null, string? LotNumber = null);
 public static class MaterialPurchaseMessages
 {
-    public static SystemMessage PaidExceedsTotal => new("PURCHASE_PAID_EXCEEDS_TOTAL", "Số đã thanh toán không được lớn hơn Tổng.") { Field = "paidVnd" };
-    public static SystemMessage MaterialInactive => new("PURCHASE_MATERIAL_INACTIVE", "Dụng cụ/vật liệu đã bị xóa. Vui lòng chọn mục khác.") { Field = "materialId" };
-    public static SystemMessage SupplierInvalid => new("PURCHASE_SUPPLIER_INVALID", "Công ty cung cấp không còn dùng. Vui lòng chọn công ty khác.") { Field = "supplierId" };
-    public static SystemMessage InvalidDate(string field) => new("PURCHASE_DATE_INVALID", field == "expiresOn" ? "Hạn dùng không được trước Ngày nhập." : "Ngày nhận không được trước Ngày nhập hoặc ở tương lai.") { Field = field };
+    public static SystemMessage PaidExceedsTotal => new("MSG82", "Số đã thanh toán không được lớn hơn Tổng.") { Field = "paidVnd" };
+    public static SystemMessage MaterialInactive => new("MSG83", "Dụng cụ/vật liệu đã bị xóa. Vui lòng chọn mục khác.") { Field = "materialId" };
+    public static SystemMessage SupplierInvalid => new("MSG84", "Công ty cung cấp không còn dùng. Vui lòng chọn công ty khác.") { Field = "supplierId" };
+    public static SystemMessage InvalidDate(string field) => new("MSG81", field == "expiresOn" ? "Hạn dùng không được trước Ngày nhập." : "Ngày nhận không được trước Ngày nhập hoặc ở tương lai.") { Field = field };
 }
 public sealed record MaterialUseLine(Guid MaterialId, decimal Quantity);
 public sealed record MaterialStockDto(Guid PurchaseId, Guid MaterialId, string Name, string CategoryName, string? UsageUnit, string? SupplierName, string? LotNumber, DateOnly ReceivedOn, DateOnly? ExpiresOn, decimal Received, decimal Used, decimal Remaining);

@@ -19,7 +19,7 @@ internal static class TreatmentBookingQueries
         foreach (var entry in entries)
         {
             var snapshot = JsonSerializer.Deserialize<SheetActivitySnapshot>(entry.PayloadJson, Json)
-                ?? throw new BusinessException(503, SystemMessages.Get("MSG144"));
+                ?? throw new BusinessException(503, SystemMessages.Get("MSG49"));
             result[snapshot.ActivityId] = snapshot.Activity;
         }
         return result;

@@ -26,7 +26,7 @@ export default function ApplyItemPlanModal({ branchId, dossierId, version, onClo
     const body = { itemPlanId: source.id, expectedItemPlanVersion: source.version, expectedVersion: version }, payload = JSON.stringify(body);
     if (retry.current?.payload !== payload) retry.current = { payload, key: crypto.randomUUID() };
     try { await api(`/api/dossiers/${dossierId}/sheet-items/from-item-plan`, { method: 'POST', body: JSON.stringify({ ...body, requestKey: retry.current.key }) }); onApplied(); }
-    catch (e) { setError(e as ApiError); if (e instanceof ApiError && (e.code === 'MSG111' || e.status === 404)) setStale(true); }
+    catch (e) { setError(e as ApiError); if (e instanceof ApiError && (e.code === 'MSG41' || e.status === 404)) setStale(true); }
     finally { guard.current = false; setBusy(false); }
   }
   return <Modal open title="Chọn kế hoạch điều trị" width={1000} onCancel={() => { if (!busy) onClose(); }} keyboard={!busy} maskClosable={!busy}

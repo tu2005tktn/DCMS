@@ -5,6 +5,7 @@ using DCMS.Application.Features.Patients;
 using DCMS.Application.Features.SystemSettings;
 using DCMS.Domain.Features.PatientLinks;
 using DCMS.Domain.Features.Patients;
+using DCMS.Domain.Features.Visits;
 using DCMS.Infrastructure.Features.SystemSettings;
 using DCMS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -39,7 +40,31 @@ public sealed partial class PatientService(DcmsDbContext db, DCMS.Application.Fe
         var total = await query.CountAsync(ct);
         var rows = await query.OrderBy(x => x.NormalizedName).ThenBy(x => x.PatientCode)
             .Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(ct);
-        return new(rows.Select(ToItem).ToArray(), total, page, pageSize);
+        var lastVisits = await LastVisitsAsync(actorId, rows.Select(x => x.Id).ToArray(), branchId, ct);
+        return new(rows.Select(x => ToItem(x) with { LastVisitAt = lastVisits.GetValueOrDefault(x.Id) }).ToArray(), total, page, pageSize);
+    }
+
+    // S05 "Lần khám gần nhất": latest started visit (not Queued/Cancelled) in the branches the actor may read
+    // (docs/implementation/UC08-09-38-S05-S06.md §API).
+    private async Task<Dictionary<int, DateTimeOffset?>> LastVisitsAsync(int actorId, int[] patientIds, int? branchId,
+        CancellationToken ct)
+    {
+        if (patientIds.Length == 0) return [];
+        var visits = db.Visits.AsNoTracking().Where(v => patientIds.Contains(v.PatientId) &&
+            (v.Status == VisitStatuses.InProgress || v.Status == VisitStatuses.ExaminationConfirmed || v.Status == VisitStatuses.Completed));
+        if (branchId is { } one) visits = visits.Where(v => v.BranchId == one);
+        else
+        {
+            var scope = await access.ResolveAsync(actorId, ct);
+            if (!scope.Owner)
+            {
+                var branches = scope.BranchIds;
+                visits = visits.Where(v => branches.Contains(v.BranchId));
+            }
+        }
+        return await visits.GroupBy(v => v.PatientId)
+            .Select(g => new { PatientId = g.Key, At = g.Max(v => (DateTimeOffset?)v.ArrivalAt) })
+            .ToDictionaryAsync(x => x.PatientId, x => x.At, ct);
     }
 
     public async Task<IReadOnlyList<DuplicateCandidate>> DuplicatesAsync(DuplicateCheckRequest request, CancellationToken ct)
@@ -60,7 +85,7 @@ public sealed partial class PatientService(DcmsDbContext db, DCMS.Application.Fe
         var scope = await access.ResolveAsync(actorId, ct);
         if (branchId.HasValue)
         {
-            if (!scope.Owner && !scope.BranchIds.Contains(branchId.Value)) throw new BusinessException(403, SystemMessages.Get("MSG06"));
+            if (!scope.Owner && !scope.BranchIds.Contains(branchId.Value)) throw new BusinessException(403, SystemMessages.Get("MSG05"));
             var one = db.Appointments.Where(a => a.PatientId != null && a.BranchId == branchId).Select(a => a.PatientId!.Value)
                 .Union(db.Visits.Where(v => v.BranchId == branchId).Select(v => v.PatientId))
                 .Union(db.TreatmentDossiers.Where(d => d.BranchId == branchId).Select(d => d.PatientId));
@@ -92,9 +117,9 @@ public sealed partial class PatientService(DcmsDbContext db, DCMS.Application.Fe
             var prior = await db.Set<PatientCreateReceipt>().AsNoTracking().SingleOrDefaultAsync(x => x.ActorId == actorId && x.RequestKey == key, ct);
             if (prior != null)
             {
-                if (prior.Fingerprint != fingerprint) throw new BusinessException(409, SystemMessages.Get("MSG111") with { Field = "requestKey" });
+                if (prior.Fingerprint != fingerprint) throw new BusinessException(409, SystemMessages.Get("MSG41") with { Field = "requestKey" });
                 var existing = await db.Patients.AsNoTracking().SingleAsync(x => x.Id == prior.PatientId, ct);
-                return new(await DetailAsync(existing, ct), SystemMessages.Get("MSG222", "hồ sơ bệnh nhân", value: existing.PatientCode));
+                return new(await DetailAsync(existing, ct), SystemMessages.Get("MSG53", "hồ sơ bệnh nhân", value: existing.PatientCode));
             }
         }
         var policy = await PolicyAsync(request.PolicyVersion, ct);
@@ -123,13 +148,13 @@ public sealed partial class PatientService(DcmsDbContext db, DCMS.Application.Fe
         await AuditAsync(patient.Id, actorId, PatientAuditActions.Create, null,
             [new("Mã bệnh nhân", null, patient.PatientCode), .. changes], now, ct);
         await transaction.CommitAsync(ct);
-        return new(await DetailAsync(patient, ct), SystemMessages.Get("MSG222", "hồ sơ bệnh nhân", value: patient.PatientCode));
+        return new(await DetailAsync(patient, ct), SystemMessages.Get("MSG53", "hồ sơ bệnh nhân", value: patient.PatientCode));
     }
 
     public async Task<PatientChange> UpdateAsync(int actorId, int id, UpdatePatientRequest request, CancellationToken ct)
     {
         var patient = await db.Patients.SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw Missing();
-        if (patient.IsArchived) throw new BusinessException(409, SystemMessages.Get("MSG202"));
+        if (patient.IsArchived) throw new BusinessException(409, SystemMessages.Get("MSG51"));
         if (patient.Version != request.Version) throw Stale();
         var input = Validate(request.FullName, request.BirthDate, request.Gender, request.Phone, request.Address,
             request.GuardianName, request.GuardianRelationship, request.GuardianPhone, request.Note);
@@ -142,13 +167,13 @@ public sealed partial class PatientService(DcmsDbContext db, DCMS.Application.Fe
         await RequireReviewAsync(input, id, request.DuplicatesReviewed, ct);
         var now = DateTimeOffset.UtcNow;
         var changes = Apply(patient, input).Concat(ApplyExtra(patient, extra, names, actorId, now)).ToList();
-        if (changes.Count == 0) return new(await DetailAsync(patient, ct), SystemMessages.Get("MSG116"));
+        if (changes.Count == 0) return new(await DetailAsync(patient, ct), SystemMessages.Get("MSG44"));
         patient.UpdatedAt = now;
         patient.Version++;
         await SaveAsync(() => Task.CompletedTask, ct);
         await AuditAsync(patient.Id, actorId, PatientAuditActions.Update, null, changes, now, ct);
         await transaction.CommitAsync(ct);
-        return new(await DetailAsync(patient, ct), SystemMessages.Get("MSG116"));
+        return new(await DetailAsync(patient, ct), SystemMessages.Get("MSG44"));
     }
 
     public async Task<PatientChange> ArchiveAsync(int actorId, int id, ArchivePatientRequest request, bool archive, CancellationToken ct)
@@ -168,7 +193,7 @@ public sealed partial class PatientService(DcmsDbContext db, DCMS.Application.Fe
             [new("Trạng thái", archive ? "Đang sử dụng" : "Ngừng sử dụng", archive ? "Ngừng sử dụng" : "Đang sử dụng")], now, ct);
         await transaction.CommitAsync(ct);
         return new(await DetailAsync(patient, ct),
-            SystemMessages.Get("MSG222", archive ? "ngừng sử dụng hồ sơ" : "khôi phục hồ sơ", value: patient.PatientCode));
+            SystemMessages.Get("MSG53", archive ? "ngừng sử dụng hồ sơ" : "khôi phục hồ sơ", value: patient.PatientCode));
     }
 
     public async Task<OwnPatientRecord> OwnAsync(int accountId, CancellationToken ct)
@@ -186,7 +211,7 @@ public sealed partial class PatientService(DcmsDbContext db, DCMS.Application.Fe
     public async Task<OwnPatientChange> UpdateOwnAsync(int accountId, UpdateOwnPatientRequest request, CancellationToken ct)
     {
         var (link, patient) = await OwnLinkAsync(accountId, tracked: true, ct);
-        if (patient.IsArchived) throw new BusinessException(409, SystemMessages.Get("MSG202"));
+        if (patient.IsArchived) throw new BusinessException(409, SystemMessages.Get("MSG51"));
         if (patient.Version != request.Version) throw Stale();
         // The administrative note is internal to the clinic: kept as is, never shown or edited by the patient.
         var input = Validate(request.FullName, request.BirthDate, request.Gender, request.Phone, request.Address,
@@ -204,7 +229,7 @@ public sealed partial class PatientService(DcmsDbContext db, DCMS.Application.Fe
             await AuditAsync(patient.Id, accountId, PatientAuditActions.Update, "Bệnh nhân tự cập nhật qua ứng dụng", changes, now, ct);
             await transaction.CommitAsync(ct);
         }
-        return new(ToOwn(patient, link), SystemMessages.Get("MSG116"));
+        return new(ToOwn(patient, link), SystemMessages.Get("MSG44"));
     }
 
     // Rechecked against the database on every request so a revoked link blocks the next read or save (GBR-075).
@@ -212,7 +237,7 @@ public sealed partial class PatientService(DcmsDbContext db, DCMS.Application.Fe
     {
         var link = await db.PatientAccountLinks.AsNoTracking()
             .SingleOrDefaultAsync(x => x.AccountId == accountId && x.Status == PatientLinkStatus.Verified, ct)
-            ?? throw new BusinessException(403, SystemMessages.Get("MSG06"));
+            ?? throw new BusinessException(403, SystemMessages.Get("MSG05"));
         var patients = tracked ? db.Patients : db.Patients.AsNoTracking();
         var patient = await patients.SingleAsync(x => x.Id == link.PatientId, ct);
         return (link, patient);
@@ -339,7 +364,7 @@ public sealed partial class PatientService(DcmsDbContext db, DCMS.Application.Fe
         await db.Database.ExecuteSqlRawAsync(ClinicSettingsStore.SharedLock, ct);
         var policy = await ClinicSettingsStore.PolicyAsync(db, ct);
         if (expectedVersion is { } version && version != policy.Version)
-            throw new BusinessException(409, SystemMessages.Get("MSG111") with { Field = "policyVersion" });
+            throw new BusinessException(409, SystemMessages.Get("MSG41") with { Field = "policyVersion" });
         return policy;
     }
 
@@ -473,12 +498,12 @@ public sealed partial class PatientService(DcmsDbContext db, DCMS.Application.Fe
             x.IntakeRecordedAt, recorder);
     }
 
-    // Last visit stays null until UC-07 check-in/VISIT exists; the UI shows "no data", never a fabricated date.
+    // LastVisitAt is filled by SearchAsync (LastVisitsAsync); other callers leave it null.
     private static PatientListItem ToItem(PatientProfile x) =>
         new(x.Id, x.PatientCode, x.FullName, x.BirthDate, x.Gender, x.Phone, x.IsArchived, null, x.UpdatedAt);
 
-    private static BusinessException Missing() => new(404, SystemMessages.Get("MSG113"));
-    private static BusinessException DuplicateCode() => new(409, SystemMessages.Get("MSG201", Entity));
+    private static BusinessException Missing() => new(404, SystemMessages.Get("MSG42"));
+    private static BusinessException DuplicateCode() => new(409, SystemMessages.Get("MSG50", Entity));
 
     [GeneratedRegex("^[A-Z0-9][A-Z0-9._-]*$")]
     private static partial Regex CodePattern();

@@ -27,7 +27,7 @@ export default function GeneralSettingsPanel({ onDirtyChange }: { onDirtyChange:
 
   function markDirty(value: boolean) { setDirty(value); onDirtyChange(value); }
 
-  // keepInput: after MSG111 only the version baseline is refreshed; the draft stays as typed.
+  // keepInput: after MSG41 only the version baseline is refreshed; the draft stays as typed.
   async function load(keepInput = false) {
     setLoading(!keepInput); setLoadError(undefined);
     try {
@@ -109,7 +109,7 @@ export default function GeneralSettingsPanel({ onDirtyChange }: { onDirtyChange:
       { key: 'actor', label: 'Người lưu', children: data.actorName ?? '—' },
     ]} />
     {error && <Alert type="error" showIcon message={error.message}
-      action={error.code === 'MSG111' ? <Button onClick={() => void load(true)}>Tải phiên bản mới</Button> : undefined} />}
+      action={error.code === 'MSG41' ? <Button onClick={() => void load(true)}>Tải phiên bản mới</Button> : undefined} />}
     <Form<GeneralSettings> form={form} layout="vertical" disabled={busy || !canManage} onValuesChange={() => markDirty(true)}>
       <Card size="small" title="Tự đăng xuất">
         <Form.Item name="staffIdleTimeoutMinutes" label="Tự đăng xuất khi không thao tác sau" extra="Chỉ áp dụng cho phiên nhân viên trên web; ứng dụng bệnh nhân có chính sách riêng.">

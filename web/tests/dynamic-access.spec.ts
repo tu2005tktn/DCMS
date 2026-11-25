@@ -57,11 +57,11 @@ async function prepare(page:Page,readOnly=false){
       if(method==='GET')return ok(id?group:state.groups);
       const body=request.postDataJSON();state.requests.push({method,path,body});
       if(path.endsWith('/preview')){
-        if(group?.version!==body.expectedVersion)return route.fulfill({status:409,json:{code:'MSG111',message:'SYNTHETIC nhóm đã đổi phiên bản'}});
+        if(group?.version!==body.expectedVersion)return route.fulfill({status:409,json:{code:'MSG41',message:'SYNTHETIC nhóm đã đổi phiên bản'}});
         return ok({added:body.entry.grants.filter((key:string)=>!group.grants.includes(key)),removed:group.grants.filter(key=>!body.entry.grants.includes(key)),affected:group.assignedCount});
       }
       const receipt=method+path+body.requestKey;if(receipts.has(receipt))return ok(receipts.get(receipt));
-      if(group&&group.version!==body.expectedVersion)return route.fulfill({status:409,json:{code:'MSG111',message:'SYNTHETIC nhóm đã đổi phiên bản'}});
+      if(group&&group.version!==body.expectedVersion)return route.fulfill({status:409,json:{code:'MSG41',message:'SYNTHETIC nhóm đã đổi phiên bản'}});
       let saved:AccessGroup;
       if(path.endsWith('/state')){group!.active=body.active;group!.version++;saved=group!;}
       else if(group){Object.assign(group,body.entry,{version:group.version+1});saved=group;}
@@ -73,7 +73,7 @@ async function prepare(page:Page,readOnly=false){
     }
     if(path==='/api/patients')return ok({items:[],total:0,page:1,pageSize:20});
     if(path==='/api/patients/1')return ok({id:1,patientCode:'BN-SYN',fullName:'SYNTHETIC bệnh nhân',birthDate:null,gender:null,phone:null,link:{},intakeHistory:[],isArchived:false});
-    return route.fulfill({status:404,json:{code:'MSG113',message:'Không tìm thấy.'}});
+    return route.fulfill({status:404,json:{code:'MSG42',message:'Không tìm thấy.'}});
   });
   await page.goto('/system-settings?tab=access-groups');await expect(page.getByRole('button',{name:'Thiết lập SYNTHETIC lễ tân',exact:true})).toBeVisible();return state;
 }

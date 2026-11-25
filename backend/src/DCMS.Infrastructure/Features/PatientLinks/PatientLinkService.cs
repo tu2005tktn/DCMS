@@ -41,9 +41,9 @@ public sealed partial class PatientLinkService(DcmsDbContext db) : IPatientLinkS
         if (user == null || user.AccountType != "Public") throw Forbidden();
         var open = await db.PatientAccountLinks.AsNoTracking().Where(x => x.AccountId == accountId
             && (x.Status == PatientLinkStatus.Pending || x.Status == PatientLinkStatus.Verified)).ToListAsync(ct);
-        if (open.Any(x => x.Status == PatientLinkStatus.Verified)) throw new BusinessException(409, SystemMessages.Get("MSG142"));
+        if (open.Any(x => x.Status == PatientLinkStatus.Verified)) throw new BusinessException(409, SystemMessages.Get("MSG47"));
         // Repeated submission returns the request already being processed instead of creating a duplicate.
-        if (open.SingleOrDefault() is { } pending) return new SelfLinkChange(Map(pending), SystemMessages.Get("MSG18"), false);
+        if (open.SingleOrDefault() is { } pending) return new SelfLinkChange(Map(pending), SystemMessages.Get("MSG15"), false);
 
         var now = DateTimeOffset.UtcNow;
         var link = new PatientAccountLink
@@ -55,12 +55,8 @@ public sealed partial class PatientLinkService(DcmsDbContext db) : IPatientLinkS
         db.PatientAccountLinks.Add(link);
         AddAudit(db, link, accountId, "Submit", null, null, now);
         await CommitAsync(db, transaction, ct);
-        return new SelfLinkChange(Map(link), SystemMessages.Get("MSG18"), true);
+        return new SelfLinkChange(Map(link), SystemMessages.Get("MSG15"), true);
     });
-
-    public async Task<SelfLinkRequestDto> GetAsync(int accountId, int id, CancellationToken ct) =>
-        Map(await db.PatientAccountLinks.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id && x.AccountId == accountId, ct)
-            ?? throw NotFound());
 
     public Task<SelfLinkRequestDto> WithdrawAsync(int accountId, int id, WithdrawLinkRequest request, CancellationToken ct) => GuardAsync(async () =>
     {
@@ -107,6 +103,6 @@ public sealed partial class PatientLinkService(DcmsDbContext db) : IPatientLinkS
             x.DeclaredPatientCode, x.RequestNote, decided, PublicResult(x.Status), disclosed, x.Version);
     }
 
-    private static BusinessException Forbidden() => new(403, SystemMessages.Get("MSG06"));
+    private static BusinessException Forbidden() => new(403, SystemMessages.Get("MSG05"));
     [GeneratedRegex(@"^[A-Za-z0-9_-]{1,40}$")] private static partial Regex PatientCodePattern();
 }

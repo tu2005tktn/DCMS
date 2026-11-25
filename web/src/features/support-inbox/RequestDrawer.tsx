@@ -421,15 +421,13 @@ export default function RequestDrawer({ id, refreshToken, onClose, onChanged }: 
 
 function notificationMessage(code: string | undefined): string {
   switch (code) {
-    case 'MSG31': return 'Đã đổi lịch và thông báo cho bệnh nhân.';
-    case 'MSG32': return 'Đã gửi thông báo xác nhận cho bệnh nhân.';
-    case 'MSG33': return 'Đã gửi lời nhắc cho bệnh nhân.';
-    case 'MSG34': return 'Đã đổi lịch và thông báo cho bệnh nhân.';
-    case 'MSG35': return 'Đã huỷ lịch và thông báo cho bệnh nhân.';
-    case 'MSG36': return 'Đã ghi nhận không đến.';
-    case 'MSG37': return 'Đã xử lý yêu cầu và thông báo cho bệnh nhân.';
-    case 'MSG38': return 'Đã từ chối yêu cầu và thông báo cho bệnh nhân.';
-    case 'MSG94': return 'Đã ghi nhận thay đổi; đang gửi thông báo.';
+    case 'MSG26': return 'Đã đổi lịch và thông báo cho bệnh nhân.';
+    case 'MSG27': return 'Đã gửi thông báo xác nhận cho bệnh nhân.';
+    case 'MSG28': return 'Đã gửi lời nhắc cho bệnh nhân.';
+    case 'MSG29': return 'Đã đổi lịch và thông báo cho bệnh nhân.';
+    case 'MSG30': return 'Đã huỷ lịch và thông báo cho bệnh nhân.';
+    case 'MSG31': return 'Đã xử lý yêu cầu và thông báo cho bệnh nhân.';
+    case 'MSG32': return 'Đã từ chối yêu cầu và thông báo cho bệnh nhân.';
     default: return 'Đã ghi nhận thao tác.';
   }
 }

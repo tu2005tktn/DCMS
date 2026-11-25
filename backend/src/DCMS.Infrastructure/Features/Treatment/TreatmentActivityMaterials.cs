@@ -10,7 +10,7 @@ public sealed partial class TreatmentDossierService
         await access.RequireAsync(actorId, "treatment.actuals.update", ct);
         await DossierAsync(actorId, dossierId, ct);
         if (!await db.ClinicalActivities.AnyAsync(x => x.Id == activityId && x.DossierId == dossierId, ct))
-            throw Error("MSG113", 404);
+            throw Error("MSG42", 404);
         return await db.MaterialUsages.AsNoTracking().Where(x => x.ActivityId == activityId)
             .Select(x => new SheetActivityMaterial(x.MaterialId, x.Quantity)).ToListAsync(ct);
     }

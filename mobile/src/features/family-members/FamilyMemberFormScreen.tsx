@@ -75,7 +75,7 @@ export default function FamilyMemberFormScreen() {
       if (handleAuth(failure)) return;
       if (failure instanceof FamilyApiError && failure.field && serverFields[failure.field]) setErrors(previous => ({ ...previous, [serverFields[failure.field!]]: failure.message }));
       else setSaveError(messageOf(failure));
-      setStale(failure instanceof FamilyApiError && failure.status === 409 && failure.code === 'MSG111');
+      setStale(failure instanceof FamilyApiError && failure.status === 409 && failure.code === 'MSG41');
     } finally { sending.current = false; setSaving(false); }
   }
 

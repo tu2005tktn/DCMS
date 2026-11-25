@@ -37,7 +37,7 @@ export async function resendRecovery(identifier: string, customer = false): Prom
   );
 }
 
-/** Returns the reset grant on success, or throws an ApiError carrying MSG108. */
+/** Returns the reset grant on success, or throws an ApiError carrying MSG38. */
 export async function verifyRecovery(identifier: string, proof: string, customer = false): Promise<string> {
   const response = await api<{ resetGrant: string }>(
     `${base(customer)}/verify`,
@@ -47,7 +47,7 @@ export async function verifyRecovery(identifier: string, proof: string, customer
   return response.resetGrant;
 }
 
-/** Throws an ApiError carrying MSG108 (proof rejected) or MSG109 (password policy). */
+/** Throws an ApiError carrying MSG38 (proof rejected) or MSG39 (password policy). */
 export async function resetPassword(
   identifier: string,
   resetGrant: string,

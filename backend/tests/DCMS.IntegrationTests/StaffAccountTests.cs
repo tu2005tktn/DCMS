@@ -8,7 +8,7 @@ namespace DCMS.IntegrationTests;
 [Collection(ApiCollection.Name)]
 public sealed class StaffAccountTests(ApiHost host)
 {
-    private const string Admin = "Quản trị viên (Admin) đã đăng nhập.";
+    private const string Admin = "An administrator (Admin) is signed in.";
 
     private static CreateStaffRequest Body(string userName, string employeeCode, string password = "Abcdef1!x", string[]? roles = null) =>
         new(userName, password, "Nguyễn Văn An", employeeCode, Guid.NewGuid().ToString("N")[..10] + "@dcms.vn", "09" + Random.Shared.Next(10000000, 99999999), roles ?? ["ClinicAssistant"]);

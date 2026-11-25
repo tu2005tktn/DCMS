@@ -1,19 +1,18 @@
 /**
  * S26 — Notification HTTP client (real API).
  *
- * Contract-first: gọi endpoint backend TV5 theo spec S26. Khi backend chưa sẵn sàng,
- * bật `EXPO_PUBLIC_USE_REAL_NOTIFICATION_API=false` (mặc định) để dùng mock.
+ * Gọi endpoint backend theo spec S26.
  *
  * Endpoint contract (sẽ thống nhất với backend TV5):
  *
  *   GET    /api/notifications?unreadOnly=&limit=&cursor=
  *          → 200 { items: NotificationDto[], nextCursor: string | null }
- *          → 401 MSG07, 403 MSG06
+ *          → 401 MSG06, 403 MSG05
  *
  *   POST   /api/notifications/mark-read
  *          Body: MarkReadRequest
  *          → 200 MarkReadResult
- *          → 401/403/409 (stale version → MSG111)
+ *          → 401/403/409 (stale version → MSG41)
  *
  *   GET    /api/notifications/unread-count
  *          → 200 { count: number }
@@ -25,7 +24,7 @@
  *   POST   /api/notifications/{id}/mark-read
  *          Body: { expectedAccountId: number }
  *          → 200 { ok: true }
- *          → 409 MSG111 nếu id không thuộc account
+ *          → 409 MSG41 nếu id không thuộc account
  *
  * Lỗi server trả {code, message} theo convention chung; UI dịch sang System Message.
  *

@@ -48,7 +48,7 @@ export default function PatientCodeSequenceCard({ revision }: { revision: number
       const failure = e as ApiError;
       if (failure.status !== 0) pending.current = null;
       setError(failure); setPreview(null);
-      if (failure.code === 'MSG111') await load();
+      if (failure.code === 'MSG41') await load();
     } finally { setBusy(false); }
   }
 

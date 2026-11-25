@@ -148,7 +148,7 @@ public sealed class AppointmentChangeApiTests(AppointmentChangeFixture fixture) 
             AttendeeName = patient.FullName, StartAt = start, EndAt = end, CreatedAt = start.AddDays(-1) };
         db.Add(source);
         await db.SaveChangesAsync();
-        return (s, new(id, source.Code, 1, "Confirmed", start, end, SystemMessages.Get("MSG29")));
+        return (s, new(id, source.Code, 1, "Confirmed", start, end, SystemMessages.Get("MSG24")));
     }
     private async Task<CreateAppointmentRequest> Replacement(HttpClient staff, Setup s, AppointmentResult source)
     {
@@ -178,7 +178,7 @@ public sealed class AppointmentChangeApiTests(AppointmentChangeFixture fixture) 
         var created = (await response.Content.ReadFromJsonAsync<AppointmentResult>())!;
         Assert.NotEqual(source.AppointmentId, created.AppointmentId); Assert.True(created.StartAt > fixture.Clock.Now); Assert.True(created.EndAt <= source.EndAt);
         Assert.Equal(HttpStatusCode.OK, (await staff.PostAsJsonAsync("/api/appointments", booking)).StatusCode);
-        await Message(await staff.PostAsJsonAsync("/api/appointments", booking with { RequestKey = Guid.NewGuid() }), HttpStatusCode.Conflict, "MSG27");
+        await Message(await staff.PostAsJsonAsync("/api/appointments", booking with { RequestKey = Guid.NewGuid() }), HttpStatusCode.Conflict, "MSG22");
         using var scope = fixture.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
         var original = await db.Appointments.SingleAsync(x => x.Id == source.AppointmentId);
         Assert.Equal("NoShow", original.Status); Assert.Equal("SYNTHETIC original patient", original.AttendeeName); Assert.NotNull(original.PatientId); Assert.Equal(2, original.Version);
@@ -277,7 +277,7 @@ public sealed class AppointmentChangeApiTests(AppointmentChangeFixture fixture) 
         using var customer = scenario == "customer" ? await Login("guest.demo") : null;
         var response = await (customer ?? staff).PostAsJsonAsync("/api/appointments", command);
         Assert.False(response.IsSuccessStatusCode);
-        if (scenario != "customer") Assert.Equal("APPOINTMENT_REPLACEMENT_UNAVAILABLE", (await response.Content.ReadFromJsonAsync<SystemMessage>())!.Code);
+        if (scenario != "customer") Assert.Equal("MSG66", (await response.Content.ReadFromJsonAsync<SystemMessage>())!.Code);
         using var scope = fixture.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
         Assert.Equal(1, await db.Appointments.CountAsync(x => x.BranchId == s.BranchId));
         Assert.Empty(await db.AppointmentReceipts.Where(x => x.RequestKey == command.RequestKey).ToArrayAsync());
@@ -314,11 +314,11 @@ public sealed class AppointmentChangeApiTests(AppointmentChangeFixture fixture) 
     public async Task ProactiveModeDoesNotExpandCustomerOrOtherDoctorsAccess()
     {
         var s = await Prepare(); var (customer, _) = await Public(); var a = await Book(customer, s, (await Slots(customer, s))[36]);
-        await Message(await customer.PostAsJsonAsync(Path(a, "cancel"), Cancel(a) with { ClinicInitiated = true }), HttpStatusCode.Forbidden, "MSG06");
+        await Message(await customer.PostAsJsonAsync(Path(a, "cancel"), Cancel(a) with { ClinicInitiated = true }), HttpStatusCode.Forbidden, "MSG05");
         using var dentist = await Login("dentist.demo");
         var availability = (await dentist.GetFromJsonAsync<AvailabilityResult>(Path(a, "availability") + $"?date={s.Date:yyyy-MM-dd}"))!;
         var transfer = Move(a, availability.Slots.First()) with { ClinicInitiated = true, DentistId = s.SecondDentistId };
-        await Message(await dentist.PostAsJsonAsync(Path(a, "reschedule"), transfer), HttpStatusCode.Forbidden, "MSG06");
+        await Message(await dentist.PostAsJsonAsync(Path(a, "reschedule"), transfer), HttpStatusCode.Forbidden, "MSG05");
         var other = s with { DentistId = s.SecondDentistId }; var b = await Book(customer, other, (await Slots(customer, other))[40]);
         Assert.Equal(HttpStatusCode.Forbidden, (await dentist.PostAsJsonAsync(Path(b, "cancel"), Cancel(b) with { ClinicInitiated = true })).StatusCode);
         using var scope = fixture.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
@@ -367,7 +367,7 @@ public sealed class AppointmentChangeApiTests(AppointmentChangeFixture fixture) 
         var response = await client.PostAsJsonAsync(Path(a, "reschedule"), command);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var moved = (await response.Content.ReadFromJsonAsync<AppointmentChangeResult>())!;
-        Assert.Equal("MSG35", moved.Notification.Code); Assert.Equal(command.NewStart, moved.Appointment.Start);
+        Assert.Equal("MSG30", moved.Notification.Code); Assert.Equal(command.NewStart, moved.Appointment.Start);
         Assert.Equal(30, moved.Appointment.DurationMinutes); Assert.Equal("RELATIVE", moved.Appointment.AttendeeKind);
         Assert.Equal(2, moved.Appointment.Version); Assert.Single(moved.Appointment.History);
         var available = await Slots(client, s);
@@ -376,7 +376,7 @@ public sealed class AppointmentChangeApiTests(AppointmentChangeFixture fixture) 
         var cancelled = await client.PostAsJsonAsync(Path(a, "cancel"), cancelCommand);
         Assert.Equal(HttpStatusCode.OK, cancelled.StatusCode);
         var result = (await cancelled.Content.ReadFromJsonAsync<AppointmentChangeResult>())!;
-        Assert.Equal("Cancelled", result.Appointment.Status); Assert.Equal("MSG37", result.Notification.Code);
+        Assert.Equal("Cancelled", result.Appointment.Status); Assert.Equal("MSG31", result.Notification.Code);
         Assert.Equal(3, result.Appointment.Version); Assert.Equal(2, result.Appointment.History.Count);
         Assert.Contains(await Slots(client, s), x => x.Start == command.NewStart);
         Assert.DoesNotContain((await client.GetFromJsonAsync<MyAppointmentPage>("/api/me/appointments"))!.Items, x => x.Code == a.Code);
@@ -423,9 +423,9 @@ public sealed class AppointmentChangeApiTests(AppointmentChangeFixture fixture) 
         var first = (await (await client.PostAsJsonAsync(Path(a, "reschedule"), move)).Content.ReadFromJsonAsync<AppointmentChangeResult>())!;
         var repeated = (await (await client.PostAsJsonAsync(Path(a, "reschedule"), move)).Content.ReadFromJsonAsync<AppointmentChangeResult>())!;
         Assert.Equal(first.Appointment.Version, repeated.Appointment.Version); Assert.Single(repeated.Appointment.History);
-        await Message(await client.PostAsJsonAsync(Path(a, "reschedule"), move with { Reason = "changed" }), HttpStatusCode.Conflict, "MSG111");
-        await Message(await client.PostAsJsonAsync(Path(a, "cancel"), new CancelAppointmentRequest(2, move.RequestKey, move.Reason)), HttpStatusCode.Conflict, "MSG111");
-        await Message(await client.PostAsJsonAsync(Path(a, "cancel"), Cancel(a)), HttpStatusCode.Conflict, "MSG111");
+        await Message(await client.PostAsJsonAsync(Path(a, "reschedule"), move with { Reason = "changed" }), HttpStatusCode.Conflict, "MSG41");
+        await Message(await client.PostAsJsonAsync(Path(a, "cancel"), new CancelAppointmentRequest(2, move.RequestKey, move.Reason)), HttpStatusCode.Conflict, "MSG41");
+        await Message(await client.PostAsJsonAsync(Path(a, "cancel"), Cancel(a)), HttpStatusCode.Conflict, "MSG41");
         var cancel = new CancelAppointmentRequest(2, Guid.NewGuid(), "cancel");
         var one = await client.PostAsJsonAsync(Path(a, "cancel"), cancel);
         var two = await client.PostAsJsonAsync(Path(a, "cancel"), cancel);
@@ -445,9 +445,9 @@ public sealed class AppointmentChangeApiTests(AppointmentChangeFixture fixture) 
     {
         var s = await Prepare(); var (client, _) = await Public(); var slots = await Slots(client, s);
         var a = await Book(client, s, slots[36]); await Book(client, s, slots[40]);
-        await Message(await client.PostAsJsonAsync(Path(a, "reschedule"), Move(a, slots[40])), HttpStatusCode.Conflict, "MSG34");
-        await Message(await client.PostAsJsonAsync(Path(a, "reschedule"), Move(a, slots[44]) with { ScheduleVersion = 999 }), HttpStatusCode.Conflict, "MSG111");
-        await Message(await client.PostAsJsonAsync(Path(a, "reschedule"), Move(a, slots[44]) with { NewStart = fixture.Clock.Now.AddMinutes(59) }), HttpStatusCode.Conflict, "MSG34");
+        await Message(await client.PostAsJsonAsync(Path(a, "reschedule"), Move(a, slots[40])), HttpStatusCode.Conflict, "MSG29");
+        await Message(await client.PostAsJsonAsync(Path(a, "reschedule"), Move(a, slots[44]) with { ScheduleVersion = 999 }), HttpStatusCode.Conflict, "MSG41");
+        await Message(await client.PostAsJsonAsync(Path(a, "reschedule"), Move(a, slots[44]) with { NewStart = fixture.Clock.Now.AddMinutes(59) }), HttpStatusCode.Conflict, "MSG29");
         var unchanged = (await client.GetFromJsonAsync<MyAppointmentDetail>($"/api/me/appointments/{a.Code}"))!;
         Assert.Equal(a.StartAt, unchanged.Start); Assert.Equal(1, unchanged.Version); Assert.Empty(unchanged.History);
         // The check must exclude the old reservation, even if the new interval overlaps it.
@@ -465,7 +465,7 @@ public sealed class AppointmentChangeApiTests(AppointmentChangeFixture fixture) 
         await SetState(a, start: fixture.Clock.Now.AddMinutes(minutes));
         var response = await client.PostAsJsonAsync(Path(a, "cancel"), Cancel(a));
         if (allowed) Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        else await Message(response, HttpStatusCode.Conflict, "MSG31");
+        else await Message(response, HttpStatusCode.Conflict, "MSG26");
     }
 
     [Theory]
@@ -478,8 +478,8 @@ public sealed class AppointmentChangeApiTests(AppointmentChangeFixture fixture) 
     {
         var s = await Prepare(); var (client, _) = await Public(); var slots = await Slots(client, s); var a = await Book(client, s, slots[36]);
         await SetState(a, status);
-        await Message(await client.PostAsJsonAsync(Path(a, "cancel"), Cancel(a)), HttpStatusCode.Conflict, "MSG31");
-        await Message(await client.PostAsJsonAsync(Path(a, "reschedule"), Move(a, slots[40])), HttpStatusCode.Conflict, "MSG31");
+        await Message(await client.PostAsJsonAsync(Path(a, "cancel"), Cancel(a)), HttpStatusCode.Conflict, "MSG26");
+        await Message(await client.PostAsJsonAsync(Path(a, "reschedule"), Move(a, slots[40])), HttpStatusCode.Conflict, "MSG26");
     }
 
     [Fact]
@@ -489,10 +489,10 @@ public sealed class AppointmentChangeApiTests(AppointmentChangeFixture fixture) 
         var slots = await Slots(booker, s); var a = await Book(booker, s, slots[36]);
         var command = Cancel(a);
         using var anonymous = fixture.CreateClient();
-        await Message(await anonymous.PostAsJsonAsync(Path(a, "cancel"), command), HttpStatusCode.Unauthorized, "MSG32");
+        await Message(await anonymous.PostAsJsonAsync(Path(a, "cancel"), command), HttpStatusCode.Unauthorized, "MSG27");
         anonymous.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "invalid");
-        await Message(await anonymous.PostAsJsonAsync(Path(a, "cancel"), command), HttpStatusCode.Unauthorized, "MSG07");
-        await Message(await other.PostAsJsonAsync(Path(a, "cancel"), command), HttpStatusCode.NotFound, "MSG102");
+        await Message(await anonymous.PostAsJsonAsync(Path(a, "cancel"), command), HttpStatusCode.Unauthorized, "MSG06");
+        await Message(await other.PostAsJsonAsync(Path(a, "cancel"), command), HttpStatusCode.NotFound, "MSG37");
         int linkId;
         using (var scope = fixture.Services.CreateScope())
         {
@@ -512,7 +512,7 @@ public sealed class AppointmentChangeApiTests(AppointmentChangeFixture fixture) 
             (await db.PatientAccountLinks.FindAsync(linkId))!.Status = PatientLinkStatus.Revoked;
             await db.SaveChangesAsync();
         }
-        await Message(await other.PostAsJsonAsync(Path(a, "cancel"), command), HttpStatusCode.NotFound, "MSG102");
+        await Message(await other.PostAsJsonAsync(Path(a, "cancel"), command), HttpStatusCode.NotFound, "MSG37");
     }
 
     [Fact]
@@ -521,14 +521,14 @@ public sealed class AppointmentChangeApiTests(AppointmentChangeFixture fixture) 
         var s = await Prepare(); var (owner, _) = await Public(); var a = await Book(owner, s, (await Slots(owner, s))[36]);
         await SetState(a, start: fixture.Clock.Now.AddHours(2));
         using var assistant = await Login("assistant.demo"); using var dentist = await Login("dentist.demo");
-        await Message(await dentist.PostAsJsonAsync(Path(a, "cancel"), Cancel(a)), HttpStatusCode.Forbidden, "MSG06");
+        await Message(await dentist.PostAsJsonAsync(Path(a, "cancel"), Cancel(a)), HttpStatusCode.Forbidden, "MSG05");
         await Message(await assistant.PostAsJsonAsync(Path(a, "cancel"), Cancel(a)), HttpStatusCode.BadRequest, "MSG02");
         var command = Cancel(a) with { RequesterVerification = "Original contact and code verified" };
         var response = await assistant.PostAsJsonAsync(Path(a, "cancel"), command);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("STAFF", (await response.Content.ReadFromJsonAsync<AppointmentChangeResult>())!.Appointment.Access);
         var otherBranch = await Prepare(false); var b = await Book(owner, otherBranch, (await Slots(owner, otherBranch))[36]);
-        await Message(await assistant.PostAsJsonAsync(Path(b, "cancel"), Cancel(b) with { RequesterVerification = "verified" }), HttpStatusCode.NotFound, "MSG102");
+        await Message(await assistant.PostAsJsonAsync(Path(b, "cancel"), Cancel(b) with { RequesterVerification = "verified" }), HttpStatusCode.NotFound, "MSG37");
     }
 
     [Fact]
@@ -554,13 +554,13 @@ public sealed class AppointmentChangeApiTests(AppointmentChangeFixture fixture) 
         var results = await Task.WhenAll(client.PostAsJsonAsync(Path(a, "reschedule"), Move(a, slots[44])),
             client.PostAsJsonAsync(Path(b, "reschedule"), Move(b, slots[44])));
         Assert.Single(results, x => x.StatusCode == HttpStatusCode.OK);
-        await Message(Assert.Single(results, x => x.StatusCode != HttpStatusCode.OK), HttpStatusCode.Conflict, "MSG34");
+        await Message(Assert.Single(results, x => x.StatusCode != HttpStatusCode.OK), HttpStatusCode.Conflict, "MSG29");
         var winner = results[0].IsSuccessStatusCode ? a : b;
         var cancel = Cancel(winner) with { ExpectedVersion = 2 };
         var competing = await Task.WhenAll(client.PostAsJsonAsync(Path(winner, "cancel"), cancel),
             client.PostAsJsonAsync(Path(winner, "cancel"), cancel with { RequestKey = Guid.NewGuid() }));
         Assert.Single(competing, x => x.StatusCode == HttpStatusCode.OK);
-        await Message(Assert.Single(competing, x => x.StatusCode != HttpStatusCode.OK), HttpStatusCode.Conflict, "MSG111");
+        await Message(Assert.Single(competing, x => x.StatusCode != HttpStatusCode.OK), HttpStatusCode.Conflict, "MSG41");
     }
 
     [Fact]
@@ -582,7 +582,7 @@ public sealed class AppointmentChangeApiTests(AppointmentChangeFixture fixture) 
             blockerId = blocker.Id; db.Add(blocker); await db.SaveChangesAsync();
         }
         await Message(await client.PostAsJsonAsync(Path(a, "reschedule"), Move(a, slots[40])),
-            HttpStatusCode.Conflict, "MSG34");
+            HttpStatusCode.Conflict, "MSG29");
         using (var scope = fixture.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
@@ -609,8 +609,8 @@ public sealed class AppointmentChangeApiTests(AppointmentChangeFixture fixture) 
         }
         var path = $"/api/appointments/{a.Code}/availability?date={s.Date:yyyy-MM-dd}";
         using var anonymous = fixture.CreateClient();
-        await Message(await anonymous.GetAsync(path), HttpStatusCode.Unauthorized, "MSG32");
-        await Message(await stranger.GetAsync(path), HttpStatusCode.NotFound, "MSG102");
+        await Message(await anonymous.GetAsync(path), HttpStatusCode.Unauthorized, "MSG27");
+        await Message(await stranger.GetAsync(path), HttpStatusCode.NotFound, "MSG37");
         Assert.Equal(HttpStatusCode.BadRequest, (await client.GetAsync($"/api/availability?branchId={s.BranchId}&dentistId={s.DentistId}&serviceId={s.ServiceId}&date={s.Date:yyyy-MM-dd}&durationMinutes=45")).StatusCode);
         var available = (await client.GetFromJsonAsync<AvailabilityResult>(path))!;
         Assert.NotEmpty(available.Slots);

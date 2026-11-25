@@ -28,14 +28,6 @@ public static class SchedulingEndpoints
             Results.Ok(await service.PreviewRecurringAvailabilityAsync(AuthenticationEndpoints.AccountId(context.User), request, ct)));
         group.MapGet("/options", async (HttpContext context, IWorkingScheduleService service, CancellationToken ct) =>
             Results.Ok(await service.OptionsAsync(AuthenticationEndpoints.AccountId(context.User), ct)));
-        group.MapGet("/", async (HttpContext context, int branchId, int dentistId, DateOnly weekStart, IWorkingScheduleService service, CancellationToken ct) =>
-            Results.Ok(await service.GetAsync(AuthenticationEndpoints.AccountId(context.User), branchId, dentistId, weekStart, ct)));
-        group.MapPost("/preview", async (HttpContext context, ScheduleCommand request, IWorkingScheduleService service, CancellationToken ct) =>
-            Results.Ok(await service.PreviewAsync(AuthenticationEndpoints.AccountId(context.User), request, ct)));
-        group.MapPost("/publish", async (HttpContext context, ScheduleCommand request, IWorkingScheduleService service, CancellationToken ct) =>
-            Results.Ok(await service.PublishAsync(AuthenticationEndpoints.AccountId(context.User), request, ct)));
-        group.MapPost("/preview-availability", async (HttpContext context, PreviewAvailabilityRequest request, IWorkingScheduleService service, CancellationToken ct) =>
-            Results.Ok(await service.PreviewAvailabilityAsync(AuthenticationEndpoints.AccountId(context.User), request, ct)));
         endpoints.MapGet("/api/availability/options", async (int? branchId, IWorkingScheduleService service, CancellationToken ct) =>
             Results.Ok(await service.PublicOptionsAsync(branchId ?? 0, ct))).AllowAnonymous().WithTags("Shared availability");
         endpoints.MapGet("/api/availability", async (HttpContext context, int branchId, int? dentistId, int? serviceId, DateOnly date,

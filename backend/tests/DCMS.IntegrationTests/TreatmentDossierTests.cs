@@ -9,7 +9,7 @@ namespace DCMS.IntegrationTests;
 [Collection(ApiCollection.Name)]
 public sealed class TreatmentDossierTests(ApiHost host)
 {
-    private const string Dentist = "Nha sĩ (dentist.demo) đã đăng nhập, làm việc tại chi nhánh A; bệnh nhân đã tồn tại.";
+    private const string Dentist = "Dentist dentist.demo is signed in and works in branch A; the patient exists.";
 
     private async Task<int> NewPatientAsync()
     {
@@ -53,7 +53,7 @@ public sealed class TreatmentDossierTests(ApiHost host)
         Assert.Equal(1, await host.QueryAsync(db => db.TreatmentDossiers.CountAsync(x => x.PatientId == patient)));
     }
 
-    [Fact, Case("DOS-03", "A patient that does not exist is rejected", "Nha sĩ (dentist.demo) đã đăng nhập; patient 999999 does not exist.",
+    [Fact, Case("DOS-03", "A patient that does not exist is rejected", "Dentist dentist.demo is signed in; patient 999999 does not exist.",
         "Step 1: Call POST /api/patients/999999/dossiers/quick.")]
     public async Task Unknown_patient_is_rejected()
     {
@@ -62,10 +62,10 @@ public sealed class TreatmentDossierTests(ApiHost host)
         var response = await client.PostAsync("/api/patients/999999/dossiers/quick", new QuickDossierRequest(host.BranchA, Guid.NewGuid()));
 
         Assert.Equal(404, response.Status);
-        Assert.Equal("MSG113", response.Code);
+        Assert.Equal("MSG42", response.Code);
     }
 
-    [Fact, Case("DOS-04", "A branch the dentist does not work in is rejected", "Nha sĩ (dentist.demo) đã đăng nhập, chỉ làm việc tại chi nhánh A; bệnh nhân đã tồn tại.",
+    [Fact, Case("DOS-04", "A branch the dentist does not work in is rejected", "Dentist dentist.demo is signed in and works only in branch A; the patient exists.",
         "Step 1: Call POST /api/patients/{id}/dossiers/quick with the id of branch B.")]
     public async Task Other_branch_is_rejected()
     {
@@ -75,10 +75,10 @@ public sealed class TreatmentDossierTests(ApiHost host)
         var response = await client.PostAsync($"/api/patients/{patient}/dossiers/quick", new QuickDossierRequest(host.BranchB, Guid.NewGuid()));
 
         Assert.Equal(403, response.Status);
-        Assert.Equal("MSG06", response.Code);
+        Assert.Equal("MSG05", response.Code);
     }
 
-    [Fact, Case("DOS-05", "A clinic assistant cannot open a dossier", "Trợ lý (assistant.demo) đã đăng nhập; bệnh nhân đã tồn tại.",
+    [Fact, Case("DOS-05", "A clinic assistant cannot open a dossier", "Clinic assistant assistant.demo is signed in; the patient exists.",
         "Step 1: Sign in as assistant.demo.",
         "Step 2: Call POST /api/patients/{id}/dossiers/quick.")]
     public async Task Assistant_is_rejected()

@@ -39,9 +39,6 @@ public static class TreatmentEndpoints
             ITreatmentDossierService service, CancellationToken ct) => Results.Ok(await service.NextVisitCandidatesAsync(
                 AuthenticationEndpoints.AccountId(context.User), patientId, ct))).RequireAuthorization(DentistPolicy)
             .WithTags("Next plan item to book");
-        patient.MapGet("/summary", async (HttpContext context, int patientId, int? branchId,
-            ITreatmentDossierService service, CancellationToken ct) => Results.Ok(await service.SummaryAsync(
-                AuthenticationEndpoints.AccountId(context.User), patientId, branchId, ct)));
 
         var dossier = endpoints.MapGroup("/api/dossiers/{dossierId:guid}")
             .RequireAuthorization(DentistPolicy).WithTags("UC-13/39 S21/S43 Treatment");
@@ -93,9 +90,6 @@ public static class TreatmentEndpoints
             ITreatmentDossierService service, CancellationToken ct) => Results.Ok(await service.MarkSheetItemAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, itemId, request, ct)));
         dossier.MapDelete("/sheet-items/{itemId:guid}", async (HttpContext context, Guid dossierId, Guid itemId, [FromBody] SheetItemActionRequest request,
             ITreatmentDossierService service, CancellationToken ct) => Results.Ok(await service.DeleteSheetItemAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, itemId, request, ct)));
-        dossier.MapPatch("/plan/items/{itemId:guid}/schedule-note", async (HttpContext context, Guid dossierId, Guid itemId,
-            ScheduleNoteRequest request, ITreatmentDossierService service, CancellationToken ct) => Results.Ok(await service.ScheduleNoteAsync(
-                AuthenticationEndpoints.AccountId(context.User), dossierId, itemId, request, ct)));
         dossier.MapGet("/plan/items/{itemId:guid}/planned-date-preview", async (HttpContext context, Guid dossierId, Guid itemId,
             DateOnly plannedOn, ITreatmentDossierService service, CancellationToken ct) => Results.Ok(await service.PlannedDatePreviewAsync(
                 AuthenticationEndpoints.AccountId(context.User), dossierId, itemId, plannedOn, ct)));
@@ -123,11 +117,6 @@ public static class TreatmentEndpoints
                 dossierId, rowId, expectedVersion, ct);
             return Results.NoContent();
         });
-        dossier.MapGet("/plan/preview", async (HttpContext context, Guid dossierId,
-            ITreatmentDossierService service, CancellationToken ct) => Results.Ok(await service.PricePreviewAsync(
-                AuthenticationEndpoints.AccountId(context.User), dossierId, ct)));
-        dossier.MapGet("/plan/history", async (HttpContext context, Guid dossierId, ITreatmentDossierService service, CancellationToken ct) =>
-            Results.Ok(await service.HistoryAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, ct)));
         dossier.MapPost("/close", async (HttpContext context, Guid dossierId, CloseDossierRequest request,
             ITreatmentDossierService service, CancellationToken ct) =>
             Results.Ok(await service.CloseAsync(AuthenticationEndpoints.AccountId(context.User), dossierId, request, ct)));

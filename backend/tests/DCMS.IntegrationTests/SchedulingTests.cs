@@ -58,6 +58,10 @@ public sealed class SchedulingApiTests(ApiFixture fixture) : IClassFixture<ApiFi
         var employees = await (from e in db.Employees join a in db.Users on e.AccountId equals a.Id select new { e.Id, e.AccountId, a.UserName }).ToArrayAsync();
         var dentist = employees.Single(e => e.UserName == "dentist.demo"); var assistant = employees.Single(e => e.UserName == "assistant.demo");
         var other = employees.Single(e => e.UserName == "dual.demo"); var owner = employees.Single(e => e.UserName == "owner.demo");
+        // Recurring schedule versions are per employee across all branches, and the demo staff are shared by every test in this
+        // class: start each test from an unpublished schedule so expected versions (0, 1, ...) belong to this test only.
+        int[] staff = [dentist.Id, assistant.Id, other.Id, owner.Id];
+        await db.Set<WorkingScheduleRevision>().Where(x => staff.Contains(x.EmployeeId)).ExecuteDeleteAsync();
         await db.AddSchedulingDataAsync(new SchedulingMember { BranchId = branch.Id, EmployeeId = dentist.Id, CanDentist = true }, new SchedulingMember { BranchId = branch.Id, EmployeeId = assistant.Id },
             new SchedulingMember { BranchId = branch.Id, EmployeeId = other.Id, CanDentist = true }, new SchedulingMember { BranchId = branch.Id, EmployeeId = owner.Id, CanDentist = true, CanManageSchedules = true });
         var service = new SchedulingService { BranchId = branch.Id, Name = "Khám", PublicDurationMinutes = 60, IsInitialExamination = true };
@@ -86,24 +90,24 @@ public sealed class SchedulingApiTests(ApiFixture fixture) : IClassFixture<ApiFi
         using var anonymous = fixture.CreateClient();
         var publicOptions = (await anonymous.GetFromJsonAsync<ScheduleOptions>($"/api/availability/options?branchId={s.Branch}"))!;
         Assert.Equal(s.Service, Assert.Single(publicOptions.Services).Id);
-        await Message(await anonymous.GetAsync($"/api/availability?branchId={s.Branch}&dentistId={s.Dentist}&serviceId={treatment.Id}&date={s.Date:yyyy-MM-dd}&durationMinutes=95"), HttpStatusCode.BadRequest, "MSG110");
+        await Message(await anonymous.GetAsync($"/api/availability?branchId={s.Branch}&dentistId={s.Dentist}&serviceId={treatment.Id}&date={s.Date:yyyy-MM-dd}&durationMinutes=95"), HttpStatusCode.BadRequest, "MSG40");
         var forged = new CreateAppointmentRequest(s.Branch, new("Synthetic booker", "0987654321", null), new(null, "Synthetic attendee", null),
             "Self", "Standard", "App", treatment.Id, null, s.Dentist, null, Start(s, 480), 95,
             null, null, Guid.NewGuid(), 1, null);
-        await Message(await anonymous.PostAsJsonAsync("/api/appointments", forged), HttpStatusCode.BadRequest, "MSG110");
+        await Message(await anonymous.PostAsJsonAsync("/api/appointments", forged), HttpStatusCode.BadRequest, "MSG40");
         var replay = (await (await dentist.PutAsJsonAsync(path, command)).Content.ReadFromJsonAsync<BookingSettings>())!;
         Assert.Equal(saved.Version, replay.Version); Assert.Equal(2, replay.Services.Length);
-        await Message(await dentist.PutAsJsonAsync(path, command with { RequestKey = Guid.NewGuid() }), HttpStatusCode.Conflict, "MSG111");
-        await Message(await dentist.PutAsJsonAsync(path, command with { SlotIntervalMinutes = 30 }), HttpStatusCode.Conflict, "MSG111");
+        await Message(await dentist.PutAsJsonAsync(path, command with { RequestKey = Guid.NewGuid() }), HttpStatusCode.Conflict, "MSG41");
+        await Message(await dentist.PutAsJsonAsync(path, command with { SlotIntervalMinutes = 30 }), HttpStatusCode.Conflict, "MSG41");
         await Message(await dentist.PutAsJsonAsync(path, new SaveBookingSettings(saved.Version, Guid.NewGuid(), 0, saved.Services)), HttpStatusCode.BadRequest, "MSG04");
         await Message(await dentist.PutAsJsonAsync(path, new SaveBookingSettings(saved.Version, Guid.NewGuid(), 20,
             [saved.Services[0] with { Id = int.MaxValue }, saved.Services[1]])), HttpStatusCode.BadRequest, "MSG04");
         using var assistant = await Login("assistant.demo");
-        await Message(await assistant.PostAsJsonAsync("/api/appointments", forged with { Source = "InPerson", RequestKey = Guid.NewGuid() }), HttpStatusCode.BadRequest, "MSG110");
-        await Message(await assistant.GetAsync(path), HttpStatusCode.Forbidden, "MSG06");
+        await Message(await assistant.PostAsJsonAsync("/api/appointments", forged with { Source = "InPerson", RequestKey = Guid.NewGuid() }), HttpStatusCode.BadRequest, "MSG40");
+        await Message(await assistant.GetAsync(path), HttpStatusCode.Forbidden, "MSG05");
         using var guest = await Login("guest.demo");
-        await Message(await guest.GetAsync(path), HttpStatusCode.Forbidden, "MSG06");
-        await Message(await dentist.GetAsync("/api/booking-settings/2147483647"), HttpStatusCode.Forbidden, "MSG06");
+        await Message(await guest.GetAsync(path), HttpStatusCode.Forbidden, "MSG05");
+        await Message(await dentist.GetAsync("/api/booking-settings/2147483647"), HttpStatusCode.Forbidden, "MSG05");
     }
 
     [Fact]
@@ -122,12 +126,12 @@ public sealed class SchedulingApiTests(ApiFixture fixture) : IClassFixture<ApiFi
         Assert.DoesNotContain(slots, x => x.Start == Start(s, 495));
         Assert.All(slots, x => { Assert.Equal(35, (x.End - x.Start).TotalMinutes); Assert.Equal(saved.Version, x.BookingSettingsVersion); });
         Assert.DoesNotContain(slots, x => x.Start == Start(s, 700) || x.Start == Start(s, 1060));
-        await Message(await anonymous.GetAsync(query.Replace("durationMinutes=35", "durationMinutes=30")), HttpStatusCode.BadRequest, "MSG110");
+        await Message(await anonymous.GetAsync(query.Replace("durationMinutes=35", "durationMinutes=30")), HttpStatusCode.BadRequest, "MSG40");
         var slot = slots.First();
         CreateAppointmentRequest Booking(AvailabilitySlot value) => new(s.Branch, new("Synthetic booker", "0987654321", null),
             new(null, "Synthetic attendee", null), "Self", "Standard", "App", s.Service, null, s.Dentist, null,
             value.Start, 35, null, null, Guid.NewGuid(), value.ScheduleVersion, null, value.BookingSettingsVersion);
-        await Message(await anonymous.PostAsJsonAsync("/api/appointments", Booking(slot) with { StartAt = slot.Start.AddMinutes(1) }), HttpStatusCode.Conflict, "MSG110");
+        await Message(await anonymous.PostAsJsonAsync("/api/appointments", Booking(slot) with { StartAt = slot.Start.AddMinutes(1) }), HttpStatusCode.Conflict, "MSG40");
         var bookedResponse = await anonymous.PostAsJsonAsync("/api/appointments", Booking(slot));
         Assert.Equal(HttpStatusCode.Created, bookedResponse.StatusCode);
         var booked = (await bookedResponse.Content.ReadFromJsonAsync<AppointmentResult>())!;
@@ -135,7 +139,7 @@ public sealed class SchedulingApiTests(ApiFixture fixture) : IClassFixture<ApiFi
         Assert.DoesNotContain(remaining, x => x.Start < booked.EndAt && x.End > booked.StartAt);
         var changed = (await (await dentist.PutAsJsonAsync(path, new SaveBookingSettings(saved.Version, Guid.NewGuid(), 20,
             [new(s.Service, "Exam 55", 55, true)]))).Content.ReadFromJsonAsync<BookingSettings>())!;
-        await Message(await anonymous.PostAsJsonAsync("/api/appointments", Booking(remaining.Last())), HttpStatusCode.Conflict, "MSG111");
+        await Message(await anonymous.PostAsJsonAsync("/api/appointments", Booking(remaining.Last())), HttpStatusCode.Conflict, "MSG41");
         var detail = (await dentist.GetFromJsonAsync<StaffAppointmentDetail>($"/api/appointments/{booked.AppointmentId}"))!;
         Assert.Equal(35, detail.Appointment.DurationMinutes);
         using var assistant = await Login("assistant.demo");
@@ -152,7 +156,7 @@ public sealed class SchedulingApiTests(ApiFixture fixture) : IClassFixture<ApiFi
         Assert.False((await disabled.Content.ReadFromJsonAsync<BookingSettings>())!.Services.Single().Active);
         var publicOptions = (await anonymous.GetFromJsonAsync<ScheduleOptions>($"/api/availability/options?branchId={s.Branch}"))!;
         Assert.DoesNotContain(publicOptions.Services, x => x.Id == s.Service);
-        await Message(await anonymous.GetAsync(query.Replace("durationMinutes=35", "durationMinutes=55")), HttpStatusCode.BadRequest, "MSG110");
+        await Message(await anonymous.GetAsync(query.Replace("durationMinutes=35", "durationMinutes=55")), HttpStatusCode.BadRequest, "MSG40");
     }
 
     // docs/specs/CHAIR-CAPACITY-ANY-DENTIST-BOOKING.vi.md: chairs are branch capacity; "any dentist" assigns a free on-shift
@@ -182,7 +186,7 @@ public sealed class SchedulingApiTests(ApiFixture fixture) : IClassFixture<ApiFi
         Assert.Equal(initial.Select(x => (x.Start, x.DentistId, x.ChairId)), (await Slots(any + "&dentistId=0")).Select(x => (x.Start, x.DentistId, x.ChairId)));
         Assert.Equal(initial.Length, initial.Select(x => x.Start).Distinct().Count());
         Assert.Equal((await Slots(any + $"&dentistId={s.Dentist}")).Select(x => x.Start), initial.Select(x => x.Start));
-        await Message(await anonymous.GetAsync(any + $"&assistantId={s.Assistant}"), HttpStatusCode.BadRequest, "MSG110");
+        await Message(await anonymous.GetAsync(any + $"&assistantId={s.Assistant}"), HttpStatusCode.BadRequest, "MSG40");
 
         var nine = Start(s, 540);
         var first = initial.Single(x => x.Start == nine);
@@ -201,7 +205,7 @@ public sealed class SchedulingApiTests(ApiFixture fixture) : IClassFixture<ApiFi
         var third = new[] { s.Dentist, s.Other, await OwnerEmployee() }.Single(x => x != first.DentistId && x != second.DentistId);
         Assert.DoesNotContain(await Slots(any + $"&dentistId={third}"), x => x.Start == nine);
         await Message(await anonymous.PostAsJsonAsync("/api/appointments", Booking(first with { DentistId = third,
-            ScheduleVersion = 1 }, "Attendee three")), HttpStatusCode.Conflict, "MSG28");
+            ScheduleVersion = 1 }, "Attendee three")), HttpStatusCode.Conflict, "MSG23");
 
         using (var scope = fixture.Services.CreateScope())
         {
@@ -224,13 +228,16 @@ public sealed class SchedulingApiTests(ApiFixture fixture) : IClassFixture<ApiFi
         Assert.Equal(HttpStatusCode.OK, response.StatusCode); var session = (await response.Content.ReadFromJsonAsync<SignInResponse>())!;
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", session.AccessToken); return client;
     }
-    private static ScheduleCommand Command(Setup s, int version = 0, int? employee = null, SchedulePeriod[]? periods = null) =>
-        new(s.Branch, employee ?? s.Dentist, s.Date, version, periods ?? [new(0, 480, 1080, "Work"), new(0, 720, 780, "Break", "Nghỉ trưa")], Guid.NewGuid());
-    private static async Task<PublishResult> Publish(HttpClient client, ScheduleCommand command)
+    // Weekly template published through the recurring schedule API (docs/specs/UNUSED-API-REMOVAL.vi.md).
+    private static RecurringCommand Command(Setup s, int version = 0, int? employee = null, SchedulePeriod[]? periods = null) =>
+        new(employee ?? s.Dentist, s.Date, "Template", version,
+            (periods ?? [new(0, 480, 1080, "Work"), new(0, 720, 780, "Break", "Nghỉ trưa")])
+                .Select(p => new BranchPeriod(s.Branch, p.Day, p.StartMinute, p.EndMinute, p.Kind, p.Reason)).ToArray(), Guid.NewGuid());
+    private static async Task<RecurringPublishResult> Publish(HttpClient client, RecurringCommand command)
     {
-        var response = await client.PostAsJsonAsync("/api/working-schedules/publish", command);
+        var response = await client.PostAsJsonAsync("/api/working-schedules/recurring/publish", command);
         Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
-        return (await response.Content.ReadFromJsonAsync<PublishResult>())!;
+        return (await response.Content.ReadFromJsonAsync<RecurringPublishResult>())!;
     }
     private static DateTimeOffset Start(Setup s, int minute) => new DateTimeOffset(s.Date.ToDateTime(TimeOnly.MinValue), TimeSpan.FromHours(7)).AddMinutes(minute);
     private async Task<DCMS.Domain.Features.Appointments.Appointment> Reserve(Setup s, int start, int end, int? dentist = null, int? patientId = null, string status = "Confirmed")
@@ -249,70 +256,33 @@ public sealed class SchedulingApiTests(ApiFixture fixture) : IClassFixture<ApiFi
     { Assert.Equal(status, response.StatusCode); Assert.Equal(code, (await response.Content.ReadFromJsonAsync<SystemMessage>())!.Code); }
 
     [Fact]
-    public async Task ReportedWorkBreakBlockSamplePublishesAndExcludesBothBreakAndBlock()
-    {
-        var s = await Create(); using var client = await Login();
-        var command = Command(s, periods: [new(0, 480, 1020, "Work"), new(0, 720, 780, "Break", "Nghỉ trưa"), new(0, 900, 930, "Block", "Họp nội bộ")]);
-        var preview = await client.PostAsJsonAsync("/api/working-schedules/preview", command);
-        Assert.Equal(HttpStatusCode.OK, preview.StatusCode);
-        var published = await Publish(client, command);
-        Assert.Equal("Published", published.Schedule.Status); Assert.Equal(3, published.Schedule.Intervals.Length);
-        using var scope = fixture.Services.CreateScope(); var service = scope.ServiceProvider.GetRequiredService<IAvailabilityService>();
-        var query = new AvailabilityQuery(s.Branch, s.Dentist, s.Service, s.Date, 30);
-        var slots = (await service.QueryAsync(query, s.Actor, default)).Slots;
-        Assert.Contains(slots, slot => slot.Start == Start(s, 480)); Assert.Contains(slots, slot => slot.Start == Start(s, 990));
-        Assert.DoesNotContain(slots, slot => slot.Start < Start(s, 780) && slot.End > Start(s, 720));
-        Assert.DoesNotContain(slots, slot => slot.Start < Start(s, 930) && slot.End > Start(s, 900));
-        var longer = (await service.QueryAsync(query with { DurationMinutes = 120 }, s.Actor, default)).Slots;
-        Assert.Contains(longer, slot => slot.Start == Start(s, 600));
-        Assert.DoesNotContain(longer, slot => slot.Start == Start(s, 660) || slot.Start == Start(s, 840));
-    }
-    [Fact]
-    public async Task PublishedWeekReadbackPublicAndStaffDurationsAndBoundary()
-    {
-        var s = await Create(); using var client = await Login(); var published = await Publish(client, Command(s));
-        Assert.Equal(1, published.Schedule.Version); Assert.NotNull(published.Schedule.Id); Assert.Equal("MSG39", published.Notification.Code);
-        var read = await client.GetFromJsonAsync<ScheduleDto>($"/api/working-schedules?branchId={s.Branch}&dentistId={s.Dentist}&weekStart={s.Date:yyyy-MM-dd}");
-        Assert.Equal(published.Schedule.Id, read!.Id); Assert.Equal("Published", read.Status);
-        using var publicClient = fixture.CreateClient();
-        var path = $"/api/availability?branchId={s.Branch}&dentistId={s.Dentist}&serviceId={s.Service}&date={s.Date:yyyy-MM-dd}&durationMinutes=";
-        var slots = (await publicClient.GetFromJsonAsync<AvailabilityResult>(path + "60"))!;
-        Assert.Equal("Asia/Ho_Chi_Minh", slots.TimeZone); Assert.NotEmpty(slots.Slots);
-        Assert.All(slots.Slots, slot => { Assert.Equal(TimeSpan.FromHours(7), slot.Start.Offset); Assert.Equal(TimeSpan.FromMinutes(60), slot.End - slot.Start); Assert.Equal(s.Chair, slot.ChairId); });
-        Assert.Contains(slots.Slots, slot => slot.Start == Start(s, 660)); Assert.DoesNotContain(slots.Slots, slot => slot.Start == Start(s, 675));
-        Assert.DoesNotContain(slots.Slots, slot => slot.Start == Start(s, 735)); Assert.Contains(slots.Slots, slot => slot.Start == Start(s, 1020)); Assert.DoesNotContain(slots.Slots, slot => slot.Start == Start(s, 1035));
-        await Message(await publicClient.GetAsync(path + "120"), HttpStatusCode.BadRequest, "MSG110");
-        var staff = (await client.GetFromJsonAsync<AvailabilityResult>(path + "120"))!;
-        Assert.Contains(staff.Slots, slot => slot.Start == Start(s, 600)); Assert.DoesNotContain(staff.Slots, slot => slot.Start == Start(s, 615));
-        Assert.Contains(staff.Slots, slot => slot.Start == Start(s, 960)); Assert.DoesNotContain(staff.Slots, slot => slot.Start == Start(s, 975));
-    }
-    [Fact]
     public async Task InvalidCommandsAndOwnershipCannotChangePublishedWeek()
     {
         var s = await Create(); using var dentist = await Login(); using var assistant = await Login("assistant.demo");
         using var guest = await Login("guest.demo"); using var anonymous = fixture.CreateClient();
-        await Message(await anonymous.PostAsJsonAsync("/api/working-schedules/publish", Command(s)), HttpStatusCode.Unauthorized, "MSG07");
-        await Message(await guest.PostAsJsonAsync("/api/working-schedules/publish", Command(s)), HttpStatusCode.Forbidden, "MSG06");
-        await Message(await assistant.PostAsJsonAsync("/api/working-schedules/publish", Command(s)), HttpStatusCode.Forbidden, "MSG06");
-        await Message(await dentist.PostAsJsonAsync("/api/working-schedules/publish", Command(s, employee: s.Other)), HttpStatusCode.Forbidden, "MSG06");
-        await Message(await dentist.PostAsJsonAsync("/api/working-schedules/publish", Command(s, periods: [new(0, 600, 480, "Work")])), HttpStatusCode.BadRequest, "MSG110");
+        await Message(await anonymous.PostAsJsonAsync("/api/working-schedules/recurring/publish", Command(s)), HttpStatusCode.Unauthorized, "MSG06");
+        await Message(await guest.PostAsJsonAsync("/api/working-schedules/recurring/publish", Command(s)), HttpStatusCode.Forbidden, "MSG05");
+        await Message(await assistant.PostAsJsonAsync("/api/working-schedules/recurring/publish", Command(s)), HttpStatusCode.Forbidden, "MSG05");
+        await Message(await dentist.PostAsJsonAsync("/api/working-schedules/recurring/publish", Command(s, employee: s.Other)), HttpStatusCode.Forbidden, "MSG05");
+        await Message(await dentist.PostAsJsonAsync("/api/working-schedules/recurring/publish", Command(s, periods: [new(0, 600, 480, "Work")])), HttpStatusCode.BadRequest, "MSG40");
         await Publish(dentist, Command(s));
-        await Message(await dentist.PostAsJsonAsync("/api/working-schedules/publish", Command(s)), HttpStatusCode.Conflict, "MSG111");
+        await Message(await dentist.PostAsJsonAsync("/api/working-schedules/recurring/publish", Command(s)), HttpStatusCode.Conflict, "MSG41");
         using var scope = fixture.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
-        Assert.Equal(1, (await db.Set<WorkingWeek>().SingleAsync(w => w.BranchId == s.Branch)).Version);
+        Assert.Equal(1, (await db.Set<WorkingScheduleRevision>().SingleAsync(w => w.EmployeeId == s.Dentist)).Version);
     }
     [Fact]
     public async Task ConfirmedAppointmentBlocksPublicationAndPreviewListsImpact()
     {
         var s = await Create(); using var client = await Login(); await Publish(client, Command(s));
         var booked = await Reserve(s, 480, 600); var command = Command(s, 1, periods: [new(0, 600, 1080, "Work")]);
-        var preview = await client.PostAsJsonAsync("/api/working-schedules/preview", command);
+        var preview = await client.PostAsJsonAsync("/api/working-schedules/recurring/preview", command);
         Assert.Equal(HttpStatusCode.OK, preview.StatusCode); var impact = (await preview.Content.ReadFromJsonAsync<SchedulePreview>())!;
         Assert.Equal(booked.Id, Assert.Single(impact.AffectedAppointments).Id);
-        await Message(await client.PostAsJsonAsync("/api/working-schedules/publish", command), HttpStatusCode.Conflict, "MSG38");
+        await Message(await client.PostAsJsonAsync("/api/working-schedules/recurring/publish", command), HttpStatusCode.Conflict, "MSG32");
         using var scope = fixture.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
-        Assert.Equal(1, (await db.Set<WorkingWeek>().SingleAsync(w => w.BranchId == s.Branch)).Version);
-        Assert.Equal(480, (await db.Set<WorkingWeek>().Where(w => w.BranchId == s.Branch).SelectMany(w => w.Periods).OrderBy(p => p.StartMinute).FirstAsync()).StartMinute);
+        // The blocked publication leaves the first revision as the only one, with its original 08:00 start.
+        var head = await db.Set<WorkingScheduleRevision>().AsNoTracking().SingleAsync(w => w.EmployeeId == s.Dentist);
+        Assert.Equal(1, head.Version); Assert.Equal(480, head.Periods.Min(p => p.StartMinute));
     }
     [Fact]
     public async Task ChairMainAssistantAndAttendeeConflictsAreCheckedForEntireInterval()
@@ -334,7 +304,7 @@ public sealed class SchedulingApiTests(ApiFixture fixture) : IClassFixture<ApiFi
         using var scope = fixture.Services.CreateScope(); var service = scope.ServiceProvider.GetRequiredService<IAvailabilityService>(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
         await using var tx = await db.Database.BeginTransactionAsync();
         var request = new ResourceCheck(s.Branch, s.Dentist, s.Service, Start(s, 480), 120, s.Chair, s.Assistant, null, 1, 1);
-        Assert.Equal("MSG28", (await Assert.ThrowsAsync<BusinessException>(() => service.CheckInTransactionAsync(request, default))).Response.Code);
+        Assert.Equal("MSG23", (await Assert.ThrowsAsync<BusinessException>(() => service.CheckInTransactionAsync(request, default))).Response.Code);
         // Move occupancy to another chair and reassign to assistant: main's assistant remains unavailable, independent of chair capacity.
         var occupancy = await db.Appointments.SingleAsync(x => x.BranchId == s.Branch);
         var extraChair = new SchedulingChair { BranchId = s.Branch, Name = "Other" }; await db.AddSchedulingDataAsync(extraChair); await db.SaveChangesAsync();
@@ -355,17 +325,7 @@ public sealed class SchedulingApiTests(ApiFixture fixture) : IClassFixture<ApiFi
         var s = await Create(); using var owner = await Login("owner.demo");
         await Publish(owner, Command(s));
         await Reserve(s, 480, 600, dentist: s.Dentist);
-        await Message(await owner.PostAsJsonAsync("/api/working-schedules/publish", Command(s, 1, s.Dentist, [])), HttpStatusCode.Conflict, "MSG38");
-    }
-    [Fact]
-    public async Task IdempotentRetryAndConcurrentVersionConflict()
-    {
-        var s = await Create(); using var client = await Login(); var command = Command(s);
-        var first = await Publish(client, command); var replay = await Publish(client, command);
-        Assert.Equal(first.Schedule.Id, replay.Schedule.Id); Assert.Equal(first.Schedule.Version, replay.Schedule.Version);
-        await Message(await client.PostAsJsonAsync("/api/working-schedules/publish", command with { Intervals = [] }), HttpStatusCode.Conflict, "MSG111");
-        var results = await Task.WhenAll(client.PostAsJsonAsync("/api/working-schedules/publish", Command(s, 1)), client.PostAsJsonAsync("/api/working-schedules/publish", Command(s, 1)));
-        Assert.Single(results, r => r.StatusCode == HttpStatusCode.OK); Assert.Single(results, r => r.StatusCode == HttpStatusCode.Conflict);
+        await Message(await owner.PostAsJsonAsync("/api/working-schedules/recurring/publish", Command(s, 1, s.Dentist, [])), HttpStatusCode.Conflict, "MSG32");
     }
     [Fact]
     public async Task ResourceGuardSerializesCompetingReservationsAndRechecksCommittedOccupancy()
@@ -394,7 +354,7 @@ public sealed class SchedulingApiTests(ApiFixture fixture) : IClassFixture<ApiFi
                     PatientId = first ? patientId : null, AttendeeName = "Concurrent patient", CreatedAt = DateTimeOffset.UtcNow, BookingInfo = new() { BookerName = "Concurrent" } });
                 await db.SaveChangesAsync(); await tx.CommitAsync(); return true;
             }
-            catch (BusinessException ex) { Assert.Equal("MSG27", ex.Response.Code); return false; }
+            catch (BusinessException ex) { Assert.Equal("MSG22", ex.Response.Code); return false; }
         }
         var attempts = await Task.WhenAll(Attempt(true), Attempt(false));
         Assert.Single(attempts, success => success);
@@ -412,8 +372,8 @@ public sealed class SchedulingApiTests(ApiFixture fixture) : IClassFixture<ApiFi
         await Assert.ThrowsAsync<BusinessException>(() => service.QueryAsync(query with { DurationMinutes = 30 }, null, default));
         await using var tx = await db.Database.BeginTransactionAsync();
         var request = new ResourceCheck(s.Branch, s.Dentist, s.Service, Start(s, 540), 60, s.Chair, s.Assistant, null, 1, 0);
-        Assert.Equal("MSG111", (await Assert.ThrowsAsync<BusinessException>(() => service.CheckInTransactionAsync(request, default))).Response.Code);
-        Assert.Equal("MSG26", (await Assert.ThrowsAsync<BusinessException>(() => service.CheckInTransactionAsync(request with { ExpectedAssistantScheduleVersion = 1, Start = Start(s, 690) }, default))).Response.Code);
+        Assert.Equal("MSG41", (await Assert.ThrowsAsync<BusinessException>(() => service.CheckInTransactionAsync(request, default))).Response.Code);
+        Assert.Equal("MSG21", (await Assert.ThrowsAsync<BusinessException>(() => service.CheckInTransactionAsync(request with { ExpectedAssistantScheduleVersion = 1, Start = Start(s, 690) }, default))).Response.Code);
         var member = await db.LoadMemberAsync(s.Branch, s.Dentist); member.CanDentist = false; await db.SaveChangesAsync();
         await Assert.ThrowsAsync<BusinessException>(() => service.QueryAsync(query, null, default));
     }
@@ -424,8 +384,10 @@ public sealed class SchedulingApiTests(ApiFixture fixture) : IClassFixture<ApiFi
         using var scope = fixture.Services.CreateScope(); var service = scope.ServiceProvider.GetRequiredService<IAvailabilityService>();
         await Assert.ThrowsAsync<InvalidOperationException>(() => service.CheckInTransactionAsync(new(s.Branch, s.Dentist, s.Service, Start(s, 480), 60, s.Chair, null, null, 0), default));
         var query = new AvailabilityQuery(s.Branch, s.Dentist, s.Service, s.Date, 60);
-        var response = await client.PostAsJsonAsync("/api/working-schedules/preview-availability", new PreviewAvailabilityRequest(Command(s), query));
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode); Assert.NotEmpty((await response.Content.ReadFromJsonAsync<AvailabilityResult>())!.Slots);
+        var response = await client.PostAsJsonAsync("/api/working-schedules/recurring/preview-availability",
+            new RecurringPreviewRequest(Command(s), s.Branch, s.Service, s.Date, s.Date, 60));
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotEmpty(Assert.Single((await response.Content.ReadFromJsonAsync<RecurringAvailabilityResult>())!.Days).Slots);
         Assert.Empty((await service.QueryAsync(query, null, default)).Slots);
         Assert.False(await scope.ServiceProvider.GetRequiredService<DcmsDbContext>().Appointments.AnyAsync(x => x.BranchId == s.Branch));
     }

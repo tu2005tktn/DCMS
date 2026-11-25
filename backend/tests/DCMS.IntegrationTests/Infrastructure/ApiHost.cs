@@ -50,6 +50,7 @@ public sealed class ApiHost : WebApplicationFactory<Program>, IAsyncLifetime
         }));
         builder.ConfigureServices(services =>
         {
+            services.AddSingleton<Microsoft.AspNetCore.Hosting.IStartupFilter, HttpExchangeLog>();
             services.RemoveAll<DcmsDbContext>();
             services.RemoveAll<DbContextOptions<DcmsDbContext>>();
             services.RemoveAll<IDbContextOptionsConfiguration<DcmsDbContext>>();
@@ -57,8 +58,6 @@ public sealed class ApiHost : WebApplicationFactory<Program>, IAsyncLifetime
             // No e-mail, SMS or push traffic from tests.
             services.RemoveAll<IContactDeliveryAdapter>();
             services.AddSingleton<IContactDeliveryAdapter, SilentContactDelivery>();
-            services.RemoveAll<IEmailVerificationDelivery>();
-            services.AddSingleton<IEmailVerificationDelivery, SilentEmailDelivery>();
             services.RemoveAll<IRealtimeNotifier>();
             services.AddSingleton<IRealtimeNotifier, SilentRealtime>();
         });
@@ -127,11 +126,6 @@ public sealed class ApiHost : WebApplicationFactory<Program>, IAsyncLifetime
         public bool IsValid(string contact) => true;
         public string Normalize(string contact) => contact.Trim();
         public Task<bool> SendRecoveryAsync(int accountId, RecoveryChannel channel, string destination, string proof, string resetLink, CancellationToken ct) => Task.FromResult(true);
-    }
-
-    private sealed class SilentEmailDelivery : IEmailVerificationDelivery
-    {
-        public Task<bool> SendAsync(string destination, string code, int lifetimeMinutes, CancellationToken ct) => Task.FromResult(true);
     }
 
     private sealed class SilentRealtime : IRealtimeNotifier

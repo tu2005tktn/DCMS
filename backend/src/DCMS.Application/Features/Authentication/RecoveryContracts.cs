@@ -12,15 +12,6 @@ public sealed record RecoveryResetOutcome(bool Succeeded, string MessageCode);
 
 public sealed record RecoveryResendOutcome(bool Accepted, string MessageCode, int? RetryAfterSeconds);
 
-// Rich outcome for the authorized Admin-assisted path (S04). Admins already have a legitimate
-// need to know, so this path is not neutral - and it is guarded by the service itself (GBR-075).
-public sealed record AdminRecoveryRequestOutcome(bool Accepted, string MessageCode, int AccountId,
-    string ChannelType, string Destination, int? RetryAfterSeconds);
-
-public sealed record RecoveryStatusSnapshot(bool HasActiveRequest, string ChannelType,
-    int AttemptsUsed, int ResendsUsed, int? SecondsUntilExpiry, int? MaxAttempts, int? MaxResends,
-    int? RetryAfterSeconds);
-
 public interface IAccountRecoveryService
 {
     // UC-02 self-service recovery (anonymous caller). Every response is neutral: the same text,
@@ -34,13 +25,6 @@ public interface IAccountRecoveryService
     Task<RecoveryResendOutcome> ResendAsync(string identifier, string? ipAddress, CancellationToken ct,
         bool publicOnly = false);
 
-    // UC-31 / S04 Admin-assisted recovery. The service re-checks the Admin permission server-side
-    // on every call instead of trusting the caller (GBR-075).
-    Task<AdminRecoveryRequestOutcome> RequestForAccountAsync(int actorId, int targetAccountId, CancellationToken ct);
-    Task<RecoveryVerifyOutcome> VerifyForAccountAsync(int actorId, int targetAccountId, string proof, CancellationToken ct);
-    Task<RecoveryResetOutcome> ResetForAccountAsync(int actorId, int targetAccountId, string newPassword,
-        string confirmPassword, CancellationToken ct);
-    Task<RecoveryStatusSnapshot> GetStatusAsync(int actorId, int targetAccountId, CancellationToken ct);
 }
 
 // Shared S02 contact adapter contract. Consumed here; never duplicated or re-implemented.

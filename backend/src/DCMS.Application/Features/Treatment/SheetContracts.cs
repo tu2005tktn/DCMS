@@ -20,11 +20,7 @@ public sealed record EditSheetItemRequest(int ExpectedVersion, System.Text.Json.
 public sealed record ConfirmSheetPlanRequest(int ExpectedVersion, int ExpectedDraftVersion, Guid RequestKey);
 public sealed record ConfirmSheetActualRequest(int ExpectedVersion, int ExpectedDraftVersion, Guid RequestKey);
 public sealed record ConfirmSheetActualResult(TreatmentDossierDto Dossier, ActivityDto Activity);
-public sealed record ScheduleNoteRequest(int ExpectedVersion, DateOnly? PlannedOn, string? Note, Guid RequestKey);
 public sealed record TreatmentActivityPage(IReadOnlyList<ActivityDto> Items, int Total, int Page, int PageSize);
-public sealed record DossierTotals(int DossierCount, long PlannedGrossVnd, long PlannedDiscountVnd,
-    long PlannedNetVnd, bool FinancialAvailable, long? PostedNetVnd, long? ConfirmedAllocatedVnd,
-    long? OutstandingVnd, long? UnusedAdvanceVnd, int PendingFeeCount);
 
 // Handoff to DCMS-101. Unique sourceKey is the consumer's idempotency key.
 public sealed record ClinicalFeeRequest(string SourceKey, Guid ActivityId, int ActivityVersion,

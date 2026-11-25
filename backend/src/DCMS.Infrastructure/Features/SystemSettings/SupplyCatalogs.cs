@@ -52,7 +52,7 @@ internal static partial class SupplyCatalogSupport
 
     public static long? Price(long? value) => value switch
     {
-        < 0 => throw new BusinessException(400, SystemMessages.Get("MSG257") with { Field = "referencePrice" }),
+        < 0 => throw new BusinessException(400, SystemMessages.Get("MSG60") with { Field = "referencePrice" }),
         > MaxPrice => throw Error("MSG04", label: "Giá tham khảo", field: "referencePrice"),
         _ => value
     };
@@ -82,8 +82,8 @@ internal static partial class SupplyCatalogSupport
         var prior = await db.SystemCatalogChanges.AsNoTracking().SingleOrDefaultAsync(x => x.RequestKey == key, ct);
         if (prior != null)
         {
-            if (prior.ActorId != actorId || prior.Command != command || prior.Fingerprint != hash) throw Error("MSG111", 409);
-            return JsonSerializer.Deserialize<TDto>(prior.ResultJson, ClinicSettingsStore.Json) ?? throw Error("MSG144", 503);
+            if (prior.ActorId != actorId || prior.Command != command || prior.Fingerprint != hash) throw Error("MSG41", 409);
+            return JsonSerializer.Deserialize<TDto>(prior.ResultJson, ClinicSettingsStore.Json) ?? throw Error("MSG49", 503);
         }
         var now = clock.GetUtcNow();
         var (id, reason, before, result) = await apply(now);
@@ -196,7 +196,7 @@ public abstract class SupplyCatalog<TEntity, TInput, TDto>(DcmsDbContext db, Tim
         {
             var reason = SupplyCatalogSupport.Reason(request.Reason);
             var row = await RowAsync(id, tracked: true, ct);
-            if (row.Version != request.ExpectedVersion) throw Error("MSG111", 409);
+            if (row.Version != request.ExpectedVersion) throw Error("MSG41", 409);
             var next = await NormalizeAsync(request.Entry, row, ct);
             if (SameContent(row, next)) throw new BusinessException(400, GeneralSettingsMessages.NoChange);
             await UniqueAsync(next, id, ct);
@@ -222,7 +222,7 @@ public abstract class SupplyCatalog<TEntity, TInput, TDto>(DcmsDbContext db, Tim
         {
             var reason = SupplyCatalogSupport.Reason(request.Reason);
             var row = await RowAsync(id, tracked: true, ct);
-            if (row.Version != request.ExpectedVersion || row.IsActive == request.Active) throw Error("MSG111", 409);
+            if (row.Version != request.ExpectedVersion || row.IsActive == request.Active) throw Error("MSG41", 409);
             var before = await DtoAsync(row, ct);
             row.IsActive = request.Active;
             row.Version++;
@@ -255,7 +255,7 @@ public abstract class SupplyCatalog<TEntity, TInput, TDto>(DcmsDbContext db, Tim
     }
 
     protected async Task<TEntity> RowAsync(Guid id, bool tracked, CancellationToken ct) =>
-        await (tracked ? Set : Set.AsNoTracking()).SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw Error("MSG113", 404);
+        await (tracked ? Set : Set.AsNoTracking()).SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw Error("MSG42", 404);
 
     private async Task<TDto> DtoAsync(TEntity row, CancellationToken ct) => (await DtosAsync([row], ct))[0];
 
@@ -300,7 +300,7 @@ public sealed partial class ProviderCatalog(DcmsDbContext db, TimeProvider clock
     protected override async Task UpdateGuardAsync(CatalogProvider current, CatalogProvider next, CancellationToken ct)
     {
         if (next.Type == ProviderTypes.Supplier && current.Type != ProviderTypes.Supplier && await Db.LabWorkTypes.AnyAsync(x => x.ProviderId == current.Id, ct))
-            throw new BusinessException(409, SystemMessages.Get("MSG205") with { Field = "type" });
+            throw new BusinessException(409, SystemMessages.Get("MSG52") with { Field = "type" });
     }
 
     protected override async Task<string?> StateImpactAsync(CatalogProvider row, bool active, CancellationToken ct)
@@ -435,7 +435,7 @@ public sealed class MedicineCatalog(DcmsDbContext db, TimeProvider clock, DCMS.A
 
     private async Task<CatalogMedicine> RowAsync(Guid id, bool tracked, CancellationToken ct) =>
         await (tracked ? db.CatalogMedicines : db.CatalogMedicines.AsNoTracking()).SingleOrDefaultAsync(x => x.Id == id, ct)
-        ?? throw SupplyCatalogSupport.Error("MSG113", 404);
+        ?? throw SupplyCatalogSupport.Error("MSG42", 404);
 
     public async Task<CatalogPage<MedicineDto>> ListAsync(int actorId, string? q, string? status, string? type, int page, int pageSize, CancellationToken ct)
     {
@@ -468,7 +468,7 @@ public sealed class MedicineCatalog(DcmsDbContext db, TimeProvider clock, DCMS.A
         {
             var reason = SupplyCatalogSupport.Reason(request.Reason);
             var row = await RowAsync(id, tracked: true, ct);
-            if (row.Version != request.ExpectedVersion) throw SupplyCatalogSupport.Error("MSG111", 409);
+            if (row.Version != request.ExpectedVersion) throw SupplyCatalogSupport.Error("MSG41", 409);
             var next = ValidateAndBuild(request.Entry);
             if (SameContent(row, next)) throw new BusinessException(400, GeneralSettingsMessages.NoChange);
             await EnsureUniqueAsync(next.Code, next.Name, id, ct);
@@ -492,7 +492,7 @@ public sealed class MedicineCatalog(DcmsDbContext db, TimeProvider clock, DCMS.A
         {
             var reason = SupplyCatalogSupport.Reason(request.Reason);
             var row = await RowAsync(id, tracked: true, ct);
-            if (row.Version != request.ExpectedVersion || row.IsActive == request.Active) throw SupplyCatalogSupport.Error("MSG111", 409);
+            if (row.Version != request.ExpectedVersion || row.IsActive == request.Active) throw SupplyCatalogSupport.Error("MSG41", 409);
             var before = ToDto(row);
             row.IsActive = request.Active; row.Version++;
             await SupplyCatalogSupport.SaveWithUniqueCheckAsync(db, ct);

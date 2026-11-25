@@ -22,30 +22,30 @@ public sealed class BusinessErrorMiddleware(RequestDelegate next, ILogger<Busine
             {
                 BusinessException business => (business.Status, business.Response),
                 BadHttpRequestException => (400, SystemMessages.Get("MSG04", "Yêu cầu")),
-                DbUpdateConcurrencyException => (409, SystemMessages.Get("MSG111")),
+                DbUpdateConcurrencyException => (409, SystemMessages.Get("MSG41")),
                 _ when context.Request.Path.StartsWithSegments("/api/treatment-templates")
                     && postgres?.SqlState is PostgresErrorCodes.UniqueViolation
                         or PostgresErrorCodes.SerializationFailure or PostgresErrorCodes.DeadlockDetected
-                    => (409, SystemMessages.Get("MSG111")),
+                    => (409, SystemMessages.Get("MSG41")),
                 _ when (context.Request.Path.StartsWithSegments("/api/dossiers")
                         || context.Request.Path.Value?.Contains("/dossiers", StringComparison.Ordinal) == true)
                     && postgres?.SqlState is PostgresErrorCodes.UniqueViolation
                         or PostgresErrorCodes.SerializationFailure or PostgresErrorCodes.DeadlockDetected
-                    => (409, SystemMessages.Get("MSG111")),
+                    => (409, SystemMessages.Get("MSG41")),
                 _ when context.Request.Path.StartsWithSegments("/api/accounts")
                     && postgres?.SqlState == PostgresErrorCodes.UniqueViolation => (409, StaffAccountConflicts.ForConstraint(postgres.ConstraintName)),
                 _ when (context.Request.Path.StartsWithSegments("/api/accounts")
                         || context.Request.Path.StartsWithSegments("/api/auth/register")
                         || context.Request.Path.StartsWithSegments("/api/auth/google"))
-                    && postgres?.SqlState == PostgresErrorCodes.UniqueViolation => (409, SystemMessages.Get("MSG139")),
+                    && postgres?.SqlState == PostgresErrorCodes.UniqueViolation => (409, SystemMessages.Get("MSG46")),
                 _ when (context.Request.Path.StartsWithSegments("/api/accounts")
                         || context.Request.Path.StartsWithSegments("/api/auth/google"))
-                    && postgres?.SqlState is PostgresErrorCodes.SerializationFailure or PostgresErrorCodes.DeadlockDetected => (409, SystemMessages.Get("MSG111")),
+                    && postgres?.SqlState is PostgresErrorCodes.SerializationFailure or PostgresErrorCodes.DeadlockDetected => (409, SystemMessages.Get("MSG41")),
                 _ when context.Request.Path.StartsWithSegments("/api/system-settings") && postgres?.SqlState == PostgresErrorCodes.UniqueViolation
                     => (409, DCMS.Application.Features.SystemSettings.CatalogMessages.Duplicate),
                 _ when context.Request.Path.StartsWithSegments("/api/system-settings") && postgres?.SqlState is PostgresErrorCodes.SerializationFailure or PostgresErrorCodes.DeadlockDetected
-                    => (409, SystemMessages.Get("MSG111")),
-                _ => (503, SystemMessages.Get("MSG144"))
+                    => (409, SystemMessages.Get("MSG41")),
+                _ => (503, SystemMessages.Get("MSG49"))
             };
             if (status == 503) logger.LogError(ex, "Operation failed ({ExceptionType}); trace {TraceId}", ex.GetType().Name, context.TraceIdentifier);
             context.Response.StatusCode = status;
