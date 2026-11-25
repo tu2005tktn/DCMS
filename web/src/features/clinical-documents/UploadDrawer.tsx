@@ -66,7 +66,7 @@ export default function UploadDrawer({ open, patientId, contexts, initialContext
 
   const update = (key: string, patch: Partial<Row>) => setRows(previous => previous.map(r => r.key === key ? { ...r, ...patch } : r));
 
-  async function send(row: Row, values: Values) {
+  async function send(row: Row, values: Values): Promise<boolean> {
     const controller = new AbortController();
     aborts.current.set(row.key, controller);
     update(row.key, { status: 'uploading', progress: 0, error: undefined });
@@ -78,9 +78,11 @@ export default function UploadDrawer({ open, patientId, contexts, initialContext
         requestKey: row.requestKey,
       }, row.file, progress => update(row.key, { progress }), controller.signal);
       update(row.key, { status: 'done', progress: 100, result });
+      return true;
     } catch (failure) {
       // The same requestKey is kept for retry, so the server returns the earlier result instead of a second copy.
       update(row.key, { status: 'failed', error: (failure as ApiError).message });
+      return false;
     } finally { aborts.current.delete(row.key); }
   }
 
@@ -90,9 +92,11 @@ export default function UploadDrawer({ open, patientId, contexts, initialContext
     setBusy(true);
     try {
       // Two at a time keeps progress readable without one slow file blocking the rest.
-      const queue = [...pending];
-      await Promise.all([0, 1].map(async () => { for (let next = queue.shift(); next; next = queue.shift()) await send(next, values); }));
+      const queue = [...pending]; let allSent = true;
+      await Promise.all([0, 1].map(async () => { for (let next = queue.shift(); next; next = queue.shift()) if (!await send(next, values)) allSent = false; }));
       onUploaded();
+      // Everything went through: nothing left to look at, so close. Failed files keep the drawer open for retry.
+      if (allSent && !rows.some(r => r.status === 'invalid')) onClose();
     } finally { setBusy(false); }
   }
 
@@ -148,7 +152,6 @@ export default function UploadDrawer({ open, patientId, contexts, initialContext
     ]} />}
     {rows.length > 0 && !uploading && (done > 0 || failed > 0) && <Alert className="patient-section" showIcon
       type={failed > 0 ? 'warning' : 'success'}
-      message={failed > 0 ? `${done} tệp đã gửi, ${failed} tệp lỗi. Các tệp lỗi được giữ lại để thử lại.` : `${done} tệp đã gửi.`}
-      description={done > 0 ? 'Tệp đang kiểm tra an toàn chỉ mở được khi chuyển sang Sẵn sàng.' : undefined} />}
+      message={failed > 0 ? `${done} tệp đã gửi, ${failed} tệp lỗi. Các tệp lỗi được giữ lại để thử lại.` : `${done} tệp đã gửi.`} />}
   </Drawer>;
 }

@@ -32,9 +32,8 @@ test('ending an examination opens durable clinical history in the correct patien
   const f = await fixture(request); await signIn(page); await page.goto(`/visits/${f.visit.visitId}`);
   await page.getByRole('tab', { name: 'Tổng kết khám', exact: true }).click();
   await page.getByRole('button', { name: 'Hoàn tất khám', exact: true }).click();
-  await page.getByRole('button', { name: 'Kết thúc lượt khám', exact: true }).click();
-  const dialog = page.getByRole('dialog', { name: 'Kết thúc lượt khám', exact: true }); await dialog.getByRole('checkbox').check();
-  await dialog.getByRole('button', { name: 'Xác nhận kết thúc lượt', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Hoàn tất khám và kết thúc lượt', exact: true });
+  await dialog.getByRole('button', { name: 'Xác nhận', exact: true }).click();
   await expect(page.getByText('Đã lưu lịch sử khám vào hồ sơ bệnh nhân', { exact: true })).toBeVisible();
   await page.getByRole('link', { name: 'Xem lịch sử khám của bệnh nhân', exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/patients/${f.patient.id}\\?tab=examinations$`));

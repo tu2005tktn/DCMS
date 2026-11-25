@@ -201,13 +201,14 @@ function ChangeDialog({ detail, token, mode, onClose, onChanged, onAccessError, 
 
   const isUnder12h = !detail.eligibility.canSelfService;
 
-  async function confirm() {
+  async function confirm(reasonOverride?: string) {
     if (submitting.current || conflict || (moving && !slot)) return;
+    const why = reasonOverride ?? reason;
     const payload = isUnder12h
       ? (moving
-          ? { reason, newStartAt: slot!.start, dentistId, chairId: slot!.chairId, kind: 'Change' }
-          : { reason, kind: 'Cancel' })
-      : { expectedVersion: detail.version, reason,
+          ? { reason: why, newStartAt: slot!.start, dentistId, chairId: slot!.chairId, kind: 'Change' }
+          : { reason: why, kind: 'Cancel' })
+      : { expectedVersion: detail.version, reason: why,
           ...(moving && slot ? { dentistId, newStart: slot.start, chairId: slot.chairId, scheduleVersion: slot.scheduleVersion,
             assistantScheduleVersion: slot.assistantScheduleVersion, bookingSettingsVersion: slot.bookingSettingsVersion } : {}) };
     const fingerprint = JSON.stringify({ code: detail.code, mode, isUnder12h, ...payload });
@@ -261,7 +262,9 @@ function ChangeDialog({ detail, token, mode, onClose, onChanged, onAccessError, 
           {moving ? (isUnder12h ? 'Gửi yêu cầu đổi lịch' : 'Xác nhận đổi lịch') : (isUnder12h ? 'Gửi yêu cầu hủy lịch' : 'Xác nhận hủy lịch')}</Button></Space>
     </> : <Form form={form} layout="vertical" onFinish={values => {
       if (moving && !slot) return;
-      setReason(values.reason.trim()); setReviewing(true);
+      const trimmed = values.reason.trim(); setReason(trimmed);
+      // Cancelling needs no review page: the warning is already on this form, so one click sends it.
+      if (moving) setReviewing(true); else void confirm(trimmed);
     }}>
       <div className="customer-change-dialog-current"><span>Giờ hẹn hiện tại</span><strong>{formatTime(detail.start)}</strong>
         <span>{detail.dentistName} · {detail.durationMinutes} phút</span></div>
@@ -288,8 +291,13 @@ function ChangeDialog({ detail, token, mode, onClose, onChanged, onAccessError, 
         { required: true, whitespace: true, message: 'Vui lòng nhập Lý do.' }, { max: 500, message: 'Lý do không được vượt quá 500 ký tự.' },
       ]}><Input.TextArea rows={3} maxLength={500} showCount /></Form.Item>
       <Typography.Paragraph type="secondary">Không ghi thông tin bệnh lý trong lý do.</Typography.Paragraph>
-      <Space className="customer-change-actions" wrap><Button onClick={onClose}>Đóng</Button><Button type="primary" htmlType="submit"
-        disabled={Boolean(conflict) || (moving && (!dentistId || !slot || slotsBusy || dentistsBusy))}>Xem lại</Button></Space>
+      {!moving && (isUnder12h
+        ? <Alert className="form-alert" type="info" showIcon message="Lịch hẹn còn dưới 12 giờ. Sau khi bạn gửi yêu cầu hủy, thông tin sẽ được chuyển đến nhân viên phòng khám để kiểm tra và xác nhận. Lịch hẹn cũ vẫn được giữ nguyên cho đến khi nhân viên duyệt." />
+        : <Alert className="form-alert" type="warning" showIcon message="Sau khi xác nhận, lịch hẹn này sẽ bị hủy." />)}
+      <Space className="customer-change-actions" wrap><Button onClick={onClose} disabled={busy}>Đóng</Button><Button type="primary" htmlType="submit"
+        danger={!moving} loading={!moving && busy}
+        disabled={Boolean(conflict) || (moving && (!dentistId || !slot || slotsBusy || dentistsBusy))}>
+        {moving ? 'Xem lại' : isUnder12h ? 'Gửi yêu cầu hủy lịch' : 'Xác nhận hủy lịch'}</Button></Space>
     </Form>}
   </Modal>;
 }

@@ -42,7 +42,7 @@ test('staff sees inbox menu, can filter and open a request drawer', async ({ pag
   expect(errors).toEqual([]);
 });
 
-test('resolve without prior change is blocked for change/cancel requests', async ({ page }) => {
+test('change request is handled with one Đổi lịch click', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', e => errors.push(e.message));
   await login(page, 'assistant.demo');
@@ -52,17 +52,12 @@ test('resolve without prior change is blocked for change/cancel requests', async
   const changeRow = page.locator('table tbody tr.ant-table-row').filter({ hasText: 'Yêu cầu đổi lịch' }).first();
   await changeRow.click();
   await page.getByRole('tab', { name: 'Xử lý', exact: true }).click();
-  // Nút Xử lý yêu cầu phải bị disabled khi chưa đổi lịch.
-  const resolveButton = page.getByRole('button', { name: 'Xử lý yêu cầu', exact: true });
-  await expect(resolveButton).toBeDisabled();
-  await page.getByRole('button', { name: 'Xác minh người yêu cầu', exact: true }).click();
-  await expect(page.getByText('Đã xác minh người yêu cầu.', { exact: true })).toBeVisible();
-  // Bấm Đổi lịch → command chạy trực tiếp.
+  // Không còn bước xác minh hoặc "Xử lý yêu cầu" riêng cho yêu cầu đổi lịch.
+  await expect(page.getByRole('button', { name: 'Xác minh người yêu cầu', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Xử lý yêu cầu', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'Đổi lịch', exact: true }).click();
-  // Sau khi commit, nút "Đổi lịch" chuyển thành "Đã thay đổi lịch" + resolve bật.
-  await expect(page.getByRole('button', { name: 'Đã thay đổi lịch', exact: true })).toBeVisible({ timeout: 10000 });
-  // Sau khi commit, nút Xử lý yêu cầu phải bật.
-  await expect(resolveButton).toBeEnabled();
+  await expect(page.getByText('Đã đổi lịch và đóng yêu cầu.', { exact: true })).toBeVisible({ timeout: 10000 });
+  await expect(page.getByRole('button', { name: 'Đã thay đổi lịch', exact: true })).toBeVisible();
   expect(errors).toEqual([]);
 });
 

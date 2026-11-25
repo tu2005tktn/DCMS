@@ -174,10 +174,10 @@ Màn "Tiếp nhận hôm nay" không còn dòng "Lịch hẹn và lượt khám 
 
 ## Tiếp nhận: một khối liền mạch và bảng có viền (08/11/2026)
 
-Bộ lọc, thẻ chuyển Lịch hẹn / Hàng chờ và lượt khám và bảng nằm chung một thẻ (không còn khối lọc tách riêng). Hai bảng có viền ngoài bo góc, đường kẻ giữa hàng và cột. Chức năng không đổi.
+Bộ lọc, thẻ chuyển Lịch hẹn / Hàng chờ khám và bảng nằm chung một thẻ (không còn khối lọc tách riêng). Hai bảng có viền ngoài bo góc, đường kẻ giữa hàng và cột. Chức năng không đổi.
 
 
-Bảng không cuộn ngang: chữ trong ô tự xuống dòng; từ 1000px trở xuống mỗi dòng là một thẻ, mỗi trường một dòng "nhãn: giá trị" (cả hai tab Lịch hẹn và Hàng chờ và lượt khám).
+Bảng không cuộn ngang: chữ trong ô tự xuống dòng; từ 1000px trở xuống mỗi dòng là một thẻ, mỗi trường một dòng "nhãn: giá trị" (cả hai tab Lịch hẹn và Hàng chờ khám).
 
 ## Điều chỉnh giao diện bảng Lịch hẹn (14/11/2026)
 
@@ -198,3 +198,11 @@ Trang tiếp nhận bệnh nhân (check-in): tiêu đề bên trái, nút "Về 
 ## Bỏ chọn đợt điều trị cũ khi tiếp nhận (17/11/2026)
 
 Theo [rút gọn bảng VISIT](VISIT-TABLE-SIMPLIFICATION.vi.md), check-in không còn trường "Đợt điều trị cũ (nếu có)" và không còn cờ "cần bác sĩ xác nhận nguồn". Bỏ `priorCourseId` khỏi request check-in, bỏ `source`, `requiresClinicalSourceReview`, `recordedAt` khỏi `VisitResult` và bỏ `GET /api/reception/appointments/{appointmentId}/courses`. Lượt "Tiếp tục điều trị" mở tab Điều trị của bệnh nhân để bác sĩ chọn hồ sơ. Hàng chờ hiển thị thêm trạng thái lượt "Đã xác nhận phiếu khám".
+
+## Hàng chờ khám chỉ hiện lượt chưa xong (25/11/2026)
+
+Tab đổi tên thành **Hàng chờ khám**. Khi không chọn bộ lọc trạng thái, `GET /api/reception/queue` chỉ trả các lượt chưa xong: `Queued` (Chờ khám), `InProgress` (Đang khám) và `ExaminationConfirmed` (dữ liệu cũ chưa kết thúc lượt). Lượt `Completed` và `Cancelled` rời hàng chờ; lễ tân vẫn xem lại được bằng cách chọn đúng trạng thái đó trong bộ lọc (`status=Completed` hoặc `status=Cancelled`). Thứ tự giữ nguyên: theo giờ đến tăng dần (`ArrivalAt`, rồi `Id`), ai đến trước hiện trước. `total` và phân trang tính trên tập đã lọc. Tab Lịch hẹn giữ thứ tự theo giờ hẹn.
+
+## Check-in không cần ô tick đối chiếu (25/11/2026)
+
+Bỏ ô tick "Đã đối chiếu đúng người đến khám với lịch và hồ sơ đã chọn". Thông tin cần đối chiếu (mã/họ tên, ngày sinh, điện thoại) vẫn hiển thị ngay trên nút; bấm **Xác nhận Check-in** chính là xác nhận đã đối chiếu, giao diện gửi `identityConfirmed=true`. Hợp đồng API và kiểm tra server giữ nguyên (thiếu `identityConfirmed` vẫn bị từ chối).

@@ -102,8 +102,11 @@ public sealed class ExaminationService(DcmsDbContext db, ClinicalAccess access, 
                 if (e == null || !VisitStatuses.HasConfirmedExamination.Contains(v.Status)) throw Error("MSG34", 409);
                 if (string.IsNullOrWhiteSpace(amendment.Reason) || amendment.Reason.Length > 1000) throw new BusinessException(400, SystemMessages.Get("MSG04", field: "Lý do đính chính (tối đa 1000 ký tự)"));
             } else if (v.Status != VisitStatuses.InProgress || a.Status != "InProgress") throw Error("MSG34", 409);
+            if (save.CompleteVisit && (!save.Confirm || action == "Amend")) throw Error("MSG04");
             if (save.Confirm && await db.Investigations.AnyAsync(x => x.VisitId == visitId && x.RequiredForDiagnosis && x.State != "Reviewed" && x.State != "Cancelled", ct))
                 throw new BusinessException(409, SystemMessages.Get("MSG56",field:"cần nhận và đọc kết quả cận lâm sàng trước khi hoàn tất khám") with { Field = "investigations" });
+            if (save.CompleteVisit && await db.Investigations.AnyAsync(x => x.VisitId == visitId && x.State != "Reviewed" && x.State != "Cancelled", ct))
+                throw new BusinessException(409, SystemMessages.Get("MSG56",field:"còn chỉ định cận lâm sàng chưa được bác sĩ đọc hoặc hủy") with { Field = "investigations" });
             Validate(save.Content, save.Confirm);
             await ValidateDiagnosisReferences(save.Content,e == null ? null : JsonSerializer.Deserialize<ExaminationContent>(e.ContentJson,Json),ct);
             save = save with { Content = NormalizeDiagnoses(save.Content) };
@@ -112,6 +115,10 @@ public sealed class ExaminationService(DcmsDbContext db, ClinicalAccess access, 
             if (e == null) { e = new VisitExamination { VisitId = visitId }; db.Add(e); }
             e.ContentJson = JsonSerializer.Serialize(stored, StoreJson);
             if (action != "Amend" && save.Confirm) v.Status = VisitStatuses.ExaminationConfirmed;
+            if (save.CompleteVisit) {
+                if (!HasDiagnosis(save.Content) || string.IsNullOrWhiteSpace(save.Content.Disposition)) throw new BusinessException(409, SystemMessages.Get("MSG56", field: "phiếu khám còn thiếu chẩn đoán hoặc hướng xử trí"));
+                v.Status = VisitStatuses.Completed; a.Status = "Completed"; a.Version++;
+            }
             e.UpdatedAt = clock.GetUtcNow(); e.UpdatedBy = actorId;
         }
         v.Version++;
@@ -121,6 +128,10 @@ public sealed class ExaminationService(DcmsDbContext db, ClinicalAccess access, 
             OccurredAt = clock.GetUtcNow(), BeforeJson = old, AfterJson = save == null
                 ? JsonSerializer.Serialize(new { v.Status, v.Version, completedAt = action == "Complete" ? clock.GetUtcNow() : (DateTimeOffset?)null }, Json)
                 : JsonSerializer.Serialize(new { examinationVersion = nextExaminationVersion, content = save.Content, confirmed = save.Confirm, reason = (payload as AmendExamination)?.Reason }, Json) });
+        if (save?.CompleteVisit == true)
+            db.Add(new VisitAudit { VisitId = v.Id, ActorAccountId = actorId, Action = "CompleteVisit", OccurredAt = clock.GetUtcNow(),
+                BeforeJson = JsonSerializer.Serialize(new { Status = VisitStatuses.InProgress }, Json),
+                AfterJson = JsonSerializer.Serialize(new { v.Status, v.Version, completedAt = clock.GetUtcNow() }, Json) });
         db.Add(new ExaminationReceipt { ActorId = actorId, RequestKey = key, VisitId = visitId, Fingerprint = hash });
         await db.SaveChangesAsync(ct); await tx.CommitAsync(ct);
         return await GetAsync(actorId, visitId, ct);

@@ -11,7 +11,7 @@ async function setup(page: Page, permitted = true) {
   const user = { id: 2, userName: 'fixture', fullName: 'Synthetic staff', accountType: 'Staff',
     roles: ['ClinicAssistant'], effectiveRoles: ['ClinicAssistant'],
     permissions: permitted ? ['appointments.support.handle'] : [], hasVerifiedPatientLink: false };
-  const request = { id: 'SR-DIRECT', appointmentId: id, appointmentCode: appointment.code, kind: 'Cancel', status: 'Pending',
+  const request = { id: 'SR-DIRECT', appointmentId: id, appointmentCode: appointment.code, kind: 'General', status: 'Pending',
     expectedVersion: 1, requestKey: id, reason: 'Synthetic cancellation', requester: { name: 'Requester', phone: null, isAnonymous: false },
     permission: { canResolve: true, canEdit: true, branchMatch: true, ownershipMatch: true }, appointmentActionCommitted: false,
     createdAt: appointment.startAt, updatedAt: appointment.startAt, history: [],

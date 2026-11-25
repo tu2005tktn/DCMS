@@ -62,3 +62,13 @@ Từ 20/11/2026 không còn quét virus ClamAV (xem S19-S20-DCMS-112 mục "Bỏ
 Bổ sung giá và thực hiện/thanh toán ngày 27/10: [INVESTIGATION-BILLING.vi.md](INVESTIGATION-BILLING.vi.md). Chỉ định/nhận/đọc không tự tạo phí; xác nhận dịch vụ đã thực hiện theo báo giá mới tạo source charge duy nhất.
 
 Cập nhật lưu trữ ngày 12/11/2026 theo [thiết kế hai bảng](EXAMINATION-TWO-TABLES.vi.md). Chỉ định nằm trong collection JSONB của `VISIT`. Đọc/ghi báo giá, thực hiện và xử lý kết quả nạp lượt khám có tracking; giữ toàn bộ ID chỉ định, snapshot tài chính, phiên bản và khóa giao dịch.
+
+## Rút gọn luồng chỉ định cận lâm sàng (25/11/2026)
+
+Theo yêu cầu người dùng, bác sĩ không phải bấm riêng "Nhận kết quả" rồi mới "Đọc kết quả". Từ 5 bước (thêm chỉ định → tải tệp → nhận kết quả → đọc kết quả → xác nhận đã xem từng tệp) còn 3 bước: **Thêm chỉ định → Tải tệp kết quả → Đọc kết quả**.
+
+- `POST /api/visits/{visitId}/investigations/{id}/review` nhận thêm trường tùy chọn `resultText` (≤ 4000 ký tự). Khi chỉ định đang `Ordered`, server trong **cùng một transaction** ghi nhận kết quả (giống `result`: tệp `Ready` của chỉ định trở thành tệp kết quả, `resultText` nếu có; cần ít nhất một tệp Ready hoặc `resultText`, nếu không trả 400 MSG02), rồi đánh dấu `Reviewed` như cũ. `ResultBy`/`ResultAt` là bác sĩ đọc kết quả. Audit ghi hai dòng `ReceiveInvestigationResult` và `ReviewInvestigation`. Khi chỉ định đã `ResultAvailable`, lệnh giữ nguyên hành vi cũ và `resultText` bị bỏ qua.
+- Hành động `review` xuất hiện trong `allowedActions` khi chỉ định `ResultAvailable` (như cũ) **hoặc** `Ordered` mà đã có ít nhất một tệp `Ready`; vẫn chỉ cho bác sĩ phụ trách có `examinations.manage` khi lượt còn mở.
+- Đọc kết quả tự đánh dấu các tệp kết quả là đã review trong lượt (như cũ), nên không cần bấm "Xác nhận đã xem" từng tệp.
+- Lệnh `result` riêng vẫn giữ cho trợ lý/kỹ thuật viên có `investigations.results.receive` nhưng không có quyền khám: họ nhận kết quả, bác sĩ chỉ còn bước Đọc kết quả.
+- Giao diện: khi chỉ định `Ordered` đã có tệp Ready, nút chính là **Đọc kết quả**; hộp thoại hiển thị tệp, ô "Nội dung kết quả" (tùy chọn) và "Nhận định của bác sĩ". Nút "Nhận kết quả" chỉ hiện khi người dùng không có hành động `review`.

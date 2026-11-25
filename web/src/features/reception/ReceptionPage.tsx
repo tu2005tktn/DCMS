@@ -81,7 +81,7 @@ export default function ReceptionPage() {
           { title: 'Thao tác', key: 'action', render: (_, row) => row.visitId ? <Link to={`/visits/${row.visitId}`}>Mở lượt khám</Link>
             : <Link to={`/reception/appointments/${row.appointmentId}`}>{row.canCheckIn ? 'Tiếp nhận' : 'Xem điều kiện tiếp nhận'}</Link> },
         ])} /> },
-      { key: 'queue', label: 'Hàng chờ và lượt khám', children: !error && <Table<VisitResult> rowKey="visitId" loading={busy}
+      { key: 'queue', label: 'Hàng chờ khám', children: !error && <Table<VisitResult> rowKey="visitId" loading={busy}
         dataSource={queue?.items} pagination={pagination} className="reception-table" columns={withLabels<VisitResult>([
           { title: 'Bệnh nhân', key: 'patient', render: (_, row) => <><strong>{row.patientName}</strong><div>{row.patientCode}</div></> },
           { title: 'Giờ đến', dataIndex: 'arrivalAt', render: arrivalClock },

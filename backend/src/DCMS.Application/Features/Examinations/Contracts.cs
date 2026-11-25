@@ -10,7 +10,7 @@ public sealed record ExaminationContent(string? Symptoms, MedicalFact MedicalHis
     string? ReturnNeed = null, string? ReferralDestination = null, IReadOnlyList<string>? Diagnoses = null, IReadOnlyList<string>? UnscopedDiagnoses = null, IReadOnlyList<DCMS.Application.Features.Settings.ReferenceSnapshot>? DiagnosisReferences = null);
 public sealed record StartExamination(int PatientId, int ExpectedVersion, Guid RequestKey);
 public sealed record SaveExamination(int PatientId, int ExpectedVersion, Guid RequestKey,
-    ExaminationContent Content, bool Confirm);
+    ExaminationContent Content, bool Confirm, bool CompleteVisit = false);
 public sealed record ExaminationDto(ExaminationContent Content, bool Confirmed, int UpdatedBy, DateTimeOffset UpdatedAt,
     Guid Id = default, int Version = 0);
 public sealed record AmendExamination(int PatientId, int ExpectedVersion, Guid RequestKey, ExaminationContent Content, string Reason);

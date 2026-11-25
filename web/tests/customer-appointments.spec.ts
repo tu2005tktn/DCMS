@@ -174,10 +174,9 @@ for (const status of [401, 403, 404]) test(`HTTP ${status} after opening detail 
   await page.goto('/customer/appointments/AP-WEB-TEST');
   await page.getByRole('button', { name: 'Hủy lịch', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Hủy lịch hẹn' });
-  await dialog.getByRole('button', { name: 'Xem lại', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Xác nhận hủy lịch', exact: true }).click();
   await expect(dialog.getByText('Vui lòng nhập Lý do.')).toBeVisible();
   await dialog.getByLabel('Lý do', { exact: true }).fill('SYNTHETIC cancellation');
-  await dialog.getByRole('button', { name: 'Xem lại', exact: true }).click();
   await dialog.getByRole('button', { name: 'Xác nhận hủy lịch', exact: true }).click();
   await expect(page.getByText(original.bookerContactMasked)).toHaveCount(0);
   if (status === 401) {
@@ -251,7 +250,6 @@ test('actual API and PostgreSQL: customer views, reschedules and cancels on web'
     await page.getByRole('button', { name: 'Hủy lịch', exact: true }).click();
     const cancelDialog = page.getByRole('dialog', { name: 'Hủy lịch hẹn' });
     await cancelDialog.getByLabel('Lý do', { exact: true }).fill('SYNTHETIC web cancellation');
-    await cancelDialog.getByRole('button', { name: 'Xem lại', exact: true }).click();
     const cancelledResponse = page.waitForResponse(response => response.url().endsWith(`/${appointment.code}/cancel`) && response.request().method() === 'POST');
     await cancelDialog.getByRole('button', { name: 'Xác nhận hủy lịch', exact: true }).click();
     expect((await cancelledResponse).status()).toBe(200);

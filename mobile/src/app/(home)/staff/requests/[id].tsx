@@ -2,10 +2,10 @@
  * S12/S26 — StaffRequestDetailScreen (mobile).
  *
  * Đọc `GET /api/support-requests/{id}` và chạy command thật cùng hợp đồng với web:
- *  1. Xác minh người yêu cầu (`verify-requester`) — Pending → InReview.
- *  2. Đổi/huỷ lịch theo yêu cầu (`change-appointment`) — lý do bắt buộc; đổi lịch chọn ngày và khung giờ
- *     trống từ `GET /api/availability` (mặc định giờ bệnh nhân đề xuất).
- *  3. Resolve/Reject (`resolve`/`reject`) — Reject bắt buộc lý do; Withdrawn không được xử lý (GBR-075).
+ *  - Yêu cầu đổi/huỷ lịch: một bước `change-appointment` — server tự xác minh người yêu cầu và đóng yêu cầu
+ *    (S12, 25/11/2026). Lý do bắt buộc; đổi lịch chọn ngày và khung giờ trống từ `GET /api/availability`.
+ *  - Loại khác: xác minh người yêu cầu (`verify-requester`, tùy chọn) rồi Resolve.
+ *  - Reject (`reject`) bắt buộc lý do; Withdrawn không được xử lý (GBR-075).
  *
  * Quyền (`permission`) do server tính. Lỗi command hiển thị lỗi thật, không báo thành công giả;
  * 409 → tải lại bản mới nhất. `requestKey` giữ nguyên khi thử lại cùng nội dung sau lỗi mạng/5xx.
@@ -157,7 +157,7 @@ export default function StaffRequestDetailScreen() {
         ok = await finish('change', await supportRequestsApi.changeAppointment(request.id, {
           requestKey: requestKey('change', fingerprint), expectedVersion: request.expectedVersion, reason, notes: trimmed,
           newStartAt: kind === 'change' ? newStartAt ?? undefined : undefined,
-        }, token), kind === 'change' ? 'Đã đổi lịch. Bây giờ bạn có thể xử lý yêu cầu.' : 'Đã huỷ lịch. Bây giờ bạn có thể xử lý yêu cầu.');
+        }, token), kind === 'change' ? 'Đã đổi lịch và đóng yêu cầu.' : 'Đã huỷ lịch và đóng yêu cầu.');
       } else {
         ok = await finish(`decision-${kind}`, await supportRequestsApi.decide(request.id, {
           requestKey: requestKey(`decision-${kind}`, fingerprint), expectedVersion: request.expectedVersion,
@@ -246,7 +246,7 @@ export default function StaffRequestDetailScreen() {
             <Text style={styles.muted}>Bạn không có quyền xử lý yêu cầu này.</Text>
           ) : (
             <View style={{ gap: spacing.sm }}>
-              {request.status === 'Pending' ? (
+              {request.status === 'Pending' && !needsAppointmentAction ? (
                 <PrimaryButton label="Xác minh người yêu cầu" onPress={() => void run('verify')} loading={busy} disabled={busy} testID="verify-requester" />
               ) : null}
               {request.kind === 'Change' && !request.appointmentActionCommitted && permission.canEdit ? (
@@ -255,9 +255,7 @@ export default function StaffRequestDetailScreen() {
               {request.kind === 'Cancel' && !request.appointmentActionCommitted && permission.canEdit ? (
                 <PrimaryButton label="Huỷ lịch theo yêu cầu" onPress={() => setModal('cancel')} loading={busy} disabled={busy} testID="staff-cancel" />
               ) : null}
-              {!canDecide ? (
-                <Text style={styles.muted}>Cần đổi/huỷ lịch thành công trước khi đánh dấu đã xử lý.</Text>
-              ) : (
+              {!canDecide ? null : (
                 <PrimaryButton label="Đánh dấu đã xử lý" onPress={() => setModal('resolve')} loading={busy} disabled={busy} testID="staff-resolve" />
               )}
               <PrimaryButton label="Từ chối yêu cầu" onPress={() => setModal('reject')} loading={busy} disabled={busy} testID="staff-reject" />

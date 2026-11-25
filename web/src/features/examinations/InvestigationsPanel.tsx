@@ -54,7 +54,7 @@ export default function InvestigationsPanel({ workspace, contexts, busy, onBusy,
     const body = { patientId: workspace.visit.patientId, expectedVisitVersion: workspace.visit.visitVersion,
       ...(order ? { expectedVersion: order.version } : {}),
       ...(mode.action === 'create' ? { ...(amendmentOrder ? { expectedExaminationVersion: workspace.examination?.version, amendmentReason: values.amendmentReason } : {}), kind: values.kind, name: values.name, region: values.region || null, reason: values.reason, requiredForDiagnosis: values.requiredForDiagnosis }
-        : mode.action === 'result' ? { resultText: values.resultText || null } : mode.action === 'review' ? { interpretation: values.interpretation || null } : { reason: values.reason }) };
+        : mode.action === 'result' ? { resultText: values.resultText || null } : mode.action === 'review' ? { interpretation: values.interpretation || null, ...(order?.state === 'Ordered' ? { resultText: values.resultText || null } : {}) } : { reason: values.reason }) };
     const fingerprint = JSON.stringify({ action: mode.action, order: order?.id, body });
     if (pending.current?.fingerprint !== fingerprint) pending.current = { fingerprint, key: crypto.randomUUID() };
     setWorking(true); onBusy(true); setError(undefined);
@@ -88,7 +88,7 @@ export default function InvestigationsPanel({ workspace, contexts, busy, onBusy,
       {order.cancellationReason && <p>Lý do hủy: {order.cancellationReason}</p>}
       <Space wrap>
         {order.allowedActions.includes('upload') && <Button disabled={busy} onClick={() => setUpload(order.id)}>Tải tệp kết quả</Button>}
-        {order.allowedActions.includes('result') && <Button disabled={busy} onClick={() => open('result', order)}>Nhận kết quả</Button>}
+        {order.allowedActions.includes('result') && !order.allowedActions.includes('review') && <Button disabled={busy} onClick={() => open('result', order)}>Nhận kết quả</Button>}
         {order.allowedActions.includes('review') && <Button type="primary" disabled={busy} onClick={() => open('review', order)}>Đọc kết quả</Button>}
         {order.allowedActions.includes('cancel') && <Button disabled={busy} onClick={() => open('cancel', order)}>Hủy chỉ định</Button>}
       </Space>
@@ -112,8 +112,11 @@ export default function InvestigationsPanel({ workspace, contexts, busy, onBusy,
           {mode.order?.documents.some(file => file.fileState !== 'Ready') && <Alert type="info" message="Tệp đang kiểm tra hoặc bị từ chối chưa được dùng làm bằng chứng kết quả. Nội dung văn bản vẫn có thể được ghi nhận riêng." />}
         </>}
         {mode?.action === 'review' && <>
-          <Typography.Paragraph strong>{mode.order?.name}</Typography.Paragraph><Typography.Paragraph style={{ whiteSpace: 'pre-wrap' }}>{mode.order?.resultText || 'Kết quả nằm trong các tệp đã nhận.'}</Typography.Paragraph>
-          {mode.order?.documents.filter(file => mode.order?.resultDocumentIds.includes(file.documentId)).map(file => <Button key={file.documentId} type="link" onClick={() => setDocumentId(file.documentId)}>{file.fileName}</Button>)}
+          <Typography.Paragraph strong>{mode.order?.name}</Typography.Paragraph>
+          {mode.order?.state === 'Ordered'
+            ? <Form.Item label="Nội dung kết quả (nếu có)" name="resultText" rules={[{ max: 4000 }]}><Input.TextArea aria-label="Nội dung kết quả" rows={3} maxLength={4000} /></Form.Item>
+            : <Typography.Paragraph style={{ whiteSpace: 'pre-wrap' }}>{mode.order?.resultText || 'Kết quả nằm trong các tệp đã nhận.'}</Typography.Paragraph>}
+          {mode.order?.documents.filter(file => mode.order?.state === 'Ordered' ? file.fileState === 'Ready' : mode.order?.resultDocumentIds.includes(file.documentId)).map(file => <Button key={file.documentId} type="link" onClick={() => setDocumentId(file.documentId)}>{file.fileName}</Button>)}
           <Form.Item label="Nhận định của bác sĩ (nếu có)" name="interpretation" rules={[{ max: 4000 }]}><Input.TextArea aria-label="Nhận định của bác sĩ" rows={3} maxLength={4000} /></Form.Item>
         </>}
         {mode?.action === 'cancel' && <><Alert type="info" message="Nếu dịch vụ đã thực hiện, hủy chỉ định không tự xóa phí, khoản phải trả hoặc phiếu thu."/><Form.Item label="Lý do hủy" name="reason" rules={[{ required: true, whitespace: true, max: 1000 }]}><Input.TextArea aria-label="Lý do hủy chỉ định" maxLength={1000} /></Form.Item></>}

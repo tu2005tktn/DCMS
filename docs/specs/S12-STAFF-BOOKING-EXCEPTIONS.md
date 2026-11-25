@@ -102,3 +102,11 @@ là bản đọc lại sau save với `expectedVersion` mới và
 UC-05/06 và booking portion UC-34; S12/S26;
 GBR-007/012–015/031/073/075/077/078/081/123;
 MSG31–38/94/111/144; AT16 phần xử lý hỗ trợ.
+
+## Xử lý yêu cầu đổi/hủy lịch một bước (25/11/2026)
+
+Theo yêu cầu người dùng, nhân viên không phải bấm lần lượt "Xác minh người yêu cầu" → "Đổi/Hủy lịch" → "Xử lý yêu cầu" → xác nhận nữa. Với yêu cầu loại `Change` hoặc `Cancel`, nhân viên chỉ điền lý do (và giờ mới nếu đổi) rồi bấm **Đổi lịch** hoặc **Hủy lịch** một lần.
+
+- `POST /api/support-requests/{id}/change-appointment`: nếu yêu cầu chưa xác minh người yêu cầu, server tự xác minh với ghi chú mặc định "Đã đối chiếu người yêu cầu với thông tin đặt lịch." (lịch sử `RequesterVerified`, người xác minh là nhân viên đang thao tác). Sau khi đổi/hủy lịch thành công, server tự đóng yêu cầu ở `Resolved` trong cùng transaction ghi dấu thay đổi: `DecisionReason` = ghi chú nhân viên hoặc "Đã xử lý yêu cầu.", lịch sử `RequestResolved`, outbox `support.resolved`, phát realtime `Resolved`. Nếu đổi/hủy lịch thất bại thì yêu cầu không đổi.
+- `verify-requester` và `resolve` giữ nguyên cho các loại yêu cầu khác và cho từ chối. Yêu cầu Change/Cancel cũ đã đổi lịch nhưng chưa đóng vẫn có nút "Xử lý yêu cầu".
+- Web và mobile ẩn nút "Xác minh người yêu cầu" với yêu cầu Change/Cancel; thông báo thành công là "Đã đổi lịch và đóng yêu cầu." hoặc "Đã hủy lịch và đóng yêu cầu.".

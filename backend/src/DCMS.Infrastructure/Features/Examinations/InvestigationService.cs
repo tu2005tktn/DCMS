@@ -36,7 +36,8 @@ public sealed class InvestigationService(DcmsDbContext db, ClinicalAccess access
                 if (grants.Contains("documents.upload")) actions.Add("upload");
                 if (grants.Contains("investigations.results.receive")) actions.Add("result");
             }
-            if (active && own && row.State == "ResultAvailable" && grants.Contains("examinations.manage")) actions.Add("review");
+            if (active && own && grants.Contains("examinations.manage") && (row.State == "ResultAvailable"
+                || row.State == "Ordered" && files.Any(f => f.FileState == "Ready"))) actions.Add("review");
             if (active && own && row.State is "Ordered" or "ResultAvailable" && grants.Contains("examinations.manage")) actions.Add("cancel");
             items.Add(new(row.Id, visitId, row.Kind, row.Name, row.Region, row.Reason, row.RequiredForDiagnosis,
                 row.State, row.Version, Name(row.CreatedBy) ?? "", row.CreatedAt, row.ResultText, Name(row.ResultBy), row.ResultAt,
@@ -102,8 +103,21 @@ public sealed class InvestigationService(DcmsDbContext db, ClinicalAccess access
             row.ResultDocumentIdsJson = JsonSerializer.Serialize(ready); row.State = "ResultAvailable";
             row.ResultBy = actorId; row.ResultAt = clock.GetUtcNow(); row.Version++;
         } else if (payload is ReviewInvestigation review) {
-            if (row!.State != "ResultAvailable") throw Error("MSG34",409);
-            if (review.Interpretation?.Length > 4000) throw Error("MSG04");
+            if (review.Interpretation?.Length > 4000 || review.ResultText?.Length > 4000) throw Error("MSG04");
+            if (row!.State == "Ordered") {
+                // One-step read: the dentist receives the result and reads it in the same command.
+                var ready = await db.Set<ClinicalDocument>().Where(x => x.Metadata.InvestigationId == row.Id && x.FileState == "Ready").Select(x => x.Id).ToArrayAsync(ct);
+                if (string.IsNullOrWhiteSpace(review.ResultText) && ready.Length == 0)
+                    throw new BusinessException(400, SystemMessages.Get("MSG02",field:"nội dung kết quả hoặc tệp sẵn sàng"));
+                var ordered = before;
+                row.ResultText = string.IsNullOrWhiteSpace(review.ResultText) ? null : review.ResultText.Trim();
+                row.ResultDocumentIdsJson = JsonSerializer.Serialize(ready); row.State = "ResultAvailable";
+                row.ResultBy = actorId; row.ResultAt = clock.GetUtcNow(); row.Version++;
+                before = JsonSerializer.Serialize(row, ExaminationService.Json);
+                db.Add(new VisitAudit { VisitId = visitId, ActorAccountId = actorId, Action = "ReceiveInvestigationResult", OccurredAt = clock.GetUtcNow(),
+                    BeforeJson = ordered, AfterJson = before });
+            }
+            if (row.State != "ResultAvailable") throw Error("MSG34",409);
             var fileIds = JsonSerializer.Deserialize<Guid[]>(row.ResultDocumentIdsJson)!;
             if (await db.Set<ClinicalDocument>().CountAsync(x => fileIds.Contains(x.Id) && x.Metadata.InvestigationId == row.Id && x.FileState == "Ready",ct) != fileIds.Length
                 || fileIds.Length == 0 && string.IsNullOrWhiteSpace(row.ResultText)) throw Error("MSG34",409);

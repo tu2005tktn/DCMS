@@ -44,11 +44,10 @@ test('real check-in appears once in queue and assigned dentist opens the identic
   await page.getByLabel('Lý do đến', { exact: true }).focus(); await page.getByLabel('Lý do đến', { exact: true }).press('ArrowDown');
   await page.locator('.ant-select-dropdown:visible').getByText('Điều trị tiếp', { exact: true }).click();
   await expect(page.getByText('Bác sĩ xác nhận nguồn và hạng mục chuyên môn sau.', { exact: false })).toBeVisible();
-  await page.getByRole('checkbox', { name: 'Đã đối chiếu đúng người đến khám với lịch và hồ sơ đã chọn' }).check();
   const savedResponse = page.waitForResponse(r => r.request().method() === 'POST' && r.url().endsWith(`/appointments/${booked.appointmentId}/check-in`));
   await page.getByRole('button', { name: 'Xác nhận Check-in', exact: true }).dblclick(); const saved = await (await savedResponse).json();
   expect(saved.status).toBe('Queued'); expect(saved.patientId).toBe(p.id); expect(saved.appointmentId).toBe(booked.appointmentId);
-  await page.getByRole('link', { name: 'Xem hàng chờ', exact: true }).click(); await page.getByRole('tab', { name: 'Hàng chờ và lượt khám' }).click();
+  await page.getByRole('link', { name: 'Xem hàng chờ', exact: true }).click(); await page.getByRole('tab', { name: 'Hàng chờ khám' }).click();
   const row = page.getByRole('row').filter({ hasText: p.patientCode }); await expect(row).toHaveCount(1); await expect(row).toContainText('Chờ khám');
   await row.getByRole('link', { name: 'Mở lượt khám' }).click(); await expect(page).toHaveURL(new RegExp(`/visits/${saved.visitId}$`));
   await expect(page.getByRole('heading', { name: `${p.patientCode} · ${p.fullName}` })).toBeVisible();
@@ -81,7 +80,6 @@ test('same phone never auto-selects a different person and a rejected check-in r
   await page.locator('.ant-select-dropdown:visible').getByText(new RegExp(other.patientCode)).click();
   await expect(page.getByText(`${other.patientCode} · ${other.fullName}`, { exact: true }).last()).toBeVisible();
   await page.getByLabel('Ghi chú thêm', { exact: true }).fill('SYNTHETIC nháp cần giữ sau lỗi');
-  await page.getByRole('checkbox', { name: 'Đã đối chiếu đúng người đến khám với lịch và hồ sơ đã chọn' }).check();
   const rejected = page.waitForResponse(r => r.request().method() === 'POST' && r.url().endsWith('/check-in'));
   await page.getByRole('button', { name: 'Xác nhận Check-in', exact: true }).click(); expect((await rejected).status()).toBe(409);
   await expect(page.getByLabel('Ghi chú thêm', { exact: true })).toHaveValue('SYNTHETIC nháp cần giữ sau lỗi');
@@ -121,6 +119,5 @@ test('walk-in uses the real S11 booking form then returns to reception', async (
   const bookedResponse = page.waitForResponse(r => r.request().method() === 'POST' && r.url().endsWith('/api/appointments'));
   await drawer.getByRole('button', { name: 'Xác nhận đặt lịch', exact: true }).click(); const booked = await (await bookedResponse).json();
   await expect(page).toHaveURL(new RegExp(`/reception/appointments/${booked.appointmentId}$`));
-  await page.getByRole('checkbox', { name: 'Đã đối chiếu đúng người đến khám với lịch và hồ sơ đã chọn' }).check();
   await page.getByRole('button', { name: 'Xác nhận Check-in', exact: true }).click(); await expect(page.getByRole('link', { name: 'Mở lượt khám', exact: true })).toBeVisible();
 });

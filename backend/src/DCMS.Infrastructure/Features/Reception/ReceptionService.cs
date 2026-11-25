@@ -148,7 +148,8 @@ public sealed class ReceptionService(DcmsDbContext db, UserManager<ApplicationUs
         var actor = await ScopeAsync(actorId, query.BranchId, false, ct);
         var appointmentsQuery = Query(query, actor, true);
         var rows = db.Visits.AsNoTracking().Where(v => appointmentsQuery.Any(a => a.Id == v.AppointmentId));
-        if (query.Status != null) rows = rows.Where(x => x.Status == query.Status);
+        rows = query.Status != null ? rows.Where(x => x.Status == query.Status)
+            : rows.Where(x => x.Status != VisitStatuses.Completed && x.Status != VisitStatuses.Cancelled);
         var total = await rows.CountAsync(ct);
         var page = await rows.OrderBy(x => x.ArrivalAt).ThenBy(x => x.Id).Skip((query.Page - 1) * query.PageSize).Take(query.PageSize).ToArrayAsync(ct);
         var items = await ResultsAsync(page, false, ct);

@@ -9,7 +9,7 @@ import type { PatientDetail, PatientListItem } from '../patients/types';
 import { formatDate, newRequestKey } from '../appointments/types';
 import { arrivalClock, purposeLabels, type ReceptionDetail, type VisitResult } from './types';
 
-type Values = { patientId?: number; purpose: string; note?: string; identityConfirmed?: boolean; backdate?: boolean; arrivalAt?: string; arrivalReason?: string };
+type Values = { patientId?: number; purpose: string; note?: string; backdate?: boolean; arrivalAt?: string; arrivalReason?: string };
 export default function CheckInPage() {
   const { appointmentId } = useParams(); const auth = useAuth(); const [form] = Form.useForm<Values>();
   const navigate = useNavigate(); const [modal, modalContext] = Modal.useModal(); const [dirty, setDirty] = useState(false);
@@ -29,13 +29,13 @@ export default function CheckInPage() {
     try {
       const value = await api<ReceptionDetail>(`/api/reception/appointments/${appointmentId}`);
       setDetail(value); setLoadedAt(Date.now()); setTick(Date.now());
-      form.setFieldValue('identityConfirmed', false);
+     
       if (initial) { form.setFieldsValue({ patientId: value.appointment.patientId ?? undefined, purpose: 'InitialExamination' }); request.current = null; }
     } catch (e) { setError(e as Error); } finally { setLoading(false); }
   }
   useEffect(() => { setDetail(undefined); setResult(undefined); form.resetFields(); void load(true); }, [appointmentId]);
   useEffect(() => {
-    let active = true; setPatient(undefined); setPatientError(undefined); setSearchError(undefined); form.setFieldValue('identityConfirmed', false);
+    let active = true; setPatient(undefined); setPatientError(undefined); setSearchError(undefined);
     if (patientId) {
       api<PatientDetail>(`/api/patients/${patientId}`).then(value => { if (active) setPatient(value); })
         .catch(e => { if (active) setPatientError((e as Error).message); });
@@ -67,7 +67,7 @@ export default function CheckInPage() {
     if (!eligible) { setError(new Error('Lịch không còn đủ điều kiện tiếp nhận. Vui lòng kiểm tra hoặc xếp lại lịch.')); return; }
     const arrival = values.backdate && values.arrivalAt ? new Date(`${values.arrivalAt}+07:00`) : null;
     if (arrival && !Number.isFinite(arrival.getTime())) { form.setFields([{ name: 'arrivalAt', errors: ['Giờ đến không hợp lệ.'] }]); return; }
-    const payload = { patientId: patient.id, expectedVersion: detail.appointment.version, identityConfirmed: values.identityConfirmed === true,
+    const payload = { patientId: patient.id, expectedVersion: detail.appointment.version, identityConfirmed: true,
       arrivalAt: arrival?.toISOString() ?? null,
       arrivalReason: values.backdate ? values.arrivalReason?.trim() ?? null : null, purpose: values.purpose,
       note: values.note?.trim() || null };
@@ -118,9 +118,6 @@ export default function CheckInPage() {
             { key: 'birth', label: 'Ngày sinh', children: patient.birthDate ? formatDate(patient.birthDate) : 'Chưa biết' },
             { key: 'phone', label: 'Điện thoại', children: patient.phone ?? 'Chưa có' },
           ]} />}
-          <Form.Item name="identityConfirmed" valuePropName="checked" rules={[{ validator: (_, value) => value === true ? Promise.resolve() : Promise.reject(new Error('Vui lòng đối chiếu và xác nhận đúng người đến khám.')) }]}>
-            <Checkbox disabled={!patient || patient.isArchived}>Đã đối chiếu đúng người đến khám với lịch và hồ sơ đã chọn</Checkbox>
-          </Form.Item>
           <Form.Item name="purpose" label="Lý do đến" rules={[{ required: true }]}><Select options={Object.entries(purposeLabels).map(([value, label]) => ({ value, label }))} /></Form.Item>
           {purpose !== 'InitialExamination' && <>
             <Alert type="info" message="Bác sĩ xác nhận nguồn và hạng mục chuyên môn sau. Thiếu đợt hoặc bước tùy chọn không chặn tiếp nhận." />
@@ -135,7 +132,7 @@ export default function CheckInPage() {
           <Button type="primary" htmlType="submit" loading={busy} disabled={!patient || patient.isArchived}>Xác nhận Check-in</Button>
         </Form>)}
     <PatientFormDrawer open={creating} patient={null} onClose={() => setCreating(false)} onSaved={change => {
-      setCreating(false); setPatient(change.patient); setDirty(true); form.setFieldValue('patientId', change.patient.id); form.setFieldValue('identityConfirmed', false);
+      setCreating(false); setPatient(change.patient); setDirty(true); form.setFieldValue('patientId', change.patient.id);
     }} />
   </>;
 }

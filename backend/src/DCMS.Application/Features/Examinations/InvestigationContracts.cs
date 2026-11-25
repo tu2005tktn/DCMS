@@ -6,7 +6,7 @@ public sealed record CreateInvestigation(int PatientId, int ExpectedVisitVersion
 public sealed record ReceiveInvestigationResult(int PatientId, int ExpectedVisitVersion, int ExpectedVersion,
     Guid RequestKey, string? ResultText);
 public sealed record ReviewInvestigation(int PatientId, int ExpectedVisitVersion, int ExpectedVersion,
-    Guid RequestKey, string? Interpretation = null);
+    Guid RequestKey, string? Interpretation = null, string? ResultText = null);
 public sealed record CancelInvestigation(int PatientId, int ExpectedVisitVersion, int ExpectedVersion,
     Guid RequestKey, string Reason);
 public sealed record InvestigationDto(Guid Id, Guid VisitId, string Kind, string Name, string? Region,

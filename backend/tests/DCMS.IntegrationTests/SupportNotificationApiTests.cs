@@ -159,7 +159,7 @@ public sealed class SupportNotificationApiTests(SupportNotificationFixture fixtu
     }
 
     [Fact]
-    public async Task VerifyCancelAndResolveReturnsFreshRequestVersionWithoutExtraRead()
+    public async Task VerifiedCancelClosesTheRequestInOneStepAndReturnsFreshVersion()
     {
         var seed = await SeedAsync("Cancel");
         using var staff = await Login("assistant.demo");
@@ -181,6 +181,8 @@ public sealed class SupportNotificationApiTests(SupportNotificationFixture fixtu
         Assert.True(changed.Ok);
         Assert.NotNull(changed.Request);
         Assert.True(changed.Request!.AppointmentActionCommitted);
+        Assert.Equal("Resolved", changed.Request.Status);
+        Assert.Equal("Đã xác minh qua số liên hệ gốc.", changed.Request.RequesterVerification);
         Assert.Equal(verified.ExpectedVersion + 1, changed.Request.ExpectedVersion);
         Assert.Equal("Cancelled", changed.Appointment!.Status);
 
@@ -190,21 +192,36 @@ public sealed class SupportNotificationApiTests(SupportNotificationFixture fixtu
             .Content.ReadFromJsonAsync<StaffSupportChangeResult>())!;
         Assert.Equal(changed.Request.ExpectedVersion, replay.Request!.ExpectedVersion);
 
-        var resolvedResponse = await staff.PostAsJsonAsync($"/api/support-requests/{seed.RequestCode}/resolve",
+        var resolveAgain = await staff.PostAsJsonAsync($"/api/support-requests/{seed.RequestCode}/resolve",
             new ResolveSupportCommand(Guid.NewGuid(), changed.Request.ExpectedVersion, "Resolve", "Đã hủy theo yêu cầu.", null));
-        Assert.Equal(HttpStatusCode.OK, resolvedResponse.StatusCode);
-        var resolved = (await resolvedResponse.Content.ReadFromJsonAsync<ResolveSupportResult>())!;
-        Assert.True(resolved.Ok);
-        Assert.Equal("Resolved", resolved.Request!.Status);
-        Assert.Equal(changed.Request.ExpectedVersion + 1, resolved.Request.ExpectedVersion);
+        Assert.NotEqual(HttpStatusCode.OK, resolveAgain.StatusCode);
 
         var realtime = fixture.Realtime.Calls.Where(x => x.Method == "supportRequestUpdated"
             && x.Payload.GetProperty("requestId").GetString() == seed.RequestCode).ToArray();
         Assert.Equal(["RequesterVerified", "AppointmentCancelled", "Resolved"],
             realtime.Select(x => x.Payload.GetProperty("action").GetString()!).ToArray());
         Assert.All(realtime, call => Assert.Equal(seed.BranchId, call.BranchId));
-        Assert.Equal([verified.ExpectedVersion, changed.Request.ExpectedVersion, resolved.Request.ExpectedVersion],
+        Assert.Equal([verified.ExpectedVersion, changed.Request.ExpectedVersion, changed.Request.ExpectedVersion],
             realtime.Select(x => x.Payload.GetProperty("version").GetInt32()).ToArray());
+    }
+
+    [Fact]
+    public async Task UnverifiedCancelIsVerifiedAndClosedByTheSameStaffAction()
+    {
+        var seed = await SeedAsync("Cancel");
+        using var staff = await Login("assistant.demo");
+        var before = (await staff.GetFromJsonAsync<SupportRequestDetail>($"/api/support-requests/{seed.RequestCode}"))!;
+        Assert.Null(before.RequesterVerifiedAt);
+
+        var changedResponse = await staff.PostAsJsonAsync($"/api/support-requests/{seed.RequestCode}/change-appointment",
+            new StaffSupportChangeCommand(Guid.NewGuid(), before.ExpectedVersion, "PatientRequest", "Bệnh nhân yêu cầu hủy.", null));
+        Assert.Equal(HttpStatusCode.OK, changedResponse.StatusCode);
+        var changed = (await changedResponse.Content.ReadFromJsonAsync<StaffSupportChangeResult>())!;
+        Assert.True(changed.Ok);
+        Assert.Equal("Resolved", changed.Request!.Status);
+        Assert.NotNull(changed.Request.RequesterVerifiedAt);
+        Assert.Equal("Đã đối chiếu người yêu cầu với thông tin đặt lịch.", changed.Request.RequesterVerification);
+        Assert.Equal("Cancelled", changed.Appointment!.Status);
     }
 
     [Fact]

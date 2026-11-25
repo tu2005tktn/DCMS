@@ -80,6 +80,8 @@ public sealed class SupportRequestService(DcmsDbContext db, UserManager<Applicat
         return result;
     }
 
+    private const string DefaultVerification = "Đã đối chiếu người yêu cầu với thông tin đặt lịch.";
+
     public async Task<StaffSupportChangeResult> ChangeAppointmentAsync(int actorId, string id,
         StaffSupportChangeCommand command, CancellationToken ct)
     {
@@ -90,16 +92,17 @@ public sealed class SupportRequestService(DcmsDbContext db, UserManager<Applicat
         var replay = await ReplayAsync<StaffSupportChangeResult>(actorId, command.RequestKey, fingerprint, ct);
         if (replay != null) return replay;
         RequirePending(request, command.ExpectedVersion);
-        if (request.RequesterVerifiedAt == null || string.IsNullOrWhiteSpace(request.RequesterVerification))
-            throw new BusinessException(400, SystemMessages.Get("MSG02", "Xác minh người yêu cầu"));
         if (request.Kind is not ("Change" or "Cancel")) throw Error("MSG04", 400);
+        // One-step handling: an unverified requester is verified by the staff member doing the change.
+        var autoVerify = request.RequesterVerifiedAt == null || string.IsNullOrWhiteSpace(request.RequesterVerification);
+        var verification = autoVerify ? DefaultVerification : request.RequesterVerification!;
 
         AppointmentChangeResult changed;
         if (request.Kind == "Cancel")
         {
             changed = await changes.CancelAsync(actorId, appointment.Code,
                 new CancelAppointmentRequest(appointment.Version, command.RequestKey,
-                    Clean(command.Notes) ?? command.Reason, request.RequesterVerification), ct);
+                    Clean(command.Notes) ?? command.Reason, verification), ct);
         }
         else
         {
@@ -111,17 +114,30 @@ public sealed class SupportRequestService(DcmsDbContext db, UserManager<Applicat
             changed = await changes.RescheduleAsync(actorId, appointment.Code,
                 new RescheduleAppointmentRequest(appointment.Version, command.RequestKey, slot.Start,
                     slot.ChairId, slot.ScheduleVersion, slot.AssistantScheduleVersion,
-                    Clean(command.Notes) ?? command.Reason, request.RequesterVerification), ct);
+                    Clean(command.Notes) ?? command.Reason, verification), ct);
         }
 
         // Booking action is committed by IAppointmentChangeService before this marker is written.
         await using var markerTx = await db.Database.BeginTransactionAsync(ct);
         request = await db.LoadSupportRequestAsync(request.Id, ct);
         RequirePending(request, command.ExpectedVersion);
+        if (autoVerify) {
+            request.RequesterVerifiedAt = clock.GetUtcNow(); request.RequesterVerifiedBy = actorId; request.RequesterVerification = verification;
+            db.AppointmentSupportHistories.Add(History(request, appointment, actorId, "RequesterVerified", verification));
+        }
         request.AppointmentActionRequestKey = command.RequestKey;
         request.Version++; request.UpdatedAt = clock.GetUtcNow();
         db.AppointmentSupportHistories.Add(History(request, appointment, actorId,
             request.Kind == "Cancel" ? "Cancelled" : "Rescheduled", Clean(command.Notes)));
+        // The appointment change is the whole job, so the request closes with it.
+        request.Status = "Resolved"; request.DecisionReason = Clean(command.Notes) ?? "Đã xử lý yêu cầu.";
+        request.PublicNote = Clean(command.Notes); request.DecidedAt = clock.GetUtcNow(); request.DecidedBy = actorId;
+        db.AppointmentSupportHistories.Add(History(request, appointment, actorId, "RequestResolved", request.PublicNote));
+        db.AppointmentOutboxEvents.Add(new AppointmentOutboxEvent
+        {
+            AggregateId = appointment.Id, EventType = "support.resolved",
+            OccurredAt = clock.GetUtcNow(), PayloadJson = JsonSerializer.Serialize(new { requestId = request.Id })
+        });
         await db.SaveChangesAsync(ct);
         var current = await db.Appointments.AsNoTracking().SingleAsync(x => x.Id == appointment.Id, ct);
         var result = new StaffSupportChangeResult(true, await AppointmentSummaryAsync(current, ct),
@@ -133,6 +149,7 @@ public sealed class SupportRequestService(DcmsDbContext db, UserManager<Applicat
         await markerTx.CommitAsync(ct);
         await PublishSupportUpdatedAsync(request, current,
             request.Kind == "Cancel" ? "AppointmentCancelled" : "AppointmentRescheduled");
+        await PublishSupportUpdatedAsync(request, current, "Resolved");
         return result;
     }
 

@@ -125,7 +125,7 @@ export default function RequestDrawer({ id, refreshToken, onClose, onChanged }: 
       finishRequest('change');
       const refreshed = result.request ?? await supportInboxApi.getRequest(detail.id);
       setDetail(refreshed);
-      setActionNotice({ kind: 'success', message: 'Đã thay đổi lịch. Bây giờ bạn có thể xử lý yêu cầu.' });
+      setActionNotice({ kind: 'success', message: detail.kind === 'Cancel' ? 'Đã hủy lịch và đóng yêu cầu.' : 'Đã đổi lịch và đóng yêu cầu.' });
       void toast.success(notificationMessage(result.notificationCode));
       onChanged();
       return result;
@@ -326,14 +326,9 @@ export default function RequestDrawer({ id, refreshToken, onClose, onChanged }: 
                   </Form.Item>
                 </Form>
                 {hasChangeCommitted && <Alert className="form-alert" type="success" showIcon
-                  message="Lịch đã được thay đổi thành công. Bây giờ bạn có thể xử lý yêu cầu." />}
+                  message={detail.status === 'Resolved' ? 'Lịch đã được thay đổi và yêu cầu đã đóng.' : 'Lịch đã được thay đổi thành công. Bây giờ bạn có thể xử lý yêu cầu.'} />}
               </>}
 
-              {detail.kind === 'Change' && !hasChangeCommitted && canEdit && (
-                <Typography.Paragraph type="warning">
-                  Resolve chỉ được kích hoạt sau khi lịch được đổi thành công.
-                </Typography.Paragraph>
-              )}
             </Spin>,
           },
           {
@@ -356,20 +351,20 @@ export default function RequestDrawer({ id, refreshToken, onClose, onChanged }: 
             key: 'commands',
             label: 'Xử lý',
             children: <>
-              {!detail.requesterVerifiedAt && !isWithdrawn && canEdit && <Button loading={saving}
+              {!detail.requesterVerifiedAt && !isWithdrawn && canEdit && !showChangeForm && <Button loading={saving}
                 onClick={() => void verifyRequester()}>
                 Xác minh người yêu cầu
               </Button>}
 
               {!isWithdrawn && canEdit && showChangeForm && <Button type="primary" loading={saving} onClick={() => void runChange()}
-                disabled={hasChangeCommitted || !detail.requesterVerifiedAt}>
+                disabled={hasChangeCommitted || !(detail.status === 'Pending' || detail.status === 'InReview')}>
                 {hasChangeCommitted
                   ? 'Đã thay đổi lịch'
                   : detail.kind === 'Change' ? 'Đổi lịch' : 'Huỷ lịch'}
               </Button>}
 
               <Space wrap>
-                <Button type="primary" disabled={!canResolve || isWithdrawn || saving ||
+                {(!showChangeForm || hasChangeCommitted) && <Button type="primary" disabled={!canResolve || isWithdrawn || saving ||
                   ((detail.kind === 'Change' || detail.kind === 'Cancel') && !hasChangeCommitted)}
                   onClick={confirmResolve}
                   title={!canResolve ? 'Bạn không có quyền xử lý yêu cầu này' :
@@ -377,7 +372,7 @@ export default function RequestDrawer({ id, refreshToken, onClose, onChanged }: 
                     (detail.kind === 'Change' || detail.kind === 'Cancel') && !hasChangeCommitted
                       ? 'Cần đổi/huỷ lịch trước khi xử lý' : ''}>
                   Xử lý yêu cầu
-                </Button>
+                </Button>}
                 <Button danger disabled={!canResolve || isWithdrawn || saving} onClick={() => setDecision('reject')}
                   title={!canResolve ? 'Bạn không có quyền xử lý yêu cầu này' :
                     isWithdrawn ? 'Yêu cầu đã rút' : ''}>

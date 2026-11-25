@@ -12,7 +12,7 @@ using static DCMS.Infrastructure.Features.Examinations.ClinicalAccess;
 namespace DCMS.Infrastructure.Features.Examinations;
 
 public sealed class ClinicalDocumentService(DcmsDbContext db, ClinicalAccess access, IConfiguration config,
-    IClinicalFileScanner scanner, TimeProvider clock, IDentalAiClient ai) : IClinicalDocumentService
+    IClinicalFileScanner scanner, TimeProvider clock, IDentalAiClient ai, DCMS.Application.Features.Settings.ISettingsAccess permissions) : IClinicalDocumentService
 {
     public static readonly DocumentConstraints Limits = new(10, 20 * 1024 * 1024,
         ["image/jpeg", "image/png", "application/pdf"], 1000);
@@ -143,6 +143,11 @@ public sealed class ClinicalDocumentService(DcmsDbContext db, ClinicalAccess acc
         if (visit != null && visit.Status is not (VisitStatuses.Queued or VisitStatuses.InProgress or VisitStatuses.ExaminationConfirmed)) throw Error("MSG34", 409);
         if (investigation != null && investigation.State != "Ordered") throw Error("MSG34",409);
         var results = new List<DocumentUploadResult>(); var ids = new List<BatchEntry>(); var written = new List<string>();
+        var reviewed = new List<(int Index, ClinicalDocument Document)>();
+        // The visit's own dentist has seen what they upload into their open visit, so no separate review click is needed.
+        var selfReview = visit != null && VisitStatuses.Open.Contains(visit.Status)
+            && await db.Employees.AnyAsync(x => x.Id == visit.DentistId && x.AccountId == actorId, ct)
+            && (await permissions.ResolveAsync(actorId, ct)).Permissions.Contains("documents.review");
         try {
             foreach (var f in files) {
                 var error = FileError(f); if (error != null) { results.Add(new(null, error)); ids.Add(new(null, error)); continue; }
@@ -157,7 +162,11 @@ public sealed class ClinicalDocumentService(DcmsDbContext db, ClinicalAccess acc
                 if (d.FileState == "Rejected") d.RejectReason = "Tệp không đạt kiểm tra an toàn.";
                 db.Add(d); Audit(d.Id, actorId, "Uploaded");
                 if (d.FileState != "PendingScan") Audit(d.Id, null, d.FileState == "Ready" ? ReadyAudit : "ScanRejected");
-                ids.Add(new(d.Id, null)); results.Add(new(await DtoAsync(d, ct), null));
+                if (selfReview && d.FileState == "Ready") {
+                    d.Reviews.Add(new DocumentReview { DocumentId = d.Id, VisitId = visit!.Id, ReviewedBy = actorId, ReviewedAt = clock.GetUtcNow() });
+                    Audit(d.Id, actorId, "ClinicallyReviewed");
+                }
+                ids.Add(new(d.Id, null)); results.Add(new(await DtoAsync(d, ct), null)); if (selfReview) reviewed.Add((results.Count - 1, d));
             }
             if (investigation != null && ids.Any(x => x.Id.HasValue)) {
                 var before = JsonSerializer.Serialize(new { investigation.Version, VisitVersion = visit!.Version });
@@ -167,6 +176,8 @@ public sealed class ClinicalDocumentService(DcmsDbContext db, ClinicalAccess acc
             }
             db.Add(new DocumentReceipt { ActorId = actorId, RequestKey = m.RequestKey, Fingerprint = hash, ResultJson = JsonSerializer.Serialize(ids) });
             await db.SaveChangesAsync(ct); await tx.CommitAsync(ct);
+            // Reviews are read back from the database, so refresh the self-reviewed rows after saving.
+            foreach (var (index, document) in reviewed) results[index] = new(await DtoAsync(document, ct), null);
         } catch { foreach (var path in written) { try { File.Delete(path); } catch (IOException) { } } throw; }
         return new(results.Count == 1 ? results[0].Document : null, results);
     }

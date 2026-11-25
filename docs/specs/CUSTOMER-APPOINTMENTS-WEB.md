@@ -46,3 +46,7 @@ thể đọc chi tiết/yêu cầu hỗ trợ dù bảng `APPOINTMENT` đã có 
 1. Web với API/PostgreSQL thật: tài khoản synthetic đặt lịch, đăng nhập khách hàng, mở S14/S16, đổi slot qua review/confirm rồi hủy qua review/confirm; xác minh version/history, slot giải phóng và danh sách Lịch sử.
 2. Kiểm thử UI xác định cho mốc dưới 12 giờ, validation lý do/ngày, slot trống/lỗi, MSG34, MSG111, 401, 403/404 và retry cùng requestKey. Không dùng mock để kết luận mutation đã lưu database.
 3. Desktop và màn hình nhỏ: không tràn toàn trang; bảng có scroll nội bộ, form/slot chọn được bằng nhãn truy cập.
+
+### Hủy lịch một bước (25/11/2026)
+
+Theo yêu cầu người dùng, bỏ bước "Xác nhận thông tin hủy" (trang xem lại) khi **hủy lịch**. Khách nhập lý do và bấm thẳng nút hủy: `Xác nhận hủy lịch` (từ 12 giờ trở lên, kèm cảnh báo "Sau khi xác nhận, lịch hẹn này sẽ bị hủy.") hoặc `Gửi yêu cầu hủy lịch` (dưới 12 giờ, kèm giải thích lịch cũ giữ nguyên cho đến khi nhân viên duyệt). Cảnh báo và mã lịch, giờ hẹn hiện tại hiển thị ngay trong form. Đổi lịch giữ nguyên hai bước Chọn lịch mới → Kiểm tra yêu cầu vì khách cần xem lại giờ mới. Hợp đồng API, requestKey và xử lý lỗi không đổi.
