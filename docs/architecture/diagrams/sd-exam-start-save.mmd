@@ -1,0 +1,38 @@
+sequenceDiagram
+  autonumber
+  actor D as Dentist
+  participant UI as Examination Screen
+  participant S as ExaminationService
+  participant CA as ClinicalAccess
+  participant DB as Database
+  D ->> UI : open the patient visit from the queue
+  UI ->> S : startExamination(visit, requestKey)
+  activate S
+  S ->> CA : check the dentist is assigned to this visit
+  activate CA
+  CA ->> DB : load the visit and its assigned dentist
+  CA -->> S : dentist is allowed
+  deactivate CA
+  S ->> DB : find stored result of this request
+  alt request was already processed
+  S -->> UI : return stored result
+  else new request
+  S ->> S : check visit version is unchanged
+  S ->> DB : visit and appointment -> InProgress
+  S ->> DB : save audit log and request record
+  S -->> UI : examination data
+  end
+  deactivate S
+  loop until the examination is confirmed
+  D ->> UI : enter examination content, save or confirm
+  UI ->> S : saveExamination(content, confirm)
+  activate S
+  S ->> S : check access, duplicate request, version
+  S ->> S : validate examination content
+  opt confirming
+  S ->> DB : required investigations reviewed or cancelled?
+  end
+  S ->> DB : save examination and audit log
+  S -->> UI : examination data
+  deactivate S
+  end

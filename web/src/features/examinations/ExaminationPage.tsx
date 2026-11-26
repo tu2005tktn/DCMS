@@ -298,6 +298,7 @@ export default function ExaminationPage() {
         </>}
         {!amending && w.allowedActions.includes('amend') && <Button key="amend-examination" aria-label="Đính chính kết quả" disabled={busy} onClick={() => { setAmending(true); setDirty(true); }}>Đính chính kết quả</Button>}
         {!amending && handoff && <Link to={`/patients/${v.patientId}?tab=treatment&sourceExaminationVisitId=${visitId}&examinationVersion=${w.examination?.version ?? 0}`}><Button type="primary">Lập kế hoạch điều trị</Button></Link>}
+        {!amending && !handoff && v.status === 'ExaminationConfirmed' && user?.permissions.includes('treatment.read') && <Link to={`/patients/${v.patientId}?tab=treatment`}><Button type="primary">Chuyển tới điều trị</Button></Link>}
         {!amending && w.allowedActions.includes('complete') && <Button disabled={busy} onClick={() => { setWorkReviewed(false); setEnding(true); }}>Kết thúc lượt khám</Button>}</Space>
         {v.status === 'ExaminationConfirmed' && <Typography.Paragraph type="secondary" style={{ marginTop: 16 }}>Phiếu khám đã hoàn tất. Kết thúc lượt khám trước khi chuyển sang phiếu điều trị.</Typography.Paragraph>}
       </Card> },

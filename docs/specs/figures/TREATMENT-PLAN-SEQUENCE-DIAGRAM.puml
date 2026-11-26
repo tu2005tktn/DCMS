@@ -1,0 +1,65 @@
+@startuml DCMS_Treatment_Plan_Sequence_Diagram
+title Sequence Diagram - Bác sĩ lập kế hoạch điều trị
+
+skinparam shadowing false
+skinparam sequenceMessageAlign left
+skinparam responseMessageBelowArrow true
+skinparam maxMessageSize 220
+skinparam sequence {
+  ParticipantBorderColor #000000
+  ParticipantBackgroundColor #FFFFFF
+  ActorBorderColor #000000
+  ActorBackgroundColor #FFFFFF
+  LifeLineBorderColor #808080
+  ArrowColor #000000
+}
+skinparam control {
+  BorderColor #000000
+  BackgroundColor #FFFFFF
+}
+skinparam entity {
+  BorderColor #000000
+  BackgroundColor #FFFFFF
+}
+
+actor "Dentist" as Dentist
+actor "Patient" as Patient
+control "TreatmentDossierService" as Service
+entity "TreatmentDossier" as Dossier
+entity "TreatmentPlanTemplate" as Template
+entity "TreatmentPlanItem" as Item
+
+autonumber
+
+== Tạo hồ sơ điều trị (đã ở trang bệnh nhân sau khi khám) ==
+Dentist -> Service : createDossier(patient, branch)
+activate Service
+Service -> Service : validateDentist()
+Service -> Dossier : create dossier (Open)
+Dentist <-- Service : dossier code
+deactivate Service
+
+== Chọn kế hoạch điều trị cho ca ==
+Dentist -> Service : chooseTreatmentPlan(dossier, plan)
+activate Service
+Service -> Template : load plan and its items
+Dentist <-- Service : show the treatment plan
+deactivate Service
+
+== Điều chỉnh kế hoạch theo bệnh nhân ==
+loop adjust the treatment plan to fit the patient
+  Dentist -> Service : addItem / editItem / deleteItem
+  activate Service
+  Service -> Item : add, update or delete a plan item
+  Service -> Dossier : update plan version
+  Dentist <-- Service : updated treatment plan
+  deactivate Service
+  Dentist -> Patient : explain the plan and ask for agreement
+  alt patient agrees
+    Dentist <-- Patient : agree
+  else patient does not agree
+    Dentist <-- Patient : ask to change the plan
+  end
+end
+
+@enduml

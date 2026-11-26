@@ -1,0 +1,37 @@
+sequenceDiagram
+  autonumber
+  actor C as Cashier
+  participant UI as Payment Screen
+  participant S as PayOsOrderService
+  participant G as PayOsGateway
+  participant DB as Database
+  participant P as payOS
+  C ->> UI : choose treatment items to pay, collector and date
+  UI ->> S : createPayOsOrder(dossier, lines, requestKey)
+  activate S
+  S ->> S : check permission and validate request
+  S ->> DB : find stored result of this request
+  alt request was already processed
+  S -->> UI : return the existing order
+  else new request
+  S ->> DB : load amount due of each treatment item
+  alt amount is more than the amount due, or another order is open
+  S -->> UI : reject (409)
+  else amounts are valid
+  S ->> DB : save order (Creating) with order code and lines
+  S ->> G : createPaymentLink(order code, amount, description)
+  activate G
+  G ->> P : create payment link
+  P -->> G : payment link id and QR code
+  deactivate G
+  alt link created
+  S ->> DB : save QR code, set order to Pending (valid 30 minutes)
+  S -->> UI : order with QR code
+  else link failed
+  S ->> DB : set order to LinkError
+  S -->> UI : error, please try again
+  end
+  end
+  end
+  deactivate S
+  UI -->> C : show QR code for the patient

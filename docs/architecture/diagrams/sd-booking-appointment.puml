@@ -1,0 +1,26 @@
+@startuml sd-booking-appointment
+autonumber
+actor "Patient" as P
+boundary "Booking Screen" as UI
+control "AppointmentService" as S
+entity "Database" as DB
+P -> UI : choose branch, examination service and date
+UI -> S : getAvailableSlots(branch, service, date)
+activate S
+S -> DB : load dentist schedules and existing bookings
+S --> UI : free time slots
+deactivate S
+P -> UI : pick a slot, enter patient and contact details
+UI -> S : createAppointment(details, slot)
+activate S
+S -> S : validate patient details, contact and lead time
+S -> DB : is the slot still free?
+alt slot already taken
+  S --> UI : reject, please choose another slot
+else slot is free
+  S -> DB : save the appointment (Confirmed)
+  S --> UI : appointment code and success message
+end
+deactivate S
+UI --> P : show appointment confirmation
+@enduml

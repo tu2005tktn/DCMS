@@ -33,18 +33,18 @@ test('thống kê công việc/dịch vụ: lỗi thử lại, dòng thu gọn x
   const state = await prepare(page);
   await expect(page.getByText('Không thể tải thử nghiệm.')).toBeVisible();
   state.fail = false; await page.getByRole('button', { name: 'Thử lại', exact: true }).click();
-  for (const title of ['Mã phiếu', 'Ngày', 'MSKH', 'Khách hàng', 'Bác sĩ', 'Chi phí', 'Đã trả', 'Còn lại'])
+  for (const title of ['Ngày', 'Khách hàng', 'Bác sĩ', 'Chi phí', 'Đã trả', 'Còn lại'])
     await expect(page.getByRole('columnheader', { name: title, exact: true })).toBeVisible();
   // Collapsed: one summary row per dossier with its totals; services stay hidden until the row is opened.
-  const summary = page.locator('tr.work-stats-row', { hasText: 'HS-001' });
+  const summary = page.locator('tr.work-stats-row', { hasText: 'SYNTHETIC Patient 1' });
   await expect(summary).toHaveCount(1);
-  await expect(summary).toContainText('BN001'); await expect(summary).toContainText('SYNTHETIC Patient 1'); await expect(summary).toContainText('SYNTHETIC Dentist');
+  await expect(summary).toContainText('SYNTHETIC Patient 1'); await expect(summary).toContainText('SYNTHETIC Dentist');
   await expect(summary).toContainText('350.000'); await expect(summary).toContainText('100.000'); await expect(summary).toContainText('250.000');
-  await expect(summary).toHaveAttribute('aria-expanded', 'false');
+  await expect(summary).toHaveAttribute('aria-haspopup', 'dialog');
   await expect(page.getByText('Trám răng')).toHaveCount(0);
   // Expanded: read-only detail with creator, dentist, services, note and what the patient owes and has paid.
   await summary.click();
-  await expect(summary).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.getByRole('dialog')).toBeVisible();
   const detail = page.getByLabel('Chi tiết phiếu HS-001', { exact: true });
   await expect(detail.getByRole('link', { name: 'BN001 - SYNTHETIC Patient 1' })).toHaveAttribute('href', '/patients/1');
   await expect(detail.getByRole('link', { name: 'Mở phiếu điều trị' })).toHaveAttribute('href', '/patients/1?tab=treatment&dossierId=d-1');
@@ -59,9 +59,9 @@ test('thống kê công việc/dịch vụ: lỗi thử lại, dòng thu gọn x
   await expect(sum.locator('div', { hasText: 'Khách cần trả' })).toContainText('350.000');
   await expect(sum.locator('div', { hasText: 'Khách đã trả' })).toContainText('100.000');
   await expect(detail.getByRole('button')).toHaveCount(0); await expect(detail.getByRole('textbox')).toHaveCount(0);
-  // Keyboard and second click collapse the detail again.
-  await summary.focus(); await page.keyboard.press('Enter');
-  await expect(detail).toBeHidden(); await expect(summary).toHaveAttribute('aria-expanded', 'false');
+  // The close button closes the dialog.
+  await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click(); await expect(page.getByRole('dialog')).toBeHidden();
+  await expect(detail).toBeHidden();
   // Summary strip: totals on the left, number of service lines on the right.
   const strip = page.getByLabel('Tổng hợp', { exact: true });
   await expect(strip).toContainText('Tổng cộng:'); await expect(strip).toContainText('350.000'); await expect(strip).toContainText('Đã trả:'); await expect(strip).toContainText('Còn lại:');
@@ -92,8 +92,9 @@ test('mở từ thống kê tài chính: chỉ một phiếu, tự xổ chi ti�
   await expect.poll(() => state.queries.at(-1)?.get('dossierId')).toBe('d-1');
   expect(state.queries.at(-1)!.get('from')).toBeNull(); expect(state.queries.at(-1)!.get('q')).toBeNull();
   await expect(page.getByRole('status')).toContainText('Đang xem phiếu HS-001.');
-  await expect(page.locator('tr.work-stats-row', { hasText: 'HS-001' })).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.getByRole('dialog')).toBeVisible();
   await expect(page.getByLabel('Chi tiết phiếu HS-001', { exact: true })).toBeVisible();
+  await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click(); await expect(page.getByRole('dialog')).toBeHidden();
   await page.getByRole('button', { name: 'Xem tất cả phiếu', exact: true }).click();
   await expect(page).toHaveURL(/\/work-statistics$/);
   await expect.poll(() => state.queries.at(-1)?.get('dossierId')).toBeNull();

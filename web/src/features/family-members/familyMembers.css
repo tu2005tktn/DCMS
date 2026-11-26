@@ -1,6 +1,8 @@
 .customer-family-heading { display:flex;justify-content:space-between;gap:20px;align-items:center;margin-bottom:24px; }
 .customer-family-heading h1 { margin:0 0 10px;font-size:30px; }.customer-family-heading p{color:#667085;margin:0;}
 .customer-family-page .ant-btn,.customer-family-picker .ant-btn,.customer-family-drawer .ant-btn { min-height:44px; }
+.customer-family-page a.customer-family-book { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 18px; border-radius: 10px; background: var(--customer-blue, #175cd3); color: #fff; font-weight: 600; white-space: nowrap; text-decoration: none; transition: background-color .15s ease; }
+.customer-family-page a.customer-family-book:hover { background: #0e438f; color: #fff; }
 .customer-family-search{margin-bottom:20px;}.customer-family-search label{display:block;margin-bottom:8px;font-weight:600;}
 .customer-family-search .ant-space-compact{width:min(100%,500px);}.customer-family-search .ant-input{min-height:44px;}
 .customer-family-page .ant-alert{margin-bottom:18px;}.customer-family-page .ant-pagination{margin-top:20px;}

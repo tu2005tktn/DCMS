@@ -1,0 +1,24 @@
+sequenceDiagram
+  autonumber
+  actor D as Dentist
+  participant UI as Treatment Screen
+  participant S as TreatmentDossierService
+  participant DB as Database
+  D ->> UI : proceed to treatment after the examination
+  UI ->> S : createDossier(patient, branch, diagnosis, sourceVisit)
+  activate S
+  S ->> S : user is a dentist of the branch?
+  S ->> DB : patient exists?
+  S ->> DB : find stored result of this request
+  alt request was already processed
+  S -->> UI : return stored result
+  else new request
+  S ->> S : validate diagnosis and note
+  S ->> DB : dentist works in the branch?
+  S ->> DB : load source visit, check version unchanged
+  S ->> DB : load confirmed examination of that visit
+  S ->> DB : create dossier with examination snapshot
+  S ->> DB : save history events and request record
+  S -->> UI : new dossier and success message
+  end
+  deactivate S

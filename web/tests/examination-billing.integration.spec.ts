@@ -27,7 +27,7 @@ async function fixture(request: APIRequestContext, demographics: { birthDate: st
   expect(checked.ok(),await checked.text()).toBeTruthy(); return {patient,visit:await checked.json(),branchId,dentistId,headers,clinicDate:options.clinicDate as string};
 }
 
-async function signIn(page:Page,name:string){await page.goto('/sign-in');await page.getByLabel('Tên đăng nhập',{exact:true}).fill(name);await page.getByLabel('Mật khẩu',{exact:true}).fill(password!);await page.getByRole('button',{name:'Đăng nhập',exact:true}).click();await expect(page.getByRole('link',{name:'Thanh toán',exact:true})).toBeVisible();}
+async function signIn(page:Page,name:string){await page.goto('/sign-in');await page.getByLabel('Tên đăng nhập',{exact:true}).fill(name);await page.getByLabel('Mật khẩu',{exact:true}).fill(password!);await page.getByRole('button',{name:'Đăng nhập',exact:true}).click();await expect(page).not.toHaveURL(/sign-in/);}
 test('configured examination fee → completion → partial cash → transfer confirmation',async({page,request},testInfo)=>{
  const f=await fixture(request),dentist=await auth(request,'dentist.demo');
  await signIn(page,'dentist.demo');await page.goto('/clinical-services');await page.getByRole('button',{name:'Sửa giá khám',exact:true}).click();let modal=page.getByRole('dialog');await modal.getByLabel('Giá khám theo bảng',{exact:true}).fill('100000');await modal.getByRole('button',{name:'Lưu giá khám',exact:true}).click();await expect(modal).not.toBeVisible();

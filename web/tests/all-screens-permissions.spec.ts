@@ -33,7 +33,7 @@ test('every sidebar entry follows grants, even for an owner role', async ({ page
     ['appointments.read', 'Lịch hẹn'], ['working-schedules.read', 'Lịch làm việc'],
     ['booking-settings.read', 'Cài đặt đặt lịch'], ['patients.read', 'Bệnh nhân'],
     ['reception.read', 'Tiếp nhận và hàng chờ'], ['appointments.support.handle', 'Hộp thư hỗ trợ'],
-    ['treatment.templates.read', 'Kế hoạch điều trị'], ['treatment.prices.read', 'Giá và duyệt điều trị'],
+    ['treatment.templates.read', 'Kế hoạch điều trị'], ['treatment.prices.read', 'Dịch vụ'],
     ['services.read', 'Dịch vụ cận lâm sàng'], ['finance.read', 'Thanh toán'],
     ['accounts.read', 'Quản lý tài khoản'], ['settings.read', 'Thiết lập hệ thống'],
     ['patient-links.read', 'Xác minh liên kết hồ sơ'],

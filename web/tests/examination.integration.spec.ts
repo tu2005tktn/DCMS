@@ -106,7 +106,7 @@ test('real queue to separate examination: draft, documents, conclusion, explicit
   await page.getByLabel('Dặn dò / lời khuyên',{exact:true}).fill('SYNTHETIC hướng dẫn vệ sinh');
   await page.getByRole('combobox',{name:'Hướng xử trí',exact:true}).click(); await page.getByText('Tiếp tục điều trị',{exact:true}).click();
   await page.getByRole('button',{name:'Hoàn tất khám',exact:true}).click();
-  await expect(page.getByText('Phiếu khám đã hoàn tất. Kết thúc lượt khám trước khi lập kế hoạch điều trị.',{exact:false})).toBeVisible();
+  await expect(page.getByText('Phiếu khám đã hoàn tất. Kết thúc lượt khám trước khi chuyển sang phiếu điều trị.',{exact:false})).toBeVisible();
   await expect(page.getByRole('tab',{name:'Tư vấn',exact:true})).toHaveCount(0);
   await expect(page.getByRole('tab',{name:'Điều trị cũ',exact:true})).toHaveCount(0);
   await page.getByRole('button',{name:'Kết thúc lượt khám',exact:true}).click(); const ending=page.getByRole('dialog');await ending.getByRole('checkbox').check();await ending.getByRole('button',{name:'Xác nhận kết thúc lượt',exact:true}).click();await expect(ending).not.toBeVisible();
@@ -346,7 +346,7 @@ test('whole-mouth examination completes without any selected tooth and remains r
   await page.getByRole('tab',{name:'Tổng kết khám',exact:true}).click();
   await expect(page.getByLabel('Kết luận khám',{exact:true})).toHaveCount(0); await page.getByLabel('Dặn dò / lời khuyên',{exact:true}).fill('SYNTHETIC hướng dẫn chăm sóc');
   await page.getByRole('combobox',{name:'Hướng xử trí',exact:true}).click(); await page.locator('.ant-select-dropdown:visible').getByText('Tư vấn, chưa điều trị',{exact:true}).click();
-  await page.getByRole('button',{name:'Hoàn tất khám',exact:true}).click(); await expect(page.getByText('Phiếu khám đã hoàn tất. Kết thúc lượt khám trước khi lập kế hoạch điều trị.',{exact:false})).toBeVisible();
+  await page.getByRole('button',{name:'Hoàn tất khám',exact:true}).click(); await expect(page.getByText('Phiếu khám đã hoàn tất. Kết thúc lượt khám trước khi chuyển sang phiếu điều trị.',{exact:false})).toBeVisible();
   await page.getByRole('tab',{name:'Khám & sơ đồ răng',exact:true}).click();
   await expect(page.getByLabel('Kết quả khám tổng quát',{exact:true})).toBeDisabled();
   const chart=page.getByRole('region',{name:'Sơ đồ răng',exact:true});
@@ -415,7 +415,7 @@ test('incomplete tooth finding stays on summary until explicitly opening the mis
   await page.getByLabel('Tình trạng 1',{exact:true}).fill('SYNTHETIC kết quả răng 16');
   await page.getByRole('tab',{name:'Tổng kết khám',exact:true}).click();await expect(page.getByRole('button',{name:'Bổ sung: Kết quả khám răng 16',exact:true})).toHaveCount(0);
   await page.getByRole('button',{name:'Hoàn tất khám',exact:true}).click();
-  await expect(page.getByText('Phiếu khám đã hoàn tất. Kết thúc lượt khám trước khi lập kế hoạch điều trị.',{exact:false})).toBeVisible();
+  await expect(page.getByText('Phiếu khám đã hoàn tất. Kết thúc lượt khám trước khi chuyển sang phiếu điều trị.',{exact:false})).toBeVisible();
   await expect(page.getByRole('tab',{name:'Tổng kết khám',exact:true})).toHaveAttribute('aria-selected','true');await expect(page.getByRole('alert').filter({hasText:'Chưa thể hoàn tất khám'})).toHaveCount(0);
 });
 
@@ -470,7 +470,7 @@ test('investigations preserve the examination draft through order, result, physi
   await dialog.getByRole('button',{name:'Xác nhận đã đọc kết quả',exact:true}).click();await expect(dialog).not.toBeVisible();await expect(order).toContainText('Bác sĩ đã đọc');
   await page.screenshot({path:testInfo.outputPath('investigation-reviewed.png'),fullPage:true,animations:'disabled'});
   await page.getByRole('tab',{name:'Tổng kết khám',exact:true}).click();await expect(page.getByRole('alert').filter({hasText:'Chưa thể hoàn tất khám'})).toHaveCount(0);
-  await page.getByRole('button',{name:'Hoàn tất khám',exact:true}).click();await expect(page.getByText('Phiếu khám đã hoàn tất. Kết thúc lượt khám trước khi lập kế hoạch điều trị.',{exact:false})).toBeVisible();
+  await page.getByRole('button',{name:'Hoàn tất khám',exact:true}).click();await expect(page.getByText('Phiếu khám đã hoàn tất. Kết thúc lượt khám trước khi chuyển sang phiếu điều trị.',{exact:false})).toBeVisible();
   const latest=await(await request.get(`${apiUrl}/api/visits/${f.visit.visitId}/examination`,{headers})).json();expect(latest.examination.confirmed).toBe(true);
   expect(latest.examination.content.symptoms).toBe('SYNTHETIC chảy máu lợi, bản nhập chưa lưu');
   const result=latest.investigations.find((item:{name:string})=>item.name==='Phim cận chóp');expect(result.state).toBe('Reviewed');expect(result.resultDocumentIds).toEqual([]);
@@ -503,7 +503,7 @@ test('scoped diagnoses are entered once and follow their teeth and region throug
   await page.getByRole('tab',{name:'Tổng kết khám',exact:true}).click();await expect(summary).not.toContainText('Sâu răng');await expect(summary).toContainText('Viêm tủy răng');await expect(summary).toContainText('Viêm lợi, nướu');
   await page.getByLabel('Dặn dò / lời khuyên',{exact:true}).fill('SYNTHETIC hướng dẫn');await page.getByRole('combobox',{name:'Hướng xử trí',exact:true}).press('ArrowDown');await page.locator('.ant-select-dropdown:visible .ant-select-item-option-content').filter({hasText:'Tư vấn, chưa điều trị'}).click();
   await page.screenshot({path:testInfo.outputPath('scoped-diagnoses-summary.png'),fullPage:true,animations:'disabled'});
-  await page.getByRole('button',{name:'Hoàn tất khám',exact:true}).click();await expect(page.getByText('Phiếu khám đã hoàn tất. Kết thúc lượt khám trước khi lập kế hoạch điều trị.',{exact:false})).toBeVisible();
+  await page.getByRole('button',{name:'Hoàn tất khám',exact:true}).click();await expect(page.getByText('Phiếu khám đã hoàn tất. Kết thúc lượt khám trước khi chuyển sang phiếu điều trị.',{exact:false})).toBeVisible();
   const latest=await(await request.get(`${apiUrl}/api/visits/${f.visit.visitId}/examination`,{headers})).json();
   expect(latest.examination.content.diagnoses).toEqual(['Viêm tủy răng','Viêm lợi, nướu']);expect(latest.examination.content.unscopedDiagnoses).toEqual([]);
   expect(latest.examination.content.findings.find((x:{tooth:number})=>x.tooth===26).diagnoses).toEqual(['Viêm tủy răng']);

@@ -1,0 +1,55 @@
+@startuml DCMS_Patient_Login_Sequence_Diagram
+title Sequence Diagram - Bệnh nhân đăng nhập
+
+skinparam shadowing false
+skinparam sequenceMessageAlign left
+skinparam responseMessageBelowArrow true
+skinparam maxMessageSize 220
+skinparam sequence {
+  ParticipantBorderColor #000000
+  ParticipantBackgroundColor #FFFFFF
+  ActorBorderColor #000000
+  ActorBackgroundColor #FFFFFF
+  LifeLineBorderColor #808080
+  ArrowColor #000000
+}
+skinparam boundary {
+  BorderColor #000000
+  BackgroundColor #FFFFFF
+}
+skinparam control {
+  BorderColor #000000
+  BackgroundColor #FFFFFF
+}
+skinparam entity {
+  BorderColor #000000
+  BackgroundColor #FFFFFF
+}
+
+actor "Patient" as Patient
+boundary "Login Screen\n(Web and Mobile)" as Screen
+control "AuthenticationService" as Service
+entity "Database" as Db
+
+autonumber
+
+Patient -> Screen : enter email or username and password
+Screen -> Service : signIn(userName, password, deviceLabel)
+activate Service
+Service -> Service : check the input is not empty
+Service -> Db : find the account by username
+Service -> Service : check the account is active, not locked and the password is correct
+
+alt wrong account or password
+  Screen <-- Service : reject, wrong account or password
+  Patient <-- Screen : show the error message
+else correct
+  Service -> Db : create a session and a refresh token
+  Service -> Db : save audit log "SignIn"
+  Service -> Service : issue the access token
+  Screen <-- Service : access token, refresh token and current user
+  deactivate Service
+  Patient <-- Screen : open the customer portal
+end
+
+@enduml

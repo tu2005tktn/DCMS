@@ -1,0 +1,35 @@
+@startuml sd-exam-start-save
+autonumber
+actor "Dentist" as D
+boundary "Examination Screen" as UI
+control "ExaminationService" as S
+control "ClinicalAccess" as CA
+entity "Database" as DB
+D -> UI : open the patient visit from the queue
+UI -> S : startExamination(visit)
+activate S
+S -> CA : check permission, role, branch and that the dentist is assigned to this visit
+activate CA
+CA -> DB : load the visit, the dentist and the branch membership
+CA --> S : dentist is allowed
+deactivate CA
+S -> S : check visit version is unchanged, visit is Queued and appointment is CheckedIn
+S -> DB : visit and appointment -> InProgress
+S -> DB : save audit log
+S --> UI : examination data
+deactivate S
+loop until the examination is confirmed
+  D -> UI : enter examination content, save or confirm
+  UI -> S : saveExamination(content, confirm)
+  activate S
+  S -> S : check access, version and that the visit is InProgress
+  opt confirming
+    S -> DB : required investigations reviewed or cancelled?
+  end
+  S -> S : validate examination content
+  S -> DB : check the diagnosis references in the catalog
+  S -> DB : save examination and audit log
+  S --> UI : examination data
+  deactivate S
+end
+@enduml

@@ -1,0 +1,28 @@
+sequenceDiagram
+  autonumber
+  actor D as Dentist
+  participant UI as Examination Screen
+  participant S as ExaminationService
+  participant F as ExaminationFeeService
+  participant DB as Database
+  D ->> UI : finish visit, confirm work reviewed, choose fee
+  UI ->> S : completeVisit(visit, feeChoice)
+  activate S
+  S ->> S : check access, duplicate request, version
+  S ->> S : examination confirmed and work reviewed?
+  S ->> DB : any clinical activity still in draft?
+  S ->> DB : investigations reviewed and billed ones performed?
+  S ->> S : diagnosis and disposition present?
+  alt any check fails
+  S -->> UI : reject, nothing is saved
+  else all checks pass
+  S ->> F : recordExaminationFee(visit, feeChoice)
+  activate F
+  F ->> DB : create examination fee record
+  F -->> S : fee recorded
+  deactivate F
+  S ->> DB : visit and appointment -> Completed
+  S ->> DB : save audit log and request record
+  S -->> UI : updated visit
+  end
+  deactivate S

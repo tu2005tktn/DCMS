@@ -1,0 +1,143 @@
+@startuml sd-exam-start-save
+autonumber
+actor "Dentist" as D
+boundary "Examination Screen" as UI
+control "ExaminationService" as S
+control "ClinicalAccess" as CA
+entity "Database" as DB
+D -> UI : open the patient visit from the queue
+UI -> S : startExamination(visit, requestKey)
+activate S
+S -> CA : check the dentist is assigned to this visit
+activate CA
+CA -> DB : load the visit and its assigned dentist
+CA --> S : dentist is allowed
+deactivate CA
+S -> DB : find stored result of this request
+alt request was already processed
+  S --> UI : return stored result
+else new request
+  S -> S : check visit version is unchanged
+  S -> DB : visit and appointment -> InProgress
+  S -> DB : save audit log and request record
+  S --> UI : examination data
+end
+deactivate S
+loop until the examination is confirmed
+  D -> UI : enter examination content, save or confirm
+  UI -> S : saveExamination(content, confirm)
+  activate S
+  S -> S : check access, duplicate request, version
+  S -> S : validate examination content
+  opt confirming
+    S -> DB : required investigations reviewed or cancelled?
+  end
+  S -> DB : save examination and audit log
+  S --> UI : examination data
+  deactivate S
+end
+@enduml
+
+@startuml sd-exam-complete
+autonumber
+actor "Dentist" as D
+boundary "Examination Screen" as UI
+control "ExaminationService" as S
+control "ExaminationFeeService" as F
+entity "Database" as DB
+D -> UI : finish visit, confirm work reviewed, choose fee
+UI -> S : completeVisit(visit, feeChoice)
+activate S
+S -> S : check access, duplicate request, version
+S -> S : examination confirmed and work reviewed?
+S -> DB : any clinical activity still in draft?
+S -> DB : investigations reviewed and billed ones performed?
+S -> S : diagnosis and disposition present?
+alt any check fails
+  S --> UI : reject, nothing is saved
+else all checks pass
+  S -> F : recordExaminationFee(visit, feeChoice)
+  activate F
+  F -> DB : create examination fee record
+  F --> S : fee recorded
+  deactivate F
+  S -> DB : visit and appointment -> Completed
+  S -> DB : save audit log and request record
+  S --> UI : updated visit
+end
+deactivate S
+@enduml
+
+@startuml sd-dossier-create
+autonumber
+actor "Dentist" as D
+boundary "Treatment Screen" as UI
+control "TreatmentDossierService" as S
+entity "Database" as DB
+D -> UI : proceed to treatment after the examination
+UI -> S : createDossier(patient, branch, diagnosis, sourceVisit)
+activate S
+S -> S : user is a dentist of the branch?
+S -> DB : patient exists?
+S -> DB : find stored result of this request
+alt request was already processed
+  S --> UI : return stored result
+else new request
+  S -> S : validate diagnosis and note
+  S -> DB : dentist works in the branch?
+  S -> DB : load source visit, check version unchanged
+  S -> DB : load confirmed examination of that visit
+  S -> DB : create dossier with examination snapshot
+  S -> DB : save history events and request record
+  S --> UI : new dossier and success message
+end
+deactivate S
+@enduml
+
+@startuml sd-plan-commit
+autonumber
+actor "Dentist" as D
+boundary "Treatment Screen" as UI
+control "TreatmentDossierService" as S
+control "SettingsAccess" as SA
+entity "Database" as DB
+D -> UI : open the treatment plan of the dossier
+UI -> S : getTreatmentPlan(dossier)
+activate S
+S -> DB : load sample treatment plans of the branch
+S --> UI : list of sample plans with their items and prices
+deactivate S
+D -> UI : choose the sample plan that fits the diagnosis
+UI -> S : applySamplePlan(dossier, samplePlan)
+activate S
+S -> DB : copy the sample items into the plan (Draft)
+S --> UI : plan with the listed items
+deactivate S
+loop until the plan fits the patient
+  D -> UI : add, edit or delete treatment items, adjust price and terms
+  UI -> S : saveDraft(dossier, plan)
+  activate S
+  S -> S : dossier open, plan not committed, version unchanged
+  S -> S : validate goals, 1-100 items, payment terms
+  S -> DB : chosen services active in the branch?
+  opt items added, removed or re-priced
+    S -> SA : require items create / delete / price permission
+  end
+  S -> DB : save draft plan
+  S --> UI : plan draft saved
+  deactivate S
+end
+D -> UI : commit the plan
+UI -> S : commitPlan(dossier)
+activate S
+S -> S : plan is draft and has items
+S -> S : counseling, decision maker, discounts, consents ready
+alt any rule fails
+  S --> UI : reject, plan stays draft
+else all rules pass
+  S -> DB : raise plan version, mark plan committed
+  S -> DB : save "plan committed" event and request record
+  S --> UI : committed plan and success message
+end
+deactivate S
+@enduml

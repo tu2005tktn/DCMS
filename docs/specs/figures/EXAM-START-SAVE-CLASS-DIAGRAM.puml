@@ -1,0 +1,145 @@
+@startuml DCMS_Exam_Start_Save_Class_Diagram
+title Class Diagram - Bác sĩ khám bệnh (bắt đầu và lưu kết quả khám)
+
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+skinparam nodesep 60
+skinparam ranksep 60
+skinparam class {
+  BorderColor #000000
+  BackgroundColor #FFFFFF
+  HeaderBackgroundColor #FFFFFF
+  ArrowColor #000000
+}
+hide circle
+
+class ExaminationScreen {
+  openVisit()
+  enterExaminationContent()
+  saveOrConfirm()
+  showExaminationData()
+}
+
+class ExaminationService {
+  startExamination()
+  saveExamination()
+  validateContent()
+}
+
+class ClinicalAccess {
+  checkAccess()
+}
+
+class Dentist {
+  id : int
+  accountId : int
+  employeeCode : string
+  fullName : string
+}
+
+class BranchMember {
+  branchId : int
+  employeeId : int
+  active : bool
+  canDentist : bool
+}
+
+class Patient {
+  id : int
+  patientCode : string
+  fullName : string
+  birthDate : DateOnly
+  gender : string
+}
+
+class Visit {
+  id : Guid
+  appointmentId : Guid
+  patientId : int
+  branchId : int
+  dentistId : int
+  status : string
+  version : int
+  arrivalAt : DateTimeOffset
+  arrivalReason : string
+}
+
+class Appointment {
+  id : Guid
+  code : string
+  status : string
+  version : int
+  startAt : DateTimeOffset
+  endAt : DateTimeOffset
+}
+
+class Examination {
+  visitId : Guid
+  content : string
+  updatedBy : int
+  updatedAt : DateTimeOffset
+}
+
+class Investigation {
+  id : Guid
+  visitId : Guid
+  kind : string
+  state : string
+  requiredForDiagnosis : bool
+}
+
+class DiagnosisCatalogEntry {
+  id : Guid
+  code : string
+  name : string
+  isActive : bool
+  version : int
+}
+
+class VisitAudit {
+  id : Guid
+  visitId : Guid
+  actorAccountId : int
+  action : string
+  occurredAt : DateTimeOffset
+  beforeJson : string
+  afterJson : string
+}
+
+ExaminationScreen -[hidden]down- ExaminationService
+
+ExaminationScreen ..> ExaminationService : calls
+ExaminationService ..> ClinicalAccess : checks access
+ClinicalAccess ..> BranchMember : reads
+ClinicalAccess ..> Visit : reads
+ExaminationService ..> Visit : updates status
+ExaminationService ..> Appointment : updates status
+ExaminationService ..> Examination : saves
+ExaminationService ..> Investigation : checks required
+ExaminationService ..> DiagnosisCatalogEntry : checks
+ExaminationService ..> VisitAudit : records
+
+Patient "1" -- "0..*" Visit : attends
+Dentist "1" -- "0..*" Visit : examines
+Dentist "1" -- "0..*" BranchMember : works at
+Appointment "1" -- "0..1" Visit : becomes
+Visit "1" *-- "0..1" Examination : has
+Visit "1" *-- "0..*" Investigation : orders
+Visit "1" *-- "0..*" VisitAudit : logs
+
+note right of Examination
+  Tên dễ đọc = Tên lớp trong code
+  Dentist = EmployeeProfile
+  BranchMember = SchedulingMember
+  Patient = PatientProfile
+  Examination = VisitExamination
+  Investigation = InvestigationOrder
+  DiagnosisCatalogEntry = ReferenceEntry
+  ---
+  Method = Method trong code
+  startExamination = StartAsync
+  saveExamination = SaveAsync
+  checkAccess = VisitAsync, BranchAsync
+end note
+
+@enduml

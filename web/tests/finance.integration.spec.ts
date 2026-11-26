@@ -27,7 +27,7 @@ async function fixture(request: APIRequestContext, demographics: { birthDate: st
   expect(checked.ok(),await checked.text()).toBeTruthy(); return {patient,visit:await checked.json(),branchId,dentistId,headers,clinicDate:options.clinicDate as string};
 }
 
-async function signIn(page:Page,name:string){await page.goto('/sign-in');await page.getByLabel('Tên đăng nhập',{exact:true}).fill(name);await page.getByLabel('Mật khẩu',{exact:true}).fill(password!);await page.getByRole('button',{name:'Đăng nhập',exact:true}).click();await expect(page.getByRole('link',{name:'Thanh toán',exact:true})).toBeVisible();}
+async function signIn(page:Page,name:string){await page.goto('/sign-in');await page.getByLabel('Tên đăng nhập',{exact:true}).fill(name);await page.getByLabel('Mật khẩu',{exact:true}).fill(password!);await page.getByRole('button',{name:'Đăng nhập',exact:true}).click();await expect(page).not.toHaveURL(/sign-in/);}
 test('real catalog → quote → perform → cash partial → pending transfer → confirm',async({page,request},testInfo)=>{
  const f=await fixture(request);const serviceName=`SYNTHETIC CBC ${crypto.randomUUID().slice(0,8)}`;
  await signIn(page,'dentist.demo');await page.goto('/clinical-services');await page.getByRole('button',{name:'Thêm dịch vụ',exact:true}).click();

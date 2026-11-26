@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using DCMS.Application.Common;
 using DCMS.Application.Features.Treatment;
+using DCMS.Domain.Features.Accounts;
 using DCMS.Domain.Features.Appointments;
 using DCMS.Domain.Features.Treatment;
 using DCMS.Infrastructure.Persistence;
@@ -24,6 +25,13 @@ public sealed class WorkStatisticsService(DcmsDbContext db, TimeProvider clock, 
         if (pageSize is not (20 or 50 or 100) || page < 1 || page > int.MaxValue / pageSize || q?.Length > 160 || from > to) throw Bad();
         var dossierQuery = db.TreatmentDossiers.AsNoTracking().Where(d => d.State != "Deleted" && scope.BranchIds.Contains(d.BranchId));
         if (branchId.HasValue) dossierQuery = dossierQuery.Where(d => d.BranchId == branchId);
+        // A plain dentist only sees the dossiers they treat; the clinic owner and admins see every dossier in their branches.
+        var roles = AccountRoles.Effective(scope.Roles);
+        if (roles.Contains(AccountRoles.Dentist) && !scope.Owner && !roles.Contains(AccountRoles.ClinicOwner) && !roles.Contains(AccountRoles.Admin))
+        {
+            var ownEmployeeId = await db.Employees.AsNoTracking().Where(e => e.AccountId == actorId).Select(e => (int?)e.Id).SingleOrDefaultAsync(ct) ?? -1;
+            dossierQuery = dossierQuery.Where(d => d.DentistId == ownEmployeeId);
+        }
         // Opened from another screen for one dossier; out-of-scope or unknown ids simply yield an empty page.
         if (dossierId.HasValue) dossierQuery = dossierQuery.Where(d => d.Id == dossierId);
         if (from.HasValue) dossierQuery = dossierQuery.Where(d => d.StartedOn >= from);

@@ -41,11 +41,10 @@ export default function CommercialTreatmentPage() {
   }
 
   return <main className="treatment-page">
-    <div className="treatment-page-heading"><div><Typography.Title level={2}>Giá tham chiếu điều trị</Typography.Title>
-      <Typography.Paragraph>Bác sĩ trong chi nhánh được phân công, Admin hoặc chủ phòng khám có thể cập nhật giá tham chiếu dịch vụ điều trị.</Typography.Paragraph></div></div>
+    <div className="treatment-page-heading"><div><Typography.Title level={2}>Giá tham chiếu điều trị</Typography.Title></div></div>
     {error && <Alert type="error" showIcon message={error} action={<Button onClick={() => void reload()}>Thử lại</Button>} />}
     {notice && <Alert type="success" showIcon message={notice} />}
-    <Card title="Giá tham chiếu dịch vụ" extra={<Typography.Text type="secondary">Thay đổi catalog không sửa giá đã chốt</Typography.Text>}>
+    <Card title="Giá tham chiếu dịch vụ">
       {prices === null ? <Skeleton active /> : prices.length === 0 ? <Empty description="Chưa có dịch vụ trong phạm vi chi nhánh." />
         : prices.map(price => <div key={price.serviceId} className="treatment-item-row">
           <div><strong>{price.name}</strong><div>Chi nhánh #{price.branchId} · {price.referenceUnitPriceVnd == null

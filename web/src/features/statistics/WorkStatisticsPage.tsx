@@ -1,4 +1,4 @@
-import { Alert, Button, Input, Select, Space, Table, Tag, Typography } from 'antd';
+import { Alert, Button, Input, Modal, Select, Space, Table, Tag, Typography } from 'antd';
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import './workStatistics.css';
@@ -34,7 +34,7 @@ function periodRange(kind: Period) {
   return { from: iso(monday), to: iso(sunday) };
 }
 
-// Read-only detail of one dossier, shown under its summary row.
+// Read-only detail of one dossier, shown in a dialog over the list.
 function DossierDetail({ d }: { d: Dossier }) {
   const state = states[d.state] ?? { label: d.state, color: 'default' };
   const discount = d.lines.reduce((sum, l) => sum + l.discountVnd, 0);
@@ -52,16 +52,16 @@ function DossierDetail({ d }: { d: Dossier }) {
       <div><dt>Ngày tạo phiếu</dt><dd>{formatDate(d.startedOn)}</dd></div>
       <div><dt>Lịch hẹn tiếp theo</dt><dd>{d.nextAppointmentAt ? dateTime(d.nextAppointmentAt) : '—'}</dd></div>
     </dl>
-    <Table<Line> rowKey="activityId" size="small" className="work-stats-lines" pagination={false} dataSource={d.lines} scroll={{ x: 'max-content' }}
+    <Table<Line> rowKey="activityId" size="small" className="work-stats-lines" pagination={false} dataSource={d.lines}
       columns={[
         { title: 'Điều trị/dịch vụ', dataIndex: 'serviceName' },
-        { title: 'Ngày thực hiện', key: 'at', width: 120, render: (_v, l) => formatDate(localDate(l.performedAt)) },
-        { title: 'Số lượng', key: 'qty', width: 90, align: 'right', render: (_v, l) => l.quantity.toLocaleString('vi-VN') },
-        { title: 'Đơn giá', key: 'unit', width: 120, align: 'right', render: (_v, l) => vnd(l.unitPriceVnd) },
-        { title: 'Giảm giá', key: 'discount', width: 110, align: 'right', render: (_v, l) => l.discountVnd ? vnd(l.discountVnd) : '' },
+        { title: 'Ngày thực hiện', key: 'at', width: 115, render: (_v, l) => formatDate(localDate(l.performedAt)) },
+        { title: 'Số lượng', key: 'qty', width: 80, align: 'right', render: (_v, l) => l.quantity.toLocaleString('vi-VN') },
+        { title: 'Đơn giá', key: 'unit', width: 115, align: 'right', render: (_v, l) => vnd(l.unitPriceVnd) },
+        { title: 'Giảm giá', key: 'discount', width: 105, align: 'right', render: (_v, l) => l.discountVnd ? vnd(l.discountVnd) : '' },
         { title: 'Thành tiền', key: 'cost', width: 120, align: 'right', render: (_v, l) => <strong>{vnd(l.costVnd)}</strong> },
-        { title: 'Đã trả', key: 'paid', width: 120, align: 'right', render: (_v, l) => vnd(l.paidVnd) },
-        { title: 'Còn lại', key: 'due', width: 120, align: 'right', render: (_v, l) => vnd(l.dueVnd) },
+        { title: 'Đã trả', key: 'paid', width: 110, align: 'right', render: (_v, l) => vnd(l.paidVnd) },
+        { title: 'Còn lại', key: 'due', width: 115, align: 'right', render: (_v, l) => vnd(l.dueVnd) },
       ]} />
     <div className="work-stats-foot">
       <div className="work-stats-note">
@@ -108,7 +108,8 @@ export default function WorkStatisticsPage() {
   const focused = focusId ? data?.items.find(d => d.dossierId === focusId) : undefined;
   useEffect(() => { if (focused) setOpen(focused.dossierId); }, [focused]);
   const totals = data?.totals;
-  const toggle = (id: string) => setOpen(current => current === id ? undefined : id);
+  const toggle = (id: string) => setOpen(id);
+  const opened = open ? data?.items.find(d => d.dossierId === open) : undefined;
   function choose(kind: Period) {
     leaveFocus(); setPeriod(kind);
     if (kind === 'all') { setFrom(''); setTo(''); } else if (kind !== 'custom') { const r = periodRange(kind); setFrom(r.from); setTo(r.to); }
@@ -141,19 +142,20 @@ export default function WorkStatisticsPage() {
       pagination={{ current: page, pageSize, total: data?.total ?? 0, showSizeChanger: true, pageSizeOptions: [20, 50, 100], showTotal: t => `Có ${t} phiếu điều trị.`,
         onChange: (p, s) => { setPage(p); setPageSize(s); setOpen(undefined); } }}
       rowClassName={d => d.dossierId === open ? 'work-stats-row work-stats-row-open' : 'work-stats-row'}
-      onRow={d => ({ tabIndex: 0, 'aria-expanded': d.dossierId === open, onClick: () => toggle(d.dossierId),
+      onRow={d => ({ tabIndex: 0, 'aria-haspopup': 'dialog', onClick: () => toggle(d.dossierId),
         onKeyDown: e => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); toggle(d.dossierId); } } })}
-      expandable={{ showExpandColumn: false, expandedRowKeys: open ? [open] : [], expandedRowRender: d => <DossierDetail d={d} /> }}
       columns={[
-        { title: 'Mã phiếu', dataIndex: 'dossierCode', width: 130 },
-        { title: 'Ngày', key: 'date', width: 105, render: (_v, d) => formatDate(d.startedOn) },
-        { title: 'MSKH', dataIndex: 'patientCode', width: 140 },
+        { title: 'Ngày', key: 'date', width: 120, render: (_v, d) => formatDate(d.startedOn) },
         { title: 'Khách hàng', dataIndex: 'patientName' },
-        { title: 'Bác sĩ', dataIndex: 'dentistName', width: 190 },
-        { title: 'Chi phí', key: 'cost', width: 130, align: 'right', render: (_v, d) => vnd(d.costVnd) },
-        { title: 'Đã trả', key: 'paid', width: 130, align: 'right', render: (_v, d) => vnd(d.paidVnd) },
-        { title: 'Còn lại', key: 'due', width: 130, align: 'right', render: (_v, d) => vnd(d.dueVnd) },
+        { title: 'Bác sĩ', dataIndex: 'dentistName', width: 220 },
+        { title: 'Chi phí', key: 'cost', width: 150, align: 'right', render: (_v, d) => vnd(d.costVnd) },
+        { title: 'Đã trả', key: 'paid', width: 150, align: 'right', render: (_v, d) => vnd(d.paidVnd) },
+        { title: 'Còn lại', key: 'due', width: 150, align: 'right', render: (_v, d) => vnd(d.dueVnd) },
       ]}
       />
+    <Modal open={!!opened} centered width="min(1100px, calc(100vw - 32px))" footer={null} destroyOnClose onCancel={() => setOpen(undefined)}
+      title={opened ? `Phiếu ${opened.dossierCode}` : ''}>
+      {opened && <DossierDetail d={opened} />}
+    </Modal>
   </div>;
 }

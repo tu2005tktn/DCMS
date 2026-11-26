@@ -1,0 +1,96 @@
+@startuml DCMS_Patient_Login_Class_Diagram
+title Class Diagram - Bệnh nhân đăng nhập
+
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+skinparam nodesep 60
+skinparam ranksep 60
+skinparam class {
+  BorderColor #000000
+  BackgroundColor #FFFFFF
+  HeaderBackgroundColor #FFFFFF
+  ArrowColor #000000
+}
+hide circle
+
+class LoginScreen {
+  enterCredentials()
+  submitSignIn()
+  showError()
+  openCustomerPortal()
+}
+
+class AuthenticationService {
+  signIn()
+  checkInput()
+  verifyAccount()
+  createSession()
+  issueAccessToken()
+}
+
+class Account {
+  id : int
+  userName : string
+  email : string
+  phoneNumber : string
+  fullName : string
+  accountType : string
+  isActive : bool
+  lockoutEnd : DateTimeOffset
+  createdAt : DateTimeOffset
+}
+
+class Session {
+  id : Guid
+  accountId : int
+  deviceLabel : string
+  clientKind : string
+  createdAt : DateTimeOffset
+  lastSeenAt : DateTimeOffset
+  expiresAt : DateTimeOffset
+  revokedAt : DateTimeOffset
+}
+
+class RefreshToken {
+  id : long
+  sessionId : Guid
+  tokenHash : string
+  issuedAt : DateTimeOffset
+  expiresAt : DateTimeOffset
+  status : string
+}
+
+class AccountAudit {
+  id : Guid
+  actorId : int
+  targetId : int
+  action : string
+  reason : string
+  occurredAt : DateTimeOffset
+}
+
+LoginScreen -[hidden]down- AuthenticationService
+
+LoginScreen ..> AuthenticationService : calls
+AuthenticationService ..> Account : finds, verifies
+AuthenticationService ..> Session : creates
+AuthenticationService ..> RefreshToken : creates
+AuthenticationService ..> AccountAudit : records
+
+Account "1" *-- "0..*" Session : has
+Session "1" *-- "1..*" RefreshToken : has
+Account "1" -- "0..*" AccountAudit : is target of
+
+note right of RefreshToken
+  Tên dễ đọc = Tên lớp trong code
+  Account = ApplicationUser
+  Session = AuthSession
+  RefreshToken = AuthRefreshToken
+  ---
+  Method = Method trong code
+  signIn = SignInAsync
+  createSession = CreateSessionAsync
+  issueAccessToken = IssueAccessToken
+end note
+
+@enduml

@@ -1,0 +1,489 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1420" height="1472" viewBox="0 0 1420 1472">
+<defs><marker id="a" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><path d="M0,0 L10,4 L0,8 z" fill="#374151"/></marker></defs>
+<rect x="0" y="0" width="1420" height="1472" fill="#ffffff" stroke="#ffffff" stroke-width="1.5" />
+<text x="710" y="28" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="bold" text-anchor="middle" fill="#1f2937">DCMS — Sub-system Package Diagram</text>
+<rect x="40" y="52" width="150" height="12" fill="#fff7ed" stroke="#111827" stroke-width="1.5"/>
+<rect x="40" y="64" width="520" height="56" fill="#fff7ed" stroke="#111827" stroke-width="1.5" />
+<circle cx="554" cy="66" r="11" fill="#fff" stroke="#111827"/>
+<text x="554" y="70" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">17</text>
+<text x="54" y="88" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="bold" text-anchor="start" fill="#1f2937">DCMS Mobile</text>
+<text x="54" y="108" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="normal" text-anchor="start" fill="#4b5563">Expo / React Native — customers; staff: support requests, schedule impact</text>
+<rect x="600" y="52" width="150" height="12" fill="#fff7ed" stroke="#111827" stroke-width="1.5"/>
+<rect x="600" y="64" width="520" height="56" fill="#fff7ed" stroke="#111827" stroke-width="1.5" />
+<circle cx="1114" cy="66" r="11" fill="#fff" stroke="#111827"/>
+<text x="1114" y="70" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">18</text>
+<text x="614" y="88" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="bold" text-anchor="start" fill="#1f2937">DCMS Web</text>
+<text x="614" y="108" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="normal" text-anchor="start" fill="#4b5563">React 19 + Vite + Ant Design — staff workspace and customer portal (/customer)</text>
+<rect x="40" y="138" width="150" height="12" fill="#eef2ff" stroke="#111827" stroke-width="1.5"/>
+<rect x="40" y="150" width="1080" height="268" fill="#eef2ff" stroke="#111827" stroke-width="1.5" />
+<text x="54" y="172" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="bold" text-anchor="start" fill="#1f2937">«package» DCMS.Api</text>
+<text x="201.6" y="172" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="normal" text-anchor="start" fill="#4b5563">Minimal-API endpoints · Hub · Hosted workers · Middleware (auth, permissions)</text>
+<rect x="60" y="196" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="60" y="204" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="222" cy="206" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="222" y="210" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">01</text>
+<text x="143" y="228" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">Authentication.Api</text>
+<text x="143" y="244" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="middle" fill="#4b5563">sign-in, Google, recovery</text>
+<rect x="238" y="196" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="238" y="204" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="400" cy="206" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="400" y="210" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">02</text>
+<text x="321" y="228" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">Accounts.Api</text>
+<text x="321" y="244" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="middle" fill="#4b5563">staff accounts, roles</text>
+<rect x="416" y="196" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="416" y="204" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="578" cy="206" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="578" y="210" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">03</text>
+<text x="499" y="228" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">Patients.Api</text>
+<text x="499" y="244" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="middle" fill="#4b5563">patient records</text>
+<rect x="594" y="196" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="594" y="204" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="756" cy="206" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="756" y="210" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">04</text>
+<text x="677" y="228" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">PatientLinks.Api</text>
+<text x="677" y="244" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="middle" fill="#4b5563">record link requests</text>
+<rect x="772" y="196" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="772" y="204" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="934" cy="206" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="934" y="210" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">05</text>
+<text x="855" y="228" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">FamilyMembers.Api</text>
+<text x="855" y="244" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="middle" fill="#4b5563">relatives, record access</text>
+<rect x="950" y="196" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="950" y="204" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="1112" cy="206" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="1112" y="210" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">06</text>
+<text x="1033" y="228" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">Scheduling.Api</text>
+<text x="1033" y="244" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="middle" fill="#4b5563">schedules, availability</text>
+<rect x="60" y="268" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="60" y="276" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="222" cy="278" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="222" y="282" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">07</text>
+<text x="143" y="300" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">Appointments.Api</text>
+<text x="143" y="316" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="middle" fill="#4b5563">booking, change, support</text>
+<rect x="238" y="268" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="238" y="276" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="400" cy="278" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="400" y="282" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">08</text>
+<text x="321" y="300" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">Reception.Api</text>
+<text x="321" y="316" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="middle" fill="#4b5563">check-in, queue</text>
+<rect x="416" y="268" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="416" y="276" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="578" cy="278" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="578" y="282" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">09</text>
+<text x="499" y="300" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">Examinations.Api</text>
+<text x="499" y="316" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="middle" fill="#4b5563">visit, orders, documents</text>
+<rect x="594" y="268" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="594" y="276" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="756" cy="278" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="756" y="282" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">10</text>
+<text x="677" y="300" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">Prescriptions.Api</text>
+<text x="677" y="316" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="middle" fill="#4b5563">prescriptions, medicine options</text>
+<rect x="772" y="268" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="772" y="276" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="934" cy="278" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="934" y="282" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">11</text>
+<text x="855" y="300" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">Treatment.Api</text>
+<text x="855" y="316" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="middle" fill="#4b5563">dossier, plan, lab, care</text>
+<rect x="950" y="268" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="950" y="276" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="1112" cy="278" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="1112" y="282" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">12</text>
+<text x="1033" y="300" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">Finance.Api</text>
+<text x="1033" y="316" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="middle" fill="#4b5563">payments, PayOS, statistics</text>
+<rect x="60" y="340" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="60" y="348" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="222" cy="350" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="222" y="354" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">13</text>
+<text x="143" y="372" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">Notifications.Api</text>
+<text x="143" y="388" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="middle" fill="#4b5563">list, read, devices</text>
+<rect x="238" y="340" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="238" y="348" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="400" cy="350" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="400" y="354" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">14</text>
+<text x="321" y="372" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">Settings.Api</text>
+<text x="321" y="388" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="middle" fill="#4b5563">branches, access groups</text>
+<rect x="416" y="340" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="416" y="348" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="578" cy="350" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="578" y="354" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">15</text>
+<text x="499" y="372" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">SystemSettings.Api</text>
+<text x="499" y="388" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="middle" fill="#4b5563">catalogs, materials</text>
+<rect x="594" y="340" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="594" y="348" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="756" cy="350" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="756" y="354" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">16</text>
+<text x="677" y="372" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">Health.Api</text>
+<text x="677" y="388" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="middle" fill="#4b5563">/health</text>
+<rect x="772" y="340" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="772" y="348" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="934" cy="350" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="934" y="354" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">13</text>
+<text x="855" y="372" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">Realtime.Hub</text>
+<text x="855" y="388" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="middle" fill="#4b5563">SignalR /hubs/notifications</text>
+<rect x="950" y="340" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="950" y="348" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="1112" cy="350" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="1112" y="354" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">16</text>
+<text x="1033" y="372" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">Hosted workers</text>
+<text x="1033" y="388" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="middle" fill="#4b5563">PayOS reconcile worker</text>
+<rect x="40" y="476" width="150" height="12" fill="#ecfdf5" stroke="#111827" stroke-width="1.5"/>
+<rect x="40" y="488" width="1080" height="268" fill="#ecfdf5" stroke="#111827" stroke-width="1.5" />
+<text x="54" y="510" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="bold" text-anchor="start" fill="#1f2937">«package» DCMS.Application</text>
+<text x="267.2" y="510" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="normal" text-anchor="start" fill="#4b5563">Contracts · DTOs · Permission grants · System messages</text>
+<rect x="60" y="534" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="60" y="542" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="222" cy="544" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="222" y="548" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">01</text>
+<text x="143" y="566" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">Authentication</text>
+<text x="143" y="582" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="middle" fill="#4b5563">contracts, policies</text>
+<rect x="238" y="534" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="238" y="542" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="400" cy="544" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="400" y="548" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">02</text>
+<text x="321" y="573" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">Accounts</text>
+<rect x="416" y="534" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="416" y="542" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="578" cy="544" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="578" y="548" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">03</text>
+<text x="499" y="573" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">Patients</text>
+<rect x="594" y="534" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="594" y="542" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="756" cy="544" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="756" y="548" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">04</text>
+<text x="677" y="573" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">PatientLinks</text>
+<rect x="772" y="534" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="772" y="542" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="934" cy="544" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="934" y="548" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">05</text>
+<text x="855" y="573" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">FamilyMembers</text>
+<rect x="950" y="534" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="950" y="542" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="1112" cy="544" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="1112" y="548" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">06</text>
+<text x="1033" y="566" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">Scheduling</text>
+<text x="1033" y="582" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="middle" fill="#4b5563">slots, booking settings</text>
+<rect x="60" y="606" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="60" y="614" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="222" cy="616" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="222" y="620" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">07</text>
+<text x="143" y="645" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">Appointments</text>
+<rect x="238" y="606" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="238" y="614" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="400" cy="616" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="400" y="620" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">07</text>
+<text x="321" y="645" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">SupportRequests</text>
+<rect x="416" y="606" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="416" y="614" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="578" cy="616" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="578" y="620" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">08</text>
+<text x="499" y="645" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">Reception</text>
+<rect x="594" y="606" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="594" y="614" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="756" cy="616" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="756" y="620" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">09</text>
+<text x="677" y="645" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">Examinations</text>
+<rect x="772" y="606" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="772" y="614" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="934" cy="616" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="934" y="620" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">10</text>
+<text x="855" y="645" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">Prescriptions</text>
+<rect x="950" y="606" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="950" y="614" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="1112" cy="616" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="1112" y="620" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">11</text>
+<text x="1033" y="638" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">Treatment</text>
+<text x="1033" y="654" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="middle" fill="#4b5563">dossier, plan, lab, care</text>
+<rect x="60" y="678" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="60" y="686" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="222" cy="688" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="222" y="692" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">13</text>
+<text x="143" y="717" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">Notifications</text>
+<rect x="238" y="678" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="238" y="686" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="400" cy="688" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="400" y="692" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">14</text>
+<text x="321" y="710" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">Settings</text>
+<text x="321" y="726" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="middle" fill="#4b5563">branches, access groups</text>
+<rect x="416" y="678" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="416" y="686" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="578" cy="688" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="578" y="692" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">15</text>
+<text x="499" y="717" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">SystemSettings</text>
+<rect x="594" y="678" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="594" y="686" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="756" cy="688" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="756" y="692" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">16</text>
+<text x="677" y="710" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">Common</text>
+<text x="677" y="726" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="middle" fill="#4b5563">messages, exceptions</text>
+<rect x="772" y="678" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="772" y="686" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="934" cy="688" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="934" y="692" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">14</text>
+<text x="855" y="710" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">ScreenGrants</text>
+<text x="855" y="726" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="middle" fill="#4b5563">screen/action grants</text>
+<rect x="40" y="814" width="150" height="12" fill="#fefce8" stroke="#111827" stroke-width="1.5"/>
+<rect x="40" y="826" width="1080" height="268" fill="#fefce8" stroke="#111827" stroke-width="1.5" />
+<text x="54" y="848" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="bold" text-anchor="start" fill="#1f2937">«package» DCMS.Infrastructure</text>
+<text x="291.79999999999995" y="848" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="normal" text-anchor="start" fill="#4b5563">Services · EF Core persistence · Background workers · External adapters</text>
+<rect x="60" y="872" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="60" y="880" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="222" cy="882" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="222" y="886" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">01</text>
+<text x="143" y="904" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">Authentication</text>
+<text x="143" y="920" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="middle" fill="#4b5563">JWT, Google, recovery</text>
+<rect x="238" y="872" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="238" y="880" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="400" cy="882" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="400" y="886" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">02</text>
+<text x="321" y="904" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">Accounts</text>
+<text x="321" y="920" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="middle" fill="#4b5563">Identity store</text>
+<rect x="416" y="872" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="416" y="880" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="578" cy="882" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="578" y="886" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">03</text>
+<text x="499" y="911" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">Patients</text>
+<rect x="594" y="872" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="594" y="880" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="756" cy="882" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="756" y="886" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">04</text>
+<text x="677" y="911" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">PatientLinks</text>
+<rect x="772" y="872" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="772" y="880" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="934" cy="882" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="934" y="886" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">05</text>
+<text x="855" y="911" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">FamilyMembers</text>
+<rect x="950" y="872" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="950" y="880" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="1112" cy="882" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="1112" y="886" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">06</text>
+<text x="1033" y="904" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">Scheduling</text>
+<text x="1033" y="920" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="middle" fill="#4b5563">advisory-lock reservations</text>
+<rect x="60" y="944" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="60" y="952" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="222" cy="954" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="222" y="958" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">07</text>
+<text x="143" y="983" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">Appointments</text>
+<rect x="238" y="944" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="238" y="952" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="400" cy="954" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="400" y="958" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">08</text>
+<text x="321" y="983" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">Reception</text>
+<rect x="416" y="944" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="416" y="952" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="578" cy="954" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="578" y="958" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">09</text>
+<text x="499" y="976" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">Examinations</text>
+<text x="499" y="992" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="middle" fill="#4b5563">documents, AI client, scan</text>
+<rect x="594" y="944" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="594" y="952" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="756" cy="954" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="756" y="958" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">10</text>
+<text x="677" y="983" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">Prescriptions</text>
+<rect x="772" y="944" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="772" y="952" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="934" cy="954" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="934" y="958" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">11</text>
+<text x="855" y="976" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">Treatment</text>
+<text x="855" y="992" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="middle" fill="#4b5563">incl. due scan worker</text>
+<rect x="950" y="944" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="950" y="952" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="1112" cy="954" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="1112" y="958" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">13</text>
+<text x="1033" y="976" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">Notifications</text>
+<text x="1033" y="992" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="middle" fill="#4b5563">dispatcher, worker, FCM</text>
+<rect x="60" y="1016" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="60" y="1024" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="222" cy="1026" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="222" y="1030" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">14</text>
+<text x="143" y="1055" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">Settings</text>
+<rect x="238" y="1016" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="238" y="1024" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="400" cy="1026" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="400" y="1030" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">15</text>
+<text x="321" y="1048" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">SystemSettings</text>
+<text x="321" y="1064" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="middle" fill="#4b5563">materials, catalogs</text>
+<rect x="416" y="1016" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="416" y="1024" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="578" cy="1026" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="578" y="1030" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">17</text>
+<text x="499" y="1048" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">Persistence</text>
+<text x="499" y="1064" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="middle" fill="#4b5563">DcmsDbContext, Migrations</text>
+<rect x="594" y="1016" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="594" y="1024" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="756" cy="1026" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="756" y="1030" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">18</text>
+<text x="677" y="1048" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">Adapters</text>
+<text x="677" y="1064" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="middle" fill="#4b5563">SMTP, Google verifier</text>
+<rect x="40" y="1152" width="150" height="12" fill="#fdf2f8" stroke="#111827" stroke-width="1.5"/>
+<rect x="40" y="1164" width="1080" height="268" fill="#fdf2f8" stroke="#111827" stroke-width="1.5" />
+<text x="54" y="1186" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="bold" text-anchor="start" fill="#1f2937">«package» DCMS.Domain</text>
+<text x="226.2" y="1186" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="normal" text-anchor="start" fill="#4b5563">Entities · Status constants · Business rules (no dependencies)</text>
+<rect x="60" y="1210" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="60" y="1218" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="222" cy="1220" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="222" y="1224" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">01</text>
+<text x="143" y="1249" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">Authentication</text>
+<rect x="238" y="1210" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="238" y="1218" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="400" cy="1220" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="400" y="1224" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">02</text>
+<text x="321" y="1242" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">Accounts</text>
+<text x="321" y="1258" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="middle" fill="#4b5563">roles, audit</text>
+<rect x="416" y="1210" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="416" y="1218" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="578" cy="1220" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="578" y="1224" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">03</text>
+<text x="499" y="1249" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">Patients</text>
+<rect x="594" y="1210" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="594" y="1218" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="756" cy="1220" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="756" y="1224" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">04</text>
+<text x="677" y="1249" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">PatientLinks</text>
+<rect x="772" y="1210" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="772" y="1218" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="934" cy="1220" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="934" y="1224" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">05</text>
+<text x="855" y="1249" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">FamilyMembers</text>
+<rect x="950" y="1210" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="950" y="1218" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="1112" cy="1220" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="1112" y="1224" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">06</text>
+<text x="1033" y="1242" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">Scheduling</text>
+<text x="1033" y="1258" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="middle" fill="#4b5563">schedule rules</text>
+<rect x="60" y="1282" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="60" y="1290" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="222" cy="1292" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="222" y="1296" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">07</text>
+<text x="143" y="1314" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">Appointments</text>
+<text x="143" y="1330" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="middle" fill="#4b5563">status, support, notifications</text>
+<rect x="238" y="1282" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="238" y="1290" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="400" cy="1292" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="400" y="1296" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">08</text>
+<text x="321" y="1321" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">Visits</text>
+<rect x="416" y="1282" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="416" y="1290" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="578" cy="1292" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="578" y="1296" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">09</text>
+<text x="499" y="1314" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">Examinations</text>
+<text x="499" y="1330" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="middle" fill="#4b5563">orders, documents</text>
+<rect x="594" y="1282" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="594" y="1290" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="756" cy="1292" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="756" y="1296" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">10</text>
+<text x="677" y="1321" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">Prescriptions</text>
+<rect x="772" y="1282" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="772" y="1290" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="934" cy="1292" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="934" y="1296" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">11</text>
+<text x="855" y="1314" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">Treatment</text>
+<text x="855" y="1330" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="middle" fill="#4b5563">dossier, lab order, care task</text>
+<rect x="950" y="1282" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="950" y="1290" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="1112" cy="1292" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="1112" y="1296" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">14</text>
+<text x="1033" y="1321" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">Settings</text>
+<rect x="60" y="1354" width="46" height="8" fill="#ffffff" stroke="#374151" stroke-width="1.2"/>
+<rect x="60" y="1362" width="166" height="50" fill="#ffffff" stroke="#374151" stroke-width="1.5" />
+<circle cx="222" cy="1364" r="10" fill="#fff" stroke="#374151" stroke-width="1.2"/>
+<text x="222" y="1368" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">15</text>
+<text x="143" y="1386" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#1f2937">SystemSettings</text>
+<text x="143" y="1402" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="middle" fill="#4b5563">materials, catalogs</text>
+<line x1="300" y1="120" x2="300" y2="138" stroke="#374151" stroke-width="1.4"  marker-end="url(#a)"/>
+<line x1="840" y1="120" x2="840" y2="138" stroke="#374151" stroke-width="1.4"  marker-end="url(#a)"/>
+<text x="246" y="140" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="normal" text-anchor="start" fill="#1f2937">«access» REST / JSON</text>
+<text x="886" y="140" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="normal" text-anchor="start" fill="#1f2937">«access» REST / SignalR</text>
+<line x1="240" y1="418" x2="240" y2="476" stroke="#374151" stroke-width="1.4" stroke-dasharray="6 4" marker-end="url(#a)"/>
+<line x1="240" y1="756" x2="240" y2="814" stroke="#374151" stroke-width="1.4" stroke-dasharray="6 4" marker-end="url(#a)"/>
+<line x1="240" y1="1094" x2="240" y2="1152" stroke="#374151" stroke-width="1.4" stroke-dasharray="6 4" marker-end="url(#a)"/>
+<line x1="580" y1="418" x2="580" y2="476" stroke="#374151" stroke-width="1.4" stroke-dasharray="6 4" marker-end="url(#a)"/>
+<line x1="580" y1="756" x2="580" y2="814" stroke="#374151" stroke-width="1.4" stroke-dasharray="6 4" marker-end="url(#a)"/>
+<line x1="580" y1="1094" x2="580" y2="1152" stroke="#374151" stroke-width="1.4" stroke-dasharray="6 4" marker-end="url(#a)"/>
+<line x1="920" y1="418" x2="920" y2="476" stroke="#374151" stroke-width="1.4" stroke-dasharray="6 4" marker-end="url(#a)"/>
+<line x1="920" y1="756" x2="920" y2="814" stroke="#374151" stroke-width="1.4" stroke-dasharray="6 4" marker-end="url(#a)"/>
+<line x1="920" y1="1094" x2="920" y2="1152" stroke="#374151" stroke-width="1.4" stroke-dasharray="6 4" marker-end="url(#a)"/>
+<text x="246" y="456" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="normal" text-anchor="start" fill="#1f2937">«use»</text>
+<text x="246" y="794" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="normal" text-anchor="start" fill="#1f2937">«use» (implements contracts)</text>
+<text x="246" y="1132" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="normal" text-anchor="start" fill="#1f2937">«import»</text>
+<rect x="1170" y="858" width="60" height="8" fill="#f3f4f6" stroke="#111827" stroke-width="1.5"/>
+<rect x="1170" y="866" width="220" height="66" fill="#f3f4f6" stroke="#111827" stroke-width="1.5" />
+<circle cx="1386" cy="868" r="11" fill="#fff" stroke="#111827"/>
+<text x="1386" y="872" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">19</text>
+<text x="1180" y="888" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="start" fill="#6b7280">«external»</text>
+<text x="1180" y="904" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="bold" text-anchor="start" fill="#1f2937">PostgreSQL</text>
+<text x="1180" y="920" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="start" fill="#4b5563">EF Core 10 / Npgsql</text>
+<text x="1180" y="932" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="start" fill="#4b5563">DcmsDbContext</text>
+<rect x="1170" y="938" width="60" height="8" fill="#f3f4f6" stroke="#111827" stroke-width="1.5"/>
+<rect x="1170" y="946" width="220" height="66" fill="#f3f4f6" stroke="#111827" stroke-width="1.5" />
+<circle cx="1386" cy="948" r="11" fill="#fff" stroke="#111827"/>
+<text x="1386" y="952" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">20</text>
+<text x="1180" y="968" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="start" fill="#6b7280">«external»</text>
+<text x="1180" y="984" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="bold" text-anchor="start" fill="#1f2937">Firebase (FCM)</text>
+<text x="1180" y="1000" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="start" fill="#4b5563">push notifications</text>
+<text x="1180" y="1012" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="start" fill="#4b5563">by Infrastructure.Notifications</text>
+<rect x="1170" y="324" width="60" height="8" fill="#f3f4f6" stroke="#111827" stroke-width="1.5"/>
+<rect x="1170" y="332" width="220" height="66" fill="#f3f4f6" stroke="#111827" stroke-width="1.5" />
+<circle cx="1386" cy="334" r="11" fill="#fff" stroke="#111827"/>
+<text x="1386" y="338" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">21</text>
+<text x="1180" y="354" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="start" fill="#6b7280">«external»</text>
+<text x="1180" y="370" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="bold" text-anchor="start" fill="#1f2937">PayOS</text>
+<text x="1180" y="386" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="start" fill="#4b5563">QR orders, status, webhook</text>
+<text x="1180" y="398" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="start" fill="#4b5563">by Api.Finance</text>
+<rect x="1170" y="1018" width="60" height="8" fill="#f3f4f6" stroke="#111827" stroke-width="1.5"/>
+<rect x="1170" y="1026" width="220" height="66" fill="#f3f4f6" stroke="#111827" stroke-width="1.5" />
+<circle cx="1386" cy="1028" r="11" fill="#fff" stroke="#111827"/>
+<text x="1386" y="1032" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">22</text>
+<text x="1180" y="1048" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="start" fill="#6b7280">«external»</text>
+<text x="1180" y="1064" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="bold" text-anchor="start" fill="#1f2937">Google Identity</text>
+<text x="1180" y="1080" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="start" fill="#4b5563">ID token verification</text>
+<text x="1180" y="1092" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="start" fill="#4b5563">by Infrastructure.Authentication</text>
+<rect x="1170" y="1098" width="60" height="8" fill="#f3f4f6" stroke="#111827" stroke-width="1.5"/>
+<rect x="1170" y="1106" width="220" height="66" fill="#f3f4f6" stroke="#111827" stroke-width="1.5" />
+<circle cx="1386" cy="1108" r="11" fill="#fff" stroke="#111827"/>
+<text x="1386" y="1112" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">23</text>
+<text x="1180" y="1128" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="start" fill="#6b7280">«external»</text>
+<text x="1180" y="1144" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="bold" text-anchor="start" fill="#1f2937">SMTP server</text>
+<text x="1180" y="1160" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="start" fill="#4b5563">recovery e-mail</text>
+<text x="1180" y="1172" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="start" fill="#4b5563">by Infrastructure.Authentication</text>
+<rect x="1170" y="1178" width="60" height="8" fill="#f3f4f6" stroke="#111827" stroke-width="1.5"/>
+<rect x="1170" y="1186" width="220" height="66" fill="#f3f4f6" stroke="#111827" stroke-width="1.5" />
+<circle cx="1386" cy="1188" r="11" fill="#fff" stroke="#111827"/>
+<text x="1386" y="1192" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">24</text>
+<text x="1180" y="1208" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="start" fill="#6b7280">«external»</text>
+<text x="1180" y="1224" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="bold" text-anchor="start" fill="#1f2937">Local file storage</text>
+<text x="1180" y="1240" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="start" fill="#4b5563">clinical documents on disk</text>
+<text x="1180" y="1252" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="start" fill="#4b5563">by Infrastructure.Examinations</text>
+<rect x="1170" y="1258" width="60" height="8" fill="#f3f4f6" stroke="#111827" stroke-width="1.5"/>
+<rect x="1170" y="1266" width="220" height="66" fill="#f3f4f6" stroke="#111827" stroke-width="1.5" />
+<circle cx="1386" cy="1268" r="11" fill="#fff" stroke="#111827"/>
+<text x="1386" y="1272" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">25</text>
+<text x="1180" y="1288" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="start" fill="#6b7280">«external»</text>
+<text x="1180" y="1304" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="bold" text-anchor="start" fill="#1f2937">Dental AI service</text>
+<text x="1180" y="1320" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="start" fill="#4b5563">X-ray caries analysis (HTTP)</text>
+<text x="1180" y="1332" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="start" fill="#4b5563">by Infrastructure.Examinations</text>
+<rect x="1170" y="1338" width="60" height="8" fill="#f3f4f6" stroke="#111827" stroke-width="1.5"/>
+<rect x="1170" y="1346" width="220" height="66" fill="#f3f4f6" stroke="#111827" stroke-width="1.5" />
+<circle cx="1386" cy="1348" r="11" fill="#fff" stroke="#111827"/>
+<text x="1386" y="1352" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#1f2937">26</text>
+<text x="1180" y="1368" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="start" fill="#6b7280">«external»</text>
+<text x="1180" y="1384" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="bold" text-anchor="start" fill="#1f2937">ClamAV (optional)</text>
+<text x="1180" y="1400" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="start" fill="#4b5563">virus scan, TCP 3310</text>
+<text x="1180" y="1412" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="start" fill="#4b5563">by Infrastructure.Examinations</text>
+<line x1="1120" y1="899" x2="1170" y2="899" stroke="#374151" stroke-width="1.4" stroke-dasharray="6 4" marker-end="url(#a)"/>
+<text x="1095" y="903" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="normal" text-anchor="start" fill="#374151">«use»</text>
+<line x1="1120" y1="979" x2="1170" y2="979" stroke="#374151" stroke-width="1.4" stroke-dasharray="6 4" marker-end="url(#a)"/>
+<text x="1095" y="983" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="normal" text-anchor="start" fill="#374151">«use»</text>
+<line x1="1120" y1="1059" x2="1170" y2="1059" stroke="#374151" stroke-width="1.4" stroke-dasharray="6 4" marker-end="url(#a)"/>
+<text x="1095" y="1063" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="normal" text-anchor="start" fill="#374151">«use»</text>
+<line x1="1120" y1="1139" x2="1170" y2="1139" stroke="#374151" stroke-width="1.4" stroke-dasharray="6 4" marker-end="url(#a)"/>
+<text x="1095" y="1143" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="normal" text-anchor="start" fill="#374151">«use»</text>
+<line x1="1120" y1="1219" x2="1170" y2="1219" stroke="#374151" stroke-width="1.4" stroke-dasharray="6 4" marker-end="url(#a)"/>
+<text x="1095" y="1223" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="normal" text-anchor="start" fill="#374151">«use»</text>
+<line x1="1120" y1="1299" x2="1170" y2="1299" stroke="#374151" stroke-width="1.4" stroke-dasharray="6 4" marker-end="url(#a)"/>
+<text x="1095" y="1303" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="normal" text-anchor="start" fill="#374151">«use»</text>
+<line x1="1120" y1="1379" x2="1170" y2="1379" stroke="#374151" stroke-width="1.4" stroke-dasharray="6 4" marker-end="url(#a)"/>
+<text x="1095" y="1383" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="normal" text-anchor="start" fill="#374151">«use»</text>
+<line x1="1120" y1="365" x2="1170" y2="365" stroke="#374151" stroke-width="1.4" stroke-dasharray="6 4" marker-end="url(#a)"/>
+<text x="1025" y="369" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="normal" text-anchor="start" fill="#374151">«use» HTTP / webhook</text>
+<text x="40" y="1464" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="normal" text-anchor="start" fill="#6b7280">Dependency rule: Api → Application → Infrastructure → Domain. Finance has no Application package: payments are ledger rows (AUDIT_LOG) handled in Api and Infrastructure.Treatment.</text>
+</svg>
