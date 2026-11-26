@@ -40,6 +40,10 @@ Các cột **Ngày, MSKH, Khách hàng, Lịch hẹn tiếp theo, Bác sĩ & ph�
 
 Menu "Thống kê công việc/dịch vụ" (nhóm Quản trị) hiện khi có `finance.work-statistics.read`. Bộ lọc: khoảng ngày, chi nhánh, ô tìm kiếm. Bảng 9 cột (Ngày, MSKH, Khách hàng, Lịch hẹn tiếp theo, Điều trị/dịch vụ, Bác sĩ & phụ tá, Chi phí, Đã trả, Còn lại), tiền căn phải định dạng VND, hàng tổng cộng phía dưới theo bộ lọc, phân trang 20/50/100. Trạng thái: đang tải, trống ("Chưa có công việc nào"), lỗi kèm "Thử lại".
 
+## Màn hình hẹp: không cuộn ngang (06/11/2026)
+
+Bảng không có thanh cuộn ngang ở mọi độ rộng; chữ trong ô tự xuống dòng. Từ 900px trở xuống, mỗi công việc/dịch vụ là một thẻ, mỗi trường một dòng "nhãn: giá trị" (Ngày, MSKH, Khách hàng, Lịch hẹn tiếp theo, Điều trị/dịch vụ, Bác sĩ & phụ tá, Chi phí, Đã trả, Còn lại); thông tin phiếu (ngày, khách hàng, bác sĩ...) lặp lại trên từng thẻ, không gộp ô. Trên 900px giữ bảng gộp ô theo phiếu như cũ.
+
 ## Giới hạn
 
 Không xuất Excel, không gom theo bác sĩ/dịch vụ, không sửa dữ liệu từ màn này. Dữ liệu tổng hợp trong bộ nhớ ở quy mô một phòng khám.

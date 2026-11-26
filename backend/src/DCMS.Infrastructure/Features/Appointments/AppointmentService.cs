@@ -150,11 +150,27 @@ public sealed class AppointmentService(DcmsDbContext db, IAvailabilityService av
             || await db.Visits.AnyAsync(x => x.AppointmentId == replacementSource.Id, ct)))
             throw new BusinessException(409, new SystemMessage("MSG66", "Khung giờ của lịch khách không tới không còn phù hợp. Vui lòng tải lại hoặc đặt một lịch khác."));
 
-        if (kind != "FollowUp" && !await db.Set<SchedulingService>().AsNoTracking().AnyAsync(s =>
-            s.Id == request.ServiceId && s.BranchId == request.BranchId && s.Active && s.IsInitialExamination, ct)) throw Error("MSG40");
+        if (kind != "FollowUp")
+        {
+            var serviceMinutes = await db.Set<SchedulingService>().AsNoTracking()
+                .Where(s => s.Id == request.ServiceId && s.BranchId == request.BranchId && s.Active && s.IsInitialExamination)
+                .Select(s => (int?)s.PublicDurationMinutes).SingleOrDefaultAsync(ct) ?? throw Error("MSG40");
+            // A counter booking takes the service duration; only a replacement may differ, to fit the freed time.
+            // Public bookings are held to the same duration by the availability check.
+            if (staff && replacementSource == null && request.DurationMinutes != serviceMinutes)
+                throw new BusinessException(400, new SystemMessage("MSG04",
+                    $"Thời lượng phải đúng với thời lượng của dịch vụ ({serviceMinutes} phút). Vui lòng tải lại và chọn khung giờ.")
+                    { Field = "durationMinutes" });
+        }
         if (start <= now) throw Error("MSG20", 409);
         if (!staff && !AppointmentRules.PublicLeadTimeValid(now, start)) throw Error("MSG19");
         if (staff && start < now.AddMinutes(60) && exceptionReason == null) throw Error("MSG19");
+        if (!staff && kind == "Standard")
+        {
+            // One open self-booked examination per person until it is checked in or cancelled.
+            if (await OpenBookings.Of(db, now, patientId, request.FamilyMemberId, attendeeName, accountId, phone ?? email).AnyAsync(ct))
+                throw Error("MSG118", 409);
+        }
 
         if (request.DossierId.HasValue)
         {

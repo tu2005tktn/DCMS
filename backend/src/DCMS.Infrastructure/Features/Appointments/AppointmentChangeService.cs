@@ -30,12 +30,14 @@ public sealed class AppointmentChangeService(DcmsDbContext db, IAvailabilityServ
     {
         if (string.IsNullOrWhiteSpace(code) || code.Length > 40 || date.Year is < 2000 or > 2100) throw Error("MSG04", 400);
         var (appointment, staff) = await AuthorizeAsync(actorId, code, ct, clinicInitiated: true);
-        RequireAvailabilityEligible(appointment, clock.GetUtcNow());
+        var now = clock.GetUtcNow();
+        var missed = staff && (await MissedAppointments.RebookableAsync(db, [appointment], now, ct)).Contains(appointment.Id);
+        if (!missed) RequireAvailabilityEligible(appointment, now);
         var selectedDentistId = dentistId ?? appointment.DentistId;
         if (selectedDentistId <= 0) throw Error("MSG04", 400);
         var result = await availability.QueryForAppointmentAsync(new(appointment.BranchId, selectedDentistId,
             appointment.ServiceId, date, (int)(appointment.EndAt - appointment.StartAt).TotalMinutes),
-            appointment.Id, appointment.PatientId, ct);
+            appointment.Id, appointment.PatientId, ct, requireLeadTime: !missed);
         return result with { Slots = result.Slots.Where(x => selectedDentistId != appointment.DentistId || x.Start != appointment.StartAt).ToArray() };
     }
 
@@ -128,6 +130,87 @@ public sealed class AppointmentChangeService(DcmsDbContext db, IAvailabilityServ
         return result;
     }
 
+    public async Task<AppointmentChangeResult> UndoNoShowAsync(int actorId, string code,
+        NoShowAppointmentRequest request, CancellationToken ct)
+    {
+        if (request.RequestKey == Guid.Empty || request.ExpectedVersion <= 0 ||
+            string.IsNullOrWhiteSpace(code) || code.Length > 40) throw Error("MSG04", 400);
+        var reason = RequiredText(request.Reason, "Lý do");
+        var fingerprint = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
+            JsonSerializer.Serialize(new { action = "UNDO_NO_SHOW", code, request.ExpectedVersion, reason }))));
+        await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
+        await db.Database.ExecuteSqlRawAsync($"SELECT pg_advisory_xact_lock({WorkingScheduleService.TransactionLock})", ct);
+        var (appointment, staff) = await AuthorizeAsync(actorId, code, ct, "appointments.no-show", clinicInitiated: true);
+        if (!staff) throw Error("MSG05", 403);
+        var receipt = await db.AppointmentChangeReceipts.AsNoTracking().SingleOrDefaultAsync(x =>
+            x.ActorAccountId == actorId && x.RequestKey == request.RequestKey, ct);
+        if (receipt != null)
+        {
+            if (receipt.Fingerprint != fingerprint) throw Error("MSG41");
+            return JsonSerializer.Deserialize<AppointmentChangeResult>(receipt.ResultJson)!;
+        }
+        var now = clock.GetUtcNow();
+        if (appointment.Version != request.ExpectedVersion) throw Error("MSG41");
+        if (appointment.Status != "NoShow") throw Error("MSG26");
+        if (!(await MissedAppointments.UndoableAsync(db, [appointment], now, ct)).Contains(appointment.Id)) throw Error("MSG119");
+        // The freed time may already belong to someone else (replacement walk-in, or a new booking).
+        if (await db.Appointments.AsNoTracking().AnyAsync(x => x.Id != appointment.Id
+            && (x.Status == "Confirmed" || x.Status == "CheckedIn" || x.Status == "InProgress" || x.Status == "Completed")
+            && x.StartAt < appointment.EndAt && x.EndAt > appointment.StartAt
+            && (x.ChairId == appointment.ChairId || x.DentistId == appointment.DentistId
+                || appointment.PatientId != null && x.PatientId == appointment.PatientId), ct)) throw Error("MSG120");
+        if (appointment.DossierId != null && await db.TreatmentDossiers.AsNoTracking()
+            .AnyAsync(x => x.Id == appointment.DossierId && x.State == "Deleted", ct)) throw Error("MSG121");
+        appointment.Status = "Confirmed";
+        appointment.Version++;
+        db.AppointmentChanges.Add(new AppointmentChange
+        {
+            AppointmentId = appointment.Id, ActorAccountId = actorId, ActorKind = "STAFF",
+            Action = "UNDO_NO_SHOW", OldStart = appointment.StartAt, OldEnd = appointment.EndAt,
+            OldChairId = appointment.ChairId, OldDentistId = appointment.DentistId,
+            Reason = reason, RequestKey = request.RequestKey, OccurredAt = now
+        });
+        await CloseMissedTasksAsync(appointment.Id, "MissedAppointmentUndone", ct);
+        db.AppointmentOutboxEvents.Add(new AppointmentOutboxEvent
+        {
+            AggregateId = appointment.Id, EventType = "appointment.no_show_undone", OccurredAt = now,
+            PayloadJson = JsonSerializer.Serialize(new { appointmentId = appointment.Id,
+                appointment.Code, appointment.Version, appointment.DossierId })
+        });
+        await db.SaveChangesAsync(ct);
+        var result = new AppointmentChangeResult(await queries.ChangeDetailAsync(actorId, code, ct),
+            SystemMessages.Get("MSG53", "hoàn tác khách không tới", value: code));
+        db.AppointmentChangeReceipts.Add(new AppointmentChangeReceipt
+        {
+            ActorAccountId = actorId, RequestKey = request.RequestKey, AppointmentId = appointment.Id,
+            Fingerprint = fingerprint, ResultJson = JsonSerializer.Serialize(result)
+        });
+        await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
+        return result;
+    }
+
+    // The callback task of a no-show is kept for history but retyped, so a later real no-show gets a new one.
+    private async Task CloseMissedTasksAsync(Guid appointmentId, string type, CancellationToken ct)
+    {
+        foreach (var task in await db.CareTasks.Where(x => x.AppointmentId == appointmentId && x.Type == "MissedAppointment").ToListAsync(ct))
+        {
+            task.Type = type;
+            if (task.Status is "Open" or "InProgress") task.Status = "Cancelled";
+            task.Version++;
+        }
+    }
+
+    private async Task RequireRebookAsync(Appointment appointment, DateTimeOffset now, CancellationToken ct)
+    {
+        if (appointment.DossierId != null && await db.TreatmentDossiers.AsNoTracking()
+            .AnyAsync(x => x.Id == appointment.DossierId && x.State == "Deleted", ct)) throw Error("MSG121");
+        // The person may have booked again after missing this one; do not leave them with two open bookings.
+        if (await OpenBookings.Of(db, now, appointment.PatientId, appointment.FamilyMemberId, appointment.AttendeeName,
+                appointment.BookerAccountId, appointment.BookingInfo.BookerContact)
+            .AnyAsync(x => x.Id != appointment.Id, ct)) throw Error("MSG118");
+    }
+
     private static string RequiredText(string? value, string field)
     {
         var text = Clean(value);
@@ -168,7 +251,11 @@ public sealed class AppointmentChangeService(DcmsDbContext db, IAvailabilityServ
         }
         var now = clock.GetUtcNow();
         if (appointment.Version != expectedVersion) throw Error("MSG41");
-        RequireEligible(appointment, staff, now);
+        // Staff may move a missed booking (late arrival, or a no-show recorded today) to a new time without the usual limits.
+        var missed = move != null && staff && clinicInitiated
+            && (await MissedAppointments.RebookableAsync(db, [appointment], now, ct)).Contains(appointment.Id);
+        if (missed) await RequireRebookAsync(appointment, now, ct);
+        else RequireEligible(appointment, staff, now);
         var change = new AppointmentChange
         {
             AppointmentId = appointment.Id, ActorAccountId = actorId, ActorKind = staff ? "STAFF" : "SELF",
@@ -182,7 +269,7 @@ public sealed class AppointmentChangeService(DcmsDbContext db, IAvailabilityServ
             if (staff && clinicInitiated && !(await queries.OptionsAsync(actorId, ct)).Dentists.Any(x => x.BranchId == appointment.BranchId && x.Id == selectedDentistId))
                 throw Error("MSG05", 403);
             if (selectedDentistId <= 0) throw Error("MSG29");
-            if (!AppointmentRules.PublicLeadTimeValid(now, move.NewStart)) throw Error("MSG29");
+            if (missed ? move.NewStart <= now : !AppointmentRules.PublicLeadTimeValid(now, move.NewStart)) throw Error("MSG29");
             if (move.NewStart == appointment.StartAt && move.ChairId == appointment.ChairId
                 && selectedDentistId == appointment.DentistId) throw Error("MSG29");
             AvailabilitySlot slot;
@@ -200,6 +287,11 @@ public sealed class AppointmentChangeService(DcmsDbContext db, IAvailabilityServ
             appointment.DentistId = slot.DentistId;
             change.NewStart = appointment.StartAt; change.NewEnd = appointment.EndAt;
             change.NewDentistId = appointment.DentistId; change.NewChairId = appointment.ChairId;
+            if (missed)
+            {
+                appointment.Status = "Confirmed";
+                await CloseMissedTasksAsync(appointment.Id, "MissedAppointmentRebooked", ct);
+            }
         }
         else
         {

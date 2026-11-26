@@ -91,6 +91,55 @@ public sealed partial class WorkingScheduleService
             Periods = selected.Periods.Where(p => p.BranchId == branch).Select(p => new WorkingPeriod {
                 Day = p.Day, StartMinute = p.StartMinute, EndMinute = p.EndMinute, Kind = p.Kind, Reason = p.Reason }).ToList() };
     }
+    private static readonly string[] DayNames = ["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "Chủ nhật"];
+    private static string Hm(int minute) => $"{minute / 60:00}:{minute % 60:00}";
+    public static string DescribeCapacity(IEnumerable<CapacityConflict> items) => string.Join("; ", items.Select(x =>
+        $"{DayNames[x.Day]} {Hm(x.StartMinute)}–{Hm(x.EndMinute)}: {x.Doctors} bác sĩ cùng ca nhưng chi nhánh chỉ có {x.Chairs} ghế"));
+    // Work minus Break, one flag per minute of the day.
+    private static bool[] WorkMask(IEnumerable<(string Kind, int Start, int End)> periods)
+    {
+        var mask = new bool[1440]; var list = periods.ToArray();
+        foreach (var p in list.Where(p => p.Kind == "Work")) for (var m = Math.Max(0, p.Start); m < Math.Min(1440, p.End); m++) mask[m] = true;
+        foreach (var p in list.Where(p => p.Kind == "Break")) for (var m = Math.Max(0, p.Start); m < Math.Min(1440, p.End); m++) mask[m] = false;
+        return mask;
+    }
+    // A chair serves one appointment at a time, so more dentists on shift than active chairs cannot all be booked.
+    // Counts the other dentists' published schedules (on the first date this change applies to) against this branch's active chairs.
+    private async Task<CapacityConflict[]> CapacityConflictsRecurring(RecurringCommand c, CancellationToken ct)
+    {
+        var result = new List<CapacityConflict>();
+        var members = await ActiveMembers(ct);
+        foreach (var branch in c.Intervals.Select(p => p.BranchId).Distinct())
+        {
+            var chairs = await db.SchedulingChairs.AsNoTracking().CountAsync(x => x.BranchId == branch && x.Active, ct);
+            var others = members.Where(x => x.BranchId == branch && x.CanDentist && x.EmployeeId != c.DentistId).Select(x => x.EmployeeId).Distinct().ToArray();
+            if (chairs == 0 || others.Length + 1 <= chairs) continue;
+            foreach (var day in c.Intervals.Where(p => p.BranchId == branch).Select(p => p.Day).Distinct())
+            {
+                var date = c.Kind == "Exception" ? c.Date : Monday(c.Date).AddDays(day);
+                if (c.Kind == "Template" && date < c.Date) date = date.AddDays(7);
+                var mine = WorkMask(c.Intervals.Where(p => p.BranchId == branch && p.Day == day).Select(p => (p.Kind, p.StartMinute, p.EndMinute)));
+                var counts = new int[1440];
+                foreach (var employee in others)
+                {
+                    var week = await Resolve(branch, employee, date, null, ct);
+                    if (week == null) continue;
+                    var theirs = WorkMask(week.Periods.Where(p => p.Day == day).Select(p => (p.Kind, p.StartMinute, p.EndMinute)));
+                    for (var m = 0; m < 1440; m++) if (theirs[m]) counts[m]++;
+                }
+                int? start = null; var doctors = 0;
+                for (var m = 0; m <= 1440; m++)
+                {
+                    var over = m < 1440 && mine[m] && counts[m] + 1 > chairs;
+                    var now = m < 1440 ? counts[m] + 1 : 0;
+                    if (over && start != null && now == doctors) continue;
+                    if (start != null) { result.Add(new(branch, day, start.Value, m, doctors, chairs)); start = null; }
+                    if (over) { start = m; doctors = now; }
+                }
+            }
+        }
+        return result.ToArray();
+    }
     private async Task<AffectedAppointment[]> AffectedRecurring(RecurringCommand c, CancellationToken ct)
     {
         var from = Local(c.Date).ToUniversalTime();
@@ -117,7 +166,7 @@ public sealed partial class WorkingScheduleService
     public async Task<SchedulePreview> PreviewRecurringAsync(int actorId, RecurringCommand command, CancellationToken ct)
     {
         await ValidateRecurring(actorId, command, ct);
-        return new(await AffectedRecurring(command, ct));
+        return new(await AffectedRecurring(command, ct), await CapacityConflictsRecurring(command, ct));
     }
     public async Task<RecurringPublishResult> PublishRecurringAsync(int actorId, RecurringCommand command, CancellationToken ct)
     {
@@ -133,6 +182,8 @@ public sealed partial class WorkingScheduleService
         }
         await ValidateRecurring(actorId, command, ct);
         if ((await AffectedRecurring(command, ct)).Length > 0) throw Error("MSG32", 409);
+        var capacity = await CapacityConflictsRecurring(command, ct);
+        if (capacity.Length > 0) throw new BusinessException(409, new SystemMessage("MSG117", "Không đủ ghế để đăng ký khung giờ này. " + DescribeCapacity(capacity)));
         var revision = Proposed(command, command.ExpectedVersion + 1);
         revision.PublishedBy = actorId; revision.PublishedAt = clock.GetUtcNow();
         db.Add(revision);

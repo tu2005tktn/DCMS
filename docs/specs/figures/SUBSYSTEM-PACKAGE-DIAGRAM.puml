@@ -1,0 +1,222 @@
+@startuml DCMS_Subsystem_Package_Diagram
+title DCMS - Sub-system Package Diagram
+skinparam shadowing false
+skinparam defaultTextAlignment center
+skinparam rectangle {
+  BorderColor #374151
+}
+skinparam package {
+  BorderColor #374151
+}
+
+rectangle "DCMS Mobile\nExpo / React Native" as Mobile #FFF7ED
+rectangle "DCMS Web\nReact + Vite + Ant Design" as Web #FFF7ED
+Mobile -[hidden]right- Web
+
+rectangle "DCMS.Api\nEndpoints, Hub, Hosted workers" as Api #EEF2FF {
+  package "01 Authentication.Api" as Api0 #FFFFFF
+  package "02 Accounts.Api" as Api1 #FFFFFF
+  package "03 Patients.Api" as Api2 #FFFFFF
+  package "04 PatientLinks.Api" as Api3 #FFFFFF
+  package "05 FamilyMembers.Api" as Api4 #FFFFFF
+  package "06 Scheduling.Api" as Api5 #FFFFFF
+  package "07 Appointments.Api" as Api6 #FFFFFF
+  package "08 Reception.Api" as Api7 #FFFFFF
+  package "09 Examinations.Api" as Api8 #FFFFFF
+  package "10 Prescriptions.Api" as Api9 #FFFFFF
+  package "11 Treatment.Api" as Api10 #FFFFFF
+  package "12 Finance.Api" as Api11 #FFFFFF
+  package "13 Notifications.Api" as Api12 #FFFFFF
+  package "13 Realtime.Hub" as Api13 #FFFFFF
+  package "14 Settings.Api" as Api14 #FFFFFF
+  package "15 SystemSettings.Api" as Api15 #FFFFFF
+  package "16 Health.Api" as Api16 #FFFFFF
+  package "16 Hosted workers (PayOS)" as Api17 #FFFFFF
+}
+
+rectangle "DCMS.Application\nContracts, DTOs, Grants, Messages" as App #ECFDF5 {
+  package "01 Authentication" as App0 #FFFFFF
+  package "02 Accounts" as App1 #FFFFFF
+  package "03 Patients" as App2 #FFFFFF
+  package "04 PatientLinks" as App3 #FFFFFF
+  package "05 FamilyMembers" as App4 #FFFFFF
+  package "06 Scheduling" as App5 #FFFFFF
+  package "07 Appointments" as App6 #FFFFFF
+  package "07 SupportRequests" as App7 #FFFFFF
+  package "08 Reception" as App8 #FFFFFF
+  package "09 Examinations" as App9 #FFFFFF
+  package "10 Prescriptions" as App10 #FFFFFF
+  package "11 Treatment" as App11 #FFFFFF
+  package "13 Notifications" as App12 #FFFFFF
+  package "14 Settings" as App13 #FFFFFF
+  package "14 ScreenGrants" as App14 #FFFFFF
+  package "15 SystemSettings" as App15 #FFFFFF
+  package "16 Common" as App16 #FFFFFF
+}
+
+rectangle "DCMS.Infrastructure\nServices, EF Core, Workers, Adapters" as Inf #FEFCE8 {
+  package "01 Authentication" as Inf0 #FFFFFF
+  package "02 Accounts" as Inf1 #FFFFFF
+  package "03 Patients" as Inf2 #FFFFFF
+  package "04 PatientLinks" as Inf3 #FFFFFF
+  package "05 FamilyMembers" as Inf4 #FFFFFF
+  package "06 Scheduling" as Inf5 #FFFFFF
+  package "07 Appointments" as Inf6 #FFFFFF
+  package "08 Reception" as Inf7 #FFFFFF
+  package "09 Examinations" as Inf8 #FFFFFF
+  package "10 Prescriptions" as Inf9 #FFFFFF
+  package "11 Treatment" as Inf10 #FFFFFF
+  package "13 Notifications" as Inf11 #FFFFFF
+  package "14 Settings" as Inf12 #FFFFFF
+  package "15 SystemSettings" as Inf13 #FFFFFF
+  package "17 Persistence" as Inf14 #FFFFFF
+  package "18 Adapters" as Inf15 #FFFFFF
+}
+
+rectangle "DCMS.Domain\nEntities, Statuses, Rules" as Dom #FDF2F8 {
+  package "01 Authentication" as Dom0 #FFFFFF
+  package "02 Accounts" as Dom1 #FFFFFF
+  package "03 Patients" as Dom2 #FFFFFF
+  package "04 PatientLinks" as Dom3 #FFFFFF
+  package "05 FamilyMembers" as Dom4 #FFFFFF
+  package "06 Scheduling" as Dom5 #FFFFFF
+  package "07 Appointments" as Dom6 #FFFFFF
+  package "08 Visits" as Dom7 #FFFFFF
+  package "09 Examinations" as Dom8 #FFFFFF
+  package "10 Prescriptions" as Dom9 #FFFFFF
+  package "11 Treatment" as Dom10 #FFFFFF
+  package "14 Settings" as Dom11 #FFFFFF
+  package "15 SystemSettings" as Dom12 #FFFFFF
+}
+
+Api0 -[hidden]right- Api1
+Api0 -[hidden]down- Api6
+Api1 -[hidden]right- Api2
+Api1 -[hidden]down- Api7
+Api2 -[hidden]right- Api3
+Api2 -[hidden]down- Api8
+Api3 -[hidden]right- Api4
+Api3 -[hidden]down- Api9
+Api4 -[hidden]right- Api5
+Api4 -[hidden]down- Api10
+Api5 -[hidden]down- Api11
+Api6 -[hidden]right- Api7
+Api6 -[hidden]down- Api12
+Api7 -[hidden]right- Api8
+Api7 -[hidden]down- Api13
+Api8 -[hidden]right- Api9
+Api8 -[hidden]down- Api14
+Api9 -[hidden]right- Api10
+Api9 -[hidden]down- Api15
+Api10 -[hidden]right- Api11
+Api10 -[hidden]down- Api16
+Api11 -[hidden]down- Api17
+Api12 -[hidden]right- Api13
+Api13 -[hidden]right- Api14
+Api14 -[hidden]right- Api15
+Api15 -[hidden]right- Api16
+Api16 -[hidden]right- Api17
+App0 -[hidden]right- App1
+App0 -[hidden]down- App6
+App1 -[hidden]right- App2
+App1 -[hidden]down- App7
+App2 -[hidden]right- App3
+App2 -[hidden]down- App8
+App3 -[hidden]right- App4
+App3 -[hidden]down- App9
+App4 -[hidden]right- App5
+App4 -[hidden]down- App10
+App5 -[hidden]down- App11
+App6 -[hidden]right- App7
+App6 -[hidden]down- App12
+App7 -[hidden]right- App8
+App7 -[hidden]down- App13
+App8 -[hidden]right- App9
+App8 -[hidden]down- App14
+App9 -[hidden]right- App10
+App9 -[hidden]down- App15
+App10 -[hidden]right- App11
+App10 -[hidden]down- App16
+App12 -[hidden]right- App13
+App13 -[hidden]right- App14
+App14 -[hidden]right- App15
+App15 -[hidden]right- App16
+Inf0 -[hidden]right- Inf1
+Inf0 -[hidden]down- Inf6
+Inf1 -[hidden]right- Inf2
+Inf1 -[hidden]down- Inf7
+Inf2 -[hidden]right- Inf3
+Inf2 -[hidden]down- Inf8
+Inf3 -[hidden]right- Inf4
+Inf3 -[hidden]down- Inf9
+Inf4 -[hidden]right- Inf5
+Inf4 -[hidden]down- Inf10
+Inf5 -[hidden]down- Inf11
+Inf6 -[hidden]right- Inf7
+Inf6 -[hidden]down- Inf12
+Inf7 -[hidden]right- Inf8
+Inf7 -[hidden]down- Inf13
+Inf8 -[hidden]right- Inf9
+Inf8 -[hidden]down- Inf14
+Inf9 -[hidden]right- Inf10
+Inf9 -[hidden]down- Inf15
+Inf10 -[hidden]right- Inf11
+Inf12 -[hidden]right- Inf13
+Inf13 -[hidden]right- Inf14
+Inf14 -[hidden]right- Inf15
+Dom0 -[hidden]right- Dom1
+Dom0 -[hidden]down- Dom6
+Dom1 -[hidden]right- Dom2
+Dom1 -[hidden]down- Dom7
+Dom2 -[hidden]right- Dom3
+Dom2 -[hidden]down- Dom8
+Dom3 -[hidden]right- Dom4
+Dom3 -[hidden]down- Dom9
+Dom4 -[hidden]right- Dom5
+Dom4 -[hidden]down- Dom10
+Dom5 -[hidden]down- Dom11
+Dom6 -[hidden]right- Dom7
+Dom6 -[hidden]down- Dom12
+Dom7 -[hidden]right- Dom8
+Dom8 -[hidden]right- Dom9
+Dom9 -[hidden]right- Dom10
+Dom10 -[hidden]right- Dom11
+
+database "PostgreSQL\nEF Core / Npgsql" as Pg
+cloud "Firebase Cloud Messaging" as Fcm
+cloud "PayOS" as PayOs
+cloud "Google Identity" as Google
+cloud "SMTP server" as Smtp
+storage "Local file storage\nclinical documents" as Files
+cloud "Dental AI service" as Ai
+node "ClamAV (optional)" as Clam
+
+Mobile ..> Api : <<access>> REST
+Web ..> Api : <<access>> REST, SignalR
+Api ..> App : <<use>>
+App ..> Inf : <<access>>
+Inf ..> Dom : <<import>>
+
+Inf ..> Pg : <<use>>
+Inf ..> Fcm : <<use>>
+Inf ..> Google : <<use>>
+Inf ..> Smtp : <<use>>
+Inf ..> Files : <<use>>
+Inf ..> Ai : <<use>> HTTP
+Inf ..> Clam : <<use>> TCP
+Api ..> PayOs : <<use>> HTTP / webhook
+
+Inf5 -[hidden]right- Pg
+Pg -[hidden]down- Fcm
+Fcm -[hidden]down- Google
+Google -[hidden]down- Smtp
+Smtp -[hidden]down- Files
+Files -[hidden]down- Ai
+Ai -[hidden]down- Clam
+Api5 -[hidden]right- PayOs
+
+note bottom of Dom
+  Finance has no Application package: payments are ledger rows
+  handled in Api and Infrastructure.Treatment.
+end note
+@enduml

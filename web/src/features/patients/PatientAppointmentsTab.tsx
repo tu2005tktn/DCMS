@@ -2,7 +2,7 @@ import { Alert, Button, Empty, Select, Space, Table, Tag } from 'antd';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../services/api';
-import { formatClock, formatDate, localDate, statusColors, statusLabels, type AppointmentListItem } from '../appointments/types';
+import { formatClock, formatDate, localDate, statusView, type AppointmentListItem } from '../appointments/types';
 import NextVisitPanel from './NextVisitPanel';
 import StaffAppointmentActions from '../appointments/StaffAppointmentActions';
 import { usePermissions } from '../authentication/usePermissions';
@@ -51,7 +51,7 @@ export default function PatientAppointmentsTab({ patientId, patientName, patient
         columns={[
           { title: 'Mã lịch hẹn', render: (_, a) => <Link to={`/appointments/${a.id}`}>{a.code}</Link> },
           { title: 'Thời gian', render: (_, a) => `${formatDate(localDate(a.startAt))} · ${formatClock(a.startAt)}–${formatClock(a.endAt)}` },
-          { title: 'Trạng thái', render: (_, a) => <Tag color={statusColors[a.status]}>{statusLabels[a.status]}</Tag> },
+          { title: 'Trạng thái', render: (_, a) => <Tag color={statusView(a).color}>{statusView(a).label}</Tag> },
           { title: 'Chi nhánh / ghế', render: (_, a) => `${a.branchName} · ${a.chairName}` },
           { title: 'Nha sĩ', dataIndex: 'dentistName' },
           { title: 'Dịch vụ', render: (_, a) => a.serviceName ?? '—' },

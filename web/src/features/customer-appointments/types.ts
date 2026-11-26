@@ -20,7 +20,7 @@ export type AppointmentDetail = AppointmentCard & {
   branchId: number; branchName: string; dentistId: number; serviceId: number | null;
   serviceName: string; bookerName: string; bookerContactMasked: string;
   eligibility: { canSelfService: boolean; hoursRemaining: number; reasonCode: string | null; canRequestSupport: boolean };
-  history: { action: 'RESCHEDULE' | 'CANCEL'; actorKind: string; oldStart: string; newStart: string | null; reason: string; occurredAt: string }[];
+  history: { action: 'RESCHEDULE' | 'CANCEL' | 'NO_SHOW' | 'UNDO_NO_SHOW'; actorKind: string; oldStart: string; newStart: string | null; reason: string; occurredAt: string }[];
   supportRequests?: CustomerSupportRequest[];
   clinicContact: { phone: string; hours: string };
 };
@@ -34,6 +34,15 @@ export const statusLabels: Record<AppointmentStatus, string> = {
 };
 export const statusColors: Record<AppointmentStatus, string> = {
   Confirmed: 'green', CheckedIn: 'blue', InProgress: 'processing', Completed: 'default', Cancelled: 'red', NoShow: 'orange',
+};
+// A confirmed booking whose time has come while the clinic has not recorded arrival or absence yet.
+export function statusView(a: { status: AppointmentStatus; start: string; end: string }, now = Date.now()) {
+  if (a.status === 'Confirmed' && Date.parse(a.end) <= now) return { label: 'Chờ phòng khám xác nhận', color: 'orange' };
+  if (a.status === 'Confirmed' && Date.parse(a.start) <= now) return { label: 'Đã đến giờ hẹn', color: 'gold' };
+  return { label: statusLabels[a.status], color: statusColors[a.status] };
+}
+export const historyLabels: Record<AppointmentDetail['history'][number]['action'], string> = {
+  RESCHEDULE: 'Đổi lịch', CANCEL: 'Hủy lịch', NO_SHOW: 'Ghi nhận vắng mặt', UNDO_NO_SHOW: 'Đính chính vắng mặt',
 };
 export const formatTime = (value: string) => new Date(value).toLocaleString('vi-VN', {
   timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',

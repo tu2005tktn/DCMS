@@ -8,7 +8,7 @@ import CareTaskDrawer from './CareTaskDrawer';
 import CareTaskModal from './CareTaskModal';
 import { customerCareApi } from './customerCare.api';
 import './customerCare.css';
-import { clinicTime, contactResultLabels, statusColors, statusFilters, statusLabels, type CareOptions, type CareWorklistItem, type CareWorklistPage,
+import { clinicTime, contactResultLabels, customerCode, statusColors, statusFilters, statusLabels, type CareOptions, type CareWorklistItem, type CareWorklistPage,
   type StatusFilter, type WorklistFilter } from './types';
 
 // S60 Chăm sóc khách hàng (docs/specs/S60-CUSTOMER-CARE-WEB.vi.md). Assistants work in their branches; the owner reads every
@@ -30,7 +30,7 @@ export default function CustomerCarePage() {
   const [options, setOptions] = useState<CareOptions | null>(null), [optionsError, setOptionsError] = useState<string>(), [optionsRevision, setOptionsRevision] = useState(0);
   const [branchId, setBranchId] = useState<number>();
   const [mode, setMode] = useState<Mode>('day'), [from, setFrom] = useState(''), [to, setTo] = useState('');
-  const [ownerAccountId, setOwner] = useState<number>(), [type, setType] = useState<string>(), [status, setStatus] = useState<StatusFilter>();
+  const [ownerAccountId, setOwner] = useState<number>(), [status, setStatus] = useState<StatusFilter>();
   const [searchText, setSearchText] = useState(''), [search, setSearch] = useState('');
   const [page, setPage] = useState(1), [pageSize, setPageSize] = useState(20), [revision, setRevision] = useState(0);
   const [data, setData] = useState<CareWorklistPage | null>(null), [loading, setLoading] = useState(false), [error, setError] = useState<string>();
@@ -52,7 +52,7 @@ export default function CustomerCarePage() {
   }, [allowed, optionsRevision]);
 
   const rangeError = from && to && (from > to ? 'Từ ngày phải trước hoặc bằng đến ngày.' : dayjs(to).diff(dayjs(from), 'day') > 366 ? 'Khoảng ngày tối đa 366 ngày.' : undefined);
-  const filter: WorklistFilter | null = options?.branches.length && from && to && !rangeError ? { branchId, from, to, ownerAccountId, type, status, search } : null;
+  const filter: WorklistFilter | null = options?.branches.length && from && to && !rangeError ? { branchId, from, to, ownerAccountId, status, search } : null;
   useEffect(() => {
     if (!filter) return;
     let live = true; setLoading(true); setError(undefined);
@@ -62,7 +62,7 @@ export default function CustomerCarePage() {
       setData(v);
     }).catch(e => { if (live) { setData(null); setError((e as Error).message); } }).finally(() => { if (live) setLoading(false); });
     return () => { live = false; };
-  }, [branchId, from, to, ownerAccountId, type, status, search, page, pageSize, revision, rangeError]);
+  }, [branchId, from, to, ownerAccountId, status, search, page, pageSize, revision, rangeError]);
 
   if (!allowed) return <Result status="403" title="Chỉ Trợ lý và Chủ phòng khám dùng màn Chăm sóc khách hàng." />;
   const shown = options?.branches.filter(b => branchId == null || b.id === branchId) ?? [];
@@ -111,10 +111,6 @@ export default function CustomerCarePage() {
           </Space.Compact>
           <Select aria-label="Người phụ trách" style={{ minWidth: 180 }} allowClear placeholder="Người phụ trách" value={ownerAccountId}
             options={staff.map(x => ({ value: x.accountId, label: x.name }))} onChange={v => { setOwner(v); reset(); }} />
-          <Select aria-label="Loại chăm sóc" style={{ minWidth: 200 }} allowClear placeholder="Loại chăm sóc" value={type}
-            options={[{ label: 'Danh mục', options: options.types.filter(x => !x.system).map(x => ({ value: x.code, label: x.name })) },
-              { label: 'Hệ thống tự tạo', options: options.types.filter(x => x.system).map(x => ({ value: x.code, label: x.name })) }]}
-            onChange={v => { setType(v); reset(); }} />
           <Select aria-label="Trạng thái" style={{ minWidth: 200 }} allowClear placeholder="Tất cả trạng thái" value={status}
             options={statusFilters} onChange={v => { setStatus(v); reset(); }} />
           <Input.Search aria-label="Khách hàng" placeholder="Khách hàng: mã, tên hoặc SĐT" allowClear maxLength={100} style={{ width: 260 }}
@@ -144,7 +140,7 @@ export default function CustomerCarePage() {
           { title: 'Thời gian', width: 92, render: (_, x) => { const [d, t] = clinicTime(x.task.dueAt).split(' '); return <>{d}<div>{t}</div></>; } },
           ...(multiBranch ? [{ title: 'Chi nhánh', width: 120, render: (_: unknown, x: CareWorklistItem) => x.branchName }] : []),
           { title: 'Khách hàng', width: 170, render: (_, x) => <><div><Typography.Text strong>{x.patientName}</Typography.Text></div>
-            <Typography.Text type="secondary">{x.patientCode}{x.phone ? ` · ${x.phone}` : ''}</Typography.Text></> },
+            <Typography.Text type="secondary">{customerCode(x)}{x.phone ? ` · ${x.phone}` : ''}</Typography.Text></> },
           { title: 'Loại chăm sóc', width: 120, dataIndex: 'typeName' },
           { title: 'Nội dung', render: (_, x) => <div className="care-content">{x.task.content}</div> },
           { title: 'Người phụ trách', width: 116, render: (_, x) => x.ownerName ?? <Typography.Text type="secondary">Chưa giao</Typography.Text> },

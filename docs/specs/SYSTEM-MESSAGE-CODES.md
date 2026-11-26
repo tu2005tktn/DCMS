@@ -11,13 +11,15 @@ Decision: the codes in [DCMS_System_Messages.docx](DCMS_System_Messages.docx) ar
 - Web and mobile compare codes (for example the "data changed, reload" code, now MSG41, and the connection-failure code, now MSG49). They use the new codes. The support inbox no longer handles old MSG36 and MSG94, which the backend never sent.
 - Results saved before this change (replayed command receipts) may still contain an old code in their stored message. A replay returns that stored body unchanged.
 
+- MSG117–MSG121 were added after the Word table and are not in it yet: MSG117 not enough chairs for a working-schedule interval, MSG118 one open booking per person, MSG119–MSG121 refusals of "undo no-show" (another day, interval booked again, treatment sheet removed; MSG121 and MSG118 also refuse moving a missed appointment).
+
 ## Old codes
 
 Older specifications, implementation notes, evidence files and the v2.5 Word documents use the old numbering. [SYSTEM-MESSAGE-CODE-MAP.md](SYSTEM-MESSAGE-CODE-MAP.md) maps each new code to its old code. Those older documents are not rewritten.
 
 ## Acceptance
 
-- The backend, web and mobile contain no message code outside MSG01–MSG116 (test mocks that invent their own codes excepted).
-- Each backend catalog entry has the same number and wording as the Word table.
+- The backend, web and mobile contain no message code outside MSG01–MSG121 (test mocks that invent their own codes excepted).
+- Each backend catalog entry from MSG01 to MSG116 has the same number and wording as the Word table.
 - A payment request that breaks a rule (for example paying other services before 30% of a lab fee) returns its MSG code and wording, and the payment dialog shows that wording.
 - The backend builds and its tests pass; the web builds.

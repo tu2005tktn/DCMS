@@ -1,10 +1,11 @@
 import { Alert, Button, Card, Descriptions, Empty, Form, Input, Modal, Select, Space, Spin, Tag, Timeline, Typography } from 'antd';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { ArrowLeftOutlined } from '@ant-design/icons';
 import { ApiError } from '../../services/api';
 import { customerApi } from '../../services/customerApi';
 import { useCustomerAuth } from '../customer-auth/CustomerAuthContext';
-import { clinicDate, formatClock, formatTime, ineligibleReasons, statusColors, statusLabels,
+import { clinicDate, formatClock, formatTime, historyLabels, ineligibleReasons, statusView,
   type AppointmentDetail, type ChangeResult, type Slot, type SupportResult } from './types';
 
 export default function CustomerAppointmentDetailPage() {
@@ -35,16 +36,16 @@ export default function CustomerAppointmentDetailPage() {
   const pendingSupport = detail?.supportRequests?.find(request => request.status === 'Pending');
 
   return <section className="customer-appointment-detail">
-    <Link to="/customer/appointments">← Lịch hẹn của tôi</Link>
+    <Link to="/customer/appointments" className="customer-back-button"><ArrowLeftOutlined aria-hidden="true" />Lịch hẹn của tôi</Link>
     <div className="calendar-toolbar customer-page-heading"><div><span className="customer-kicker">Lịch khám</span>
       <Typography.Title level={2}>Chi tiết lịch hẹn</Typography.Title></div>
       <Button loading={busy} onClick={() => setRevision(value => value + 1)}>Tải lại lịch hẹn</Button></div>
-    {notice && <Alert className="form-alert" type="success" showIcon message={notice} />}
+    <Modal open={!!notice} title="Thông báo" onCancel={() => setNotice(null)} footer={<Button type="primary" onClick={() => setNotice(null)}>Đã hiểu</Button>}>{notice}</Modal>
     {busy ? <Spin tip="Đang tải lịch hẹn…"><div className="customer-loading" /></Spin> : error ?
       <Alert type="error" showIcon message={error.message}
         action={error.status !== 403 && error.status !== 404 ? <Button onClick={() => setRevision(value => value + 1)}>Thử lại</Button> : undefined} /> :
       detail && <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-        <Card className="customer-detail-summary" title={detail.code} extra={<Tag color={statusColors[detail.status]}>{statusLabels[detail.status]}</Tag>}>
+        <Card className="customer-detail-summary" title={detail.code} extra={<Tag color={statusView(detail).color}>{statusView(detail).label}</Tag>}>
           <p className="customer-detail-time">{formatTime(detail.start)}</p>
           <Descriptions column={{ xs: 1, sm: 2 }} items={[
             { key: 'end', label: 'Kết thúc', children: formatTime(detail.end) },
@@ -59,6 +60,9 @@ export default function CustomerAppointmentDetailPage() {
           ]} />
           <Typography.Text type="secondary">Thời gian hiển thị theo giờ Việt Nam (UTC+7).</Typography.Text>
         </Card>
+        {detail.status === 'Confirmed' && Date.parse(detail.start) <= Date.now() && <Alert type="warning" showIcon
+          message={Date.parse(detail.end) <= Date.now() ? 'Lịch hẹn đã quá giờ và đang chờ phòng khám xác nhận.' : 'Đã đến giờ hẹn của bạn.'}
+          description={`Nếu bạn đã đến khám, vui lòng liên hệ phòng khám theo số ${detail.clinicContact.phone}.`} />}
         <Card className="customer-change-card" title="Đổi hoặc hủy lịch">
           <div className="customer-change-current"><span>Giờ hẹn hiện tại</span>
             <strong>{formatTime(detail.start)}</strong><span>{detail.dentistName} · {detail.branchName}</span></div>
@@ -119,7 +123,7 @@ export default function CustomerAppointmentDetailPage() {
         )}
         <Card title="Lịch sử thay đổi">{detail.history.length === 0 ? <Empty description="Chưa có thay đổi lịch hẹn." /> :
           <Timeline items={detail.history.map((item, index) => ({ key: index, children: <>
-            <Typography.Text strong>{item.action === 'RESCHEDULE' ? 'Đổi lịch' : 'Hủy lịch'}</Typography.Text>
+            <Typography.Text strong>{historyLabels[item.action] ?? item.action}</Typography.Text>
             {' · '}{formatTime(item.occurredAt)}{' · '}{item.actorKind === 'STAFF' ? 'Phòng khám' : 'Tự phục vụ'}
             <div>{formatTime(item.oldStart)}{item.newStart ? ` → ${formatTime(item.newStart)}` : ''}</div>
             <div>Lý do: {item.reason}</div>

@@ -44,4 +44,4 @@ Test classes run one after another (`xunit.runner.json`): every fixture hosts it
 in parallel exhausts PostgreSQL connections.
 
 Set `DCMS_IT_TRACE` to a file path to also write every case with its real HTTP exchanges as JSON
-(used to fill the test report sheet).
+(used to fill the test report sheet). Each exchange has `Status`, `StatusLine` (for example `HTTP 409 Conflict`) and `Body`.

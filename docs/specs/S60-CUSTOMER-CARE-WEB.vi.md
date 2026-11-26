@@ -53,7 +53,6 @@ Bố cục theo oDental:
 | Chi nhánh | **Chỉ Chủ phòng khám** có ô này, và chỉ khi có từ 2 chi nhánh. Mặc định **Tất cả chi nhánh**; chọn một chi nhánh thì chỉ hiện phiếu của chi nhánh đó. Nhân viên khác không có ô chọn: danh sách gồm phiếu của các chi nhánh mình được gán |
 | Xem theo | Ngày / Tuần (thứ Hai–Chủ nhật) / Tháng. Nút ‹ › lùi hoặc tiến một kỳ. Mặc định là hôm nay theo giờ phòng khám (UTC+7). Có thể chọn từ ngày–đến ngày bất kỳ, tối đa 366 ngày |
 | Người phụ trách | Lọc theo tài khoản phụ trách. Mặc định tất cả |
-| Loại chăm sóc | Lọc theo loại. Gồm loại trong danh mục và loại do hệ thống tự sinh |
 | Trạng thái | Tất cả / Cần xử lý (Mở + Đang xử lý) / Mở / Đang xử lý / Đã xong / Đã hủy. Mặc định Tất cả |
 | Khách hàng | Ô tìm theo mã, tên hoặc SĐT, tối đa 100 ký tự |
 | "Tìm thấy N phiếu." | Tổng số theo bộ lọc |
@@ -96,7 +95,14 @@ Trạng thái hiển thị riêng từng loại: đang tải, lỗi kèm nút Th
 - **Hủy:** đóng hộp thoại. Nếu đã nhập dữ liệu thì hỏi xác nhận trước khi bỏ.
 - **Phiếu Đã xong hoặc Đã hủy** chỉ xem được, không sửa, theo `allowedActions`.
 
-Ô gợi ý khách chỉ là cách chọn. API tạo phiếu giữ quy tắc hiện có: bệnh nhân tồn tại, chưa lưu trữ, cùng chi nhánh được phép. Lý do là công việc tự sinh từ chỉ định tái khám hoặc vắng hẹn vẫn đi qua cùng dữ liệu.
+Ô gợi ý khách chỉ là cách chọn. API tạo phiếu giữ quy tắc hiện có: bệnh nhân tồn tại, chưa lưu trữ, cùng chi nhánh được phép. Phiếu tạo tay luôn gắn một bệnh nhân.
+
+### Phiếu vắng hẹn tự sinh (26/11/2026)
+
+- Mọi lịch ở trạng thái **Khách không tới** sinh đúng một phiếu loại "Vắng hẹn", kể cả lịch chưa gắn hồ sơ bệnh nhân.
+- Phiếu chỉ sinh khi **đã qua ngày** (UTC+7) ghi nhận vắng hẹn. Trong ngày đó phòng khám còn có thể hoàn tác hoặc đổi lịch nên chưa có phiếu. Lịch cũ được đánh dấu muộn thì phiếu xuất hiện vào ngày hôm sau ngày đánh dấu.
+- Worker chạy khi API khởi động, mỗi giờ và ngay sau 0 giờ; hạn xử lý của phiếu là lúc phiếu được tạo.
+- Lịch chưa có hồ sơ: `task.patientId` là `null`, `patientCode` rỗng (giao diện hiện "Chưa có hồ sơ"), tên và số điện thoại lấy từ lịch hẹn; ô tìm kiếm tìm được theo tên và liên hệ đó. Kết quả contact `Rebooked` của API (kèm lịch mới) chỉ dùng được cho phiếu đã gắn bệnh nhân.
 
 ## 5. Ngăn chi tiết
 

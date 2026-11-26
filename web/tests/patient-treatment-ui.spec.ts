@@ -157,14 +157,14 @@ async function prepare(page: Page, withItem = true, withFinance = false) {
   return state;
 }
 
-test('ngày giảm dần, thiếu ngày cuối, sửa giữ vị trí và không đổi dữ liệu gốc', async ({page})=>{
+test('ngày tăng dần, thiếu ngày cuối, sửa giữ vị trí và không đổi dữ liệu gốc', async ({page})=>{
   const state=await prepare(page);
   state.items.push({...item,id:'date-old',serviceName:'Dịch vụ cũ',estimatedStart:'2026-01-01',plannedOrder:2},{...item,id:'date-new',serviceName:'Dịch vụ mới',estimatedStart:'2026-11-02',plannedOrder:3});
   await page.reload();await page.getByRole('tab',{name:'Điều trị & Thanh toán'}).click();
-  const rows=page.locator('.treatment-sheet-plan-table tbody tr');await expect(rows.nth(0)).toContainText('Dịch vụ mới');await expect(rows.nth(1)).toContainText('Dịch vụ cũ');await expect(rows.nth(2)).toContainText('Trám răng');
+  const rows=page.locator('.treatment-sheet-plan-table tbody tr');await expect(rows.nth(0)).toContainText('Dịch vụ cũ');await expect(rows.nth(1)).toContainText('Dịch vụ mới');await expect(rows.nth(2)).toContainText('Trám răng');
   await page.getByRole('button',{name:'Chức năng Dịch vụ cũ',exact:true}).click();await page.getByRole('menuitem',{name:'Sửa',exact:true}).click();
-  await expect(rows.nth(1)).toHaveAttribute('aria-label','Nhập hạng mục kế hoạch');
-  await page.getByLabel('Ngày dự kiến',{exact:true}).fill('2027-01-01');await expect(rows.nth(1)).toHaveAttribute('aria-label','Nhập hạng mục kế hoạch');
+  await expect(rows.nth(0)).toHaveAttribute('aria-label','Nhập hạng mục kế hoạch');
+  await page.getByLabel('Ngày dự kiến',{exact:true}).fill('2027-01-01');await expect(rows.nth(0)).toHaveAttribute('aria-label','Nhập hạng mục kế hoạch');
 });
 test('tạo phiếu nhanh không Modal hoặc chuyển trang, retry cùng key và mở đúng ID', async ({page})=>{
   await prepare(page);const id='99999999-9999-4999-8999-999999999999';const calls:any[]=[];let fail=true;

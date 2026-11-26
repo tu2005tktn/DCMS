@@ -13,14 +13,14 @@ export type BookingPrefill = { branchId: number; dentistId?: number; date: strin
 type Values = {
   kind: 'Standard' | 'WalkIn'; source: string; bookerName: string; bookerContact: string; patientId?: number;
   attendeeName?: string; attendeeBirthDate?: string; relation: 'Self' | 'Relative'; serviceId?: number; reason?: string;
-  branchId: number; dentistId?: number; chairId?: number; date: string; duration: number; exceptionReason?: string;
+  branchId: number; dentistId?: number; date: string; duration: number; exceptionReason?: string;
 };
 type PatientOption = { id: number; patientCode: string; fullName: string; birthDate: string | null; phone: string | null };
 // docs/specs/CHAIR-CAPACITY-ANY-DENTIST-BOOKING.vi.md: 0 = any on-shift dentist with a free chair.
 const ANY_DENTIST = 0;
 const slotChangedCodes = ['MSG20', 'MSG22', 'MSG23', 'MSG29'];
 
-// S11 counter booking (UC-04). Slots come from Tư's availability for the exact staff duration; the booking itself is
+// S11 counter booking (UC-04). Slots come from Tư's availability for the booking duration; the booking itself is
 // Vinh's shared POST /api/appointments with the staff session. Contract: docs/implementation/UC04-05-S10-S11.md §5.
 // Follow-up appointments of a treatment dossier are booked from NextVisitBookingDrawer (docs/specs/FOLLOW-UP-INSTRUCTION-REMOVAL.vi.md).
 export default function BookingDrawer({ open, prefill, options, replacement, onClose, onBooked }: {
@@ -61,13 +61,15 @@ export default function BookingDrawer({ open, prefill, options, replacement, onC
   const branchChairs = options?.chairs.filter(x => x.branchId === branchId) ?? [];
   const branchServices = options?.services.filter(x => x.branchId === branchId) ?? [];
   const effectiveKind = values?.kind;
-  const effectiveDuration = values?.duration;
+  // A counter booking lasts as long as its service; only a replacement is typed, to fit the time left in the freed slot.
+  const effectiveDuration = replacement ? values?.duration : branchServices.find(s => s.id === values?.serviceId)?.publicDurationMinutes;
+  const remainingMinutes = replacement
+    ? Math.min(480, Math.max(1, Math.floor((Date.parse(replacement.endAt) - Date.now()) / 60000))) : 480;
   // main (CLINIC-SLOTS-AND-SERVICE-DURATIONS.vi.md §27/§33) thay quy tắc 15–480 bội 15 bằng số phút nguyên 1–480;
   // server dùng chung ScheduleRules.ValidDuration nên client không được lệch về phía chặt hơn.
   const durationValid = !!effectiveDuration && Number.isInteger(effectiveDuration) && effectiveDuration >= 1 && effectiveDuration <= 480;
   const canQuery = !!values?.branchId && values.dentistId != null && !!values.serviceId && !!values.date && durationValid;
   const needsException = !!slot && Date.parse(slot.start) < Date.now() + 60 * 60_000;
-  const shownSlots = (slots ?? []).filter(s => !values?.chairId || s.chairId === values.chairId);
 
   // Any change to the resource selection invalidates the chosen slot; the server rechecks everything on confirm anyway.
   async function loadSlots() {
@@ -83,7 +85,7 @@ export default function BookingDrawer({ open, prefill, options, replacement, onC
       setSlots(available);
       const wanted = wantedMinute.current;
       if (wanted !== undefined) {
-        setSlot(available.find(s => localMinute(s.start) === wanted && (!values.chairId || s.chairId === values.chairId)) ?? null);
+        setSlot(available.find(s => localMinute(s.start) === wanted) ?? null);
         wantedMinute.current = undefined;
       }
     } catch (failure) { if (revision === slotRevision.current) { setSlots(null); setSlotsError((failure as Error).message); } }
@@ -194,33 +196,32 @@ export default function BookingDrawer({ open, prefill, options, replacement, onC
       <Typography.Title level={5}>Dịch vụ và tài nguyên</Typography.Title>
       <div className="patient-form-grid">
         <Form.Item name="serviceId" label="Dịch vụ" rules={[{ required: true, message: 'Vui lòng nhập Dịch vụ.' }]}>
-          <Select disabled={!!replacement} options={branchServices.map(s => ({ value: s.id, label: `${s.name} · ${s.publicDurationMinutes} phút` }))}
-            onChange={id => form.setFieldValue('duration', branchServices.find(s => s.id === id)?.publicDurationMinutes)} /></Form.Item>
+          <Select disabled={!!replacement} options={branchServices.map(s => ({ value: s.id, label: `${s.name} · ${s.publicDurationMinutes} phút` }))} /></Form.Item>
         <Form.Item name="reason" label="Lý do khám (tùy chọn)" rules={[{ max: 1000, message: 'Lý do không được vượt quá 1000 ký tự.' }]}><Input maxLength={1000} /></Form.Item>
         <Form.Item name="branchId" label="Chi nhánh" hidden={!canPickBranch || (options?.branches.length ?? 0) <= 1} rules={[{ required: true, message: 'Vui lòng nhập Chi nhánh.' }]}>
           <Select disabled={!!replacement} options={options?.branches.map(b => ({ value: b.id, label: b.name }))}
-            onChange={() => form.setFieldsValue({ dentistId: undefined, chairId: undefined, serviceId: undefined })} />
+            onChange={() => form.setFieldsValue({ dentistId: undefined, serviceId: undefined })} />
         </Form.Item>
         <Form.Item name="dentistId" label="Nha sĩ" rules={[{ required: true, message: 'Vui lòng nhập Nha sĩ.' }]}>
           <Select disabled={!!replacement} options={[{ value: ANY_DENTIST, label: "Bất kỳ nha sĩ (ghế trống)" }, ...branchDentists.map(d => ({ value: d.id, label: d.name }))]} />
         </Form.Item>
-        <Form.Item name="chairId" label="Ghế (để trống: tự chọn)"><Select allowClear options={branchChairs.map(c => ({ value: c.id, label: c.name }))} /></Form.Item>
         <Form.Item name="date" label="Ngày" rules={[{ required: true, message: 'Vui lòng nhập Ngày.' }]}>
           <Input type="date" disabled={!!replacement} min={clinicToday()} />
         </Form.Item>
-        <Form.Item name="duration" label="Thời lượng (phút)" rules={[{ required: true, message: 'Vui lòng nhập Thời lượng.' },
-          { validator: (_, v?: number) => !v || (Number.isInteger(v) && v >= 1 && v <= 480) ? Promise.resolve() : Promise.reject(new Error('Thời lượng không đúng định dạng.')) }]}>
-          <InputNumber min={1} max={480} precision={0} step={1} style={{ width: '100%' }} />
-        </Form.Item>
+        {replacement && <Form.Item name="duration" label="Thời lượng (phút)" rules={[{ required: true, message: 'Vui lòng nhập Thời lượng.' },
+          { validator: (_, v?: number) => !v || (Number.isInteger(v) && v >= 1 && v <= remainingMinutes) ? Promise.resolve()
+            : Promise.reject(new Error(`Thời lượng phải từ 1 đến ${remainingMinutes} phút.`)) }]}>
+          <InputNumber min={1} max={remainingMinutes} precision={0} step={1} style={{ width: '100%' }} />
+        </Form.Item>}
       </div>
       <Typography.Title level={5}>Khung giờ hợp lệ</Typography.Title>
-      {!canQuery ? <Typography.Text type="secondary">Chọn chi nhánh, nha sĩ, dịch vụ, ngày và thời lượng để xem khung giờ.</Typography.Text>
+      {!canQuery ? <Typography.Text type="secondary">Chọn chi nhánh, nha sĩ, dịch vụ và ngày để xem khung giờ.</Typography.Text>
         : loadingSlots ? <Spin /> : slotsError ? <Alert type="error" showIcon message={slotsError} action={<Button size="small" onClick={() => void loadSlots()}>Thử lại</Button>} />
-        : shownSlots.length === 0 ? <Alert type="info" showIcon message="Không còn khung giờ đủ tài nguyên cho thời lượng này. Chọn ngày, nha sĩ, ghế hoặc thời lượng khác." />
-        : <div className="booking-slots">{shownSlots.map(s => {
+        : !slots?.length ? <Alert type="info" showIcon message={`Không còn khung giờ đủ tài nguyên cho thời lượng này. ${replacement ? 'Chọn thời lượng ngắn hơn.' : 'Chọn ngày, nha sĩ hoặc dịch vụ khác.'}`} />
+        : <div className="booking-slots">{slots.map(s => {
           const selected = slot?.start === s.start && slot.chairId === s.chairId;
           return <Button key={`${s.start}-${s.chairId}`} type={selected ? 'primary' : 'default'} onClick={() => setSlot(s)}>
-            {formatClock(s.start)}{anyDentist && <Typography.Text type={selected ? undefined : 'secondary'} style={{ marginLeft: 6, color: selected ? '#fff' : undefined }}>{dentistLabel(s.dentistId)}</Typography.Text>}{values?.chairId ? null : <Typography.Text type={selected ? undefined : 'secondary'} style={{ marginLeft: 6, color: selected ? '#fff' : undefined }}>{chairName(s.chairId)}</Typography.Text>}</Button>;
+            {formatClock(s.start)}{anyDentist && <Typography.Text type={selected ? undefined : 'secondary'} style={{ marginLeft: 6, color: selected ? '#fff' : undefined }}>{dentistLabel(s.dentistId)}</Typography.Text>}<Typography.Text type={selected ? undefined : 'secondary'} style={{ marginLeft: 6, color: selected ? '#fff' : undefined }}>{chairName(s.chairId)}</Typography.Text></Button>;
         })}</div>}
       {slot && <Typography.Paragraph className="patient-section">Đã chọn {formatClock(slot.start)}–{formatClock(slot.end)} · {dentistLabel(slot.dentistId)} · {chairName(slot.chairId)} · kết thúc dự kiến {clock(localMinute(slot.end))}</Typography.Paragraph>}
       {needsException && <Form.Item name="exceptionReason" label="Lý do ngoại lệ (bắt đầu trong vòng 60 phút)" rules={[{ max: 500, message: 'Lý do ngoại lệ không được vượt quá 500 ký tự.' }]}>

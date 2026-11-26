@@ -25,19 +25,19 @@ export function validateSchedulePeriods(periods: Period[]): string[] {
       errors.push(`${name}: giờ phải theo bước 15 phút, trong khoảng 00:00–24:00.`);
     if (p.startMinute >= p.endMinute)
       errors.push(`${name}: kết thúc ${formatScheduleTime(p.endMinute)} phải sau bắt đầu ${formatScheduleTime(p.startMinute)}. Kiểm tra SA/CH nếu ô giờ dùng định dạng 12 giờ.`);
-    if (!['Work', 'Break', 'Block'].includes(p.kind)) errors.push(`${name}: chọn loại Làm việc, Nghỉ hoặc Block.`);
+    if (!['Work', 'Break'].includes(p.kind)) errors.push(`${name}: chọn loại Làm việc hoặc Nghỉ.`);
     if ((p.reason ?? '').length > 500) errors.push(`${name}: lý do không được vượt quá 500 ký tự.`);
     if (p.kind !== 'Work') {
-      if (!p.reason?.trim()) errors.push(`${name}: nhập lý do nghỉ / block.`);
+      if (!p.reason?.trim()) errors.push(`${name}: nhập lý do nghỉ.`);
       if (!periods.some(w => w.day === p.day && w.kind === 'Work' && w.startMinute <= p.startMinute && w.endMinute >= p.endMinute))
-        errors.push(`${name}: giờ nghỉ / block phải nằm hoàn toàn trong một khoảng Làm việc cùng ngày.`);
+        errors.push(`${name}: giờ nghỉ phải nằm hoàn toàn trong một khoảng Làm việc cùng ngày.`);
     }
     for (let j = 0; j < i; j++) {
       const other = periods[j];
       if (other.day !== p.day || (other.kind === 'Work') !== (p.kind === 'Work') || !overlap(other, p)) continue;
       errors.push(p.kind === 'Work'
-        ? `${label(other, j)} và ${name} trùng giờ Làm việc. Nếu một khoảng là giờ nghỉ hoặc họp, hãy đổi Loại khoảng thành Nghỉ hoặc Block.`
-        : `${label(other, j)} và ${name} có giờ nghỉ / block chồng nhau.`);
+        ? `${label(other, j)} và ${name} trùng giờ Làm việc. Nếu một khoảng là giờ nghỉ hoặc họp, hãy đổi Loại khoảng thành Nghỉ.`
+        : `${label(other, j)} và ${name} có giờ nghỉ chồng nhau.`);
     }
   });
   return errors;

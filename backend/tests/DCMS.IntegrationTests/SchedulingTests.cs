@@ -32,7 +32,7 @@ public sealed class ScheduleRulesTests
         Assert.False(ScheduleRules.ValidWeek(Monday, [new(0, 480, 720, "Work"), new(0, 600, 780, "Work")]));
         Assert.False(ScheduleRules.ValidWeek(Monday, [new(0, 480, 720, "Work"), new(0, 705, 735, "Break", "Nghỉ")]));
         Assert.False(ScheduleRules.ValidWeek(Monday, [new(0, 480, 720, "Work"), new(0, 600, 630, "Break")]));
-        Assert.False(ScheduleRules.ValidWeek(Monday, [new(0, 480, 720, "Work"), new(0, 600, 645, "Break", "Nghỉ"), new(0, 630, 660, "Block", "Bận")]));
+        Assert.False(ScheduleRules.ValidWeek(Monday, [new(0, 480, 720, "Work"), new(0, 600, 645, "Break", "Nghỉ"), new(0, 630, 660, "Break", "Bận")]));
         Assert.True(ScheduleRules.ValidWeek(Monday, [new(0, 480, 720, "Work"), new(0, 720, 900, "Work")]));
     }
     [Fact]

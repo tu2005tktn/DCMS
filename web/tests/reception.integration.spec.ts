@@ -110,7 +110,7 @@ test('walk-in uses the real S11 booking form then returns to reception', async (
   await page.locator('.ant-select-dropdown:visible').getByText(new RegExp(p.patientCode)).click();
   await drawer.getByLabel('Dịch vụ', { exact: true }).click(); await page.locator('.ant-select-dropdown:visible').getByText('Khám · 1 phút', { exact: true }).click();
   await drawer.getByLabel('Nha sĩ', { exact: true }).click(); await page.locator('.ant-select-dropdown:visible').getByText(c.dentistName, { exact: true }).click();
-  await drawer.getByLabel('Thời lượng (phút)', { exact: true }).fill('1');
+  await expect(drawer.getByLabel('Thời lượng (phút)', { exact: true })).toHaveCount(0);
   const slotsResponse = await request.get(`${apiUrl}/api/availability?branchId=${c.branchId}&dentistId=${c.dentistId}&serviceId=${c.serviceId}&date=${c.date}&durationMinutes=1`, { headers: c.headers });
   const slots = (await slotsResponse.json()).slots; const slot = slots.find((x: { start: string }) => Date.parse(x.start) > Date.now() + 60000);
   expect(slot).toBeTruthy(); const label = new Date(slot.start).toLocaleTimeString('en-GB', { timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit' });

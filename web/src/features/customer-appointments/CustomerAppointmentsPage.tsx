@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { ApiError } from '../../services/api';
 import { customerApi } from '../../services/customerApi';
 import { useCustomerAuth } from '../customer-auth/CustomerAuthContext';
-import { formatTime, statusColors, statusLabels, type AppointmentCard, type AppointmentPage, type AppointmentStatus } from './types';
+import { formatTime, statusLabels, statusView, type AppointmentCard, type AppointmentPage, type AppointmentStatus } from './types';
 
 type Filters = { status: AppointmentStatus | 'ALL'; from?: string; to?: string };
 
@@ -70,14 +70,14 @@ export default function CustomerAppointmentsPage() {
           { title: 'Thời gian', dataIndex: 'start', render: (start, item) => <>{formatTime(start)}<br /><Typography.Text type="secondary">{item.durationMinutes} phút</Typography.Text></> },
           { title: 'Nha sĩ', dataIndex: 'dentistName' },
           { title: 'Người khám', dataIndex: 'attendeeName', render: (name, item) => <>{name}<br /><Typography.Text type="secondary">{item.attendeeKind === 'RELATIVE' ? 'Người thân' : 'Bản thân'} · {item.access === 'BOOKED_BY_ME' ? 'Lịch tôi đặt' : 'Lịch của tôi'}</Typography.Text></> },
-          { title: 'Trạng thái', dataIndex: 'status', render: (status: AppointmentStatus) => <Tag color={statusColors[status]}>{statusLabels[status]}</Tag> },
+          { title: 'Trạng thái', key: 'status', render: (_, item) => <Tag color={statusView(item).color}>{statusView(item).label}</Tag> },
           { title: '', key: 'action', render: (_, item) => <Link aria-label={`Xem lịch ${item.code}`} to={`/customer/appointments/${encodeURIComponent(item.code)}`}>Chi tiết</Link> },
         ]} /></div>
       <div className="customer-appointment-mobile-list">
         {busy ? <Spin tip="Đang tải lịch hẹn"><div className="customer-loading" /></Spin> : data?.items.length ? data.items.map(item =>
           <Card key={item.code} className="customer-appointment-mobile-card">
             <div className="customer-appointment-mobile-head"><Link to={`/customer/appointments/${encodeURIComponent(item.code)}`}><strong>{item.code}</strong></Link>
-              <Tag color={statusColors[item.status]}>{statusLabels[item.status]}</Tag></div>
+              <Tag color={statusView(item).color}>{statusView(item).label}</Tag></div>
             <div className="customer-appointment-mobile-time">{formatTime(item.start)}</div>
             <p>Nha sĩ: {item.dentistName} · {item.durationMinutes} phút</p>
             <p>Người khám: {item.attendeeName} ({item.attendeeKind === 'RELATIVE' ? 'Người thân' : 'Bản thân'})</p>

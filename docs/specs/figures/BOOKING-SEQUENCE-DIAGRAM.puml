@@ -1,0 +1,60 @@
+@startuml DCMS_Patient_Booking_Sequence_Diagram
+title Sequence Diagram - Bệnh nhân đặt lịch hẹn
+
+skinparam shadowing false
+skinparam sequenceMessageAlign left
+skinparam responseMessageBelowArrow true
+skinparam maxMessageSize 220
+skinparam sequence {
+  ParticipantBorderColor #000000
+  ParticipantBackgroundColor #FFFFFF
+  ActorBorderColor #000000
+  ActorBackgroundColor #FFFFFF
+  LifeLineBorderColor #808080
+  ArrowColor #000000
+  BoxBorderColor #000000
+}
+skinparam boundary {
+  BorderColor #000000
+  BackgroundColor #FFFFFF
+}
+skinparam control {
+  BorderColor #000000
+  BackgroundColor #FFFFFF
+}
+skinparam entity {
+  BorderColor #000000
+  BackgroundColor #FFFFFF
+}
+
+actor "Patient" as Patient
+boundary "Booking Screen\n(Web and Mobile)" as Screen
+control "AppointmentService" as Service
+entity "Database" as Db
+
+autonumber
+
+Patient -> Screen : choose branch, examination service, dentist and date
+Screen -> Service : getAvailableSlots(branch, service, dentist, date)
+activate Service
+Service -> Db : load dentist schedules and existing bookings
+Screen <-- Service : free time slots
+deactivate Service
+
+Patient -> Screen : pick a slot, enter patient and contact details
+Screen -> Service : createAppointment(details, slot)
+activate Service
+Service -> Service : validate patient details, contact and lead time
+Service -> Db : is the slot still free?
+
+alt slot already taken
+  Screen <-- Service : reject, please choose another slot
+else slot is free
+  Service -> Db : save the appointment (Confirmed)
+  Screen <-- Service : appointment code and success message
+end
+deactivate Service
+
+Patient <-- Screen : show appointment confirmation
+
+@enduml

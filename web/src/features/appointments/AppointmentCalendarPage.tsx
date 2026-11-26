@@ -6,10 +6,11 @@ import { Link } from 'react-router-dom';
 import AppointmentDetailContent from './AppointmentDetailContent';
 import BookingDrawer, { type BookingPrefill } from './BookingDrawer';
 import {
-  addDays, clinicToday, clock, formatDate, localDate, localMinute, mondayOf, sourceLabels, statusColors, statusLabels, weekday,
+  addDays, clinicToday, clock, formatDate, localDate, localMinute, mondayOf, sourceLabels, statusLabels, statusView, weekday,
   type AppointmentOptions, type AppointmentStatus, type CalendarPeriod, type CalendarView,
 } from './types';
 import { useCanPickBranch } from '../authentication/useCanPickBranch';
+import { useAuth } from '../authentication/AuthContext';
 
 const SLOT = 15;
 const ROW = 18; // px per 15 minutes
@@ -24,6 +25,10 @@ function cellKind(periods: CalendarPeriod[], minute: number) {
 // S10 Appointment calendar (UC-05). Scope is decided by the server; filters only narrow what the server allows.
 export default function AppointmentCalendarPage() {
   const canPickBranch = useCanPickBranch();
+  const { user } = useAuth();
+  // Nha sĩ thường chỉ xem lịch của mình; chỉ chủ phòng khám và trợ lý mới lọc được theo nha sĩ khác.
+  const roles = user?.effectiveRoles ?? [];
+  const canPickDentist = roles.includes('ClinicOwner') || roles.includes('ClinicAssistant') || !roles.includes('Dentist');
   const has = usePermissions();
   const [toast, toastContext] = message.useMessage();
   const [options, setOptions] = useState<AppointmentOptions | null>(null);
@@ -115,16 +120,13 @@ export default function AppointmentCalendarPage() {
         <Space wrap>
           {canPickBranch && options.branches.length > 1 && <Select aria-label="Chi nhánh" style={{ width: 220 }} value={branchId} options={options.branches.map(b => ({ value: b.id, label: b.name }))}
             onChange={value => { setBranchId(value); setDentistId(defaultDentist(options, value)); setSelectedId(null); }} />}
-          <Select aria-label="Nha sĩ" style={{ width: 200 }} allowClear={mode === 'DAY'} placeholder="Tất cả nha sĩ" value={mode === 'WEEK' ? weekDentist : dentistId}
-            options={dentists.map(d => ({ value: d.id, label: d.name }))} onChange={setDentistId} />
+          {!options.ownScheduleOnly && canPickDentist && <Select aria-label="Nha sĩ" style={{ width: 200 }} allowClear={mode === 'DAY'} placeholder="Tất cả nha sĩ" value={mode === 'WEEK' ? weekDentist : dentistId}
+            options={dentists.map(d => ({ value: d.id, label: d.name }))} onChange={setDentistId} />}
           <Select aria-label="Trạng thái" style={{ width: 170 }} value={status} onChange={setStatus}
             options={[{ value: 'ALL', label: 'Tất cả trạng thái' }, ...(Object.keys(statusLabels) as AppointmentStatus[]).map(s => ({ value: s, label: statusLabels[s] }))]} />
           <Button loading={loading} onClick={() => setRevision(v => v + 1)}>Tải lại</Button>
         </Space>
       </div>
-      <Space className="calendar-legend" size="large">
-        <span><i className="legend work" /> Giờ làm</span><span><i className="legend blocked" /> Nghỉ / block</span><span><i className="legend off" /> Ngoài lịch</span>
-      </Space>
       {error ? <Alert type="error" showIcon message={error} description="Chưa tải được lịch — đây không phải là lịch trống."
         action={<Button size="small" onClick={() => setRevision(v => v + 1)}>Thử lại</Button>} />
         : !view ? <Spin /> : columns.length === 0 ? <Empty description="Chi nhánh chưa có nha sĩ trong phạm vi của bạn." />
@@ -151,7 +153,7 @@ export default function AppointmentCalendarPage() {
                       onClick={() => setSelectedId(a.id)} aria-label={`Lịch ${a.code}`}>
                       <strong>{clock(localMinute(a.startAt))}–{clock(localMinute(a.endAt))}</strong> {a.attendeeName}
                       <span>{a.code}{a.source ? ` · ${sourceLabels[a.source] ?? a.source}` : ''}{a.serviceName ? ` · ${a.serviceName}` : ''}{a.chairName ? ` · ${a.chairName}` : ''}</span>
-                      <Tag color={statusColors[a.status]}>{statusLabels[a.status]}</Tag>
+                      <Tag color={statusView(a).color}>{statusView(a).label}</Tag>
                     </button>;
                   })}
                 </div>;

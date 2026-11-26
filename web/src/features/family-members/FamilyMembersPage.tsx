@@ -1,3 +1,4 @@
+import { CalendarOutlined } from '@ant-design/icons';
 import { Alert, Button, Card, Empty, Input, Pagination, Popconfirm, Space, Table } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -32,7 +33,7 @@ function MemberList() {
     catch (failure) { setError((failure as Error).message); }
     finally { sending.current = false; setDeleting(null); }
   }
-  const actions = (member: FamilyMember) => <Space wrap><Link to={`/customer/book?familyMemberId=${encodeURIComponent(member.id)}`}>Đặt lịch</Link>
+  const actions = (member: FamilyMember) => <Space wrap><Link to={`/customer/book?familyMemberId=${encodeURIComponent(member.id)}`} className="customer-family-book"><CalendarOutlined aria-hidden="true" />Đặt lịch</Link>
     <Button onClick={() => setRecordMember(member)}>Xem hồ sơ</Button>
     <Button onClick={() => { setEditing(member); setDrawer(true); }}>Sửa</Button><Popconfirm title="Bạn có muốn xóa người thân này khỏi danh sách không?" okText="Đồng ý" cancelText="Không đồng ý" onConfirm={() => remove(member)}>
       <Button danger loading={deleting === member.id} disabled={deleting !== null && deleting !== member.id}>Xóa</Button></Popconfirm></Space>;

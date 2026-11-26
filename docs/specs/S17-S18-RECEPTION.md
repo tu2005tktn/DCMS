@@ -4,6 +4,22 @@
 
 Ngày chốt contract: **25/10/2026**. Trạng thái ngày **26/10/2026**: đã triển khai phần tiếp nhận DCMS-111 và đọc Visit bàn giao; xem [bằng chứng và giới hạn](../implementation/DCMS-111-RECEPTION.md). Nguồn: yêu cầu người dùng trong phiên này; [DCMS-111](https://capstone-fpt-fa26.atlassian.net/browse/DCMS-111), [luồng DCMS-110](CLINIC-FLOW-DCMS-110.vi.md), [UC/GBR/MSG v2.5](DCMS_Use_Cases_Business_Rules_Messages_v2.5.docx) UC-07 và [Screen Specifications v2.5](DCMS_Screen_Specifications_v2.5.docx) S17/S18.
 
+## Xử lý khách không đến (26/11/2026)
+
+- Trạng thái lưu trong DB không đổi và không có job tự đánh No-show. Nhãn hiển thị của lịch `Confirmed`:
+
+| Thời điểm | Phía phòng khám | Phía bệnh nhân |
+| --- | --- | --- |
+| Chưa đến giờ bắt đầu | Đã xác nhận | Đã xác nhận |
+| Đã bắt đầu, chưa hết khung giờ | Trễ hẹn | Đã đến giờ hẹn |
+| Đã hết khung giờ, chưa xử lý | Chờ xử lý | Chờ phòng khám xác nhận |
+| Đã ghi nhận (`NoShow`) | Khách không tới | Vắng mặt |
+
+- Nhân viên có `appointments.no-show` được ghi nhận ngay sau giờ bắt đầu (không có thời gian chờ 15 phút).
+- `GET /api/reception/overdue?branchId=&dentistId=&keyword=&page=&pageSize=`: lịch `Confirmed` của mọi ngày đã hết giờ và chưa có Visit, mới nhất trước, cùng phạm vi quyền với tiếp nhận. Tab “Quá giờ chưa xử lý (N)” dùng API này.
+- `POST /api/appointments/{code}/no-show/undo` (grant `appointments.no-show`, body có `requestKey`, `expectedVersion`, `reason`): chỉ trong ngày phòng khám đã ghi nhận (MSG119); bị chặn khi lịch khác đang hiệu lực trùng ghế, bác sĩ hoặc bệnh nhân (MSG120), hoặc phiếu điều trị đã bị xóa do bỏ cọc (MSG121). Thành công: lịch về `Confirmed`, ghi lịch sử `UNDO_NO_SHOW`, hủy việc chăm sóc vắng hẹn còn mở (loại đổi thành “Vắng hẹn (đã hoàn tác)”), gửi thông báo đính chính cho khách.
+- **Đổi lịch vắng hẹn** (khách đến muộn): dùng `GET /api/appointments/{code}/availability` và `POST /api/appointments/{code}/reschedule` (grant `appointments.reschedule`, `clinicInitiated=true`). Áp dụng cho lịch `Confirmed` của hôm nay đã qua giờ bắt đầu, hoặc `NoShow` được ghi nhận trong ngày. Không áp dụng giới hạn 60 phút, chỉ nhận giờ trong tương lai còn trống. Lịch về `Confirmed` ở giờ mới, lịch sử giữ dòng vắng mặt, việc gọi lại còn mở bị hủy (“Vắng hẹn (đã đổi lịch)”), khách nhận thông báo đổi lịch. Bị chặn khi người đó đã có lịch khám tự đặt khác đang mở (MSG118) hoặc phiếu điều trị đã bị xóa (MSG121). Khách tự phục vụ không dùng được.
+
 ## Quyết định triển khai ngày 25/10/2026
 
 Người dùng yêu cầu bắt đầu triển khai DCMS-111. Đợt này giữ các contract bên dưới, bổ sung `GET /api/reception/options` cho lựa chọn được phân quyền và `GET /api/reception/appointments/{appointmentId}/courses?patientId=...` cho nguồn đợt cũ. Các danh sách phân trang 20/50/100; lọc bác sĩ/trạng thái/từ khóa không nới quyền. Các route staff là `/reception`, `/reception/appointments/:appointmentId` và `/visits/:visitId`.
@@ -89,6 +105,7 @@ Các endpoint và route trong phần này đã có trên nhánh `feat/dcms-111-r
 | `GET /api/reception/appointments/{appointmentId}` | Ngữ cảnh S18: lịch, booker/attendee riêng, Patient đã gắn, phiên bản, nguồn sẵn có và quyền hồi cứu; không giữ chỗ |
 | `POST /api/reception/appointments/{appointmentId}/check-in` | Xác nhận danh tính/giờ đến/lý do, tạo hoặc trả đúng một Visit |
 | `GET /api/reception/queue?branchId=1&date=2026-10-25&page=1&pageSize=20` | Dòng chờ/lượt được phép xem, phân trang/tổng số đúng quyền; mỗi Visit một lần |
+| `GET /api/reception/overdue?branchId=1&page=1&pageSize=20` | Lịch `Confirmed` đã hết giờ chưa xử lý của mọi ngày (xem mục “Xử lý khách không đến”) |
 | `GET /api/visits/{visitId}` | Contract đọc Visit dùng chung với DCMS-112; server kiểm Patient/chi nhánh/phân công. Start Visit của DCMS-112 cập nhật lượt này, không tạo lượt khác |
 
 Tìm/tạo Patient tái sử dụng `GET /api/patients`, `POST /api/patients/duplicates`, `POST /api/patients`. Xếp lịch dùng `POST /api/appointments` cùng API availability hiện có. Không sao chép request tạo lịch, resolver hoặc bảng hồ sơ sang module mới.
@@ -198,3 +215,7 @@ Trang tiếp nhận bệnh nhân (check-in): tiêu đề bên trái, nút "Về 
 ## Bỏ chọn đợt điều trị cũ khi tiếp nhận (17/11/2026)
 
 Theo [rút gọn bảng VISIT](VISIT-TABLE-SIMPLIFICATION.vi.md), check-in không còn trường "Đợt điều trị cũ (nếu có)" và không còn cờ "cần bác sĩ xác nhận nguồn". Bỏ `priorCourseId` khỏi request check-in, bỏ `source`, `requiresClinicalSourceReview`, `recordedAt` khỏi `VisitResult` và bỏ `GET /api/reception/appointments/{appointmentId}/courses`. Lượt "Tiếp tục điều trị" mở tab Điều trị của bệnh nhân để bác sĩ chọn hồ sơ. Hàng chờ hiển thị thêm trạng thái lượt "Đã xác nhận phiếu khám".
+
+## Thứ tự dòng bảng Lịch hẹn (26/11/2026)
+
+`GET /api/reception/appointments` xếp theo việc còn phải làm, trong mỗi nhóm giờ sớm hơn đứng trước, áp dụng xuyên các trang: (1) `Confirmed` đã đến giờ (Trễ hẹn, Chờ xử lý); (2) `Confirmed` sắp đến; (3) `CheckedIn`, `InProgress`; (4) `Completed`, `NoShow`, `Cancelled` — web làm mờ nhóm này. Tab “Quá giờ chưa xử lý” và “Hàng chờ và lượt khám” giữ thứ tự cũ.

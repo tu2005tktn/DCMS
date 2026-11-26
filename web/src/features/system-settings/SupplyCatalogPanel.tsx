@@ -10,7 +10,6 @@ type Page = { items: Row[]; total: number; page: number; pageSize: number };
 type StatePreview = { entry: Row; allowed: boolean; blockers: string[]; impact: string };
 type HistoryItem = { occurredAt: string; actorName: string; command: string; reason: string | null; before: Row | null; after: Row };
 type Status = 'Active' | 'Inactive' | 'All';
-type MedicineType = 'All' | 'Clinic' | 'External';
 type Option = { id: string; code: string | null; name: string };
 type SectionKey = 'suppliers' | 'labs' | 'lab-work-types' | 'medicines';
 
@@ -58,14 +57,11 @@ const sections: Section[] = [
         <InputNumber style={{ width: '100%' }} min={0} step={1000} precision={0} /></Form.Item>
       <Form.Item name="warranty" label="Bảo hành" rules={[{ max: 1000, message: 'Bảo hành tối đa 1000 ký tự.' }]}><Input.TextArea rows={2} maxLength={1000} /></Form.Item>
     </> },
-  { key: 'medicines', title: 'Thuốc phòng khám & mua ngoài', resource: 'medicines', nameMax: 200, exportable: true, defaults: { prescriptionEligible: true, internalStockTracked: false },
-    help: 'Thuốc kê mua ngoài không cần theo dõi tồn và không trừ kho. Lời dặn là mặc định cho dòng đơn mới; nha sĩ sửa theo từng bệnh nhân.',
+  { key: 'medicines', title: 'Thuốc', resource: 'medicines', nameMax: 200, exportable: true, defaults: { prescriptionEligible: true, internalStockTracked: false },
+    help: 'Lời dặn là mặc định cho dòng đơn mới; nha sĩ sửa theo từng bệnh nhân.',
     columns: [
-      { title: 'Nhóm', dataIndex: 'internalStockTracked', width: 145, render: v => v ? <Tag color="green">Phòng khám</Tag> : <Tag color="blue">Mua ngoài</Tag> },
       { title: 'Hoạt chất', dataIndex: 'activeIngredient', ellipsis: true, render: text },
       { title: 'Đơn vị', dataIndex: 'baseUnit', width: 90 },
-      { title: 'Giá tham khảo', dataIndex: 'referencePrice', width: 140, align: 'right', render: vnd },
-      { title: 'Kê đơn', dataIndex: 'prescriptionEligible', width: 90, render: v => v ? <Tag color="blue">Có</Tag> : '—' },
     ],
     fields: () => <>
       <Form.Item name="activeIngredient" label="Hoạt chất / biệt dược" rules={[{ max: 200, message: 'Tối đa 200 ký tự.' }]}><Input maxLength={200} /></Form.Item>
@@ -77,10 +73,9 @@ const sections: Section[] = [
         <Input maxLength={40} /></Form.Item>
       <Form.Item name="packaging" label="Quy cách đóng gói" rules={[{ max: 160, message: 'Tối đa 160 ký tự.' }]}><Input maxLength={160} placeholder="Hộp 10 vỉ x 10 viên" /></Form.Item>
       <Form.Item name="instructions" label="Hướng dẫn sử dụng mặc định" rules={[{ max: 1000, message: 'Tối đa 1000 ký tự.' }]}><Input.TextArea rows={2} maxLength={1000} showCount /></Form.Item>
-      <Form.Item name="referencePrice" label="Giá tham khảo (VND)" extra="Để trống nếu chưa xác định." rules={[priceRule]}>
-        <InputNumber style={{ width: '100%' }} min={0} step={1000} precision={0} /></Form.Item>
-      <Form.Item name="prescriptionEligible" valuePropName="checked"><Checkbox>Dùng để kê đơn</Checkbox></Form.Item>
-      <Form.Item name="internalStockTracked" valuePropName="checked" extra="Bật cho thuốc dùng tại phòng khám; tắt cho thuốc bệnh nhân mua ngoài."><Checkbox>Thuốc dùng tại phòng khám</Checkbox></Form.Item>
+      <Form.Item name="referencePrice" hidden><InputNumber /></Form.Item>
+      <Form.Item name="prescriptionEligible" valuePropName="checked" hidden><Checkbox /></Form.Item>
+      <Form.Item name="internalStockTracked" valuePropName="checked" hidden><Checkbox /></Form.Item>
     </> },
 ];
 const base = '/api/system-settings/settings/catalogs';
@@ -94,7 +89,6 @@ export default function SupplyCatalogPanel({ onlyMedicines = false, initialKey, 
   const can = (resource: string, action: string) => user?.permissions.includes(`catalog.${resource}.${action}`) ?? false;
   const visibleSections = sections.filter(s => (!onlyMedicines || s.key === 'medicines') && can(s.resource, 'read'));
   const [key, setKey] = useState<SectionKey>(onlyMedicines ? 'medicines' : initialKey ?? 'suppliers'), [status, setStatus] = useState<Status>('Active');
-  const [medicineType, setMedicineType] = useState<MedicineType>('Clinic');
   const [search, setSearch] = useState(''), [query, setQuery] = useState(''), [page, setPage] = useState(1), [size, setSize] = useState(20);
   const [data, setData] = useState<Page | null>(null), [loading, setLoading] = useState(false), [error, setError] = useState<string>(), [revision, setRevision] = useState(0);
   const [editing, setEditing] = useState<{ row?: Row } | null>(null), [formError, setFormError] = useState<ApiError>();
@@ -115,14 +109,14 @@ export default function SupplyCatalogPanel({ onlyMedicines = false, initialKey, 
     if (!can(section.resource, 'read')) return;
     let live = true; setLoading(true); setError(undefined);
     const params = new URLSearchParams({ q: query, status, page: String(page), pageSize: String(size),
-      ...(section.type ? { type: section.type } : {}), ...(section.key === 'medicines' && medicineType !== 'All' ? { type: medicineType } : {}) });
+      ...(section.type ? { type: section.type } : {}), });
     void api<Page>(`${base}/${section.resource}?${params}`).then(v => {
       if (!live) return;
       if (!v.items.length && v.total && page > 1) { setPage(Math.max(1, Math.ceil(v.total / size))); return; }
       setData(v);
     }).catch(e => { if (live) { setError((e as Error).message); setData(null); } }).finally(() => { if (live) setLoading(false); });
     return () => { live = false; };
-  }, [key, status, medicineType, query, page, size, revision, user]);
+  }, [key, status, query, page, size, revision, user]);
 
   function select(next: SectionKey) { setKey(next); setPage(1); setSearch(''); setQuery(''); setData(null); }
   async function run<T>(action: () => Promise<T>, onError: (e: ApiError) => void) {
@@ -132,8 +126,7 @@ export default function SupplyCatalogPanel({ onlyMedicines = false, initialKey, 
   }
   function open(row?: Row) {
     requestKey.current = null; setFormError(undefined); form.resetFields();
-    form.setFieldsValue((row ? { ...row, reason: '' } : { ...section.defaults,
-      ...(section.key === 'medicines' ? { internalStockTracked: medicineType === 'Clinic' } : {}) }) as Record<string, never>);
+    form.setFieldsValue((row ? { ...row, reason: '' } : { ...section.defaults }) as Record<string, never>);
     if (section.key === 'lab-work-types') void api<Option[]>('/api/system-settings/reference-options?kind=lab-providers').then(setLabProviders).catch(() => setLabProviders([]));
     setEditing({ row });
   }
@@ -210,10 +203,8 @@ export default function SupplyCatalogPanel({ onlyMedicines = false, initialKey, 
       <div className="system-settings-toolbar">
         <Input.Search aria-label="Tìm theo tên hoặc mã" placeholder="Tìm theo tên hoặc mã" maxLength={100} allowClear value={search}
           onChange={e => { setSearch(e.target.value); if (!e.target.value) { setQuery(''); setPage(1); } }} onSearch={v => { setQuery(v.trim()); setPage(1); }} />
-        <Segmented<Status> value={status} onChange={v => { setStatus(v); setPage(1); }}
-          options={[{ value: 'Active', label: 'Đang dùng' }, { value: 'Inactive', label: 'Ngừng dùng' }, { value: 'All', label: 'Tất cả' }]} />
-        {section.key === 'medicines' && <Segmented<MedicineType> value={medicineType} onChange={v => { setMedicineType(v); setPage(1); }}
-          options={[{ value: 'All', label: 'Tất cả thuốc' }, { value: 'Clinic', label: 'Thuốc phòng khám' }, { value: 'External', label: 'Thuốc mua ngoài' }]} />}
+        {section.key !== 'medicines' && <Segmented<Status> value={status} onChange={v => { setStatus(v); setPage(1); }}
+          options={[{ value: 'Active', label: 'Đang dùng' }, { value: 'Inactive', label: 'Ngừng dùng' }, { value: 'All', label: 'Tất cả' }]} />}
         {can(section.resource, 'create') && <Button type="primary" onClick={() => open()}>Thêm mới</Button>}
         {section.exportable && can(section.resource, 'export') && <Button disabled={busy} onClick={() => void exportExcel()}>Xuất Excel</Button>}
       </div>
@@ -226,11 +217,11 @@ export default function SupplyCatalogPanel({ onlyMedicines = false, initialKey, 
           { title: 'Mã', dataIndex: 'code', width: 130 },
           { title: 'Tên', dataIndex: 'name' },
           ...section.columns,
-          { title: 'Trạng thái', dataIndex: 'active', width: 110, render: (v: boolean) => v ? <Tag color="green">Đang dùng</Tag> : <Tag>Ngừng dùng</Tag> },
+          ...(section.key === 'medicines' ? [] : [{ title: 'Trạng thái', dataIndex: 'active', width: 110, render: (v: boolean) => v ? <Tag color="green">Đang dùng</Tag> : <Tag>Ngừng dùng</Tag> }]),
           { title: 'Thao tác', key: 'actions', width: 240, render: (_, row) => <Space wrap>
             {section.key === 'medicines' && <Button size="small" onClick={() => void viewMedicine(row)}>Xem</Button>}
             {can(section.resource, 'update') && <Button size="small" aria-label={`Sửa ${row.name}`} onClick={() => open(row)}>Sửa</Button>}
-            {can(section.resource, 'deactivate') && <Button size="small" danger={row.active} disabled={busy} onClick={() => void previewState(row)}>{row.active ? 'Ngừng dùng' : 'Khôi phục'}</Button>}
+            {section.key !== 'medicines' && can(section.resource, 'deactivate') && <Button size="small" danger={row.active} disabled={busy} onClick={() => void previewState(row)}>{row.active ? 'Ngừng dùng' : 'Khôi phục'}</Button>}
             <Button size="small" type="link" onClick={() => void openHistory(row)}>Lịch sử</Button>
           </Space> },
         ] as ColumnsType<Row>).map(c => ({ ...c, onCell: () => ({ 'data-label': typeof c.title === 'string' ? c.title : '' }) as React.HTMLAttributes<HTMLElement> }))} />
@@ -255,15 +246,12 @@ export default function SupplyCatalogPanel({ onlyMedicines = false, initialKey, 
     <Drawer open={!!viewed} width={480} title={`Thuốc · ${viewed?.name ?? ''}`} onClose={() => setViewed(null)}>
       {viewed && <Space direction="vertical" size="middle">
         <Typography.Text><b>Mã:</b> {viewed.code}</Typography.Text>
-        <Typography.Text><b>Nhóm:</b> {viewed.internalStockTracked ? 'Thuốc phòng khám' : 'Thuốc mua ngoài'}</Typography.Text>
         <Typography.Text><b>Hoạt chất:</b> {text(viewed.activeIngredient)}</Typography.Text>
         <Typography.Text><b>Hàm lượng:</b> {text(viewed.strength)}</Typography.Text>
         <Typography.Text><b>Dạng bào chế:</b> {text(viewed.dosageForm)}</Typography.Text>
         <Typography.Text><b>Đơn vị:</b> {text(viewed.baseUnit)}</Typography.Text>
         <Typography.Text><b>Đóng gói:</b> {text(viewed.packaging)}</Typography.Text>
         <Typography.Text><b>Hướng dẫn mặc định:</b> {text(viewed.instructions)}</Typography.Text>
-        <Typography.Text><b>Giá tham khảo:</b> {vnd(viewed.referencePrice)}</Typography.Text>
-        <Typography.Text><b>Trạng thái:</b> {viewed.active ? 'Đang dùng' : 'Ngừng dùng'}</Typography.Text>
       </Space>}
     </Drawer>
 

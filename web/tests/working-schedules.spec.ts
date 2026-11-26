@@ -50,11 +50,13 @@ test('stale and network failures preserve draft; discard requires confirmation',
   await select(page, 'Bắt đầu 1', '09:00');
   await page.route('**/api/working-schedules/recurring/publish', route => route.fulfill({ status: 409, json: { code: 'MSG41', message: 'Dữ liệu đã thay đổi.' } }));
   await page.getByRole('button', { name: 'Lưu và công bố' }).click();
-  await expect(page.getByText('Xung đột · Cần kiểm tra lại · MSG41')).toBeVisible();
+  await expect(page.getByRole('dialog').getByText('Xung đột · Cần kiểm tra lại · MSG41')).toBeVisible();
+  await page.getByRole('dialog').getByRole('button', { name: 'Đóng', exact: true }).click();
   await expect(page.getByRole('group', { name: 'Khoảng 1 · 09:00 → 17:00', exact: true })).toBeVisible();
   await page.route('**/api/working-schedules/recurring/publish', route => route.abort());
   await page.getByRole('button', { name: 'Lưu và công bố' }).click();
-  await expect(page.getByText('Lỗi kết nối hoặc dịch vụ · MSG49')).toBeVisible();
+  await expect(page.getByRole('dialog').getByText('Lỗi kết nối hoặc dịch vụ · MSG49')).toBeVisible();
+  await page.getByRole('dialog').getByRole('button', { name: 'Đóng', exact: true }).click();
   page.once('dialog', dialog => dialog.dismiss());
   await page.getByRole('button', { name: 'Hủy thay đổi chưa lưu' }).click();
   await expect(page.getByRole('group', { name: 'Khoảng 1 · 09:00 → 17:00', exact: true })).toBeVisible();
@@ -67,7 +69,8 @@ test('dated absence requires reason and submits an empty single-date exception',
   await workspace(page); await select(page, 'Loại lịch', 'Ngoại lệ ngày cụ thể');
   await expect(page.getByRole('combobox', { name: /^Chi nhánh (Thứ|Chủ nhật)/ })).toHaveCount(1);
   await page.getByRole('button', { name: 'Lưu và công bố' }).click();
-  await expect(page.getByText('Nhập lý do ngoại lệ, kể cả ngày không làm việc.')).toBeVisible();
+  await expect(page.getByRole('dialog').getByText('Nhập lý do ngoại lệ, kể cả ngày không làm việc.')).toBeVisible();
+  await page.getByRole('dialog').getByRole('button', { name: 'Đóng', exact: true }).click();
   await page.getByLabel('Lý do ngoại lệ', { exact: true }).fill('Nghỉ phép');
   await page.route('**/api/working-schedules/recurring/publish', route => {
     const c = route.request().postDataJSON(); expect(c.kind).toBe('Exception'); expect(c.date).toBe('2032-01-05'); expect(c.intervals).toEqual([]); expect(c.reason).toBe('Nghỉ phép');
@@ -75,6 +78,23 @@ test('dated absence requires reason and submits an empty single-date exception',
   });
   await page.getByRole('button', { name: 'Lưu và công bố' }).click();
   await expect(page.getByText('Đã công bố', { exact: true })).toBeVisible();
+});
+
+test('leave over several days publishes one empty exception per date', async ({ page }) => {
+  await workspace(page); await select(page, 'Loại lịch', 'Ngoại lệ ngày cụ thể');
+  await page.getByLabel('Lý do ngoại lệ', { exact: true }).fill('Nghỉ phép');
+  await page.getByLabel('Đến ngày', { exact: true }).fill('2032-01-07');
+  const published: { date: string; version: number; intervals: unknown[] }[] = [];
+  await page.route('**/api/working-schedules/recurring/preview', route => route.fulfill({ json: { affectedAppointments: [] } }));
+  await page.route('**/api/working-schedules/recurring/publish', route => {
+    const c = route.request().postDataJSON(); published.push({ date: c.date, version: c.expectedVersion, intervals: c.intervals });
+    return route.fulfill({ json: { schedule: { ...empty(), version: c.expectedVersion + 1 }, notification: { message: 'Đã cập nhật lịch làm việc.' } } });
+  });
+  await page.getByRole('button', { name: 'Lưu và công bố' }).click();
+  await expect.poll(() => published.length).toBe(3);
+  expect(published.map(p => p.date)).toEqual(['2032-01-07', '2032-01-06', '2032-01-05']);
+  expect(published.map(p => p.version)).toEqual([0, 1, 2]);
+  expect(published.every(p => p.intervals.length === 0)).toBe(true);
 });
 
 test('affected future appointments block publication and link to S12', async ({ page }) => {
@@ -86,27 +106,15 @@ test('affected future appointments block publication and link to S12', async ({ 
   await expect(page.getByRole('link', { name: 'AP-001 · S12' })).toHaveAttribute('href', '/appointments/r1'); expect(writes).toBe(0);
 });
 
-test('duration correction and range preview preserve draft; invalid range sends nothing', async ({ page }) => {
-  await workspace(page); await select(page, 'Chi nhánh Thứ 2', 'Chi nhánh A');
-  let calls = 0;
-  await page.route('**/api/working-schedules/recurring/preview-availability', route => {
-    calls++; const c = route.request().postDataJSON(); expect(c.durationMinutes).toBe(75); expect(c.from).toBe('2032-01-05'); expect(c.to).toBe('2032-01-19');
-    return route.fulfill({ json: { days: [{ timeZone: 'Asia/Ho_Chi_Minh', date: c.from, slots: [] }] } });
-  });
-  await page.getByLabel('Preview từ ngày', { exact: true }).fill('2032-01-05');
-  await page.getByLabel('Preview đến ngày', { exact: true }).fill('2032-01-19');
-  await page.getByRole('spinbutton', { name: 'Thời lượng phút' }).fill('0');
-  await page.getByRole('button', { name: 'Preview slot', exact: true }).click();
-  await expect(page.getByRole('alert').filter({ hasText: '480' }).first()).toBeVisible(); expect(calls).toBe(0);
-  await page.getByRole('spinbutton', { name: 'Thời lượng phút' }).fill('');
-  await page.getByRole('button', { name: 'Preview slot', exact: true }).click(); expect(calls).toBe(0);
-  await page.getByRole('spinbutton', { name: 'Thời lượng phút' }).fill('75');
-  await page.getByRole('button', { name: 'Preview slot', exact: true }).click();
-  await expect(page.getByText('Không có khung giờ đáp ứng tài nguyên')).toBeVisible(); expect(calls).toBe(1);
-  await page.getByLabel('Preview đến ngày', { exact: true }).fill('2032-02-05');
-  await page.getByRole('button', { name: 'Preview slot', exact: true }).click();
-  await expect(page.getByText('Chọn khoảng preview từ 1 đến 31 ngày.')).toBeVisible(); expect(calls).toBe(1);
-  await expect(page.getByRole('group', { name: 'Khoảng 1 · 08:00 → 17:00', exact: true })).toBeVisible();
+test('not enough chairs blocks publication with a pop-up', async ({ page }) => {
+  await workspace(page);
+  let writes = 0;
+  await page.route('**/api/working-schedules/recurring/publish', route => { writes++; return route.abort(); });
+  await page.route('**/api/working-schedules/recurring/preview', route => route.fulfill({ json: { affectedAppointments: [], capacityConflicts: [{ branchId: 1, day: 0, startMinute: 420, endMinute: 480, doctors: 3, chairs: 2 }] } }));
+  await page.getByRole('button', { name: 'Lưu và công bố' }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByText('Thứ 2 07:00–08:00: 3 bác sĩ cùng ca, chi nhánh chỉ có 2 ghế')).toBeVisible();
+  expect(writes).toBe(0);
 });
 
 test('retry after a lost publish response reuses receipt key without stale preflight', async ({ page }) => {
@@ -120,24 +128,10 @@ test('retry after a lost publish response reuses receipt key without stale prefl
     return route.fulfill({ json: { schedule: { ...empty(), version: 1, template: { ...c, id: 'r', version: 1, publishedBy: 10, publishedAt: '2032-01-05T00:00:00Z' } }, notification: { message: 'Đã cập nhật lịch làm việc.' } } });
   });
   await page.getByRole('button', { name: 'Lưu và công bố' }).click();
-  await expect(page.getByText('Lỗi kết nối hoặc dịch vụ · MSG49')).toBeVisible();
+  await expect(page.getByRole('dialog').getByText('Lỗi kết nối hoặc dịch vụ · MSG49')).toBeVisible();
+  await page.getByRole('dialog').getByRole('button', { name: 'Đóng', exact: true }).click();
   await page.getByRole('button', { name: 'Lưu và công bố' }).click();
   await expect(page.getByText('Đã công bố', { exact: true })).toBeVisible(); expect(previews).toBe(1);
-});
-
-test('public preview uses published GET and catalog duration while keeping an invalid draft', async ({ page }) => {
-  await workspace(page); await select(page, 'Chi nhánh Thứ 2', 'Chi nhánh A');
-  await page.getByRole('button', { name: 'Thêm khoảng', exact: true }).first().click(); // Overlap remains an unsaved draft.
-  await select(page, 'Chế độ preview', 'Công khai · bản đã công bố');
-  await page.getByLabel('Preview từ ngày', { exact: true }).fill('2032-01-05'); await page.getByLabel('Preview đến ngày', { exact: true }).fill('2032-01-05');
-  await page.route('**/api/availability?*', route => {
-    expect(new URL(route.request().url()).searchParams.get('durationMinutes')).toBe('30');
-    return route.fulfill({ json: { date: '2032-01-05', timeZone: 'Asia/Ho_Chi_Minh', slots: [] } });
-  });
-  await expect(page.getByRole('spinbutton', { name: 'Thời lượng phút' })).toBeDisabled();
-  await page.getByRole('button', { name: 'Preview slot', exact: true }).click();
-  await expect(page.getByText('Không có khung giờ đáp ứng tài nguyên')).toBeVisible();
-  await expect(page.getByText('Có thay đổi chưa lưu', { exact: false })).toBeVisible();
 });
 
 test('denied load is distinct from an empty schedule and retry reloads current data', async ({ page }) => {
@@ -151,28 +145,3 @@ test('denied load is distinct from an empty schedule and retry reloads current d
   await expect(page.getByText('Chưa công bố', { exact: true })).toBeVisible();
 });
 
-test('real editor previews a recurring sample in a later week without publishing', async ({ page }) => {
-  test.skip(!process.env.E2E_DEMO_PASSWORD, 'Requires local API and demo password');
-  await page.goto('/sign-in'); await page.getByLabel('Tên đăng nhập', { exact: true }).fill('dentist.demo'); await page.getByLabel('Mật khẩu', { exact: true }).fill(process.env.E2E_DEMO_PASSWORD!);
-  await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click(); await page.getByRole('link', { name: 'Lịch làm việc', exact: true }).click();
-  await expect(page.getByLabel('Ngày áp dụng', { exact: true })).toBeVisible();
-  await page.getByLabel('Ngày áp dụng', { exact: true }).fill('2035-01-01');
-  // Build a clean unsaved draft regardless of the clinic's already published template.
-  for (const day of ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ nhật']) await select(page, `Chi nhánh ${day}`, 'Không làm việc');
-  const branchSelect = page.getByRole('combobox', { name: 'Chi nhánh Thứ 2', exact: true });
-  await expect(branchSelect).toBeEnabled(); await branchSelect.press('ArrowDown');
-  const branchList = await branchSelect.getAttribute('aria-controls');
-  await page.locator('.ant-select-dropdown').filter({ has: page.locator(`[id="${branchList}"]`) }).locator('.ant-select-item-option').filter({ hasNotText: 'Không làm việc' }).first().click();
-  await page.getByRole('button', { name: 'Thêm khoảng', exact: true }).first().click();
-  await select(page, 'Loại khoảng 2', 'Nghỉ'); await select(page, 'Bắt đầu 2', '12:00'); await select(page, 'Kết thúc 2', '13:00'); await page.getByLabel('Lý do 2', { exact: true }).fill('Nghỉ trưa');
-  await page.getByRole('button', { name: 'Thêm khoảng', exact: true }).first().click();
-  await select(page, 'Loại khoảng 3', 'Block'); await select(page, 'Bắt đầu 3', '15:00'); await select(page, 'Kết thúc 3', '15:30'); await page.getByLabel('Lý do 3', { exact: true }).fill('Họp nội bộ');
-  await page.getByLabel('Preview từ ngày', { exact: true }).fill('2035-01-08'); await page.getByLabel('Preview đến ngày', { exact: true }).fill('2035-01-08');
-  const response = page.waitForResponse(r => r.url().endsWith('/recurring/preview-availability'));
-  await page.getByRole('button', { name: 'Preview slot', exact: true }).click();
-  const result = await response; expect(result.status()).toBe(200);
-  const data = await result.json(); expect(data.days[0].slots.length).toBeGreaterThan(0);
-  expect(data.days[0].slots.some((s: { start: string }) => s.start.includes('T12:00'))).toBe(false);
-  await expect(page.getByRole('button', { name: 'Preview slot', exact: true })).toBeEnabled();
-  await page.screenshot({ path: '../.artifacts/test-results/s09-recurring/editor.png', fullPage: true });
-});

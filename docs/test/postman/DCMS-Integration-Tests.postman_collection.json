@@ -1,0 +1,5151 @@
+{
+  "info": {
+    "name": "DCMS Integration Tests (5.2)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Chạy theo thứ tự từ thư mục 0 đến 11. Thư mục 0 đăng nhập lấy token cho từng vai trò."
+  },
+  "variable": [
+    {
+      "key": "run",
+      "value": "01"
+    },
+    {
+      "key": "pid",
+      "value": ""
+    },
+    {
+      "key": "pid2",
+      "value": ""
+    },
+    {
+      "key": "planId",
+      "value": ""
+    },
+    {
+      "key": "planId2",
+      "value": ""
+    },
+    {
+      "key": "catId",
+      "value": ""
+    },
+    {
+      "key": "tokenAdmin",
+      "value": ""
+    },
+    {
+      "key": "tokenOwner",
+      "value": ""
+    },
+    {
+      "key": "tokenDentist",
+      "value": ""
+    },
+    {
+      "key": "tokenAssistant",
+      "value": ""
+    },
+    {
+      "key": "tokenGuest",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "0. Đăng nhập (chạy trước, token hết hạn sau khoảng 15 phút)",
+      "item": [
+        {
+          "name": "Đăng nhập admin.demo",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set(\"tokenAdmin\", pm.response.json().accessToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/sign-in",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "sign-in"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"userName\": \"admin.demo\", \"password\": \"{{password}}\", \"deviceLabel\": \"postman\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Đăng nhập owner.demo",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set(\"tokenOwner\", pm.response.json().accessToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/sign-in",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "sign-in"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"userName\": \"owner.demo\", \"password\": \"{{password}}\", \"deviceLabel\": \"postman\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Đăng nhập dentist.demo",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set(\"tokenDentist\", pm.response.json().accessToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/sign-in",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "sign-in"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"userName\": \"dentist.demo\", \"password\": \"{{password}}\", \"deviceLabel\": \"postman\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Đăng nhập assistant.demo",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set(\"tokenAssistant\", pm.response.json().accessToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/sign-in",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "sign-in"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"userName\": \"assistant.demo\", \"password\": \"{{password}}\", \"deviceLabel\": \"postman\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Đăng nhập guest.demo",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set(\"tokenGuest\", pm.response.json().accessToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/sign-in",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "sign-in"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"userName\": \"guest.demo\", \"password\": \"{{password}}\", \"deviceLabel\": \"postman\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "1. Staff Account",
+      "item": [
+        {
+          "name": "ACC-01 Admin tạo tài khoản hợp lệ",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"notification = MSG14\", () => pm.expect(pm.response.json().notification.code).to.eql(\"MSG14\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/accounts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "accounts"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"userName\": \"nv.{{run}}\", \"password\": \"Abcdef1!x\", \"fullName\": \"Nguyễn Văn An\", \"employeeCode\": \"NV{{run}}\", \"email\": \"nv{{run}}@dcms.vn\", \"phone\": \"07000000{{run}}\", \"roles\": [\"ClinicAssistant\"] }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "ACC-02 Trùng tên đăng nhập",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"code = MSG139\", () => pm.expect(pm.response.json().code).to.eql(\"MSG139\"));",
+                  "pm.test(\"field = userName\", () => pm.expect(pm.response.json().field).to.eql(\"userName\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/accounts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "accounts"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"userName\": \"nv.{{run}}\", \"password\": \"Abcdef1!x\", \"fullName\": \"Nguyễn Văn An\", \"employeeCode\": \"NVB{{run}}\", \"email\": \"nvb{{run}}@dcms.vn\", \"phone\": \"08000000{{run}}\", \"roles\": [\"ClinicAssistant\"] }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "ACC-03 Trùng mã nhân viên",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"code = MSG139\", () => pm.expect(pm.response.json().code).to.eql(\"MSG139\"));",
+                  "pm.test(\"field = employeeCode\", () => pm.expect(pm.response.json().field).to.eql(\"employeeCode\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/accounts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "accounts"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"userName\": \"nv.c{{run}}\", \"password\": \"Abcdef1!x\", \"fullName\": \"Nguyễn Văn An\", \"employeeCode\": \"NV{{run}}\", \"email\": \"nvc{{run}}@dcms.vn\", \"phone\": \"05000000{{run}}\", \"roles\": [\"ClinicAssistant\"] }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "ACC-04 Tên đăng nhập có khoảng trắng",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"code = MSG04\", () => pm.expect(pm.response.json().code).to.eql(\"MSG04\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/accounts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "accounts"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"userName\": \"nv an\", \"password\": \"Abcdef1!x\", \"fullName\": \"Nguyễn Văn An\", \"employeeCode\": \"NVD{{run}}\", \"email\": \"nvd{{run}}@dcms.vn\", \"phone\": \"03000000{{run}}\", \"roles\": [\"ClinicAssistant\"] }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "ACC-05 Trợ lý không được tạo tài khoản",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"code = MSG06\", () => pm.expect(pm.response.json().code).to.eql(\"MSG06\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/accounts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "accounts"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAssistant}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"userName\": \"nv.e{{run}}\", \"password\": \"Abcdef1!x\", \"fullName\": \"Nguyễn Văn An\", \"employeeCode\": \"NVE{{run}}\", \"email\": \"nve{{run}}@dcms.vn\", \"phone\": \"07000000{{run}}\", \"roles\": [\"ClinicAssistant\"] }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "ACC-06 Không có token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"code = MSG07\", () => pm.expect(pm.response.json().code).to.eql(\"MSG07\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/accounts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "accounts"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"userName\": \"nv.e{{run}}\", \"password\": \"Abcdef1!x\", \"fullName\": \"Nguyễn Văn An\", \"employeeCode\": \"NVE{{run}}\", \"email\": \"nve{{run}}@dcms.vn\", \"phone\": \"07000000{{run}}\", \"roles\": [\"ClinicAssistant\"] }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Customer Register",
+      "item": [
+        {
+          "name": "REG-01 Đăng ký hợp lệ",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"notification = MSG11\", () => pm.expect(pm.response.json().notification.code).to.eql(\"MSG11\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"fullName\": \"Lê Văn Nam\", \"phoneNumber\": \"09000000{{run}}\", \"email\": \"nam{{run}}@gmail.com\", \"password\": \"Abcdef1!x\", \"confirmPassword\": \"Abcdef1!x\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "REG-02 Trùng số điện thoại",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"code = MSG139\", () => pm.expect(pm.response.json().code).to.eql(\"MSG139\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"fullName\": \"Lê Văn Nam\", \"phoneNumber\": \"09000000{{run}}\", \"email\": \"nam201@gmail.com\", \"password\": \"Abcdef1!x\", \"confirmPassword\": \"Abcdef1!x\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "REG-03 Trùng email",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"code = MSG139\", () => pm.expect(pm.response.json().code).to.eql(\"MSG139\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"fullName\": \"Lê Văn Nam\", \"phoneNumber\": \"08000000{{run}}\", \"email\": \"nam{{run}}@gmail.com\", \"password\": \"Abcdef1!x\", \"confirmPassword\": \"Abcdef1!x\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "REG-04 Họ tên rỗng",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"code = MSG02\", () => pm.expect(pm.response.json().code).to.eql(\"MSG02\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"fullName\": \"\", \"phoneNumber\": \"07000000{{run}}\", \"email\": \"nam401@gmail.com\", \"password\": \"Abcdef1!x\", \"confirmPassword\": \"Abcdef1!x\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "REG-05 SĐT 5 số",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"code = MSG04\", () => pm.expect(pm.response.json().code).to.eql(\"MSG04\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"fullName\": \"Lê Văn Nam\", \"phoneNumber\": \"12345\", \"email\": \"nam501@gmail.com\", \"password\": \"Abcdef1!x\", \"confirmPassword\": \"Abcdef1!x\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "REG-06 Email không có @",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"code = MSG04\", () => pm.expect(pm.response.json().code).to.eql(\"MSG04\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"fullName\": \"Lê Văn Nam\", \"phoneNumber\": \"05000000{{run}}\", \"email\": \"nam-gmail.com\", \"password\": \"Abcdef1!x\", \"confirmPassword\": \"Abcdef1!x\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "REG-07 Xác nhận mật khẩu không khớp",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"code = MSG04\", () => pm.expect(pm.response.json().code).to.eql(\"MSG04\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"fullName\": \"Lê Văn Nam\", \"phoneNumber\": \"03000000{{run}}\", \"email\": \"nam701@gmail.com\", \"password\": \"Abcdef1!x\", \"confirmPassword\": \"Abcdef1!y\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "REG-08 Mật khẩu yếu",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"code = MSG109\", () => pm.expect(pm.response.json().code).to.eql(\"MSG109\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"fullName\": \"Lê Văn Nam\", \"phoneNumber\": \"03000000{{run}}\", \"email\": \"nam801@gmail.com\", \"password\": \"abc\", \"confirmPassword\": \"abc\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "REG-09 Đăng nhập bằng tài khoản vừa đăng ký",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"có accessToken\", () => pm.expect(pm.response.json().accessToken).to.be.a(\"string\").and.not.empty);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/sign-in",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "sign-in"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"userName\": \"09000000{{run}}\", \"password\": \"Abcdef1!x\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Patient",
+      "item": [
+        {
+          "name": "PAT-01 Trợ lý tạo bệnh nhân",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"notification = MSG222\", () => pm.expect(pm.response.json().notification.code).to.eql(\"MSG222\"));",
+                  "pm.collectionVariables.set(\"pid\", pm.response.json().patient.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/patients",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "patients"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAssistant}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"fullName\": \"Trần Thị Mai {{run}}\", \"birthDate\": \"1990-05-20\", \"gender\": \"FEMALE\", \"phone\": \"09000000{{run}}\", \"address\": \"12 Lê Lợi, Quận 1\", \"duplicatesReviewed\": true, \"requestKey\": \"aaaaaaaa-0000-4000-8000-0001000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "PAT-02 Gửi lần 1",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"pid2\", pm.response.json().patient.id);",
+                  "pm.collectionVariables.set(\"pat02Code\", pm.response.json().patient.patientCode);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/patients",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "patients"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAssistant}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"fullName\": \"Phạm Văn Bình {{run}}\", \"birthDate\": \"1985-03-12\", \"gender\": \"MALE\", \"phone\": \"08000000{{run}}\", \"address\": \"45 Nguyễn Huệ, Quận 1\", \"duplicatesReviewed\": true, \"requestKey\": \"00000000-0000-4000-8000-0002000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "PAT-02 Gửi lần 2 (cùng requestKey, phải trả lại đúng bệnh nhân cũ)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"cùng mã bệnh nhân\", () => pm.expect(pm.response.json().patient.patientCode).to.eql(pm.collectionVariables.get(\"pat02Code\")));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/patients",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "patients"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAssistant}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"fullName\": \"Phạm Văn Bình {{run}}\", \"birthDate\": \"1985-03-12\", \"gender\": \"MALE\", \"phone\": \"08000000{{run}}\", \"address\": \"45 Nguyễn Huệ, Quận 1\", \"duplicatesReviewed\": true, \"requestKey\": \"00000000-0000-4000-8000-0002000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "PAT-03 Họ tên rỗng",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"code = MSG02\", () => pm.expect(pm.response.json().code).to.eql(\"MSG02\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/patients",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "patients"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAssistant}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"fullName\": \"\", \"birthDate\": \"1990-05-20\", \"gender\": \"FEMALE\", \"phone\": \"07000000{{run}}\", \"address\": \"12 Lê Lợi, Quận 1\", \"duplicatesReviewed\": true, \"requestKey\": \"aaaaaaaa-0000-4000-8000-0002000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "PAT-04 Ngày sinh tương lai",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"code = MSG04\", () => pm.expect(pm.response.json().code).to.eql(\"MSG04\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/patients",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "patients"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAssistant}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"fullName\": \"Trần Thị Mai {{run}}\", \"birthDate\": \"2099-01-01\", \"gender\": \"FEMALE\", \"phone\": \"07000000{{run}}\", \"address\": \"12 Lê Lợi, Quận 1\", \"duplicatesReviewed\": true, \"requestKey\": \"aaaaaaaa-0000-4000-8000-0003000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "PAT-05 SĐT 5 số",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"code = MSG04\", () => pm.expect(pm.response.json().code).to.eql(\"MSG04\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/patients",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "patients"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAssistant}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"fullName\": \"Trần Thị Mai {{run}}\", \"birthDate\": \"1990-05-20\", \"gender\": \"FEMALE\", \"phone\": \"12345\", \"address\": \"12 Lê Lợi, Quận 1\", \"duplicatesReviewed\": true, \"requestKey\": \"aaaaaaaa-0000-4000-8000-0004000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "PAT-06 Giới tính ngoài danh sách",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"code = MSG04\", () => pm.expect(pm.response.json().code).to.eql(\"MSG04\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/patients",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "patients"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAssistant}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"fullName\": \"Trần Thị Mai {{run}}\", \"birthDate\": \"1990-05-20\", \"gender\": \"ROBOT\", \"phone\": \"07000000{{run}}\", \"address\": \"12 Lê Lợi, Quận 1\", \"duplicatesReviewed\": true, \"requestKey\": \"aaaaaaaa-0000-4000-8000-0005000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "PAT-07 Nghi trùng chưa xác nhận",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"code = MSG02\", () => pm.expect(pm.response.json().code).to.eql(\"MSG02\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/patients",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "patients"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAssistant}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"fullName\": \"Trần Thị Mai {{run}}\", \"birthDate\": \"1990-05-20\", \"gender\": \"FEMALE\", \"phone\": \"09000000{{run}}\", \"address\": \"12 Lê Lợi, Quận 1\", \"duplicatesReviewed\": false, \"requestKey\": \"aaaaaaaa-0000-4000-8000-0006000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "PAT-08 Khách hàng không được tạo bệnh nhân",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"code = MSG06\", () => pm.expect(pm.response.json().code).to.eql(\"MSG06\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/patients",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "patients"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenGuest}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"fullName\": \"Trần Thị Mai {{run}}\", \"birthDate\": \"1990-05-20\", \"gender\": \"FEMALE\", \"phone\": \"05000000{{run}}\", \"address\": \"12 Lê Lợi, Quận 1\", \"duplicatesReviewed\": true, \"requestKey\": \"aaaaaaaa-0000-4000-8000-0007000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "PAT-09 Không có token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"code = MSG07\", () => pm.expect(pm.response.json().code).to.eql(\"MSG07\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/patients",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "patients"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"fullName\": \"Trần Thị Mai {{run}}\", \"birthDate\": \"1990-05-20\", \"gender\": \"FEMALE\", \"phone\": \"05000000{{run}}\", \"address\": \"12 Lê Lợi, Quận 1\", \"duplicatesReviewed\": true, \"requestKey\": \"aaaaaaaa-0000-4000-8000-0007000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Family Member",
+      "item": [
+        {
+          "name": "FAM-01 Khách thêm người thân",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/me/family-members",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "me",
+                "family-members"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenGuest}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"fullName\": \"Nguyễn Thị Lan {{run}}\", \"relationship\": \"Mother\", \"birthDate\": \"1965-03-12\", \"gender\": \"FEMALE\", \"contactPhone\": \"0912345678\", \"requestKey\": \"aaaaaaaa-0000-4000-8000-0008000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "FAM-02 Gửi lần 1",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/me/family-members",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "me",
+                "family-members"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenGuest}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"fullName\": \"Nguyễn Văn Bình {{run}}\", \"relationship\": \"Father\", \"birthDate\": \"1960-07-01\", \"gender\": \"MALE\", \"contactPhone\": \"0912345678\", \"requestKey\": \"00000000-0000-4000-8000-0004000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "FAM-02 Gửi lần 2 (cùng requestKey)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/me/family-members",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "me",
+                "family-members"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenGuest}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"fullName\": \"Nguyễn Văn Bình {{run}}\", \"relationship\": \"Father\", \"birthDate\": \"1960-07-01\", \"gender\": \"MALE\", \"contactPhone\": \"0912345678\", \"requestKey\": \"00000000-0000-4000-8000-0004000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "FAM-02 Kiểm tra danh sách chỉ có 1 người",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"total = 1\", () => pm.expect(pm.response.json().total).to.eql(1));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/me/family-members?keyword=Nguyễn Văn Bình {{run}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "me",
+                "family-members"
+              ],
+              "query": [
+                {
+                  "key": "keyword",
+                  "value": "Nguyễn Văn Bình {{run}}"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenGuest}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "FAM-03 Họ tên rỗng",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"code = FAMILY_MEMBER_VALIDATION\", () => pm.expect(pm.response.json().code).to.eql(\"FAMILY_MEMBER_VALIDATION\"));",
+                  "pm.test(\"field = fullName\", () => pm.expect(pm.response.json().field).to.eql(\"fullName\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/me/family-members",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "me",
+                "family-members"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenGuest}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"fullName\": \"\", \"relationship\": \"Mother\", \"birthDate\": \"1965-03-12\", \"gender\": \"FEMALE\", \"contactPhone\": \"0912345678\", \"requestKey\": \"aaaaaaaa-0000-4000-8000-0009000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "FAM-04 Quan hệ ngoài danh sách",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"code = FAMILY_MEMBER_VALIDATION\", () => pm.expect(pm.response.json().code).to.eql(\"FAMILY_MEMBER_VALIDATION\"));",
+                  "pm.test(\"field = relationship\", () => pm.expect(pm.response.json().field).to.eql(\"relationship\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/me/family-members",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "me",
+                "family-members"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenGuest}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"fullName\": \"Nguyễn Thị Lan {{run}}\", \"relationship\": \"Friend\", \"birthDate\": \"1965-03-12\", \"gender\": \"FEMALE\", \"contactPhone\": \"0912345678\", \"requestKey\": \"aaaaaaaa-0000-4000-8000-0010000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "FAM-05 Ngày sinh tương lai",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"code = FAMILY_MEMBER_VALIDATION\", () => pm.expect(pm.response.json().code).to.eql(\"FAMILY_MEMBER_VALIDATION\"));",
+                  "pm.test(\"field = birthDate\", () => pm.expect(pm.response.json().field).to.eql(\"birthDate\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/me/family-members",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "me",
+                "family-members"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenGuest}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"fullName\": \"Nguyễn Thị Lan {{run}}\", \"relationship\": \"Mother\", \"birthDate\": \"2099-01-01\", \"gender\": \"FEMALE\", \"contactPhone\": \"0912345678\", \"requestKey\": \"aaaaaaaa-0000-4000-8000-0011000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "FAM-06 Nhân viên không dùng danh sách người thân",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"code = MSG06\", () => pm.expect(pm.response.json().code).to.eql(\"MSG06\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/me/family-members",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "me",
+                "family-members"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenDentist}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"fullName\": \"Nguyễn Thị Lan {{run}}\", \"relationship\": \"Mother\", \"birthDate\": \"1965-03-12\", \"gender\": \"FEMALE\", \"contactPhone\": \"0912345678\", \"requestKey\": \"aaaaaaaa-0000-4000-8000-0012000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "FAM-07 Không có token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"code = MSG07\", () => pm.expect(pm.response.json().code).to.eql(\"MSG07\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/me/family-members",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "me",
+                "family-members"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"fullName\": \"Nguyễn Thị Lan {{run}}\", \"relationship\": \"Mother\", \"birthDate\": \"1965-03-12\", \"gender\": \"FEMALE\", \"contactPhone\": \"0912345678\", \"requestKey\": \"aaaaaaaa-0000-4000-8000-0012000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "FAM-08 Giới tính rỗng",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"code = FAMILY_MEMBER_VALIDATION\", () => pm.expect(pm.response.json().code).to.eql(\"FAMILY_MEMBER_VALIDATION\"));",
+                  "pm.test(\"field = gender\", () => pm.expect(pm.response.json().field).to.eql(\"gender\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/me/family-members",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "me",
+                "family-members"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenGuest}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"fullName\": \"Nguyễn Thị Lan {{run}}\", \"relationship\": \"Mother\", \"birthDate\": \"1965-03-12\", \"gender\": \"\", \"contactPhone\": \"0912345678\", \"requestKey\": \"aaaaaaaa-0000-4000-8000-0013000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "FAM-09 SĐT liên hệ sai định dạng",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"code = FAMILY_MEMBER_VALIDATION\", () => pm.expect(pm.response.json().code).to.eql(\"FAMILY_MEMBER_VALIDATION\"));",
+                  "pm.test(\"field = contactPhone\", () => pm.expect(pm.response.json().field).to.eql(\"contactPhone\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/me/family-members",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "me",
+                "family-members"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenGuest}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"fullName\": \"Nguyễn Thị Lan {{run}}\", \"relationship\": \"Mother\", \"birthDate\": \"1965-03-12\", \"gender\": \"FEMALE\", \"contactPhone\": \"12345\", \"requestKey\": \"aaaaaaaa-0000-4000-8000-0014000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Appointment",
+      "item": [
+        {
+          "name": "APT-01 Chưa chọn chi nhánh",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"code = MSG04\", () => pm.expect(pm.response.json().code).to.eql(\"MSG04\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/appointments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "appointments"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"branchId\": 0, \"booker\": { \"name\": \"Lê Văn Nam\", \"phone\": \"0987654321\", \"email\": \"nam@gmail.com\" }, \"attendee\": { \"name\": \"Lê Văn Nam\", \"birthDate\": \"1990-01-01\" }, \"attendeeRelation\": \"Self\", \"kind\": \"Standard\", \"source\": \"App\", \"serviceId\": 3, \"reason\": \"Đau răng\", \"dentistId\": 3, \"startAt\": \"2030-01-15T09:00:00+07:00\", \"durationMinutes\": 30, \"requestKey\": \"aaaaaaaa-0000-4000-8000-0015000000{{run}}\", \"scheduleVersion\": 1 }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "APT-02 Chưa chọn nha sĩ",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"code = MSG04\", () => pm.expect(pm.response.json().code).to.eql(\"MSG04\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/appointments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "appointments"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"branchId\": 1, \"booker\": { \"name\": \"Lê Văn Nam\", \"phone\": \"0987654321\", \"email\": \"nam@gmail.com\" }, \"attendee\": { \"name\": \"Lê Văn Nam\", \"birthDate\": \"1990-01-01\" }, \"attendeeRelation\": \"Self\", \"kind\": \"Standard\", \"source\": \"App\", \"serviceId\": 3, \"reason\": \"Đau răng\", \"dentistId\": 0, \"startAt\": \"2030-01-15T09:00:00+07:00\", \"durationMinutes\": 30, \"requestKey\": \"aaaaaaaa-0000-4000-8000-0016000000{{run}}\", \"scheduleVersion\": 1 }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "APT-03 Chưa chọn giờ",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"code = MSG04\", () => pm.expect(pm.response.json().code).to.eql(\"MSG04\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/appointments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "appointments"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"branchId\": 1, \"booker\": { \"name\": \"Lê Văn Nam\", \"phone\": \"0987654321\", \"email\": \"nam@gmail.com\" }, \"attendee\": { \"name\": \"Lê Văn Nam\", \"birthDate\": \"1990-01-01\" }, \"attendeeRelation\": \"Self\", \"kind\": \"Standard\", \"source\": \"App\", \"serviceId\": 3, \"reason\": \"Đau răng\", \"dentistId\": 3, \"startAt\": \"0001-01-01T00:00:00+00:00\", \"durationMinutes\": 30, \"requestKey\": \"aaaaaaaa-0000-4000-8000-0017000000{{run}}\", \"scheduleVersion\": 1 }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "APT-04 Tên người đặt rỗng",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"code = MSG04\", () => pm.expect(pm.response.json().code).to.eql(\"MSG04\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/appointments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "appointments"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"branchId\": 1, \"booker\": { \"name\": \"\", \"phone\": \"0987654321\", \"email\": \"nam@gmail.com\" }, \"attendee\": { \"name\": \"Lê Văn Nam\", \"birthDate\": \"1990-01-01\" }, \"attendeeRelation\": \"Self\", \"kind\": \"Standard\", \"source\": \"App\", \"serviceId\": 3, \"reason\": \"Đau răng\", \"dentistId\": 3, \"startAt\": \"2030-01-15T09:00:00+07:00\", \"durationMinutes\": 30, \"requestKey\": \"aaaaaaaa-0000-4000-8000-0018000000{{run}}\", \"scheduleVersion\": 1 }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "APT-05 Người đặt không có SĐT lẫn email",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"code = MSG04\", () => pm.expect(pm.response.json().code).to.eql(\"MSG04\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/appointments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "appointments"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"branchId\": 1, \"booker\": { \"name\": \"Lê Văn Nam\", \"phone\": \"\", \"email\": \"\" }, \"attendee\": { \"name\": \"Lê Văn Nam\", \"birthDate\": \"1990-01-01\" }, \"attendeeRelation\": \"Self\", \"kind\": \"Standard\", \"source\": \"App\", \"serviceId\": 3, \"reason\": \"Đau răng\", \"dentistId\": 3, \"startAt\": \"2030-01-15T09:00:00+07:00\", \"durationMinutes\": 30, \"requestKey\": \"aaaaaaaa-0000-4000-8000-0019000000{{run}}\", \"scheduleVersion\": 1 }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "APT-06 SĐT người đặt 5 số",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"code = MSG04\", () => pm.expect(pm.response.json().code).to.eql(\"MSG04\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/appointments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "appointments"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"branchId\": 1, \"booker\": { \"name\": \"Lê Văn Nam\", \"phone\": \"12345\", \"email\": \"nam@gmail.com\" }, \"attendee\": { \"name\": \"Lê Văn Nam\", \"birthDate\": \"1990-01-01\" }, \"attendeeRelation\": \"Self\", \"kind\": \"Standard\", \"source\": \"App\", \"serviceId\": 3, \"reason\": \"Đau răng\", \"dentistId\": 3, \"startAt\": \"2030-01-15T09:00:00+07:00\", \"durationMinutes\": 30, \"requestKey\": \"aaaaaaaa-0000-4000-8000-0020000000{{run}}\", \"scheduleVersion\": 1 }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "APT-07 Email người đặt không có @",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"code = MSG04\", () => pm.expect(pm.response.json().code).to.eql(\"MSG04\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/appointments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "appointments"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"branchId\": 1, \"booker\": { \"name\": \"Lê Văn Nam\", \"phone\": \"0987654321\", \"email\": \"nam-gmail.com\" }, \"attendee\": { \"name\": \"Lê Văn Nam\", \"birthDate\": \"1990-01-01\" }, \"attendeeRelation\": \"Self\", \"kind\": \"Standard\", \"source\": \"App\", \"serviceId\": 3, \"reason\": \"Đau răng\", \"dentistId\": 3, \"startAt\": \"2030-01-15T09:00:00+07:00\", \"durationMinutes\": 30, \"requestKey\": \"aaaaaaaa-0000-4000-8000-0021000000{{run}}\", \"scheduleVersion\": 1 }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "APT-08 Tên người khám rỗng",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"code = MSG23\", () => pm.expect(pm.response.json().code).to.eql(\"MSG23\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/appointments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "appointments"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"branchId\": 1, \"booker\": { \"name\": \"Lê Văn Nam\", \"phone\": \"0987654321\", \"email\": \"nam@gmail.com\" }, \"attendee\": { \"name\": \"\", \"birthDate\": \"1990-01-01\" }, \"attendeeRelation\": \"Self\", \"kind\": \"Standard\", \"source\": \"App\", \"serviceId\": 3, \"reason\": \"Đau răng\", \"dentistId\": 3, \"startAt\": \"2030-01-15T09:00:00+07:00\", \"durationMinutes\": 30, \"requestKey\": \"aaaaaaaa-0000-4000-8000-0022000000{{run}}\", \"scheduleVersion\": 1 }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "APT-09 Ngày sinh người khám ở tương lai",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"code = MSG04\", () => pm.expect(pm.response.json().code).to.eql(\"MSG04\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/appointments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "appointments"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"branchId\": 1, \"booker\": { \"name\": \"Lê Văn Nam\", \"phone\": \"0987654321\", \"email\": \"nam@gmail.com\" }, \"attendee\": { \"name\": \"Lê Văn Nam\", \"birthDate\": \"2099-01-01\" }, \"attendeeRelation\": \"Self\", \"kind\": \"Standard\", \"source\": \"App\", \"serviceId\": 3, \"reason\": \"Đau răng\", \"dentistId\": 3, \"startAt\": \"2030-01-15T09:00:00+07:00\", \"durationMinutes\": 30, \"requestKey\": \"aaaaaaaa-0000-4000-8000-0023000000{{run}}\", \"scheduleVersion\": 1 }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "APT-10 Quan hệ ngoài danh sách",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"code = MSG04\", () => pm.expect(pm.response.json().code).to.eql(\"MSG04\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/appointments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "appointments"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"branchId\": 1, \"booker\": { \"name\": \"Lê Văn Nam\", \"phone\": \"0987654321\", \"email\": \"nam@gmail.com\" }, \"attendee\": { \"name\": \"Lê Văn Nam\", \"birthDate\": \"1990-01-01\" }, \"attendeeRelation\": \"Friend\", \"kind\": \"Standard\", \"source\": \"App\", \"serviceId\": 3, \"reason\": \"Đau răng\", \"dentistId\": 3, \"startAt\": \"2030-01-15T09:00:00+07:00\", \"durationMinutes\": 30, \"requestKey\": \"aaaaaaaa-0000-4000-8000-0024000000{{run}}\", \"scheduleVersion\": 1 }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Treatment Dossier",
+      "item": [
+        {
+          "name": "DOS-01 Nha sĩ mở hồ sơ điều trị",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"notification = MSG222\", () => pm.expect(pm.response.json().notification.code).to.eql(\"MSG222\"));",
+                  "pm.test(\"state = Open\", () => pm.expect(pm.response.json().dossier.state).to.eql(\"Open\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/patients/{{pid}}/dossiers/quick",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "patients",
+                "{{pid}}",
+                "dossiers",
+                "quick"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenDentist}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"branchId\": 1, \"requestKey\": \"aaaaaaaa-0000-4000-8000-0025000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "DOS-02 Gửi lần 1",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set(\"dos02Id\", pm.response.json().dossier.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/patients/{{pid2}}/dossiers/quick",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "patients",
+                "{{pid2}}",
+                "dossiers",
+                "quick"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenDentist}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"branchId\": 1, \"requestKey\": \"00000000-0000-4000-8000-0006000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "DOS-02 Gửi lần 2 (cùng requestKey, phải trả lại đúng hồ sơ cũ)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"cùng dossier.id\", () => pm.expect(pm.response.json().dossier.id).to.eql(pm.collectionVariables.get(\"dos02Id\")));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/patients/{{pid2}}/dossiers/quick",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "patients",
+                "{{pid2}}",
+                "dossiers",
+                "quick"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenDentist}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"branchId\": 1, \"requestKey\": \"00000000-0000-4000-8000-0006000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "DOS-03 Bệnh nhân không tồn tại",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"code = MSG113\", () => pm.expect(pm.response.json().code).to.eql(\"MSG113\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/patients/999999/dossiers/quick",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "patients",
+                "999999",
+                "dossiers",
+                "quick"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenDentist}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"branchId\": 1, \"requestKey\": \"aaaaaaaa-0000-4000-8000-0026000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "DOS-04 Chi nhánh nha sĩ không làm việc",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"code = MSG06\", () => pm.expect(pm.response.json().code).to.eql(\"MSG06\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/patients/{{pid}}/dossiers/quick",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "patients",
+                "{{pid}}",
+                "dossiers",
+                "quick"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenDentist}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"branchId\": 3, \"requestKey\": \"aaaaaaaa-0000-4000-8000-0027000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "DOS-05 Trợ lý không được mở hồ sơ",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"code = MSG06\", () => pm.expect(pm.response.json().code).to.eql(\"MSG06\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/patients/{{pid}}/dossiers/quick",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "patients",
+                "{{pid}}",
+                "dossiers",
+                "quick"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAssistant}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"branchId\": 1, \"requestKey\": \"aaaaaaaa-0000-4000-8000-0028000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "DOS-06 Không có token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"code = MSG07\", () => pm.expect(pm.response.json().code).to.eql(\"MSG07\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/patients/1/dossiers/quick",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "patients",
+                "1",
+                "dossiers",
+                "quick"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"branchId\": 1, \"requestKey\": \"aaaaaaaa-0000-4000-8000-0029000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Item Plan",
+      "item": [
+        {
+          "name": "PLN-01 Nha sĩ tạo kế hoạch",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set(\"planId\", pm.response.json().id);",
+                  "pm.test(\"version = 1\", () => pm.expect(pm.response.json().version).to.eql(1));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/treatment-templates/item-plans",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "treatment-templates",
+                "item-plans"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenDentist}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"branchId\": 1, \"name\": \"Cạo vôi răng {{run}}\", \"requestKey\": \"aaaaaaaa-0000-4000-8000-0030000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "PLN-02 Gửi lần 1",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set(\"planId2\", pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/treatment-templates/item-plans",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "treatment-templates",
+                "item-plans"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenDentist}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"branchId\": 1, \"name\": \"Trám răng {{run}}\", \"requestKey\": \"00000000-0000-4000-8000-0007000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "PLN-02 Gửi lần 2 (cùng requestKey, phải trả lại đúng kế hoạch cũ)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"cùng id\", () => pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get(\"planId2\")));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/treatment-templates/item-plans",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "treatment-templates",
+                "item-plans"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenDentist}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"branchId\": 1, \"name\": \"Trám răng {{run}}\", \"requestKey\": \"00000000-0000-4000-8000-0007000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "PLN-03 Tên rỗng",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"code = ITEM_PLAN_VALIDATION\", () => pm.expect(pm.response.json().code).to.eql(\"ITEM_PLAN_VALIDATION\"));",
+                  "pm.test(\"field = name\", () => pm.expect(pm.response.json().field).to.eql(\"name\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/treatment-templates/item-plans",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "treatment-templates",
+                "item-plans"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenDentist}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"branchId\": 1, \"name\": \"\", \"requestKey\": \"aaaaaaaa-0000-4000-8000-0031000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "PLN-04 Tên 161 ký tự",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"code = ITEM_PLAN_VALIDATION\", () => pm.expect(pm.response.json().code).to.eql(\"ITEM_PLAN_VALIDATION\"));",
+                  "pm.test(\"field = name\", () => pm.expect(pm.response.json().field).to.eql(\"name\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/treatment-templates/item-plans",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "treatment-templates",
+                "item-plans"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenDentist}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"branchId\": 1, \"name\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\", \"requestKey\": \"aaaaaaaa-0000-4000-8000-0032000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "PLN-05 Chi nhánh nha sĩ không làm việc",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"code = MSG06\", () => pm.expect(pm.response.json().code).to.eql(\"MSG06\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/treatment-templates/item-plans",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "treatment-templates",
+                "item-plans"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenDentist}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"branchId\": 3, \"name\": \"Kế hoạch B {{run}}\", \"requestKey\": \"aaaaaaaa-0000-4000-8000-0033000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "PLN-06 Trợ lý không được tạo kế hoạch",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"code = MSG06\", () => pm.expect(pm.response.json().code).to.eql(\"MSG06\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/treatment-templates/item-plans",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "treatment-templates",
+                "item-plans"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAssistant}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"branchId\": 1, \"name\": \"Kế hoạch {{run}}\", \"requestKey\": \"aaaaaaaa-0000-4000-8000-0034000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "PLN-07 Không có token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"code = MSG07\", () => pm.expect(pm.response.json().code).to.eql(\"MSG07\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/treatment-templates/item-plans",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "treatment-templates",
+                "item-plans"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"branchId\": 1, \"name\": \"Kế hoạch {{run}}\", \"requestKey\": \"aaaaaaaa-0000-4000-8000-0034000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Plan Item",
+      "item": [
+        {
+          "name": "ROW-01 Thêm hạng mục",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"version = 2, 1 hạng mục\", () => { const j = pm.response.json(); pm.expect(j.version).to.eql(2); pm.expect(j.itemCount).to.eql(1); pm.expect(j.totalCostVnd).to.eql(300000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/treatment-templates/item-plans/{{planId}}/items",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "treatment-templates",
+                "item-plans",
+                "{{planId}}",
+                "items"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenDentist}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"teeth\": [\"25\"], \"serviceId\": 7, \"estimatedMinutes\": 30, \"costVnd\": 300000, \"expectedVersion\": 1, \"requestKey\": \"aaaaaaaa-0000-4000-8000-0035000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "ROW-02 Gửi lần 1",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/treatment-templates/item-plans/{{planId2}}/items",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "treatment-templates",
+                "item-plans",
+                "{{planId2}}",
+                "items"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenDentist}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"teeth\": [\"25\"], \"serviceId\": 7, \"estimatedMinutes\": 30, \"costVnd\": 300000, \"expectedVersion\": 1, \"requestKey\": \"00000000-0000-4000-8000-0008000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "ROW-02 Gửi lần 2 (cùng requestKey, vẫn chỉ 1 hạng mục)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"itemCount = 1\", () => pm.expect(pm.response.json().itemCount).to.eql(1));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/treatment-templates/item-plans/{{planId2}}/items",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "treatment-templates",
+                "item-plans",
+                "{{planId2}}",
+                "items"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenDentist}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"teeth\": [\"25\"], \"serviceId\": 7, \"estimatedMinutes\": 30, \"costVnd\": 300000, \"expectedVersion\": 1, \"requestKey\": \"00000000-0000-4000-8000-0008000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "ROW-03 Mã răng không tồn tại",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"code = ITEM_PLAN_VALIDATION\", () => pm.expect(pm.response.json().code).to.eql(\"ITEM_PLAN_VALIDATION\"));",
+                  "pm.test(\"field = teeth\", () => pm.expect(pm.response.json().field).to.eql(\"teeth\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/treatment-templates/item-plans/{{planId}}/items",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "treatment-templates",
+                "item-plans",
+                "{{planId}}",
+                "items"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenDentist}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"teeth\": [\"99\"], \"serviceId\": 7, \"estimatedMinutes\": 30, \"costVnd\": 300000, \"expectedVersion\": 2, \"requestKey\": \"aaaaaaaa-0000-4000-8000-0036000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "ROW-04 481 phút",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"code = ITEM_PLAN_VALIDATION\", () => pm.expect(pm.response.json().code).to.eql(\"ITEM_PLAN_VALIDATION\"));",
+                  "pm.test(\"field = estimatedMinutes\", () => pm.expect(pm.response.json().field).to.eql(\"estimatedMinutes\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/treatment-templates/item-plans/{{planId}}/items",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "treatment-templates",
+                "item-plans",
+                "{{planId}}",
+                "items"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenDentist}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"teeth\": [\"25\"], \"serviceId\": 7, \"estimatedMinutes\": 481, \"costVnd\": 300000, \"expectedVersion\": 2, \"requestKey\": \"aaaaaaaa-0000-4000-8000-0037000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "ROW-05 Chi phí âm",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"code = ITEM_PLAN_VALIDATION\", () => pm.expect(pm.response.json().code).to.eql(\"ITEM_PLAN_VALIDATION\"));",
+                  "pm.test(\"field = costVnd\", () => pm.expect(pm.response.json().field).to.eql(\"costVnd\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/treatment-templates/item-plans/{{planId}}/items",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "treatment-templates",
+                "item-plans",
+                "{{planId}}",
+                "items"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenDentist}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"teeth\": [\"25\"], \"serviceId\": 7, \"estimatedMinutes\": 30, \"costVnd\": -1, \"expectedVersion\": 2, \"requestKey\": \"aaaaaaaa-0000-4000-8000-0038000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "ROW-06 Ghi chú 1001 ký tự",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"code = ITEM_PLAN_VALIDATION\", () => pm.expect(pm.response.json().code).to.eql(\"ITEM_PLAN_VALIDATION\"));",
+                  "pm.test(\"field = note\", () => pm.expect(pm.response.json().field).to.eql(\"note\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/treatment-templates/item-plans/{{planId}}/items",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "treatment-templates",
+                "item-plans",
+                "{{planId}}",
+                "items"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenDentist}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"teeth\": [\"25\"], \"serviceId\": 7, \"estimatedMinutes\": 30, \"costVnd\": 300000, \"note\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\", \"expectedVersion\": 2, \"requestKey\": \"aaaaaaaa-0000-4000-8000-0039000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "ROW-07 Chưa chọn dịch vụ",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"code = ITEM_PLAN_VALIDATION\", () => pm.expect(pm.response.json().code).to.eql(\"ITEM_PLAN_VALIDATION\"));",
+                  "pm.test(\"field = serviceId\", () => pm.expect(pm.response.json().field).to.eql(\"serviceId\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/treatment-templates/item-plans/{{planId}}/items",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "treatment-templates",
+                "item-plans",
+                "{{planId}}",
+                "items"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenDentist}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"teeth\": [\"25\"], \"serviceId\": 0, \"estimatedMinutes\": 30, \"costVnd\": 300000, \"expectedVersion\": 2, \"requestKey\": \"aaaaaaaa-0000-4000-8000-0040000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "ROW-08 Version cũ",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"code = MSG111\", () => pm.expect(pm.response.json().code).to.eql(\"MSG111\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/treatment-templates/item-plans/{{planId}}/items",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "treatment-templates",
+                "item-plans",
+                "{{planId}}",
+                "items"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenDentist}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"teeth\": [\"26\"], \"serviceId\": 7, \"estimatedMinutes\": 30, \"costVnd\": 300000, \"expectedVersion\": 1, \"requestKey\": \"aaaaaaaa-0000-4000-8000-0041000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "ROW-09 Kế hoạch không tồn tại",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"code = MSG113\", () => pm.expect(pm.response.json().code).to.eql(\"MSG113\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/treatment-templates/item-plans/00000000-0000-0000-0000-000000000001/items",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "treatment-templates",
+                "item-plans",
+                "00000000-0000-0000-0000-000000000001",
+                "items"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenDentist}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"teeth\": [\"25\"], \"serviceId\": 7, \"estimatedMinutes\": 30, \"costVnd\": 300000, \"expectedVersion\": 1, \"requestKey\": \"aaaaaaaa-0000-4000-8000-0042000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "ROW-10 Trợ lý không được thêm hạng mục",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"code = MSG06\", () => pm.expect(pm.response.json().code).to.eql(\"MSG06\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/treatment-templates/item-plans/{{planId}}/items",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "treatment-templates",
+                "item-plans",
+                "{{planId}}",
+                "items"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAssistant}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"teeth\": [\"25\"], \"serviceId\": 7, \"estimatedMinutes\": 30, \"costVnd\": 300000, \"expectedVersion\": 2, \"requestKey\": \"aaaaaaaa-0000-4000-8000-0043000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. Lab Work Type",
+      "item": [
+        {
+          "name": "LWT-01 Chủ phòng khám tạo loại labo",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"active, version 1\", () => { const j = pm.response.json(); pm.expect(j.active).to.eql(true); pm.expect(j.version).to.eql(1); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/system-settings/settings/catalogs/lab-work-types",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "system-settings",
+                "settings",
+                "catalogs",
+                "lab-work-types"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenOwner}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"requestKey\": \"aaaaaaaa-0000-4000-8000-0044000000{{run}}\", \"entry\": { \"code\": \"LW-{{run}}\", \"name\": \"Mão răng sứ {{run}}\", \"unit\": \"Tooth\", \"referencePrice\": 1500000 } }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "LWT-02 Mã rỗng",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"code = MSG02\", () => pm.expect(pm.response.json().code).to.eql(\"MSG02\"));",
+                  "pm.test(\"field = code\", () => pm.expect(pm.response.json().field).to.eql(\"code\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/system-settings/settings/catalogs/lab-work-types",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "system-settings",
+                "settings",
+                "catalogs",
+                "lab-work-types"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenOwner}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"requestKey\": \"aaaaaaaa-0000-4000-8000-0045000000{{run}}\", \"entry\": { \"code\": \"\", \"name\": \"Mão răng sứ {{run}}\", \"unit\": \"Tooth\", \"referencePrice\": 1500000 } }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "LWT-03 Mã có khoảng trắng",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"code = MSG04\", () => pm.expect(pm.response.json().code).to.eql(\"MSG04\"));",
+                  "pm.test(\"field = code\", () => pm.expect(pm.response.json().field).to.eql(\"code\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/system-settings/settings/catalogs/lab-work-types",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "system-settings",
+                "settings",
+                "catalogs",
+                "lab-work-types"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenOwner}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"requestKey\": \"aaaaaaaa-0000-4000-8000-0046000000{{run}}\", \"entry\": { \"code\": \"LW {{run}}\", \"name\": \"Mão răng sứ {{run}}\", \"unit\": \"Tooth\", \"referencePrice\": 1500000 } }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "LWT-04 Tên rỗng",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"code = MSG02\", () => pm.expect(pm.response.json().code).to.eql(\"MSG02\"));",
+                  "pm.test(\"field = name\", () => pm.expect(pm.response.json().field).to.eql(\"name\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/system-settings/settings/catalogs/lab-work-types",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "system-settings",
+                "settings",
+                "catalogs",
+                "lab-work-types"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenOwner}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"requestKey\": \"aaaaaaaa-0000-4000-8000-0047000000{{run}}\", \"entry\": { \"code\": \"LW-A{{run}}\", \"name\": \"\", \"unit\": \"Tooth\", \"referencePrice\": 1500000 } }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "LWT-05 Chưa chọn đơn vị",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"code = MSG04\", () => pm.expect(pm.response.json().code).to.eql(\"MSG04\"));",
+                  "pm.test(\"field = unit\", () => pm.expect(pm.response.json().field).to.eql(\"unit\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/system-settings/settings/catalogs/lab-work-types",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "system-settings",
+                "settings",
+                "catalogs",
+                "lab-work-types"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenOwner}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"requestKey\": \"aaaaaaaa-0000-4000-8000-0048000000{{run}}\", \"entry\": { \"code\": \"LW-B{{run}}\", \"name\": \"Mão răng sứ B {{run}}\", \"unit\": \"\", \"referencePrice\": 1500000 } }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "LWT-06 Giá tham chiếu âm",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"code = MSG257\", () => pm.expect(pm.response.json().code).to.eql(\"MSG257\"));",
+                  "pm.test(\"field = referencePrice\", () => pm.expect(pm.response.json().field).to.eql(\"referencePrice\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/system-settings/settings/catalogs/lab-work-types",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "system-settings",
+                "settings",
+                "catalogs",
+                "lab-work-types"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenOwner}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"requestKey\": \"aaaaaaaa-0000-4000-8000-0049000000{{run}}\", \"entry\": { \"code\": \"LW-C{{run}}\", \"name\": \"Mão răng sứ C {{run}}\", \"unit\": \"Tooth\", \"referencePrice\": -1 } }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "LWT-07 Trùng mã",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"code = MSG201\", () => pm.expect(pm.response.json().code).to.eql(\"MSG201\"));",
+                  "pm.test(\"field = code\", () => pm.expect(pm.response.json().field).to.eql(\"code\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/system-settings/settings/catalogs/lab-work-types",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "system-settings",
+                "settings",
+                "catalogs",
+                "lab-work-types"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenOwner}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"requestKey\": \"aaaaaaaa-0000-4000-8000-0050000000{{run}}\", \"entry\": { \"code\": \"lw-{{run}}\", \"name\": \"Tên khác {{run}}\", \"unit\": \"Tooth\", \"referencePrice\": 1500000 } }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "LWT-08 Trợ lý không được tạo",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"code = MSG06\", () => pm.expect(pm.response.json().code).to.eql(\"MSG06\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/system-settings/settings/catalogs/lab-work-types",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "system-settings",
+                "settings",
+                "catalogs",
+                "lab-work-types"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAssistant}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"requestKey\": \"aaaaaaaa-0000-4000-8000-0051000000{{run}}\", \"entry\": { \"code\": \"LW-D{{run}}\", \"name\": \"Mão răng sứ D {{run}}\", \"unit\": \"Tooth\", \"referencePrice\": 1500000 } }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "10. Material Group",
+      "item": [
+        {
+          "name": "CAT-01 Chủ phòng khám tạo nhóm vật tư",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"catId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/system-settings/material-categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "system-settings",
+                "material-categories"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenOwner}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"name\": \"Vật liệu trám {{run}}\", \"requestKey\": \"aaaaaaaa-0000-4000-8000-0052000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "CAT-02 Tên rỗng",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"code = MSG04\", () => pm.expect(pm.response.json().code).to.eql(\"MSG04\"));",
+                  "pm.test(\"field = name\", () => pm.expect(pm.response.json().field).to.eql(\"name\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/system-settings/material-categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "system-settings",
+                "material-categories"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenOwner}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"name\": \"\", \"requestKey\": \"aaaaaaaa-0000-4000-8000-0053000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "CAT-03 Tên 161 ký tự",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"code = MSG04\", () => pm.expect(pm.response.json().code).to.eql(\"MSG04\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/system-settings/material-categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "system-settings",
+                "material-categories"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenOwner}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"name\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\", \"requestKey\": \"aaaaaaaa-0000-4000-8000-0054000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "CAT-04 Trùng tên",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"code = CATALOG_NAME_DUPLICATE\", () => pm.expect(pm.response.json().code).to.eql(\"CATALOG_NAME_DUPLICATE\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/system-settings/material-categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "system-settings",
+                "material-categories"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenOwner}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"name\": \"vật liệu trám {{run}}\", \"requestKey\": \"aaaaaaaa-0000-4000-8000-0055000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "CAT-05 Trợ lý không được tạo",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"code = MSG06\", () => pm.expect(pm.response.json().code).to.eql(\"MSG06\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/system-settings/material-categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "system-settings",
+                "material-categories"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAssistant}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"name\": \"Vật liệu khác {{run}}\", \"requestKey\": \"aaaaaaaa-0000-4000-8000-0056000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "11. Material",
+      "item": [
+        {
+          "name": "MAT-01 Chủ phòng khám tạo vật tư",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"usageUnit = g\", () => pm.expect(pm.response.json().usageUnit).to.eql(\"g\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/system-settings/materials",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "system-settings",
+                "materials"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenOwner}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"name\": \"Composite {{run}}\", \"categoryId\": \"{{catId}}\", \"usageUnit\": \"g\", \"requestKey\": \"aaaaaaaa-0000-4000-8000-0057000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "MAT-02 Tên rỗng",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"code = MSG04\", () => pm.expect(pm.response.json().code).to.eql(\"MSG04\"));",
+                  "pm.test(\"field = name\", () => pm.expect(pm.response.json().field).to.eql(\"name\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/system-settings/materials",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "system-settings",
+                "materials"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenOwner}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"name\": \"\", \"categoryId\": \"{{catId}}\", \"usageUnit\": \"g\", \"requestKey\": \"aaaaaaaa-0000-4000-8000-0058000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "MAT-03 Đơn vị 41 ký tự",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"code = MSG04\", () => pm.expect(pm.response.json().code).to.eql(\"MSG04\"));",
+                  "pm.test(\"field = usageUnit\", () => pm.expect(pm.response.json().field).to.eql(\"usageUnit\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/system-settings/materials",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "system-settings",
+                "materials"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenOwner}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"name\": \"Composite B {{run}}\", \"categoryId\": \"{{catId}}\", \"usageUnit\": \"ggggggggggggggggggggggggggggggggggggggggg\", \"requestKey\": \"aaaaaaaa-0000-4000-8000-0059000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "MAT-04 Nhóm không tồn tại",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"code = MSG113\", () => pm.expect(pm.response.json().code).to.eql(\"MSG113\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/system-settings/materials",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "system-settings",
+                "materials"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenOwner}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"name\": \"Composite C {{run}}\", \"categoryId\": \"00000000-0000-0000-0000-000000000001\", \"usageUnit\": \"g\", \"requestKey\": \"aaaaaaaa-0000-4000-8000-0060000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "MAT-05 Trùng tên trong nhóm",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"code = CATALOG_NAME_DUPLICATE\", () => pm.expect(pm.response.json().code).to.eql(\"CATALOG_NAME_DUPLICATE\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/system-settings/materials",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "system-settings",
+                "materials"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenOwner}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"name\": \"composite {{run}}\", \"categoryId\": \"{{catId}}\", \"usageUnit\": \"g\", \"requestKey\": \"aaaaaaaa-0000-4000-8000-0061000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "MAT-06 Trợ lý không được tạo",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"code = MSG06\", () => pm.expect(pm.response.json().code).to.eql(\"MSG06\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/system-settings/materials",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "system-settings",
+                "materials"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAssistant}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"name\": \"Composite D {{run}}\", \"categoryId\": \"{{catId}}\", \"usageUnit\": \"g\", \"requestKey\": \"aaaaaaaa-0000-4000-8000-0062000000{{run}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// HTTP_STATUS_LINE: hiện dòng trạng thái của mọi request, ví dụ \"HTTP 409 Conflict\"",
+          "const statusLine = `HTTP ${pm.response.code} ${pm.response.status}`;",
+          "console.log(statusLine);",
+          "pm.test(statusLine, () => pm.expect(pm.response.code).to.be.within(100, 599));"
+        ]
+      }
+    }
+  ]
+}

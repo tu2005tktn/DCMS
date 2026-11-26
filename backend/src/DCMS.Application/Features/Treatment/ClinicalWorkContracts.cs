@@ -33,7 +33,7 @@ public sealed record UpdateCareTaskRequest(int ExpectedVersion, string Status,
     int? OwnerAccountId, DateTimeOffset DueAt, string Content, Guid RequestKey);
 public sealed record ContactAttemptRequest(string Channel, string Result,
     string? NextAction, Guid? RebookedAppointmentId, int ExpectedTaskVersion, Guid RequestKey);
-public sealed record CareTaskDto(Guid Id, int PatientId, int BranchId,
+public sealed record CareTaskDto(Guid Id, int? PatientId, int BranchId,
     Guid? AppointmentId, string Type, string Content,
     int? OwnerAccountId, DateTimeOffset DueAt, string Status, int Version,
     string[] AllowedActions);

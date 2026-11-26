@@ -107,14 +107,23 @@ public sealed class AppointmentQueryService(DcmsDbContext db, UserManager<Applic
         var weekStarts = Enumerable.Range(0, to.DayNumber - from.DayNumber + 1).Select(i => Monday(from.AddDays(i))).Distinct().ToArray();
         var weeks = await db.Set<WorkingWeek>().AsNoTracking()
             .Where(x => x.BranchId == branchId && dentistIds.Contains(x.EmployeeId) && weekStarts.Contains(x.WeekStart)).ToListAsync(ct);
+        // Published recurring schedules (template / day exception) take precedence over legacy per-week rows,
+        // the same order the booking availability uses.
+        var revisions = await db.Set<WorkingScheduleRevision>().AsNoTracking()
+            .Where(x => dentistIds.Contains(x.EmployeeId) && x.Date <= to).ToListAsync(ct);
         var days = new List<CalendarDay>();
         foreach (var id in dentistIds)
             for (var date = from; date <= to; date = date.AddDays(1))
             {
-                var week = weeks.Where(x => x.EmployeeId == id && x.WeekStart == Monday(date)).MaxBy(x => x.Version);
                 var index = date.DayNumber - Monday(date).DayNumber;
-                days.Add(new(id, date, week?.Periods.Where(p => p.Day == index).OrderBy(p => p.StartMinute)
-                    .Select(p => new CalendarPeriod(p.StartMinute, p.EndMinute, p.Kind, p.Kind == "Work" ? null : p.Reason)).ToArray() ?? []));
+                var mine = revisions.Where(x => x.EmployeeId == id).ToList();
+                var selected = mine.Where(x => x.Kind == "Exception" && x.Date == date).MaxBy(x => x.Version)
+                    ?? mine.Where(x => x.Kind == "Template" && x.Date <= date).OrderByDescending(x => x.Date).ThenByDescending(x => x.Version).FirstOrDefault();
+                IEnumerable<WorkingPeriod> source = selected != null
+                    ? selected.Periods.Where(p => p.BranchId == branchId)
+                    : weeks.Where(x => x.EmployeeId == id && x.WeekStart == Monday(date)).MaxBy(x => x.Version)?.Periods ?? [];
+                days.Add(new(id, date, source.Where(p => p.Day == index).OrderBy(p => p.StartMinute)
+                    .Select(p => new CalendarPeriod(p.StartMinute, p.EndMinute, p.Kind, p.Kind == "Work" ? null : p.Reason)).ToArray()));
             }
         return new(branchId, from, to, await ItemsAsync(rows, ct), days, scope.OwnDentistId.HasValue);
     }
@@ -289,10 +298,12 @@ public sealed class AppointmentQueryService(DcmsDbContext db, UserManager<Applic
         var branches = await db.Set<SchedulingBranch>().AsNoTracking().Where(x => branchIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.Name, ct);
         var chairs = await db.SchedulingChairs.AsNoTracking().Where(x => chairIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.Name, ct);
         var services = await db.Set<SchedulingService>().AsNoTracking().Where(x => serviceIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.Name, ct);
+        var undoable = await MissedAppointments.UndoableAsync(db, rows, clock.GetUtcNow(), ct);
         return rows.Select(x => new AppointmentListItem(x.Id, x.Code, x.BranchId, branches.GetValueOrDefault(x.BranchId, ""),
             x.StartAt, x.EndAt, (int)(x.EndAt - x.StartAt).TotalMinutes, x.DentistId, names.GetValueOrDefault(x.DentistId, ""),
             x.ChairId, chairs.GetValueOrDefault(x.ChairId, ""), x.ServiceId.HasValue ? services.GetValueOrDefault(x.ServiceId.Value) : null,
-            x.AttendeeName, x.BookingInfo.AttendeeRelation, x.Kind, x.Source, x.Status, x.Version)).ToArray();
+            x.AttendeeName, x.BookingInfo.AttendeeRelation, x.Kind, x.Source, x.Status, x.Version,
+            undoable.Contains(x.Id))).ToArray();
     }
 
     private static string? MaskPhone(string? phone) => phone is { Length: >= 4 } ? phone[..2] + new string('*', phone.Length - 4) + phone[^2..] : null;

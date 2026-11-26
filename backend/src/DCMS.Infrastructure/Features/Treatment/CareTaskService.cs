@@ -172,7 +172,7 @@ public sealed class CareTaskService(DcmsDbContext db, UserManager<ApplicationUse
             Clean(request.NextAction)?.Length > 1000) throw Error("MSG04");
         if (request.Result == "Rebooked" && (!request.RebookedAppointmentId.HasValue ||
             !await db.Appointments.AsNoTracking().AnyAsync(x => x.Id == request.RebookedAppointmentId &&
-                x.BranchId == task.BranchId && x.PatientId == task.PatientId &&
+                x.BranchId == task.BranchId && task.PatientId != null && x.PatientId == task.PatientId &&
                 x.Status == "Confirmed", ct))) throw Error("MSG54", 409);
         var row = new CareContactAttempt
         {
@@ -192,7 +192,7 @@ public sealed class CareTaskService(DcmsDbContext db, UserManager<ApplicationUse
     {
         ["FollowUp"] = "Theo dõi tái khám", ["FollowUpDue"] = "Chỉ định đến hạn đặt lịch",
         ["PrerequisiteBlocked"] = "Bị chặn bởi bước trước", ["LabBlocked"] = "Chờ labo",
-        ["MissedAppointment"] = "Vắng hẹn"
+        ["MissedAppointment"] = "Vắng hẹn", ["MissedAppointmentUndone"] = "Vắng hẹn (đã hoàn tác)", ["MissedAppointmentRebooked"] = "Vắng hẹn (đã đổi lịch)"
     };
     private static readonly Dictionary<string, string> StatusLabels = new()
     {
@@ -319,8 +319,11 @@ public sealed class CareTaskService(DcmsDbContext db, UserManager<ApplicationUse
         if (Clean(q.Search) is { } search)
         {
             var pattern = Like(search);
+            // A task without a patient record is found by what the booking itself recorded.
             query = query.Where(x => db.Patients.Any(p => p.Id == x.PatientId && (EF.Functions.ILike(p.PatientCode, pattern) ||
-                EF.Functions.ILike(p.FullName, pattern) || p.Phone != null && EF.Functions.ILike(p.Phone, pattern))));
+                    EF.Functions.ILike(p.FullName, pattern) || p.Phone != null && EF.Functions.ILike(p.Phone, pattern)))
+                || x.PatientId == null && db.Appointments.Any(a => a.Id == x.AppointmentId && (EF.Functions.ILike(a.AttendeeName, pattern) ||
+                    a.BookingInfo.BookerContact != null && EF.Functions.ILike(a.BookingInfo.BookerContact, pattern))));
         }
         return (query.OrderBy(x => x.DueAt).ThenBy(x => x.Id), scope.Branches);
     }
@@ -328,9 +331,12 @@ public sealed class CareTaskService(DcmsDbContext db, UserManager<ApplicationUse
     private async Task<IReadOnlyList<CareWorklistItem>> ItemsAsync(IReadOnlyList<CareTask> rows,
         Dictionary<int, string> branches, CancellationToken ct)
     {
-        var patientIds = rows.Select(x => x.PatientId).Distinct().ToArray();
+        var patientIds = rows.Where(x => x.PatientId.HasValue).Select(x => x.PatientId!.Value).Distinct().ToArray();
         var patients = await db.Patients.AsNoTracking().Where(x => patientIds.Contains(x.Id))
             .ToDictionaryAsync(x => x.Id, x => new { x.PatientCode, x.FullName, x.Phone }, ct);
+        var bookingIds = rows.Where(x => x.PatientId == null && x.AppointmentId.HasValue).Select(x => x.AppointmentId!.Value).Distinct().ToArray();
+        var bookings = await db.Appointments.AsNoTracking().Where(x => bookingIds.Contains(x.Id))
+            .Select(x => new { x.Id, x.AttendeeName, Contact = x.BookingInfo.BookerContact }).ToDictionaryAsync(x => x.Id, ct);
         var ownerIds = rows.Where(x => x.OwnerAccountId.HasValue).Select(x => x.OwnerAccountId!.Value).Distinct().ToArray();
         var owners = await db.Employees.AsNoTracking().Where(x => ownerIds.Contains(x.AccountId))
             .ToDictionaryAsync(x => x.AccountId, x => x.FullName, ct);
@@ -341,9 +347,12 @@ public sealed class CareTaskService(DcmsDbContext db, UserManager<ApplicationUse
         var types = await TypeNamesAsync(ct);
         return rows.Select(x =>
         {
-            var patient = patients.GetValueOrDefault(x.PatientId);
+            var patient = x.PatientId is { } patientId ? patients.GetValueOrDefault(patientId) : null;
+            var booking = x.PatientId == null && x.AppointmentId is { } appointmentId ? bookings.GetValueOrDefault(appointmentId) : null;
             var contact = contacts.GetValueOrDefault(x.Id);
-            return new CareWorklistItem(Map(x), branches.GetValueOrDefault(x.BranchId, ""), patient?.PatientCode ?? "", patient?.FullName ?? "", patient?.Phone,
+            // Without a patient record the worklist shows the attendee and the contact of the booking; the code stays empty.
+            return new CareWorklistItem(Map(x), branches.GetValueOrDefault(x.BranchId, ""), patient?.PatientCode ?? "",
+                patient?.FullName ?? booking?.AttendeeName ?? "", patient != null ? patient.Phone : booking?.Contact,
                 types.GetValueOrDefault(x.Type, x.Type),
                 x.OwnerAccountId is { } owner ? owners.GetValueOrDefault(owner) : null,
                 contact?.Result, contact?.OccurredAt);

@@ -28,6 +28,7 @@ internal static class CreateTestKit
         var connection = new Microsoft.Data.Sqlite.SqliteConnection("Data Source=:memory:");
         connection.Open();
         connection.CreateFunction("pg_advisory_xact_lock", (long _) => 0L);
+        connection.CreateFunction("pg_advisory_xact_lock", (long _, long __) => 0L);
         // Postgres functions used by column defaults / computed columns / constraints in the model.
         connection.CreateFunction<object?, string?, string?>("btrim", null, (_, s) => s?.Trim(), true);
         connection.CreateFunction<object?, string?, string?, string?>("btrim", null, (_, s, c) => s?.Trim((c ?? " ").ToCharArray()), true);

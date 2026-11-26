@@ -1706,7 +1706,7 @@ namespace DCMS.Infrastructure.Persistence.Migrations
                     b.Property<int?>("OwnerAccountId")
                         .HasColumnType("integer");
 
-                    b.Property<int>("PatientId")
+                    b.Property<int?>("PatientId")
                         .HasColumnType("integer");
 
                     b.Property<string>("Status")

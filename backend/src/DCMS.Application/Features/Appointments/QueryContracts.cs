@@ -11,7 +11,8 @@ public sealed record AppointmentOptions(CalendarOption[] Branches, CalendarDenti
 
 public sealed record AppointmentListItem(Guid Id, string Code, int BranchId, string BranchName, DateTimeOffset StartAt,
     DateTimeOffset EndAt, int DurationMinutes, int DentistId, string DentistName, int ChairId, string ChairName,
-    string? ServiceName, string AttendeeName, string AttendeeRelation, string Kind, string Source, string Status, int Version);
+    string? ServiceName, string AttendeeName, string AttendeeRelation, string Kind, string Source, string Status, int Version,
+    bool CanUndoNoShow = false);
 public sealed record AppointmentListPage(IReadOnlyList<AppointmentListItem> Items, int Total, int Page, int PageSize);
 public sealed record StaffAppointmentDetail(AppointmentListItem Appointment, string BookerName, string? BookerPhoneMasked,
     string? BookerEmailMasked, bool BookedFromApp, string? Reason, string? ExceptionReason, DateTimeOffset CreatedAt);

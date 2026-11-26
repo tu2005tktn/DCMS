@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DCMS – Major Features</title>
+<style>
+  :root { --ink:#1b1b1b; --line:#9aa0a6; --head:#e9eef5; --accent:#1f4e79; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:#eef0f3; color:var(--ink); font:12pt/1.5 "Times New Roman", Times, serif; }
+  .page { max-width:210mm; margin:16px auto; background:#fff; padding:20mm; box-shadow:0 1px 6px rgba(0,0,0,.15); }
+  h1 { font-size:16pt; color:var(--accent); margin:0 0 12px; border-bottom:2px solid var(--accent); padding-bottom:4px; }
+  table { width:100%; border-collapse:collapse; font-size:11.5pt; }
+  th, td { border:1px solid var(--line); padding:6px 8px; vertical-align:top; text-align:left; }
+  th { background:var(--head); }
+  td:first-child { white-space:nowrap; font-weight:bold; }
+  @media print {
+    body { background:#fff; }
+    .page { box-shadow:none; margin:0; max-width:none; padding:0; }
+    @page { size:A4; margin:20mm; }
+    tr { page-break-inside:avoid; }
+  }
+  @media (max-width:700px){ .page{ padding:14px; margin:0; } table{ font-size:10.5pt; } }
+</style>
+</head>
+<body>
+<section class="page">
+  <h1>1. Major Features</h1>
+  <table>
+    <tr><th style="width:70px">ID</th><th style="width:190px">Feature Name</th><th>Description</th></tr>
+    <tr><td>MF-01</td><td>Appointment Scheduling &amp; Calendar Management</td><td>Calendar-based scheduling for the clinic's dentists and treatment rooms across service types, with automatic conflict detection and daily/weekly schedule views.</td></tr>
+    <tr><td>MF-02</td><td>Patient Self-Booking Portal</td><td>A patient-facing web page where patients view real-time available time slots and book appointments directly; bookings are updated automatically into the clinic's central schedule.</td></tr>
+    <tr><td>MF-03</td><td>Patient Records &amp; Clinical Data Management</td><td>Centralized storage of patient profiles, medical history, treatment history, dental charting, prescriptions, and clinical notes, retrievable instantly when a patient returns.</td></tr>
+    <tr><td>MF-04</td><td>Integrated Dental Image Management</td><td>Storage and viewing of X-ray and intraoral images (DICOM, JPEG, PNG) directly inside the patient's record, with side-by-side comparison of current and historical images without page reloads.</td></tr>
+    <tr><td>MF-05</td><td>AI-Assisted Dental Image Analysis (Advance)</td><td>AI analysis of uploaded dental images to detect and highlight potential abnormalities (caries, periodontal bone loss, periapical lesions) as annotated overlays with confidence scores; dentists can confirm, modify, or reject AI suggestions.</td></tr>
+    <tr><td>MF-06</td><td>Billing and Payment Management</td><td>Invoicing and payment recording supporting cash, bank transfer, and QR payments; revenue reports by dentist, service, and time period.</td></tr>
+    <tr><td>MF-07</td><td>Inventory and Consumables Management</td><td>Tracking of dental materials and consumables with automatic low-stock alerts and usage history linked to treatments.</td></tr>
+    <tr><td>MF-08</td><td>Medication and Follow-up Reminders</td><td>A mobile application that allows patients to receive medication reminders, follow-up appointment reminders</td></tr>
+  </table>
+</section>
+</body>
+</html>

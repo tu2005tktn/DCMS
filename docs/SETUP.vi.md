@@ -152,6 +152,8 @@ Mở PowerShell tại thư mục gốc:
 
 Lệnh đầu cũng thêm danh mục thuốc khởi tạo và ba mẫu đơn thuốc `DEMO-*` (chỉ minh họa, không phải hướng dẫn điều trị). Lệnh thứ hai (tùy chọn) nạp thêm dữ liệu phòng khám: dịch vụ, kế hoạch điều trị, dụng cụ/vật liệu, công ty labo và loại công việc labo. Cả hai chỉ chạy ở Development, chạy lại không nhân đôi dữ liệu. Chi tiết: `docs/specs/TREATMENT-CATALOG-SEED.md`, `docs/specs/MATERIAL-CATALOG-SEED.md` và `docs/specs/LAB-CATALOG-SEED.md`.
 
+Nếu chỉ dùng PostgreSQL bằng Docker và không muốn chạy lệnh thứ hai, nạp đúng bộ dữ liệu mẫu đó bằng tệp SQL (sau `-Migrate -SeedDemo`, chạy lại không nhân đôi): `& .\infrastructure\scripts\import-clinic-catalog.ps1`. Chi tiết: `docs/specs/CLINIC-CATALOG-SQL-SEED.md`.
+
 Lệnh đầu áp dụng migration còn thiếu và thêm dữ liệu demo chưa có, rồi kết thúc. Lệnh thứ hai chạy HTTP server; giữ terminal này mở. Script đọc `.env`, đặt connection string và JWT config trong process, chạy profile `http` ở Development. API ở `http://localhost:5080`. Seed không thay đổi account đã có và không xóa dữ liệu.
 
 Nếu chạy `dotnet run` trực tiếp mà chưa đặt connection string, API sẽ báo thiếu cấu hình. Dùng script trên cho quy trình chạy local thông thường.

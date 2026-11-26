@@ -10,6 +10,11 @@ async function mockCommon(page: Page) {
   await page.route('**/api/auth/google/config', route => route.fulfill(json({ enabled: false, clientId: null })));
   await page.route('**/api/auth/me', route => route.fulfill(json(publicUser)));
   await page.route('**/api/auth/sign-out', route => route.fulfill({ status: 204 }));
+  // The customer dashboard loads upcoming appointments after sign-in; an unmocked call would hit the real API with a fake token.
+  await page.route('**/api/me/appointments**', route => route.fulfill(json({ items: [], total: 0, page: 1, pageSize: 20 })));
+  // Customer notifications load after sign-in too; a real call with the fake token would sign the customer out.
+  await page.route('**/api/notifications/unread-count', route => route.fulfill(json({ count: 0 })));
+  await page.route('**/api/notifications?*', route => route.fulfill(json({ items: [], total: 0, page: 1, pageSize: 20, unread: 0 })));
 }
 
 test('entry offers separate customer and unchanged staff login', async ({ page }) => {
@@ -39,6 +44,7 @@ test('customer booking requires a Public session before loading booking options'
 test('staff sign-in and sign-out still use existing routes', async ({ page }) => {
   await mockCommon(page);
   await page.route('**/api/auth/sign-in', route => route.fulfill(json({ accessToken: 'staff-token', user: staffUser })));
+  await page.route('**/api/auth/session/idle**', route => route.fulfill(json({ deadlineAt: new Date(Date.now() + 1_200_000).toISOString(), serverNow: new Date().toISOString(), activityVersion: 1 })));
   await page.goto('/sign-in');
   await page.getByLabel('Tên đăng nhập', { exact: true }).fill('staff.demo');
   await page.getByLabel('Mật khẩu', { exact: true }).fill('Password123!');
@@ -182,6 +188,40 @@ test('signed-in customer booking retains form after a slot conflict and confirms
   await expect(page.getByText('Trạng thái: Đã xác nhận')).toBeVisible();
   expect(calls).toBe(2);
   expect(requestKeys[0]).not.toBe(requestKeys[1]);
+});
+
+// One open booking per person: the refusal (MSG118) appears as a pop-up, not as a banner.
+test('customer sees a pop-up when the person already has an open booking', async ({ page }) => {
+  await mockCommon(page);
+  await page.addInitScript(() => sessionStorage.setItem('dcms.customer.accessToken', 'public-token'));
+  const start = new Date(Date.now() + 3 * 86_400_000).toISOString();
+  await page.route('**/api/availability/options', route => route.fulfill(json({
+    branches: [{ id: 1, name: 'Chi nhánh A' }],
+    employees: [{ id: 2, branchId: 1, name: 'Bác sĩ B', canDentist: true }],
+    services: [{ id: 3, branchId: 1, name: 'Khám tổng quát', publicDurationMinutes: 30 }],
+  })));
+  await page.route('**/api/availability?*', route => route.fulfill(json({ timeZone: 'Asia/Ho_Chi_Minh', date: '2026-10-20',
+    slots: [{ start, end: start, chairId: 4, dentistId: 2, scheduleVersion: 1, assistantScheduleVersion: null }] })));
+  const message = 'Người này đã có một lịch hẹn chưa được tiếp nhận. Vui lòng hủy lịch cũ hoặc đợi đến khi lịch đó được tiếp nhận trước khi đặt lịch mới.';
+  await page.route('**/api/appointments', route => route.fulfill(json({ code: 'MSG118', message }, 409)));
+  await page.goto('/customer/book');
+  await page.getByRole('button', { name: 'Tiếp tục' }).click();
+  await page.locator('.ant-select').nth(0).click();
+  await page.getByText('Chi nhánh A').last().click();
+  await page.locator('.ant-select').nth(1).click();
+  await page.getByText('Bác sĩ B').last().click();
+  await page.locator('.customer-slots button').first().click();
+  await page.getByRole('button', { name: 'Tiếp tục' }).click();
+  await page.getByLabel('Họ tên người đặt').fill('Khách A');
+  await page.getByLabel('Số điện thoại Việt Nam hoặc email').fill('0912345678');
+  await page.getByLabel('Họ tên người khám').fill('Người thân B');
+  await page.getByRole('button', { name: 'Xem lại' }).click();
+  await page.getByRole('button', { name: 'Xác nhận đặt lịch' }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByText(message)).toBeVisible();
+  await expect(page.locator('.form-alert')).toHaveCount(0);
+  await dialog.getByRole('button', { name: 'Đã hiểu' }).click();
+  await expect(dialog).toHaveCount(0);
 });
 
 // docs/specs/CHAIR-CAPACITY-ANY-DENTIST-BOOKING.vi.md: "any dentist" queries with dentistId=0 and books the slot's dentist.

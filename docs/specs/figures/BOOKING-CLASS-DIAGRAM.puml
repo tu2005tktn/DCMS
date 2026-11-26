@@ -1,0 +1,89 @@
+@startuml DCMS_Patient_Booking_Class_Diagram
+title Class Diagram - Bệnh nhân đặt lịch hẹn
+
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+skinparam nodesep 60
+skinparam ranksep 60
+skinparam class {
+  BorderColor #000000
+  BackgroundColor #FFFFFF
+  HeaderBackgroundColor #FFFFFF
+  ArrowColor #000000
+}
+hide circle
+
+class AppointmentService <<control>> {
+  + getAvailableSlots()
+  + createAppointment()
+  + validateDetails()
+  + isSlotFree()
+}
+
+class Patient {
+  id : int
+  patientCode : string
+  fullName : string
+  birthDate : DateOnly
+  phone : string
+  address : string
+}
+
+class Appointment {
+  id : Guid
+  code : string
+  patientId : int
+  branchId : int
+  serviceId : int
+  dentistId : int
+  chairId : int
+  startAt : DateTimeOffset
+  endAt : DateTimeOffset
+  status : string
+}
+
+class Branch {
+  id : int
+  name : string
+  address : string
+}
+
+class ExaminationService {
+  id : int
+  branchId : int
+  name : string
+  publicDurationMinutes : int
+}
+
+class Dentist {
+  id : int
+  employeeCode : string
+  fullName : string
+}
+
+class DentistSchedule {
+  id : Guid
+  dentistId : int
+  branchId : int
+  day : int
+  startMinute : int
+  endMinute : int
+}
+
+AppointmentService -[hidden]down- Appointment
+
+AppointmentService ..> Branch : loads
+AppointmentService ..> ExaminationService : loads
+AppointmentService ..> Dentist : loads
+AppointmentService ..> DentistSchedule : reads
+AppointmentService ..> Patient : validates
+AppointmentService ..> Appointment : checks, saves
+
+Patient "1" *-- "0..*" Appointment : books
+Branch "1" -- "0..*" Appointment : hosts
+ExaminationService "1" -- "0..*" Appointment : booked for
+Dentist "1" -- "0..*" Appointment : examines
+Branch "1" -- "0..*" ExaminationService : offers
+Dentist "1" -- "0..*" DentistSchedule : works by
+
+@enduml

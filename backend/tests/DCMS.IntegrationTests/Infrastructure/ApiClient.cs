@@ -4,9 +4,12 @@ using System.Text.Json;
 namespace DCMS.IntegrationTests;
 
 /// <summary>What the API answered: HTTP status plus the raw JSON body.</summary>
-public sealed record ApiResponse(int Status, string Body)
+public sealed record ApiResponse(int Status, string Body, string? Reason = null)
 {
     private static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web);
+
+    /// <summary>The HTTP status line as the report shows it, for example "HTTP 409 Conflict".</summary>
+    public string StatusLine => $"HTTP {Status} {Reason}".TrimEnd();
 
     public T Json<T>() => JsonSerializer.Deserialize<T>(Body, Options) ?? throw new InvalidOperationException("Empty body: " + Body);
 
@@ -39,7 +42,10 @@ public sealed class ApiClient(HttpClient http)
         using var request = new HttpRequestMessage(method, path);
         if (body != null) request.Content = JsonContent.Create(body);
         using var response = await http.SendAsync(request);
-        var result = new ApiResponse((int)response.StatusCode, await response.Content.ReadAsStringAsync());
+        var reason = string.IsNullOrWhiteSpace(response.ReasonPhrase)
+            ? Microsoft.AspNetCore.WebUtilities.ReasonPhrases.GetReasonPhrase((int)response.StatusCode)
+            : response.ReasonPhrase;
+        var result = new ApiResponse((int)response.StatusCode, await response.Content.ReadAsStringAsync(), reason);
         Trace.Record(method.Method, path, result);
         return result;
     }

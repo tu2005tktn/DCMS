@@ -2,7 +2,7 @@
 
 ## Chủ động chỉnh sửa và hủy lịch — 09/11/2026
 
-Lịch Confirmed đã tới giờ, chưa được tiếp nhận có **Khách không tới** theo grant riêng `appointments.no-show`. Sau xác nhận, lịch cũ được giữ với trạng thái này; nếu còn giờ và có `appointments.create` thì có **Đặt lịch thay thế** cho khách khác trong phần thời gian còn trống. Không thay Patient của lịch cũ. Chi tiết contract thay thế ở UC-06.
+Lịch Confirmed đã tới giờ, chưa được tiếp nhận có **Khách không tới** theo grant riêng `appointments.no-show`. Sau xác nhận, lịch cũ được giữ với trạng thái này; nếu còn giờ và có `appointments.create` thì có **Đặt lịch thay thế** cho khách khác trong phần thời gian còn trống. Không thay Patient của lịch cũ. Chi tiết contract thay thế ở UC-06. Từ 26/11/2026: lịch Confirmed hiển thị “Trễ hẹn” sau giờ bắt đầu và “Chờ xử lý” sau giờ kết thúc; trong ngày đã ghi nhận vắng mặt có thao tác **Hoàn tác không tới** (cùng grant). Lịch trễ của hôm nay hoặc vắng mặt ghi nhận trong ngày có **Đổi lịch** (grant `appointments.reschedule`). Xem [S17/S18](S17-S18-RECEPTION.md).
 
 Tab Lịch hẹn có thao tác **Chỉnh sửa lịch** theo `appointments.reschedule` và **Hủy lịch** theo `appointments.cancel` trên từng lịch Confirmed chưa bắt đầu. Dùng chung form với màn chi tiết, gọi command với `clinicInitiated=true`; lý do bắt buộc, chỉ đổi/hủy sau server commit rồi tải lại danh sách và hạng mục cần hẹn. Lịch sử/ngoài quyền không hiện nút. Phạm vi nha sĩ/chi nhánh, slot và chỉ định tiếp tục kiểm ở server. Contract và kiểm thử tại [UC-06](UC06-APPOINTMENT-CHANGES.md), mục bổ sung cùng ngày.
 

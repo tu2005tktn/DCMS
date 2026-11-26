@@ -19,5 +19,6 @@ public interface IAppointmentChangeService
     Task<AppointmentChangeResult> RescheduleAsync(int actorId, string code, RescheduleAppointmentRequest request, CancellationToken ct);
     Task<AppointmentChangeResult> CancelAsync(int actorId, string code, CancelAppointmentRequest request, CancellationToken ct);
     Task<AppointmentChangeResult> MarkNoShowAsync(int actorId, string code, NoShowAppointmentRequest request, CancellationToken ct);
+    Task<AppointmentChangeResult> UndoNoShowAsync(int actorId, string code, NoShowAppointmentRequest request, CancellationToken ct);
 }
 

@@ -7,6 +7,10 @@
 .reception-panel .ant-table-placeholder > td { border-inline-end: 0; }
 .reception-table .ant-table-cell { overflow-wrap: anywhere; }
 .reception-table table { width: 100% !important; table-layout: auto !important; }
+/* The check-in link sits on its own line; the attendance buttons share the line below it. */
+.reception-actions { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+/* Closed bookings are dimmed; their tags, links and buttons stay as they are. */
+.reception-panel .reception-table .ant-table-tbody > tr.reception-row-closed > td { background: #f2f4f7; color: #667085; }
 @media screen and (max-width: 1000px) {
   .reception-panel .reception-table .ant-table { border: 0; border-radius: 0; }
   .reception-table .ant-table-thead, .reception-table .ant-table-measure-row { display: none; }

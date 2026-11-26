@@ -1,5 +1,5 @@
 import { ArrowLeftOutlined } from '@ant-design/icons';
-import { Alert, Button, Card, Empty, Input, Select, Spin, Steps } from 'antd';
+import { Alert, Button, Card, Empty, Input, Modal, Select, Spin, Steps } from 'antd';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import FamilyMemberPicker from '../family-members/FamilyMemberPicker';
@@ -59,6 +59,7 @@ function BookingForm() {
   const [slots, setSlots] = useState<Slot[]>([]);
   const [slotsBusy, setSlotsBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [authExpired, setAuthExpired] = useState(false);
   const [step, setStep] = useState(0);
   const [relation, setRelation] = useState<'Self' | 'Relative'>('Self');
@@ -189,7 +190,9 @@ function BookingForm() {
         setError('Phiên khách hàng đã hết hạn. Vui lòng đăng nhập lại trước khi xác nhận lịch.');
       } else {
         const code = failure instanceof ApiError ? failure.code : '';
-        setError(`${code ? `${code}: ` : ''}${(failure as Error).message}`);
+        // One open booking per person: shown as a pop-up so the customer cannot miss it.
+        if (code === 'MSG118') setNotice((failure as Error).message);
+        else setError(`${code ? `${code}: ` : ''}${(failure as Error).message}`);
         if (['MSG19', 'MSG20', 'MSG21', 'MSG22', 'MSG23', 'MSG41'].includes(code)) {
           setSlot(null); setStep(1); retryRef.current = null;
           const query = new URLSearchParams({ branchId: String(branchId), dentistId: String(dentistId),
@@ -206,6 +209,7 @@ function BookingForm() {
     action={<Button onClick={() => void reload()}>Thử lại</Button>} /></div>;
 
   return <div className="customer-booking">
+    <Modal open={!!notice} title="Không thể đặt thêm lịch" onCancel={() => setNotice(null)} footer={<Button type="primary" onClick={() => setNotice(null)}>Đã hiểu</Button>}>{notice}</Modal>
     <div className="customer-booking-header"><Link to={state.status === 'authenticated' ? '/customer/home' : '/customer/sign-in'} className="customer-back-button"><ArrowLeftOutlined aria-hidden="true" />Quay lại</Link>
       <h1>Đặt lịch khám</h1></div>
     <div className="customer-booking-progress"><span>Bước {step + 1}/5</span><strong>{stepNames[step]}</strong></div>
@@ -224,7 +228,6 @@ function BookingForm() {
             if (relation !== 'Relative') { setRelation('Relative'); chooseMember(null); }
           }}><strong>Người thân</strong><span>Tôi đặt lịch cho một người khác</span></Button>
         </div>
-        {relation === 'Relative' && <Alert type="info" showIcon message="Đặt lịch cho người thân không cấp quyền xem hồ sơ bệnh án của họ." />}
         {relation === 'Relative' && <>
           {familyLoading && <p role="status">Đang tải người thân đã chọn…</p>}
           {familyError && <Alert type="error" showIcon message={familyError} action={<Button onClick={() => setFamilyRevision(r => r + 1)}>Thử lại</Button>} />}
@@ -318,7 +321,6 @@ function BookingForm() {
               {fieldErrors.attendeeBirthDate && <span className="customer-field-error" id="booking-attendee-birth-error">{fieldErrors.attendeeBirthDate}</span>}</label>}
           </fieldset>
         </div>
-        {relation === 'Relative' && <Alert type="info" showIcon message="Đặt lịch cho người thân không cấp quyền xem hồ sơ bệnh án của họ." />}
         <div className="customer-booking-actions"><Button onClick={() => setStep(1)}>Quay lại chọn lịch</Button>
           <Button type="primary" onClick={() => { if (validateContact()) { setError(null); setStep(3); } }}>Xem lại</Button></div>
       </div>}

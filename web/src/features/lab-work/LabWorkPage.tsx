@@ -1,6 +1,6 @@
-import { Alert, Button, Drawer, Input, Select, Skeleton, Table, Tag, Typography } from 'antd';
+import { Alert, Button, Drawer, Input, Select, Skeleton, Table, Tag } from 'antd';
 import type { ColumnType } from 'antd/es/table';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api, ApiError } from '../../services/api';
 import { formatDate } from '../appointments/types';
 import { usePermissions } from '../authentication/usePermissions';
@@ -16,7 +16,6 @@ type Item = { id: string; code: string | null; dossierId: string; dossierCode: s
   totalFeeVnd: number; paidVnd: number; patientPaidVnd: number; patientPaymentStatus: 'NoFee' | 'Unpaid' | 'Partial' | 'Paid'; status: Status; overdue: boolean; version: number };
 type Counts = { notSent: number; sent: number; received: number; delivered: number; rework: number; overdue: number };
 type Page = { items: Item[]; total: number; page: number; pageSize: number; counts: Counts; labs: { id: string; name: string }[]; dentists: { id: number; name: string }[] };
-type Log = { fromStatus: Status | null; toStatus: Status; changedAt: string; changedByName: string; note: string | null };
 
 const labels: Record<Status, string> = { NotSent: 'Chưa gửi', Sent: 'Đã gửi xưởng', Received: 'Đã nhận về', Delivered: 'Đã giao bệnh nhân', Rework: 'Làm lại' };
 const colors: Record<Status, string> = { NotSent: 'default', Sent: 'blue', Received: 'cyan', Delivered: 'green', Rework: 'orange' };
@@ -27,7 +26,6 @@ const tiles: { key: string; label: string; field: keyof Counts }[] = [
   { key: 'Overdue', label: 'Quá hạn hẹn', field: 'overdue' }, { key: 'Delivered', label: 'Đã giao bệnh nhân', field: 'delivered' }, { key: 'Rework', label: 'Làm lại', field: 'rework' }];
 const vnd = (n: number) => `${n.toLocaleString('vi-VN')} ₫`;
 const day = (d: string | null) => d ? formatDate(d) : '—';
-const stamp = (v: string) => new Date(v).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' });
 const message = (e: unknown) => e instanceof Error ? e.message : 'Không thể hoàn tất thao tác. Vui lòng thử lại.';
 const paymentLabels = { NoFee: 'Không có phí', Unpaid: 'Chưa thanh toán', Partial: 'Thanh toán một phần', Paid: 'Đã thanh toán' };
 const paymentColors = { NoFee: 'default', Unpaid: 'default', Partial: 'orange', Paid: 'green' };
@@ -39,7 +37,7 @@ export default function LabWorkPage() {
   const [status, setStatus] = useState<string>(), [q, setQ] = useState(''), [search, setSearch] = useState(''), [lab, setLab] = useState<string>(), [dentist, setDentist] = useState<number>();
   const [from, setFrom] = useState(''), [to, setTo] = useState(''), [page, setPage] = useState(1), [pageSize, setPageSize] = useState(20), [attempt, setAttempt] = useState(0);
   const [data, setData] = useState<Page>(), [error, setError] = useState<string>(), [loading, setLoading] = useState(true);
-  const [open, setOpen] = useState<Item>(), [history, setHistory] = useState<Log[]>(), [note, setNote] = useState(''), [busy, setBusy] = useState(false), [actionError, setActionError] = useState<string>();
+  const [open, setOpen] = useState<Item>(), [note, setNote] = useState(''), [busy, setBusy] = useState(false), [actionError, setActionError] = useState<string>();
   const [editing, setEditing] = useState(false);
   const canPickBranch = useCanPickBranch();
   const [branch, setBranch] = useState<number>();
@@ -70,16 +68,12 @@ export default function LabWorkPage() {
     if (data) setOpen(current => data.items.find(item => item.id === current?.id) ?? current);
   }, [data]);
 
-  const loadHistory = useCallback((id: string) => {
-    setHistory(undefined);
-    api<Log[]>(`/api/lab-orders/${id}/history`).then(setHistory).catch(() => setHistory([]));
-  }, []);
-  function show(item: Item) { setOpen(item); setNote(''); setActionError(undefined); loadHistory(item.id); }
+  function show(item: Item) { setOpen(item); setNote(''); setActionError(undefined); }
   async function move(item: Item, target: Status) {
     setBusy(true); setActionError(undefined);
     try {
       const updated = await api<Item>(`/api/lab-orders/${item.id}/status`, { method: 'PUT', body: JSON.stringify({ status: target, expectedVersion: item.version, note: note.trim() || null }) });
-      setOpen(updated); setNote(''); loadHistory(item.id); setAttempt(a => a + 1);
+      setOpen(updated); setNote(''); setAttempt(a => a + 1);
     } catch (e) {
       setActionError(message(e));
       if (e instanceof ApiError && e.status === 409) setAttempt(a => a + 1);
@@ -143,8 +137,6 @@ export default function LabWorkPage() {
           <div>{next[open.status].map(s => <Button key={s} type={s === 'Rework' ? 'default' : 'primary'} danger={s === 'Rework'} loading={busy} disabled={busy} onClick={() => void move(open, s)}>{actionLabels[s]}</Button>)}</div>
         </div> : null}
         {actionError ? <Alert type="error" showIcon message={actionError} /> : null}
-        <Typography.Title level={5}>Nhật ký trạng thái</Typography.Title>
-        {history ? <ol className="lab-work-history">{history.map((h, i) => <li key={i}><strong>{labels[h.toStatus]}</strong> · {stamp(h.changedAt)}{h.changedByName ? ` · ${h.changedByName}` : ''}{h.note ? <div>{h.note}</div> : null}</li>)}</ol> : <Skeleton active paragraph={{ rows: 2 }} />}
       </div> : null}
     </Drawer>
     {open && editing ? <LabOrderModal dossierId={open.dossierId} activityId={open.activityId} serviceName={open.workName} canEdit={canManage} onClose={() => setEditing(false)}

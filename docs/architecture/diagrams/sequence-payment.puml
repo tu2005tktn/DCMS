@@ -1,0 +1,81 @@
+@startuml sd-payos-create-qr
+autonumber
+actor "Cashier" as C
+boundary "Payment Screen" as UI
+control "PayOsOrderService" as S
+control "PayOsGateway" as G
+entity "Database" as DB
+participant "payOS" as P
+C -> UI : choose treatment items to pay, collector and date
+UI -> S : createPayOsOrder(dossier, lines, requestKey)
+activate S
+S -> S : check permission and validate request
+S -> DB : find stored result of this request
+alt request was already processed
+  S --> UI : return the existing order
+else new request
+  S -> DB : load amount due of each treatment item
+  alt amount is more than the amount due, or another order is open
+    S --> UI : reject (409)
+  else amounts are valid
+    S -> DB : save order (Creating) with order code and lines
+    S -> G : createPaymentLink(order code, amount, description)
+    activate G
+    G -> P : create payment link
+    P --> G : payment link id and QR code
+    deactivate G
+    alt link created
+      S -> DB : save QR code, set order to Pending (valid 30 minutes)
+      S --> UI : order with QR code
+    else link failed
+      S -> DB : set order to LinkError
+      S --> UI : error, please try again
+    end
+  end
+end
+deactivate S
+UI --> C : show QR code for the patient
+@enduml
+
+@startuml sd-payos-confirm
+autonumber
+actor "Patient" as PT
+participant "payOS" as P
+control "PayOsOrderService" as S
+entity "Database" as DB
+boundary "Payment Screen" as UI
+actor "Cashier" as C
+PT -> P : scan QR code and pay by bank transfer
+P -> S : send payment notification (webhook)
+activate S
+S -> S : verify the signature
+alt signature invalid
+  S --> P : reject
+else signature valid
+  S -> DB : find the order by order code
+  S -> S : payment successful, amount, currency and link id match?
+  alt data does not match
+    S -> DB : set order to Review (manual check)
+  else data matches
+    S -> DB : amounts still due for each item?
+    alt items already paid or changed
+      S -> DB : set order to Review (manual check)
+    else all items still payable
+      S -> DB : create treatment payment with lines (Transfer)
+      S -> DB : set order to Paid with bank reference
+    end
+  end
+  S --> P : acknowledge
+end
+deactivate S
+loop screen polls the order status, background worker reconciles Pending orders
+  UI -> S : get order status
+  activate S
+  S -> P : ask payOS for the payment status
+  P --> S : PAID, CANCELLED or EXPIRED
+  S -> DB : update the order if the state changed (same checks as above)
+  S --> UI : current order state
+  deactivate S
+end
+UI --> C : show payment successful and new balance
+@enduml

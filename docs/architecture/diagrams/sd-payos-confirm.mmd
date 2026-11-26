@@ -1,0 +1,41 @@
+sequenceDiagram
+  autonumber
+  actor PT as Patient
+  participant P as payOS
+  participant S as PayOsOrderService
+  participant DB as Database
+  participant UI as Payment Screen
+  actor C as Cashier
+  PT ->> P : scan QR code and pay by bank transfer
+  P ->> S : send payment notification (webhook)
+  activate S
+  S ->> S : verify the signature
+  alt signature invalid
+  S -->> P : reject
+  else signature valid
+  S ->> DB : find the order by order code
+  S ->> S : payment successful, amount, currency and link id match?
+  alt data does not match
+  S ->> DB : set order to Review (manual check)
+  else data matches
+  S ->> DB : amounts still due for each item?
+  alt items already paid or changed
+  S ->> DB : set order to Review (manual check)
+  else all items still payable
+  S ->> DB : create treatment payment with lines (Transfer)
+  S ->> DB : set order to Paid with bank reference
+  end
+  end
+  S -->> P : acknowledge
+  end
+  deactivate S
+  loop screen polls the order status, background worker reconciles Pending orders
+  UI ->> S : get order status
+  activate S
+  S ->> P : ask payOS for the payment status
+  P -->> S : PAID, CANCELLED or EXPIRED
+  S ->> DB : update the order if the state changed (same checks as above)
+  S -->> UI : current order state
+  deactivate S
+  end
+  UI -->> C : show payment successful and new balance

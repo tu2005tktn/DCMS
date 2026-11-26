@@ -23,7 +23,7 @@ public sealed class CaseAttribute(string key, string description, string preCond
 
 internal static class Trace
 {
-    private sealed record Exchange(string Method, string Path, int Status, string Body);
+    private sealed record Exchange(string Method, string Path, int Status, string StatusLine, string Body);
     private sealed class Entry(CaseAttribute info) { public CaseAttribute Info { get; } = info; public List<Exchange> Exchanges { get; } = []; }
 
     // All API tests share one collection, so they run one after another and a plain static is safe.
@@ -34,7 +34,7 @@ internal static class Trace
     public static void End() { if (current != null) finished.Add(current); current = null; }
 
     public static void Record(string method, string path, ApiResponse response) =>
-        current?.Exchanges.Add(new(method, path, response.Status, response.Body.Length > 4000 ? response.Body[..4000] : response.Body));
+        current?.Exchanges.Add(new(method, path, response.Status, response.StatusLine, response.Body.Length > 4000 ? response.Body[..4000] : response.Body));
 
     public static void Flush()
     {

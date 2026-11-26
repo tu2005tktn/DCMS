@@ -19,7 +19,7 @@ export type SupportRequest = {
   proposedStartAt?: string | null;
 };
 export type AppointmentChange = {
-  action: 'RESCHEDULE' | 'CANCEL'; actorKind: 'SELF' | 'STAFF'; oldStart: string; newStart: string | null; reason: string; occurredAt: string;
+  action: 'RESCHEDULE' | 'CANCEL' | 'NO_SHOW' | 'UNDO_NO_SHOW'; actorKind: 'SELF' | 'STAFF'; oldStart: string; newStart: string | null; reason: string; occurredAt: string;
 };
 export type AppointmentDetail = AppointmentCard & {
   branchId: number; branchName: string; dentistId: number; serviceId: number; serviceName: string;

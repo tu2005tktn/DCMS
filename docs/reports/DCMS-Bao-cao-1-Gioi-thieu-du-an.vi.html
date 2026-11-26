@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DCMS – Báo cáo 1: Giới thiệu dự án</title>
+<style>
+  :root { --ink:#1b1b1b; --muted:#555; --line:#9aa0a6; --head:#e9eef5; --accent:#1f4e79; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:#eef0f3; color:var(--ink); font:12.5pt/1.55 "Times New Roman", Times, serif; }
+  .page { max-width:210mm; margin:16px auto; background:#fff; padding:22mm 20mm; box-shadow:0 1px 6px rgba(0,0,0,.15); }
+  h1 { font-size:17pt; color:var(--accent); margin:0 0 12px; border-bottom:2px solid var(--accent); padding-bottom:4px; }
+  h2 { font-size:14pt; margin:22px 0 8px; }
+  h3 { font-size:12.5pt; margin:16px 0 6px; }
+  p { margin:6px 0 8px; text-align:justify; }
+  ul, ol { margin:4px 0 10px; padding-left:24px; }
+  li { margin:3px 0; }
+  table { width:100%; border-collapse:collapse; margin:8px 0 14px; font-size:11.5pt; }
+  th, td { border:1px solid var(--line); padding:5px 8px; vertical-align:top; text-align:left; }
+  th { background:var(--head); }
+  .cover { text-align:center; padding-top:40mm; min-height:250mm; }
+  .cover .t1 { font-size:20pt; font-weight:bold; letter-spacing:.5px; }
+  .cover .t2 { font-size:26pt; font-weight:bold; margin:34px 0 4px; color:var(--accent); }
+  .cover .t3 { font-size:15pt; color:var(--muted); }
+  .cover .t4 { font-size:17pt; font-weight:bold; margin-top:60px; }
+  .cover .t5 { margin-top:140px; font-size:13pt; }
+  .toc a { color:var(--ink); text-decoration:none; }
+  .toc div { margin:3px 0; }
+  .toc .l2 { padding-left:22px; } .toc .l1 { font-weight:bold; margin-top:8px; }
+  dl.sol { margin:6px 0 14px; }
+  dl.sol dt { font-weight:bold; margin-top:8px; }
+  dl.sol dd { margin:2px 0 0 18px; }
+  .note { font-size:10.5pt; color:var(--muted); }
+  .flow { border:1px solid var(--line); background:#f7f9fc; padding:8px 12px; border-radius:4px; text-align:left; }
+  @media print {
+    body { background:#fff; }
+    .page { box-shadow:none; margin:0; max-width:none; padding:0; page-break-after:always; }
+    @page { size:A4; margin:20mm; }
+    tr { page-break-inside:avoid; }
+  }
+  @media (max-width:700px){ .page{ padding:14px; margin:0; } table{ font-size:10.5pt; } }
+</style>
+</head>
+<body>
+
+<!-- BÌA -->
+<section class="page cover">
+  <div class="t1">BÁO CÁO ĐỒ ÁN TỐT NGHIỆP</div>
+  <div class="t2">Hệ thống quản lý phòng khám nha khoa</div>
+  <div class="t3">Dental Clinic Management System (DCMS)</div>
+  <div class="t4">Báo cáo 1 – Giới thiệu dự án</div>
+  <div class="t5">Hà Nội, tháng 9 năm 2026</div>
+</section>
+
+<!-- MỤC LỤC -->
+<section class="page toc">
+  <h1>Mục lục</h1>
+  <div class="l1"><a href="#changelog">Nhật ký thay đổi</a></div>
+  <div class="l1"><a href="#dinhnghia">Định nghĩa và từ viết tắt</a></div>
+  <div class="l1"><a href="#I">I. Tổng quan dự án</a></div>
+  <div class="l2"><a href="#I-1">1. Thông tin dự án</a></div>
+  <div class="l2"><a href="#I-2">2. Mục đích dự án</a></div>
+  <div class="l2"><a href="#I-3">3. Các bên liên quan</a></div>
+  <div class="l1"><a href="#II">II. Bối cảnh sản phẩm</a></div>
+  <div class="l2"><a href="#II-1">1. Hồ sơ phòng khám mục tiêu: Phòng khám Nha khoa Ngọc Khang</a></div>
+  <div class="l2"><a href="#II-2">2. Quy trình vận hành hiện tại</a></div>
+  <div class="l2"><a href="#II-3">3. Các điểm nghẽn vận hành đã xác định</a></div>
+  <div class="l2"><a href="#II-4">4. Lý do phát triển DCMS</a></div>
+  <div class="l1"><a href="#III">III. Các giải pháp hiện có</a></div>
+  <div class="l2"><a href="#III-1">1. DentalFlow</a></div>
+  <div class="l2"><a href="#III-2">2. Nextsoft iDental</a></div>
+  <div class="l2"><a href="#III-3">3. TDental</a></div>
+  <div class="l2"><a href="#III-4">4. Tổng kết và các khoảng trống đã xác định</a></div>
+  <div class="l1"><a href="#IV">IV. Giải pháp đề xuất</a></div>
+  <div class="l2"><a href="#IV-1">1. Tổng quan giải pháp và cách giải quyết từng điểm nghẽn</a></div>
+  <div class="l2"><a href="#IV-2">2. Quy trình đích (To-Be)</a></div>
+  <div class="l2"><a href="#IV-3">3. Mục tiêu cốt lõi</a></div>
+  <div class="l1"><a href="#V">V. Phạm vi và giới hạn của dự án</a></div>
+  <div class="l2"><a href="#V-1">1. Các chức năng chính</a></div>
+  <div class="l2"><a href="#V-2">2. Giới hạn và loại trừ</a></div>
+</section>
+
+<!-- NHẬT KÝ THAY ĐỔI + ĐỊNH NGHĨA -->
+<section class="page">
+  <h1 id="changelog">Nhật ký thay đổi</h1>
+  <table>
+    <tr><th style="width:90px">Ngày</th><th style="width:60px">Loại*</th><th style="width:80px">Phụ trách</th><th>Mô tả thay đổi</th></tr>
+    <tr><td>10/09/2026</td><td>A</td><td>Tư</td><td>Khởi tạo cấu trúc tài liệu và mẫu báo cáo.</td></tr>
+    <tr><td>12/09/2026</td><td>A</td><td>Vinh</td><td>Bổ sung Thông tin dự án và Định nghĩa, từ viết tắt.</td></tr>
+    <tr><td>15/09/2026</td><td>A</td><td>Triển</td><td>Bổ sung Mục đích dự án và Các bên liên quan.</td></tr>
+    <tr><td>16/09/2026</td><td>A</td><td>Trí</td><td>Bổ sung Bối cảnh sản phẩm, gồm bối cảnh thị trường toàn cầu và Việt Nam.</td></tr>
+    <tr><td>17/09/2026</td><td>M</td><td>Tuấn</td><td>Chỉnh sửa các điểm nghẽn của phòng khám và cơ hội sản phẩm trong Bối cảnh sản phẩm.</td></tr>
+    <tr><td>18/09/2026</td><td>M</td><td>Vinh</td><td>Chỉnh sửa định vị sản phẩm và lý do phát triển DCMS.</td></tr>
+    <tr><td>19/09/2026</td><td>M</td><td>Triển</td><td>Cập nhật thông tin thị trường, tài liệu tham khảo và phân tích bối cảnh.</td></tr>
+    <tr><td>20/09/2026</td><td>A</td><td>Tư</td><td>Bổ sung Giải pháp hiện có, gồm so sánh đối thủ và các khoảng trống đã xác định.</td></tr>
+    <tr><td>20/09/2026</td><td>A</td><td>Tuấn</td><td>Bổ sung Giải pháp đề xuất, gồm chức năng AI, quy trình lâm sàng và mục tiêu cốt lõi.</td></tr>
+    <tr><td>21/09/2026</td><td>M</td><td>Trí</td><td>Chỉnh sửa điểm mạnh, điểm yếu của đối thủ và mô tả khoảng trống của dự án.</td></tr>
+    <tr><td>21/09/2026</td><td>M</td><td>Tư</td><td>Sửa Giải pháp đề xuất để bổ sung triển khai do phòng khám kiểm soát, minh bạch tài chính và sao lưu theo lịch.</td></tr>
+    <tr><td>22/09/2026</td><td>A</td><td>Vinh</td><td>Bổ sung Các chức năng chính, mô tả chức năng và đối chiếu khoảng trống được giải quyết.</td></tr>
+    <tr><td>22/09/2026</td><td>A</td><td>Triển</td><td>Bổ sung Giới hạn và loại trừ, xác định ranh giới của bản phát hành đầu tiên.</td></tr>
+    <tr><td>24/09/2026</td><td>M</td><td>Cả nhóm</td><td>Tập trung lại báo cáo vào hoạt động thực tế của Phòng khám Nha khoa Ngọc Khang, bỏ phân tích thị trường toàn cầu không liên quan, điều chỉnh các đối thủ trong nước và làm rõ truy vết Điểm nghẽn – Giải pháp – Chức năng.</td></tr>
+  </table>
+  <p class="note">* A – Thêm mới; M – Chỉnh sửa; D – Xóa.</p>
+
+  <h1 id="dinhnghia" style="margin-top:28px">Định nghĩa và từ viết tắt</h1>
+  <table>
+    <tr><th style="width:110px">Từ viết tắt</th><th>Định nghĩa</th></tr>
+    <tr><td>DCMS</td><td>Dental Clinic Management System – Hệ thống quản lý phòng khám nha khoa</td></tr>
+    <tr><td>DPMS</td><td>Dental Practice Management Software – Phần mềm quản lý phòng khám nha khoa</td></tr>
+    <tr><td>EMR</td><td>Electronic Medical Record – Hồ sơ bệnh án điện tử</td></tr>
+    <tr><td>RBAC</td><td>Role-Based Access Control – Phân quyền theo vai trò</td></tr>
+    <tr><td>AI</td><td>Artificial Intelligence – Trí tuệ nhân tạo</td></tr>
+    <tr><td>OPG</td><td>Orthopantomogram – Phim X-quang toàn cảnh răng</td></tr>
+    <tr><td>QR</td><td>Quick Response – Mã phản hồi nhanh (dùng cho chuyển khoản, thanh toán trực tuyến)</td></tr>
+  </table>
+</section>
+
+<!-- I -->
+<section class="page">
+  <h1 id="I">I. Tổng quan dự án</h1>
+
+  <h2 id="I-1">1. Thông tin dự án</h2>
+  <table>
+    <tr><th style="width:190px">Hạng mục</th><th>Nội dung</th></tr>
+    <tr><td>Tên tiếng Anh</td><td>Dental Clinic Management System</td></tr>
+    <tr><td>Tên tiếng Việt</td><td>Hệ thống quản lý phòng khám nha khoa Ngọc Khang</td></tr>
+    <tr><td>Mã dự án</td><td>DCMS</td></tr>
+    <tr><td>Tên nhóm</td><td>SEP490-G113</td></tr>
+    <tr><td>Loại phần mềm</td><td>Ứng dụng web (cổng dành cho nhân viên và bệnh nhân) và ứng dụng di động dành cho bệnh nhân.</td></tr>
+  </table>
+
+  <h2 id="I-2">2. Mục đích dự án</h2>
+  <p>Dự án DCMS (Hệ thống quản lý phòng khám nha khoa) dành cho Phòng khám Nha khoa Ngọc Khang nhằm thay thế quy trình quản lý thủ công, như hồ sơ giấy và bảng tính Excel, bằng một nền tảng số thống nhất. Hệ thống bao quát toàn bộ chu trình vận hành, gồm đặt lịch hẹn, khám tư vấn, điều trị, đơn đặt labo, quản lý vật tư, thanh toán và báo cáo.</p>
+  <p>DCMS giúp nhân viên phòng khám tra cứu nhanh chóng và chính xác hồ sơ bệnh nhân, lịch hẹn, lịch sử điều trị và dữ liệu vật tư, đồng thời theo dõi liên tục tiến trình điều trị của từng bệnh nhân. Hệ thống cũng cung cấp cho chủ phòng khám cái nhìn rõ ràng về tình hình tài chính và hoạt động thông qua các báo cáo tổng hợp. Bệnh nhân có thể chủ động đặt lịch hẹn, nhận nhắc lịch và xem hồ sơ cũng như tiến trình điều trị của bản thân hoặc người thân qua giao diện web hoặc ứng dụng di động.</p>
+  <p>Ngoài ra, DCMS có một mô-đun AI tùy chọn, làm nổi bật các vùng nghi sâu răng trên phim X-quang toàn cảnh để hỗ trợ bác sĩ; tuy nhiên, chẩn đoán lâm sàng cuối cùng và quyết định điều trị vẫn hoàn toàn thuộc trách nhiệm của bác sĩ.</p>
+
+  <h2 id="I-3">3. Các bên liên quan</h2>
+  <table>
+    <tr><th>Họ và tên</th><th>Vai trò</th><th>Email</th><th>Điện thoại</th></tr>
+    <tr><td>Nghiem Thi Lan Phuong</td><td>Giảng viên hướng dẫn</td><td>phuongntl@fe.edu.vn</td><td></td></tr>
+    <tr><td>Nguyen Van Tu</td><td>Trưởng nhóm</td><td>tunguyen209205@gmail.com</td><td>0362798258</td></tr>
+    <tr><td>Tong Nguyen Tuan</td><td>Thành viên</td><td>tuantnhe171132@fpt.edu.vn</td><td>0349515588</td></tr>
+    <tr><td>Nguyen Thanh Vinh</td><td>Thành viên</td><td>vinhnthe180347@fpt.edu</td><td>0336865091</td></tr>
+    <tr><td>Tran Van Trien</td><td>Thành viên</td><td>trientvhe181820@fpt.edu.vn</td><td>0397461826</td></tr>
+    <tr><td>Ngo Minh Tri</td><td>Thành viên</td><td>trinmhe151037@fpt.edu.vn</td><td>0368300125</td></tr>
+  </table>
+</section>
+
+<!-- II -->
+<section class="page">
+  <h1 id="II">II. Bối cảnh sản phẩm</h1>
+
+  <h2 id="II-1">1. Hồ sơ phòng khám mục tiêu: Phòng khám Nha khoa Ngọc Khang</h2>
+  <p>Phòng khám Nha khoa Ngọc Khang là phòng khám nha khoa một chi nhánh, có 4 ghế nha, với đội ngũ gọn nhẹ gồm 2 bác sĩ và 1 trợ lý phòng khám. Do đội ngũ nhỏ, trợ lý phòng khám phải kiêm nhiệm nhiều việc cùng lúc: đón bệnh nhân và ghi nhận thông tin khi đến khám; nhận và sắp xếp lịch hẹn theo từng bác sĩ, từng ghế; phụ bác sĩ cạnh ghế trong lúc điều trị; thu tiền và ghi lại các khoản thanh toán. Ngoài ra, trợ lý còn ghi chép vật tư đã dùng và liên hệ bệnh nhân sau buổi khám để nhắc tái khám, hỏi thăm sau điều trị. Các bác sĩ vừa trực tiếp khám chữa bệnh, vừa phụ trách quản lý phòng khám.</p>
+  <p>Phòng khám thực hiện cả các ca chỉ cần một lần khám (khám tư vấn, trám răng) lẫn các thủ thuật kéo dài nhiều lần khám như điều trị tủy và phục hình răng, trong đó phục hình cần gia công tại labo bên ngoài. Bệnh nhân còn được hẹn tái khám định kỳ để theo dõi sau điều trị.</p>
+  <p>Từ trước đến nay, phòng khám chưa sử dụng phần mềm quản lý nha khoa chuyên dụng nào. Thông tin được ghi tay vào sổ giấy trước, sau đó mới nhập lại vào Excel.</p>
+
+  <h2 id="II-2">2. Quy trình vận hành hiện tại</h2>
+  <p>Trong quy trình thủ công hiện nay của Phòng khám Nha khoa Ngọc Khang:</p>
+  <ul>
+    <li><b>Đặt lịch và tiếp đón:</b> Lịch hẹn được nhận qua điện thoại, tin nhắn Zalo hoặc bệnh nhân đến trực tiếp, sau đó ghi vào sổ lịch hẹn giấy. Không có cách nào xem được tức thời mối tương quan giữa lịch làm việc của bác sĩ và bốn ghế nha.</li>
+    <li><b>Hồ sơ bệnh nhân và khám lâm sàng:</b> Thông tin bệnh nhân, tiền sử bệnh, tình trạng răng, ghi chú điều trị và đơn thuốc được ghi trên phiếu giấy, sau đó tóm tắt vào bảng tính Excel. Ảnh X-quang được lưu trong các thư mục riêng trên máy tính của phòng khám, tách rời khỏi hồ sơ lâm sàng của bệnh nhân.</li>
+    <li><b>Điều trị, labo và vật tư:</b> Tiến trình điều trị nhiều lần khám, các đơn đặt labo bên ngoài (như mão răng, phục hình) và lượng vật tư tiêu hao đều được ghi tay vào sổ.</li>
+    <li><b>Thanh toán và theo dõi doanh thu:</b> Các khoản thanh toán tiền mặt và chuyển khoản, tiền đặt cọc và công nợ của bệnh nhân được ghi vào sổ biên lai; cuối ngày hoặc cuối tuần, số liệu này được nhập thủ công vào bảng tính Excel để tính doanh thu.</li>
+    <li><b>Theo dõi sau điều trị và chăm sóc khách hàng:</b> Việc nhắc lịch hẹn hoặc tái khám phụ thuộc vào việc trợ lý tự tra sổ lịch hẹn rồi gọi điện hoặc nhắn tin cho bệnh nhân mỗi khi rảnh.</li>
+  </ul>
+
+  <h2 id="II-3">3. Các điểm nghẽn vận hành đã xác định</h2>
+  <p>Các điểm nghẽn vận hành cụ thể của Phòng khám Nha khoa Ngọc Khang:</p>
+  <ol>
+    <li><b>Thiếu minh bạch tài chính và theo dõi thanh toán thủ công trên Excel:</b> Các khoản thanh toán được nhập thủ công vào Excel nên dễ sai sót khi nhập, bỏ sót khoản và chênh lệch số liệu, mà không có cơ chế tự động kiểm tra. Việc theo dõi tiền đặt cọc, các khoản thanh toán từng phần qua nhiều lần điều trị, công nợ chưa thu, chi phí labo bên ngoài và đối chiếu chuyển khoản hoặc QR phải làm bằng tay, chậm và thiếu rõ ràng, khiến chủ phòng khám khó biết chính xác doanh thu và lợi nhuận ròng mỗi ngày.</li>
+    <li><b>Thông tin bệnh nhân rời rạc và tra cứu hồ sơ chậm:</b> Hồ sơ bệnh nhân, ghi chú các lần khám trước, sơ đồ răng (odontogram), ảnh X-quang, tiến trình điều trị và đơn thuốc nằm rải rác trong sổ giấy, các tệp Excel và các thư mục ảnh trên máy. Khi bệnh nhân quay lại, hoặc chuyển giữa hai bác sĩ, việc tìm lại đầy đủ tiền sử lâm sàng diễn ra chậm và dễ thiếu sót chi tiết.</li>
+    <li><b>Chăm sóc bệnh nhân còn yếu và không có kênh tự phục vụ:</b> Chỉ có một trợ lý vừa phụ trách quầy lễ tân vừa hỗ trợ lâm sàng, nên việc nhắc lịch hẹn thủ công và theo dõi sau điều trị dễ bị bỏ sót, dẫn đến tỷ lệ bệnh nhân không đến cao hơn và khả năng giữ chân bệnh nhân thấp hơn. Ngoài ra, bệnh nhân không có kênh số nào để tự đặt hoặc đổi lịch hẹn, hoặc xem hồ sơ y tế của bản thân và người thân (ví dụ cha mẹ theo dõi việc chăm sóc răng cho con nhỏ hoặc người cao tuổi).</li>
+    <li><b>Xung đột lịch hẹn và ghế nha không được tận dụng hết:</b> Khi không có lịch tập trung gắn với giờ làm việc của bác sĩ và 4 ghế nha, việc bệnh nhân đến trực tiếp và đặt lịch qua điện thoại hoặc Zalo có thể gây trùng lịch, khối lượng việc không đều giữa hai bác sĩ, hoặc ghế bị bỏ trống khi bệnh nhân hủy sát giờ. Hệ quả là có lúc bệnh nhân phải chờ lâu dù ca điều trị chỉ mất ít thời gian, trong khi ở thời điểm khác ghế lại trống.</li>
+    <li><b>Thiếu công cụ lập kế hoạch điều trị và quản lý điều trị, labo, vật tư:</b> Bác sĩ xác định hướng điều trị dựa trên kinh nghiệm nhưng chưa có công cụ ghi thành kế hoạch cụ thể (hạng mục, răng, thời gian, chi phí dự kiến) để trình bày cho bệnh nhân, nên bệnh nhân khó biết trước mình điều trị những gì và tốn bao nhiêu. Đồng thời, tiến trình điều trị nhiều lần khám, trạng thái đơn labo và mức tiêu hao vật tư không được liên kết trong một hệ thống, nên phòng khám khó theo dõi tiến độ giao phục hình, khó kiểm soát vật tư và dễ tính sai chi phí điều trị.</li>
+  </ol>
+
+  <h2 id="II-4">4. Lý do phát triển DCMS</h2>
+  <p>Nhìn lại các điểm nghẽn ở mục trên, có thể thấy chúng đều bắt nguồn từ một chỗ: thông tin của phòng khám đang nằm ở quá nhiều nơi. Lịch hẹn ghi trong sổ, hồ sơ bệnh nhân trên phiếu giấy, ảnh X-quang trong thư mục riêng, còn tiền thu thì ghi vào sổ biên lai rồi mới nhập sang Excel. Mỗi thứ một nơi, cùng một dữ liệu phải ghi đi ghi lại, và không ai nhìn được toàn cảnh. Việc này lại dồn lên một đội ngũ rất nhỏ, khi trợ lý phải làm đủ thứ việc cùng lúc còn các bác sĩ vừa khám bệnh vừa quản lý phòng khám. Phòng khám chưa từng dùng phần mềm quản lý nên cũng chưa có công cụ nào nối các việc này lại với nhau. Vì thế, phòng khám cần một hệ thống chung để lịch hẹn, hồ sơ, điều trị, labo, vật tư và thanh toán cùng dùng một nguồn dữ liệu, giúp bớt ghi chép lặp lại và đủ đơn giản để đội ngũ hiện tại dùng được ngay.</p>
+</section>
+
+<!-- III -->
+<section class="page">
+  <h1 id="III">III. Các giải pháp hiện có</h1>
+  <p>Mục này khảo sát một số phần mềm quản lý nha khoa phổ biến tại Việt Nam, nhằm làm rõ các phần mềm đó đã làm được gì và còn thiếu gì so với nhu cầu thực tế của Phòng khám Nha khoa Ngọc Khang. Thông tin dựa trên nội dung công khai trên trang web của từng nhà cung cấp; các nhận định “chưa thấy” nghĩa là trang không đề cập, chưa phải khẳng định chức năng đó không tồn tại.</p>
+
+  <h2 id="III-1">1. DentalFlow (phần mềm quản lý phòng khám nha khoa trực tuyến)</h2>
+  <p>DentalFlow là nền tảng quản lý phòng khám nha khoa chạy trên đám mây tại Việt Nam.</p>
+  <dl class="sol">
+    <dt>Website</dt><dd>https://dentalflow.vn</dd>
+    <dt>Đối tượng sử dụng</dt><dd>Chủ phòng khám, bác sĩ, lễ tân và quản lý phòng khám tại Việt Nam.</dd>
+    <dt>Tính năng chính</dt><dd>Bệnh án điện tử, lịch hẹn, kế hoạch điều trị, thu chi và công nợ, quản lý vật tư và labo, chăm sóc khách hàng qua Zalo, SMS.</dd>
+    <dt>Điểm mạnh</dt>
+    <dd><ul>
+      <li>Quản lý nội bộ đầy đủ, từ bệnh án, điều trị, thu chi đến vật tư và labo.</li>
+      <li>Phù hợp thị trường Việt Nam: giao diện tiếng Việt, hỗ trợ Zalo, SMS, hóa đơn điện tử.</li>
+      <li>Thuê theo tháng, tính theo số ghế, dễ tiếp cận về chi phí (theo nhà cung cấp).</li>
+    </ul></dd>
+    <dt>Điểm hạn chế</dt>
+    <dd><ul>
+      <li>Hướng tới nhân viên là chính.</li>
+      <li>Chưa thấy ứng dụng hay cổng cho bệnh nhân xem hồ sơ và tiến trình điều trị của bản thân và người thân, ngoài việc đặt lịch qua website phòng khám.</li>
+      <li>Chưa thấy thanh toán QR đối soát tự động với giao dịch ngân hàng.</li>
+    </ul></dd>
+    <dt>Khoảng trống của dự án</dt><dd>GAP-01, GAP-02.</dd>
+  </dl>
+
+  <h2 id="III-2">2. Nextsoft iDental (phần mềm quản lý phòng khám nha khoa)</h2>
+  <p>Nextsoft iDental là phần mềm quản lý nha khoa của Việt Nam, dành cho phòng khám đơn lẻ và chuỗi phòng khám.</p>
+  <dl class="sol">
+    <dt>Website</dt><dd>https://nextsoft.vn/products/phan-mem-nha-khoa-nextsoft-idental</dd>
+    <dt>Đối tượng sử dụng</dt><dd>Chủ phòng khám, bác sĩ, lễ tân và thu ngân tại các phòng khám nha khoa ở Việt Nam, từ phòng khám đơn lẻ đến chuỗi.</dd>
+    <dt>Tính năng chính</dt><dd>Hồ sơ điều trị theo từng răng, lịch hẹn theo bác sĩ và ghế, thu ngân và công nợ, nhắc hẹn qua Zalo và SMS, báo cáo doanh thu, quản lý đa chi nhánh.</dd>
+    <dt>Điểm mạnh</dt>
+    <dd><ul>
+      <li>Bao quát quy trình từ đặt lịch, tiếp đón, điều trị, thu ngân đến chăm sóc sau khám.</li>
+      <li>Quản lý lịch theo bác sĩ và ghế nha, có nhắc hẹn tự động, hỗ trợ nhiều chi nhánh.</li>
+      <li>Phân quyền chi tiết theo vai trò và có nhật ký thao tác.</li>
+    </ul></dd>
+    <dt>Điểm hạn chế</dt>
+    <dd><ul>
+      <li>Đặt lịch do nhân viên thực hiện, chưa thấy bệnh nhân tự đặt hoặc đổi lịch.</li>
+      <li>Chưa thấy cổng hay ứng dụng cho bệnh nhân xem hồ sơ của bản thân và người thân. Ứng dụng di động chỉ dành cho chủ phòng khám xem báo cáo.</li>
+      <li>Chưa thấy thanh toán QR đối soát tự động với giao dịch ngân hàng.</li>
+    </ul></dd>
+    <dt>Khoảng trống của dự án</dt><dd>GAP-01, GAP-02.</dd>
+  </dl>
+
+  <h2 id="III-3">3. TDental (phần mềm quản lý phòng khám nha khoa)</h2>
+  <p>TDental là phần mềm quản lý nha khoa của Việt Nam, dùng cho phòng khám đơn lẻ và chuỗi phòng khám.</p>
+  <dl class="sol">
+    <dt>Website</dt><dd>https://tdental.vn</dd>
+    <dt>Đối tượng sử dụng</dt><dd>Chủ phòng khám, bác sĩ và nhân viên phòng khám nha khoa tại Việt Nam.</dd>
+    <dt>Tính năng chính</dt><dd>Quản lý thông tin bệnh nhân và công đoạn điều trị, nhắc lịch hẹn và tái khám, quản lý công nợ khách hàng và nhà cung cấp, quản lý labo, báo cáo, quản lý đa chi nhánh, ứng dụng di động xem tổng quan hoạt động.</dd>
+    <dt>Điểm mạnh</dt>
+    <dd><ul>
+      <li>Có đủ các phần quản lý chính của phòng khám: bệnh nhân, điều trị, labo, thu chi và công nợ.</li>
+      <li>Hỗ trợ nhiều chi nhánh, có ứng dụng di động cho người quản lý.</li>
+      <li>Có dùng thử 7 ngày và hỗ trợ tận nơi (theo nhà cung cấp).</li>
+    </ul></dd>
+    <dt>Điểm hạn chế</dt>
+    <dd><ul>
+      <li>Hướng tới nhân viên và người quản lý là chính.</li>
+      <li>Chưa thấy cổng hay ứng dụng cho bệnh nhân tự đặt lịch và xem hồ sơ của bản thân và người thân.</li>
+      <li>Chưa thấy thanh toán QR đối soát tự động với giao dịch ngân hàng.</li>
+    </ul></dd>
+    <dt>Khoảng trống của dự án</dt><dd>GAP-01, GAP-02.</dd>
+  </dl>
+
+  <h2 id="III-4">4. Tổng kết và các khoảng trống đã xác định</h2>
+  <p>Các giải pháp trên (DentalFlow, Nextsoft iDental, TDental) đều số hóa được phần lớn công việc quản lý của phòng khám. Tuy vậy, nếu dùng nguyên bản, vẫn còn hai khoảng trống đối với Phòng khám Nha khoa Ngọc Khang:</p>
+  <table>
+    <tr><th style="width:70px">Mã</th><th style="width:210px">Khoảng trống</th><th>Tác động đến Phòng khám Nha khoa Ngọc Khang</th></tr>
+    <tr>
+      <td>GAP-01</td>
+      <td>Chưa có trải nghiệm tự phục vụ thống nhất trên web và di động cho bệnh nhân và người thân</td>
+      <td>Chỉ có một trợ lý hỗ trợ hai bác sĩ và bốn ghế, nên việc tiếp nhận lịch, nhắc lịch và trả lời về hồ sơ vẫn dồn lên nhân viên. Phòng khám cần cổng web và ứng dụng di động để bệnh nhân tự đặt lịch, nhận nhắc lịch trước 24 giờ và 2 giờ, và xem hồ sơ của bản thân cùng người thân đã được xác minh.</td>
+    </tr>
+    <tr>
+      <td>GAP-02</td>
+      <td>Chưa thấy thanh toán QR đối soát tự động gắn với từng đợt điều trị</td>
+      <td>Việc đối chiếu chuyển khoản và QR hiện làm bằng tay, nên chủ phòng khám khó biết chính xác doanh thu, khoản thu từng phần và công nợ. Phòng khám cần thanh toán QR được hệ thống tự đối soát và ghi thẳng vào sổ thu chi của từng đợt điều trị, không phải nhập lại vào Excel.</td>
+    </tr>
+  </table>
+</section>
+
+<!-- IV -->
+<section class="page">
+  <h1 id="IV">IV. Giải pháp đề xuất</h1>
+
+  <h2 id="IV-1">1. Tổng quan giải pháp và cách giải quyết từng điểm nghẽn</h2>
+  <p>DCMS được đề xuất là một hệ thống web và di động thống nhất, xây dựng riêng cho Phòng khám Nha khoa Ngọc Khang để số hóa phòng khám từ đầu đến cuối. Giải pháp xuất phát từ năm điểm nghẽn vận hành thực tế nêu ở Mục II.3; mỗi điểm nghẽn được giải quyết như sau.</p>
+
+  <h3>Điểm nghẽn 1 – Thiếu minh bạch tài chính và theo dõi thanh toán thủ công</h3>
+  <p>Mọi khoản thu được ghi một lần ngay trên phiếu điều trị của bệnh nhân, gồm tiền mặt, chuyển khoản, tiền tạm ứng và các khoản thanh toán từng phần qua nhiều lần điều trị. Với chuyển khoản bằng mã QR, hệ thống tạo đơn thanh toán, tự nhận kết quả từ cổng thanh toán và đối chiếu lại định kỳ mỗi 15 giây, nên không còn phải đối chiếu bằng tay hay nhập lại vào Excel. Chủ phòng khám xem được các chỉ số tài chính theo kỳ: tiền cần thu, tiền đã thu, tiền thu trước, tiền còn phải thu, chi phí vật tư và lãi. Màn hình này chỉ dành riêng cho chủ phòng khám.</p>
+
+  <h3>Điểm nghẽn 2 – Thông tin bệnh nhân rời rạc và tra cứu hồ sơ chậm</h3>
+  <p>Hồ sơ của mỗi bệnh nhân được gom vào một nơi: thông tin hành chính, tiền sử, các lần khám, sơ đồ răng 2D và 3D, ảnh X-quang và tài liệu lâm sàng, đơn thuốc và tiến trình điều trị. Khi bệnh nhân quay lại hoặc chuyển sang bác sĩ khác, người dùng có quyền chỉ cần mở hồ sơ là thấy đầy đủ tiền sử mà không phải tìm trong sổ, tệp Excel hay thư mục ảnh.</p>
+
+  <h3>Điểm nghẽn 3 – Chăm sóc bệnh nhân còn yếu và không có kênh tự phục vụ</h3>
+  <p>Bệnh nhân có tài khoản trên cổng web và ứng dụng di động để tự đặt lịch cho bản thân hoặc người thân, xem lịch sử lịch hẹn, dời hoặc hủy lịch khi còn cách giờ hẹn ít nhất 12 giờ (gần hơn thì gửi yêu cầu hỗ trợ cho phòng khám), và nhận thông báo nhắc lịch trước 24 giờ và 2 giờ. Sau khi phòng khám xác minh việc liên kết, bệnh nhân xem được hồ sơ, tiến trình điều trị và đơn thuốc của bản thân và của người thân. Với nhân viên, hệ thống có danh sách công việc chăm sóc khách hàng để gọi hỏi thăm sau điều trị và nhắc tái khám, thay cho việc tự nhớ và tra sổ.</p>
+
+  <h3>Điểm nghẽn 4 – Xung đột lịch hẹn và ghế nha không được tận dụng hết</h3>
+  <p>Mỗi bác sĩ tự thiết lập lịch làm việc của mình (mẫu lặp hằng tuần hoặc ngoại lệ cho một ngày, như ngày nghỉ) rồi công bố; trước khi công bố, hệ thống báo những lịch hẹn đã xác nhận bị ảnh hưởng. Lịch hẹn nhận từ bất kỳ kênh nào (tại quầy, qua điện thoại hay từ cổng bệnh nhân) đều chỉ được đặt vào các khung giờ còn trống theo lịch đó, mỗi lịch hẹn gắn với một bác sĩ và một ghế, và hệ thống kiểm tra trùng lịch trước khi xác nhận. Nhờ đó nhân viên thấy ngay giờ nào bác sĩ nào, ghế nào còn trống, và có thể phân đều bệnh nhân cho các bác sĩ.</p>
+
+  <h3>Điểm nghẽn 5 – Thiếu công cụ lập kế hoạch điều trị và quản lý điều trị, labo, vật tư</h3>
+  <p>Bác sĩ lập phiếu điều trị theo kế hoạch gồm hạng mục, răng, thời gian và chi phí dự kiến, có thể dùng các mẫu kế hoạch dùng lại cho những ca thường gặp, để trình bày cho bệnh nhân trước khi điều trị. Mỗi buổi điều trị được ghi lại theo từng lần khám. Đơn đặt labo được theo dõi theo trạng thái và hạn giao, đơn quá hạn được đánh dấu. Vật tư dùng trong điều trị được trừ vào tồn kho, và hệ thống chặn việc dùng vượt quá lượng tồn.</p>
+
+  <h3>Nền tảng chung và chức năng hỗ trợ</h3>
+  <p>Hệ thống có tài khoản và phân quyền theo vai trò (quản trị, chủ phòng khám, bác sĩ, trợ lý), kèm các nhóm quyền cấu hình được theo từng màn hình và thao tác, và tự đăng xuất khi không hoạt động. Bệnh nhân có thể đăng nhập bằng Google. Ngoài ra, bác sĩ có thể chạy dịch vụ AI nội bộ trên phim X-quang toàn cảnh để làm nổi bật các vùng nghi sâu răng; kết quả chỉ là gợi ý tham khảo, không tự thay đổi chẩn đoán hay hồ sơ.</p>
+
+  <p>Hai điểm khác biệt so với các phần mềm hiện có ở Mục III là cổng và ứng dụng tự phục vụ cho bệnh nhân và người thân (GAP-01), và thanh toán QR tự động đối soát gắn với từng đợt điều trị (GAP-02).</p>
+
+  <h2 id="IV-2">2. Quy trình đích (To-Be)</h2>
+  <p>DCMS thay quy trình giấy và Excel của Phòng khám Nha khoa Ngọc Khang bằng một quy trình số liên tục:</p>
+  <p class="flow">Đặt lịch (cổng bệnh nhân hoặc tại quầy) → Nhắc lịch tự động (24 giờ, 2 giờ) → Tiếp đón và hàng chờ → Khám lâm sàng (sơ đồ răng 2D/3D) → Tải X-quang và AI tùy chọn → Bác sĩ xem xét, chẩn đoán → Phiếu điều trị nhiều lần khám, labo, trừ vật tư → Đơn thuốc → Thanh toán và đối soát QR → Báo cáo tài chính, chăm sóc sau khám và truy cập hồ sơ trên di động</p>
+
+  <h2 id="IV-3">3. Mục tiêu cốt lõi</h2>
+  <ol>
+    <li><b>Bỏ ghi chép trùng giữa giấy và Excel:</b> Số hóa toàn bộ hoạt động hằng ngày vào một nguồn dữ liệu duy nhất, phù hợp với đội ngũ gọn (2 bác sĩ, 1 trợ lý, 4 ghế). <i>(Điểm nghẽn 2, 4, 5)</i></li>
+    <li><b>Bảo đảm minh bạch tài chính:</b> Theo dõi được hóa đơn, thanh toán tiền mặt, chuyển khoản và QR, tiền tạm ứng, công nợ, chi phí vật tư và lãi. <i>(Điểm nghẽn 1)</i></li>
+    <li><b>Nâng cao chăm sóc và giữ chân bệnh nhân:</b> Cho bệnh nhân và gia đình tự đặt lịch, nhận nhắc lịch và xem hồ sơ trên web và di động. <i>(Điểm nghẽn 3, 4)</i></li>
+    <li><b>Hỗ trợ lâm sàng có trách nhiệm:</b> Hỗ trợ bác sĩ khi xem phim X-quang toàn cảnh bằng AI sàng lọc sâu răng tùy chọn, quyền chẩn đoán vẫn hoàn toàn thuộc bác sĩ.</li>
+  </ol>
+</section>
+
+<!-- V -->
+<section class="page">
+  <h1 id="V">V. Phạm vi và giới hạn của dự án</h1>
+
+  <h2 id="V-1">1. Các chức năng chính</h2>
+  <table>
+    <tr><th style="width:62px">Mã</th><th style="width:150px">Tên chức năng</th><th>Mô tả</th><th style="width:80px">Điểm nghẽn</th><th style="width:70px">GAP</th></tr>
+    <tr><td>MF-01</td><td>Tài khoản, xác thực và phân quyền</td><td>Đăng nhập, đăng xuất (có đăng nhập Google cho bệnh nhân), khôi phục mật khẩu, quản lý tài khoản nhân viên, tự đăng xuất khi không hoạt động, nhóm quyền cấu hình được theo màn hình và thao tác.</td><td>Nền tảng chung</td><td>—</td></tr>
+    <tr><td>MF-02</td><td>Lịch làm việc của bác sĩ và quản lý lịch hẹn</td><td>Bác sĩ tự thiết lập lịch làm việc theo mẫu hằng tuần hoặc ngoại lệ ngày, xem trước các khung giờ còn trống và kiểm tra ảnh hưởng đến lịch hẹn đã xác nhận trước khi công bố. Quản lý chi nhánh và ghế nha, lịch hẹn theo ngày và tuần (mỗi lịch hẹn gắn với bác sĩ và ghế) có kiểm tra trùng lịch, đặt lịch tại quầy, dời lịch, hủy lịch.</td><td>4</td><td>—</td></tr>
+    <tr><td>MF-03</td><td>Cổng đặt lịch cho bệnh nhân và yêu cầu hỗ trợ</td><td>Luồng web và di động để bệnh nhân tự đặt lịch (cho bản thân hoặc người thân), xem lịch sử lịch hẹn, dời hoặc hủy lịch khi còn cách giờ hẹn ít nhất 12 giờ, hoặc gửi yêu cầu hỗ trợ để trợ lý phòng khám xử lý.</td><td>3, 4</td><td>GAP-01</td></tr>
+    <tr><td>MF-04</td><td>Tiếp đón, hồ sơ bệnh nhân và truy cập hồ sơ gia đình</td><td>Check-in và hàng chờ, hồ sơ bệnh nhân tập trung, liên kết tài khoản với hồ sơ có xác minh, quản lý người thân, phạm vi xem hồ sơ người thân do phòng khám duyệt.</td><td>2, 3</td><td>GAP-01</td></tr>
+    <tr><td>MF-05</td><td>Khám lâm sàng, sơ đồ răng 2D/3D và quản lý tài liệu</td><td>Khám theo cấu trúc (triệu chứng, tiền sử bệnh), sơ đồ răng 2D và 3D, chẩn đoán, chỉ định cận lâm sàng, lưu trữ và xem tài liệu lâm sàng, ảnh X-quang.</td><td>2</td><td>—</td></tr>
+    <tr><td>MF-06</td><td>AI sàng lọc sâu răng trên X-quang toàn cảnh (tùy chọn)</td><td>Phân tích theo yêu cầu ảnh X-quang toàn cảnh đã tải lên để làm nổi bật vùng nghi sâu răng kèm độ tin cậy, lưu lịch sử mỗi lần chạy để bác sĩ xem xét.</td><td>Hỗ trợ lâm sàng</td><td>—</td></tr>
+    <tr><td>MF-07</td><td>Điều trị nhiều lần khám, đơn labo, vật tư và đơn thuốc</td><td>Phiếu điều trị và mẫu kế hoạch dùng lại, ghi từng buổi điều trị, theo dõi đơn labo (trạng thái, hạn giao, quá hạn), trừ vật tư theo điều trị, đơn thuốc.</td><td>5</td><td>—</td></tr>
+    <tr><td>MF-08</td><td>Thanh toán, QR trực tuyến và báo cáo tài chính</td><td>Ghi nhận tiền mặt, chuyển khoản và tiền tạm ứng, thanh toán QR tự đối soát (nhận kết quả từ cổng thanh toán và đối chiếu mỗi 15 giây), nhập mua và tồn kho vật tư, thống kê tài chính và thống kê công việc, dịch vụ.</td><td>1</td><td>GAP-02</td></tr>
+    <tr><td>MF-09</td><td>Ứng dụng di động bệnh nhân, nhắc lịch tự động và chăm sóc khách hàng</td><td>Ứng dụng cho bệnh nhân xem hồ sơ liên kết, điều trị và đơn thuốc; thông báo thời gian thực và thông báo đẩy về lịch hẹn, nhắc lịch trước 24 giờ và 2 giờ; danh sách công việc chăm sóc khách hàng cho nhân viên gọi hỏi thăm.</td><td>3</td><td>GAP-01</td></tr>
+  </table>
+
+  <h2 id="V-2">2. Giới hạn và loại trừ</h2>
+  <table>
+    <tr><th style="width:62px">Mã</th><th style="width:200px">Nội dung loại trừ</th><th>Lý do</th></tr>
+    <tr><td>LI-01</td><td>AI tự động chẩn đoán lâm sàng</td><td>Mô-đun AI chỉ hỗ trợ trực quan cho việc nghi sâu răng trên X-quang toàn cảnh; không chẩn đoán, không sửa hồ sơ và không thay thế bác sĩ có chứng chỉ hành nghề.</td></tr>
+    <tr><td>LI-02</td><td>Kết nối trực tiếp thiết bị X-quang/cảm biến và trình xem DICOM gốc</td><td>Ảnh lâm sàng được tải lên dưới các định dạng ảnh thông dụng và tài liệu ở dạng PDF; việc kết nối trực tiếp cảm biến X-quang và hiển thị đầy đủ theo chuẩn PACS/DICOM nằm ngoài phạm vi bản v1.</td></tr>
+    <tr><td>LI-03</td><td>Thiết kế và gia công phục hình CAD/CAM 3D</td><td>Quét trong miệng 3D, thiết kế phục hình và phay đòi hỏi thiết bị và phần mềm chuyên dụng của nhà cung cấp, nằm ngoài phạm vi DCMS.</td></tr>
+    <tr><td>LI-04</td><td>Nhắn tin qua cổng Zalo OA / SMS của bên thứ ba</td><td>Thông báo lịch hẹn và nhắc lịch trước 24 giờ, 2 giờ được gửi qua dịch vụ thông báo thời gian thực và thông báo đẩy của DCMS, không dùng cổng Zalo hoặc SMS trả phí ở bản v1.</td></tr>
+    <tr><td>LI-05</td><td>Thanh toán bảo hiểm y tế và khai báo hóa đơn điện tử, thuế</td><td>DCMS tập trung vào minh bạch tài chính nội bộ, đối soát thanh toán QR và báo cáo vận hành cho Phòng khám Nha khoa Ngọc Khang; việc tích hợp trực tiếp với cổng bảo hiểm hoặc hệ thống hóa đơn điện tử, thuế quốc gia được để lại cho các giai đoạn sau.</td></tr>
+  </table>
+</section>
+
+</body>
+</html>

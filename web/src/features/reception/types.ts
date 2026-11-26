@@ -12,7 +12,7 @@ export type ReceptionAppointment = {
   chairId: number; chairName: string; startAt: string; endAt: string;
   status: AppointmentStatus; version: number; patientId: number | null; patientCode: string | null; patientName: string | null;
   bookerName: string; bookerPhone: string | null; bookerEmail: string | null; attendeeName: string; attendeeBirthDate: string | null;
-  attendeeRelation: string; visitId: string | null; canCheckIn: boolean; ineligibleReason: string | null;
+  attendeeRelation: string; visitId: string | null; canCheckIn: boolean; ineligibleReason: string | null; canUndoNoShow?: boolean;
 };
 export type VisitResult = {
   visitId: string; patientId: number; patientCode: string; patientName: string; appointmentId: string; appointmentCode: string;

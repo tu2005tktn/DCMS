@@ -227,7 +227,7 @@ Bản số ghi theo dạng *cha — con*: ví dụ `1 — N` = một bản ghi c
 | Cột | Kiểu | Khoá | NN | Ghi chú |
 |---|---|---|---|---|
 | Id | uuid | PK | ✓ |  |
-| PatientId | integer |  | ✓ |  |
+| PatientId | integer |  |  | trống: vắng hẹn của lịch chưa có hồ sơ |
 | BranchId | integer |  | ✓ |  |
 | AppointmentId | uuid |  |  |  |
 | Type | varchar(40) |  | ✓ |  |

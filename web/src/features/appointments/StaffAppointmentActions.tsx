@@ -5,14 +5,27 @@ import { usePermissions } from '../authentication/usePermissions';
 import { clinicToday, formatClock, formatDate, localDate, newRequestKey, type AppointmentListItem, type AppointmentOptions, type AvailabilitySlot, type StaffAppointmentDetail } from './types';
 import ReplacementBooking from './ReplacementBooking';
 
-type Mode = 'edit' | 'cancel' | 'no-show';
+type Mode = 'edit' | 'rebook' | 'cancel' | 'no-show' | 'undo-no-show';
 type ChangeResult = { notification: { message: string } };
 const eligible = (appointment: AppointmentListItem) => appointment.status === 'Confirmed' && Date.parse(appointment.startAt) > Date.now();
 const noShowEligible = (appointment: AppointmentListItem) => appointment.status === 'Confirmed' && Date.parse(appointment.startAt) <= Date.now();
+const undoEligible = (appointment: AppointmentListItem) => appointment.status === 'NoShow' && !!appointment.canUndoNoShow;
+// A missed booking: today's one whose start has passed, or a no-show recorded today (the same ones that can be undone).
+const rebookEligible = (appointment: AppointmentListItem) => undoEligible(appointment)
+  || noShowEligible(appointment) && localDate(appointment.startAt) === clinicToday();
+const modeEligible = (mode: Mode, appointment: AppointmentListItem) =>
+  mode === 'no-show' ? noShowEligible(appointment) : mode === 'undo-no-show' ? undoEligible(appointment)
+    : mode === 'rebook' ? rebookEligible(appointment) : eligible(appointment);
+const modePermission: Record<Mode, string> = { edit: 'appointments.reschedule', rebook: 'appointments.reschedule', cancel: 'appointments.cancel', 'no-show': 'appointments.no-show', 'undo-no-show': 'appointments.no-show' };
+const modePath: Record<Mode, string> = { edit: 'reschedule', rebook: 'reschedule', cancel: 'cancel', 'no-show': 'no-show', 'undo-no-show': 'no-show/undo' };
+const reasonLabels: Record<Mode, string> = { edit: 'chỉnh sửa', rebook: 'đổi lịch', cancel: 'hủy lịch', 'no-show': 'khách không tới', 'undo-no-show': 'hoàn tác' };
+const defaultReasons: Record<Mode, string> = { edit: '', rebook: 'Khách đến muộn, đổi sang giờ khác.', cancel: '',
+  'no-show': 'Khách không tới theo lịch hẹn.', 'undo-no-show': 'Ghi nhận nhầm khách không tới.' };
 const slotKey = (slot: AvailabilitySlot) => `${slot.start}:${slot.chairId}`;
 
-export default function StaffAppointmentActions({ appointment, onChanged, size = 'small' }: {
-  appointment: AppointmentListItem; onChanged: (notice: string) => void; size?: 'small' | 'middle';
+// attendanceOnly (reception tables) offers just moving a missed booking, the no-show and its undo.
+export default function StaffAppointmentActions({ appointment, onChanged, size = 'small', attendanceOnly = false }: {
+  appointment: AppointmentListItem; onChanged: (notice: string) => void; size?: 'small' | 'middle'; attendanceOnly?: boolean;
 }) {
   const has = usePermissions();
   const [mode, setMode] = useState<Mode | null>(null);
@@ -24,15 +37,19 @@ export default function StaffAppointmentActions({ appointment, onChanged, size =
     const timer = window.setTimeout(() => tick(value => value + 1), Math.min(2147483647, deadline - Date.now() + 1));
     return () => window.clearTimeout(timer);
   }, [appointment.status, appointment.startAt, appointment.endAt, clockRevision]);
-  const canEdit = has('appointments.reschedule'), canCancel = has('appointments.cancel');
+  const canEdit = !attendanceOnly && has('appointments.reschedule'), canCancel = !attendanceOnly && has('appointments.cancel');
   const canNoShow = has('appointments.no-show') && noShowEligible(appointment);
-  const canReplace = has('appointments.create') && appointment.status === 'NoShow' && Date.parse(appointment.endAt) > Date.now();
-  if ((!eligible(appointment) || !canEdit && !canCancel) && !canNoShow && !canReplace && !mode && !replacement) return null;
+  const canUndo = has('appointments.no-show') && undoEligible(appointment);
+  const canRebook = has('appointments.reschedule') && rebookEligible(appointment);
+  const canReplace = !attendanceOnly && has('appointments.create') && appointment.status === 'NoShow' && Date.parse(appointment.endAt) > Date.now();
+  if ((!eligible(appointment) || !canEdit && !canCancel) && !canNoShow && !canUndo && !canRebook && !canReplace && !mode && !replacement) return null;
   return <>
-    <Space wrap>
+    <Space wrap={!attendanceOnly}>
       {eligible(appointment) && canEdit && <Button size={size} onClick={() => setMode('edit')}>Chỉnh sửa lịch</Button>}
       {eligible(appointment) && canCancel && <Button size={size} danger onClick={() => setMode('cancel')}>Hủy lịch</Button>}
+      {canRebook && <Button size={size} onClick={() => setMode('rebook')}>Đổi lịch</Button>}
       {canNoShow && <Button size={size} onClick={() => setMode('no-show')}>Khách không tới</Button>}
+      {canUndo && <Button size={size} onClick={() => setMode('undo-no-show')}>Hoàn tác không tới</Button>}
       {canReplace && <Button size={size} type="primary" onClick={() => setReplacement(true)}>Đặt lịch thay thế</Button>}
     </Space>
     {mode && <ChangeForm key={`${appointment.id}:${mode}`} appointment={appointment} mode={mode} onClose={() => setMode(null)}
@@ -46,23 +63,24 @@ function ChangeForm({ appointment, mode, onClose, onChanged }: {
 }) {
   const has = usePermissions();
   const [current, setCurrent] = useState(appointment);
-  const [date, setDate] = useState(localDate(appointment.startAt)), [dentist, setDentist] = useState(appointment.dentistId);
+  const moving = mode === 'edit' || mode === 'rebook';
+  const [date, setDate] = useState(mode === 'rebook' ? clinicToday() : localDate(appointment.startAt)), [dentist, setDentist] = useState(appointment.dentistId);
   const [options, setOptions] = useState<AppointmentOptions | null>(null), [optionsError, setOptionsError] = useState('');
   const [slots, setSlots] = useState<AvailabilitySlot[]>([]), [slot, setSlot] = useState<AvailabilitySlot | null>(null);
-  const [reason, setReason] = useState(mode === 'no-show' ? 'Khách không tới theo lịch hẹn.' : ''), [error, setError] = useState<ApiError | Error | null>(null);
+  const [reason, setReason] = useState(defaultReasons[mode]), [error, setError] = useState<ApiError | Error | null>(null);
   const [loading, setLoading] = useState(false), [busy, setBusy] = useState(false), [reloading, setReloading] = useState(false), [revision, setRevision] = useState(0);
   const pending = useRef<{ fingerprint: string; key: string } | null>(null), sending = useRef(false);
-  const currentEligible = mode === 'no-show' ? noShowEligible(current) : eligible(current);
-  const allowed = has(mode === 'edit' ? 'appointments.reschedule' : mode === 'no-show' ? 'appointments.no-show' : 'appointments.cancel') && currentEligible;
+  const currentEligible = modeEligible(mode, current);
+  const allowed = has(modePermission[mode]) && currentEligible;
   useEffect(() => {
-    if (mode !== 'edit') return;
+    if (!moving) return;
     let active = true; const controller = new AbortController(); setOptionsError('');
     void api<AppointmentOptions>('/api/appointments/options', { signal: controller.signal }).then(value => { if (active) setOptions(value); })
       .catch(failure => { if (active) setOptionsError((failure as Error).message); });
     return () => { active = false; controller.abort(); };
-  }, [mode, revision]);
+  }, [moving, revision]);
   useEffect(() => {
-    if (mode !== 'edit' || !allowed || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !dentist) return;
+    if (!moving || !allowed || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !dentist) return;
     let active = true; const controller = new AbortController();
     setLoading(true); setSlots([]); setSlot(null);
     const query = new URLSearchParams({ date, dentistId: String(dentist) });
@@ -71,7 +89,7 @@ function ChangeForm({ appointment, mode, onClose, onChanged }: {
       .catch(failure => { if (active) setError(failure as Error); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; controller.abort(); };
-  }, [mode, current.code, current.version, allowed, date, dentist, revision]);
+  }, [moving, current.code, current.version, allowed, date, dentist, revision]);
 
   async function reloadCurrent() {
     if (sending.current) return;
@@ -83,15 +101,15 @@ function ChangeForm({ appointment, mode, onClose, onChanged }: {
     finally { setReloading(false); }
   }
   async function submit() {
-    if (!allowed || !reason.trim() || sending.current || mode === 'edit' && (!slot || loading || optionsError)) return;
-    const payload = { expectedVersion: current.version, reason: reason.trim(), ...(mode !== 'no-show' ? { clinicInitiated: true } : {}),
-      ...(mode === 'edit' && slot ? { dentistId: dentist, newStart: slot.start, chairId: slot.chairId, scheduleVersion: slot.scheduleVersion,
+    if (!allowed || !reason.trim() || sending.current || moving && (!slot || loading || optionsError)) return;
+    const payload = { expectedVersion: current.version, reason: reason.trim(), ...(moving || mode === 'cancel' ? { clinicInitiated: true } : {}),
+      ...(moving && slot ? { dentistId: dentist, newStart: slot.start, chairId: slot.chairId, scheduleVersion: slot.scheduleVersion,
         assistantScheduleVersion: slot.assistantScheduleVersion, bookingSettingsVersion: slot.bookingSettingsVersion } : {}) };
     const fingerprint = JSON.stringify(payload);
     if (pending.current?.fingerprint !== fingerprint) pending.current = { fingerprint, key: newRequestKey() };
     sending.current = true; setBusy(true); setError(null);
     try {
-      const result = await api<ChangeResult>(`/api/appointments/${current.code}/${mode === 'edit' ? 'reschedule' : mode === 'no-show' ? 'no-show' : 'cancel'}`,
+      const result = await api<ChangeResult>(`/api/appointments/${current.code}/${modePath[mode]}`,
         { method: 'POST', body: JSON.stringify({ ...payload, requestKey: pending.current.key }) });
       onChanged(result.notification.message);
     } catch (failure) {
@@ -101,7 +119,7 @@ function ChangeForm({ appointment, mode, onClose, onChanged }: {
     } finally { sending.current = false; setBusy(false); }
   }
   const valid = allowed && reason.trim().length > 0 && reason.trim().length <= 500 && !reloading
-    && (mode !== 'edit' || !!slot && !loading && !optionsError);
+    && (!moving || !!slot && !loading && !optionsError);
   const feedback = <>
     {error && <Alert className="form-alert" type="error" showIcon message={error.message}
       action={error instanceof ApiError && error.code === 'MSG41' ? <Button aria-label="Tải lại phiên bản" loading={reloading} onClick={() => void reloadCurrent()}>Tải lại phiên bản</Button> : undefined} />}
@@ -113,7 +131,7 @@ function ChangeForm({ appointment, mode, onClose, onChanged }: {
     { label: 'Chi nhánh', children: current.branchName }, { label: 'Bác sĩ', children: current.dentistName },
     { label: 'Thời lượng', children: `${current.durationMinutes} phút` },
   ]} />;
-  const reasonField = <div className="patient-section"><label htmlFor="staff-appointment-change-reason">Lý do {mode === 'edit' ? 'chỉnh sửa' : mode === 'no-show' ? 'khách không tới' : 'hủy lịch'} (bắt buộc)</label>
+  const reasonField = <div className="patient-section"><label htmlFor="staff-appointment-change-reason">Lý do {reasonLabels[mode]} (bắt buộc)</label>
     <Input.TextArea id="staff-appointment-change-reason" value={reason} maxLength={500} showCount rows={3} disabled={busy}
       onChange={event => setReason(event.target.value)} /></div>;
   if (mode === 'cancel') return <Modal open title="Hủy lịch hẹn" onCancel={() => { if (!busy) onClose(); }} maskClosable={!busy} closable={!busy}
@@ -128,7 +146,14 @@ function ChangeForm({ appointment, mode, onClose, onChanged }: {
     {feedback}
     {summary}{reasonField}
   </Modal>;
-  return <Drawer open title="Chỉnh sửa lịch hẹn" aria-label="Chỉnh sửa lịch hẹn" width={560} styles={{ wrapper: { maxWidth: '100vw' } }} closable={!busy} maskClosable={!busy} onClose={() => { if (!busy) onClose(); }}
+  if (mode === 'undo-no-show') return <Modal open title="Hoàn tác khách không tới" onCancel={() => { if (!busy) onClose(); }} maskClosable={!busy} closable={!busy}
+    okText="Xác nhận hoàn tác" cancelText="Đóng" confirmLoading={busy} okButtonProps={{ 'aria-label': 'Xác nhận hoàn tác', disabled: busy || !valid }}
+    cancelButtonProps={{ disabled: busy }} onOk={() => void submit()}>
+    {feedback}<Alert className="form-alert" type="info" showIcon message="Lịch hẹn sẽ trở lại trạng thái đã xác nhận và bệnh nhân được thông báo đính chính." />
+    {summary}{reasonField}
+  </Modal>;
+  const title = mode === 'rebook' ? 'Đổi lịch' : 'Chỉnh sửa lịch hẹn';
+  return <Drawer open title={title} aria-label={title} width={560} styles={{ wrapper: { maxWidth: '100vw' } }} closable={!busy} maskClosable={!busy} onClose={() => { if (!busy) onClose(); }}
     footer={<Space wrap><Button disabled={busy} onClick={onClose}>Đóng</Button><Button type="primary" aria-label="Lưu thay đổi" disabled={busy || !valid} loading={busy} onClick={() => void submit()}>Lưu thay đổi</Button></Space>}>
     {feedback}{summary}
     {optionsError && <Alert className="form-alert" type="error" message={optionsError} action={<Button onClick={() => setRevision(value => value + 1)}>Thử lại</Button>} />}

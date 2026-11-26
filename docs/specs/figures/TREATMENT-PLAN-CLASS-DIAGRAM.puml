@@ -1,0 +1,166 @@
+@startuml DCMS_Treatment_Plan_Class_Diagram
+title Class Diagram - Bác sĩ lập kế hoạch điều trị
+
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+skinparam nodesep 60
+skinparam ranksep 60
+skinparam class {
+  BorderColor #000000
+  BackgroundColor #FFFFFF
+  HeaderBackgroundColor #FFFFFF
+  ArrowColor #000000
+}
+hide circle
+
+class TreatmentDossierService {
+  validateDentist()
+  createDossier()
+  chooseTreatmentPlan()
+  addItem()
+  editItem()
+  deleteItem()
+}
+
+class Patient {
+  id : int
+  patientCode : string
+  fullName : string
+  birthDate : DateOnly
+  gender : string
+  phone : string
+  address : string
+}
+
+class Dentist {
+  id : int
+  accountId : int
+  employeeCode : string
+  fullName : string
+}
+
+class Branch {
+  id : int
+  code : string
+  name : string
+  address : string
+  phone : string
+  active : bool
+}
+
+class Visit {
+  id : Guid
+  patientId : int
+  branchId : int
+  dentistId : int
+  status : string
+  arrivalAt : DateTimeOffset
+}
+
+class TreatmentDossier {
+  id : Guid
+  code : string
+  sourceExaminationVisitId : Guid
+  patientId : int
+  branchId : int
+  dentistId : int
+  startedOn : DateOnly
+  diagnosis : string
+  note : string
+  state : string
+  version : int
+  createdAt : DateTimeOffset
+  updatedAt : DateTimeOffset
+}
+
+class TreatmentPlanItem {
+  id : Guid
+  dossierId : Guid
+  plannedOrder : int
+  serviceId : int
+  serviceName : string
+  region : string
+  unit : string
+  quantity : decimal
+  agreedUnitPriceVnd : long
+  discountType : string
+  discountValue : decimal
+  discountReason : string
+  estimatedStart : DateOnly
+  estimatedMinutes : int
+  responsibleDentistId : int
+  assistantId : int
+  note : string
+  displayCompleted : bool
+}
+
+class DentalService {
+  id : int
+  branchId : int
+  name : string
+  unit : string
+  referenceUnitPriceVnd : long
+  active : bool
+}
+
+class TreatmentPlanTemplate {
+  id : Guid
+  branchId : int
+  name : string
+  version : int
+  createdBy : int
+  createdAt : DateTimeOffset
+}
+
+class TreatmentPlanTemplateItem {
+  id : Guid
+  templateId : Guid
+  position : int
+  serviceId : int
+  serviceName : string
+  teeth : string
+  costVnd : long
+  estimatedMinutes : int
+  note : string
+}
+
+TreatmentDossierService -[hidden]down- TreatmentDossier
+
+TreatmentDossierService ..> Dentist : validates
+TreatmentDossierService ..> TreatmentDossier : creates
+TreatmentDossierService ..> TreatmentPlanTemplate : loads
+TreatmentDossierService ..> TreatmentPlanItem : adds, edits, deletes
+
+Patient "1" -- "0..*" TreatmentDossier : has
+Dentist "1" -- "0..*" TreatmentDossier : plans
+Branch "1" -- "0..*" TreatmentDossier : treats at
+Visit "0..1" -- "0..*" TreatmentDossier : created from
+Patient "1" -- "0..*" Visit : attends
+
+TreatmentDossier "1" *-- "0..*" TreatmentPlanItem : contains
+DentalService "1" -- "0..*" TreatmentPlanItem : for service
+Dentist "0..1" -- "0..*" TreatmentPlanItem : responsible for
+
+Branch "1" -- "0..*" DentalService : offers
+Branch "1" -- "0..*" TreatmentPlanTemplate : owns
+TreatmentPlanTemplate "1" *-- "1..*" TreatmentPlanTemplateItem : contains
+
+note right of TreatmentPlanTemplate
+  Tên dễ đọc = Tên lớp trong code
+  Patient = PatientProfile
+  Dentist = EmployeeProfile
+  Branch = SchedulingBranch
+  DentalService = SchedulingService
+  TreatmentPlanItem = TreatmentItem
+  TreatmentPlanTemplate = TreatmentTemplate
+  TreatmentPlanTemplateItem = TreatmentTemplateItem
+  ---
+  Method = Method trong code
+  createDossier = CreateAsync
+  chooseTreatmentPlan = ImportItemPlanAsync
+  addItem = ConfirmSheetPlanAsync
+  editItem = EditSheetItemAsync
+  deleteItem = DeleteSheetItemAsync
+end note
+
+@enduml
