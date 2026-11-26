@@ -26,7 +26,11 @@ public static class AppointmentEndpoints
             NoShowAppointmentRequest request, IAppointmentChangeService service, CancellationToken ct) =>
             Results.Ok(await service.MarkNoShowAsync(ChangeActor(context), code, request, ct)))
             .RequireAuthorization().WithTags("UC-06 Staff NoShow follow-up transition");
-        endpoints.MapPost("/api/appointments/{code}/support-requests", async (HttpContext context, string code,
+        endpoints.MapPost("/api/appointments/{code}/no-show/undo", async (HttpContext context, string code,
+            NoShowAppointmentRequest request, IAppointmentChangeService service, CancellationToken ct) =>
+            Results.Ok(await service.UndoNoShowAsync(ChangeActor(context), code, request, ct)))
+            .RequireAuthorization().WithTags("UC-06 Staff NoShow follow-up transition");
+        endpoints.MapPost("/api/appointments/{code}/support-requests",async (HttpContext context, string code,
             CustomerSupportRequestCommand command, ISupportRequestService service, CancellationToken ct) =>
             Results.Json(await service.CreateCustomerRequestAsync(ChangeActor(context), code, command, ct),
                 statusCode: StatusCodes.Status201Created))

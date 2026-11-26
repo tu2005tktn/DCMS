@@ -14,7 +14,7 @@ public sealed record ReceptionAppointment(Guid AppointmentId, string Code, int B
     DateTimeOffset StartAt, DateTimeOffset EndAt, string Status, int Version, int? PatientId,
     string? PatientCode, string? PatientName, string BookerName, string? BookerPhone, string? BookerEmail,
     string AttendeeName, DateOnly? AttendeeBirthDate, string AttendeeRelation, Guid? VisitId,
-    bool CanCheckIn, string? IneligibleReason);
+    bool CanCheckIn, string? IneligibleReason, bool CanUndoNoShow = false);
 public sealed record ReceptionDetail(ReceptionAppointment Appointment, VisitResult? Visit,
     DateOnly ClinicDate, DateTimeOffset ServerNow, bool CanBackdate);
 public sealed record VisitResult(Guid VisitId, int PatientId, string PatientCode, string PatientName,
@@ -29,6 +29,8 @@ public interface IReceptionService
 {
     Task<ReceptionOptions> OptionsAsync(int actorId, CancellationToken ct);
     Task<ReceptionPage<ReceptionAppointment>> AppointmentsAsync(int actorId, ReceptionQuery query, CancellationToken ct);
+    // Confirmed bookings of any date whose time has ended without check-in; Date and Status of the query are ignored.
+    Task<ReceptionPage<ReceptionAppointment>> OverdueAsync(int actorId, ReceptionQuery query, CancellationToken ct);
     Task<ReceptionDetail> DetailAsync(int actorId, Guid appointmentId, CancellationToken ct);
     Task<ReceptionPage<VisitResult>> QueueAsync(int actorId, ReceptionQuery query, CancellationToken ct);
     Task<VisitResult> VisitAsync(int actorId, Guid visitId, CancellationToken ct, bool clinical = false);

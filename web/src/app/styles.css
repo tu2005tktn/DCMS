@@ -76,7 +76,7 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }
 .calendar-legend { margin-bottom: 12px; color: #475467; font-size: 13px; }
 .legend { display: inline-block; width: 14px; height: 14px; border: 1px solid #d0d5dd; vertical-align: middle; margin-right: 4px; }
 .legend.work, .calendar-cell.work { background: #fff; }
-.legend.blocked, .calendar-cell.blocked { background: repeating-linear-gradient(45deg, #f2f4f7, #f2f4f7 4px, #e4e7ec 4px, #e4e7ec 8px); }
+.legend.blocked, .calendar-cell.blocked { background: repeating-linear-gradient(45deg, #fff4d6, #fff4d6 4px, #ffe29a 4px, #ffe29a 8px); }
 .legend.off, .calendar-cell.off { background: #f2f4f7; }
 .calendar-scroll { overflow: auto; max-height: 72vh; border: 1px solid #eaecf0; border-radius: 8px; }
 .calendar-grid { display: grid; position: relative; }

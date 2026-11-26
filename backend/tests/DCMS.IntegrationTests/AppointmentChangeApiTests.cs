@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using DCMS.Application.Common;
 using DCMS.Application.Features.Appointments;
 using DCMS.Application.Features.Authentication;
+using DCMS.Application.Features.Reception;
 using DCMS.Application.Features.Scheduling;
 using DCMS.Domain.Features.Accounts;
 using DCMS.Domain.Features.Appointments;
@@ -258,6 +259,158 @@ public sealed class AppointmentChangeApiTests(AppointmentChangeFixture fixture) 
         Assert.False(response.IsSuccessStatusCode);
         using var check = fixture.Services.CreateScope(); var context = check.ServiceProvider.GetRequiredService<DcmsDbContext>();
         Assert.Empty(await context.AppointmentChanges.Where(x => x.AppointmentId == source.AppointmentId).ToArrayAsync());
+    }
+
+    [Fact]
+    public async Task MistakenNoShowCanBeUndoneAndMarkedAgain()
+    {
+        var (_, source) = await DueAppointment(); using var staff = await Login("assistant.demo");
+        // Other tests share the synthetic dentist; their bookings in the same window would rightly block the undo.
+        using (var cleanup = fixture.Services.CreateScope())
+            await cleanup.ServiceProvider.GetRequiredService<DcmsDbContext>().Appointments
+                .Where(x => x.Id != source.AppointmentId && x.StartAt < source.EndAt && x.EndAt > source.StartAt)
+                .ExecuteUpdateAsync(update => update.SetProperty(x => x.Status, "Cancelled"));
+        (await staff.PostAsJsonAsync(Path(source, "no-show"), new NoShowAppointmentRequest(1, Guid.NewGuid(), "SYNTHETIC no-show"))).EnsureSuccessStatusCode();
+        var detail = await staff.GetFromJsonAsync<StaffAppointmentDetail>($"/api/appointments/{source.AppointmentId}");
+        Assert.True(detail!.Appointment.CanUndoNoShow);
+        await Ingest();
+        var undo = new NoShowAppointmentRequest(2, Guid.NewGuid(), "SYNTHETIC marked by mistake");
+        var response = await staff.PostAsJsonAsync(Path(source, "no-show/undo"), undo);
+        Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
+        Assert.Equal("Confirmed", (await response.Content.ReadFromJsonAsync<AppointmentChangeResult>())!.Appointment.Status);
+        Assert.Equal(HttpStatusCode.OK, (await staff.PostAsJsonAsync(Path(source, "no-show/undo"), undo)).StatusCode);
+        (await staff.PostAsJsonAsync(Path(source, "no-show"), new NoShowAppointmentRequest(3, Guid.NewGuid(), "SYNTHETIC really absent"))).EnsureSuccessStatusCode();
+        await Ingest();
+        using var scope = fixture.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
+        var tasks = await db.CareTasks.Where(x => x.AppointmentId == source.AppointmentId).ToArrayAsync();
+        Assert.Equal("Cancelled", Assert.Single(tasks, x => x.Type == "MissedAppointmentUndone").Status);
+        Assert.Equal("Open", Assert.Single(tasks, x => x.Type == "MissedAppointment").Status);
+        Assert.Equal(3, await db.AppointmentChanges.CountAsync(x => x.AppointmentId == source.AppointmentId));
+        Assert.Single(await db.AppointmentOutboxEvents.Where(x => x.AggregateId == source.AppointmentId && x.EventType == "appointment.no_show_undone").ToArrayAsync());
+    }
+
+    [Theory]
+    [InlineData("no-show")]
+    [InlineData("late")]
+    public async Task MissedAppointmentCanBeMovedToAFreeSlotWithoutLeadTime(string state)
+    {
+        var (s, source) = await DueAppointment(); using var staff = await Login("assistant.demo");
+        if (state == "no-show") {
+            (await staff.PostAsJsonAsync(Path(source, "no-show"), new NoShowAppointmentRequest(1, Guid.NewGuid(), "SYNTHETIC no-show"))).EnsureSuccessStatusCode();
+            await Ingest();
+        }
+        var version = state == "no-show" ? 2 : 1;
+        // Search from now until the end of tomorrow so the test also works just before midnight.
+        var slots = new List<AvailabilitySlot>();
+        foreach (var date in new[] { s.Date, s.Date.AddDays(1) })
+        {
+            var response = await staff.GetAsync($"{Path(source, "availability")}?date={date:yyyy-MM-dd}");
+            if (response.IsSuccessStatusCode) slots.AddRange((await response.Content.ReadFromJsonAsync<AvailabilityResult>())!.Slots);
+        }
+        Assert.All(slots, x => Assert.True(x.Start > fixture.Clock.Now));
+        // Late at night an 80 minute slot no longer fits today, so only require a within-the-hour slot before then.
+        if (fixture.Clock.Now.ToOffset(TimeSpan.FromHours(7)).Hour < 22) Assert.Contains(slots, x => x.Start < fixture.Clock.Now.AddMinutes(60));
+        var slot = slots.OrderBy(x => x.Start).First();
+        var move = Move(source, slot) with { ExpectedVersion = version, ClinicInitiated = true };
+        var moved = await staff.PostAsJsonAsync(Path(source, "reschedule"), move);
+        Assert.True(moved.IsSuccessStatusCode, await moved.Content.ReadAsStringAsync());
+        var result = (await moved.Content.ReadFromJsonAsync<AppointmentChangeResult>())!.Appointment;
+        Assert.Equal("Confirmed", result.Status);
+        using var scope = fixture.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
+        var row = await db.Appointments.AsNoTracking().SingleAsync(x => x.Id == source.AppointmentId);
+        Assert.Equal(slot.Start.ToUniversalTime(), row.StartAt);
+        Assert.Equal(state == "no-show" ? 2 : 1, await db.AppointmentChanges.CountAsync(x => x.AppointmentId == source.AppointmentId));
+        if (state == "no-show") {
+            var task = Assert.Single(await db.CareTasks.Where(x => x.AppointmentId == source.AppointmentId).ToArrayAsync());
+            Assert.Equal(("MissedAppointmentRebooked", "Cancelled"), (task.Type, task.Status));
+            await Ingest();
+            Assert.Equal(1, await db.CareTasks.CountAsync(x => x.AppointmentId == source.AppointmentId));
+        }
+    }
+
+    [Theory]
+    [InlineData("recorded-yesterday", "MSG26")]
+    [InlineData("appointment-yesterday", "MSG26")]
+    [InlineData("booked-again", "MSG118")]
+    [InlineData("past-time", "MSG29")]
+    [InlineData("customer", "MSG26")]
+    public async Task MovingAMissedAppointmentKeepsItsLimits(string scenario, string code)
+    {
+        var (s, source) = await DueAppointment(); using var staff = await Login("assistant.demo");
+        var version = 1;
+        if (scenario is "recorded-yesterday" or "booked-again") {
+            (await staff.PostAsJsonAsync(Path(source, "no-show"), new NoShowAppointmentRequest(1, Guid.NewGuid(), "SYNTHETIC no-show"))).EnsureSuccessStatusCode();
+            version = 2;
+        }
+        var booker = scenario == "customer" ? await Public() : default;
+        using var customer = booker.Client;
+        using (var arrange = fixture.Services.CreateScope())
+        {
+            var db = arrange.ServiceProvider.GetRequiredService<DcmsDbContext>();
+            var row = await db.Appointments.SingleAsync(x => x.Id == source.AppointmentId);
+            if (scenario == "recorded-yesterday")
+                (await db.AppointmentChanges.SingleAsync(x => x.AppointmentId == row.Id)).OccurredAt = fixture.Clock.Now.AddDays(-1);
+            if (scenario == "appointment-yesterday") { row.StartAt = fixture.Clock.Now.AddDays(-1); row.EndAt = row.StartAt.AddMinutes(30); }
+            if (scenario == "booked-again") {
+                var id = Guid.NewGuid();
+                db.Add(new Appointment { Id = id, Code = "AP-" + id.ToString("N").ToUpperInvariant(), BranchId = row.BranchId,
+                    DentistId = s.SecondDentistId, ChairId = row.ChairId, ServiceId = row.ServiceId, PatientId = row.PatientId, Kind = "Standard",
+                    BookingInfo = new AppointmentBookingInfo { BookerName = "SYNTHETIC booker", BookerContact = "0912345678" },
+                    AttendeeName = row.AttendeeName, StartAt = fixture.Clock.Now.AddDays(3), EndAt = fixture.Clock.Now.AddDays(3).AddMinutes(30),
+                    CreatedAt = fixture.Clock.Now });
+            }
+            if (scenario == "customer") row.BookerAccountId = booker.Id;
+            await db.SaveChangesAsync();
+        }
+        var start = scenario == "past-time" ? fixture.Clock.Now.AddMinutes(-30) : fixture.Clock.Now.AddDays(2);
+        var request = new RescheduleAppointmentRequest(version, Guid.NewGuid(), start, s.ChairId, 1, null, "SYNTHETIC move",
+            DentistId: s.DentistId, ClinicInitiated: scenario != "customer");
+        await Message(await (customer ?? staff).PostAsJsonAsync(Path(source, "reschedule"), request), HttpStatusCode.Conflict, code);
+    }
+
+    private async Task Ingest()
+    {
+        using var scope = fixture.Services.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<DCMS.Infrastructure.Features.Treatment.CareTaskIngestionService>().IngestAsync(default);
+    }
+
+    [Theory]
+    [InlineData("slot-taken", "MSG120")]
+    [InlineData("next-day", "MSG119")]
+    [InlineData("not-no-show", "MSG26")]
+    [InlineData("customer", "MSG37")]
+    public async Task UndoNoShowRejectsReusedSlotLaterDayOrWrongActor(string scenario, string code)
+    {
+        var (s, source) = await DueAppointment(); using var staff = await Login("assistant.demo");
+        if (scenario != "not-no-show")
+            (await staff.PostAsJsonAsync(Path(source, "no-show"), new NoShowAppointmentRequest(1, Guid.NewGuid(), "SYNTHETIC no-show"))).EnsureSuccessStatusCode();
+        if (scenario == "slot-taken")
+            (await staff.PostAsJsonAsync("/api/appointments", await Replacement(staff, s, source))).EnsureSuccessStatusCode();
+        if (scenario == "next-day") {
+            using var scope = fixture.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
+            var change = await db.AppointmentChanges.SingleAsync(x => x.AppointmentId == source.AppointmentId);
+            change.OccurredAt = fixture.Clock.Now.AddDays(-1); await db.SaveChangesAsync();
+        }
+        using var customer = scenario == "customer" ? await Login("guest.demo") : null;
+        var response = await (customer ?? staff).PostAsJsonAsync(Path(source, "no-show/undo"),
+            new NoShowAppointmentRequest(scenario == "not-no-show" ? 1 : 2, Guid.NewGuid(), "SYNTHETIC undo"));
+        Assert.False(response.IsSuccessStatusCode);
+        Assert.Equal(code, (await response.Content.ReadFromJsonAsync<SystemMessage>())!.Code);
+        using var check = fixture.Services.CreateScope(); var context = check.ServiceProvider.GetRequiredService<DcmsDbContext>();
+        Assert.Equal(scenario == "not-no-show" ? "Confirmed" : "NoShow", (await context.Appointments.SingleAsync(x => x.Id == source.AppointmentId)).Status);
+    }
+
+    [Fact]
+    public async Task OverdueListHoldsOnlyEndedConfirmedBookings()
+    {
+        var (s, source) = await DueAppointment(); using var staff = await Login("assistant.demo");
+        var url = $"/api/reception/overdue?branchId={s.BranchId}";
+        Assert.Equal(0, (await staff.GetFromJsonAsync<ReceptionPage<ReceptionAppointment>>(url))!.Total);
+        await SetState(source, start: fixture.Clock.Now.AddDays(-3));
+        var page = (await staff.GetFromJsonAsync<ReceptionPage<ReceptionAppointment>>(url))!;
+        Assert.Equal(source.AppointmentId, Assert.Single(page.Items).AppointmentId);
+        await SetState(source, "NoShow");
+        Assert.Equal(0, (await staff.GetFromJsonAsync<ReceptionPage<ReceptionAppointment>>(url))!.Total);
     }
 
     [Theory]

@@ -182,7 +182,15 @@ public sealed class AppointmentQueryApiTests(ApiFixture fixture) : IClassFixture
         Assert.Equal("App", item.Source);
         Assert.Contains(calendar.Days, d => d.DentistId == s.DentistId && d.Periods.Any(p => p.Kind == "Break" && p.StartMinute == 720));
 
+        using (var scope = fixture.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
+            (await db.Set<SchedulingService>().FindAsync(s.ServiceId))!.PublicDurationMinutes = 120;
+            await db.SaveChangesAsync();
+        }
         var slot = await Slot(assistant, s, s.DentistId, 120, TimeSpan.FromHours(14));
+        // A counter booking cannot be shorter or longer than its service.
+        await AssertMessage(await assistant.PostAsJsonAsync("/api/appointments", Staff(s, slot, s.DentistId, 90)), HttpStatusCode.BadRequest, "MSG04");
         var walkIn = await Book(assistant, Staff(s, slot, s.DentistId, 120));
         Assert.Equal("Confirmed", walkIn.Status);
         var detail = (await assistant.GetFromJsonAsync<StaffAppointmentDetail>($"/api/appointments/{walkIn.AppointmentId}"))!;

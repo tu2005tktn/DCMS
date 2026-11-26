@@ -36,7 +36,8 @@ public sealed class ClinicalCommandReceipt : DCMS.Domain.Common.CommandReceiptRe
 public sealed class CareTask
 {
     public Guid Id { get; set; } = Guid.NewGuid();
-    public int PatientId { get; set; }
+    // Empty only for the callback of a missed booking that was never linked to a patient record.
+    public int? PatientId { get; set; }
     public int BranchId { get; set; }
     public Guid? AppointmentId { get; set; }
     public string Type { get; set; } = "FollowUp";

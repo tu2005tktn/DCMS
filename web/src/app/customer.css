@@ -195,10 +195,11 @@
 .customer-schedule-times .customer-slot-group + .customer-slot-group { padding-top: 18px; border-top: 1px solid var(--customer-line); }
 .customer-slots { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 0; }
 .customer-slots .ant-btn { min-width: 88px; min-height: 44px; border-radius: 10px; }
-.customer-slots .ant-btn-primary { background: var(--customer-blue); border-color: var(--customer-blue); color: #fff; }
+/* The reschedule dialog is rendered outside .customer-portal, so these need a fallback colour. */
+.customer-slots .ant-btn-primary { background: var(--customer-blue, #175cd3); border-color: var(--customer-blue, #175cd3); color: #fff; }
 .customer-schedule-times .customer-slots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .customer-schedule-times .customer-slots .ant-btn { width: 100%; min-height: 48px; font-size: 16px; font-weight: 700; }
-.customer-slots .ant-btn[aria-pressed='true'] { outline: 2px solid var(--customer-blue); outline-offset: 2px; }
+.customer-slots .ant-btn[aria-pressed='true'] { outline: 2px solid var(--customer-blue, #175cd3); outline-offset: 2px; }
 .customer-booking-selection { display: grid; gap: 2px; padding: 14px 17px; border-left: 4px solid var(--customer-blue); border-radius: 0 10px 10px 0; background: var(--customer-tint); }
 .customer-booking-selection span { color: var(--customer-muted); font-size: 13px; }
 .customer-booking-selection strong { color: var(--customer-ink); font-size: 18px; }

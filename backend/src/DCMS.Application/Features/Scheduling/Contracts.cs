@@ -49,7 +49,7 @@ public interface IAvailabilityService
 {
     Task<AvailabilityResult> QueryAsync(AvailabilityQuery query, int? staffActorId, CancellationToken ct);
     // Caller must authorize the existing appointment and supply its immutable resource requirements.
-    Task<AvailabilityResult> QueryForAppointmentAsync(AvailabilityQuery query, Guid appointmentId, int? patientId, CancellationToken ct);
+    Task<AvailabilityResult> QueryForAppointmentAsync(AvailabilityQuery query, Guid appointmentId, int? patientId, CancellationToken ct, bool requireLeadTime = true);
     // TV2: caller MUST begin a transaction on the same scoped DbContext and persist the appointment before commit.
     Task<AvailabilitySlot> CheckInTransactionAsync(ResourceCheck request, CancellationToken ct);
     // Reception rechecks the existing appointment without replacing or releasing it.

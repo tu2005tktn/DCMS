@@ -11,6 +11,7 @@ using DCMS.Domain.Features.Appointments;
 using DCMS.Domain.Features.Scheduling;
 using DCMS.Domain.Features.Visits;
 using DCMS.Infrastructure.Features.Accounts;
+using DCMS.Infrastructure.Features.Appointments;
 using DCMS.Infrastructure.Features.PatientLinks;
 using DCMS.Infrastructure.Features.Scheduling;
 using DCMS.Infrastructure.Persistence;
@@ -83,12 +84,13 @@ public sealed class ReceptionService(DcmsDbContext db, UserManager<ApplicationUs
         }, actor.Assistant, ClinicDate(clock.GetUtcNow()), clock.GetUtcNow());
     }
 
-    private IQueryable<Appointment> Query(ReceptionQuery q, Actor actor, bool queue)
+    private IQueryable<Appointment> Query(ReceptionQuery q, Actor actor, bool queue, bool anyDate = false)
     {
         if (q.Date.Year is < 2000 or > 2100 || q.Page < 1 || q.Page > 100000 || !new[] { 20, 50, 100 }.Contains(q.PageSize)
             || q.Keyword?.Length > 100 || q.DentistId is <= 0 || q.Status != null && !(queue ? VisitStatuses.All : AppointmentStatuses).Contains(q.Status)) throw Error("MSG04");
         var from = Midnight(q.Date); var to = Midnight(q.Date.AddDays(1));
-        var rows = db.Appointments.AsNoTracking().Where(x => x.BranchId == q.BranchId && x.StartAt >= from && x.StartAt < to);
+        var rows = db.Appointments.AsNoTracking().Where(x => x.BranchId == q.BranchId);
+        if (!anyDate) rows = rows.Where(x => x.StartAt >= from && x.StartAt < to);
         var dentist = actor.Assistant ? q.DentistId : actor.EmployeeId;
         if (dentist.HasValue) rows = rows.Where(x => x.DentistId == dentist);
         if (!queue && q.Status != null) rows = rows.Where(x => x.Status == q.Status);
@@ -106,11 +108,26 @@ public sealed class ReceptionService(DcmsDbContext db, UserManager<ApplicationUs
     {
         var actor = await ScopeAsync(actorId, query.BranchId, false, ct);
         var rows = Query(query, actor, false); var total = await rows.CountAsync(ct);
-        var page = await rows.OrderBy(x => x.StartAt).ThenBy(x => x.Id).Skip((query.Page - 1) * query.PageSize).Take(query.PageSize).ToArrayAsync(ct);
+        var now = clock.GetUtcNow();
+        // Work still to do comes first: missed bookings, upcoming ones, patients already in, then closed bookings.
+        var page = await rows.OrderBy(x => x.Status == "Confirmed" ? (x.StartAt <= now ? 0 : 1)
+                : x.Status == "CheckedIn" || x.Status == "InProgress" ? 2 : 3)
+            .ThenBy(x => x.StartAt).ThenBy(x => x.Id).Skip((query.Page - 1) * query.PageSize).Take(query.PageSize).ToArrayAsync(ct);
         var items = await AppointmentDtosAsync(page, actor.Assistant, ct);
-        return new(items, total, query.Page, query.PageSize, ClinicDate(clock.GetUtcNow()), clock.GetUtcNow());
+        return new(items, total, query.Page, query.PageSize, ClinicDate(now), now);
     }
-    private static string? Ineligible(Appointment a, DateTimeOffset now) => a.Status != "Confirmed" ? "Lịch không còn ở trạng thái đã xác nhận."
+    public async Task<ReceptionPage<ReceptionAppointment>> OverdueAsync(int actorId, ReceptionQuery query, CancellationToken ct)
+    {
+        var actor = await ScopeAsync(actorId, query.BranchId, false, ct);
+        var now = clock.GetUtcNow();
+        var rows = Query(query with { Status = null }, actor, false, anyDate: true)
+            .Where(x => x.Status == "Confirmed" && x.EndAt <= now && !db.Visits.Any(v => v.AppointmentId == x.Id));
+        var total = await rows.CountAsync(ct);
+        var page = await rows.OrderByDescending(x => x.StartAt).ThenBy(x => x.Id)
+            .Skip((query.Page - 1) * query.PageSize).Take(query.PageSize).ToArrayAsync(ct);
+        return new(await AppointmentDtosAsync(page, actor.Assistant, ct), total, query.Page, query.PageSize, ClinicDate(now), now);
+    }
+    private static string? Ineligible(Appointment a, DateTimeOffset now) =>a.Status != "Confirmed" ? "Lịch không còn ở trạng thái đã xác nhận."
         : ClinicDate(a.StartAt) != ClinicDate(now) ? "Chỉ tiếp nhận lịch trong ngày hiện tại của phòng khám."
         : a.EndAt <= now ? "Khoảng đặt lịch đã kết thúc. Vui lòng xếp lại lịch hợp lệ trước khi tiếp nhận." : null;
 
@@ -124,6 +141,7 @@ public sealed class ReceptionService(DcmsDbContext db, UserManager<ApplicationUs
         var chairs = await db.SchedulingChairs.AsNoTracking().Where(x => chairIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.Name, ct);
         var visits = await db.Visits.AsNoTracking().Where(x => ids.Contains(x.AppointmentId)).ToDictionaryAsync(x => x.AppointmentId, x => x.Id, ct);
         var now = clock.GetUtcNow();
+        var undoable = await MissedAppointments.UndoableAsync(db, rows, now, ct);
         return rows.Select(a =>
         {
             var patient = a.PatientId.HasValue ? patients.GetValueOrDefault(a.PatientId.Value) : null;
@@ -131,7 +149,7 @@ public sealed class ReceptionService(DcmsDbContext db, UserManager<ApplicationUs
             return new ReceptionAppointment(a.Id, a.Code, a.BranchId, branches[a.BranchId], a.DentistId, dentists[a.DentistId], a.ChairId,
                 chairs[a.ChairId], a.StartAt, a.EndAt, a.Status, a.Version, a.PatientId, patient?.PatientCode, patient?.FullName,
                 a.BookingInfo.BookerName, a.BookingInfo.Phone(), a.BookingInfo.Email(), a.AttendeeName, a.BookingInfo.AttendeeBirthDate, a.BookingInfo.AttendeeRelation, visitId,
-                assistant && visitId == null && reason == null, reason);
+                assistant && visitId == null && reason == null, reason, undoable.Contains(a.Id));
         }).ToArray();
     }
 

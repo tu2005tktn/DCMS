@@ -325,7 +325,7 @@ export default function AppointmentDetailScreen() {
 
     {detail.history.length > 0 && <Card title="Lịch sử thay đổi">
       {detail.history.map((h, index) => <View key={index} style={styles.request}>
-        <Text style={styles.rowValue}>{h.action === 'CANCEL' ? 'Hủy lịch' : 'Đổi lịch'} · {h.actorKind === 'SELF' ? 'Bạn thực hiện' : 'Phòng khám thực hiện'}</Text>
+        <Text style={styles.rowValue}>{{ RESCHEDULE: 'Đổi lịch', CANCEL: 'Hủy lịch', NO_SHOW: 'Ghi nhận vắng mặt', UNDO_NO_SHOW: 'Đính chính vắng mặt' }[h.action]} · {h.actorKind === 'SELF' ? 'Bạn thực hiện' : 'Phòng khám thực hiện'}</Text>
         <Text style={styles.muted}>{formatDateTime(h.occurredAt)}</Text>
         {h.newStart && <Text style={styles.line}>{formatDateTime(h.oldStart)} → {formatDateTime(h.newStart)}</Text>}
         <Text style={styles.line}>Lý do: {h.reason}</Text>

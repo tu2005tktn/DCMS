@@ -43,4 +43,4 @@ cùng một khoảng thời gian chi nhánh nhận tối đa N lịch hẹn (m�
 - Web khách hàng (đặt lịch): ô "Bác sĩ" có lựa chọn đầu tiên **"Bất kỳ bác sĩ (ghế trống)"**. Khi chọn, danh sách khung giờ gộp
   của mọi bác sĩ; tóm tắt và bước xác nhận hiển thị tên bác sĩ được gán theo slot đã chọn.
 - Web nhân viên (BookingDrawer): ô "Nha sĩ" có lựa chọn **"Bất kỳ nha sĩ (ghế trống)"**; bước xem lại hiển thị nha sĩ và ghế
-  theo slot. Bộ lọc ghế vẫn áp dụng trên các slot trả về.
+  theo slot. Từ 26/11/2026 bỏ ô “Ghế” và bộ lọc ghế: mỗi khung giờ hiện ghế do hệ thống gán.

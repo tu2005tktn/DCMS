@@ -4,7 +4,7 @@ import dayjs, { type Dayjs } from 'dayjs';
 import { useEffect, useRef, useState } from 'react';
 import { ApiError } from '../../services/api';
 import { customerCareApi } from './customerCare.api';
-import { clinicParts, statusLabels, toDueAt, type CareBranch, type CareOptions, type CarePatient, type CareStatus, type CareWorklistItem } from './types';
+import { clinicParts, customerCode, statusLabels, toDueAt, type CareBranch, type CareOptions, type CarePatient, type CareStatus, type CareWorklistItem } from './types';
 
 // S60 "Thêm chăm sóc" (docs/specs/S60-CUSTOMER-CARE-WEB.vi.md §4). Edit keeps patient and type fixed.
 // `branches` are the branches the user may write in; a branch field appears only when there are two or more.
@@ -103,7 +103,7 @@ export default function CareTaskModal({ open, options, branches, initialBranchId
         </Space>
       </Form.Item>
       {editing
-        ? <Form.Item label="Khách hàng"><Typography.Text>{editing.patientCode} · {editing.patientName}{editing.phone ? ` · ${editing.phone}` : ''}</Typography.Text></Form.Item>
+        ? <Form.Item label="Khách hàng"><Typography.Text>{customerCode(editing)} · {editing.patientName}{editing.phone ? ` · ${editing.phone}` : ''}</Typography.Text></Form.Item>
         : <Form.Item label="Khách hàng" name="patientId" rules={[{ required: true, message: 'Vui lòng chọn khách hàng.' }]}
             extra={searchError ?? 'Chỉ gợi ý khách đã hoặc đang khám tại chi nhánh này.'} validateStatus={searchError ? 'error' : undefined}>
             <Select aria-label="Khách hàng" showSearch filterOption={false} onSearch={search} loading={searching} allowClear

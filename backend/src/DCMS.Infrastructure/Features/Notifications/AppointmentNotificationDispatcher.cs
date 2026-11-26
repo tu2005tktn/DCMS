@@ -78,7 +78,8 @@ public sealed class AppointmentNotificationDispatcher(
             var recipients = await RecipientsAsync(appointment, ct);
             if (recipients.Count > 0)
             {
-                var kind = noShow ? NotificationKind.NoShow : cancelled ? NotificationKind.AppointmentCancelled
+                var restored = item.EventType.Equals("appointment.no_show_undone", StringComparison.OrdinalIgnoreCase);
+                var kind = noShow || restored ? NotificationKind.NoShow : cancelled ? NotificationKind.AppointmentCancelled
                     : item.EventType.Contains("resched", StringComparison.OrdinalIgnoreCase)
                         ? NotificationKind.AppointmentRescheduled : NotificationKind.AppointmentBooked;
                 var when = appointment.StartAt.ToOffset(TimeSpan.FromHours(7))
@@ -90,7 +91,9 @@ public sealed class AppointmentNotificationDispatcher(
                     NotificationKind.AppointmentRescheduled => "Lịch hẹn đã đổi",
                     _ => "Đặt lịch thành công"
                 };
-                var body = kind == NotificationKind.NoShow ? $"Lịch {appointment.Code} đã ghi nhận khách không tới."
+                if (restored) title = "Đã đính chính vắng mặt";
+                var body = restored ? $"Lịch {appointment.Code} không còn bị ghi nhận khách không tới."
+                    : kind == NotificationKind.NoShow ? $"Lịch {appointment.Code} đã ghi nhận khách không tới."
                     : kind == NotificationKind.AppointmentCancelled
                     ? $"Lịch {appointment.Code} đã được huỷ."
                     : $"Lịch {appointment.Code} vào {when}.";

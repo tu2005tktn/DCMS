@@ -123,14 +123,16 @@ public sealed partial class WorkingScheduleService(DcmsDbContext db, TimeProvide
         }
         return new("Asia/Ho_Chi_Minh", q.Date, chosen.Values.OrderBy(x => x.Start).ToArray());
     }
-    public async Task<AvailabilityResult> QueryForAppointmentAsync(AvailabilityQuery query, Guid appointmentId, int? patientId, CancellationToken ct)
+    public async Task<AvailabilityResult> QueryForAppointmentAsync(AvailabilityQuery query, Guid appointmentId, int? patientId, CancellationToken ct, bool requireLeadTime = true)
     {
         await ValidateQuery(query, false, ct);
         var data = await Load(query, ct);
         var slots = new List<AvailabilitySlot>();
         foreach (var minute in CandidateMinutes(query, data))
         {
-            var slot = Evaluate(query, true, Local(query.Date, minute), null, patientId, appointmentId, data);
+            var start = Local(query.Date, minute);
+            if (!requireLeadTime && start <= clock.GetUtcNow()) continue;
+            var slot = Evaluate(query, requireLeadTime, start, null, patientId, appointmentId, data);
             if (slot != null) slots.Add(slot);
         }
         return new("Asia/Ho_Chi_Minh", query.Date, slots.ToArray());

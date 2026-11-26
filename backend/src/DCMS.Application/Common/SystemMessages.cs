@@ -101,7 +101,10 @@ public static class SystemMessages
         "MSG114" => "Mã yêu cầu đã được dùng cho một khoản thu khác.",
         "MSG118" => "Người này đã có một lịch hẹn chưa được tiếp nhận. Vui lòng hủy lịch cũ hoặc đợi đến khi lịch đó được tiếp nhận trước khi đặt lịch mới.",
         "MSG117" => "Không đủ ghế để đăng ký khung giờ này. Vui lòng chọn khung giờ khác hoặc liên hệ quản lý phòng khám.",
-        "MSG115" => "Mã yêu cầu đã được dùng cho một khoản phân bổ khác.",
+        "MSG119" => "Chỉ hoàn tác được trong ngày đã ghi nhận khách không tới.",
+        "MSG120" => "Khung giờ này đã được đặt cho lịch khác nên không thể hoàn tác.",
+        "MSG121" => "Phiếu điều trị của lịch này đã bị xóa do khách bỏ cọc nên không thể mở lại lịch. Vui lòng đặt lịch mới.",
+        "MSG115" =>"Mã yêu cầu đã được dùng cho một khoản phân bổ khác.",
         "MSG116" => "Mã yêu cầu đã được dùng cho thao tác khác.",
         _ => throw new ArgumentOutOfRangeException(nameof(code))
     });

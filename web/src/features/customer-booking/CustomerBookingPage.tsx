@@ -228,7 +228,6 @@ function BookingForm() {
             if (relation !== 'Relative') { setRelation('Relative'); chooseMember(null); }
           }}><strong>Người thân</strong><span>Tôi đặt lịch cho một người khác</span></Button>
         </div>
-        {relation === 'Relative' && <Alert type="info" showIcon message="Đặt lịch cho người thân không cấp quyền xem hồ sơ bệnh án của họ." />}
         {relation === 'Relative' && <>
           {familyLoading && <p role="status">Đang tải người thân đã chọn…</p>}
           {familyError && <Alert type="error" showIcon message={familyError} action={<Button onClick={() => setFamilyRevision(r => r + 1)}>Thử lại</Button>} />}
@@ -322,7 +321,6 @@ function BookingForm() {
               {fieldErrors.attendeeBirthDate && <span className="customer-field-error" id="booking-attendee-birth-error">{fieldErrors.attendeeBirthDate}</span>}</label>}
           </fieldset>
         </div>
-        {relation === 'Relative' && <Alert type="info" showIcon message="Đặt lịch cho người thân không cấp quyền xem hồ sơ bệnh án của họ." />}
         <div className="customer-booking-actions"><Button onClick={() => setStep(1)}>Quay lại chọn lịch</Button>
           <Button type="primary" onClick={() => { if (validateContact()) { setError(null); setStep(3); } }}>Xem lại</Button></div>
       </div>}

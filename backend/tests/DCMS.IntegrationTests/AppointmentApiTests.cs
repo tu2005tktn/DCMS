@@ -211,7 +211,7 @@ public sealed class AppointmentApiTests(ApiFixture fixture) : IClassFixture<ApiF
             (await signIn.Content.ReadFromJsonAsync<SignInResponse>())!.AccessToken);
         var command = new CreateAppointmentRequest(setup.BranchId, new BookerContact("Khách vãng lai", "0912345678", null),
             new AppointmentAttendee(null, "Người khám", null), "Self", "WalkIn", "InPerson", setup.ServiceId,
-            "Khám khẩn", setup.DentistId, null, candidate, 15, null, null, Guid.NewGuid(), 1, null);
+            "Khám khẩn", setup.DentistId, null, candidate, 30, null, null, Guid.NewGuid(), 1, null);
         var denied = await client.PostAsJsonAsync("/api/appointments", command);
         Assert.Equal(HttpStatusCode.BadRequest, denied.StatusCode);
         Assert.Equal("MSG19", (await denied.Content.ReadFromJsonAsync<SystemMessage>())!.Code);

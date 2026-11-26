@@ -8,6 +8,12 @@ export const statusLabels: Record<AppointmentStatus, string> = {
 export const statusColors: Record<AppointmentStatus, string> = {
   Confirmed: 'green', CheckedIn: 'blue', InProgress: 'geekblue', Completed: 'default', Cancelled: 'red', NoShow: 'orange',
 };
+// A confirmed booking whose time has come without check-in. Derived for display only; the stored status stays Confirmed.
+export function statusView(a: { status: AppointmentStatus; startAt: string; endAt: string }, now = Date.now()) {
+  if (a.status === 'Confirmed' && Date.parse(a.endAt) <= now) return { label: 'Chờ xử lý', color: 'volcano' };
+  if (a.status === 'Confirmed' && Date.parse(a.startAt) <= now) return { label: 'Trễ hẹn', color: 'gold' };
+  return { label: statusLabels[a.status], color: statusColors[a.status] };
+}
 export const kindLabels: Record<string, string> = { Standard: 'Thường', WalkIn: 'Vãng lai', FollowUp: 'Tái khám' };
 export const sourceLabels: Record<string, string> = { Phone: 'Điện thoại', Zalo: 'Zalo', Facebook: 'Facebook', InPerson: 'Trực tiếp', App: 'Ứng dụng' };
 
@@ -21,9 +27,9 @@ export type AppointmentOptions = {
 export type AppointmentListItem = {
   id: string; code: string; branchId: number; branchName: string; startAt: string; endAt: string; durationMinutes: number;
   dentistId: number; dentistName: string; chairId: number; chairName: string; serviceName: string | null; attendeeName: string;
-  attendeeRelation: string; kind: string; source: string; status: AppointmentStatus; version: number;
+  attendeeRelation: string; kind: string; source: string; status: AppointmentStatus; version: number; canUndoNoShow?: boolean;
 };
-export type CalendarPeriod = { startMinute: number; endMinute: number; kind: 'Work' | 'Break' | 'Block'; reason: string | null };
+export type CalendarPeriod = { startMinute: number; endMinute: number; kind: 'Work' | 'Break'; reason: string | null };
 export type CalendarDay = { dentistId: number; date: string; periods: CalendarPeriod[] };
 export type CalendarView = { branchId: number; from: string; to: string; appointments: AppointmentListItem[]; days: CalendarDay[]; ownScheduleOnly: boolean };
 export type StaffAppointmentDetail = {

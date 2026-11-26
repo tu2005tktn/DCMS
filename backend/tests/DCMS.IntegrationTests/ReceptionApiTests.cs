@@ -101,6 +101,26 @@ public sealed class ReceptionApiTests(ReceptionFixture fixture) : IClassFixture<
         if (code != null) Assert.Equal(code, (await response.Content.ReadFromJsonAsync<SystemMessage>())!.Code);
     }
 
+    [Fact] public async Task DayListPutsMissedBookingsFirstThenUpcomingThenCheckedInThenClosed()
+    {
+        var s = await Prepare(); using var client = await Login();
+        using var scope = fixture.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<DcmsDbContext>();
+        Appointment At(string name, string status, int seconds) => new() { Code = "AP-" + Guid.NewGuid().ToString("N"), BranchId = s.BranchId,
+            DentistId = s.DentistId, ChairId = s.ChairId, ServiceId = s.ServiceId, AttendeeName = name, Status = status,
+            BookingInfo = new AppointmentBookingInfo { BookerName = "SYNTHETIC", BookerContact = "0912345678", AttendeeRelation = "Self" },
+            StartAt = fixture.Clock.Now.AddSeconds(seconds), EndAt = fixture.Clock.Now.AddSeconds(seconds).AddMinutes(15), CreatedAt = fixture.Clock.Now };
+        db.AddRange(At("closed-1", "NoShow", -10), At("closed-2", "Cancelled", -9), At("in-1", "CheckedIn", -8), At("in-2", "InProgress", -7),
+            At("missed-2", "Confirmed", -1), At("upcoming-2", "Confirmed", 2), At("missed-1", "Confirmed", -2), At("upcoming-1", "Confirmed", 1),
+            At("closed-3", "Completed", -6));
+        await db.SaveChangesAsync();
+
+        var page = await client.GetFromJsonAsync<ReceptionPage<ReceptionAppointment>>(
+            $"/api/reception/appointments?branchId={s.BranchId}&date={Today:yyyy-MM-dd}&page=1&pageSize=20");
+
+        Assert.Equal(["missed-1", "missed-2", "upcoming-1", "upcoming-2", "in-1", "in-2", "closed-1", "closed-2", "closed-3"],
+            page!.Items.Where(x => x.AppointmentId != s.AppointmentId).Select(x => x.AttendeeName));
+    }
+
     [Fact] public async Task CheckInLinksActualAttendeeAndExposesSameVisitToAssignedDentistWithoutSideEffects()
     {
         var s = await Prepare(false); using var client = await Login();
@@ -213,10 +233,10 @@ public sealed class ReceptionApiTests(ReceptionFixture fixture) : IClassFixture<
     [Fact] public async Task QuickBookingUsesExistingCommandThenCheckInAndResourceConflictsAreRejected()
     {
         var s = await Prepare(); using var client = await Login();
-        var available = (await client.GetFromJsonAsync<AvailabilityResult>($"/api/availability?branchId={s.BranchId}&dentistId={s.DentistId}&serviceId={s.ServiceId}&date={Today:yyyy-MM-dd}&durationMinutes=15"))!;
+        var available = (await client.GetFromJsonAsync<AvailabilityResult>($"/api/availability?branchId={s.BranchId}&dentistId={s.DentistId}&serviceId={s.ServiceId}&date={Today:yyyy-MM-dd}&durationMinutes=30"))!;
         var slot = available.Slots.First(x => x.Start > fixture.Clock.Now);
         var booking = new CreateAppointmentRequest(s.BranchId, new BookerContact("SYNTHETIC người đặt", "0912345678", null), new AppointmentAttendee(s.PatientId, "SYNTHETIC người đến", null),
-            "Relative", "WalkIn", "InPerson", s.ServiceId, null, s.DentistId, slot.ChairId, slot.Start, 15, null, "Vãng lai còn nguồn lực", Guid.NewGuid(), slot.ScheduleVersion, null, slot.BookingSettingsVersion);
+            "Relative", "WalkIn", "InPerson", s.ServiceId, null, s.DentistId, slot.ChairId, slot.Start, 30, null, "Vãng lai còn nguồn lực", Guid.NewGuid(), slot.ScheduleVersion, null, slot.BookingSettingsVersion);
         var response = await client.PostAsJsonAsync("/api/appointments", booking); Assert.Equal(HttpStatusCode.Created, response.StatusCode); var created = (await response.Content.ReadFromJsonAsync<AppointmentResult>())!;
         await Error(await client.PostAsJsonAsync("/api/appointments", booking with { RequestKey = Guid.NewGuid() }), HttpStatusCode.Conflict, "MSG22");
         var v = await Check(client, s with { AppointmentId = created.AppointmentId }); Assert.Equal(created.AppointmentId, v.AppointmentId);

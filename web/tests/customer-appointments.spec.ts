@@ -22,6 +22,8 @@ async function mockSession(page: Page, detail = original, currentDetail: () => A
   await page.addInitScript(() => sessionStorage.setItem('dcms.customer.accessToken', 'customer-test-token'));
   await page.route('**/api/auth/me', route => route.fulfill(json(user)));
   await page.route('**/api/auth/google/config', route => route.fulfill(json({ enabled: false })));
+  await page.route('**/api/notifications/unread-count', route => route.fulfill(json({ count: 0 })));
+  await page.route('**/api/notifications?*', route => route.fulfill(json({ items: [], total: 0, page: 1, pageSize: 20, unread: 0 })));
   await page.route('**/api/me/appointments?*', route => route.fulfill(json({ items: [detail], total: 1, page: 1, pageSize: 20 })));
   await page.route('**/api/me/appointments/*', route => route.fulfill(json(currentDetail())));
   await page.route('**/api/availability/options?*', route => route.fulfill(json({ employees: [
@@ -42,6 +44,18 @@ async function reviewMove(page: Page, reason = 'SYNTHETIC change') {
   return dialog;
 }
 
+test('an appointment past its time is shown as awaiting the clinic, with a way to contact it', async ({ page }, info) => {
+  const past = new Date(Date.now() - 2 * 86400_000);
+  await mockSession(page, { ...original, start: past.toISOString(), end: new Date(past.getTime() + 1800_000).toISOString(),
+    eligibility: { canSelfService: false, hoursRemaining: -48, reasonCode: 'STARTED', canRequestSupport: false },
+    history: [{ action: 'UNDO_NO_SHOW', actorKind: 'STAFF', oldStart: past.toISOString(), newStart: null, reason: 'SYNTHETIC undo', occurredAt: past.toISOString() }] });
+  await page.goto(`/customer/appointments/${original.code}`);
+  await expect(page.getByText('Chờ phòng khám xác nhận', { exact: true })).toBeVisible();
+  await expect(page.getByText(`Nếu bạn đã đến khám, vui lòng liên hệ phòng khám theo số ${original.clinicContact.phone}.`)).toBeVisible();
+  await expect(page.getByText('Đính chính vắng mặt')).toBeVisible();
+  await page.screenshot({ path: info.outputPath('customer-overdue.png'), fullPage: true });
+});
+
 test('date validation, empty state and responsive detail preserve ownership labels', async ({ page }) => {
   await mockSession(page);
   await page.goto('/customer/appointments');
@@ -56,7 +70,7 @@ test('date validation, empty state and responsive detail preserve ownership labe
   await expect(page.getByText('SYNTHETIC attendee (người thân)')).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBeTruthy();
   await page.route('**/api/me/appointments?*', route => route.fulfill(json({ items: [], total: 0, page: 1, pageSize: 20 })));
-  await page.getByRole('link', { name: '← Lịch hẹn của tôi', exact: true }).click();
+  await page.locator('.customer-back-button').click();
   await expect(page.locator('.customer-appointment-mobile-list').getByText('Không có lịch hẹn phù hợp.')).toBeVisible();
 });
 
@@ -263,7 +277,7 @@ test('actual API and PostgreSQL: customer views, reschedules and cancels on web'
     const released = await (await request.get(`${api}/api/availability?${releasedQuery}`)).json();
     expect(released.slots.some((item: Slot) => Date.parse(item.start) === Date.parse(target.start))).toBeTruthy();
     await page.screenshot({ path: '../.artifacts/test-results/customer-appointments/cancelled-web.png', fullPage: true });
-    await page.getByRole('link', { name: '← Lịch hẹn của tôi', exact: true }).click();
+    await page.locator('.customer-back-button').click();
     await expect(page.getByText('Không có lịch hẹn phù hợp.')).toBeVisible();
     await page.getByRole('tab', { name: 'Lịch sử', exact: true }).click();
     await expect(page.getByRole('row').filter({ hasText: appointment.code })).toContainText('Đã hủy');

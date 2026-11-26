@@ -2,7 +2,7 @@ import { Alert, Button, Descriptions, Drawer, Empty, Form, Input, Select, Space,
 import { useEffect, useRef, useState } from 'react';
 import { ApiError } from '../../services/api';
 import { customerCareApi } from './customerCare.api';
-import { channelLabels, clinicTime, contactResultChoices, contactResultLabels, statusColors, statusLabels, type CareStaff, type CareTaskDetail,
+import { channelLabels, clinicTime, contactResultChoices, contactResultLabels, customerCode, statusColors, statusLabels, type CareStaff, type CareTaskDetail,
   type CareWorklistItem } from './types';
 
 // S60 ngăn chi tiết (docs/specs/S60-CUSTOMER-CARE-WEB.vi.md §5). A contact never sends a message, books or completes clinical work.
@@ -54,7 +54,7 @@ export default function CareTaskDrawer({ item, staff, canManage, onClose, onEdit
   const task = detail?.task;
   const editable = canManage && (task?.allowedActions.includes('update') ?? false);
   const contactable = canManage && (task?.allowedActions.includes('recordContact') ?? false);
-  return <Drawer open={!!item} onClose={onClose} width={620} destroyOnClose title={item ? `${item.patientCode} · ${item.patientName}` : ''}
+  return <Drawer open={!!item} onClose={onClose} width={620} destroyOnClose title={item ? `${customerCode(item)} · ${item.patientName}` : ''}
     extra={task && <Space>
       {editable && <Button disabled={busy} onClick={() => item && onEdit({ ...item, task })}>Sửa</Button>}
       {editable && <Button type="primary" loading={busy} onClick={() => void done()}>Đánh dấu đã xong</Button>}
@@ -67,7 +67,7 @@ export default function CareTaskDrawer({ item, staff, canManage, onClose, onEdit
         afterClose={() => setError(undefined)} closable />}
       <Descriptions column={1} size="small" bordered>
         <Descriptions.Item label="Chi nhánh">{item.branchName}</Descriptions.Item>
-        <Descriptions.Item label="Khách hàng">{item.patientCode} · {item.patientName}</Descriptions.Item>
+        <Descriptions.Item label="Khách hàng">{customerCode(item)} · {item.patientName}</Descriptions.Item>
         <Descriptions.Item label="SĐT">{item.phone ?? '—'}</Descriptions.Item>
         <Descriptions.Item label="Thời gian chăm sóc">{clinicTime(task.dueAt)}</Descriptions.Item>
         <Descriptions.Item label="Loại chăm sóc">{item.typeName}</Descriptions.Item>

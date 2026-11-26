@@ -19,6 +19,10 @@
 .customer-dashboard-appointment-info .anticon { flex-shrink: 0; }
 .customer-dashboard-appointment-footer { display: flex; align-items: center; justify-content: space-between; gap: 15px; border-top: 1px solid #e4eaf2; padding-top: 20px; }
 .customer-dashboard-appointment-footer > span { font-size: 13px; color: #667085; }
+.customer-portal a.customer-dashboard-recent { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; min-height: 44px; margin-bottom: 14px; padding: 8px 12px; border: 1px solid #e4eaf2; border-radius: 10px; background: #f9fafb; color: #344054; font-size: 14px; text-decoration: none; }
+.customer-portal a.customer-dashboard-recent:hover { border-color: #175cd3; }
+.customer-dashboard-recent > span:not(.ant-tag) { flex: 1 1 180px; min-width: 0; overflow-wrap: anywhere; }
+.customer-dashboard-recent .ant-tag { margin: 0; }
 .customer-dashboard-booking { padding: 28px; border-radius: 16px; background: #175cd3; color: #fff; display: flex; align-items: flex-start; flex-direction: column; }
 .customer-dashboard-booking-icon { width: 48px; height: 48px; background: #ffffff24; border-radius: 10px; display: grid; place-items: center; font-size: 25px; margin-bottom: 22px; }
 .customer-dashboard-booking h2 { color: #fff; }

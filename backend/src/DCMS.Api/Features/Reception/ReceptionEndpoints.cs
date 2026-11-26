@@ -11,7 +11,10 @@ public static class ReceptionEndpoints
         group.MapGet("/options", async (HttpContext c, IReceptionService s, CancellationToken ct) => Results.Ok(await s.OptionsAsync(AuthenticationEndpoints.AccountId(c.User), ct)));
         group.MapGet("/appointments", async (HttpContext c, int branchId, DateOnly date, int? dentistId, string? status, string? keyword,
             int? page, int? pageSize, IReceptionService s, CancellationToken ct) => Results.Ok(await s.AppointmentsAsync(AuthenticationEndpoints.AccountId(c.User), new(branchId, date, dentistId, status, keyword, page ?? 1, pageSize ?? 20), ct)));
-        group.MapGet("/queue", async (HttpContext c, int branchId, DateOnly date, int? dentistId, string? status, string? keyword,
+        group.MapGet("/overdue", async (HttpContext c, int branchId, int? dentistId, string? keyword, int? page, int? pageSize,
+            IReceptionService s, CancellationToken ct) => Results.Ok(await s.OverdueAsync(AuthenticationEndpoints.AccountId(c.User),
+                new(branchId, DateOnly.FromDateTime(DateTime.UtcNow), dentistId, null, keyword, page ?? 1, pageSize ?? 20), ct)));
+        group.MapGet("/queue",async (HttpContext c, int branchId, DateOnly date, int? dentistId, string? status, string? keyword,
             int? page, int? pageSize, IReceptionService s, CancellationToken ct) => Results.Ok(await s.QueueAsync(AuthenticationEndpoints.AccountId(c.User), new(branchId, date, dentistId, status, keyword, page ?? 1, pageSize ?? 20), ct)));
         group.MapGet("/appointments/{appointmentId:guid}", async (HttpContext c, Guid appointmentId, IReceptionService s, CancellationToken ct) => Results.Ok(await s.DetailAsync(AuthenticationEndpoints.AccountId(c.User), appointmentId, ct)));
         group.MapPost("/appointments/{appointmentId:guid}/check-in", async (HttpContext c, Guid appointmentId, CheckInRequest request, IReceptionService s, CancellationToken ct) => Results.Ok(await s.CheckInAsync(AuthenticationEndpoints.AccountId(c.User), appointmentId, request, ct)));

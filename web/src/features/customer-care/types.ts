@@ -1,7 +1,7 @@
 // S60 Chăm sóc khách hàng. Contract: docs/specs/S60-CUSTOMER-CARE-WEB.vi.md §6.
 export type CareStatus = 'Open' | 'InProgress' | 'Done' | 'Cancelled';
 export type StatusFilter = CareStatus | 'Pending';
-export type CareTask = { id: string; patientId: number; branchId: number; appointmentId: string | null;
+export type CareTask = { id: string; patientId: number | null; branchId: number; appointmentId: string | null;
   type: string; content: string; ownerAccountId: number | null; dueAt: string; status: CareStatus; version: number;
   allowedActions: string[] };
 export type CareWorklistItem = { task: CareTask; branchName: string; patientCode: string; patientName: string; phone: string | null; typeName: string;
@@ -18,6 +18,8 @@ export type ContactAttempt = { id: string; taskId: string; channel: string; resu
 export type CareTaskDetail = { task: CareTask; contacts: ContactAttempt[] };
 export type WorklistFilter = { branchId?: number; from: string; to: string; ownerAccountId?: number; type?: string; status?: StatusFilter; search?: string };
 
+// A missed booking without a patient record has no code; the name and phone then come from the booking.
+export const customerCode = (item: CareWorklistItem) => item.patientCode || 'Chưa có hồ sơ';
 export const statusLabels: Record<CareStatus, string> = { Open: 'Mở', InProgress: 'Đang xử lý', Done: 'Đã xong', Cancelled: 'Đã hủy' };
 export const statusColors: Record<CareStatus, string> = { Open: 'blue', InProgress: 'gold', Done: 'green', Cancelled: 'default' };
 export const statusFilters: { value: StatusFilter; label: string }[] = [
